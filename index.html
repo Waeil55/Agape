@@ -188,21 +188,13 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════
-// BOOT — always show auth immediately, never block on Firebase
+// BOOT — dead simple, no race conditions
 // ═══════════════════════════════════════════════════════════════════════
-var BOOT_DONE = false;
 function showAuth() {
-  if (BOOT_DONE) return;
-  BOOT_DONE = true;
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = '';
-  // Populate select after a tick so APP is guaranteed to exist
-  setTimeout(function() {
-    if (window.APP && APP.populateAuthSelect) APP.populateAuthSelect();
-  }, 0);
+  if (window.APP && APP.populateAuthSelect) APP.populateAuthSelect();
 }
-// Hard deadline — show auth after 3s no matter what
-var BOOT_TIMER = setTimeout(showAuth, 3000);
 
 // ═══════════════════════════════════════════════════════════════════════
 // INDEXEDDB
@@ -460,17 +452,9 @@ var APP = {
   },
 
   afterLoad: function() {
-    clearTimeout(BOOT_TIMER);
+    showAuth();
     if (STATE.settings.firebaseConfig && STATE.settings.firebaseConfig.trim()) {
-      // FIX: Show loading while Firebase connects so we get remote settings first
-      document.getElementById('loading-msg').textContent = 'Connecting to cloud...';
-      initFirebase(STATE.settings.firebaseConfig, function() {
-        showAuth();
-      });
-      // Safety fallback — show auth after 5s regardless
-      setTimeout(showAuth, 5000);
-    } else {
-      showAuth();
+      initFirebase(STATE.settings.firebaseConfig, null);
     }
   },
 
