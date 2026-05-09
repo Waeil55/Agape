@@ -1,17 +1,15 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover">
   <meta name="theme-color" content="#2563eb">
   <title>Agape Care NEMT Pro</title>
-  <!-- CSS loaded non-blocking so they never stall the page -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" media="print" onload="this.media='all'">
-  <script async src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     input,select,textarea,button{font-family:inherit;font-size:16px;outline:none}
     html,body{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent}
@@ -39,7 +37,6 @@
 <body class="bg-slate-50 text-slate-800">
 
 <!-- Loading Screen -->
-
 <div id="loading-screen">
   <div class="spinner"></div>
   <h2 class="font-bold text-2xl text-slate-800">Agape Care NEMT</h2>
@@ -47,7 +44,6 @@
 </div>
 
 <!-- Auth Screen -->
-
 <div id="auth-screen" style="display:none" class="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
   <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
     <div class="flex justify-center mb-6 text-blue-600"><i class="ph-fill ph-ambulance text-5xl"></i></div>
@@ -69,7 +65,6 @@
 </div>
 
 <!-- Main App -->
-
 <div id="app-main" style="display:none" class="min-h-screen bg-slate-50 pb-20">
   <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-10 w-full" style="padding-top:max(1rem,env(safe-area-inset-top))">
     <div class="max-w-4xl mx-auto flex justify-between items-center">
@@ -96,7 +91,6 @@
 <div class="toast-container" id="toast-container"></div>
 
 <!-- Modal: Wizard -->
-
 <div class="modal-backdrop" id="modal-wizard-prompt">
   <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
     <div class="flex justify-between items-center p-4 border-b">
@@ -120,7 +114,6 @@
 </div>
 
 <!-- Modal: Trip Form -->
-
 <div class="modal-backdrop" id="modal-trip-form" onclick="if(event.target===this)APP.closeModal('modal-trip-form')">
   <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden">
     <div class="flex justify-between items-center p-4 border-b">
@@ -160,7 +153,6 @@
 </div>
 
 <!-- Modal: Driver Form -->
-
 <div class="modal-backdrop" id="modal-driver-form" onclick="if(event.target===this)APP.closeModal('modal-driver-form')">
   <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
     <div class="flex justify-between items-center p-4 border-b">
@@ -182,22 +174,18 @@
 </div>
 
 <!-- CDN scripts at bottom so they don't block rendering -->
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════
-// BOOT — dead simple, no race conditions
+// BOOT
 // ═══════════════════════════════════════════════════════════════════════
 function showAuth() {
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = '';
   if (window.APP && APP.populateAuthSelect) APP.populateAuthSelect();
 }
-// Hard failsafe: if APP.init() never calls showAuth (e.g. IDB hangs), force it after 2s
-setTimeout(showAuth, 2000);
 
 // ═══════════════════════════════════════════════════════════════════════
 // INDEXEDDB
@@ -313,11 +301,9 @@ var DB = {
   saveSettings: function(s, cb) {
     cb = cb || function(){};
     IDB.putKV('settings', s, cb);
-    // FIX: Also sync settings to Firebase so other devices can retrieve them
     if (STATE.fbDb) {
-      // Store a sanitized copy (no apiKey for security) for cross-device sync
       var syncable = Object.assign({}, s);
-      delete syncable.apiKey; // Never sync API key to cloud
+      delete syncable.apiKey;
       STATE.fbDb.collection('nemt_config').doc('settings').set(syncable).catch(function(e){
         console.warn('Firebase settings sync failed:', e);
       });
@@ -332,7 +318,6 @@ function initFirebase(configJson, onConnected) {
   if (!configJson || !configJson.trim()) return;
 
   function loadScript(src, cb) {
-    // Check if already loaded
     var existing = document.querySelector('script[src="'+src+'"]');
     if (existing) { cb(); return; }
     var s = document.createElement('script');
@@ -358,7 +343,6 @@ function initFirebase(configJson, onConnected) {
         var app;
         try {
           app = firebase.app();
-          // App exists — check if it's configured for the same project
           console.log('Reusing existing Firebase app.');
         } catch(e) {
           app = firebase.initializeApp(config);
@@ -366,20 +350,16 @@ function initFirebase(configJson, onConnected) {
 
         STATE.fbDb = firebase.firestore(app);
 
-        // Detach old listeners
         STATE.fbUnsubs.forEach(function(u){ try{u();}catch(e){} });
         STATE.fbUnsubs = [];
 
-        // FIX: First pull remote settings so new devices get workerUrl etc.
         STATE.fbDb.collection('nemt_config').doc('settings').get().then(function(doc) {
           if (doc.exists) {
             var remote = doc.data();
-            // Merge remote settings, but keep local apiKey (never synced to cloud)
             var localApiKey = STATE.settings.apiKey;
             STATE.settings = Object.assign(STATE.settings, remote);
-            STATE.settings.apiKey = localApiKey; // preserve local apiKey
-            STATE.settings.firebaseConfig = configJson; // preserve the config
-            // Save merged settings back to local IDB
+            STATE.settings.apiKey = localApiKey;
+            STATE.settings.firebaseConfig = configJson;
             IDB.putKV('settings', STATE.settings, function(){});
             console.log('Remote settings loaded from Firebase');
           }
@@ -389,12 +369,10 @@ function initFirebase(configJson, onConnected) {
           if (onConnected) onConnected();
         });
 
-        // Live trips listener
         STATE.fbUnsubs.push(
           STATE.fbDb.collection('nemt_trips').onSnapshot(function(snap) {
             STATE.trips = [];
             snap.forEach(function(d){ STATE.trips.push(Object.assign({id:d.id}, d.data())); });
-            // Cache locally
             STATE.trips.forEach(function(t){ IDB.put('trips', t); });
             APP.refreshView();
           }, function(e){
@@ -403,7 +381,6 @@ function initFirebase(configJson, onConnected) {
           })
         );
 
-        // Live drivers listener
         STATE.fbUnsubs.push(
           STATE.fbDb.collection('nemt_drivers').onSnapshot(function(snap) {
             if (!snap.empty) {
@@ -754,8 +731,6 @@ var APP = {
   // ── AI EXTRACT ─────────────────────────────────────────────────────
   vExtract: function() {
     var dOpts = '<option value="">Unassigned</option>'+STATE.drivers.filter(function(d){return d.status==='active';}).map(function(d){return '<option value="'+d.id+'">'+d.name+'</option>';}).join('');
-
-    // FIX: Show clear status of what's configured
     var apiStatus = STATE.settings.apiKey
       ? '<span class="text-emerald-600 font-bold">✓ API Key set</span>'
       : STATE.settings.workerUrl
@@ -807,7 +782,6 @@ var APP = {
 
     fi.addEventListener('change', function(e) {
       if (!e.target.files || !e.target.files.length) return;
-      // FIX: Copy files to array BEFORE resetting input (resetting clears the FileList)
       var filesCopy = Array.from(e.target.files);
       fi.value = '';
       APP.handleFiles(filesCopy);
@@ -817,7 +791,6 @@ var APP = {
   handleFiles: function(files) {
     if (!files || !files.length) return;
 
-    // FIX: Check for API config before doing anything
     if (!STATE.settings.apiKey && !STATE.settings.workerUrl) {
       document.getElementById('extract-results').innerHTML =
         '<div class="bg-amber-50 border border-amber-200 p-5 rounded-lg text-amber-800">'
@@ -835,10 +808,10 @@ var APP = {
     var arr = Array.from(files);
     var idx = 0;
     function next() {
-      if (idx >= arr.length) { 
+      if (idx >= arr.length) {
         if (statusEl) statusEl.classList.add('hidden');
-        APP.renderExtracted(); 
-        return; 
+        APP.renderExtracted();
+        return;
       }
       var file = arr[idx++];
       if (statusEl) statusEl.innerHTML = '<p class="text-xs text-blue-600">Processing: '+file.name+'</p>';
@@ -854,14 +827,11 @@ var APP = {
     next();
   },
 
-  // FIX: readFile now passes errors to callback; waits for PDF.js to load
   readFile: function(file, cb) {
     var name = file.name.toLowerCase();
 
-    // ── CSV ──────────────────────────────────────────────────────────
     if (name.endsWith('.csv')) {
       if (typeof Papa === 'undefined') {
-        // Papa not loaded yet, try reading as text
         var r = new FileReader();
         r.onload = function(e){ cb(e.target.result); };
         r.onerror = function(){ cb('', 'FileReader error'); };
@@ -873,7 +843,6 @@ var APP = {
         error: function(e) { cb('', 'CSV parse error: '+e); }
       });
 
-    // ── Excel ────────────────────────────────────────────────────────
     } else if (name.match(/\.(xlsx|xls)$/)) {
       if (typeof XLSX === 'undefined') {
         cb('', 'Excel library not loaded yet. Please wait a moment and try again.');
@@ -892,9 +861,7 @@ var APP = {
         cb('', 'Cannot read Excel file: '+e.message);
       });
 
-    // ── PDF ─────────────────────────────────────────────────────────
     } else if (name.endsWith('.pdf')) {
-      // FIX: If PDF.js not loaded yet, wait up to 5 seconds for it
       var pdfAttempts = 0;
       function tryPdf() {
         if (typeof pdfjsLib === 'undefined') {
@@ -903,8 +870,6 @@ var APP = {
           setTimeout(tryPdf, 500);
           return;
         }
-
-        // Ensure worker is always set
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -932,11 +897,10 @@ var APP = {
       }
       tryPdf();
 
-    // ── Image ────────────────────────────────────────────────────────
     } else if (file.type.startsWith('image/')) {
       var r = new FileReader();
       r.onload = function(e) { cb(e.target.result); };
-      r.onerror = function(e) { cb('', 'Image read error'); };
+      r.onerror = function() { cb('', 'Image read error'); };
       r.readAsDataURL(file);
 
     } else {
@@ -1043,213 +1007,209 @@ var APP = {
   },
 
   // ── SETTINGS ───────────────────────────────────────────────────────
+  // FIX: Rebuilt vSettings as a clean concatenated string — no backtick blocks inside
   vSettings: function() {
     var s = STATE.settings;
     var fbSt = STATE.fbDb
       ? '<span class="text-emerald-600 text-xs font-bold ml-2">✓ Connected</span>'
       : '<span class="text-slate-400 text-xs ml-2">Not connected</span>';
 
-    // FIX: Use text input with toggle for API key so user can see it's set
-    // FIX: Pre-fill all fields from STATE.settings correctly
+    var apiKeySaved   = s.apiKey    ? '<p class="text-xs text-emerald-600 mt-1 font-bold">✓ API key is saved on this device</p>' : '<p class="text-xs text-amber-600 mt-1">⚠ No API key set yet</p>';
+    var workerSaved   = s.workerUrl ? '<p class="text-xs text-emerald-600 mt-1 font-bold">✓ Worker URL is configured</p>' : '';
+    var fbConnected   = STATE.fbDb
+      ? '<p class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded mt-2">🔥 Firebase is currently connected and syncing.</p>'
+      : '<p class="text-xs text-slate-500 mt-2">After entering config and saving, the page will reload to connect.</p>';
+
+    var modelGpt4Mini = s.aiModel === 'gpt-4o-mini' ? ' selected' : '';
+    var modelGpt4o    = s.aiModel === 'gpt-4o'      ? ' selected' : '';
+
     return '<div class="bg-white border rounded-xl p-6 shadow-sm max-w-2xl mb-20">'
-      +'<h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="ph ph-gear"></i> System Settings</h2>'
-      +'<div class="space-y-6">'
+      + '<h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="ph ph-gear"></i> System Settings</h2>'
+      + '<div class="space-y-6">'
 
-        // ── AI Section ──
-        +'<div>'
-          +'<h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="ph ph-robot text-blue-600"></i> AI (for document extraction)</h3>'
-          
-          // API Key with show/hide toggle
-          +'<div class="mb-4">'
-            +'<label class="block text-sm font-medium mb-1">OpenAI API Key</label>'
-            +'<div class="relative">'
-              +'<input type="password" id="set-api-key" class="w-full border p-3 rounded-lg pr-20" placeholder="sk-..." value="'+(s.apiKey||'')+'">'
-              +'<button type="button" onclick="APP.toggleKeyVis(\'set-api-key\',this)" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded font-medium text-slate-600 transition">Show</button>'
-            +'</div>'
-            +'<p class="text-xs text-slate-500 mt-1">Direct browser call to OpenAI. <strong>Stored locally on this device only</strong> — not synced to cloud for security.</p>'
-            +(s.apiKey ? '<p class="text-xs text-emerald-600 mt-1 font-bold">✓ API key is saved on this device</p>' : '<p class="text-xs text-amber-600 mt-1">⚠ No API key set yet</p>')
-          +'</div>'
+      // ── AI Section ──
+      + '<div>'
+        + '<h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="ph ph-robot text-blue-600"></i> AI (for document extraction)</h3>'
 
-          // Cloudflare Worker URL
-          +'<div class="mb-4">'
-            +'<label class="block text-sm font-medium mb-1">Cloudflare Worker URL <span class="text-slate-400 font-normal">(secure proxy — synced to all devices)</span></label>'
-            +'<input type="url" id="set-url" class="w-full border p-3 rounded-lg" value="'+(s.workerUrl||'')+'" placeholder="https://your-worker.workers.dev">'
-            +'<p class="text-xs text-slate-500 mt-1">If set, this is used instead of the API key above. Gets synced across devices via Firebase.</p>'
-            +(s.workerUrl ? '<p class="text-xs text-emerald-600 mt-1 font-bold">✓ Worker URL is configured</p>' : '')
-          +'</div>'
+        + '<div class="mb-4">'
+          + '<label class="block text-sm font-medium mb-1">OpenAI API Key</label>'
+          + '<div class="relative">'
+            + '<input type="password" id="set-api-key" class="w-full border p-3 rounded-lg pr-20" placeholder="sk-..." value="'+(s.apiKey||'')+'">'
+            + '<button type="button" onclick="APP.toggleKeyVis(\'set-api-key\',this)" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded font-medium text-slate-600 transition">Show</button>'
+          + '</div>'
+          + '<p class="text-xs text-slate-500 mt-1">Direct browser call to OpenAI. <strong>Stored locally on this device only</strong> — not synced to cloud for security.</p>'
+          + apiKeySaved
+        + '</div>'
 
-          // Model
-          +'<div>'
-            +'<label class="block text-sm font-medium mb-1">Model</label>'
-            +'<select id="set-model" class="w-full border p-3 rounded-lg bg-white">'
-              +'<option value="gpt-4o-mini" '+(s.aiModel==='gpt-4o-mini'?'selected':'')+'>GPT-4o Mini (fast, cheap)</option>'
-              +'<option value="gpt-4o" '+(s.aiModel==='gpt-4o'?'selected':'')+'>GPT-4o (best quality + scanned PDF/image OCR)</option>'
-            +'</select>'
-          +'</div>'
+        + '<div class="mb-4">'
+          + '<label class="block text-sm font-medium mb-1">Cloudflare Worker URL <span class="text-slate-400 font-normal">(secure proxy — synced to all devices)</span></label>'
+          + '<input type="url" id="set-url" class="w-full border p-3 rounded-lg" value="'+(s.workerUrl||'')+'" placeholder="https://your-worker.workers.dev">'
+          + '<p class="text-xs text-slate-500 mt-1">If set, this is used instead of the API key above. Gets synced across devices via Firebase.</p>'
+          + workerSaved
+        + '</div>'
+
+        + '<div>'
+          + '<label class="block text-sm font-medium mb-1">Model</label>'
+          + '<select id="set-model" class="w-full border p-3 rounded-lg bg-white">'
+            + '<option value="gpt-4o-mini"'+modelGpt4Mini+'>GPT-4o Mini (fast, cheap)</option>'
+            + '<option value="gpt-4o"'+modelGpt4o+'>GPT-4o (best quality + scanned PDF/image OCR)</option>'
+          + '</select>'
+        + '</div>'
+      + '</div>'
+
+      // ── Firebase Section ──
+      + '<div class="border-t pt-6">'
+        + '<h3 class="font-bold text-slate-700 mb-1 flex items-center"><i class="ph-fill ph-database text-blue-600 mr-2"></i>Cloud Firebase' + fbSt + '</h3>'
+        + '<p class="text-xs text-slate-500 mb-3">Paste your Firebase project config JSON. This syncs <strong>trips, drivers, and most settings</strong> across all devices. The OpenAI API key is never synced for security.</p>'
+        + '<textarea id="set-firebase" rows="5" class="w-full border p-3 rounded-lg font-mono text-xs bg-slate-50" placeholder=\'{"apiKey":"AIza...","authDomain":"your-app.firebaseapp.com","projectId":"your-app","storageBucket":"your-app.appspot.com","messagingSenderId":"123","appId":"1:123:web:abc"}\'>'+(s.firebaseConfig||'')+'</textarea>'
+        + '<p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2 rounded mt-2"><strong>⚠ Firestore rules:</strong> In Firebase console → Firestore → Rules, set: <code>allow read, write: if true;</code> for testing.</p>'
+        + fbConnected
+      + '</div>'
+
+      // ── Security ──
+      + '<div class="border-t pt-6">'
+        + '<h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="ph ph-lock-key text-slate-600"></i> Security</h3>'
+        + '<label class="block text-sm font-medium mb-1">Admin PIN</label>'
+        + '<input type="text" id="set-admin-pin" class="w-full border p-3 rounded-lg" value="'+(s.adminPin||'1234')+'">'
+      + '</div>'
+
+      + '<button class="w-full py-4 bg-blue-600 text-white font-bold rounded-lg mt-4 shadow-md hover:bg-blue-700 transition text-lg" onclick="APP.saveSettings()">💾 Save Settings</button>'
+    + '</div></div>';
+  },
+
+  toggleKeyVis: function(inputId, btn) {
+    var inp = document.getElementById(inputId);
+    if (!inp) return;
+    if (inp.type === 'password') {
+      inp.type = 'text';
+      btn.textContent = 'Hide';
+    } else {
+      inp.type = 'password';
+      btn.textContent = 'Show';
+    }
+  },
+
+  saveSettings: function() {
+    var oldFb = STATE.settings.firebaseConfig;
+    var newApiKey    = document.getElementById('set-api-key').value.trim();
+    var newWorkerUrl = document.getElementById('set-url').value.trim();
+    var newFbConfig  = document.getElementById('set-firebase').value.trim();
+
+    if (newFbConfig) {
+      try { JSON.parse(newFbConfig); }
+      catch(e) { APP.toast('Firebase config is not valid JSON. Please check it.','danger'); return; }
+    }
+
+    STATE.settings.apiKey         = newApiKey;
+    STATE.settings.workerUrl      = newWorkerUrl;
+    STATE.settings.aiModel        = document.getElementById('set-model').value;
+    STATE.settings.adminPin       = document.getElementById('set-admin-pin').value;
+    STATE.settings.firebaseConfig = newFbConfig;
+
+    DB.saveSettings(STATE.settings, function(){
+      APP.toast('Settings saved ✓','success');
+    });
+
+    if (oldFb !== newFbConfig) {
+      APP.toast('Firebase config changed — reloading in 2s...','warning');
+      setTimeout(function(){ window.location.reload(); }, 2000);
+    } else {
+      setTimeout(function(){ APP.switchView('settings'); }, 300);
+    }
+  },
+
+  // ── DRIVER WIZARD ──────────────────────────────────────────────────
+  vWizard: function() {
+    var mine = STATE.trips.filter(function(t){return t.driverId===STATE.user.id&&t.status!=='Completed';})
+      .sort(function(a,b){return new Date(a.pickupTime)-new Date(b.pickupTime);});
+    if (!mine.length) return '<div class="bg-white border rounded-xl p-10 text-center"><i class="ph-fill ph-check-circle text-emerald-500 text-6xl mb-4"></i><h2 class="text-2xl font-bold text-slate-800">All Caught Up!</h2><p class="text-slate-500 mt-2">No active assignments.</p></div>';
+
+    var a=mine[0], q=mine.slice(1);
+    var isPend=a.status==='Pending'||a.status==='Assigned';
+    var isERP =a.status==='En Route to Pickup';
+    var isAP  =a.status==='Arrived at Pickup';
+    var isERD =a.status==='En Route to Dropoff';
+    var ts = a.pickupTime?new Date(a.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—';
+
+    function puCard() {
+      var active=isERP?'bg-blue-50 border-blue-300':'bg-slate-50 border-slate-200';
+      var btn='';
+      if(isPend) btn='<button onclick="APP.setStatus(\''+a.id+'\',\'En Route to Pickup\')" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-900 shadow-md"><i class="ph-fill ph-play"></i> Start Trip to Pickup</button>';
+      if(isERP)  btn='<div class="flex gap-2"><button onclick="APP.nav(\''+a.pickupAddress+'\')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg flex items-center justify-center gap-2 shadow-sm"><i class="ph-fill ph-navigation-arrow text-blue-600"></i> Map</button><button onclick="APP.promptPickup(\''+a.id+'\')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md"><i class="ph-fill ph-check-circle"></i> Arrived</button></div>';
+      return '<div class="p-4 rounded-xl border-2 transition-all '+active+'"><span class="text-xs text-slate-500 font-bold tracking-widest uppercase">1. Pickup</span><p class="text-slate-800 font-bold text-lg leading-tight my-3">'+(a.pickupAddress||'—')+'</p>'+btn+'</div>';
+    }
+    function doCard() {
+      var active=isERD?'bg-blue-50 border-blue-300':'bg-slate-50 border-slate-200';
+      var btn='';
+      if(isAP)  btn='<button onclick="APP.setStatus(\''+a.id+'\',\'En Route to Dropoff\')" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 shadow-md"><i class="ph-fill ph-play"></i> Begin Leg to Dropoff</button>';
+      if(isERD) btn='<div class="flex gap-2"><button onclick="APP.nav(\''+a.dropoffAddress+'\')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg flex items-center justify-center gap-2 shadow-sm"><i class="ph-fill ph-navigation-arrow text-blue-600"></i> Map</button><button onclick="APP.promptDropoff(\''+a.id+'\')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md"><i class="ph-fill ph-flag-checkered"></i> Finish Trip</button></div>';
+      return '<div class="p-4 rounded-xl border-2 transition-all '+active+'"><span class="text-xs text-slate-500 font-bold tracking-widest uppercase">2. Dropoff</span><p class="text-slate-800 font-bold text-lg leading-tight my-3">'+(a.dropoffAddress||'—')+'</p>'+btn+'</div>';
+    }
+
+    var queue = q.length
+      ? '<h4 class="mb-3 text-slate-500 uppercase font-bold text-xs tracking-wider mt-8">Up Next ('+q.length+')</h4><div class="grid gap-3">'
+        +q.map(function(t){
+          var ts2=t.pickupTime?new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—';
+          return '<div class="bg-white border p-4 rounded-xl shadow-sm flex justify-between items-center opacity-80"><div><h4 class="font-bold text-slate-800">'+t.patientName+'</h4><div class="text-xs text-slate-500 mt-1"><i class="ph-fill ph-clock"></i> '+ts2+' — '+(t.pickupAddress||'').substring(0,35)+'...</div></div></div>';
+        }).join('')+'</div>'
+      : '';
+
+    return '<h2 class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Active Trip</h2>'
+      +'<div class="bg-white border-2 border-blue-400 p-5 rounded-xl shadow-md mb-8">'
+        +'<div class="flex justify-between items-start mb-4 border-b border-slate-100 pb-4">'
+          +'<div><h3 class="font-bold text-xl text-slate-800">'+a.patientName+'</h3><span class="text-blue-600 text-sm font-medium"><i class="ph-fill ph-clock"></i> '+ts+'</span></div>'
+          +'<span class="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase">'+a.status+'</span>'
         +'</div>'
+        +'<div class="mb-4 flex gap-2">'
+          +(a.phone
+            ?'<a href="tel:'+a.phone+'" class="flex-1 flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 py-3 rounded-lg border border-emerald-200 font-bold"><i class="ph-fill ph-phone"></i> Call</a>'
+             +'<a href="sms:'+a.phone+'" class="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-700 py-3 rounded-lg border border-blue-200 font-bold"><i class="ph-fill ph-chat-circle-text"></i> SMS</a>'
+            :'<button class="w-full py-3 bg-slate-100 text-slate-400 rounded-lg font-bold" disabled>No Phone</button>')
+        +'</div>'
+        +(a.notes?'<div class="flex items-start gap-2 bg-amber-50 text-amber-800 p-3 rounded-lg border border-amber-200 text-sm mb-4"><i class="ph-fill ph-warning shrink-0 mt-0.5"></i><p><strong>Notes:</strong> '+a.notes+'</p></div>':'')
+        +'<div class="space-y-4">'+puCard()+doCard()+'</div>'
+      +'</div>'
+      +queue;
+  },
 
-        // ── Firebase Section ──
-        +'<div class="border-t pt-6">'
-          +'<h3 class="font-bold text-slate-700 mb-1 flex items-center">'
-            +'<i class="ph-fill ph-database text-blue-600 mr-2"></i>Cloud Firebase'+fbSt
-          +'</h3>'
-          +'<p class="text-xs text-slate-500 mb-3">Paste your Firebase project config JSON. This syncs <strong>trips, drivers, and most settings</strong> across all devices. The OpenAI API key is never synced for security.</p>'
-          +'<textarea id="set-firebase" rows="5" class="w-full border p-3 rounded-lg font-mono text-xs bg-slate-50" placeholder=\'{"apiKey":"AIza...","authDomain":"your-app.firebaseapp.com","projectId":"your-app","storageBucket":"your-app.appspot.com","messagingSenderId":"123","appId":"1:123:web:abc"}\'>'+(s.firebaseConfig||'')+'</textarea>'
+  nav: function(addr) { window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr),'_blank'); },
 
-```
-      +'<p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2 rounded mt-2"><strong>⚠ Firestore rules:</strong> In Firebase console → Firestore → Rules, set: <code>allow read, write: if true;</code> for testing.</p>'
-      +(STATE.fbDb ? '<p class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded mt-2">🔥 Firebase is currently connected and syncing.</p>' : '<p class="text-xs text-slate-500 mt-2">After entering config and saving, the page will reload to connect.</p>')
-    +'</div>'
+  setStatus: function(id, status) {
+    var t = STATE.trips.find(function(x){return x.id===id;});
+    if (!t) return;
+    t.status = status;
+    DB.saveTrip(t, function(){ APP.refreshView(); });
+  },
 
-    // ── Security ──
-    +'<div class="border-t pt-6">'
-      +'<h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="ph ph-lock-key text-slate-600"></i> Security</h3>'
-      +'<label class="block text-sm font-medium mb-1">Admin PIN</label>'
-      +'<input type="text" id="set-admin-pin" class="w-full border p-3 rounded-lg" value="'+(s.adminPin||'1234')+'">'
-    +'</div>'
+  promptPickup: function(id) {
+    STATE.wizCb = function(){ APP.setStatus(id,'Arrived at Pickup'); };
+    document.getElementById('wizard-prompt-title').innerText = 'Arrived at Pickup';
+    document.getElementById('wizard-sig-wrap').classList.remove('hidden');
+    document.getElementById('wizard-odo').value = '';
+    document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5);
+    document.getElementById('wizard-sig-check').checked = false;
+    APP.openModal('modal-wizard-prompt');
+  },
 
-    +'<button class="w-full py-4 bg-blue-600 text-white font-bold rounded-lg mt-4 shadow-md hover:bg-blue-700 transition text-lg" onclick="APP.saveSettings()">💾 Save Settings</button>'
-  +'</div></div>';
-```
+  promptDropoff: function(id) {
+    STATE.wizCb = function(){ APP.setStatus(id,'Completed'); };
+    document.getElementById('wizard-prompt-title').innerText = 'Trip Completed';
+    document.getElementById('wizard-sig-wrap').classList.add('hidden');
+    document.getElementById('wizard-odo').value = '';
+    document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5);
+    APP.openModal('modal-wizard-prompt');
+  },
 
-},
-
-// FIX: Toggle API key visibility
-toggleKeyVis: function(inputId, btn) {
-var inp = document.getElementById(inputId);
-if (!inp) return;
-if (inp.type === ‘password’) {
-inp.type = ‘text’;
-btn.textContent = ‘Hide’;
-} else {
-inp.type = ‘password’;
-btn.textContent = ‘Show’;
-}
-},
-
-saveSettings: function() {
-var oldFb = STATE.settings.firebaseConfig;
-var newApiKey = document.getElementById(‘set-api-key’).value.trim();
-var newWorkerUrl = document.getElementById(‘set-url’).value.trim();
-var newFbConfig = document.getElementById(‘set-firebase’).value.trim();
-
-```
-// Validate Firebase JSON before saving
-if (newFbConfig) {
-  try { JSON.parse(newFbConfig); }
-  catch(e) { APP.toast('Firebase config is not valid JSON. Please check it.','danger'); return; }
-}
-
-STATE.settings.apiKey         = newApiKey;
-STATE.settings.workerUrl      = newWorkerUrl;
-STATE.settings.aiModel        = document.getElementById('set-model').value;
-STATE.settings.adminPin       = document.getElementById('set-admin-pin').value;
-STATE.settings.firebaseConfig = newFbConfig;
-
-DB.saveSettings(STATE.settings, function(){
-  APP.toast('Settings saved ✓','success');
-});
-
-if (oldFb !== newFbConfig) {
-  APP.toast('Firebase config changed — reloading in 2s...','warning');
-  setTimeout(function(){ window.location.reload(); }, 2000);
-} else {
-  // FIX: Re-render settings to show updated status without full reload
-  setTimeout(function(){ APP.switchView('settings'); }, 300);
-}
-```
-
-},
-
-// ── DRIVER WIZARD ──────────────────────────────────────────────────
-vWizard: function() {
-var mine = STATE.trips.filter(function(t){return t.driverId===STATE.user.id&&t.status!==‘Completed’;})
-.sort(function(a,b){return new Date(a.pickupTime)-new Date(b.pickupTime);});
-if (!mine.length) return ‘<div class="bg-white border rounded-xl p-10 text-center"><i class="ph-fill ph-check-circle text-emerald-500 text-6xl mb-4"></i><h2 class="text-2xl font-bold text-slate-800">All Caught Up!</h2><p class="text-slate-500 mt-2">No active assignments.</p></div>’;
-
-```
-var a=mine[0], q=mine.slice(1);
-var isPend=a.status==='Pending'||a.status==='Assigned';
-var isERP =a.status==='En Route to Pickup';
-var isAP  =a.status==='Arrived at Pickup';
-var isERD =a.status==='En Route to Dropoff';
-var ts = a.pickupTime?new Date(a.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—';
-
-function puCard() {
-  var active=isERP?'bg-blue-50 border-blue-300':'bg-slate-50 border-slate-200';
-  var btn='';
-  if(isPend) btn='<button onclick="APP.setStatus(\''+a.id+'\',\'En Route to Pickup\')" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-900 shadow-md"><i class="ph-fill ph-play"></i> Start Trip to Pickup</button>';
-  if(isERP)  btn='<div class="flex gap-2"><button onclick="APP.nav(\''+a.pickupAddress+'\')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg flex items-center justify-center gap-2 shadow-sm"><i class="ph-fill ph-navigation-arrow text-blue-600"></i> Map</button><button onclick="APP.promptPickup(\''+a.id+'\')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md"><i class="ph-fill ph-check-circle"></i> Arrived</button></div>';
-  return '<div class="p-4 rounded-xl border-2 transition-all '+active+'"><span class="text-xs text-slate-500 font-bold tracking-widest uppercase">1. Pickup</span><p class="text-slate-800 font-bold text-lg leading-tight my-3">'+(a.pickupAddress||'—')+'</p>'+btn+'</div>';
-}
-function doCard() {
-  var active=isERD?'bg-blue-50 border-blue-300':'bg-slate-50 border-slate-200';
-  var btn='';
-  if(isAP) btn='<button onclick="APP.setStatus(\''+a.id+'\',\'En Route to Dropoff\')" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 shadow-md"><i class="ph-fill ph-play"></i> Begin Leg to Dropoff</button>';
-  if(isERD) btn='<div class="flex gap-2"><button onclick="APP.nav(\''+a.dropoffAddress+'\')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg flex items-center justify-center gap-2 shadow-sm"><i class="ph-fill ph-navigation-arrow text-blue-600"></i> Map</button><button onclick="APP.promptDropoff(\''+a.id+'\')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md"><i class="ph-fill ph-flag-checkered"></i> Finish Trip</button></div>';
-  return '<div class="p-4 rounded-xl border-2 transition-all '+active+'"><span class="text-xs text-slate-500 font-bold tracking-widest uppercase">2. Dropoff</span><p class="text-slate-800 font-bold text-lg leading-tight my-3">'+(a.dropoffAddress||'—')+'</p>'+btn+'</div>';
-}
-
-var queue = q.length?'<h4 class="mb-3 text-slate-500 uppercase font-bold text-xs tracking-wider mt-8">Up Next ('+q.length+')</h4><div class="grid gap-3">'
-  +q.map(function(t){var ts2=t.pickupTime?new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—';return '<div class="bg-white border p-4 rounded-xl shadow-sm flex justify-between items-center opacity-80"><div><h4 class="font-bold text-slate-800">'+t.patientName+'</h4><div class="text-xs text-slate-500 mt-1"><i class="ph-fill ph-clock"></i> '+ts2+' — '+(t.pickupAddress||'').substring(0,35)+'...</div></div></div>';}).join('')+'</div>':'';
-
-return '<h2 class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Active Trip</h2>'
-  +'<div class="bg-white border-2 border-blue-400 p-5 rounded-xl shadow-md mb-8">'
-    +'<div class="flex justify-between items-start mb-4 border-b border-slate-100 pb-4">'
-      +'<div><h3 class="font-bold text-xl text-slate-800">'+a.patientName+'</h3><span class="text-blue-600 text-sm font-medium"><i class="ph-fill ph-clock"></i> '+ts+'</span></div>'
-      +'<span class="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase">'+a.status+'</span>'
-    +'</div>'
-    +'<div class="mb-4 flex gap-2">'
-      +(a.phone?'<a href="tel:'+a.phone+'" class="flex-1 flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 py-3 rounded-lg border border-emerald-200 font-bold"><i class="ph-fill ph-phone"></i> Call</a>'
-        +'<a href="sms:'+a.phone+'" class="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-700 py-3 rounded-lg border border-blue-200 font-bold"><i class="ph-fill ph-chat-circle-text"></i> SMS</a>'
-      :'<button class="w-full py-3 bg-slate-100 text-slate-400 rounded-lg font-bold" disabled>No Phone</button>')
-    +'</div>'
-    +(a.notes?'<div class="flex items-start gap-2 bg-amber-50 text-amber-800 p-3 rounded-lg border border-amber-200 text-sm mb-4"><i class="ph-fill ph-warning shrink-0 mt-0.5"></i><p><strong>Notes:</strong> '+a.notes+'</p></div>':'')
-    +'<div class="space-y-4">'+puCard()+doCard()+'</div>'
-  +'</div>'
-  +queue;
-```
-
-},
-
-nav: function(addr) { window.open(‘https://www.google.com/maps/search/?api=1&query=’+encodeURIComponent(addr),’_blank’); },
-
-setStatus: function(id, status) {
-var t = STATE.trips.find(function(x){return x.id===id;});
-if (!t) return;
-t.status = status;
-DB.saveTrip(t, function(){ APP.refreshView(); });
-},
-
-promptPickup: function(id) {
-STATE.wizCb = function(){ APP.setStatus(id,‘Arrived at Pickup’); };
-document.getElementById(‘wizard-prompt-title’).innerText = ‘Arrived at Pickup’;
-document.getElementById(‘wizard-sig-wrap’).classList.remove(‘hidden’);
-document.getElementById(‘wizard-odo’).value = ‘’;
-document.getElementById(‘wizard-time’).value = new Date().toTimeString().slice(0,5);
-document.getElementById(‘wizard-sig-check’).checked = false;
-APP.openModal(‘modal-wizard-prompt’);
-},
-
-promptDropoff: function(id) {
-STATE.wizCb = function(){ APP.setStatus(id,‘Completed’); };
-document.getElementById(‘wizard-prompt-title’).innerText = ‘Trip Completed’;
-document.getElementById(‘wizard-sig-wrap’).classList.add(‘hidden’);
-document.getElementById(‘wizard-odo’).value = ‘’;
-document.getElementById(‘wizard-time’).value = new Date().toTimeString().slice(0,5);
-APP.openModal(‘modal-wizard-prompt’);
-},
-
-confirmWizardPrompt: function() {
-var odo = document.getElementById(‘wizard-odo’).value;
-var time = document.getElementById(‘wizard-time’).value;
-var sigWrap = document.getElementById(‘wizard-sig-wrap’);
-var sigOk = document.getElementById(‘wizard-sig-check’).checked;
-if (!odo||!time) return APP.toast(‘Please fill in odometer and time.’,‘danger’);
-if (!sigWrap.classList.contains(‘hidden’)&&!sigOk) return APP.toast(‘Please verify the paper signature.’,‘danger’);
-APP.closeModal(‘modal-wizard-prompt’);
-if (STATE.wizCb){ STATE.wizCb(); STATE.wizCb=null; }
-}
+  confirmWizardPrompt: function() {
+    var odo = document.getElementById('wizard-odo').value;
+    var time = document.getElementById('wizard-time').value;
+    var sigWrap = document.getElementById('wizard-sig-wrap');
+    var sigOk = document.getElementById('wizard-sig-check').checked;
+    if (!odo||!time) return APP.toast('Please fill in odometer and time.','danger');
+    if (!sigWrap.classList.contains('hidden')&&!sigOk) return APP.toast('Please verify the paper signature.','danger');
+    APP.closeModal('modal-wizard-prompt');
+    if (STATE.wizCb){ STATE.wizCb(); STATE.wizCb=null; }
+  }
 };
 
 window.APP = APP;
@@ -1258,22 +1218,24 @@ window.APP = APP;
 // START
 // ═══════════════════════════════════════════════════════════════════════
 APP.init();
+// Failsafe: force auth screen if loading hangs past 4 seconds
+setTimeout(function(){
+  if (document.getElementById('loading-screen').style.display !== 'none') {
+    console.warn('Failsafe triggered — forcing auth screen');
+    showAuth();
+  }
+}, 4000);
 </script>
 
 <!-- Heavy parsers loaded last, non-blocking -->
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-
 <script>
-  // Configure PDF.js worker immediately after load
   if (typeof pdfjsLib !== 'undefined') {
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 </script>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
 </body>
