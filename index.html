@@ -244,7 +244,12 @@ Return ONLY the JSON array.`
 
     const Storage = {
       get: (key, def = null) => {
-        try { const val = localStorage.getItem(CONFIG.storagePrefix + key); return val ? JSON.parse(val) : def; } catch(e) { return def; }
+        try { 
+          const val = localStorage.getItem(CONFIG.storagePrefix + key); 
+          if (!val) return def;
+          const parsed = JSON.parse(val);
+          return parsed !== null ? parsed : def;
+        } catch(e) { return def; }
       },
       set: (key, val) => {
         try { localStorage.setItem(CONFIG.storagePrefix + key, JSON.stringify(val)); } catch(e) { console.error("Storage Error", e); }
@@ -254,9 +259,9 @@ Return ONLY the JSON array.`
 
     let STATE = {
       user: null,
-      trips: Storage.get('trips', []),
-      drivers: Storage.get('drivers', [{id: 'd1', name: 'John Doe', pin: '1111', phone: '555-0101', status: 'active'}]),
-      settings: Storage.get('settings', { workerUrl: '', apiKey: '', aiModel: 'gpt-4o-mini', adminPin: '1234', mapApp: 'google' }),
+      trips: Array.isArray(Storage.get('trips')) ? Storage.get('trips') : [],
+      drivers: Array.isArray(Storage.get('drivers')) ? Storage.get('drivers') : [{id: 'd1', name: 'John Doe', pin: '1111', phone: '555-0101', status: 'active'}],
+      settings: Storage.get('settings', { workerUrl: '', apiKey: '', aiModel: 'gpt-4o-mini', adminPin: '1234', mapApp: 'google' }) || { workerUrl: '', apiKey: '', aiModel: 'gpt-4o-mini', adminPin: '1234', mapApp: 'google' },
       currentView: 'dashboard',
       extractedQueue: [],
       mapInstance: null,
