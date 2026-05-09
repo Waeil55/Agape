@@ -42,7 +42,7 @@
   <p class="text-slate-500 mt-2" id="loading-msg">Starting up...</p>
 </div>
 
-<!-- Auth Screen (hidden until ready) -->
+<!-- Auth Screen -->
 <div id="auth-screen" style="display:none" class="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
   <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
     <div class="flex justify-center mb-6 text-blue-600"><i class="ph-fill ph-ambulance text-5xl"></i></div>
@@ -178,7 +178,7 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════
-// BOOT: Hide loading screen ASAP — within 300ms regardless of anything
+// BOOT
 // ═══════════════════════════════════════════════════════════════════════
 var BOOT_DONE = false;
 function showAuth() {
@@ -188,11 +188,10 @@ function showAuth() {
   document.getElementById('auth-screen').style.display = '';
   if (window.APP && APP.populateAuthSelect) APP.populateAuthSelect();
 }
-// Hard deadline: show auth screen after 1.5s NO MATTER WHAT
 var BOOT_TIMER = setTimeout(showAuth, 1500);
 
 // ═══════════════════════════════════════════════════════════════════════
-// INDEXEDDB — permanent local database (gigabytes, survives restarts)
+// INDEXEDDB
 // ═══════════════════════════════════════════════════════════════════════
 var IDB = {
   db: null,
@@ -201,9 +200,9 @@ var IDB = {
       var req = indexedDB.open('AgapeNEMT', 2);
       req.onupgradeneeded = function(e) {
         var db = e.target.result;
-        if (!db.objectStoreNames.contains('trips'))    db.createObjectStore('trips',    {keyPath:'id'});
-        if (!db.objectStoreNames.contains('drivers'))  db.createObjectStore('drivers',  {keyPath:'id'});
-        if (!db.objectStoreNames.contains('kv'))       db.createObjectStore('kv',        {keyPath:'k'});
+        if (!db.objectStoreNames.contains('trips'))   db.createObjectStore('trips',   {keyPath:'id'});
+        if (!db.objectStoreNames.contains('drivers')) db.createObjectStore('drivers', {keyPath:'id'});
+        if (!db.objectStoreNames.contains('kv'))      db.createObjectStore('kv',       {keyPath:'k'});
       };
       req.onsuccess = function(e) { IDB.db = e.target.result; cb(null); };
       req.onerror   = function(e) { cb(e); };
@@ -309,42 +308,74 @@ var DB = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// FIREBASE — optional cloud sync, loaded only when user configures it
+// FIREBASE — FIX: guard against duplicate initializeApp calls
 // ═══════════════════════════════════════════════════════════════════════
 function initFirebase(configJson) {
   if (!configJson || !configJson.trim()) return;
-  // Load Firebase compat scripts dynamically — never blocks startup
+
   function loadScript(src, cb) {
     var s = document.createElement('script');
     s.src = src;
     s.onload = cb;
-    s.onerror = function() { console.warn('Firebase script failed:', src); };
+    s.onerror = function() { console.warn('Firebase script failed to load:', src); APP.toast('Firebase SDK failed to load. Check your internet.','danger'); };
     document.head.appendChild(s);
   }
+
   loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js', function() {
     loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js', function() {
       try {
         var config = JSON.parse(configJson);
-        var app = firebase.initializeApp(config);
+
+        // ── FIX: Prevent "app already exists" error on re-init ──────────
+        var app;
+        if (typeof firebase === 'undefined') {
+          APP.toast('Firebase SDK unavailable.','danger');
+          return;
+        }
+        try {
+          // If a default app already exists, reuse it
+          app = firebase.app();
+          console.log('Reusing existing Firebase app.');
+        } catch(e) {
+          // No existing app — initialize fresh
+          app = firebase.initializeApp(config);
+        }
+        // ────────────────────────────────────────────────────────────────
+
         STATE.fbDb = firebase.firestore(app);
-        // Sync listeners
-        STATE.fbUnsubs.forEach(function(u){try{u();}catch(e){}});
+
+        // Detach any old listeners before setting new ones
+        STATE.fbUnsubs.forEach(function(u){ try{u();}catch(e){} });
         STATE.fbUnsubs = [];
-        STATE.fbUnsubs.push(STATE.fbDb.collection('nemt_trips').onSnapshot(function(snap) {
-          STATE.trips = [];
-          snap.forEach(function(d){STATE.trips.push(Object.assign({id:d.id},d.data()));});
-          APP.refreshView();
-        }, function(e){console.warn('FB trips listener:',e);}));
-        STATE.fbUnsubs.push(STATE.fbDb.collection('nemt_drivers').onSnapshot(function(snap) {
-          STATE.drivers = [];
-          snap.forEach(function(d){STATE.drivers.push(Object.assign({id:d.id},d.data()));});
-          if (STATE.view==='drivers') APP.refreshView();
-        }, function(e){console.warn('FB drivers listener:',e);}));
+
+        STATE.fbUnsubs.push(
+          STATE.fbDb.collection('nemt_trips').onSnapshot(function(snap) {
+            STATE.trips = [];
+            snap.forEach(function(d){ STATE.trips.push(Object.assign({id:d.id}, d.data())); });
+            APP.refreshView();
+          }, function(e){ console.warn('FB trips listener error:',e); APP.toast('Firebase trips error: '+e.message,'danger'); })
+        );
+
+        STATE.fbUnsubs.push(
+          STATE.fbDb.collection('nemt_drivers').onSnapshot(function(snap) {
+            if (!snap.empty) {
+              STATE.drivers = [];
+              snap.forEach(function(d){ STATE.drivers.push(Object.assign({id:d.id}, d.data())); });
+              if (STATE.view==='drivers') APP.refreshView();
+            }
+          }, function(e){ console.warn('FB drivers listener error:',e); })
+        );
+
         document.getElementById('db-badge').classList.remove('hidden');
         APP.toast('🔥 Firebase connected — cloud sync active','success');
+
       } catch(e) {
-        console.warn('Firebase init error:',e);
-        APP.toast('Firebase config invalid. Using local database only.','warning');
+        console.error('Firebase init error:', e);
+        if (e.message && e.message.includes('JSON')) {
+          APP.toast('Firebase config is not valid JSON. Check Settings.','danger');
+        } else {
+          APP.toast('Firebase error: '+e.message,'danger');
+        }
       }
     });
   });
@@ -355,21 +386,16 @@ function initFirebase(configJson) {
 // ═══════════════════════════════════════════════════════════════════════
 var APP = {
 
-  // ── INIT (no async/await — pure callbacks for maximum compatibility) ──
   init: function() {
     document.getElementById('loading-msg').textContent = 'Opening local database...';
     IDB.open(function(err) {
-      if (err) {
-        console.warn('IDB failed, running in memory mode:', err);
-        APP.afterLoad();
-        return;
-      }
+      if (err) { console.warn('IDB failed, running in memory mode:', err); APP.afterLoad(); return; }
       document.getElementById('loading-msg').textContent = 'Loading your data...';
       IDB.getAll('trips', function(trips) {
         if (trips.length) STATE.trips = trips;
         IDB.getAll('drivers', function(drivers) {
           if (drivers.length) STATE.drivers = drivers;
-          else IDB.put('drivers', STATE.drivers[0]); // persist default driver
+          else IDB.put('drivers', STATE.drivers[0]);
           IDB.getKV('settings', null, function(saved) {
             if (saved) STATE.settings = Object.assign(STATE.settings, saved);
             APP.afterLoad();
@@ -381,7 +407,7 @@ var APP = {
 
   afterLoad: function() {
     clearTimeout(BOOT_TIMER);
-    showAuth(); // hides loading, shows auth
+    showAuth();
     if (STATE.settings.firebaseConfig && STATE.settings.firebaseConfig.trim()) {
       initFirebase(STATE.settings.firebaseConfig);
     }
@@ -630,7 +656,7 @@ var APP = {
           +'<div class="flex items-center gap-4">'
             +'<div class="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center text-blue-600"><i class="ph-fill ph-user text-2xl"></i></div>'
             +'<div><h3 class="font-bold text-slate-800 flex items-center gap-2">'+d.name+' <span class="w-2 h-2 rounded-full '+(d.status==='active'?'bg-emerald-500':'bg-red-500')+'"></span></h3>'
-            +'<p class="text-xs text-slate-500">PIN: '+d.pin+' | '+( d.phone||'No phone')+'</p></div>'
+            +'<p class="text-xs text-slate-500">PIN: '+d.pin+' | '+(d.phone||'No phone')+'</p></div>'
           +'</div>'
           +'<button class="p-2 text-blue-600 hover:bg-blue-50 rounded" onclick="APP.editDriver(\''+d.id+'\')"><i class="ph ph-pencil"></i></button>'
         +'</div>';
@@ -685,7 +711,7 @@ var APP = {
         +'<h3 class="font-bold text-lg text-slate-800 mb-2">AI Extraction</h3>'
         +'<p class="text-sm text-slate-500 mb-6">Drop manifests — PDF, Excel, CSV, or photo. AI parses everything.</p>'
         +'<div class="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center bg-blue-50 relative cursor-pointer hover:bg-blue-100 transition" id="drop-zone">'
-          +'<input type="file" id="file-input" multiple accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">'
+          +'<input type="file" id="file-input" multiple accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" style="cursor:pointer">'
           +'<i class="ph-fill ph-upload-simple text-blue-500 text-5xl mb-4"></i>'
           +'<h3 class="font-bold text-slate-700 text-lg">Tap or drag files</h3>'
           +'<p class="text-xs text-slate-500 mt-2">PDF, Excel, CSV, Images</p>'
@@ -704,79 +730,189 @@ var APP = {
   },
 
   initDrop: function() {
-    var dz=document.getElementById('drop-zone'), fi=document.getElementById('file-input');
-    if(!dz||!fi) return;
-    ['dragenter','dragover','dragleave','drop'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();});});
-    dz.addEventListener('drop',function(e){APP.handleFiles(e.dataTransfer.files);});
-    fi.addEventListener('change',function(e){APP.handleFiles(e.target.files);});
+    var dz = document.getElementById('drop-zone');
+    var fi = document.getElementById('file-input');
+    if (!dz || !fi) return;
+
+    ['dragenter','dragover','dragleave','drop'].forEach(function(ev){
+      dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); });
+    });
+
+    dz.addEventListener('dragover', function(){ dz.classList.add('bg-blue-100'); });
+    dz.addEventListener('dragleave', function(){ dz.classList.remove('bg-blue-100'); });
+
+    dz.addEventListener('drop', function(e) {
+      dz.classList.remove('bg-blue-100');
+      APP.handleFiles(e.dataTransfer.files);
+    });
+
+    // ── FIX: Reset file input after use so the same file can be re-uploaded ──
+    fi.addEventListener('change', function(e) {
+      if (!e.target.files || !e.target.files.length) return;
+      APP.handleFiles(e.target.files);
+      // Reset so same file can trigger change event again
+      fi.value = '';
+    });
   },
 
   handleFiles: function(files) {
-    if(!files||!files.length) return;
+    if (!files || !files.length) return;
     var el = document.getElementById('extract-results');
-    el.innerHTML = '<div class="text-center py-12"><div class="spinner inline-block"></div><p class="text-slate-600 font-medium mt-4">AI is analyzing '+files.length+' document(s)...</p></div>';
+    el.innerHTML = '<div class="text-center py-12"><div class="spinner" style="display:inline-block"></div><p class="text-slate-600 font-medium mt-4">AI is analyzing '+files.length+' document(s)...</p></div>';
     STATE.extracted = [];
     var idx = 0;
     function next() {
-      if(idx>=files.length){APP.renderExtracted();return;}
-      var file=files[idx++];
-      APP.readFile(file,function(text){
-        if(text) APP.callAI(text,file.name,function(){next();});
+      if (idx >= files.length) { APP.renderExtracted(); return; }
+      var file = files[idx++];
+      APP.readFile(file, function(text) {
+        if (text) APP.callAI(text, file.name, function(){ next(); });
         else next();
       });
     }
     next();
   },
 
+  // ── FIX: Complete readFile rewrite — PDF worker + proper data format + .catch() everywhere ──
   readFile: function(file, cb) {
-    if(file.name.endsWith('.csv')) {
-      if(typeof Papa==='undefined'){cb('CSV parsing unavailable');return;}
-      Papa.parse(file,{complete:function(r){cb(JSON.stringify(r.data));}});
-    } else if(file.name.match(/\.(xlsx|xls)$/)) {
-      if(typeof XLSX==='undefined'){cb('Excel parsing unavailable');return;}
-      file.arrayBuffer().then(function(buf){var wb=XLSX.read(buf,{type:'array'});cb(wb.SheetNames.map(function(n){return JSON.stringify(XLSX.utils.sheet_to_json(wb.Sheets[n]));}).join('\n'));});
-    } else if(file.name.endsWith('.pdf')) {
-      if(typeof pdfjsLib==='undefined'){cb('PDF parsing unavailable');return;}
-      file.arrayBuffer().then(function(buf){return pdfjsLib.getDocument(buf).promise;}).then(function(pdf){
-        var ps=[]; for(var i=1;i<=Math.min(pdf.numPages,8);i++) ps.push(pdf.getPage(i).then(function(p){return p.getTextContent();}));
-        Promise.all(ps).then(function(pages){cb(pages.map(function(p){return p.items.map(function(i){return i.str;}).join(' ');}).join('\n'));});
+    var name = file.name.toLowerCase();
+
+    // ── CSV ──────────────────────────────────────────────────────────
+    if (name.endsWith('.csv')) {
+      if (typeof Papa === 'undefined') { cb('CSV data from: ' + file.name); return; }
+      Papa.parse(file, {
+        complete: function(r) { cb(JSON.stringify(r.data)); },
+        error: function(e) { console.error('CSV parse error:', e); cb(''); }
       });
-    } else if(file.type.startsWith('image/')) {
-      var r=new FileReader(); r.onload=function(e){cb(e.target.result);}; r.readAsDataURL(file);
-    } else cb('');
+
+    // ── Excel ────────────────────────────────────────────────────────
+    } else if (name.match(/\.(xlsx|xls)$/)) {
+      if (typeof XLSX === 'undefined') { cb(''); return; }
+      file.arrayBuffer().then(function(buf) {
+        try {
+          var wb = XLSX.read(new Uint8Array(buf), {type:'array'});
+          cb(wb.SheetNames.map(function(n){
+            return JSON.stringify(XLSX.utils.sheet_to_json(wb.Sheets[n]));
+          }).join('\n'));
+        } catch(e) {
+          console.error('Excel parse error:', e);
+          APP.toast('Excel read failed: ' + e.message, 'danger');
+          cb('');
+        }
+      }).catch(function(e) {
+        console.error('Excel arrayBuffer error:', e);
+        APP.toast('Cannot read Excel file.', 'danger');
+        cb('');
+      });
+
+    // ── PDF — FIX: set workerSrc + pass Uint8Array + .catch() ────────
+    } else if (name.endsWith('.pdf')) {
+      if (typeof pdfjsLib === 'undefined') {
+        APP.toast('PDF library not loaded yet. Try again in a moment.', 'warning');
+        cb('');
+        return;
+      }
+
+      // Ensure worker is configured (critical fix — without this PDF.js fails silently)
+      if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+
+      file.arrayBuffer().then(function(buf) {
+        // FIX: pass {data: Uint8Array} — not raw ArrayBuffer
+        return pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+      }).then(function(pdf) {
+        var pagePromises = [];
+        for (var i = 1; i <= Math.min(pdf.numPages, 8); i++) {
+          pagePromises.push(pdf.getPage(i).then(function(p){ return p.getTextContent(); }));
+        }
+        return Promise.all(pagePromises);
+      }).then(function(pages) {
+        var text = pages.map(function(p){
+          return p.items.map(function(item){ return item.str; }).join(' ');
+        }).join('\n');
+        if (!text.trim()) {
+          APP.toast('PDF appears to be a scanned image. Switch model to GPT-4o for OCR.', 'warning');
+        }
+        cb(text || '');
+      }).catch(function(e) {
+        console.error('PDF load/parse error:', e);
+        APP.toast('PDF failed to load: ' + (e.message || 'Unknown error'), 'danger');
+        cb('');
+      });
+
+    // ── Image — read as base64 for vision API ─────────────────────────
+    } else if (file.type.startsWith('image/')) {
+      var r = new FileReader();
+      r.onload = function(e) { cb(e.target.result); };
+      r.onerror = function(e) { console.error('Image read error:', e); cb(''); };
+      r.readAsDataURL(file);
+
+    } else {
+      cb('');
+    }
   },
 
   callAI: function(content, filename, done) {
     var url = STATE.settings.workerUrl;
     var isDirect = false;
-    if(!url){
-      if(STATE.settings.apiKey){url='https://api.openai.com/v1/chat/completions';isDirect=true;}
-      else{document.getElementById('extract-results').innerHTML='<div class="bg-amber-50 border border-amber-200 p-4 rounded-lg text-amber-800"><strong>API key required.</strong> Add your OpenAI API key in Settings.</div>';return;}
+    if (!url) {
+      if (STATE.settings.apiKey) {
+        url = 'https://api.openai.com/v1/chat/completions';
+        isDirect = true;
+      } else {
+        document.getElementById('extract-results').innerHTML =
+          '<div class="bg-amber-50 border border-amber-200 p-4 rounded-lg text-amber-800"><strong>API key required.</strong> Add your OpenAI API key in Settings.</div>';
+        return;
+      }
     }
     var prompt = 'You are a precise NEMT trip extractor. Extract ALL trips. Return ONLY a JSON array: [{"patientName":"","pickupAddress":"","dropoffAddress":"","pickupTime":"YYYY-MM-DDTHH:mm","phone":"","notes":""}]. No markdown.';
-    var msgs = [{role:'system',content:prompt}];
-    if(content.startsWith('data:image')) msgs.push({role:'user',content:[{type:'text',text:'Extract from '+filename},{type:'image_url',image_url:{url:content}}]});
-    else msgs.push({role:'user',content:'Extract from '+filename+':\n\n'+content.substring(0,12000)});
+    var msgs = [{role:'system', content:prompt}];
+    if (content.startsWith('data:image')) {
+      msgs.push({role:'user', content:[
+        {type:'text', text:'Extract all NEMT trips from this document: '+filename},
+        {type:'image_url', image_url:{url:content}}
+      ]});
+    } else {
+      msgs.push({role:'user', content:'Extract all NEMT trips from '+filename+':\n\n'+content.substring(0,12000)});
+    }
     var hdrs = {'Content-Type':'application/json'};
-    if(isDirect) hdrs['Authorization']='Bearer '+STATE.settings.apiKey;
-    fetch(url,{method:'POST',headers:hdrs,body:JSON.stringify({model:STATE.settings.aiModel,messages:msgs,temperature:0})})
-      .then(function(r){return r.json();})
-      .then(function(data){
-        if(data.error) throw new Error(data.error.message);
-        var raw=data.choices[0].message.content;
-        var m=raw.match(/\[[\s\S]*\]/);
-        if(m){var trips=JSON.parse(m[0]);trips.forEach(function(t){t.driverId='';STATE.extracted.push(t);});}
-        done();
-      }).catch(function(e){
-        document.getElementById('extract-results').innerHTML='<div class="text-red-700 bg-red-50 p-4 border border-red-200 rounded-lg"><strong>Error:</strong> '+e.message+'</div>';
-      });
+    if (isDirect) hdrs['Authorization'] = 'Bearer '+STATE.settings.apiKey;
+
+    fetch(url, {
+      method:'POST',
+      headers: hdrs,
+      body: JSON.stringify({model: STATE.settings.aiModel, messages: msgs, temperature:0})
+    })
+    .then(function(r){
+      if (!r.ok) throw new Error('HTTP '+r.status+': '+r.statusText);
+      return r.json();
+    })
+    .then(function(data) {
+      if (data.error) throw new Error(data.error.message);
+      var raw = data.choices[0].message.content;
+      var m = raw.match(/\[[\s\S]*\]/);
+      if (m) {
+        var trips = JSON.parse(m[0]);
+        trips.forEach(function(t){ t.driverId=''; STATE.extracted.push(t); });
+      }
+      done();
+    })
+    .catch(function(e) {
+      console.error('AI call error:', e);
+      document.getElementById('extract-results').innerHTML =
+        '<div class="text-red-700 bg-red-50 p-4 border border-red-200 rounded-lg"><strong>AI Error:</strong> '+e.message+'</div>';
+    });
   },
 
   renderExtracted: function() {
-    var el=document.getElementById('extract-results');
-    if(!STATE.extracted.length){el.innerHTML='<div class="text-center text-slate-500 py-12">No trips found in documents.</div>';return;}
-    var dOpts='<option value="">Unassigned</option>'+STATE.drivers.filter(function(d){return d.status==='active';}).map(function(d){return '<option value="'+d.id+'">'+d.name+'</option>';}).join('');
-    el.innerHTML=STATE.extracted.map(function(t,i){
+    var el = document.getElementById('extract-results');
+    if (!STATE.extracted.length) {
+      el.innerHTML = '<div class="text-center text-slate-500 py-12">No trips found in documents.</div>';
+      return;
+    }
+    var dOpts = '<option value="">Unassigned</option>'+STATE.drivers.filter(function(d){return d.status==='active';}).map(function(d){return '<option value="'+d.id+'">'+d.name+'</option>';}).join('');
+    el.innerHTML = STATE.extracted.map(function(t,i){
       return '<div class="bg-white p-4 rounded-lg mb-3 border border-slate-200 shadow-sm relative">'
         +'<button class="absolute top-2 right-2 text-slate-400 hover:text-red-500" onclick="APP.removeExtracted('+i+')"><i class="ph ph-x"></i></button>'
         +'<div class="flex justify-between items-start mb-3 pr-6">'
@@ -792,16 +928,16 @@ var APP = {
     }).join('');
   },
 
-  setExtractedDriver: function(i,v){STATE.extracted[i].driverId=v;},
-  bulkAssign: function(v){STATE.extracted.forEach(function(t){t.driverId=v;});APP.renderExtracted();},
-  removeExtracted: function(i){STATE.extracted.splice(i,1);APP.renderExtracted();},
+  setExtractedDriver: function(i,v){ STATE.extracted[i].driverId=v; },
+  bulkAssign: function(v){ STATE.extracted.forEach(function(t){t.driverId=v;}); APP.renderExtracted(); },
+  removeExtracted: function(i){ STATE.extracted.splice(i,1); APP.renderExtracted(); },
 
   saveExtracted: function() {
-    if(!STATE.extracted.length) return;
-    var list=STATE.extracted.slice(), i=0;
+    if (!STATE.extracted.length) return;
+    var list = STATE.extracted.slice(), i = 0;
     function next(){
-      if(i>=list.length){STATE.extracted=[];APP.renderExtracted();APP.toast('All trips saved!','success');return;}
-      var t=list[i++];
+      if (i>=list.length){ STATE.extracted=[]; APP.renderExtracted(); APP.toast('All trips saved!','success'); return; }
+      var t = list[i++];
       DB.saveTrip({id:uid(),patientName:t.patientName,pickupAddress:t.pickupAddress,dropoffAddress:t.dropoffAddress,pickupTime:t.pickupTime,notes:t.notes||'',phone:t.phone||'',status:'Pending',driverId:t.driverId||''},next);
     }
     next();
@@ -809,8 +945,10 @@ var APP = {
 
   // ── SETTINGS ───────────────────────────────────────────────────────
   vSettings: function() {
-    var s=STATE.settings;
-    var fbSt=STATE.fbDb?'<span class="text-emerald-600 text-xs font-bold ml-2">✓ Connected</span>':'<span class="text-slate-400 text-xs ml-2">Not connected</span>';
+    var s = STATE.settings;
+    var fbSt = STATE.fbDb
+      ? '<span class="text-emerald-600 text-xs font-bold ml-2">✓ Connected</span>'
+      : '<span class="text-slate-400 text-xs ml-2">Not connected</span>';
     return '<div class="bg-white border rounded-xl p-6 shadow-sm max-w-2xl mb-20">'
       +'<h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="ph ph-gear"></i> System Settings</h2>'
       +'<div class="space-y-6">'
@@ -820,8 +958,9 @@ var APP = {
           +'<div><label class="block text-sm font-medium mb-1">Model</label><select id="set-model" class="w-full border p-3 rounded-lg bg-white"><option value="gpt-4o-mini" '+(s.aiModel==='gpt-4o-mini'?'selected':'')+'>GPT-4o Mini (fast)</option><option value="gpt-4o" '+(s.aiModel==='gpt-4o'?'selected':'')+'>GPT-4o (best + vision)</option></select></div>'
         +'</div>'
         +'<div class="border-t pt-6"><h3 class="font-bold text-slate-700 mb-1 flex items-center"><i class="ph-fill ph-database text-blue-600 mr-2"></i>Cloud Firebase'+fbSt+'</h3>'
-          +'<p class="text-xs text-slate-500 mb-3">Paste your Firebase config JSON to sync all data across devices in real time. Without it, everything saves permanently in <strong>this browser\'s IndexedDB</strong> — no data loss, works offline.</p>'
-          +'<textarea id="set-firebase" rows="4" class="w-full border p-3 rounded-lg font-mono text-xs bg-slate-50" placeholder=\'{"apiKey":"...","authDomain":"...","projectId":"..."}\'>'+(s.firebaseConfig||'')+'</textarea>'
+          +'<p class="text-xs text-slate-500 mb-3">Paste your Firebase config JSON to sync all data across devices in real time. Data saves in <strong>IndexedDB locally</strong> as cache AND syncs to Firebase as the source of truth.</p>'
+          +'<textarea id="set-firebase" rows="5" class="w-full border p-3 rounded-lg font-mono text-xs bg-slate-50" placeholder=\'{"apiKey":"AIza...","authDomain":"your-app.firebaseapp.com","projectId":"your-app","storageBucket":"your-app.appspot.com","messagingSenderId":"123","appId":"1:123:web:abc"}\'>'+(s.firebaseConfig||'')+'</textarea>'
+          +'<p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2 rounded mt-2"><strong>⚠ Firestore rules:</strong> Make sure your Firestore security rules allow read/write. For testing: set rules to <code>allow read, write: if true;</code></p>'
         +'</div>'
         +'<div class="border-t pt-6"><h3 class="font-bold text-slate-700 mb-3">Security</h3>'
           +'<label class="block text-sm font-medium mb-1">Admin PIN</label><input type="text" id="set-admin-pin" class="w-full border p-3 rounded-lg" value="'+(s.adminPin||'1234')+'"></div>'
@@ -836,18 +975,20 @@ var APP = {
     STATE.settings.aiModel        = document.getElementById('set-model').value;
     STATE.settings.adminPin       = document.getElementById('set-admin-pin').value;
     STATE.settings.firebaseConfig = document.getElementById('set-firebase').value;
-    DB.saveSettings(STATE.settings, function() { APP.toast('Settings saved ✓','success'); });
+    DB.saveSettings(STATE.settings, function(){ APP.toast('Settings saved ✓','success'); });
     if (oldFb !== STATE.settings.firebaseConfig) {
-      APP.toast('Database config changed — reloading in 2s...','warning');
-      setTimeout(function(){window.location.reload();},2000);
-    } else { APP.switchView('settings'); }
+      APP.toast('Firebase config changed — reloading in 2s...','warning');
+      setTimeout(function(){ window.location.reload(); }, 2000);
+    } else {
+      APP.switchView('settings');
+    }
   },
 
   // ── DRIVER WIZARD ──────────────────────────────────────────────────
   vWizard: function() {
     var mine = STATE.trips.filter(function(t){return t.driverId===STATE.user.id&&t.status!=='Completed';})
       .sort(function(a,b){return new Date(a.pickupTime)-new Date(b.pickupTime);});
-    if(!mine.length) return '<div class="bg-white border rounded-xl p-10 text-center"><i class="ph-fill ph-check-circle text-emerald-500 text-6xl mb-4"></i><h2 class="text-2xl font-bold text-slate-800">All Caught Up!</h2><p class="text-slate-500 mt-2">No active assignments.</p></div>';
+    if (!mine.length) return '<div class="bg-white border rounded-xl p-10 text-center"><i class="ph-fill ph-check-circle text-emerald-500 text-6xl mb-4"></i><h2 class="text-2xl font-bold text-slate-800">All Caught Up!</h2><p class="text-slate-500 mt-2">No active assignments.</p></div>';
 
     var a=mine[0], q=mine.slice(1);
     var isPend=a.status==='Pending'||a.status==='Assigned';
@@ -876,7 +1017,6 @@ var APP = {
 
     return '<h2 class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Active Trip</h2>'
       +'<div class="bg-white border-2 border-blue-400 p-5 rounded-xl shadow-md mb-8">'
-        +'<div class="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>'
         +'<div class="flex justify-between items-start mb-4 border-b border-slate-100 pb-4">'
           +'<div><h3 class="font-bold text-xl text-slate-800">'+a.patientName+'</h3><span class="text-blue-600 text-sm font-medium"><i class="ph-fill ph-clock"></i> '+ts+'</span></div>'
           +'<span class="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase">'+a.status+'</span>'
@@ -895,53 +1035,61 @@ var APP = {
   nav: function(addr) { window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr),'_blank'); },
 
   setStatus: function(id, status) {
-    var t=STATE.trips.find(function(x){return x.id===id;});
-    if(!t) return;
-    t.status=status;
-    DB.saveTrip(t,function(){APP.refreshView();});
+    var t = STATE.trips.find(function(x){return x.id===id;});
+    if (!t) return;
+    t.status = status;
+    DB.saveTrip(t, function(){ APP.refreshView(); });
   },
 
   promptPickup: function(id) {
-    STATE.wizCb=function(){APP.setStatus(id,'Arrived at Pickup');};
-    document.getElementById('wizard-prompt-title').innerText='Arrived at Pickup';
+    STATE.wizCb = function(){ APP.setStatus(id,'Arrived at Pickup'); };
+    document.getElementById('wizard-prompt-title').innerText = 'Arrived at Pickup';
     document.getElementById('wizard-sig-wrap').classList.remove('hidden');
-    document.getElementById('wizard-odo').value='';
-    document.getElementById('wizard-time').value=new Date().toTimeString().slice(0,5);
-    document.getElementById('wizard-sig-check').checked=false;
+    document.getElementById('wizard-odo').value = '';
+    document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5);
+    document.getElementById('wizard-sig-check').checked = false;
     APP.openModal('modal-wizard-prompt');
   },
 
   promptDropoff: function(id) {
-    STATE.wizCb=function(){APP.setStatus(id,'Completed');};
-    document.getElementById('wizard-prompt-title').innerText='Trip Completed';
+    STATE.wizCb = function(){ APP.setStatus(id,'Completed'); };
+    document.getElementById('wizard-prompt-title').innerText = 'Trip Completed';
     document.getElementById('wizard-sig-wrap').classList.add('hidden');
-    document.getElementById('wizard-odo').value='';
-    document.getElementById('wizard-time').value=new Date().toTimeString().slice(0,5);
+    document.getElementById('wizard-odo').value = '';
+    document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5);
     APP.openModal('modal-wizard-prompt');
   },
 
   confirmWizardPrompt: function() {
-    var odo=document.getElementById('wizard-odo').value;
-    var time=document.getElementById('wizard-time').value;
-    var sigWrap=document.getElementById('wizard-sig-wrap');
-    var sigOk=document.getElementById('wizard-sig-check').checked;
-    if(!odo||!time) return APP.toast('Please fill in odometer and time.','danger');
-    if(!sigWrap.classList.contains('hidden')&&!sigOk) return APP.toast('Please verify the paper signature.','danger');
+    var odo = document.getElementById('wizard-odo').value;
+    var time = document.getElementById('wizard-time').value;
+    var sigWrap = document.getElementById('wizard-sig-wrap');
+    var sigOk = document.getElementById('wizard-sig-check').checked;
+    if (!odo||!time) return APP.toast('Please fill in odometer and time.','danger');
+    if (!sigWrap.classList.contains('hidden')&&!sigOk) return APP.toast('Please verify the paper signature.','danger');
     APP.closeModal('modal-wizard-prompt');
-    if(STATE.wizCb){STATE.wizCb();STATE.wizCb=null;}
+    if (STATE.wizCb){ STATE.wizCb(); STATE.wizCb=null; }
   }
 };
 
 window.APP = APP;
 
 // ═══════════════════════════════════════════════════════════════════════
-// START — runs when HTML is fully parsed (script is at bottom of body)
+// START
 // ═══════════════════════════════════════════════════════════════════════
 APP.init();
 </script>
 
-<!-- PDF.js and other heavy parsers loaded last, non-blocking -->
+<!-- Heavy parsers loaded last, non-blocking -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  // ── FIX: Configure PDF.js worker immediately after the script loads ──
+  // Without this, PDF.js fails to process any PDF file ("failed to load")
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
