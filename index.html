@@ -1,101 +1,114 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover">
   <meta name="theme-color" content="#2563eb">
   <title>Agape Care NEMT Pro Enterprise</title>
-  
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
+
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  
+
+  <!-- CDN Libraries (regular scripts, NOT ES modules — avoids blocking) -->
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- Firebase COMPAT scripts (no ES module import needed) -->
+
+  <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-app-compat.js"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore-compat.js"></script>
+
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
-    /* Prevent iOS Zoom & Base */
     input, select, textarea, button { font-family: inherit; font-size: 16px; outline: none; }
     html, body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-    
+
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
 
-    /* Modals */
     .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
-      display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center; z-index: 100;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
       padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
     }
     .modal-backdrop.open { opacity: 1; pointer-events: auto; }
-    .modal-panel { transform: scale(0.95); transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); max-height: 100%; display: flex; flex-direction: column; }
+    .modal-panel { transform: scale(0.95); transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); max-height: 96vh; display: flex; flex-direction: column; }
     .modal-backdrop.open .modal-panel { transform: scale(1); }
     .modal-body { overflow-y: auto; }
 
-    /* Toast */
     .toast-container { position: fixed; bottom: max(2rem, env(safe-area-inset-bottom)); right: 2rem; display: flex; flex-direction: column; gap: 0.5rem; z-index: 200; }
     @media (max-width: 600px) { .toast-container { left: 1rem; right: 1rem; bottom: max(1rem, env(safe-area-inset-bottom)); } }
     .toast { padding: 1rem 1.25rem; border-radius: 0.5rem; background: #1e293b; color: white; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-left: 4px solid #3b82f6; display: flex; align-items: center; gap: 0.75rem; transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
     .toast.show { transform: translateX(0); }
     .toast.success { border-left-color: #10b981; }
-    .toast.danger { border-left-color: #ef4444; }
+    .toast.danger  { border-left-color: #ef4444; }
     .toast.warning { border-left-color: #f59e0b; }
 
-    /* Loading Screen */
     #loading-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.4s; }
+    #loading-screen.hidden { display: none !important; }
     .spinner { width: 48px; height: 48px; border: 4px solid #bfdbfe; border-top-color: #2563eb; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1rem; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    #loading-error { display:none; color:#ef4444; font-size:13px; margin-top:12px; text-align:center; max-width:280px; }
+
     @media print { .no-print, header, .tabs-bar { display: none !important; } }
   </style>
+
 </head>
 <body class="bg-slate-50 text-slate-800">
 
   <!-- Loading Screen -->
+
   <div id="loading-screen">
     <div class="spinner"></div>
     <h2 class="font-bold text-2xl text-slate-800">Agape Care NEMT</h2>
-    <p class="text-slate-500 mt-2">Loading Enterprise Environment...</p>
+    <p class="text-slate-500 mt-2" id="loading-status">Loading Enterprise Environment...</p>
+    <p id="loading-error"></p>
   </div>
 
   <!-- Auth Screen -->
-  <div id="auth-screen" class="hidden min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
+
+  <div id="auth-screen" class="hidden min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
       <div class="flex justify-center mb-6 text-blue-600">
         <i class="ph-fill ph-ambulance text-5xl"></i>
       </div>
       <h1 class="text-2xl font-bold text-center text-slate-800 mb-8">NEMT Manager Pro</h1>
-
       <div class="space-y-6">
         <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
           <h2 class="font-semibold text-slate-700 mb-4 flex items-center gap-2"><i class="ph ph-map-pin"></i> Driver Login</h2>
           <select id="auth-driver-select" class="w-full p-3 border rounded-lg mb-3 bg-white"></select>
           <input type="password" id="auth-driver-pin" placeholder="Driver PIN" class="w-full p-3 border rounded-lg mb-3" onkeydown="if(event.key==='Enter')APP.loginDriver()">
-          <button onclick="APP.loginDriver()" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition shadow-sm">
-            Login as Driver
-          </button>
+          <button onclick="APP.loginDriver()" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition shadow-sm">Login as Driver</button>
         </div>
-
         <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
           <h2 class="font-semibold text-slate-700 mb-4 flex items-center gap-2"><i class="ph ph-gear"></i> Admin Portal</h2>
-          <input type="password" id="auth-admin-pin" placeholder="Admin PIN (Try 1234)" class="w-full p-3 border rounded-lg mb-3" onkeydown="if(event.key==='Enter')APP.loginAdmin()">
-          <button onclick="APP.loginAdmin()" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition shadow-sm">
-            Access Admin Panel
-          </button>
+          <input type="password" id="auth-admin-pin" placeholder="Admin PIN (default: 1234)" class="w-full p-3 border rounded-lg mb-3" onkeydown="if(event.key==='Enter')APP.loginAdmin()">
+          <button onclick="APP.loginAdmin()" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition shadow-sm">Access Admin Panel</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Main App Layout -->
+
   <div class="hidden min-h-screen bg-slate-50 pb-20" id="app-main">
     <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-10 w-full" style="padding-top: max(1rem, env(safe-area-inset-top));">
       <div class="max-w-4xl mx-auto flex justify-between items-center">
@@ -103,35 +116,38 @@
           <i class="ph-fill ph-ambulance text-2xl"></i>
           <h1 class="font-bold text-lg" id="header-title">Admin Dashboard</h1>
         </div>
-        <button onclick="APP.logout()" class="flex items-center gap-1 bg-white/20 px-3 py-1.5 rounded-full hover:bg-white/30 text-sm font-medium transition">
-          <i class="ph ph-sign-out"></i> Logout
-        </button>
+        <div class="flex items-center gap-3">
+          <span id="db-indicator" class="text-xs bg-white/20 px-2 py-1 rounded-full font-medium hidden">🔥 Cloud</span>
+          <button onclick="APP.logout()" class="flex items-center gap-1 bg-white/20 px-3 py-1.5 rounded-full hover:bg-white/30 text-sm font-medium transition">
+            <i class="ph ph-sign-out"></i> Logout
+          </button>
+        </div>
       </div>
     </header>
-    
-    <div id="driver-status-bar" class="hidden bg-white shadow-sm border-b px-4 py-3 sticky z-10 flex justify-between items-center max-w-4xl mx-auto" style="top: calc(56px + max(1rem, env(safe-area-inset-top)));">
-      <div class="flex flex-col">
-        <span class="text-sm font-bold text-slate-700">GPS Tracking</span>
-        <span class="text-xs text-green-600" id="driver-gps-text">Transmitting Live Location...</span>
-      </div>
-      <button class="px-4 py-2 rounded-full font-bold text-sm transition shadow-sm bg-green-600 text-white hover:bg-green-700">
-        GO ONLINE
-      </button>
-    </div>
 
-    <main class="max-w-4xl mx-auto p-4 mt-4">
-      <!-- Tabs Bar -->
-      <div class="flex space-x-2 mb-6 bg-white p-1 rounded-xl shadow-sm overflow-x-auto tabs-bar" id="tabs-container"></div>
+```
+<div id="driver-status-bar" class="hidden bg-white shadow-sm border-b px-4 py-3 sticky z-10 flex justify-between items-center max-w-4xl mx-auto" style="top: calc(56px + max(1rem, env(safe-area-inset-top)));">
+  <div class="flex flex-col">
+    <span class="text-sm font-bold text-slate-700">GPS Tracking</span>
+    <span class="text-xs text-green-600">Transmitting Live Location...</span>
+  </div>
+  <button class="px-4 py-2 rounded-full font-bold text-sm transition shadow-sm bg-green-600 text-white hover:bg-green-700">GO ONLINE</button>
+</div>
 
-      <!-- Views Container -->
-      <div id="views-container"></div>
-    </main>
+<main class="max-w-4xl mx-auto p-4 mt-4">
+  <div class="flex space-x-2 mb-6 bg-white p-1 rounded-xl shadow-sm overflow-x-auto tabs-bar" id="tabs-container"></div>
+  <div id="views-container"></div>
+</main>
+```
+
   </div>
 
   <!-- Toast Container -->
+
   <div class="toast-container" id="toast-container"></div>
 
   <!-- MODALS -->
+
   <div class="modal-backdrop" id="modal-wizard-prompt">
     <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
       <div class="flex justify-between items-center p-4 border-b">
@@ -139,7 +155,7 @@
         <button onclick="APP.closeModal('modal-wizard-prompt')" class="p-2 hover:bg-slate-100 rounded-full text-slate-500"><i class="ph ph-x"></i></button>
       </div>
       <div class="modal-body p-6">
-        <p class="text-sm text-slate-500 mb-4" id="wizard-prompt-desc">Please enter the current odometer reading and verify the time.</p>
+        <p class="text-sm text-slate-500 mb-4">Please enter the current odometer reading and verify the time.</p>
         <div class="mb-4">
           <label class="block text-xs font-medium text-slate-500 mb-1">Odometer</label>
           <input type="number" id="wizard-odo" class="w-full border p-2.5 rounded-lg" placeholder="e.g. 154200">
@@ -182,9 +198,12 @@
             <div>
               <label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
               <select id="trip-status" class="w-full border p-2.5 rounded-lg bg-white">
-                <option value="Pending">Pending</option><option value="En Route to Pickup">En Route to Pickup</option>
-                <option value="Arrived at Pickup">Arrived at Pickup</option><option value="En Route to Dropoff">En Route to Dropoff</option>
-                <option value="Completed">Completed</option><option value="Cancelled">Cancelled</option>
+                <option value="Pending">Pending</option>
+                <option value="En Route to Pickup">En Route to Pickup</option>
+                <option value="Arrived at Pickup">Arrived at Pickup</option>
+                <option value="En Route to Dropoff">En Route to Dropoff</option>
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
               </select>
             </div>
           </div>
@@ -221,825 +240,1000 @@
     </div>
   </div>
 
-  <!-- JAVASCRIPT LOGIC (Modules for Firebase) -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, updateDoc, doc, deleteDoc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+  <!-- ===================== MAIN APPLICATION SCRIPT ===================== -->
 
-    const CONFIG = {
-      version: '5.1.0-Enterprise',
-      storagePrefix: 'agape_ent_',
-      extractionPrompt: `You are a strict and precise NEMT trip data extractor.
-Extract ALL trips perfectly. Never miss a detail. Never mix trips.
-Output MUST be a JSON array of objects with these exact keys:
-[
-  {
-    "patientName": "Full Name",
-    "pickupAddress": "Full pickup address",
-    "dropoffAddress": "Full dropoff address",
-    "pickupTime": "YYYY-MM-DDTHH:mm",
-    "phone": "Phone number or empty",
-    "notes": "Any special instructions"
-  }
-]
-Return ONLY the JSON array.`
-    };
+  <script>
+  // ─── SAFETY NET: if anything goes wrong, always hide the loading screen ─────
+  window.onerror = function(msg, src, line, col, err) {
+    console.error('App Error:', msg, err);
+    var ls = document.getElementById('loading-screen');
+    if (ls) ls.classList.add('hidden');
+    var auth = document.getElementById('auth-screen');
+    if (auth) auth.classList.remove('hidden');
+    var errEl = document.getElementById('loading-error');
+    if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Error: ' + msg; }
+  };
 
-    const Storage = {
-      get: (key, def = null) => {
-        try { 
-          const val = localStorage.getItem(CONFIG.storagePrefix + key); 
-          if (!val) return def;
-          const parsed = JSON.parse(val);
-          return parsed !== null ? parsed : def;
-        } catch(e) { return def; }
-      },
-      set: (key, val) => {
-        try { localStorage.setItem(CONFIG.storagePrefix + key, JSON.stringify(val)); } catch(e) { console.error("Storage Error", e); }
-      },
-      uid: () => Date.now().toString(36) + Math.random().toString(36).substring(2)
-    };
+  // Absolute fallback: force-hide loading screen after 8 seconds no matter what
+  setTimeout(function() {
+    var ls = document.getElementById('loading-screen');
+    if (ls && !ls.classList.contains('hidden')) {
+      ls.classList.add('hidden');
+      var auth = document.getElementById('auth-screen');
+      if (auth) auth.classList.remove('hidden');
+    }
+  }, 8000);
 
-    let STATE = {
-      user: null,
-      trips: Array.isArray(Storage.get('trips')) ? Storage.get('trips') : [],
-      drivers: Array.isArray(Storage.get('drivers')) ? Storage.get('drivers') : [{id: 'd1', name: 'John Doe', pin: '1111', phone: '555-0101', status: 'active'}],
-      settings: Storage.get('settings') || { workerUrl: '', apiKey: '', aiModel: 'gpt-4o-mini', adminPin: '1234', mapApp: 'google', firebaseConfig: '' },
-      currentView: 'dashboard',
-      extractedQueue: [],
-      mapInstance: null,
-      wizardCb: null,
-      wizardTripId: null
-    };
+  // ─── INDEXEDDB: PERMANENT DATABASE (survives page reloads, browser restarts) ─
+  var IDB = {
+    db: null,
+    DB_NAME: 'AgapeCareNEMT_v1',
+    DB_VERSION: 1,
 
-    // Firebase DB Abstraction Layer
-    const DB = {
-      app: null,
-      db: null,
-      unsubs: [],
-      init() {
-        if(typeof STATE.settings.firebaseConfig === 'string' && STATE.settings.firebaseConfig.trim() !== '') {
-          try {
-            const config = JSON.parse(STATE.settings.firebaseConfig);
-            this.app = initializeApp(config);
-            this.db = getFirestore(this.app);
-            this.startListeners();
-            console.log("🔥 Firebase Firestore Connected");
-          } catch(e) {
-            console.error("Firebase Config Error:", e);
-            APP.toast("Invalid Firebase Config. Using Local Storage.", "warning");
-          }
-        }
-      },
-      startListeners() {
-        if(!this.db) return;
-        this.unsubs.forEach(u => u());
-        this.unsubs = [];
-        
-        // Listen to Trips
-        this.unsubs.push(onSnapshot(collection(this.db, "nemt_trips"), (snap) => {
-          STATE.trips = [];
-          snap.forEach(d => STATE.trips.push({ id: d.id, ...d.data() }));
-          if(APP.refreshCurrentView) APP.refreshCurrentView();
-        }));
+    init: function() {
+      return new Promise(function(resolve, reject) {
+        var req = indexedDB.open(IDB.DB_NAME, IDB.DB_VERSION);
 
-        // Listen to Drivers
-        this.unsubs.push(onSnapshot(collection(this.db, "nemt_drivers"), (snap) => {
-          STATE.drivers = [];
-          snap.forEach(d => STATE.drivers.push({ id: d.id, ...d.data() }));
-          if(STATE.currentView === 'drivers') APP.refreshCurrentView();
-        }));
-      },
-      async saveTrip(trip) {
-        if(this.db) {
-          const id = trip.id; const tripData = { ...trip }; delete tripData.id;
-          await setDoc(doc(this.db, "nemt_trips", id), tripData);
-        } else {
-          const idx = STATE.trips.findIndex(t => t.id === trip.id);
-          if(idx > -1) STATE.trips[idx] = trip; else STATE.trips.push(trip);
-          Storage.set('trips', STATE.trips);
-        }
-      },
-      async deleteTrip(id) {
-        if(this.db) await deleteDoc(doc(this.db, "nemt_trips", id));
-        else { STATE.trips = STATE.trips.filter(t => t.id !== id); Storage.set('trips', STATE.trips); }
-      },
-      async saveDriver(driver) {
-        if(this.db) {
-          const id = driver.id; const data = { ...driver }; delete data.id;
-          await setDoc(doc(this.db, "nemt_drivers", id), data);
-        } else {
-          const idx = STATE.drivers.findIndex(d => d.id === driver.id);
-          if(idx > -1) STATE.drivers[idx] = driver; else STATE.drivers.push(driver);
-          Storage.set('drivers', STATE.drivers);
-        }
-      }
-    };
-
-    const APP = {
-      init() {
-        DB.init();
-        this.populateAuthSelect();
-        setTimeout(() => {
-          document.getElementById('loading-screen').classList.add('hidden');
-          if (STATE.user) this.enterApp();
-          else document.getElementById('auth-screen').classList.remove('hidden');
-        }, 800);
-      },
-
-      populateAuthSelect() {
-        const sel = document.getElementById('auth-driver-select');
-        sel.innerHTML = `<option value="">Select your profile...</option>` + 
-          (STATE.drivers||[]).filter(d => d.status === 'active').map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-      },
-
-      loginAdmin() {
-        const pin = document.getElementById('auth-admin-pin').value;
-        if (pin === (STATE.settings.adminPin || '1234')) {
-          STATE.user = { role: 'admin', id: 'admin', name: 'Administrator' };
-          this.enterApp();
-        } else this.toast('Invalid Admin PIN', 'danger');
-      },
-
-      loginDriver() {
-        const sel = document.getElementById('auth-driver-select').value;
-        const pin = document.getElementById('auth-driver-pin').value;
-        if(!sel) return this.toast("Select a driver profile", "warning");
-        const driver = STATE.drivers.find(d => d.id === sel);
-        if (driver && driver.pin === pin) {
-          STATE.user = { role: 'driver', id: driver.id, name: driver.name };
-          this.enterApp();
-        } else this.toast('Invalid Driver PIN', 'danger');
-      },
-
-      logout() {
-        STATE.user = null;
-        document.getElementById('app-main').classList.add('hidden');
-        document.getElementById('auth-screen').classList.remove('hidden');
-        document.getElementById('auth-admin-pin').value = '';
-        document.getElementById('auth-driver-pin').value = '';
-        this.populateAuthSelect();
-        this.toast('Logged out successfully', 'success');
-      },
-
-      enterApp() {
-        document.getElementById('auth-screen').classList.add('hidden');
-        document.getElementById('app-main').classList.remove('hidden');
-        document.getElementById('header-title').innerText = STATE.user.role === 'admin' ? 'Admin Dashboard' : `Driver: ${STATE.user.name}`;
-        
-        if(STATE.user.role === 'driver') {
-          document.getElementById('driver-status-bar').classList.remove('hidden');
-        } else {
-          document.getElementById('driver-status-bar').classList.add('hidden');
-        }
-
-        this.toast(`Welcome back, ${STATE.user.name}`, 'success');
-        this.switchView(STATE.user.role === 'admin' ? 'dashboard' : 'driver-wizard');
-      },
-
-      toast(message, type = 'primary') {
-        const container = document.getElementById('toast-container');
-        const el = document.createElement('div');
-        el.className = `toast ${type}`;
-        let icon = 'info';
-        if(type==='success') icon = 'check-circle';
-        if(type==='danger') icon = 'warning-circle';
-        if(type==='warning') icon = 'warning';
-        el.innerHTML = `<i class="ph-fill ph-${icon} text-xl"></i> <span>${message}</span>`;
-        container.appendChild(el);
-        setTimeout(() => el.classList.add('show'), 10);
-        setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 4000);
-      },
-
-      openModal(id) { document.getElementById(id).classList.add('open'); },
-      closeModal(id) { document.getElementById(id).classList.remove('open'); },
-
-      renderTabs() {
-        const adminTabs = [
-          { id: 'dashboard', icon: 'chart-pie-slice', label: 'Dashboard' },
-          { id: 'dispatch', icon: 'radar', label: 'Live Fleet' },
-          { id: 'trips', icon: 'clipboard-text', label: 'Tasks' },
-          { id: 'extract', icon: 'magic-wand', label: 'AI Extract' },
-          { id: 'drivers', icon: 'users', label: 'Drivers' },
-          { id: 'settings', icon: 'gear', label: 'Settings' }
-        ];
-        const driverTabs = [
-          { id: 'driver-wizard', icon: 'clipboard-text', label: 'My Route' },
-          { id: 'settings', icon: 'gear', label: 'Settings' }
-        ];
-
-        const tabs = STATE.user.role === 'admin' ? adminTabs : driverTabs;
-        const c = document.getElementById('tabs-container');
-        c.innerHTML = tabs.map(t => `
-          <button onclick="APP.switchView('${t.id}')" class="flex-1 py-2 px-4 font-medium rounded-lg flex items-center justify-center gap-2 whitespace-nowrap transition ${STATE.currentView === t.id ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}">
-            <i class="ph ph-${t.icon} text-lg"></i> ${t.label}
-          </button>
-        `).join('');
-      },
-
-      switchView(viewId) {
-        STATE.currentView = viewId;
-        this.renderTabs();
-        this.refreshCurrentView();
-      },
-
-      refreshCurrentView() {
-        const container = document.getElementById('views-container');
-        container.innerHTML = this.getViewHTML(STATE.currentView);
-        
-        if (STATE.currentView === 'dashboard') this.initDashboardChart();
-        if (STATE.currentView === 'dispatch') this.initMap();
-        if (STATE.currentView === 'extract') this.initDragDrop();
-      },
-
-      getViewHTML(viewId) {
-        switch(viewId) {
-          case 'dashboard': return this.htmlDashboard();
-          case 'trips': return this.htmlTrips();
-          case 'dispatch': return this.htmlDispatch();
-          case 'extract': return this.htmlExtract();
-          case 'settings': return this.htmlSettings();
-          case 'drivers': return this.htmlDrivers();
-          case 'driver-wizard': return this.htmlDriverWizard();
-          default: return `<div class="bg-white p-5 rounded-xl border"><p class="text-slate-500">View under construction: ${viewId}</p></div>`;
-        }
-      },
-
-      // --- ADMIN VIEWS ---
-      htmlDashboard() {
-        const today = new Date().toISOString().split('T')[0];
-        const todaysTrips = STATE.trips.filter(t => t.pickupTime && t.pickupTime.startsWith(today));
-        const completed = todaysTrips.filter(t => t.status === 'Completed').length;
-        
-        return `
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white border rounded-xl p-5 shadow-sm">
-              <div class="text-xs text-slate-500 uppercase font-bold tracking-wide">Total Trips Today</div>
-              <div class="text-3xl font-bold text-slate-800 mt-2">${todaysTrips.length}</div>
-            </div>
-            <div class="bg-white border rounded-xl p-5 shadow-sm">
-              <div class="text-xs text-slate-500 uppercase font-bold tracking-wide">Completed</div>
-              <div class="text-3xl font-bold text-emerald-600 mt-2">${completed}</div>
-            </div>
-            <div class="bg-white border rounded-xl p-5 shadow-sm">
-              <div class="text-xs text-slate-500 uppercase font-bold tracking-wide">Active Drivers</div>
-              <div class="text-3xl font-bold text-blue-600 mt-2">${STATE.drivers.filter(d=>d.status==='active').length}</div>
-            </div>
-            <div class="bg-white border rounded-xl p-5 shadow-sm">
-              <div class="text-xs text-slate-500 uppercase font-bold tracking-wide">Total Logged</div>
-              <div class="text-3xl font-bold text-amber-500 mt-2">${STATE.trips.length}</div>
-            </div>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-white border rounded-xl p-5 shadow-sm md:col-span-2">
-              <h3 class="font-bold text-lg text-slate-800 mb-4">Weekly Volume</h3>
-              <div style="height: 300px; position: relative;"><canvas id="dash-chart"></canvas></div>
-            </div>
-            <div class="bg-white border rounded-xl p-5 shadow-sm">
-              <h3 class="font-bold text-lg text-slate-800 mb-4">Today's Activity</h3>
-              <div class="space-y-3">
-                ${todaysTrips.slice(0,5).map(t => `
-                  <div class="flex justify-between items-center pb-3 border-b border-slate-100 last:border-0 last:pb-0">
-                    <div>
-                      <div class="font-bold text-slate-800 text-sm">${t.patientName}</div>
-                      <div class="text-xs text-slate-500">${new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
-                    </div>
-                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${t.status==='Completed'?'bg-green-100 text-green-700':t.status==='Pending'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700'}">${t.status}</span>
-                  </div>
-                `).join('') || '<p class="text-sm text-slate-500 text-center py-4">No trips today yet.</p>'}
-              </div>
-            </div>
-          </div>
-        `;
-      },
-
-      initDashboardChart() {
-        const ctx = document.getElementById('dash-chart');
-        if(!ctx) return;
-        new Chart(ctx, {
-          type: 'line',
-          data: { labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], datasets: [{ label: 'Trips', data: [12, 19, 15, 25, 22, 10, 8], borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', fill: true, tension: 0.4 }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
-        });
-      },
-
-      htmlTrips() {
-        return `
-          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 no-print">
-            <h2 class="text-xl font-bold text-slate-800">All Tasks</h2>
-            <div class="flex gap-2 w-full sm:w-auto">
-              <input type="date" class="border p-2 rounded-lg text-sm bg-white flex-1" id="trip-filter-date" onchange="APP.renderTripsList()">
-              <button onclick="APP.editTrip('')" class="flex-1 sm:flex-none bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm transition">
-                <i class="ph ph-plus"></i> Manual Task
-              </button>
-            </div>
-          </div>
-          <div class="space-y-4" id="trips-list-container">${this.buildTripsListHTML()}</div>
-        `;
-      },
-
-      buildTripsListHTML() {
-        let filtered = STATE.trips;
-        const dateF = document.getElementById('trip-filter-date')?.value;
-        if(dateF) filtered = filtered.filter(t => t.pickupTime && t.pickupTime.startsWith(dateF));
-        filtered.sort((a,b) => new Date(b.pickupTime) - new Date(a.pickupTime));
-
-        if(filtered.length === 0) return '<div class="bg-white border rounded-xl p-10 text-center text-slate-500">No tasks found.</div>';
-
-        return filtered.map(t => {
-          const dName = STATE.drivers.find(d => d.id === t.driverId)?.name || 'Unassigned';
-          const tTime = t.pickupTime ? new Date(t.pickupTime).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'No Time';
-          
-          return `
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 relative">
-              <div class="flex justify-between items-start mb-3">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <h3 class="font-bold text-lg text-slate-800">${t.patientName}</h3>
-                  </div>
-                  <p class="text-sm text-slate-500 mt-1">Driver: <span class="font-medium text-slate-700">${dName}</span></p>
-                </div>
-                <div class="flex flex-col items-end gap-2">
-                  <span class="px-3 py-1 rounded-full text-xs font-bold uppercase ${t.status === 'Completed' ? 'bg-green-100 text-green-700' : t.status === 'Pending' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${t.status}</span>
-                  <div class="flex gap-2 no-print mt-1">
-                    <button class="text-blue-600 hover:bg-blue-50 p-1.5 rounded" onclick="APP.editTrip('${t.id}')"><i class="ph ph-pencil"></i></button>
-                    <button class="text-red-600 hover:bg-red-50 p-1.5 rounded" onclick="APP.deleteTrip('${t.id}')"><i class="ph ph-trash"></i></button>
-                  </div>
-                </div>
-              </div>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
-                <div class="bg-slate-50 p-3 rounded-lg border">
-                  <span class="text-xs text-slate-500 font-bold block mb-1">PICKUP (${tTime})</span>
-                  <p class="text-sm font-medium text-slate-800">${t.pickupAddress}</p>
-                </div>
-                <div class="bg-slate-50 p-3 rounded-lg border">
-                  <span class="text-xs text-slate-500 font-bold block mb-1">DROPOFF</span>
-                  <p class="text-sm font-medium text-slate-800">${t.dropoffAddress}</p>
-                </div>
-              </div>
-              ${t.notes ? `<div class="mt-2 text-sm text-amber-700 bg-amber-50 p-2 rounded flex items-start gap-2"><i class="ph-fill ph-warning mt-0.5"></i> ${t.notes}</div>` : ''}
-            </div>
-          `;
-        }).join('');
-      },
-
-      renderTripsList() {
-        const c = document.getElementById('trips-list-container');
-        if(c) c.innerHTML = this.buildTripsListHTML();
-      },
-
-      editTrip(id) {
-        const trip = STATE.trips.find(t => t.id === id);
-        const driverSel = document.getElementById('trip-driver');
-        driverSel.innerHTML = '<option value="">Unassigned</option>' + STATE.drivers.filter(d=>d.status==='active').map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-        
-        document.getElementById('trip-id').value = trip ? trip.id : '';
-        document.getElementById('trip-patient').value = trip ? trip.patientName : '';
-        document.getElementById('trip-phone').value = trip ? (trip.phone || '') : '';
-        document.getElementById('trip-pickup').value = trip ? trip.pickupAddress : '';
-        document.getElementById('trip-dropoff').value = trip ? trip.dropoffAddress : '';
-        document.getElementById('trip-time').value = trip && trip.pickupTime ? trip.pickupTime : '';
-        document.getElementById('trip-driver').value = trip ? trip.driverId : '';
-        document.getElementById('trip-status').value = trip ? trip.status : 'Pending';
-        document.getElementById('trip-notes').value = trip ? trip.notes : '';
-        
-        this.openModal('modal-trip-form');
-      },
-
-      async saveTrip() {
-        const id = document.getElementById('trip-id').value || Storage.uid();
-        const trip = {
-          id: id, patientName: document.getElementById('trip-patient').value, phone: document.getElementById('trip-phone').value,
-          pickupAddress: document.getElementById('trip-pickup').value, dropoffAddress: document.getElementById('trip-dropoff').value,
-          pickupTime: document.getElementById('trip-time').value, driverId: document.getElementById('trip-driver').value,
-          status: document.getElementById('trip-status').value, notes: document.getElementById('trip-notes').value
+        req.onupgradeneeded = function(e) {
+          var db = e.target.result;
+          if (!db.objectStoreNames.contains('trips'))
+            db.createObjectStore('trips', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('drivers'))
+            db.createObjectStore('drivers', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('settings'))
+            db.createObjectStore('settings', { keyPath: 'key' });
         };
-        await DB.saveTrip(trip);
-        this.closeModal('modal-trip-form');
-        if(!DB.db && STATE.currentView === 'trips') this.renderTripsList();
-        this.toast('Trip saved successfully', 'success');
-      },
-      
-      async deleteTrip(id) {
-        if(confirm("Delete this trip?")) { 
-          await DB.deleteTrip(id);
-          if(!DB.db && STATE.currentView === 'trips') this.renderTripsList(); 
-          this.toast('Trip deleted', 'danger'); 
-        }
-      },
 
-      htmlDrivers() {
-        return `
-          <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-bold text-slate-800">Manage Drivers</h2>
-            <button onclick="APP.editDriver('')" class="bg-slate-800 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-900 shadow-sm"><i class="ph ph-user-plus"></i> Add Driver</button>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            ${STATE.drivers.map(d => `
-              <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
-                <div class="flex items-center gap-4">
-                  <div class="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center text-blue-600"><i class="ph-fill ph-user text-2xl"></i></div>
-                  <div>
-                    <h3 class="font-bold text-slate-800 flex items-center gap-2">${d.name} <span class="w-2 h-2 rounded-full ${d.status==='active'?'bg-emerald-500':'bg-red-500'}"></span></h3>
-                    <p class="text-xs text-slate-500">PIN: ${d.pin} | Phone: ${d.phone||'N/A'}</p>
-                  </div>
-                </div>
-                <div class="flex gap-1">
-                  <button class="p-2 text-blue-600 hover:bg-blue-50 rounded" onclick="APP.editDriver('${d.id}')"><i class="ph ph-pencil"></i></button>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        `;
-      },
+        req.onsuccess = function(e) {
+          IDB.db = e.target.result;
+          IDB.db.onerror = function(ev) { console.error('IDB error:', ev); };
+          resolve();
+        };
 
-      editDriver(id) {
-        const d = STATE.drivers.find(x => x.id === id);
-        document.getElementById('driver-id').value = d ? d.id : '';
-        document.getElementById('driver-name').value = d ? d.name : '';
-        document.getElementById('driver-phone').value = d ? d.phone : '';
-        document.getElementById('driver-pin').value = d ? d.pin : '';
-        document.getElementById('driver-status').value = d ? d.status : 'active';
-        this.openModal('modal-driver-form');
-      },
-      async saveDriver() {
-        const id = document.getElementById('driver-id').value || Storage.uid();
-        const d = { id: id, name: document.getElementById('driver-name').value, phone: document.getElementById('driver-phone').value, pin: document.getElementById('driver-pin').value, status: document.getElementById('driver-status').value };
-        await DB.saveDriver(d);
-        this.closeModal('modal-driver-form');
-        if(!DB.db) this.switchView('drivers');
-        this.toast('Driver saved.', 'success');
-      },
+        req.onerror = function(e) {
+          console.error('IDB open error:', e);
+          reject(e);
+        };
+      });
+    },
 
-      htmlExtract() {
-        const dOpts = '<option value="">Unassigned</option>' + STATE.drivers.filter(d=>d.status==='active').map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-        return `
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="md:col-span-1">
-              <div class="bg-white border rounded-xl p-6 shadow-sm">
-                <h3 class="font-bold text-lg text-slate-800 mb-2">AI Extraction</h3>
-                <p class="text-sm text-slate-500 mb-6">Drop manifest PDFs, Excel files, CSVs, or photos. The AI will parse them perfectly.</p>
-                <div class="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center bg-blue-50 relative cursor-pointer hover:bg-blue-100 transition" id="drop-zone">
-                  <input type="file" id="file-input" multiple accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                  <i class="ph-fill ph-upload-simple text-blue-500 mb-4 text-5xl"></i>
-                  <h3 class="font-bold text-slate-700 text-lg">Tap or drag files</h3>
-                  <p class="text-xs text-slate-500 mt-2">PDF, Excel, CSV, Images</p>
-                </div>
-              </div>
-            </div>
-            <div class="md:col-span-2">
-              <div class="bg-white border rounded-xl p-6 shadow-sm h-full flex flex-col">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                  <h3 class="font-bold text-lg text-slate-800">Extracted Preview</h3>
-                  <div class="flex gap-2 w-full sm:w-auto">
-                    <select id="bulk-driver-select" class="border p-2 rounded-lg text-sm bg-white" onchange="APP.bulkAssignDriver(this.value)">
-                      <option value="">Bulk Assign...</option>
-                      ${STATE.drivers.filter(d=>d.status==='active').map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
-                    </select>
-                    <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition whitespace-nowrap" onclick="APP.saveAllExtracted()"><i class="ph ph-check-square"></i> Save All</button>
-                  </div>
-                </div>
-                <div id="extract-results" class="flex-1 overflow-y-auto bg-slate-50 rounded-lg p-4 border border-slate-200" style="min-height: 300px;">
-                  <div class="text-center text-slate-400 py-12"><i class="ph ph-file-dashed text-4xl mb-2"></i><br>Awaiting documents...</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      },
-
-      initDragDrop() {
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        if(!dropZone || !fileInput) return;
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => dropZone.addEventListener(eventName, preventDefaults, false));
-        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-        dropZone.addEventListener('drop', (e) => this.handleFiles(e.dataTransfer.files), false);
-        fileInput.addEventListener('change', (e) => this.handleFiles(e.target.files), false);
-      },
-
-      async handleFiles(files) {
-        if(!files.length) return;
-        const resultsEl = document.getElementById('extract-results');
-        resultsEl.innerHTML = `<div class="text-center py-12"><div class="spinner inline-block"></div><p class="text-slate-600 font-medium mt-4">AI is analyzing ${files.length} document(s)...</p></div>`;
-        
+    getAll: function(store) {
+      return new Promise(function(resolve, reject) {
+        if (!IDB.db) { resolve([]); return; }
         try {
-          STATE.extractedQueue = [];
-          for(let file of files) {
-            let text = '';
-            if(file.name.endsWith('.pdf')) text = await this.extractPDF(file);
-            else if(file.name.endsWith('.csv')) text = await this.extractCSV(file);
-            else if(file.name.match(/\.(xlsx|xls)$/)) text = await this.extractExcel(file);
-            else if(file.type.startsWith('image/')) text = await this.extractImage(file);
-            if(text) await this.callCloudflareWorker(text, file.name);
-          }
-          this.renderExtracted();
-        } catch(e) {
-          console.error(e);
-          resultsEl.innerHTML = `<div class="text-red-700 bg-red-50 p-4 border border-red-200 rounded-lg"><h4 class="font-bold flex items-center gap-2"><i class="ph-fill ph-warning"></i> Processing Failed</h4><p class="text-sm mt-2">${e.message}</p></div>`;
-        }
-      },
-      extractPDF(file) { return file.arrayBuffer().then(buffer => pdfjsLib.getDocument(buffer).promise).then(pdf => Promise.all(Array.from({length: Math.min(pdf.numPages, 5)}, (_, i) => pdf.getPage(i+1).then(p => p.getTextContent())))).then(pages => pages.map(p => p.items.map(i => i.str).join(' ')).join('\n')); },
-      extractCSV(file) { return new Promise(resolve => Papa.parse(file, { complete: res => resolve(JSON.stringify(res.data)) })); },
-      extractExcel(file) { return file.arrayBuffer().then(buf => { const wb = XLSX.read(buf, {type: 'array'}); return wb.SheetNames.map(n => JSON.stringify(XLSX.utils.sheet_to_json(wb.Sheets[n]))).join('\n'); }); },
-      extractImage(file) { return new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = e => resolve(e.target.result); reader.onerror = reject; reader.readAsDataURL(file); }); },
+          var tx = IDB.db.transaction(store, 'readonly');
+          var req = tx.objectStore(store).getAll();
+          req.onsuccess = function() { resolve(req.result || []); };
+          req.onerror = function(e) { console.error(e); resolve([]); };
+        } catch(e) { console.error(e); resolve([]); }
+      });
+    },
 
-      async callCloudflareWorker(content, filename) {
-        let url = STATE.settings.workerUrl;
-        let isDirect = false;
-        if(!url) { if(STATE.settings.apiKey) { url = 'https://api.openai.com/v1/chat/completions'; isDirect = true; } else { throw new Error("Please configure your OpenAI API Key or Cloudflare Worker URL in Settings."); } }
-        let messages = [ { role: 'system', content: CONFIG.extractionPrompt } ];
-        if(content.startsWith('data:image')) { messages.push({ role: 'user', content: [{ type: 'text', text: `Extract from ${filename}` }, { type: 'image_url', image_url: { url: content } }] }); } else { messages.push({ role: 'user', content: `Extract from ${filename}:\n\n${content.substring(0,10000)}` }); }
-        const headers = { 'Content-Type': 'application/json' };
-        if(isDirect) headers['Authorization'] = `Bearer ${STATE.settings.apiKey}`;
-        const res = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify({ model: STATE.settings.aiModel, messages, temperature: 0 }) });
-        const data = await res.json();
-        if(!res.ok) throw new Error(`API Error: ${data.error?.message || res.statusText}`);
-        if(data.error) throw new Error(`OpenAI Error: ${data.error.message}`);
-        const rawJson = data.choices[0].message.content;
-        const match = rawJson.match(/\[[\s\S]*\]/);
-        if(!match) throw new Error("AI did not return a valid JSON array.");
-        const trips = JSON.parse(match[0]);
-        trips.forEach(t => t.driverId = '');
-        STATE.extractedQueue.push(...trips);
-      },
+    put: function(store, item) {
+      return new Promise(function(resolve, reject) {
+        if (!IDB.db) { resolve(); return; }
+        try {
+          var tx = IDB.db.transaction(store, 'readwrite');
+          var req = tx.objectStore(store).put(item);
+          req.onsuccess = resolve;
+          req.onerror = function(e) { console.error(e); resolve(); };
+        } catch(e) { console.error(e); resolve(); }
+      });
+    },
 
-      renderExtracted() {
-        const resultsEl = document.getElementById('extract-results');
-        if(!STATE.extractedQueue.length) { resultsEl.innerHTML = `<div class="text-center text-slate-500 py-12">No trips found.</div>`; return; }
-        const dOpts = '<option value="">Unassigned</option>' + STATE.drivers.filter(d=>d.status==='active').map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-        resultsEl.innerHTML = STATE.extractedQueue.map((t, i) => `
-          <div class="bg-white p-4 rounded-lg mb-3 border border-slate-200 shadow-sm relative">
-            <button class="absolute top-2 right-2 text-slate-400 hover:text-red-500" onclick="APP.removeExtracted(${i})"><i class="ph ph-x"></i></button>
-            <div class="flex justify-between items-start mb-3 pr-6">
-              <div>
-                <div class="font-bold text-slate-800">${t.patientName || 'Unknown Patient'}</div>
-                <div class="text-xs text-slate-500 font-bold">${t.pickupTime || 'No Time'}</div>
-              </div>
-              <select class="border rounded p-1 text-sm bg-white" onchange="APP.updateExtractedDriver(${i}, this.value)">
-                ${dOpts.replace(`value="${t.driverId}"`, `value="${t.driverId}" selected`)}
-              </select>
-            </div>
-            <div class="grid grid-cols-2 gap-2 mt-2 bg-slate-50 border border-slate-100 p-3 rounded">
-              <div><p class="text-xs font-bold text-slate-500 mb-1">PU</p><p class="text-sm text-slate-700">${t.pickupAddress}</p></div>
-              <div><p class="text-xs font-bold text-slate-500 mb-1">DO</p><p class="text-sm text-slate-700">${t.dropoffAddress}</p></div>
-            </div>
-            ${t.notes ? `<div class="text-xs text-blue-700 mt-2 bg-blue-50 p-2 rounded"><i class="ph ph-info"></i> ${t.notes}</div>` : ''}
-          </div>
-        `).join('');
-      },
-      updateExtractedDriver(index, driverId) { STATE.extractedQueue[index].driverId = driverId; },
-      bulkAssignDriver(driverId) { STATE.extractedQueue.forEach(t => t.driverId = driverId); this.renderExtracted(); },
-      removeExtracted(index) { STATE.extractedQueue.splice(index, 1); this.renderExtracted(); },
-      async saveAllExtracted() {
-        if(!STATE.extractedQueue.length) return;
-        for(const t of STATE.extractedQueue) {
-          await DB.saveTrip({ id: Storage.uid(), patientName: t.patientName, pickupAddress: t.pickupAddress, dropoffAddress: t.dropoffAddress, pickupTime: t.pickupTime, notes: t.notes, phone: t.phone || '', status: 'Pending', driverId: t.driverId || '' });
-        }
-        STATE.extractedQueue = []; this.renderExtracted(); this.toast("Trips saved to schedule!", "success");
-      },
+    delete: function(store, id) {
+      return new Promise(function(resolve, reject) {
+        if (!IDB.db) { resolve(); return; }
+        try {
+          var tx = IDB.db.transaction(store, 'readwrite');
+          var req = tx.objectStore(store).delete(id);
+          req.onsuccess = resolve;
+          req.onerror = function(e) { console.error(e); resolve(); };
+        } catch(e) { console.error(e); resolve(); }
+      });
+    },
 
-      htmlSettings() {
-        return `
-          <div class="bg-white border rounded-xl p-6 shadow-sm max-w-2xl mb-20">
-            <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="ph ph-gear"></i> System Settings</h2>
-            
-            <div class="space-y-6">
-              <div>
-                <h3 class="font-bold text-slate-700 mb-3">AI Configuration</h3>
-                <div class="mb-4">
-                  <label class="block text-sm font-medium mb-1">Direct OpenAI API Key (Quick Start)</label>
-                  <input type="password" id="set-api-key" class="w-full border p-3 rounded-lg" value="${STATE.settings.apiKey || ''}" placeholder="sk-...">
-                  <p class="text-xs text-slate-500 mt-1">If set, the app calls OpenAI directly.</p>
-                </div>
-                <div class="mb-4">
-                  <label class="block text-sm font-medium mb-1">Cloudflare Worker URL (Production)</label>
-                  <input type="url" id="set-url" class="w-full border p-3 rounded-lg" value="${STATE.settings.workerUrl || ''}" placeholder="https://your-worker.workers.dev">
-                  <p class="text-xs text-slate-500 mt-1">Overrides the direct API key for secure proxying.</p>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium mb-1">OpenAI Model</label>
-                  <select id="set-model" class="w-full border p-3 rounded-lg bg-white">
-                    <option value="gpt-4o-mini" ${STATE.settings.aiModel==='gpt-4o-mini'?'selected':''}>GPT-4o Mini (Fast/Cheap)</option>
-                    <option value="gpt-4o" ${STATE.settings.aiModel==='gpt-4o'?'selected':''}>GPT-4o (Most Accurate/Vision)</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div class="border-t pt-6">
-                <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="ph-fill ph-database text-blue-600"></i> Cloud Database (Firebase)</h3>
-                <p class="text-xs text-slate-500 mb-4">Paste your Firebase Project Configuration JSON below to enable permanent real-time cloud syncing across all devices. If left blank, the app stores data strictly on this browser.</p>
-                <div>
-                  <textarea id="set-firebase" rows="6" class="w-full border p-3 rounded-lg font-mono text-xs bg-slate-50" placeholder='{"apiKey": "...", "authDomain": "...", ...}'>${STATE.settings.firebaseConfig || ''}</textarea>
-                </div>
-              </div>
+    getSetting: function(key, defaultVal) {
+      return new Promise(function(resolve) {
+        if (!IDB.db) { resolve(defaultVal); return; }
+        try {
+          var tx = IDB.db.transaction('settings', 'readonly');
+          var req = tx.objectStore('settings').get(key);
+          req.onsuccess = function() {
+            resolve(req.result ? req.result.value : defaultVal);
+          };
+          req.onerror = function() { resolve(defaultVal); };
+        } catch(e) { resolve(defaultVal); }
+      });
+    },
 
-              <div class="border-t pt-6">
-                <h3 class="font-bold text-slate-700 mb-3">Navigation</h3>
-                <label class="flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition ${STATE.settings.mapApp === 'google' ? 'border-blue-500 bg-blue-50' : 'hover:bg-slate-50'}">
-                  <input type="radio" name="mapApp" value="google" ${STATE.settings.mapApp === 'google' ? 'checked' : ''} class="w-5 h-5 text-blue-600" onchange="document.getElementById('set-map').value='google'">
-                  <span class="font-medium text-slate-700">Google Maps</span>
-                </label>
-                <input type="hidden" id="set-map" value="${STATE.settings.mapApp}">
-              </div>
+    putSetting: function(key, value) {
+      return IDB.put('settings', { key: key, value: value });
+    }
+  };
 
-              <div class="border-t pt-6">
-                <h3 class="font-bold text-slate-700 mb-3">Security</h3>
-                <div>
-                  <label class="block text-sm font-medium mb-1">Admin Login PIN</label>
-                  <input type="text" id="set-admin-pin" class="w-full border p-3 rounded-lg" value="${STATE.settings.adminPin || '1234'}">
-                </div>
-              </div>
+  // ─── CONFIG ───────────────────────────────────────────────────────────────
+  var CONFIG = {
+    version: '5.2.0-Enterprise',
+    extractionPrompt: `You are a strict and precise NEMT trip data extractor.
+Extract ALL trips perfectly. Never miss a detail. Never mix trips.
+Output MUST be a JSON array with these exact keys:
+[{"patientName":"Full Name","pickupAddress":"Full pickup address","dropoffAddress":"Full dropoff address","pickupTime":"YYYY-MM-DDTHH:mm","phone":"Phone or empty","notes":"Special instructions"}]
+Return ONLY the JSON array. No markdown, no explanation.`
+  };
 
-              <button class="w-full py-4 bg-blue-600 text-white font-bold rounded-lg mt-4 shadow-md hover:bg-blue-700 transition" onclick="APP.saveSettings()">Save Settings</button>
-            </div>
-          </div>
-        `;
-      },
+  // ─── STATE ────────────────────────────────────────────────────────────────
+  var STATE = {
+    user: null,
+    trips: [],
+    drivers: [{ id: 'd1', name: 'John Doe', pin: '1111', phone: '555-0101', status: 'active' }],
+    settings: { workerUrl: '', apiKey: '', aiModel: 'gpt-4o-mini', adminPin: '1234', mapApp: 'google', firebaseConfig: '' },
+    currentView: 'dashboard',
+    extractedQueue: [],
+    mapInstance: null,
+    wizardCb: null,
+    wizardTripId: null,
+    firebaseDb: null,
+    firebaseUnsubs: []
+  };
 
-      saveSettings() {
-        STATE.settings.apiKey = document.getElementById('set-api-key').value;
-        STATE.settings.workerUrl = document.getElementById('set-url').value;
-        STATE.settings.aiModel = document.getElementById('set-model').value;
-        STATE.settings.adminPin = document.getElementById('set-admin-pin').value;
-        STATE.settings.mapApp = document.getElementById('set-map').value;
-        
-        const oldFirebase = STATE.settings.firebaseConfig;
-        STATE.settings.firebaseConfig = document.getElementById('set-firebase').value;
-        Storage.set('settings', STATE.settings);
-        this.toast("Settings saved successfully.", "success");
-        
-        if(oldFirebase !== STATE.settings.firebaseConfig) {
-          alert("Database configuration changed. The app will reload to apply changes.");
-          window.location.reload();
-        } else {
-          this.switchView('settings');
-        }
-      },
+  // ─── FIREBASE (optional cloud sync) ───────────────────────────────────────
+  var FB = {
+    init: function(configJson) {
+      if (!configJson || !configJson.trim()) return;
+      try {
+        var config = JSON.parse(configJson);
+        // Delete existing app if one exists
+        try {
+          var existing = firebase.app();
+          if (existing) existing.delete();
+        } catch(e) {}
 
-      htmlDispatch() {
-        return `
-          <div class="bg-white border rounded-xl p-0 overflow-hidden shadow-sm relative">
-            <div id="map-container" style="height: 500px; width: 100%;"></div>
-            <div class="absolute top-4 right-4 z-[400] bg-white p-4 rounded-xl shadow-lg w-64 border border-slate-100">
-              <h4 class="font-bold text-slate-800 mb-3">Live Fleet Status</h4>
-              <div class="space-y-3">
-                ${STATE.drivers.filter(d=>d.status==='active').map(d => `
-                  <div class="flex items-center justify-between text-sm">
-                    <span class="flex items-center gap-2 font-medium text-slate-700"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span> ${d.name}</span>
-                    <span class="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold">ON DUTY</span>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          </div>
-        `;
-      },
-      initMap() {
-        if(STATE.mapInstance) { STATE.mapInstance.remove(); STATE.mapInstance = null; }
-        const mapEl = document.getElementById('map-container');
-        if(!mapEl) return;
-        STATE.mapInstance = L.map('map-container').setView([39.8283, -98.5795], 4);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap & CARTO' }).addTo(STATE.mapInstance);
-      },
-
-      // --- DRIVER VIEWS ---
-      htmlDriverWizard() {
-        const myTrips = STATE.trips.filter(t => t.driverId === STATE.user.id && t.status !== 'Completed').sort((a,b) => new Date(a.pickupTime) - new Date(b.pickupTime));
-        if(!myTrips.length) return `<div class="bg-white border rounded-xl p-10 text-center"><i class="ph-fill ph-check-circle text-emerald-500 text-6xl mb-4"></i><h2 class="text-2xl font-bold text-slate-800">All Caught Up!</h2><p class="text-slate-500 mt-2">You have no active assignments.</p></div>`;
-
-        const active = myTrips[0];
-        const queued = myTrips.slice(1);
-
-        const isPending = active.status === 'Pending' || active.status === 'Assigned';
-        const isEnRoutePickup = active.status === 'En Route to Pickup';
-        const isAtPickup = active.status === 'Arrived at Pickup';
-        const isEnRouteDropoff = active.status === 'En Route to Dropoff';
-
-        return `
-          <div class="mb-8">
-            <h2 class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Active Trip</h2>
-            <div class="bg-white border-2 border-blue-400 p-5 rounded-xl shadow-md relative overflow-hidden">
-              <div class="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>
-              <div class="flex justify-between items-start mb-4 border-b border-slate-100 pb-4">
-                <div>
-                  <h3 class="font-bold text-xl text-slate-800">${active.patientName}</h3>
-                  <div class="flex items-center gap-3 mt-1 text-sm text-slate-600 font-medium">
-                    <span class="text-blue-600"><i class="ph-fill ph-clock"></i> ${new Date(active.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
-                  </div>
-                </div>
-                <span class="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase text-center max-w-[120px] shadow-sm">
-                  ${active.status}
-                </span>
-              </div>
-              
-              <div class="mb-4 flex gap-2">
-                ${active.phone ? `
-                  <a href="tel:${active.phone}" class="flex-1 flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 py-3 rounded-lg border border-emerald-200 font-bold hover:bg-emerald-100 transition shadow-sm"><i class="ph-fill ph-phone text-lg"></i> Call</a>
-                  <a href="sms:${active.phone}" class="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-700 py-3 rounded-lg border border-blue-200 font-bold hover:bg-blue-100 transition shadow-sm"><i class="ph-fill ph-chat-circle-text text-lg"></i> SMS</a>
-                ` : `<button class="w-full py-3 bg-slate-100 text-slate-400 rounded-lg font-bold border border-slate-200" disabled>No Phone Available</button>`}
-              </div>
-              
-              ${active.notes ? `<div class="flex items-start gap-2 bg-amber-50 text-amber-800 p-3 rounded-lg border border-amber-200 text-sm mb-6 shadow-sm"><i class="ph-fill ph-warning text-lg shrink-0 mt-0.5"></i><p><strong>Notes:</strong> ${active.notes}</p></div>` : ''}
-              
-              <div class="space-y-4 mb-6">
-                <!-- Pickup Card -->
-                <div class="p-4 rounded-xl border-2 transition-all ${isEnRoutePickup ? 'bg-blue-50 border-blue-300 shadow-inner' : 'bg-slate-50 border-slate-200'}">
-                  <div class="flex justify-between items-center mb-2">
-                    <span class="text-xs text-slate-500 font-bold tracking-widest uppercase">1. Pickup</span>
-                  </div>
-                  <p class="text-slate-800 font-bold text-lg leading-tight mb-4">${active.pickupAddress}</p>
-                  ${isPending ? `<button onclick="APP.updateTripStatus('${active.id}', 'En Route to Pickup')" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-900 shadow-md active:scale-95 transition"><i class="ph-fill ph-play text-lg"></i> Start Trip to Pickup</button>` : ''}
-                  ${isEnRoutePickup ? `
-                    <div class="flex gap-2">
-                      <button onclick="APP.openNavigation('${active.pickupAddress}')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 shadow-sm"><i class="ph-fill ph-navigation-arrow text-lg text-blue-600"></i> Map</button>
-                      <button onclick="APP.promptArrivePickup('${active.id}')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md active:scale-95"><i class="ph-fill ph-check-circle text-lg"></i> Arrived</button>
-                    </div>
-                  ` : ''}
-                </div>
-                
-                <!-- Dropoff Card -->
-                <div class="p-4 rounded-xl border-2 transition-all ${isEnRouteDropoff ? 'bg-blue-50 border-blue-300 shadow-inner' : 'bg-slate-50 border-slate-200'}">
-                  <div class="flex justify-between items-center mb-2">
-                    <span class="text-xs text-slate-500 font-bold tracking-widest uppercase">2. Dropoff</span>
-                  </div>
-                  <p class="text-slate-800 font-bold text-lg leading-tight mb-4">${active.dropoffAddress}</p>
-                  ${isAtPickup ? `<button onclick="APP.updateTripStatus('${active.id}', 'En Route to Dropoff')" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 shadow-md active:scale-95 transition"><i class="ph-fill ph-play text-lg"></i> Begin Leg to Dropoff</button>` : ''}
-                  ${isEnRouteDropoff ? `
-                    <div class="flex gap-2">
-                      <button onclick="APP.openNavigation('${active.dropoffAddress}')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 shadow-sm"><i class="ph-fill ph-navigation-arrow text-lg text-blue-600"></i> Map</button>
-                      <button onclick="APP.promptArriveDropoff('${active.id}')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md active:scale-95"><i class="ph-fill ph-flag-checkered text-lg"></i> Finish</button>
-                    </div>
-                  ` : ''}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          ${queued.length > 0 ? `
-            <h4 class="mb-3 text-slate-500 uppercase font-bold text-xs tracking-wider">Up Next (${queued.length})</h4>
-            <div class="grid grid-cols-1 gap-3">
-              ${queued.map(t => `
-                <div class="bg-white border p-4 rounded-xl shadow-sm flex justify-between items-center opacity-80 hover:opacity-100 transition">
-                  <div>
-                    <h4 class="font-bold text-slate-800 text-base">${t.patientName}</h4>
-                    <div class="text-xs text-slate-500 font-medium mt-1"><i class="ph-fill ph-clock"></i> ${new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} - ${t.pickupAddress.substring(0,30)}...</div>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          ` : ''}
-        `;
-      },
-
-      openNavigation(address) {
-        const mapApp = STATE.settings.mapApp || 'google';
-        const encoded = encodeURIComponent(address);
-        let url = `https://www.google.com/maps/search/?api=1&query=${encoded}`; // default
-        if(mapApp === 'apple') url = `http://maps.apple.com/?daddr=${encoded}`;
-        window.open(url, '_blank');
-      },
-
-      async updateTripStatus(id, status) {
-        const trip = STATE.trips.find(t => t.id === id);
-        if(trip) { 
-          trip.status = status; 
-          await DB.saveTrip(trip); 
-          if(!DB.db) this.switchView('driver-wizard'); 
-        }
-      },
-
-      promptArrivePickup(id) {
-        STATE.wizardTripId = id; STATE.wizardCb = () => this.updateTripStatus(id, 'Arrived at Pickup');
-        document.getElementById('wizard-prompt-title').innerText = "Arrived at Pickup";
-        document.getElementById('wizard-sig-wrap').classList.remove('hidden');
-        document.getElementById('wizard-odo').value = ''; document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5); document.getElementById('wizard-sig-check').checked = false;
-        this.openModal('modal-wizard-prompt');
-      },
-
-      promptArriveDropoff(id) {
-        STATE.wizardTripId = id; STATE.wizardCb = () => this.updateTripStatus(id, 'Completed');
-        document.getElementById('wizard-prompt-title').innerText = "Trip Completed";
-        document.getElementById('wizard-sig-wrap').classList.add('hidden');
-        document.getElementById('wizard-odo').value = ''; document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5);
-        this.openModal('modal-wizard-prompt');
-      },
-
-      confirmWizardPrompt() {
-        const odo = document.getElementById('wizard-odo').value;
-        const time = document.getElementById('wizard-time').value;
-        const sigWrap = document.getElementById('wizard-sig-wrap');
-        const sigCheck = document.getElementById('wizard-sig-check').checked;
-        if(!odo || !time) return this.toast("Please fill in the odometer and time.", "danger");
-        if(!sigWrap.classList.contains('hidden') && !sigCheck) return this.toast("Please verify the paper signature.", "danger");
-        this.closeModal('modal-wizard-prompt');
-        if(STATE.wizardCb) STATE.wizardCb();
+        var app = firebase.initializeApp(config);
+        STATE.firebaseDb = firebase.firestore(app);
+        FB.startListeners();
+        document.getElementById('db-indicator').classList.remove('hidden');
+        APP.toast('🔥 Firebase Connected — Cloud Sync Active', 'success');
+        console.log('Firebase Firestore connected.');
+      } catch(e) {
+        console.error('Firebase init error:', e);
+        APP.toast('Firebase config invalid. Using local database.', 'warning');
       }
-    };
+    },
 
-    // Expose APP globally so HTML onclick handlers can reach it
-    window.APP = APP;
-    window.addEventListener('DOMContentLoaded', () => APP.init());
-  </script>
+    startListeners: function() {
+      if (!STATE.firebaseDb) return;
+      STATE.firebaseUnsubs.forEach(function(u) { try { u(); } catch(e){} });
+      STATE.firebaseUnsubs = [];
+
+      STATE.firebaseUnsubs.push(
+        STATE.firebaseDb.collection('nemt_trips').onSnapshot(function(snap) {
+          STATE.trips = [];
+          snap.forEach(function(d) { STATE.trips.push(Object.assign({ id: d.id }, d.data())); });
+          if (APP.refreshCurrentView) APP.refreshCurrentView();
+        }, function(err) { console.error('Trips listener error:', err); })
+      );
+
+      STATE.firebaseUnsubs.push(
+        STATE.firebaseDb.collection('nemt_drivers').onSnapshot(function(snap) {
+          STATE.drivers = [];
+          snap.forEach(function(d) { STATE.drivers.push(Object.assign({ id: d.id }, d.data())); });
+          if (STATE.currentView === 'drivers') APP.refreshCurrentView();
+        }, function(err) { console.error('Drivers listener error:', err); })
+      );
+    }
+  };
+
+  // ─── DB ABSTRACTION (IDB + optional Firebase) ─────────────────────────────
+  var DB = {
+    uid: function() { return Date.now().toString(36) + Math.random().toString(36).substring(2); },
+
+    saveTrip: async function(trip) {
+      // Always save locally first (IndexedDB)
+      await IDB.put('trips', trip);
+      var idx = STATE.trips.findIndex(function(t) { return t.id === trip.id; });
+      if (idx > -1) STATE.trips[idx] = trip; else STATE.trips.push(trip);
+
+      // Also sync to Firebase if connected
+      if (STATE.firebaseDb) {
+        try {
+          var data = Object.assign({}, trip);
+          var id = data.id; delete data.id;
+          await STATE.firebaseDb.collection('nemt_trips').doc(id).set(data);
+        } catch(e) { console.error('Firebase saveTrip error:', e); }
+      }
+    },
+
+    deleteTrip: async function(id) {
+      await IDB.delete('trips', id);
+      STATE.trips = STATE.trips.filter(function(t) { return t.id !== id; });
+
+      if (STATE.firebaseDb) {
+        try { await STATE.firebaseDb.collection('nemt_trips').doc(id).delete(); }
+        catch(e) { console.error('Firebase deleteTrip error:', e); }
+      }
+    },
+
+    saveDriver: async function(driver) {
+      await IDB.put('drivers', driver);
+      var idx = STATE.drivers.findIndex(function(d) { return d.id === driver.id; });
+      if (idx > -1) STATE.drivers[idx] = driver; else STATE.drivers.push(driver);
+
+      if (STATE.firebaseDb) {
+        try {
+          var data = Object.assign({}, driver);
+          var id = data.id; delete data.id;
+          await STATE.firebaseDb.collection('nemt_drivers').doc(id).set(data);
+        } catch(e) { console.error('Firebase saveDriver error:', e); }
+      }
+    },
+
+    saveSettings: async function(settings) {
+      await IDB.putSetting('app_settings', settings);
+
+      if (STATE.firebaseDb) {
+        try { await STATE.firebaseDb.collection('nemt_config').doc('settings').set(settings); }
+        catch(e) { console.error('Firebase saveSettings error:', e); }
+      }
+    }
+  };
+
+  // ─── MAIN APPLICATION ─────────────────────────────────────────────────────
+  var APP = {
+
+    init: async function() {
+      try {
+        document.getElementById('loading-status').textContent = 'Opening database...';
+        await IDB.init();
+
+        document.getElementById('loading-status').textContent = 'Loading trips & drivers...';
+        var savedTrips   = await IDB.getAll('trips');
+        var savedDrivers = await IDB.getAll('drivers');
+        var savedSettings = await IDB.getSetting('app_settings', null);
+
+        if (savedTrips.length)   STATE.trips   = savedTrips;
+        if (savedDrivers.length) STATE.drivers = savedDrivers;
+        if (savedSettings)       STATE.settings = Object.assign(STATE.settings, savedSettings);
+
+        // If no drivers saved yet, persist the default
+        if (!savedDrivers.length) {
+          await IDB.put('drivers', STATE.drivers[0]);
+        }
+
+        document.getElementById('loading-status').textContent = 'Connecting to cloud...';
+
+        // Try Firebase if configured
+        if (STATE.settings.firebaseConfig && STATE.settings.firebaseConfig.trim()) {
+          FB.init(STATE.settings.firebaseConfig);
+        }
+
+        // Hide loading, show auth
+        document.getElementById('loading-screen').classList.add('hidden');
+        APP.populateAuthSelect();
+        document.getElementById('auth-screen').classList.remove('hidden');
+
+      } catch(e) {
+        console.error('Init failed:', e);
+        document.getElementById('loading-screen').classList.add('hidden');
+        document.getElementById('auth-screen').classList.remove('hidden');
+        APP.toast('Database error — using memory mode. Data may not persist.', 'warning');
+      }
+    },
+
+    populateAuthSelect: function() {
+      var sel = document.getElementById('auth-driver-select');
+      sel.innerHTML = '<option value="">Select your profile...</option>' +
+        STATE.drivers.filter(function(d) { return d.status === 'active'; })
+          .map(function(d) { return '<option value="' + d.id + '">' + d.name + '</option>'; }).join('');
+    },
+
+    loginAdmin: function() {
+      var pin = document.getElementById('auth-admin-pin').value;
+      if (pin === (STATE.settings.adminPin || '1234')) {
+        STATE.user = { role: 'admin', id: 'admin', name: 'Administrator' };
+        APP.enterApp();
+      } else APP.toast('Invalid Admin PIN', 'danger');
+    },
+
+    loginDriver: function() {
+      var sel = document.getElementById('auth-driver-select').value;
+      var pin = document.getElementById('auth-driver-pin').value;
+      if (!sel) return APP.toast('Select a driver profile', 'warning');
+      var driver = STATE.drivers.find(function(d) { return d.id === sel; });
+      if (driver && driver.pin === pin) {
+        STATE.user = { role: 'driver', id: driver.id, name: driver.name };
+        APP.enterApp();
+      } else APP.toast('Invalid Driver PIN', 'danger');
+    },
+
+    logout: function() {
+      STATE.user = null;
+      document.getElementById('app-main').classList.add('hidden');
+      document.getElementById('auth-screen').classList.remove('hidden');
+      document.getElementById('auth-admin-pin').value = '';
+      document.getElementById('auth-driver-pin').value = '';
+      APP.populateAuthSelect();
+      APP.toast('Logged out successfully', 'success');
+    },
+
+    enterApp: function() {
+      document.getElementById('auth-screen').classList.add('hidden');
+      document.getElementById('app-main').classList.remove('hidden');
+      document.getElementById('header-title').innerText = STATE.user.role === 'admin' ? 'Admin Dashboard' : 'Driver: ' + STATE.user.name;
+
+      if (STATE.user.role === 'driver') {
+        document.getElementById('driver-status-bar').classList.remove('hidden');
+      } else {
+        document.getElementById('driver-status-bar').classList.add('hidden');
+      }
+
+      APP.toast('Welcome back, ' + STATE.user.name, 'success');
+      APP.switchView(STATE.user.role === 'admin' ? 'dashboard' : 'driver-wizard');
+    },
+
+    toast: function(message, type) {
+      type = type || 'primary';
+      var container = document.getElementById('toast-container');
+      var el = document.createElement('div');
+      el.className = 'toast ' + type;
+      var icons = { success: 'check-circle', danger: 'warning-circle', warning: 'warning', primary: 'info' };
+      var icon = icons[type] || 'info';
+      el.innerHTML = '<i class="ph-fill ph-' + icon + ' text-xl"></i> <span>' + message + '</span>';
+      container.appendChild(el);
+      setTimeout(function() { el.classList.add('show'); }, 10);
+      setTimeout(function() { el.classList.remove('show'); setTimeout(function() { el.remove(); }, 300); }, 4500);
+    },
+
+    openModal:  function(id) { document.getElementById(id).classList.add('open'); },
+    closeModal: function(id) { document.getElementById(id).classList.remove('open'); },
+
+    renderTabs: function() {
+      var adminTabs = [
+        { id: 'dashboard',    icon: 'chart-pie-slice', label: 'Dashboard' },
+        { id: 'dispatch',     icon: 'radar',           label: 'Live Fleet' },
+        { id: 'trips',        icon: 'clipboard-text',  label: 'Tasks' },
+        { id: 'extract',      icon: 'magic-wand',      label: 'AI Extract' },
+        { id: 'drivers',      icon: 'users',           label: 'Drivers' },
+        { id: 'settings',     icon: 'gear',            label: 'Settings' }
+      ];
+      var driverTabs = [
+        { id: 'driver-wizard', icon: 'clipboard-text', label: 'My Route' },
+        { id: 'settings',      icon: 'gear',           label: 'Settings' }
+      ];
+      var tabs = STATE.user.role === 'admin' ? adminTabs : driverTabs;
+      var c = document.getElementById('tabs-container');
+      c.innerHTML = tabs.map(function(t) {
+        var active = STATE.currentView === t.id;
+        return '<button onclick="APP.switchView(\'' + t.id + '\')" class="flex-1 py-2 px-4 font-medium rounded-lg flex items-center justify-center gap-2 whitespace-nowrap transition ' +
+          (active ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-100') + '">' +
+          '<i class="ph ph-' + t.icon + ' text-lg"></i> ' + t.label + '</button>';
+      }).join('');
+    },
+
+    switchView: function(viewId) {
+      STATE.currentView = viewId;
+      APP.renderTabs();
+      APP.refreshCurrentView();
+    },
+
+    refreshCurrentView: function() {
+      var container = document.getElementById('views-container');
+      if (!container) return;
+      container.innerHTML = APP.getViewHTML(STATE.currentView);
+      if (STATE.currentView === 'dashboard') APP.initDashboardChart();
+      if (STATE.currentView === 'dispatch')  APP.initMap();
+      if (STATE.currentView === 'extract')   APP.initDragDrop();
+    },
+
+    getViewHTML: function(viewId) {
+      switch(viewId) {
+        case 'dashboard':    return APP.htmlDashboard();
+        case 'trips':        return APP.htmlTrips();
+        case 'dispatch':     return APP.htmlDispatch();
+        case 'extract':      return APP.htmlExtract();
+        case 'settings':     return APP.htmlSettings();
+        case 'drivers':      return APP.htmlDrivers();
+        case 'driver-wizard':return APP.htmlDriverWizard();
+        default: return '<div class="bg-white p-5 rounded-xl border"><p class="text-slate-500">View: ' + viewId + '</p></div>';
+      }
+    },
+
+    // ── DASHBOARD ──────────────────────────────────────────────────────────
+    htmlDashboard: function() {
+      var today = new Date().toISOString().split('T')[0];
+      var todaysTrips = STATE.trips.filter(function(t) { return t.pickupTime && t.pickupTime.startsWith(today); });
+      var completed   = todaysTrips.filter(function(t) { return t.status === 'Completed'; }).length;
+      var pending     = todaysTrips.filter(function(t) { return t.status === 'Pending'; }).length;
+
+      return '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">' +
+        APP._statCard('Total Today', todaysTrips.length, 'text-slate-800') +
+        APP._statCard('Completed',   completed,          'text-emerald-600') +
+        APP._statCard('Active Drivers', STATE.drivers.filter(function(d){return d.status==='active';}).length, 'text-blue-600') +
+        APP._statCard('Total Logged',   STATE.trips.length, 'text-amber-500') +
+      '</div>' +
+      '<div class="grid grid-cols-1 md:grid-cols-3 gap-6">' +
+        '<div class="bg-white border rounded-xl p-5 shadow-sm md:col-span-2">' +
+          '<h3 class="font-bold text-lg text-slate-800 mb-4">Weekly Volume</h3>' +
+          '<div style="height:300px;position:relative;"><canvas id="dash-chart"></canvas></div>' +
+        '</div>' +
+        '<div class="bg-white border rounded-xl p-5 shadow-sm">' +
+          '<h3 class="font-bold text-lg text-slate-800 mb-4">Today\'s Activity</h3>' +
+          '<div class="space-y-3">' +
+          (todaysTrips.slice(0,6).map(function(t) {
+            var cls = t.status==='Completed' ? 'bg-green-100 text-green-700' : t.status==='Pending' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700';
+            var tStr = t.pickupTime ? new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+            return '<div class="flex justify-between items-center pb-3 border-b border-slate-100 last:border-0 last:pb-0">' +
+              '<div><div class="font-bold text-slate-800 text-sm">' + t.patientName + '</div>' +
+              '<div class="text-xs text-slate-500">' + tStr + '</div></div>' +
+              '<span class="px-2 py-1 rounded text-[10px] font-bold uppercase ' + cls + '">' + t.status + '</span>' +
+            '</div>';
+          }).join('') || '<p class="text-sm text-slate-500 text-center py-4">No trips today yet.</p>') +
+          '</div></div></div>';
+    },
+
+    _statCard: function(label, value, cls) {
+      return '<div class="bg-white border rounded-xl p-5 shadow-sm">' +
+        '<div class="text-xs text-slate-500 uppercase font-bold tracking-wide">' + label + '</div>' +
+        '<div class="text-3xl font-bold ' + cls + ' mt-2">' + value + '</div></div>';
+    },
+
+    initDashboardChart: function() {
+      var ctx = document.getElementById('dash-chart');
+      if (!ctx) return;
+      // Build real weekly data from STATE.trips
+      var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      var counts = [0,0,0,0,0,0,0];
+      var now = new Date();
+      STATE.trips.forEach(function(t) {
+        if (!t.pickupTime) return;
+        var d = new Date(t.pickupTime);
+        var diff = Math.floor((now - d) / 86400000);
+        if (diff >= 0 && diff < 7) counts[d.getDay()]++;
+      });
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: days,
+          datasets: [{ label: 'Trips', data: counts, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.1)', fill: true, tension: 0.4 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
+      });
+    },
+
+    // ── TRIPS ──────────────────────────────────────────────────────────────
+    htmlTrips: function() {
+      return '<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 no-print">' +
+        '<h2 class="text-xl font-bold text-slate-800">All Tasks</h2>' +
+        '<div class="flex gap-2 w-full sm:w-auto">' +
+          '<input type="date" class="border p-2 rounded-lg text-sm bg-white flex-1" id="trip-filter-date" onchange="APP.renderTripsList()">' +
+          '<button onclick="APP.editTrip(\'\')" class="flex-1 sm:flex-none bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm transition">' +
+            '<i class="ph ph-plus"></i> Manual Task' +
+          '</button>' +
+        '</div></div>' +
+        '<div class="space-y-4" id="trips-list-container">' + APP.buildTripsListHTML() + '</div>';
+    },
+
+    buildTripsListHTML: function() {
+      var filtered = STATE.trips.slice();
+      var dateF = document.getElementById('trip-filter-date');
+      if (dateF && dateF.value) filtered = filtered.filter(function(t) { return t.pickupTime && t.pickupTime.startsWith(dateF.value); });
+      filtered.sort(function(a,b) { return new Date(b.pickupTime) - new Date(a.pickupTime); });
+
+      if (!filtered.length) return '<div class="bg-white border rounded-xl p-10 text-center text-slate-500">No tasks found.</div>';
+
+      return filtered.map(function(t) {
+        var dName = (STATE.drivers.find(function(d) { return d.id === t.driverId; }) || {}).name || 'Unassigned';
+        var tTime = t.pickupTime ? new Date(t.pickupTime).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'No Time';
+        var cls   = t.status==='Completed' ? 'bg-green-100 text-green-700' : t.status==='Pending' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700';
+        return '<div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">' +
+          '<div class="flex justify-between items-start mb-3">' +
+            '<div>' +
+              '<h3 class="font-bold text-lg text-slate-800">' + t.patientName + '</h3>' +
+              '<p class="text-sm text-slate-500 mt-1">Driver: <span class="font-medium text-slate-700">' + dName + '</span></p>' +
+            '</div>' +
+            '<div class="flex flex-col items-end gap-2">' +
+              '<span class="px-3 py-1 rounded-full text-xs font-bold uppercase ' + cls + '">' + t.status + '</span>' +
+              '<div class="flex gap-2 no-print mt-1">' +
+                '<button class="text-blue-600 hover:bg-blue-50 p-1.5 rounded" onclick="APP.editTrip(\'' + t.id + '\')"><i class="ph ph-pencil"></i></button>' +
+                '<button class="text-red-600 hover:bg-red-50 p-1.5 rounded" onclick="APP.deleteTrip(\'' + t.id + '\')"><i class="ph ph-trash"></i></button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">' +
+            '<div class="bg-slate-50 p-3 rounded-lg border"><span class="text-xs text-slate-500 font-bold block mb-1">PICKUP (' + tTime + ')</span><p class="text-sm font-medium text-slate-800">' + (t.pickupAddress||'—') + '</p></div>' +
+            '<div class="bg-slate-50 p-3 rounded-lg border"><span class="text-xs text-slate-500 font-bold block mb-1">DROPOFF</span><p class="text-sm font-medium text-slate-800">' + (t.dropoffAddress||'—') + '</p></div>' +
+          '</div>' +
+          (t.notes ? '<div class="mt-2 text-sm text-amber-700 bg-amber-50 p-2 rounded flex items-start gap-2"><i class="ph-fill ph-warning mt-0.5"></i> ' + t.notes + '</div>' : '') +
+        '</div>';
+      }).join('');
+    },
+
+    renderTripsList: function() {
+      var c = document.getElementById('trips-list-container');
+      if (c) c.innerHTML = APP.buildTripsListHTML();
+    },
+
+    editTrip: function(id) {
+      var trip = STATE.trips.find(function(t) { return t.id === id; });
+      var dSel = document.getElementById('trip-driver');
+      dSel.innerHTML = '<option value="">Unassigned</option>' +
+        STATE.drivers.filter(function(d){return d.status==='active';}).map(function(d){ return '<option value="'+d.id+'">'+d.name+'</option>'; }).join('');
+
+      document.getElementById('trip-id').value      = trip ? trip.id : '';
+      document.getElementById('trip-patient').value = trip ? trip.patientName : '';
+      document.getElementById('trip-phone').value   = trip ? (trip.phone||'') : '';
+      document.getElementById('trip-pickup').value  = trip ? trip.pickupAddress : '';
+      document.getElementById('trip-dropoff').value = trip ? trip.dropoffAddress : '';
+      document.getElementById('trip-time').value    = trip && trip.pickupTime ? trip.pickupTime : '';
+      document.getElementById('trip-driver').value  = trip ? (trip.driverId||'') : '';
+      document.getElementById('trip-status').value  = trip ? trip.status : 'Pending';
+      document.getElementById('trip-notes').value   = trip ? (trip.notes||'') : '';
+      APP.openModal('modal-trip-form');
+    },
+
+    saveTrip: async function() {
+      var id = document.getElementById('trip-id').value || DB.uid();
+      var trip = {
+        id:            id,
+        patientName:   document.getElementById('trip-patient').value,
+        phone:         document.getElementById('trip-phone').value,
+        pickupAddress: document.getElementById('trip-pickup').value,
+        dropoffAddress:document.getElementById('trip-dropoff').value,
+        pickupTime:    document.getElementById('trip-time').value,
+        driverId:      document.getElementById('trip-driver').value,
+        status:        document.getElementById('trip-status').value,
+        notes:         document.getElementById('trip-notes').value
+      };
+      await DB.saveTrip(trip);
+      APP.closeModal('modal-trip-form');
+      APP.renderTripsList();
+      APP.toast('Trip saved ✓', 'success');
+    },
+
+    deleteTrip: async function(id) {
+      if (confirm('Delete this trip? This cannot be undone.')) {
+        await DB.deleteTrip(id);
+        APP.renderTripsList();
+        APP.toast('Trip deleted', 'danger');
+      }
+    },
+
+    // ── DRIVERS ────────────────────────────────────────────────────────────
+    htmlDrivers: function() {
+      return '<div class="flex justify-between items-center mb-6">' +
+        '<h2 class="text-xl font-bold text-slate-800">Manage Drivers</h2>' +
+        '<button onclick="APP.editDriver(\'\')" class="bg-slate-800 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-900 shadow-sm"><i class="ph ph-user-plus"></i> Add Driver</button>' +
+      '</div>' +
+      '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+      STATE.drivers.map(function(d) {
+        return '<div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">' +
+          '<div class="flex items-center gap-4">' +
+            '<div class="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center text-blue-600"><i class="ph-fill ph-user text-2xl"></i></div>' +
+            '<div>' +
+              '<h3 class="font-bold text-slate-800 flex items-center gap-2">' + d.name + ' <span class="w-2 h-2 rounded-full ' + (d.status==='active'?'bg-emerald-500':'bg-red-500') + '"></span></h3>' +
+              '<p class="text-xs text-slate-500">PIN: ' + d.pin + ' | Phone: ' + (d.phone||'N/A') + '</p>' +
+            '</div>' +
+          '</div>' +
+          '<div class="flex gap-1">' +
+            '<button class="p-2 text-blue-600 hover:bg-blue-50 rounded" onclick="APP.editDriver(\'' + d.id + '\')"><i class="ph ph-pencil"></i></button>' +
+          '</div>' +
+        '</div>';
+      }).join('') + '</div>';
+    },
+
+    editDriver: function(id) {
+      var d = STATE.drivers.find(function(x) { return x.id === id; });
+      document.getElementById('driver-id').value     = d ? d.id : '';
+      document.getElementById('driver-name').value   = d ? d.name : '';
+      document.getElementById('driver-phone').value  = d ? (d.phone||'') : '';
+      document.getElementById('driver-pin').value    = d ? d.pin : '';
+      document.getElementById('driver-status').value = d ? d.status : 'active';
+      APP.openModal('modal-driver-form');
+    },
+
+    saveDriver: async function() {
+      var id = document.getElementById('driver-id').value || DB.uid();
+      var driver = {
+        id:     id,
+        name:   document.getElementById('driver-name').value,
+        phone:  document.getElementById('driver-phone').value,
+        pin:    document.getElementById('driver-pin').value,
+        status: document.getElementById('driver-status').value
+      };
+      await DB.saveDriver(driver);
+      APP.closeModal('modal-driver-form');
+      APP.switchView('drivers');
+      APP.toast('Driver saved ✓', 'success');
+    },
+
+    // ── AI EXTRACT ─────────────────────────────────────────────────────────
+    htmlExtract: function() {
+      return '<div class="grid grid-cols-1 md:grid-cols-3 gap-6">' +
+        '<div class="md:col-span-1">' +
+          '<div class="bg-white border rounded-xl p-6 shadow-sm">' +
+            '<h3 class="font-bold text-lg text-slate-800 mb-2">AI Extraction</h3>' +
+            '<p class="text-sm text-slate-500 mb-6">Drop manifest PDFs, Excel, CSVs, or photos. AI will parse them perfectly.</p>' +
+            '<div class="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center bg-blue-50 relative cursor-pointer hover:bg-blue-100 transition" id="drop-zone">' +
+              '<input type="file" id="file-input" multiple accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">' +
+              '<i class="ph-fill ph-upload-simple text-blue-500 mb-4 text-5xl"></i>' +
+              '<h3 class="font-bold text-slate-700 text-lg">Tap or drag files</h3>' +
+              '<p class="text-xs text-slate-500 mt-2">PDF, Excel, CSV, Images</p>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="md:col-span-2">' +
+          '<div class="bg-white border rounded-xl p-6 shadow-sm h-full flex flex-col">' +
+            '<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">' +
+              '<h3 class="font-bold text-lg text-slate-800">Extracted Preview</h3>' +
+              '<div class="flex gap-2 w-full sm:w-auto">' +
+                '<select id="bulk-driver-select" class="border p-2 rounded-lg text-sm bg-white" onchange="APP.bulkAssignDriver(this.value)">' +
+                  '<option value="">Bulk Assign Driver...</option>' +
+                  STATE.drivers.filter(function(d){return d.status==='active';}).map(function(d){ return '<option value="'+d.id+'">'+d.name+'</option>'; }).join('') +
+                '</select>' +
+                '<button class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition whitespace-nowrap" onclick="APP.saveAllExtracted()"><i class="ph ph-check-square"></i> Save All</button>' +
+              '</div>' +
+            '</div>' +
+            '<div id="extract-results" class="flex-1 overflow-y-auto bg-slate-50 rounded-lg p-4 border border-slate-200" style="min-height:300px;">' +
+              '<div class="text-center text-slate-400 py-12"><i class="ph ph-file-dashed text-4xl mb-2"></i><br>Awaiting documents...</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    },
+
+    initDragDrop: function() {
+      var dropZone = document.getElementById('drop-zone');
+      var fileInput = document.getElementById('file-input');
+      if (!dropZone || !fileInput) return;
+      ['dragenter','dragover','dragleave','drop'].forEach(function(ev) {
+        dropZone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); });
+      });
+      dropZone.addEventListener('drop',    function(e) { APP.handleFiles(e.dataTransfer.files); });
+      fileInput.addEventListener('change', function(e) { APP.handleFiles(e.target.files); });
+    },
+
+    handleFiles: async function(files) {
+      if (!files.length) return;
+      var resultsEl = document.getElementById('extract-results');
+      resultsEl.innerHTML = '<div class="text-center py-12"><div class="spinner inline-block"></div><p class="text-slate-600 font-medium mt-4">AI is analyzing ' + files.length + ' document(s)...</p></div>';
+
+      try {
+        STATE.extractedQueue = [];
+        for (var i = 0; i < files.length; i++) {
+          var file = files[i];
+          var text = '';
+          if (file.name.endsWith('.pdf')) text = await APP.extractPDF(file);
+          else if (file.name.endsWith('.csv')) text = await APP.extractCSV(file);
+          else if (file.name.match(/\.(xlsx|xls)$/)) text = await APP.extractExcel(file);
+          else if (file.type.startsWith('image/')) text = await APP.extractImage(file);
+          if (text) await APP.callAI(text, file.name);
+        }
+        APP.renderExtracted();
+      } catch(e) {
+        console.error(e);
+        resultsEl.innerHTML = '<div class="text-red-700 bg-red-50 p-4 border border-red-200 rounded-lg"><h4 class="font-bold">Processing Failed</h4><p class="text-sm mt-2">' + e.message + '</p></div>';
+      }
+    },
+
+    extractPDF: function(file) {
+      return file.arrayBuffer()
+        .then(function(buf) { return pdfjsLib.getDocument(buf).promise; })
+        .then(function(pdf) {
+          var pages = [];
+          for (var i = 1; i <= Math.min(pdf.numPages, 8); i++) pages.push(pdf.getPage(i).then(function(p) { return p.getTextContent(); }));
+          return Promise.all(pages);
+        })
+        .then(function(pages) { return pages.map(function(p) { return p.items.map(function(i) { return i.str; }).join(' '); }).join('\n'); });
+    },
+
+    extractCSV: function(file) {
+      return new Promise(function(resolve) { Papa.parse(file, { complete: function(res) { resolve(JSON.stringify(res.data)); } }); });
+    },
+
+    extractExcel: function(file) {
+      return file.arrayBuffer().then(function(buf) {
+        var wb = XLSX.read(buf, { type: 'array' });
+        return wb.SheetNames.map(function(n) { return JSON.stringify(XLSX.utils.sheet_to_json(wb.Sheets[n])); }).join('\n');
+      });
+    },
+
+    extractImage: function(file) {
+      return new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function(e) { resolve(e.target.result); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    },
+
+    callAI: async function(content, filename) {
+      var url = STATE.settings.workerUrl;
+      var isDirect = false;
+      if (!url) {
+        if (STATE.settings.apiKey) { url = 'https://api.openai.com/v1/chat/completions'; isDirect = true; }
+        else throw new Error('Configure your OpenAI API Key or Worker URL in Settings.');
+      }
+
+      var messages = [{ role: 'system', content: CONFIG.extractionPrompt }];
+      if (content.startsWith('data:image')) {
+        messages.push({ role: 'user', content: [{ type: 'text', text: 'Extract from ' + filename }, { type: 'image_url', image_url: { url: content } }] });
+      } else {
+        messages.push({ role: 'user', content: 'Extract from ' + filename + ':\n\n' + content.substring(0, 12000) });
+      }
+
+      var headers = { 'Content-Type': 'application/json' };
+      if (isDirect) headers['Authorization'] = 'Bearer ' + STATE.settings.apiKey;
+
+      var res = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify({ model: STATE.settings.aiModel, messages: messages, temperature: 0 }) });
+      var data = await res.json();
+      if (!res.ok) throw new Error('API Error: ' + (data.error && data.error.message ? data.error.message : res.statusText));
+
+      var rawJson = data.choices[0].message.content;
+      var match = rawJson.match(/\[[\s\S]*\]/);
+      if (!match) throw new Error('AI did not return a valid JSON array.');
+      var trips = JSON.parse(match[0]);
+      trips.forEach(function(t) { t.driverId = ''; });
+      STATE.extractedQueue.push.apply(STATE.extractedQueue, trips);
+    },
+
+    renderExtracted: function() {
+      var resultsEl = document.getElementById('extract-results');
+      if (!STATE.extractedQueue.length) { resultsEl.innerHTML = '<div class="text-center text-slate-500 py-12">No trips found.</div>'; return; }
+      var dOpts = '<option value="">Unassigned</option>' + STATE.drivers.filter(function(d){return d.status==='active';}).map(function(d){ return '<option value="'+d.id+'">'+d.name+'</option>'; }).join('');
+      resultsEl.innerHTML = STATE.extractedQueue.map(function(t, i) {
+        return '<div class="bg-white p-4 rounded-lg mb-3 border border-slate-200 shadow-sm relative">' +
+          '<button class="absolute top-2 right-2 text-slate-400 hover:text-red-500" onclick="APP.removeExtracted(' + i + ')"><i class="ph ph-x"></i></button>' +
+          '<div class="flex justify-between items-start mb-3 pr-6">' +
+            '<div><div class="font-bold text-slate-800">' + (t.patientName||'Unknown') + '</div>' +
+            '<div class="text-xs text-slate-500 font-bold">' + (t.pickupTime||'No Time') + '</div></div>' +
+            '<select class="border rounded p-1 text-sm bg-white" onchange="APP.updateExtractedDriver(' + i + ', this.value)">' +
+              dOpts.replace('value="' + t.driverId + '"', 'value="' + t.driverId + '" selected') +
+            '</select>' +
+          '</div>' +
+          '<div class="grid grid-cols-2 gap-2 mt-2 bg-slate-50 border border-slate-100 p-3 rounded">' +
+            '<div><p class="text-xs font-bold text-slate-500 mb-1">PICKUP</p><p class="text-sm text-slate-700">' + (t.pickupAddress||'—') + '</p></div>' +
+            '<div><p class="text-xs font-bold text-slate-500 mb-1">DROPOFF</p><p class="text-sm text-slate-700">' + (t.dropoffAddress||'—') + '</p></div>' +
+          '</div>' +
+          (t.notes ? '<div class="text-xs text-blue-700 mt-2 bg-blue-50 p-2 rounded"><i class="ph ph-info"></i> ' + t.notes + '</div>' : '') +
+        '</div>';
+      }).join('');
+    },
+
+    updateExtractedDriver: function(i, driverId) { STATE.extractedQueue[i].driverId = driverId; },
+    bulkAssignDriver: function(dId) { STATE.extractedQueue.forEach(function(t) { t.driverId = dId; }); APP.renderExtracted(); },
+    removeExtracted: function(i) { STATE.extractedQueue.splice(i, 1); APP.renderExtracted(); },
+
+    saveAllExtracted: async function() {
+      if (!STATE.extractedQueue.length) return;
+      for (var i = 0; i < STATE.extractedQueue.length; i++) {
+        var t = STATE.extractedQueue[i];
+        await DB.saveTrip({ id: DB.uid(), patientName: t.patientName, pickupAddress: t.pickupAddress, dropoffAddress: t.dropoffAddress, pickupTime: t.pickupTime, notes: t.notes||'', phone: t.phone||'', status: 'Pending', driverId: t.driverId||'' });
+      }
+      STATE.extractedQueue = [];
+      APP.renderExtracted();
+      APP.toast('All trips saved to schedule!', 'success');
+    },
+
+    // ── SETTINGS ───────────────────────────────────────────────────────────
+    htmlSettings: function() {
+      var s = STATE.settings;
+      var fbStatus = STATE.firebaseDb ?
+        '<span class="text-emerald-600 font-bold">✓ Connected</span>' :
+        '<span class="text-slate-400">Not connected</span>';
+
+      return '<div class="bg-white border rounded-xl p-6 shadow-sm max-w-2xl mb-20">' +
+        '<h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="ph ph-gear"></i> System Settings</h2>' +
+        '<div class="space-y-6">' +
+
+          '<div>' +
+            '<h3 class="font-bold text-slate-700 mb-3">AI Configuration</h3>' +
+            '<div class="mb-4">' +
+              '<label class="block text-sm font-medium mb-1">OpenAI API Key</label>' +
+              '<input type="password" id="set-api-key" class="w-full border p-3 rounded-lg" value="' + (s.apiKey||'') + '" placeholder="sk-...">' +
+              '<p class="text-xs text-slate-500 mt-1">Calls OpenAI directly from your browser.</p>' +
+            '</div>' +
+            '<div class="mb-4">' +
+              '<label class="block text-sm font-medium mb-1">Cloudflare Worker URL (Production)</label>' +
+              '<input type="url" id="set-url" class="w-full border p-3 rounded-lg" value="' + (s.workerUrl||'') + '" placeholder="https://your-worker.workers.dev">' +
+            '</div>' +
+            '<div>' +
+              '<label class="block text-sm font-medium mb-1">AI Model</label>' +
+              '<select id="set-model" class="w-full border p-3 rounded-lg bg-white">' +
+                '<option value="gpt-4o-mini" ' + (s.aiModel==='gpt-4o-mini'?'selected':'') + '>GPT-4o Mini (Fast & Cheap)</option>' +
+                '<option value="gpt-4o" '     + (s.aiModel==='gpt-4o'?'selected':'')      + '>GPT-4o (Best Accuracy + Vision)</option>' +
+              '</select>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="border-t pt-6">' +
+            '<h3 class="font-bold text-slate-700 mb-1 flex items-center gap-2"><i class="ph-fill ph-database text-blue-600"></i> Cloud Database (Firebase) ' + fbStatus + '</h3>' +
+            '<p class="text-xs text-slate-500 mb-3">Paste your Firebase Project JSON to enable real-time cloud sync across all devices. Without it, all data is saved permanently in this browser via IndexedDB.</p>' +
+            '<textarea id="set-firebase" rows="5" class="w-full border p-3 rounded-lg font-mono text-xs bg-slate-50" placeholder=\'{"apiKey":"...","authDomain":"...","projectId":"..."}\'>' + (s.firebaseConfig||'') + '</textarea>' +
+
+```
+      '</div>' +
+
+      '<div class="border-t pt-6">' +
+        '<h3 class="font-bold text-slate-700 mb-3">Security</h3>' +
+        '<label class="block text-sm font-medium mb-1">Admin PIN</label>' +
+        '<input type="text" id="set-admin-pin" class="w-full border p-3 rounded-lg" value="' + (s.adminPin||'1234') + '">' +
+      '</div>' +
+
+      '<button class="w-full py-4 bg-blue-600 text-white font-bold rounded-lg mt-4 shadow-md hover:bg-blue-700 transition" onclick="APP.saveSettings()">Save Settings</button>' +
+    '</div></div>';
+},
+
+saveSettings: async function() {
+  var oldFb = STATE.settings.firebaseConfig;
+  STATE.settings.apiKey        = document.getElementById('set-api-key').value;
+  STATE.settings.workerUrl     = document.getElementById('set-url').value;
+  STATE.settings.aiModel       = document.getElementById('set-model').value;
+  STATE.settings.adminPin      = document.getElementById('set-admin-pin').value;
+  STATE.settings.firebaseConfig = document.getElementById('set-firebase').value;
+
+  await DB.saveSettings(STATE.settings);
+  APP.toast('Settings saved ✓', 'success');
+
+  if (oldFb !== STATE.settings.firebaseConfig) {
+    APP.toast('Database config changed — reloading...', 'warning');
+    setTimeout(function() { window.location.reload(); }, 1500);
+  } else {
+    APP.switchView('settings');
+  }
+},
+
+// ── DISPATCH / MAP ──────────────────────────────────────────────────────
+htmlDispatch: function() {
+  return '<div class="bg-white border rounded-xl overflow-hidden shadow-sm relative">' +
+    '<div id="map-container" style="height:500px;width:100%;"></div>' +
+    '<div class="absolute top-4 right-4 z-[400] bg-white p-4 rounded-xl shadow-lg w-64 border border-slate-100">' +
+      '<h4 class="font-bold text-slate-800 mb-3">Live Fleet Status</h4>' +
+      '<div class="space-y-3">' +
+      STATE.drivers.filter(function(d){return d.status==='active';}).map(function(d) {
+        return '<div class="flex items-center justify-between text-sm">' +
+          '<span class="flex items-center gap-2 font-medium text-slate-700"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> ' + d.name + '</span>' +
+          '<span class="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold">ON DUTY</span>' +
+        '</div>';
+      }).join('') +
+      '</div>' +
+    '</div>' +
+  '</div>';
+},
+
+initMap: function() {
+  if (STATE.mapInstance) { try { STATE.mapInstance.remove(); } catch(e){} STATE.mapInstance = null; }
+  var mapEl = document.getElementById('map-container');
+  if (!mapEl) return;
+  STATE.mapInstance = L.map('map-container').setView([39.8283, -98.5795], 4);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap & CARTO' }).addTo(STATE.mapInstance);
+},
+
+// ── DRIVER WIZARD ───────────────────────────────────────────────────────
+htmlDriverWizard: function() {
+  var myTrips = STATE.trips.filter(function(t) { return t.driverId === STATE.user.id && t.status !== 'Completed'; })
+    .sort(function(a,b) { return new Date(a.pickupTime) - new Date(b.pickupTime); });
+
+  if (!myTrips.length) return '<div class="bg-white border rounded-xl p-10 text-center"><i class="ph-fill ph-check-circle text-emerald-500 text-6xl mb-4"></i><h2 class="text-2xl font-bold text-slate-800">All Caught Up!</h2><p class="text-slate-500 mt-2">You have no active assignments.</p></div>';
+
+  var active = myTrips[0];
+  var queued = myTrips.slice(1);
+
+  var isPending         = active.status === 'Pending' || active.status === 'Assigned';
+  var isEnRoutePickup   = active.status === 'En Route to Pickup';
+  var isAtPickup        = active.status === 'Arrived at Pickup';
+  var isEnRouteDropoff  = active.status === 'En Route to Dropoff';
+
+  var tStr = active.pickupTime ? new Date(active.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+
+  return '<div class="mb-8">' +
+    '<h2 class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Active Trip</h2>' +
+    '<div class="bg-white border-2 border-blue-400 p-5 rounded-xl shadow-md relative overflow-hidden">' +
+      '<div class="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>' +
+      '<div class="flex justify-between items-start mb-4 border-b border-slate-100 pb-4">' +
+        '<div>' +
+          '<h3 class="font-bold text-xl text-slate-800">' + active.patientName + '</h3>' +
+          '<div class="flex items-center gap-3 mt-1 text-sm text-slate-600 font-medium">' +
+            '<span class="text-blue-600"><i class="ph-fill ph-clock"></i> ' + tStr + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<span class="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase text-center max-w-[140px] shadow-sm">' + active.status + '</span>' +
+      '</div>' +
+
+      '<div class="mb-4 flex gap-2">' +
+        (active.phone ?
+          '<a href="tel:' + active.phone + '" class="flex-1 flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 py-3 rounded-lg border border-emerald-200 font-bold hover:bg-emerald-100 transition shadow-sm"><i class="ph-fill ph-phone text-lg"></i> Call</a>' +
+          '<a href="sms:' + active.phone + '" class="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-700 py-3 rounded-lg border border-blue-200 font-bold hover:bg-blue-100 transition shadow-sm"><i class="ph-fill ph-chat-circle-text text-lg"></i> SMS</a>'
+          : '<button class="w-full py-3 bg-slate-100 text-slate-400 rounded-lg font-bold border border-slate-200" disabled>No Phone Available</button>') +
+      '</div>' +
+
+      (active.notes ? '<div class="flex items-start gap-2 bg-amber-50 text-amber-800 p-3 rounded-lg border border-amber-200 text-sm mb-4 shadow-sm"><i class="ph-fill ph-warning text-lg shrink-0 mt-0.5"></i><p><strong>Notes:</strong> ' + active.notes + '</p></div>' : '') +
+
+      '<div class="space-y-4 mb-4">' +
+        // Pickup Card
+        '<div class="p-4 rounded-xl border-2 transition-all ' + (isEnRoutePickup ? 'bg-blue-50 border-blue-300 shadow-inner' : 'bg-slate-50 border-slate-200') + '">' +
+          '<span class="text-xs text-slate-500 font-bold tracking-widest uppercase">1. Pickup</span>' +
+          '<p class="text-slate-800 font-bold text-lg leading-tight my-3">' + (active.pickupAddress||'—') + '</p>' +
+          (isPending ? '<button onclick="APP.updateTripStatus(\'' + active.id + '\', \'En Route to Pickup\')" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-900 shadow-md active:scale-95 transition"><i class="ph-fill ph-play text-lg"></i> Start Trip to Pickup</button>' : '') +
+          (isEnRoutePickup ? '<div class="flex gap-2"><button onclick="APP.openNavigation(\'' + active.pickupAddress + '\')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 shadow-sm"><i class="ph-fill ph-navigation-arrow text-lg text-blue-600"></i> Map</button><button onclick="APP.promptArrivePickup(\'' + active.id + '\')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md active:scale-95"><i class="ph-fill ph-check-circle text-lg"></i> Arrived</button></div>' : '') +
+        '</div>' +
+        // Dropoff Card
+        '<div class="p-4 rounded-xl border-2 transition-all ' + (isEnRouteDropoff ? 'bg-blue-50 border-blue-300 shadow-inner' : 'bg-slate-50 border-slate-200') + '">' +
+          '<span class="text-xs text-slate-500 font-bold tracking-widest uppercase">2. Dropoff</span>' +
+          '<p class="text-slate-800 font-bold text-lg leading-tight my-3">' + (active.dropoffAddress||'—') + '</p>' +
+          (isAtPickup ? '<button onclick="APP.updateTripStatus(\'' + active.id + '\', \'En Route to Dropoff\')" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 shadow-md active:scale-95 transition"><i class="ph-fill ph-play text-lg"></i> Begin Leg to Dropoff</button>' : '') +
+          (isEnRouteDropoff ? '<div class="flex gap-2"><button onclick="APP.openNavigation(\'' + active.dropoffAddress + '\')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 shadow-sm"><i class="ph-fill ph-navigation-arrow text-lg text-blue-600"></i> Map</button><button onclick="APP.promptArriveDropoff(\'' + active.id + '\')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md active:scale-95"><i class="ph-fill ph-flag-checkered text-lg"></i> Finish</button></div>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>' +
+
+  (queued.length ? '<h4 class="mb-3 text-slate-500 uppercase font-bold text-xs tracking-wider">Up Next (' + queued.length + ')</h4><div class="grid grid-cols-1 gap-3">' +
+    queued.map(function(t) {
+      var tStr2 = t.pickupTime ? new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+      return '<div class="bg-white border p-4 rounded-xl shadow-sm flex justify-between items-center opacity-80 hover:opacity-100 transition"><div><h4 class="font-bold text-slate-800 text-base">' + t.patientName + '</h4><div class="text-xs text-slate-500 font-medium mt-1"><i class="ph-fill ph-clock"></i> ' + tStr2 + ' — ' + (t.pickupAddress||'').substring(0,30) + '...</div></div></div>';
+    }).join('') + '</div>'
+  : '');
+},
+
+openNavigation: function(address) {
+  var encoded = encodeURIComponent(address);
+  window.open('https://www.google.com/maps/search/?api=1&query=' + encoded, '_blank');
+},
+
+updateTripStatus: async function(id, status) {
+  var trip = STATE.trips.find(function(t) { return t.id === id; });
+  if (trip) {
+    trip.status = status;
+    await DB.saveTrip(trip);
+    APP.refreshCurrentView();
+  }
+},
+
+promptArrivePickup: function(id) {
+  STATE.wizardTripId = id;
+  STATE.wizardCb = function() { return APP.updateTripStatus(id, 'Arrived at Pickup'); };
+  document.getElementById('wizard-prompt-title').innerText = 'Arrived at Pickup';
+  document.getElementById('wizard-sig-wrap').classList.remove('hidden');
+  document.getElementById('wizard-odo').value = '';
+  document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5);
+  document.getElementById('wizard-sig-check').checked = false;
+  APP.openModal('modal-wizard-prompt');
+},
+
+promptArriveDropoff: function(id) {
+  STATE.wizardTripId = id;
+  STATE.wizardCb = function() { return APP.updateTripStatus(id, 'Completed'); };
+  document.getElementById('wizard-prompt-title').innerText = 'Trip Completed';
+  document.getElementById('wizard-sig-wrap').classList.add('hidden');
+  document.getElementById('wizard-odo').value = '';
+  document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5);
+  APP.openModal('modal-wizard-prompt');
+},
+
+confirmWizardPrompt: function() {
+  var odo      = document.getElementById('wizard-odo').value;
+  var time     = document.getElementById('wizard-time').value;
+  var sigWrap  = document.getElementById('wizard-sig-wrap');
+  var sigCheck = document.getElementById('wizard-sig-check').checked;
+  if (!odo || !time) return APP.toast('Please fill in the odometer and time.', 'danger');
+  if (!sigWrap.classList.contains('hidden') && !sigCheck) return APP.toast('Please verify the paper signature.', 'danger');
+  APP.closeModal('modal-wizard-prompt');
+  if (STATE.wizardCb) STATE.wizardCb();
+}
+```
+
+};
+
+// ─── BOOT ─────────────────────────────────────────────────────────────────
+window.APP = APP;
+document.addEventListener(‘DOMContentLoaded’, function() {
+APP.init();
+});
+// Also try immediately if DOMContentLoaded already fired
+if (document.readyState === ‘complete’ || document.readyState === ‘interactive’) {
+setTimeout(function() { APP.init(); }, 10);
+}
+</script>
+
 </body>
 </html>
