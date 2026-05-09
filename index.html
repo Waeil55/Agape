@@ -278,7 +278,7 @@ Return ONLY the JSON array.`
       db: null,
       unsubs: [],
       init() {
-        if(STATE.settings.firebaseConfig && STATE.settings.firebaseConfig.trim() !== '') {
+        if(typeof STATE.settings.firebaseConfig === 'string' && STATE.settings.firebaseConfig.trim() !== '') {
           try {
             const config = JSON.parse(STATE.settings.firebaseConfig);
             this.app = initializeApp(config);
