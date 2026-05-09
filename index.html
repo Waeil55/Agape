@@ -79,7 +79,7 @@
           <h2 class="font-semibold text-slate-700 mb-4 flex items-center gap-2"><i class="ph ph-map-pin"></i> Driver Login</h2>
           <select id="auth-driver-select" class="w-full p-3 border rounded-lg mb-3 bg-white"></select>
           <input type="password" id="auth-driver-pin" placeholder="Driver PIN" class="w-full p-3 border rounded-lg mb-3" onkeydown="if(event.key==='Enter')APP.loginDriver()">
-          <button onclick="APP.loginDriver()" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">
+          <button onclick="APP.loginDriver()" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition shadow-sm">
             Login as Driver
           </button>
         </div>
@@ -87,7 +87,7 @@
         <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
           <h2 class="font-semibold text-slate-700 mb-4 flex items-center gap-2"><i class="ph ph-gear"></i> Admin Portal</h2>
           <input type="password" id="auth-admin-pin" placeholder="Admin PIN (Try 1234)" class="w-full p-3 border rounded-lg mb-3" onkeydown="if(event.key==='Enter')APP.loginAdmin()">
-          <button onclick="APP.loginAdmin()" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition">
+          <button onclick="APP.loginAdmin()" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition shadow-sm">
             Access Admin Panel
           </button>
         </div>
@@ -114,7 +114,7 @@
         <span class="text-sm font-bold text-slate-700">GPS Tracking</span>
         <span class="text-xs text-green-600" id="driver-gps-text">Transmitting Live Location...</span>
       </div>
-      <button class="px-4 py-2 rounded-full font-bold text-sm transition shadow-sm bg-green-600 text-white">
+      <button class="px-4 py-2 rounded-full font-bold text-sm transition shadow-sm bg-green-600 text-white hover:bg-green-700">
         GO ONLINE
       </button>
     </div>
@@ -221,10 +221,13 @@
     </div>
   </div>
 
-  <!-- JAVASCRIPT LOGIC -->
-  <script>
+  <!-- JAVASCRIPT LOGIC (Modules for Firebase) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, updateDoc, doc, deleteDoc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+
     const CONFIG = {
-      version: '5.0.0-Enterprise',
+      version: '5.1.0-Enterprise',
       storagePrefix: 'agape_ent_',
       extractionPrompt: `You are a strict and precise NEMT trip data extractor.
 Extract ALL trips perfectly. Never miss a detail. Never mix trips.
@@ -261,7 +264,7 @@ Return ONLY the JSON array.`
       user: null,
       trips: Array.isArray(Storage.get('trips')) ? Storage.get('trips') : [],
       drivers: Array.isArray(Storage.get('drivers')) ? Storage.get('drivers') : [{id: 'd1', name: 'John Doe', pin: '1111', phone: '555-0101', status: 'active'}],
-      settings: Storage.get('settings', { workerUrl: '', apiKey: '', aiModel: 'gpt-4o-mini', adminPin: '1234', mapApp: 'google' }) || { workerUrl: '', apiKey: '', aiModel: 'gpt-4o-mini', adminPin: '1234', mapApp: 'google' },
+      settings: Storage.get('settings') || { workerUrl: '', apiKey: '', aiModel: 'gpt-4o-mini', adminPin: '1234', mapApp: 'google', firebaseConfig: '' },
       currentView: 'dashboard',
       extractedQueue: [],
       mapInstance: null,
@@ -269,8 +272,73 @@ Return ONLY the JSON array.`
       wizardTripId: null
     };
 
+    // Firebase DB Abstraction Layer
+    const DB = {
+      app: null,
+      db: null,
+      unsubs: [],
+      init() {
+        if(STATE.settings.firebaseConfig && STATE.settings.firebaseConfig.trim() !== '') {
+          try {
+            const config = JSON.parse(STATE.settings.firebaseConfig);
+            this.app = initializeApp(config);
+            this.db = getFirestore(this.app);
+            this.startListeners();
+            console.log("🔥 Firebase Firestore Connected");
+          } catch(e) {
+            console.error("Firebase Config Error:", e);
+            APP.toast("Invalid Firebase Config. Using Local Storage.", "warning");
+          }
+        }
+      },
+      startListeners() {
+        if(!this.db) return;
+        this.unsubs.forEach(u => u());
+        this.unsubs = [];
+        
+        // Listen to Trips
+        this.unsubs.push(onSnapshot(collection(this.db, "nemt_trips"), (snap) => {
+          STATE.trips = [];
+          snap.forEach(d => STATE.trips.push({ id: d.id, ...d.data() }));
+          if(APP.refreshCurrentView) APP.refreshCurrentView();
+        }));
+
+        // Listen to Drivers
+        this.unsubs.push(onSnapshot(collection(this.db, "nemt_drivers"), (snap) => {
+          STATE.drivers = [];
+          snap.forEach(d => STATE.drivers.push({ id: d.id, ...d.data() }));
+          if(STATE.currentView === 'drivers') APP.refreshCurrentView();
+        }));
+      },
+      async saveTrip(trip) {
+        if(this.db) {
+          const id = trip.id; const tripData = { ...trip }; delete tripData.id;
+          await setDoc(doc(this.db, "nemt_trips", id), tripData);
+        } else {
+          const idx = STATE.trips.findIndex(t => t.id === trip.id);
+          if(idx > -1) STATE.trips[idx] = trip; else STATE.trips.push(trip);
+          Storage.set('trips', STATE.trips);
+        }
+      },
+      async deleteTrip(id) {
+        if(this.db) await deleteDoc(doc(this.db, "nemt_trips", id));
+        else { STATE.trips = STATE.trips.filter(t => t.id !== id); Storage.set('trips', STATE.trips); }
+      },
+      async saveDriver(driver) {
+        if(this.db) {
+          const id = driver.id; const data = { ...driver }; delete data.id;
+          await setDoc(doc(this.db, "nemt_drivers", id), data);
+        } else {
+          const idx = STATE.drivers.findIndex(d => d.id === driver.id);
+          if(idx > -1) STATE.drivers[idx] = driver; else STATE.drivers.push(driver);
+          Storage.set('drivers', STATE.drivers);
+        }
+      }
+    };
+
     const APP = {
       init() {
+        DB.init();
         this.populateAuthSelect();
         setTimeout(() => {
           document.getElementById('loading-screen').classList.add('hidden');
@@ -282,7 +350,7 @@ Return ONLY the JSON array.`
       populateAuthSelect() {
         const sel = document.getElementById('auth-driver-select');
         sel.innerHTML = `<option value="">Select your profile...</option>` + 
-          STATE.drivers.filter(d => d.status === 'active').map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+          (STATE.drivers||[]).filter(d => d.status === 'active').map(d => `<option value="${d.id}">${d.name}</option>`).join('');
       },
 
       loginAdmin() {
@@ -372,12 +440,16 @@ Return ONLY the JSON array.`
       switchView(viewId) {
         STATE.currentView = viewId;
         this.renderTabs();
+        this.refreshCurrentView();
+      },
+
+      refreshCurrentView() {
         const container = document.getElementById('views-container');
-        container.innerHTML = this.getViewHTML(viewId);
+        container.innerHTML = this.getViewHTML(STATE.currentView);
         
-        if (viewId === 'dashboard') this.initDashboardChart();
-        if (viewId === 'dispatch') this.initMap();
-        if (viewId === 'extract') this.initDragDrop();
+        if (STATE.currentView === 'dashboard') this.initDashboardChart();
+        if (STATE.currentView === 'dispatch') this.initMap();
+        if (STATE.currentView === 'extract') this.initDragDrop();
       },
 
       getViewHTML(viewId) {
@@ -534,7 +606,7 @@ Return ONLY the JSON array.`
         this.openModal('modal-trip-form');
       },
 
-      saveTrip() {
+      async saveTrip() {
         const id = document.getElementById('trip-id').value || Storage.uid();
         const trip = {
           id: id, patientName: document.getElementById('trip-patient').value, phone: document.getElementById('trip-phone').value,
@@ -542,15 +614,18 @@ Return ONLY the JSON array.`
           pickupTime: document.getElementById('trip-time').value, driverId: document.getElementById('trip-driver').value,
           status: document.getElementById('trip-status').value, notes: document.getElementById('trip-notes').value
         };
-        const idx = STATE.trips.findIndex(t => t.id === id);
-        if(idx > -1) STATE.trips[idx] = trip; else STATE.trips.push(trip);
-        Storage.set('trips', STATE.trips);
+        await DB.saveTrip(trip);
         this.closeModal('modal-trip-form');
-        if(STATE.currentView === 'trips') this.renderTripsList();
+        if(!DB.db && STATE.currentView === 'trips') this.renderTripsList();
         this.toast('Trip saved successfully', 'success');
       },
-      deleteTrip(id) {
-        if(confirm("Delete this trip?")) { STATE.trips = STATE.trips.filter(t => t.id !== id); Storage.set('trips', STATE.trips); if(STATE.currentView === 'trips') this.renderTripsList(); this.toast('Trip deleted', 'danger'); }
+      
+      async deleteTrip(id) {
+        if(confirm("Delete this trip?")) { 
+          await DB.deleteTrip(id);
+          if(!DB.db && STATE.currentView === 'trips') this.renderTripsList(); 
+          this.toast('Trip deleted', 'danger'); 
+        }
       },
 
       htmlDrivers() {
@@ -587,14 +662,12 @@ Return ONLY the JSON array.`
         document.getElementById('driver-status').value = d ? d.status : 'active';
         this.openModal('modal-driver-form');
       },
-      saveDriver() {
+      async saveDriver() {
         const id = document.getElementById('driver-id').value || Storage.uid();
         const d = { id: id, name: document.getElementById('driver-name').value, phone: document.getElementById('driver-phone').value, pin: document.getElementById('driver-pin').value, status: document.getElementById('driver-status').value };
-        const idx = STATE.drivers.findIndex(x => x.id === id);
-        if(idx > -1) STATE.drivers[idx] = d; else STATE.drivers.push(d);
-        Storage.set('drivers', STATE.drivers);
+        await DB.saveDriver(d);
         this.closeModal('modal-driver-form');
-        this.switchView('drivers');
+        if(!DB.db) this.switchView('drivers');
         this.toast('Driver saved.', 'success');
       },
 
@@ -718,15 +791,17 @@ Return ONLY the JSON array.`
       updateExtractedDriver(index, driverId) { STATE.extractedQueue[index].driverId = driverId; },
       bulkAssignDriver(driverId) { STATE.extractedQueue.forEach(t => t.driverId = driverId); this.renderExtracted(); },
       removeExtracted(index) { STATE.extractedQueue.splice(index, 1); this.renderExtracted(); },
-      saveAllExtracted() {
+      async saveAllExtracted() {
         if(!STATE.extractedQueue.length) return;
-        STATE.extractedQueue.forEach(t => STATE.trips.push({ id: Storage.uid(), patientName: t.patientName, pickupAddress: t.pickupAddress, dropoffAddress: t.dropoffAddress, pickupTime: t.pickupTime, notes: t.notes, phone: t.phone || '', status: 'Pending', driverId: t.driverId || '' }));
-        Storage.set('trips', STATE.trips); STATE.extractedQueue = []; this.renderExtracted(); this.toast("Trips saved to schedule!", "success");
+        for(const t of STATE.extractedQueue) {
+          await DB.saveTrip({ id: Storage.uid(), patientName: t.patientName, pickupAddress: t.pickupAddress, dropoffAddress: t.dropoffAddress, pickupTime: t.pickupTime, notes: t.notes, phone: t.phone || '', status: 'Pending', driverId: t.driverId || '' });
+        }
+        STATE.extractedQueue = []; this.renderExtracted(); this.toast("Trips saved to schedule!", "success");
       },
 
       htmlSettings() {
         return `
-          <div class="bg-white border rounded-xl p-6 shadow-sm max-w-2xl">
+          <div class="bg-white border rounded-xl p-6 shadow-sm max-w-2xl mb-20">
             <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="ph ph-gear"></i> System Settings</h2>
             
             <div class="space-y-6">
@@ -750,6 +825,14 @@ Return ONLY the JSON array.`
                   </select>
                 </div>
               </div>
+              
+              <div class="border-t pt-6">
+                <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="ph-fill ph-database text-blue-600"></i> Cloud Database (Firebase)</h3>
+                <p class="text-xs text-slate-500 mb-4">Paste your Firebase Project Configuration JSON below to enable permanent real-time cloud syncing across all devices. If left blank, the app stores data strictly on this browser.</p>
+                <div>
+                  <textarea id="set-firebase" rows="6" class="w-full border p-3 rounded-lg font-mono text-xs bg-slate-50" placeholder='{"apiKey": "...", "authDomain": "...", ...}'>${STATE.settings.firebaseConfig || ''}</textarea>
+                </div>
+              </div>
 
               <div class="border-t pt-6">
                 <h3 class="font-bold text-slate-700 mb-3">Navigation</h3>
@@ -768,7 +851,7 @@ Return ONLY the JSON array.`
                 </div>
               </div>
 
-              <button class="w-full py-4 bg-blue-600 text-white font-bold rounded-lg mt-4 shadow-md hover:bg-blue-700" onclick="APP.saveSettings()">Save Settings</button>
+              <button class="w-full py-4 bg-blue-600 text-white font-bold rounded-lg mt-4 shadow-md hover:bg-blue-700 transition" onclick="APP.saveSettings()">Save Settings</button>
             </div>
           </div>
         `;
@@ -780,9 +863,18 @@ Return ONLY the JSON array.`
         STATE.settings.aiModel = document.getElementById('set-model').value;
         STATE.settings.adminPin = document.getElementById('set-admin-pin').value;
         STATE.settings.mapApp = document.getElementById('set-map').value;
+        
+        const oldFirebase = STATE.settings.firebaseConfig;
+        STATE.settings.firebaseConfig = document.getElementById('set-firebase').value;
         Storage.set('settings', STATE.settings);
         this.toast("Settings saved successfully.", "success");
-        this.switchView('settings');
+        
+        if(oldFirebase !== STATE.settings.firebaseConfig) {
+          alert("Database configuration changed. The app will reload to apply changes.");
+          window.location.reload();
+        } else {
+          this.switchView('settings');
+        }
       },
 
       htmlDispatch() {
@@ -908,9 +1000,13 @@ Return ONLY the JSON array.`
         window.open(url, '_blank');
       },
 
-      updateTripStatus(id, status) {
+      async updateTripStatus(id, status) {
         const trip = STATE.trips.find(t => t.id === id);
-        if(trip) { trip.status = status; Storage.set('trips', STATE.trips); this.switchView('driver-wizard'); }
+        if(trip) { 
+          trip.status = status; 
+          await DB.saveTrip(trip); 
+          if(!DB.db) this.switchView('driver-wizard'); 
+        }
       },
 
       promptArrivePickup(id) {
@@ -941,6 +1037,8 @@ Return ONLY the JSON array.`
       }
     };
 
+    // Expose APP globally so HTML onclick handlers can reach it
+    window.APP = APP;
     window.addEventListener('DOMContentLoaded', () => APP.init());
   </script>
 </body>
