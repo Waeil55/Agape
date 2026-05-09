@@ -772,7 +772,7 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
       theme: Storage.get('theme', 'dark'),
       trips: Storage.get('trips', []),
       drivers: Storage.get('drivers', [{id: 'd1', name: 'John Doe', pin: '1111', phone: '555-0101', status: 'active'}]),
-      settings: Storage.get('settings', { workerUrl: '', aiModel: 'gpt-4o-mini', adminPin: '1234' }),
+      settings: Storage.get('settings', { workerUrl: '', apiKey: '', aiModel: 'gpt-4o-mini', adminPin: '1234' }),
       currentView: 'dashboard',
       extractedQueue: [],
       mapInstance: null,
@@ -1318,8 +1318,17 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
       },
 
       async callCloudflareWorker(content, filename) {
-        const url = STATE.settings.workerUrl;
-        if(!url) throw new Error("Cloudflare Worker URL is not configured. Go to Settings and add it.");
+        let url = STATE.settings.workerUrl;
+        let isDirect = false;
+        
+        if(!url) {
+          if(STATE.settings.apiKey) {
+            url = 'https://api.openai.com/v1/chat/completions';
+            isDirect = true;
+          } else {
+            throw new Error("Please configure your OpenAI API Key or Cloudflare Worker URL in Settings.");
+          }
+        }
 
         let messages = [ { role: 'system', content: CONFIG.extractionPrompt } ];
 
@@ -1332,9 +1341,12 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
           messages.push({ role: 'user', content: `Extract from ${filename}:\n\n${content.substring(0,10000)}` });
         }
 
+        const headers = { 'Content-Type': 'application/json' };
+        if(isDirect) headers['Authorization'] = `Bearer ${STATE.settings.apiKey}`;
+
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: headers,
           body: JSON.stringify({ model: STATE.settings.aiModel, messages, temperature: 0 })
         });
 
@@ -1427,9 +1439,14 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
           <div class="card max-w-2xl mb-4">
             <h3 class="mb-4">System Settings</h3>
             <div class="input-group">
-              <label class="input-label">Cloudflare Worker URL</label>
+              <label class="input-label">Direct OpenAI API Key (Quick Start)</label>
+              <input type="password" id="set-api-key" class="input-field" value="${STATE.settings.apiKey || ''}" placeholder="sk-...">
+              <span class="text-xs text-secondary mt-1">If set, the app will call OpenAI directly (no Cloudflare Worker required).</span>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Cloudflare Worker URL (Production)</label>
               <input type="url" id="set-url" class="input-field" value="${STATE.settings.workerUrl || ''}" placeholder="https://your-worker.workers.dev">
-              <span class="text-xs text-secondary mt-1">Required for AI Extraction to bypass CORS securely.</span>
+              <span class="text-xs text-secondary mt-1">Overrides the direct API key for secure production deployments.</span>
             </div>
             <div class="input-group mb-4">
               <label class="input-label">OpenAI Model</label>
@@ -1449,6 +1466,7 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
       },
 
       saveSettings() {
+        STATE.settings.apiKey = document.getElementById('set-api-key').value;
         STATE.settings.workerUrl = document.getElementById('set-url').value;
         STATE.settings.aiModel = document.getElementById('set-model').value;
         STATE.settings.adminPin = document.getElementById('set-admin-pin').value;
