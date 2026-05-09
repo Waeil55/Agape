@@ -188,7 +188,7 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════
-// BOOT
+// BOOT — always show auth immediately, never block on Firebase
 // ═══════════════════════════════════════════════════════════════════════
 var BOOT_DONE = false;
 function showAuth() {
@@ -196,9 +196,13 @@ function showAuth() {
   BOOT_DONE = true;
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = '';
-  if (window.APP && APP.populateAuthSelect) APP.populateAuthSelect();
+  // Populate select after a tick so APP is guaranteed to exist
+  setTimeout(function() {
+    if (window.APP && APP.populateAuthSelect) APP.populateAuthSelect();
+  }, 0);
 }
-var BOOT_TIMER = setTimeout(showAuth, 1500);
+// Hard deadline — show auth after 3s no matter what
+var BOOT_TIMER = setTimeout(showAuth, 3000);
 
 // ═══════════════════════════════════════════════════════════════════════
 // INDEXEDDB
