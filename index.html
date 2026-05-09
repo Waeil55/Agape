@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#2563eb">
   <title>Agape Care NEMT Pro Enterprise</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -18,579 +18,113 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
-    :root {
-      /* Dark Theme (Default) */
-      --bg-base: #020617;
-      --bg-surface: #0f172a;
-      --bg-surface-elevated: #1e293b;
-      --bg-surface-hover: #334155;
-      
-      --text-primary: #f8fafc;
-      --text-secondary: #94a3b8;
-      --text-tertiary: #64748b;
-      
-      --border-subtle: #1e293b;
-      --border-strong: #334155;
-      
-      --brand-primary: #3b82f6;
-      --brand-primary-hover: #2563eb;
-      --brand-primary-subtle: rgba(59, 130, 246, 0.15);
-      
-      --semantic-success: #10b981;
-      --semantic-success-subtle: rgba(16, 185, 129, 0.15);
-      --semantic-warning: #f59e0b;
-      --semantic-warning-subtle: rgba(245, 158, 11, 0.15);
-      --semantic-danger: #ef4444;
-      --semantic-danger-subtle: rgba(239, 68, 68, 0.15);
-      
-      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
-      
-      --radius-sm: 0.375rem;
-      --radius-md: 0.5rem;
-      --radius-lg: 0.75rem;
-      --radius-xl: 1rem;
-      --radius-full: 9999px;
-    }
-
-    [data-theme="light"] {
-      --bg-base: #f8fafc;
-      --bg-surface: #ffffff;
-      --bg-surface-elevated: #f1f5f9;
-      --bg-surface-hover: #e2e8f0;
-      
-      --text-primary: #0f172a;
-      --text-secondary: #475569;
-      --text-tertiary: #94a3b8;
-      
-      --border-subtle: #e2e8f0;
-      --border-strong: #cbd5e1;
-      
-      --brand-primary: #2563eb;
-      --brand-primary-hover: #1d4ed8;
-      --brand-primary-subtle: rgba(37, 99, 235, 0.1);
-      
-      --semantic-success: #059669;
-      --semantic-success-subtle: rgba(5, 150, 105, 0.1);
-      --semantic-warning: #d97706;
-      --semantic-warning-subtle: rgba(217, 119, 6, 0.1);
-      --semantic-danger: #dc2626;
-      --semantic-danger-subtle: rgba(220, 38, 38, 0.1);
-      
-      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    html, body {
-      font-family: 'Inter', sans-serif;
-      font-size: 16px;
-      line-height: 1.5;
-      color: var(--text-primary);
-      background-color: var(--bg-base);
-      height: 100vh;
-      width: 100vw;
-      overflow: hidden;
-      transition: background-color 0.3s ease, color 0.3s ease;
-    }
-
-    h1, h2, h3, h4, h5, h6 {
-      font-family: 'Outfit', sans-serif;
-      font-weight: 700;
-      color: var(--text-primary);
-    }
-
-    /* iOS Auto-Zoom Prevention */
-    input, select, textarea, button {
-      font-family: inherit;
-      font-size: 16px;
-      outline: none;
-    }
-
-    /* Scrollbars */
+    /* Prevent iOS Zoom & Base */
+    input, select, textarea, button { font-family: inherit; font-size: 16px; outline: none; }
+    html, body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--radius-full); }
-
-    /* Layout & Utilities */
-    .hidden { display: none !important; }
-    .flex { display: flex; }
-    .flex-col { flex-direction: column; }
-    .items-center { align-items: center; }
-    .justify-between { justify-content: space-between; }
-    .justify-center { justify-content: center; }
-    .gap-2 { gap: 0.5rem; }
-    .gap-4 { gap: 1rem; }
-    .w-full { width: 100%; }
-    .h-full { height: 100%; }
-    .text-sm { font-size: 0.875rem; }
-    .text-xs { font-size: 0.75rem; }
-    .font-semibold { font-weight: 600; }
-    .text-center { text-align: center; }
-    .mt-4 { margin-top: 1rem; }
-    .mb-2 { margin-bottom: 0.5rem; }
-    .mb-4 { margin-bottom: 1rem; }
-    
-    .grid { display: grid; gap: 1rem; }
-    .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-
-    @media (max-width: 768px) {
-      .md\:grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-      .md\:grid-cols-2 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-    }
-
-    /* Typography */
-    .text-secondary { color: var(--text-secondary); }
-    .text-primary { color: var(--text-primary); }
-    .text-brand { color: var(--brand-primary); }
-    .text-success { color: var(--semantic-success); }
-    
-    /* Components */
-    .card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
-      padding: 1.25rem;
-      box-shadow: var(--shadow-sm);
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .card:hover { box-shadow: var(--shadow-md); }
-
-    .glass {
-      background: rgba(15, 23, 42, 0.7);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-    [data-theme="light"] .glass {
-      background: rgba(255, 255, 255, 0.7);
-      border: 1px solid rgba(0, 0, 0, 0.05);
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 0.625rem 1rem;
-      border-radius: var(--radius-md);
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s;
-      white-space: nowrap;
-    }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn:active:not(:disabled) { transform: scale(0.97); }
-
-    .btn-primary { background: var(--brand-primary); color: white; box-shadow: 0 2px 10px rgba(59, 130, 246, 0.3); }
-    .btn-primary:hover { background: var(--brand-primary-hover); }
-
-    .btn-success { background: var(--semantic-success); color: white; box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3); }
-    .btn-success:hover { background: #059669; }
-
-    .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-strong); }
-    .btn-ghost:hover { background: var(--bg-surface-elevated); color: var(--text-primary); }
-
-    .btn-danger { background: var(--semantic-danger-subtle); color: var(--semantic-danger); }
-    
-    .btn-icon { padding: 0.5rem; border-radius: var(--radius-full); }
-    .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.875rem; }
-
-    .input-group { display: flex; flex-direction: column; gap: 0.375rem; margin-bottom: 1rem; }
-    .input-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); }
-    
-    .input-field {
-      background: var(--bg-base);
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-md);
-      padding: 0.625rem 0.75rem;
-      color: var(--text-primary);
-      width: 100%;
-      transition: all 0.2s;
-    }
-    .input-field:focus { border-color: var(--brand-primary); box-shadow: 0 0 0 3px var(--brand-primary-subtle); }
-    textarea.input-field { min-height: 80px; resize: vertical; }
-    
-    .checkbox-wrap {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      cursor: pointer;
-      padding: 0.5rem 0;
-    }
-    .checkbox-wrap input[type="checkbox"] { width: 1.25rem; height: 1.25rem; cursor: pointer; }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.25rem 0.625rem;
-      border-radius: var(--radius-full);
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .badge-primary { background: var(--brand-primary-subtle); color: var(--brand-primary); }
-    .badge-success { background: var(--semantic-success-subtle); color: var(--semantic-success); }
-    .badge-warning { background: var(--semantic-warning-subtle); color: var(--semantic-warning); }
-    .badge-danger { background: var(--semantic-danger-subtle); color: var(--semantic-danger); }
-
-    /* Application Layout with iOS Safe Area Padding */
-    .app-container {
-      display: flex;
-      height: 100vh;
-      width: 100vw;
-      padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
-    }
-
-    .sidebar {
-      width: 260px;
-      background: var(--bg-surface);
-      border-right: 1px solid var(--border-subtle);
-      display: flex;
-      flex-direction: column;
-      transition: transform 0.3s ease;
-      z-index: 40;
-    }
-
-    .main-content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .topbar {
-      height: 64px;
-      background: var(--bg-surface);
-      border-bottom: 1px solid var(--border-subtle);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 1.5rem;
-      flex-shrink: 0;
-      z-index: 30;
-    }
-
-    .content-area {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1.5rem;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.875rem 1.25rem;
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: all 0.2s;
-      font-weight: 500;
-      border-left: 3px solid transparent;
-    }
-    .nav-item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
-    .nav-item.active { background: var(--brand-primary-subtle); color: var(--brand-primary); border-left-color: var(--brand-primary); }
-    .nav-icon { font-size: 1.25rem; }
-
-    .menu-toggle { display: none; }
-    .mobile-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 35;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    
-    @media (max-width: 1024px) {
-      .sidebar { position: absolute; left: 0; top: 0; bottom: 0; transform: translateX(-100%); }
-      .sidebar.open { transform: translateX(0); }
-      .menu-toggle { display: block; }
-      .mobile-overlay.open { display: block; opacity: 1; }
-      .content-area { padding: 1rem; }
-    }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
 
     /* Modals */
     .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-      padding: 1rem;
-      padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+      padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
     }
     .modal-backdrop.open { opacity: 1; pointer-events: auto; }
-    .modal-panel {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-xl);
-      width: 100%;
-      max-width: 600px;
-      max-height: 90vh;
-      display: flex;
-      flex-direction: column;
-      transform: scale(0.95);
-      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: var(--shadow-lg);
-    }
+    .modal-panel { transform: scale(0.95); transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); max-height: 100%; display: flex; flex-direction: column; }
     .modal-backdrop.open .modal-panel { transform: scale(1); }
-    .modal-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; }
-    .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
-    .modal-footer { padding: 1.25rem 1.5rem; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 1rem; }
-
-    /* Specific Components */
-    .stat-card { text-align: center; padding: 1.5rem; }
-    .stat-value {
-      font-size: 2.5rem;
-      font-family: 'Outfit', sans-serif;
-      font-weight: 800;
-      margin: 0.5rem 0;
-      background: linear-gradient(135deg, var(--brand-primary), #8b5cf6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .file-drop-zone {
-      border: 2px dashed var(--border-strong);
-      border-radius: var(--radius-lg);
-      padding: 3rem 1.5rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      background: var(--bg-base);
-      position: relative;
-    }
-    .file-drop-zone:hover, .file-drop-zone.dragover { border-color: var(--brand-primary); background: var(--brand-primary-subtle); }
-    .file-drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .modal-body { overflow-y: auto; }
 
     /* Toast */
-    .toast-container {
-      position: fixed;
-      bottom: max(2rem, env(safe-area-inset-bottom));
-      right: 2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      z-index: 200;
-    }
-    @media (max-width: 600px) {
-      .toast-container { left: 1rem; right: 1rem; bottom: max(1rem, env(safe-area-inset-bottom)); }
-    }
-    .toast {
-      padding: 1rem 1.25rem;
-      border-radius: var(--radius-md);
-      background: var(--bg-surface-elevated);
-      color: var(--text-primary);
-      box-shadow: var(--shadow-lg);
-      border-left: 4px solid var(--brand-primary);
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      transform: translateX(120%);
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
+    .toast-container { position: fixed; bottom: max(2rem, env(safe-area-inset-bottom)); right: 2rem; display: flex; flex-direction: column; gap: 0.5rem; z-index: 200; }
+    @media (max-width: 600px) { .toast-container { left: 1rem; right: 1rem; bottom: max(1rem, env(safe-area-inset-bottom)); } }
+    .toast { padding: 1rem 1.25rem; border-radius: 0.5rem; background: #1e293b; color: white; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-left: 4px solid #3b82f6; display: flex; align-items: center; gap: 0.75rem; transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
     .toast.show { transform: translateX(0); }
-    .toast.success { border-left-color: var(--semantic-success); }
-    .toast.danger { border-left-color: var(--semantic-danger); }
-    .toast.warning { border-left-color: var(--semantic-warning); }
-
-    /* Maps */
-    #map-container { height: 400px; width: 100%; border-radius: var(--radius-lg); z-index: 10; }
-    .leaflet-container { background: var(--bg-base); }
+    .toast.success { border-left-color: #10b981; }
+    .toast.danger { border-left-color: #ef4444; }
+    .toast.warning { border-left-color: #f59e0b; }
 
     /* Loading Screen */
-    #loading-screen {
-      position: fixed;
-      inset: 0;
-      background: var(--bg-base);
-      z-index: 999;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      transition: opacity 0.4s;
-    }
-    .spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid var(--brand-primary-subtle);
-      border-top-color: var(--brand-primary);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 1rem;
-    }
+    #loading-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.4s; }
+    .spinner { width: 48px; height: 48px; border: 4px solid #bfdbfe; border-top-color: #2563eb; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1rem; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Auth Screen with Safe Area */
-    #auth-screen {
-      position: fixed;
-      inset: 0;
-      background: var(--bg-base);
-      z-index: 150;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-      padding-top: max(1rem, env(safe-area-inset-top));
-      background-image: radial-gradient(circle at top right, var(--brand-primary-subtle), transparent 40%);
-    }
-    .auth-card { width: 100%; max-width: 420px; }
-
-    /* Print Styles */
-    @media print {
-      .sidebar, .topbar, .btn, .no-print { display: none !important; }
-      .main-content, .content-area { height: auto; overflow: visible; padding: 0; }
-      body { background: white; color: black; }
-      .card { border: 1px solid #ccc; box-shadow: none; break-inside: avoid; margin-bottom: 1rem; }
-      #toast-container { display: none; }
-    }
-    
-    /* Wizard Steps */
-    .wizard-step {
-      display: flex;
-      gap: 1rem;
-      padding-left: 1rem;
-      border-left: 2px solid var(--border-strong);
-      position: relative;
-      padding-bottom: 1.5rem;
-    }
-    .wizard-step.active { border-left-color: var(--brand-primary); }
-    .wizard-step.completed { border-left-color: var(--semantic-success); }
-    .wizard-step:last-child { border-left-color: transparent; padding-bottom: 0; }
-    .step-dot {
-      position: absolute;
-      left: -0.55rem;
-      top: 0;
-      width: 1rem;
-      height: 1rem;
-      border-radius: 50%;
-      background: var(--bg-surface);
-      border: 2px solid var(--border-strong);
-    }
-    .wizard-step.active .step-dot { border-color: var(--brand-primary); background: var(--brand-primary); box-shadow: 0 0 0 4px var(--brand-primary-subtle); }
-    .wizard-step.completed .step-dot { border-color: var(--semantic-success); background: var(--semantic-success); }
+    @media print { .no-print, header, .tabs-bar { display: none !important; } }
   </style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-800">
 
   <!-- Loading Screen -->
   <div id="loading-screen">
     <div class="spinner"></div>
-    <h2 style="font-family: 'Outfit', sans-serif;">Agape Care NEMT Pro</h2>
-    <p class="text-secondary text-sm mt-2">Loading Enterprise Environment...</p>
+    <h2 class="font-bold text-2xl text-slate-800">Agape Care NEMT</h2>
+    <p class="text-slate-500 mt-2">Loading Enterprise Environment...</p>
   </div>
 
   <!-- Auth Screen -->
-  <div id="auth-screen" class="hidden">
-    <div class="card auth-card glass">
-      <div class="text-center mb-6">
-        <div style="width: 64px; height: 64px; background: var(--brand-primary-subtle); border-radius: var(--radius-xl); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-          <i class="ph-fill ph-ambulance text-brand" style="font-size: 32px;"></i>
+  <div id="auth-screen" class="hidden min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
+    <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+      <div class="flex justify-center mb-6 text-blue-600">
+        <i class="ph-fill ph-ambulance text-5xl"></i>
+      </div>
+      <h1 class="text-2xl font-bold text-center text-slate-800 mb-8">NEMT Manager Pro</h1>
+
+      <div class="space-y-6">
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <h2 class="font-semibold text-slate-700 mb-4 flex items-center gap-2"><i class="ph ph-map-pin"></i> Driver Login</h2>
+          <select id="auth-driver-select" class="w-full p-3 border rounded-lg mb-3 bg-white"></select>
+          <input type="password" id="auth-driver-pin" placeholder="Driver PIN" class="w-full p-3 border rounded-lg mb-3" onkeydown="if(event.key==='Enter')APP.loginDriver()">
+          <button onclick="APP.loginDriver()" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">
+            Login as Driver
+          </button>
         </div>
-        <h1 style="font-size: 24px;">Agape Care</h1>
-        <p class="text-secondary text-sm">Enterprise NEMT Platform</p>
-      </div>
 
-      <div class="input-group">
-        <label class="input-label">Select Role / Driver</label>
-        <select id="auth-select" class="input-field">
-          <option value="admin">Administrator</option>
-        </select>
-      </div>
-      
-      <div class="input-group mb-6">
-        <label class="input-label">PIN Code</label>
-        <input type="password" id="auth-pin" class="input-field" placeholder="Enter your PIN" onkeydown="if(event.key==='Enter')APP.login()">
-      </div>
-
-      <button class="btn btn-primary w-full" onclick="APP.login()">
-        <i class="ph ph-sign-in"></i> Sign In
-      </button>
-
-      <div class="text-center mt-4 text-xs text-secondary">
-        Demo Admin PIN: <span id="hint-admin-pin">1234</span>
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <h2 class="font-semibold text-slate-700 mb-4 flex items-center gap-2"><i class="ph ph-gear"></i> Admin Portal</h2>
+          <input type="password" id="auth-admin-pin" placeholder="Admin PIN (Try 1234)" class="w-full p-3 border rounded-lg mb-3" onkeydown="if(event.key==='Enter')APP.loginAdmin()">
+          <button onclick="APP.loginAdmin()" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition">
+            Access Admin Panel
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Main App Layout -->
-  <div class="app-container hidden" id="app-main">
-    <aside class="sidebar" id="sidebar">
-      <div style="padding: 1.5rem; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--border-subtle);">
-        <div style="width: 36px; height: 36px; background: var(--brand-primary); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
-          <i class="ph-fill ph-ambulance" style="color: white; font-size: 20px;"></i>
+  <div class="hidden min-h-screen bg-slate-50 pb-20" id="app-main">
+    <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-10 w-full" style="padding-top: max(1rem, env(safe-area-inset-top));">
+      <div class="max-w-4xl mx-auto flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <i class="ph-fill ph-ambulance text-2xl"></i>
+          <h1 class="font-bold text-lg" id="header-title">Admin Dashboard</h1>
         </div>
-        <div>
-          <h3 style="font-size: 1rem; line-height: 1.2;">Agape Care</h3>
-          <span class="text-xs text-secondary">Pro Enterprise</span>
-        </div>
-      </div>
-
-      <div style="flex: 1; overflow-y: auto; padding: 1rem 0;" id="nav-menu">
-        <!-- Injected via JS -->
-      </div>
-      
-      <div style="padding: 1.5rem; border-top: 1px solid var(--border-subtle);">
-        <div class="flex items-center justify-between mb-4">
-          <span class="text-sm font-semibold">Theme</span>
-          <button class="btn btn-ghost btn-icon" onclick="APP.toggleTheme()" id="theme-btn">
-            <i class="ph ph-moon-stars nav-icon"></i>
-          </button>
-        </div>
-        <button class="btn btn-ghost w-full" onclick="APP.logout()">
+        <button onclick="APP.logout()" class="flex items-center gap-1 bg-white/20 px-3 py-1.5 rounded-full hover:bg-white/30 text-sm font-medium transition">
           <i class="ph ph-sign-out"></i> Logout
         </button>
       </div>
-    </aside>
-
-    <div class="mobile-overlay" id="mobile-overlay" onclick="APP.toggleSidebar()"></div>
-
-    <main class="main-content">
-      <header class="topbar">
-        <div class="flex items-center gap-4">
-          <button class="btn btn-ghost btn-icon menu-toggle" onclick="APP.toggleSidebar()">
-            <i class="ph ph-list nav-icon"></i>
-          </button>
-          <h2 id="page-title">Dashboard</h2>
-        </div>
-        <div class="flex items-center gap-4" id="topbar-actions">
-          <!-- Contextual buttons -->
-        </div>
-      </header>
-
-      <div class="content-area" id="views-container">
-        <!-- Views injected via JS -->
+    </header>
+    
+    <div id="driver-status-bar" class="hidden bg-white shadow-sm border-b px-4 py-3 sticky z-10 flex justify-between items-center max-w-4xl mx-auto" style="top: calc(56px + max(1rem, env(safe-area-inset-top)));">
+      <div class="flex flex-col">
+        <span class="text-sm font-bold text-slate-700">GPS Tracking</span>
+        <span class="text-xs text-green-600" id="driver-gps-text">Transmitting Live Location...</span>
       </div>
+      <button class="px-4 py-2 rounded-full font-bold text-sm transition shadow-sm bg-green-600 text-white">
+        GO ONLINE
+      </button>
+    </div>
+
+    <main class="max-w-4xl mx-auto p-4 mt-4">
+      <!-- Tabs Bar -->
+      <div class="flex space-x-2 mb-6 bg-white p-1 rounded-xl shadow-sm overflow-x-auto tabs-bar" id="tabs-container"></div>
+
+      <!-- Views Container -->
+      <div id="views-container"></div>
     </main>
   </div>
 
@@ -598,145 +132,102 @@
   <div class="toast-container" id="toast-container"></div>
 
   <!-- MODALS -->
-
-  <!-- Generic Driver Prompt Modal (for Odometer/Time) -->
   <div class="modal-backdrop" id="modal-wizard-prompt">
-    <div class="modal-panel" style="max-width: 400px;">
-      <div class="modal-header">
-        <h3 id="wizard-prompt-title">Arrived</h3>
+    <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="flex justify-between items-center p-4 border-b">
+        <h2 class="text-xl font-bold text-slate-800" id="wizard-prompt-title">Arrived</h2>
+        <button onclick="APP.closeModal('modal-wizard-prompt')" class="p-2 hover:bg-slate-100 rounded-full text-slate-500"><i class="ph ph-x"></i></button>
       </div>
-      <div class="modal-body">
-        <p class="text-sm text-secondary mb-4" id="wizard-prompt-desc">Please enter the current odometer reading and verify the time.</p>
-        
-        <div class="input-group">
-          <label class="input-label">Odometer</label>
-          <input type="number" id="wizard-odo" class="input-field" placeholder="e.g. 154200">
+      <div class="modal-body p-6">
+        <p class="text-sm text-slate-500 mb-4" id="wizard-prompt-desc">Please enter the current odometer reading and verify the time.</p>
+        <div class="mb-4">
+          <label class="block text-xs font-medium text-slate-500 mb-1">Odometer</label>
+          <input type="number" id="wizard-odo" class="w-full border p-2.5 rounded-lg" placeholder="e.g. 154200">
         </div>
-        
-        <div class="input-group">
-          <label class="input-label">Actual Time</label>
-          <input type="time" id="wizard-time" class="input-field">
+        <div class="mb-4">
+          <label class="block text-xs font-medium text-slate-500 mb-1">Actual Time</label>
+          <input type="time" id="wizard-time" class="w-full border p-2.5 rounded-lg">
         </div>
-
-        <div class="checkbox-wrap hidden" id="wizard-sig-wrap">
-          <input type="checkbox" id="wizard-sig-check">
-          <label for="wizard-sig-check" class="text-sm font-semibold">I have verified the paper signature for this leg.</label>
+        <div class="hidden mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-3 items-start" id="wizard-sig-wrap">
+          <input type="checkbox" id="wizard-sig-check" class="mt-1 w-4 h-4 cursor-pointer">
+          <label for="wizard-sig-check" class="text-sm font-semibold text-amber-900 cursor-pointer">I have verified the paper signature for this leg.</label>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="APP.closeModal('modal-wizard-prompt')">Cancel</button>
-        <button class="btn btn-primary" onclick="APP.confirmWizardPrompt()">Confirm</button>
+      <div class="p-4 border-t flex justify-end gap-3 bg-slate-50">
+        <button class="px-4 py-2 font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition" onclick="APP.closeModal('modal-wizard-prompt')">Cancel</button>
+        <button class="px-4 py-2 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-md" onclick="APP.confirmWizardPrompt()">Confirm</button>
       </div>
     </div>
   </div>
 
-  <!-- Trip Form Modal -->
   <div class="modal-backdrop" id="modal-trip-form" onclick="if(event.target===this)APP.closeModal('modal-trip-form')">
-    <div class="modal-panel">
-      <div class="modal-header">
-        <h3><i class="ph ph-file-plus"></i> Trip Details</h3>
-        <button class="btn btn-ghost btn-icon" onclick="APP.closeModal('modal-trip-form')"><i class="ph ph-x"></i></button>
+    <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden">
+      <div class="flex justify-between items-center p-4 border-b">
+        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2"><i class="ph ph-file-plus"></i> Trip Details</h2>
+        <button onclick="APP.closeModal('modal-trip-form')" class="p-2 hover:bg-slate-100 rounded-full text-slate-500"><i class="ph ph-x"></i></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body p-6 space-y-6">
         <input type="hidden" id="trip-id">
-        <div class="grid grid-cols-1 md:grid-cols-2">
-          <div class="input-group">
-            <label class="input-label">Patient Name</label>
-            <input type="text" id="trip-patient" class="input-field" placeholder="Full name">
-          </div>
-          <div class="input-group">
-            <label class="input-label">Patient Phone</label>
-            <input type="tel" id="trip-phone" class="input-field" placeholder="(555) 555-5555">
+        <div class="bg-slate-50 p-4 rounded-lg border">
+          <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="ph ph-user"></i> Patient Information</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label class="block text-xs font-medium text-slate-500 mb-1">Patient Name</label><input type="text" id="trip-patient" class="w-full border p-2.5 rounded-lg bg-white"></div>
+            <div><label class="block text-xs font-medium text-slate-500 mb-1">Phone</label><input type="tel" id="trip-phone" class="w-full border p-2.5 rounded-lg bg-white"></div>
           </div>
         </div>
-        <div class="input-group">
-          <label class="input-label">Pickup Time</label>
-          <input type="datetime-local" id="trip-time" class="input-field">
-        </div>
-        <div class="input-group">
-          <label class="input-label">Pickup Address</label>
-          <input type="text" id="trip-pickup" class="input-field" placeholder="Full pickup address">
-        </div>
-        <div class="input-group">
-          <label class="input-label">Dropoff Address</label>
-          <input type="text" id="trip-dropoff" class="input-field" placeholder="Full destination address">
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2">
-          <div class="input-group">
-            <label class="input-label">Assign Driver</label>
-            <select id="trip-driver" class="input-field"></select>
+        <div class="bg-slate-50 p-4 rounded-lg border space-y-4">
+          <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="ph ph-map-pin"></i> Route Information</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label class="block text-xs font-medium text-slate-500 mb-1">Assign Driver</label><select id="trip-driver" class="w-full border p-2.5 rounded-lg bg-white"></select></div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
+              <select id="trip-status" class="w-full border p-2.5 rounded-lg bg-white">
+                <option value="Pending">Pending</option><option value="En Route to Pickup">En Route to Pickup</option>
+                <option value="Arrived at Pickup">Arrived at Pickup</option><option value="En Route to Dropoff">En Route to Dropoff</option>
+                <option value="Completed">Completed</option><option value="Cancelled">Cancelled</option>
+              </select>
+            </div>
           </div>
-          <div class="input-group">
-            <label class="input-label">Status</label>
-            <select id="trip-status" class="input-field">
-              <option value="Pending">Pending</option>
-              <option value="En Route to Pickup">En Route to Pickup</option>
-              <option value="Arrived at Pickup">Arrived at Pickup</option>
-              <option value="En Route to Dropoff">En Route to Dropoff</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
-            </select>
-          </div>
-        </div>
-        <div class="input-group">
-          <label class="input-label">Special Notes / Requirements</label>
-          <textarea id="trip-notes" class="input-field" placeholder="Wheelchair, oxygen, specific door..."></textarea>
+          <div><label class="block text-xs font-medium text-slate-500 mb-1">Pickup Time</label><input type="datetime-local" id="trip-time" class="w-full border p-2.5 rounded-lg bg-white"></div>
+          <div><label class="block text-xs font-medium text-slate-500 mb-1">Pickup Address</label><input type="text" id="trip-pickup" class="w-full border p-2.5 rounded-lg bg-white"></div>
+          <div><label class="block text-xs font-medium text-slate-500 mb-1">Dropoff Address</label><input type="text" id="trip-dropoff" class="w-full border p-2.5 rounded-lg bg-white"></div>
+          <div><label class="block text-xs font-medium text-slate-500 mb-1">Notes / Special Req</label><input type="text" id="trip-notes" class="w-full border p-2.5 rounded-lg bg-white"></div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="APP.closeModal('modal-trip-form')">Cancel</button>
-        <button class="btn btn-primary" onclick="APP.saveTrip()">Save Trip</button>
+      <div class="p-4 border-t flex justify-end gap-3 bg-slate-50">
+        <button class="px-4 py-2 font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition" onclick="APP.closeModal('modal-trip-form')">Cancel</button>
+        <button class="px-4 py-2 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-md" onclick="APP.saveTrip()">Save Trip</button>
       </div>
     </div>
   </div>
 
-  <!-- Driver Edit Modal -->
   <div class="modal-backdrop" id="modal-driver-form" onclick="if(event.target===this)APP.closeModal('modal-driver-form')">
-    <div class="modal-panel" style="max-width: 400px;">
-      <div class="modal-header">
-        <h3><i class="ph ph-user"></i> Driver Details</h3>
-        <button class="btn btn-ghost btn-icon" onclick="APP.closeModal('modal-driver-form')"><i class="ph ph-x"></i></button>
+    <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="flex justify-between items-center p-4 border-b">
+        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2"><i class="ph ph-user"></i> Driver Details</h2>
+        <button onclick="APP.closeModal('modal-driver-form')" class="p-2 hover:bg-slate-100 rounded-full text-slate-500"><i class="ph ph-x"></i></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body p-6 space-y-4">
         <input type="hidden" id="driver-id">
-        <div class="input-group">
-          <label class="input-label">Full Name</label>
-          <input type="text" id="driver-name" class="input-field" placeholder="Driver Name">
-        </div>
-        <div class="input-group">
-          <label class="input-label">Phone</label>
-          <input type="tel" id="driver-phone" class="input-field" placeholder="Phone number">
-        </div>
-        <div class="input-group">
-          <label class="input-label">Login PIN</label>
-          <input type="text" id="driver-pin" class="input-field" placeholder="e.g. 1111">
-        </div>
-        <div class="input-group">
-          <label class="input-label">Account Status</label>
-          <select id="driver-status" class="input-field">
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
+        <div><label class="block text-xs font-medium text-slate-500 mb-1">Full Name</label><input type="text" id="driver-name" class="w-full border p-2.5 rounded-lg"></div>
+        <div><label class="block text-xs font-medium text-slate-500 mb-1">Phone</label><input type="tel" id="driver-phone" class="w-full border p-2.5 rounded-lg"></div>
+        <div><label class="block text-xs font-medium text-slate-500 mb-1">Login PIN</label><input type="text" id="driver-pin" class="w-full border p-2.5 rounded-lg"></div>
+        <div><label class="block text-xs font-medium text-slate-500 mb-1">Status</label><select id="driver-status" class="w-full border p-2.5 rounded-lg"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="APP.closeModal('modal-driver-form')">Cancel</button>
-        <button class="btn btn-primary" onclick="APP.saveDriver()">Save</button>
+      <div class="p-4 border-t flex justify-end gap-3 bg-slate-50">
+        <button class="px-4 py-2 font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition" onclick="APP.closeModal('modal-driver-form')">Cancel</button>
+        <button class="px-4 py-2 font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg transition shadow-md" onclick="APP.saveDriver()">Save Driver</button>
       </div>
     </div>
   </div>
-
 
   <!-- JAVASCRIPT LOGIC -->
   <script>
-    // -------------------------------------------------------------------------
-    // CONFIGURATION & STATE
-    // -------------------------------------------------------------------------
     const CONFIG = {
       version: '5.0.0-Enterprise',
       storagePrefix: 'agape_ent_',
       extractionPrompt: `You are a strict and precise NEMT trip data extractor.
-Extract ALL trips from the text/image perfectly. Never miss a detail. Never mix trips together.
+Extract ALL trips perfectly. Never miss a detail. Never mix trips.
 Output MUST be a JSON array of objects with these exact keys:
 [
   {
@@ -745,99 +236,75 @@ Output MUST be a JSON array of objects with these exact keys:
     "dropoffAddress": "Full dropoff address",
     "pickupTime": "YYYY-MM-DDTHH:mm",
     "phone": "Phone number or empty",
-    "notes": "Any special instructions, wheelchair, oxygen, etc."
+    "notes": "Any special instructions"
   }
 ]
-Return ONLY the JSON array. Do not include markdown formatting, extra text, or explanations.`
+Return ONLY the JSON array.`
     };
 
     const Storage = {
       get: (key, def = null) => {
-        try {
-          const val = localStorage.getItem(CONFIG.storagePrefix + key);
-          return val ? JSON.parse(val) : def;
-        } catch(e) { return def; }
+        try { const val = localStorage.getItem(CONFIG.storagePrefix + key); return val ? JSON.parse(val) : def; } catch(e) { return def; }
       },
       set: (key, val) => {
-        try {
-          localStorage.setItem(CONFIG.storagePrefix + key, JSON.stringify(val));
-        } catch(e) { console.error("Storage Error", e); }
+        try { localStorage.setItem(CONFIG.storagePrefix + key, JSON.stringify(val)); } catch(e) { console.error("Storage Error", e); }
       },
       uid: () => Date.now().toString(36) + Math.random().toString(36).substring(2)
     };
 
-    // Global State
     let STATE = {
       user: null,
-      theme: Storage.get('theme', 'dark'),
       trips: Storage.get('trips', []),
       drivers: Storage.get('drivers', [{id: 'd1', name: 'John Doe', pin: '1111', phone: '555-0101', status: 'active'}]),
-      settings: Storage.get('settings', { workerUrl: '', apiKey: '', aiModel: 'gpt-4o-mini', adminPin: '1234' }),
+      settings: Storage.get('settings', { workerUrl: '', apiKey: '', aiModel: 'gpt-4o-mini', adminPin: '1234', mapApp: 'google' }),
       currentView: 'dashboard',
       extractedQueue: [],
       mapInstance: null,
-      // Wizard Prompt State
       wizardCb: null,
       wizardTripId: null
     };
 
-    // -------------------------------------------------------------------------
-    // APP CONTROLLER
-    // -------------------------------------------------------------------------
     const APP = {
       init() {
-        this.applyTheme(STATE.theme);
         this.populateAuthSelect();
-        
-        // Setup default demo admin pin display
-        document.getElementById('hint-admin-pin').innerText = STATE.settings.adminPin || '1234';
-
         setTimeout(() => {
           document.getElementById('loading-screen').classList.add('hidden');
-          if (STATE.user) {
-            this.enterApp();
-          } else {
-            document.getElementById('auth-screen').classList.remove('hidden');
-          }
+          if (STATE.user) this.enterApp();
+          else document.getElementById('auth-screen').classList.remove('hidden');
         }, 800);
       },
 
-      // --- Auth ---
       populateAuthSelect() {
-        const sel = document.getElementById('auth-select');
-        sel.innerHTML = `<option value="admin">Administrator</option>`;
-        STATE.drivers.filter(d => d.status === 'active').forEach(d => {
-          sel.innerHTML += `<option value="${d.id}">Driver: ${d.name}</option>`;
-        });
+        const sel = document.getElementById('auth-driver-select');
+        sel.innerHTML = `<option value="">Select your profile...</option>` + 
+          STATE.drivers.filter(d => d.status === 'active').map(d => `<option value="${d.id}">${d.name}</option>`).join('');
       },
 
-      login() {
-        const sel = document.getElementById('auth-select').value;
-        const pin = document.getElementById('auth-pin').value;
+      loginAdmin() {
+        const pin = document.getElementById('auth-admin-pin').value;
+        if (pin === (STATE.settings.adminPin || '1234')) {
+          STATE.user = { role: 'admin', id: 'admin', name: 'Administrator' };
+          this.enterApp();
+        } else this.toast('Invalid Admin PIN', 'danger');
+      },
 
-        if (sel === 'admin') {
-          if (pin === (STATE.settings.adminPin || '1234')) {
-            STATE.user = { role: 'admin', id: 'admin', name: 'Administrator' };
-            this.enterApp();
-          } else {
-            this.toast('Invalid Admin PIN', 'danger');
-          }
-        } else {
-          const driver = STATE.drivers.find(d => d.id === sel);
-          if (driver && driver.pin === pin) {
-            STATE.user = { role: 'driver', id: driver.id, name: driver.name };
-            this.enterApp();
-          } else {
-            this.toast('Invalid Driver PIN', 'danger');
-          }
-        }
+      loginDriver() {
+        const sel = document.getElementById('auth-driver-select').value;
+        const pin = document.getElementById('auth-driver-pin').value;
+        if(!sel) return this.toast("Select a driver profile", "warning");
+        const driver = STATE.drivers.find(d => d.id === sel);
+        if (driver && driver.pin === pin) {
+          STATE.user = { role: 'driver', id: driver.id, name: driver.name };
+          this.enterApp();
+        } else this.toast('Invalid Driver PIN', 'danger');
       },
 
       logout() {
         STATE.user = null;
         document.getElementById('app-main').classList.add('hidden');
         document.getElementById('auth-screen').classList.remove('hidden');
-        document.getElementById('auth-pin').value = '';
+        document.getElementById('auth-admin-pin').value = '';
+        document.getElementById('auth-driver-pin').value = '';
         this.populateAuthSelect();
         this.toast('Logged out successfully', 'success');
       },
@@ -845,105 +312,61 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
       enterApp() {
         document.getElementById('auth-screen').classList.add('hidden');
         document.getElementById('app-main').classList.remove('hidden');
-        this.toast(`Welcome back, ${STATE.user.name}`, 'success');
-        this.renderSidebar();
-        this.switchView(STATE.user.role === 'admin' ? 'dashboard' : 'driver-wizard');
-      },
-
-      // --- UI Utilities ---
-      toggleSidebar() {
-        document.getElementById('sidebar').classList.toggle('open');
-        document.getElementById('mobile-overlay').classList.toggle('open');
-      },
-
-      applyTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        const icon = document.querySelector('#theme-btn i');
-        if (icon) {
-          icon.className = theme === 'dark' ? 'ph ph-sun nav-icon' : 'ph ph-moon-stars nav-icon';
+        document.getElementById('header-title').innerText = STATE.user.role === 'admin' ? 'Admin Dashboard' : `Driver: ${STATE.user.name}`;
+        
+        if(STATE.user.role === 'driver') {
+          document.getElementById('driver-status-bar').classList.remove('hidden');
+        } else {
+          document.getElementById('driver-status-bar').classList.add('hidden');
         }
-      },
 
-      toggleTheme() {
-        STATE.theme = STATE.theme === 'dark' ? 'light' : 'dark';
-        Storage.set('theme', STATE.theme);
-        this.applyTheme(STATE.theme);
+        this.toast(`Welcome back, ${STATE.user.name}`, 'success');
+        this.switchView(STATE.user.role === 'admin' ? 'dashboard' : 'driver-wizard');
       },
 
       toast(message, type = 'primary') {
         const container = document.getElementById('toast-container');
         const el = document.createElement('div');
         el.className = `toast ${type}`;
-        
         let icon = 'info';
         if(type==='success') icon = 'check-circle';
         if(type==='danger') icon = 'warning-circle';
         if(type==='warning') icon = 'warning';
-
-        el.innerHTML = `<i class="ph-fill ph-${icon}" style="font-size: 1.25rem;"></i> <span>${message}</span>`;
+        el.innerHTML = `<i class="ph-fill ph-${icon} text-xl"></i> <span>${message}</span>`;
         container.appendChild(el);
-        
         setTimeout(() => el.classList.add('show'), 10);
-        setTimeout(() => {
-          el.classList.remove('show');
-          setTimeout(() => el.remove(), 300);
-        }, 4000);
+        setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 4000);
       },
 
       openModal(id) { document.getElementById(id).classList.add('open'); },
       closeModal(id) { document.getElementById(id).classList.remove('open'); },
 
-      // --- Navigation ---
-      renderSidebar() {
-        const menu = document.getElementById('nav-menu');
-        const adminItems = [
+      renderTabs() {
+        const adminTabs = [
           { id: 'dashboard', icon: 'chart-pie-slice', label: 'Dashboard' },
-          { id: 'trips', icon: 'calendar-check', label: 'Trips Management' },
-          { id: 'extract', icon: 'magic-wand', label: 'AI Extraction' },
-          { id: 'drivers', icon: 'steering-wheel', label: 'Fleet & Drivers' },
-          { id: 'dispatch', icon: 'map-trifold', label: 'Map Overview' },
+          { id: 'dispatch', icon: 'radar', label: 'Live Fleet' },
+          { id: 'trips', icon: 'clipboard-text', label: 'Tasks' },
+          { id: 'extract', icon: 'magic-wand', label: 'AI Extract' },
+          { id: 'drivers', icon: 'users', label: 'Drivers' },
           { id: 'settings', icon: 'gear', label: 'Settings' }
         ];
-        const driverItems = [
-          { id: 'driver-wizard', icon: 'navigation-arrow', label: 'Current Route' },
-          { id: 'driver-history', icon: 'clock-counter-clockwise', label: 'Completed Trips' }
+        const driverTabs = [
+          { id: 'driver-wizard', icon: 'clipboard-text', label: 'My Route' },
+          { id: 'settings', icon: 'gear', label: 'Settings' }
         ];
 
-        const items = STATE.user.role === 'admin' ? adminItems : driverItems;
-        
-        menu.innerHTML = items.map(item => `
-          <div class="nav-item ${STATE.currentView === item.id ? 'active' : ''}" onclick="APP.switchView('${item.id}')">
-            <i class="ph ph-${item.icon} nav-icon"></i>
-            <span>${item.label}</span>
-          </div>
+        const tabs = STATE.user.role === 'admin' ? adminTabs : driverTabs;
+        const c = document.getElementById('tabs-container');
+        c.innerHTML = tabs.map(t => `
+          <button onclick="APP.switchView('${t.id}')" class="flex-1 py-2 px-4 font-medium rounded-lg flex items-center justify-center gap-2 whitespace-nowrap transition ${STATE.currentView === t.id ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}">
+            <i class="ph ph-${t.icon} text-lg"></i> ${t.label}
+          </button>
         `).join('');
       },
 
       switchView(viewId) {
         STATE.currentView = viewId;
-        this.renderSidebar();
-        
-        const titles = {
-          'dashboard': 'Enterprise Dashboard', 'trips': 'Trips Management', 'dispatch': 'Map Overview',
-          'extract': 'AI Document Extraction', 'drivers': 'Fleet & Drivers', 'settings': 'System Settings',
-          'driver-wizard': 'Route Wizard', 'driver-history': 'Completed Trips'
-        };
-        document.getElementById('page-title').innerText = titles[viewId] || viewId;
-        
-        // Update topbar actions
-        const actionsEl = document.getElementById('topbar-actions');
-        if(STATE.user.role === 'admin' && viewId === 'trips') {
-          actionsEl.innerHTML = `<button class="btn btn-primary btn-sm no-print" onclick="APP.editTrip('')"><i class="ph ph-plus"></i> <span class="hidden sm:inline">New Trip</span></button>`;
-        } else if (STATE.user.role === 'admin' && viewId === 'drivers') {
-          actionsEl.innerHTML = `<button class="btn btn-primary btn-sm no-print" onclick="APP.editDriver('')"><i class="ph ph-plus"></i> <span class="hidden sm:inline">Add Driver</span></button>`;
-        } else {
-          actionsEl.innerHTML = '';
-        }
-
-        // Close sidebar on mobile
-        document.getElementById('sidebar').classList.remove('open');
-        document.getElementById('mobile-overlay').classList.remove('open');
-
+        this.renderTabs();
         const container = document.getElementById('views-container');
         container.innerHTML = this.getViewHTML(viewId);
         
@@ -961,55 +384,52 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
           case 'settings': return this.htmlSettings();
           case 'drivers': return this.htmlDrivers();
           case 'driver-wizard': return this.htmlDriverWizard();
-          case 'driver-history': return this.htmlDriverHistory();
-          default: return `<div class="card"><p class="text-secondary">View under construction: ${viewId}</p></div>`;
+          default: return `<div class="bg-white p-5 rounded-xl border"><p class="text-slate-500">View under construction: ${viewId}</p></div>`;
         }
       },
 
-      // -------------------------------------------------------------------------
-      // ADMIN VIEWS
-      // -------------------------------------------------------------------------
+      // --- ADMIN VIEWS ---
       htmlDashboard() {
         const today = new Date().toISOString().split('T')[0];
         const todaysTrips = STATE.trips.filter(t => t.pickupTime && t.pickupTime.startsWith(today));
         const completed = todaysTrips.filter(t => t.status === 'Completed').length;
         
         return `
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="card stat-card">
-              <div class="text-xs text-secondary uppercase tracking-wide font-bold">Total Trips Today</div>
-              <div class="stat-value">${todaysTrips.length}</div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white border rounded-xl p-5 shadow-sm">
+              <div class="text-xs text-slate-500 uppercase font-bold tracking-wide">Total Trips Today</div>
+              <div class="text-3xl font-bold text-slate-800 mt-2">${todaysTrips.length}</div>
             </div>
-            <div class="card stat-card">
-              <div class="text-xs text-secondary uppercase tracking-wide font-bold">Completed</div>
-              <div class="stat-value text-success">${completed}</div>
+            <div class="bg-white border rounded-xl p-5 shadow-sm">
+              <div class="text-xs text-slate-500 uppercase font-bold tracking-wide">Completed</div>
+              <div class="text-3xl font-bold text-emerald-600 mt-2">${completed}</div>
             </div>
-            <div class="card stat-card">
-              <div class="text-xs text-secondary uppercase tracking-wide font-bold">Active Drivers</div>
-              <div class="stat-value text-brand">${STATE.drivers.filter(d=>d.status==='active').length}</div>
+            <div class="bg-white border rounded-xl p-5 shadow-sm">
+              <div class="text-xs text-slate-500 uppercase font-bold tracking-wide">Active Drivers</div>
+              <div class="text-3xl font-bold text-blue-600 mt-2">${STATE.drivers.filter(d=>d.status==='active').length}</div>
             </div>
-            <div class="card stat-card">
-              <div class="text-xs text-secondary uppercase tracking-wide font-bold">Total Trips</div>
-              <div class="stat-value" style="background: var(--semantic-warning); -webkit-background-clip: text;">${STATE.trips.length}</div>
+            <div class="bg-white border rounded-xl p-5 shadow-sm">
+              <div class="text-xs text-slate-500 uppercase font-bold tracking-wide">Total Logged</div>
+              <div class="text-3xl font-bold text-amber-500 mt-2">${STATE.trips.length}</div>
             </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="card md:col-span-2">
-              <h3 class="mb-4">Weekly Volume</h3>
+            <div class="bg-white border rounded-xl p-5 shadow-sm md:col-span-2">
+              <h3 class="font-bold text-lg text-slate-800 mb-4">Weekly Volume</h3>
               <div style="height: 300px; position: relative;"><canvas id="dash-chart"></canvas></div>
             </div>
-            <div class="card">
-              <h3 class="mb-4">Today's Activity</h3>
-              <div class="flex flex-col gap-3">
+            <div class="bg-white border rounded-xl p-5 shadow-sm">
+              <h3 class="font-bold text-lg text-slate-800 mb-4">Today's Activity</h3>
+              <div class="space-y-3">
                 ${todaysTrips.slice(0,5).map(t => `
-                  <div class="flex justify-between items-center pb-2 border-b" style="border-color: var(--border-subtle)">
+                  <div class="flex justify-between items-center pb-3 border-b border-slate-100 last:border-0 last:pb-0">
                     <div>
-                      <div class="font-semibold text-sm">${t.patientName}</div>
-                      <div class="text-xs text-secondary">${new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+                      <div class="font-bold text-slate-800 text-sm">${t.patientName}</div>
+                      <div class="text-xs text-slate-500">${new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
                     </div>
-                    <span class="badge badge-${t.status==='Completed'?'success':t.status==='Pending'?'warning':'primary'} text-xs">${t.status}</span>
+                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${t.status==='Completed'?'bg-green-100 text-green-700':t.status==='Pending'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700'}">${t.status}</span>
                   </div>
-                `).join('') || '<p class="text-sm text-secondary text-center py-4">No trips today yet.</p>'}
+                `).join('') || '<p class="text-sm text-slate-500 text-center py-4">No trips today yet.</p>'}
               </div>
             </div>
           </div>
@@ -1021,81 +441,66 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
         if(!ctx) return;
         new Chart(ctx, {
           type: 'line',
-          data: {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            datasets: [{
-              label: 'Trips',
-              data: [12, 19, 15, 25, 22, 10, 8],
-              borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4
-            }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-              y: { beginAtZero: true, grid: { color: 'rgba(150,150,150,0.1)' } },
-              x: { grid: { display: false } }
-            }
-          }
+          data: { labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], datasets: [{ label: 'Trips', data: [12, 19, 15, 25, 22, 10, 8], borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', fill: true, tension: 0.4 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
         });
       },
 
       htmlTrips() {
         return `
-          <div class="card mb-4 no-print flex gap-4 flex-wrap">
-            <input type="date" class="input-field" style="max-width: 200px;" id="trip-filter-date" onchange="APP.renderTripsList()">
-            <select class="input-field" style="max-width: 200px;" id="trip-filter-status" onchange="APP.renderTripsList()">
-              <option value="">All Statuses</option>
-              <option value="Pending">Pending</option>
-              <option value="En Route to Pickup">En Route to Pickup</option>
-              <option value="Completed">Completed</option>
-            </select>
-            <button class="btn btn-ghost" onclick="window.print()"><i class="ph ph-printer"></i> Print Manifest</button>
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 no-print">
+            <h2 class="text-xl font-bold text-slate-800">All Tasks</h2>
+            <div class="flex gap-2 w-full sm:w-auto">
+              <input type="date" class="border p-2 rounded-lg text-sm bg-white flex-1" id="trip-filter-date" onchange="APP.renderTripsList()">
+              <button onclick="APP.editTrip('')" class="flex-1 sm:flex-none bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm transition">
+                <i class="ph ph-plus"></i> Manual Task
+              </button>
+            </div>
           </div>
-          <div class="grid grid-cols-1 gap-4" id="trips-list-container">
-            ${this.buildTripsListHTML()}
-          </div>
+          <div class="space-y-4" id="trips-list-container">${this.buildTripsListHTML()}</div>
         `;
       },
 
       buildTripsListHTML() {
         let filtered = STATE.trips;
         const dateF = document.getElementById('trip-filter-date')?.value;
-        const statF = document.getElementById('trip-filter-status')?.value;
-        
         if(dateF) filtered = filtered.filter(t => t.pickupTime && t.pickupTime.startsWith(dateF));
-        if(statF) filtered = filtered.filter(t => t.status === statF);
-        
-        filtered.sort((a,b) => new Date(a.pickupTime) - new Date(b.pickupTime));
+        filtered.sort((a,b) => new Date(b.pickupTime) - new Date(a.pickupTime));
 
-        if(filtered.length === 0) return '<div class="card text-center text-secondary py-8">No trips found.</div>';
+        if(filtered.length === 0) return '<div class="bg-white border rounded-xl p-10 text-center text-slate-500">No tasks found.</div>';
 
         return filtered.map(t => {
           const dName = STATE.drivers.find(d => d.id === t.driverId)?.name || 'Unassigned';
           const tTime = t.pickupTime ? new Date(t.pickupTime).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'No Time';
           
           return `
-            <div class="card flex flex-col sm:flex-row justify-between gap-4">
-              <div style="flex: 1;">
-                <div class="flex items-center gap-2 mb-2">
-                  <h3 class="m-0">${t.patientName}</h3>
-                  <span class="badge badge-${t.status==='Completed'?'success':t.status==='Pending'?'warning':'primary'}">${t.status}</span>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 relative">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="font-bold text-lg text-slate-800">${t.patientName}</h3>
+                  </div>
+                  <p class="text-sm text-slate-500 mt-1">Driver: <span class="font-medium text-slate-700">${dName}</span></p>
                 </div>
-                <div class="text-sm text-secondary mb-2 flex flex-wrap gap-3 items-center">
-                  <span><i class="ph ph-clock text-brand"></i> ${tTime}</span>
-                  <span><strong>Driver:</strong> ${dName}</span>
-                  ${t.phone ? `<a href="tel:${t.phone}" class="text-brand font-semibold"><i class="ph-fill ph-phone"></i> Call</a>` : ''}
+                <div class="flex flex-col items-end gap-2">
+                  <span class="px-3 py-1 rounded-full text-xs font-bold uppercase ${t.status === 'Completed' ? 'bg-green-100 text-green-700' : t.status === 'Pending' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${t.status}</span>
+                  <div class="flex gap-2 no-print mt-1">
+                    <button class="text-blue-600 hover:bg-blue-50 p-1.5 rounded" onclick="APP.editTrip('${t.id}')"><i class="ph ph-pencil"></i></button>
+                    <button class="text-red-600 hover:bg-red-50 p-1.5 rounded" onclick="APP.deleteTrip('${t.id}')"><i class="ph ph-trash"></i></button>
+                  </div>
                 </div>
-                <div class="text-sm bg-base p-2 rounded mt-2" style="background: var(--bg-surface-elevated); border-radius: var(--radius-sm);">
-                  <div class="flex gap-2 mb-1"><i class="ph ph-arrow-right text-brand mt-1"></i> <span>${t.pickupAddress}</span></div>
-                  <div class="flex gap-2"><i class="ph ph-map-pin text-semantic-danger mt-1"></i> <span>${t.dropoffAddress}</span></div>
-                </div>
-                ${t.notes ? `<p class="text-xs text-semantic-warning mt-2"><i class="ph ph-warning"></i> ${t.notes}</p>` : ''}
               </div>
-              <div class="flex sm:flex-col gap-2 no-print justify-center">
-                <button class="btn btn-ghost btn-sm" onclick="APP.editTrip('${t.id}')"><i class="ph ph-pencil"></i> Edit</button>
-                <button class="btn btn-danger btn-sm" onclick="APP.deleteTrip('${t.id}')"><i class="ph ph-trash"></i> Delete</button>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                <div class="bg-slate-50 p-3 rounded-lg border">
+                  <span class="text-xs text-slate-500 font-bold block mb-1">PICKUP (${tTime})</span>
+                  <p class="text-sm font-medium text-slate-800">${t.pickupAddress}</p>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-lg border">
+                  <span class="text-xs text-slate-500 font-bold block mb-1">DROPOFF</span>
+                  <p class="text-sm font-medium text-slate-800">${t.dropoffAddress}</p>
+                </div>
               </div>
+              ${t.notes ? `<div class="mt-2 text-sm text-amber-700 bg-amber-50 p-2 rounded flex items-start gap-2"><i class="ph-fill ph-warning mt-0.5"></i> ${t.notes}</div>` : ''}
             </div>
           `;
         }).join('');
@@ -1104,63 +509,6 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
       renderTripsList() {
         const c = document.getElementById('trips-list-container');
         if(c) c.innerHTML = this.buildTripsListHTML();
-      },
-
-      htmlDrivers() {
-        return `
-          <div class="grid grid-cols-1 gap-4">
-            ${STATE.drivers.map(d => `
-              <div class="card flex justify-between items-center">
-                <div>
-                  <h3 class="flex items-center gap-2">${d.name} <span class="w-2 h-2 rounded-full ${d.status==='active'?'bg-semantic-success':'bg-semantic-danger'}"></span></h3>
-                  <p class="text-sm text-secondary">Phone: ${d.phone || 'N/A'} | PIN: ${d.pin}</p>
-                </div>
-                <div class="flex gap-2">
-                  <button class="btn btn-ghost btn-sm" onclick="APP.editDriver('${d.id}')"><i class="ph ph-pencil"></i></button>
-                  <button class="btn btn-danger btn-sm" onclick="APP.deleteDriver('${d.id}')"><i class="ph ph-trash"></i></button>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        `;
-      },
-
-      editDriver(id) {
-        const d = STATE.drivers.find(x => x.id === id);
-        document.getElementById('driver-id').value = d ? d.id : '';
-        document.getElementById('driver-name').value = d ? d.name : '';
-        document.getElementById('driver-phone').value = d ? d.phone : '';
-        document.getElementById('driver-pin').value = d ? d.pin : '';
-        document.getElementById('driver-status').value = d ? d.status : 'active';
-        this.openModal('modal-driver-form');
-      },
-
-      saveDriver() {
-        const id = document.getElementById('driver-id').value || Storage.uid();
-        const d = {
-          id: id,
-          name: document.getElementById('driver-name').value,
-          phone: document.getElementById('driver-phone').value,
-          pin: document.getElementById('driver-pin').value,
-          status: document.getElementById('driver-status').value
-        };
-        const idx = STATE.drivers.findIndex(x => x.id === id);
-        if(idx > -1) STATE.drivers[idx] = d; else STATE.drivers.push(d);
-        Storage.set('drivers', STATE.drivers);
-        this.closeModal('modal-driver-form');
-        this.switchView('drivers');
-        this.toast('Driver saved.', 'success');
-      },
-
-      deleteDriver(id) {
-        if(confirm("Delete this driver? Trips assigned to them will be unassigned.")) {
-          STATE.drivers = STATE.drivers.filter(d => d.id !== id);
-          STATE.trips.forEach(t => { if(t.driverId === id) t.driverId = ''; });
-          Storage.set('drivers', STATE.drivers);
-          Storage.set('trips', STATE.trips);
-          this.switchView('drivers');
-          this.toast('Driver deleted.', 'danger');
-        }
       },
 
       editTrip(id) {
@@ -1184,67 +532,97 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
       saveTrip() {
         const id = document.getElementById('trip-id').value || Storage.uid();
         const trip = {
-          id: id,
-          patientName: document.getElementById('trip-patient').value,
-          phone: document.getElementById('trip-phone').value,
-          pickupAddress: document.getElementById('trip-pickup').value,
-          dropoffAddress: document.getElementById('trip-dropoff').value,
-          pickupTime: document.getElementById('trip-time').value,
-          driverId: document.getElementById('trip-driver').value,
-          status: document.getElementById('trip-status').value,
-          notes: document.getElementById('trip-notes').value
+          id: id, patientName: document.getElementById('trip-patient').value, phone: document.getElementById('trip-phone').value,
+          pickupAddress: document.getElementById('trip-pickup').value, dropoffAddress: document.getElementById('trip-dropoff').value,
+          pickupTime: document.getElementById('trip-time').value, driverId: document.getElementById('trip-driver').value,
+          status: document.getElementById('trip-status').value, notes: document.getElementById('trip-notes').value
         };
-
         const idx = STATE.trips.findIndex(t => t.id === id);
-        if(idx > -1) STATE.trips[idx] = trip;
-        else STATE.trips.push(trip);
-
+        if(idx > -1) STATE.trips[idx] = trip; else STATE.trips.push(trip);
         Storage.set('trips', STATE.trips);
         this.closeModal('modal-trip-form');
         if(STATE.currentView === 'trips') this.renderTripsList();
         this.toast('Trip saved successfully', 'success');
       },
-
       deleteTrip(id) {
-        if(confirm("Delete this trip?")) {
-          STATE.trips = STATE.trips.filter(t => t.id !== id);
-          Storage.set('trips', STATE.trips);
-          if(STATE.currentView === 'trips') this.renderTripsList();
-          this.toast('Trip deleted', 'danger');
-        }
+        if(confirm("Delete this trip?")) { STATE.trips = STATE.trips.filter(t => t.id !== id); Storage.set('trips', STATE.trips); if(STATE.currentView === 'trips') this.renderTripsList(); this.toast('Trip deleted', 'danger'); }
       },
 
-      // --- AI Extraction ---
+      htmlDrivers() {
+        return `
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-slate-800">Manage Drivers</h2>
+            <button onclick="APP.editDriver('')" class="bg-slate-800 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-900 shadow-sm"><i class="ph ph-user-plus"></i> Add Driver</button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            ${STATE.drivers.map(d => `
+              <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                  <div class="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center text-blue-600"><i class="ph-fill ph-user text-2xl"></i></div>
+                  <div>
+                    <h3 class="font-bold text-slate-800 flex items-center gap-2">${d.name} <span class="w-2 h-2 rounded-full ${d.status==='active'?'bg-emerald-500':'bg-red-500'}"></span></h3>
+                    <p class="text-xs text-slate-500">PIN: ${d.pin} | Phone: ${d.phone||'N/A'}</p>
+                  </div>
+                </div>
+                <div class="flex gap-1">
+                  <button class="p-2 text-blue-600 hover:bg-blue-50 rounded" onclick="APP.editDriver('${d.id}')"><i class="ph ph-pencil"></i></button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      },
+
+      editDriver(id) {
+        const d = STATE.drivers.find(x => x.id === id);
+        document.getElementById('driver-id').value = d ? d.id : '';
+        document.getElementById('driver-name').value = d ? d.name : '';
+        document.getElementById('driver-phone').value = d ? d.phone : '';
+        document.getElementById('driver-pin').value = d ? d.pin : '';
+        document.getElementById('driver-status').value = d ? d.status : 'active';
+        this.openModal('modal-driver-form');
+      },
+      saveDriver() {
+        const id = document.getElementById('driver-id').value || Storage.uid();
+        const d = { id: id, name: document.getElementById('driver-name').value, phone: document.getElementById('driver-phone').value, pin: document.getElementById('driver-pin').value, status: document.getElementById('driver-status').value };
+        const idx = STATE.drivers.findIndex(x => x.id === id);
+        if(idx > -1) STATE.drivers[idx] = d; else STATE.drivers.push(d);
+        Storage.set('drivers', STATE.drivers);
+        this.closeModal('modal-driver-form');
+        this.switchView('drivers');
+        this.toast('Driver saved.', 'success');
+      },
+
       htmlExtract() {
         const dOpts = '<option value="">Unassigned</option>' + STATE.drivers.filter(d=>d.status==='active').map(d => `<option value="${d.id}">${d.name}</option>`).join('');
         return `
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="md:col-span-1">
-              <div class="card">
-                <h3 class="mb-2">AI Extraction</h3>
-                <p class="text-sm text-secondary mb-6">Drop manifest PDFs, Excel files, CSVs, or photos. The AI will parse them perfectly.</p>
-                <div class="file-drop-zone" id="drop-zone">
-                  <input type="file" id="file-input" multiple accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png">
-                  <i class="ph ph-upload-simple text-brand mb-2" style="font-size: 3rem;"></i>
-                  <p class="font-semibold">Click or drag files here</p>
-                  <p class="text-xs text-secondary mt-1">PDF, Excel, CSV, Images</p>
+              <div class="bg-white border rounded-xl p-6 shadow-sm">
+                <h3 class="font-bold text-lg text-slate-800 mb-2">AI Extraction</h3>
+                <p class="text-sm text-slate-500 mb-6">Drop manifest PDFs, Excel files, CSVs, or photos. The AI will parse them perfectly.</p>
+                <div class="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center bg-blue-50 relative cursor-pointer hover:bg-blue-100 transition" id="drop-zone">
+                  <input type="file" id="file-input" multiple accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                  <i class="ph-fill ph-upload-simple text-blue-500 mb-4 text-5xl"></i>
+                  <h3 class="font-bold text-slate-700 text-lg">Tap or drag files</h3>
+                  <p class="text-xs text-slate-500 mt-2">PDF, Excel, CSV, Images</p>
                 </div>
               </div>
             </div>
             <div class="md:col-span-2">
-              <div class="card h-full flex flex-col">
-                <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-                  <h3 class="m-0">Extracted Preview</h3>
-                  <div class="flex gap-2 items-center">
-                    <select id="bulk-driver-select" class="input-field py-1 px-2 text-sm" style="width: auto;" onchange="APP.bulkAssignDriver(this.value)">
-                      <option value="">Bulk Assign Driver...</option>
+              <div class="bg-white border rounded-xl p-6 shadow-sm h-full flex flex-col">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                  <h3 class="font-bold text-lg text-slate-800">Extracted Preview</h3>
+                  <div class="flex gap-2 w-full sm:w-auto">
+                    <select id="bulk-driver-select" class="border p-2 rounded-lg text-sm bg-white" onchange="APP.bulkAssignDriver(this.value)">
+                      <option value="">Bulk Assign...</option>
                       ${STATE.drivers.filter(d=>d.status==='active').map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
                     </select>
-                    <button class="btn btn-success btn-sm" onclick="APP.saveAllExtracted()"><i class="ph ph-check-square"></i> Save All to Schedule</button>
+                    <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition whitespace-nowrap" onclick="APP.saveAllExtracted()"><i class="ph ph-check-square"></i> Save All</button>
                   </div>
                 </div>
-                <div id="extract-results" class="flex-1 overflow-y-auto bg-base rounded-md p-4 border" style="border-color: var(--border-subtle); min-height: 200px;">
-                  <div class="text-center text-secondary py-8">Awaiting documents...</div>
+                <div id="extract-results" class="flex-1 overflow-y-auto bg-slate-50 rounded-lg p-4 border border-slate-200" style="min-height: 300px;">
+                  <div class="text-center text-slate-400 py-12"><i class="ph ph-file-dashed text-4xl mb-2"></i><br>Awaiting documents...</div>
                 </div>
               </div>
             </div>
@@ -1256,18 +634,8 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         if(!dropZone || !fileInput) return;
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-          dropZone.addEventListener(eventName, preventDefaults, false);
-        });
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => dropZone.addEventListener(eventName, preventDefaults, false));
         function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-        ['dragenter', 'dragover'].forEach(eventName => {
-          dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
-        });
-        ['dragleave', 'drop'].forEach(eventName => {
-          dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
-        });
-
         dropZone.addEventListener('drop', (e) => this.handleFiles(e.dataTransfer.files), false);
         fileInput.addEventListener('change', (e) => this.handleFiles(e.target.files), false);
       },
@@ -1275,7 +643,7 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
       async handleFiles(files) {
         if(!files.length) return;
         const resultsEl = document.getElementById('extract-results');
-        resultsEl.innerHTML = `<div class="text-center py-8"><div class="spinner inline-block"></div><p>Processing ${files.length} file(s) via AI...</p></div>`;
+        resultsEl.innerHTML = `<div class="text-center py-12"><div class="spinner inline-block"></div><p class="text-slate-600 font-medium mt-4">AI is analyzing ${files.length} document(s)...</p></div>`;
         
         try {
           STATE.extractedQueue = [];
@@ -1285,182 +653,118 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
             else if(file.name.endsWith('.csv')) text = await this.extractCSV(file);
             else if(file.name.match(/\.(xlsx|xls)$/)) text = await this.extractExcel(file);
             else if(file.type.startsWith('image/')) text = await this.extractImage(file);
-            
             if(text) await this.callCloudflareWorker(text, file.name);
           }
           this.renderExtracted();
         } catch(e) {
           console.error(e);
-          // Highlight the exact error for the user to debug API key issues
-          resultsEl.innerHTML = `<div class="text-semantic-danger p-4 bg-base rounded border border-danger-subtle"><h4 class="flex items-center gap-2"><i class="ph-fill ph-warning"></i> AI Processing Failed</h4><p class="text-sm mt-2 font-mono break-words">${e.message}</p></div>`;
+          resultsEl.innerHTML = `<div class="text-red-700 bg-red-50 p-4 border border-red-200 rounded-lg"><h4 class="font-bold flex items-center gap-2"><i class="ph-fill ph-warning"></i> Processing Failed</h4><p class="text-sm mt-2">${e.message}</p></div>`;
         }
       },
-
-      extractPDF(file) {
-        return file.arrayBuffer().then(buffer => pdfjsLib.getDocument(buffer).promise)
-          .then(pdf => Promise.all(Array.from({length: Math.min(pdf.numPages, 5)}, (_, i) => pdf.getPage(i+1).then(p => p.getTextContent()))))
-          .then(pages => pages.map(p => p.items.map(i => i.str).join(' ')).join('\n'));
-      },
+      extractPDF(file) { return file.arrayBuffer().then(buffer => pdfjsLib.getDocument(buffer).promise).then(pdf => Promise.all(Array.from({length: Math.min(pdf.numPages, 5)}, (_, i) => pdf.getPage(i+1).then(p => p.getTextContent())))).then(pages => pages.map(p => p.items.map(i => i.str).join(' ')).join('\n')); },
       extractCSV(file) { return new Promise(resolve => Papa.parse(file, { complete: res => resolve(JSON.stringify(res.data)) })); },
-      extractExcel(file) {
-        return file.arrayBuffer().then(buf => {
-          const wb = XLSX.read(buf, {type: 'array'});
-          return wb.SheetNames.map(n => JSON.stringify(XLSX.utils.sheet_to_json(wb.Sheets[n]))).join('\n');
-        });
-      },
-      extractImage(file) {
-        return new Promise((resolve,reject) => {
-          const reader = new FileReader();
-          reader.onload = e => resolve(e.target.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-      },
+      extractExcel(file) { return file.arrayBuffer().then(buf => { const wb = XLSX.read(buf, {type: 'array'}); return wb.SheetNames.map(n => JSON.stringify(XLSX.utils.sheet_to_json(wb.Sheets[n]))).join('\n'); }); },
+      extractImage(file) { return new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = e => resolve(e.target.result); reader.onerror = reject; reader.readAsDataURL(file); }); },
 
       async callCloudflareWorker(content, filename) {
         let url = STATE.settings.workerUrl;
         let isDirect = false;
-        
-        if(!url) {
-          if(STATE.settings.apiKey) {
-            url = 'https://api.openai.com/v1/chat/completions';
-            isDirect = true;
-          } else {
-            throw new Error("Please configure your OpenAI API Key or Cloudflare Worker URL in Settings.");
-          }
-        }
-
+        if(!url) { if(STATE.settings.apiKey) { url = 'https://api.openai.com/v1/chat/completions'; isDirect = true; } else { throw new Error("Please configure your OpenAI API Key or Cloudflare Worker URL in Settings."); } }
         let messages = [ { role: 'system', content: CONFIG.extractionPrompt } ];
-
-        if(content.startsWith('data:image')) {
-          messages.push({
-            role: 'user',
-            content: [{ type: 'text', text: `Extract from ${filename}` }, { type: 'image_url', image_url: { url: content } }]
-          });
-        } else {
-          messages.push({ role: 'user', content: `Extract from ${filename}:\n\n${content.substring(0,10000)}` });
-        }
-
+        if(content.startsWith('data:image')) { messages.push({ role: 'user', content: [{ type: 'text', text: `Extract from ${filename}` }, { type: 'image_url', image_url: { url: content } }] }); } else { messages.push({ role: 'user', content: `Extract from ${filename}:\n\n${content.substring(0,10000)}` }); }
         const headers = { 'Content-Type': 'application/json' };
         if(isDirect) headers['Authorization'] = `Bearer ${STATE.settings.apiKey}`;
-
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify({ model: STATE.settings.aiModel, messages, temperature: 0 })
-        });
-
+        const res = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify({ model: STATE.settings.aiModel, messages, temperature: 0 }) });
         const data = await res.json();
-        
-        if(!res.ok) {
-          // Extract specific OpenAI error message if present
-          const exactError = data.error?.message || res.statusText;
-          throw new Error(`API Error (${res.status}): ${exactError}`);
-        }
-        
+        if(!res.ok) throw new Error(`API Error: ${data.error?.message || res.statusText}`);
         if(data.error) throw new Error(`OpenAI Error: ${data.error.message}`);
-
         const rawJson = data.choices[0].message.content;
         const match = rawJson.match(/\[[\s\S]*\]/);
-        if(!match) throw new Error("AI successfully processed but did not return a valid JSON array. It returned: " + rawJson);
-        
+        if(!match) throw new Error("AI did not return a valid JSON array.");
         const trips = JSON.parse(match[0]);
-        // Add assignedDriver field to extracted trips (default empty)
         trips.forEach(t => t.driverId = '');
         STATE.extractedQueue.push(...trips);
       },
 
       renderExtracted() {
         const resultsEl = document.getElementById('extract-results');
-        if(!STATE.extractedQueue.length) {
-          resultsEl.innerHTML = `<div class="text-center text-secondary py-8">No trips found or extracted.</div>`;
-          return;
-        }
-
+        if(!STATE.extractedQueue.length) { resultsEl.innerHTML = `<div class="text-center text-slate-500 py-12">No trips found.</div>`; return; }
         const dOpts = '<option value="">Unassigned</option>' + STATE.drivers.filter(d=>d.status==='active').map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-
         resultsEl.innerHTML = STATE.extractedQueue.map((t, i) => `
-          <div class="bg-surface-elevated p-3 rounded mb-3 border border-subtle relative">
-            <button class="absolute top-2 right-2 btn-icon text-semantic-danger" onclick="APP.removeExtracted(${i})"><i class="ph ph-x"></i></button>
-            <div class="flex justify-between items-start mb-2 pr-8">
+          <div class="bg-white p-4 rounded-lg mb-3 border border-slate-200 shadow-sm relative">
+            <button class="absolute top-2 right-2 text-slate-400 hover:text-red-500" onclick="APP.removeExtracted(${i})"><i class="ph ph-x"></i></button>
+            <div class="flex justify-between items-start mb-3 pr-6">
               <div>
-                <div class="font-bold">${t.patientName || 'Unknown Patient'}</div>
-                <div class="text-xs text-secondary">${t.pickupTime ? new Date(t.pickupTime).toLocaleString() : 'No Time'}</div>
+                <div class="font-bold text-slate-800">${t.patientName || 'Unknown Patient'}</div>
+                <div class="text-xs text-slate-500 font-bold">${t.pickupTime || 'No Time'}</div>
               </div>
-              <select class="input-field py-1 px-2 text-sm" style="width: auto;" onchange="APP.updateExtractedDriver(${i}, this.value)">
+              <select class="border rounded p-1 text-sm bg-white" onchange="APP.updateExtractedDriver(${i}, this.value)">
                 ${dOpts.replace(`value="${t.driverId}"`, `value="${t.driverId}" selected`)}
               </select>
             </div>
-            <div class="text-sm"><span class="font-semibold">From:</span> ${t.pickupAddress}</div>
-            <div class="text-sm"><span class="font-semibold">To:</span> ${t.dropoffAddress}</div>
-            ${t.notes ? `<div class="text-xs text-brand mt-1"><i class="ph ph-info"></i> ${t.notes}</div>` : ''}
+            <div class="grid grid-cols-2 gap-2 mt-2 bg-slate-50 border border-slate-100 p-3 rounded">
+              <div><p class="text-xs font-bold text-slate-500 mb-1">PU</p><p class="text-sm text-slate-700">${t.pickupAddress}</p></div>
+              <div><p class="text-xs font-bold text-slate-500 mb-1">DO</p><p class="text-sm text-slate-700">${t.dropoffAddress}</p></div>
+            </div>
+            ${t.notes ? `<div class="text-xs text-blue-700 mt-2 bg-blue-50 p-2 rounded"><i class="ph ph-info"></i> ${t.notes}</div>` : ''}
           </div>
         `).join('');
-        this.toast(`Extracted ${STATE.extractedQueue.length} trips successfully.`, 'success');
       },
-
-      updateExtractedDriver(index, driverId) {
-        STATE.extractedQueue[index].driverId = driverId;
-      },
-
-      bulkAssignDriver(driverId) {
-        STATE.extractedQueue.forEach(t => t.driverId = driverId);
-        this.renderExtracted();
-      },
-
-      removeExtracted(index) {
-        STATE.extractedQueue.splice(index, 1);
-        this.renderExtracted();
-      },
-
+      updateExtractedDriver(index, driverId) { STATE.extractedQueue[index].driverId = driverId; },
+      bulkAssignDriver(driverId) { STATE.extractedQueue.forEach(t => t.driverId = driverId); this.renderExtracted(); },
+      removeExtracted(index) { STATE.extractedQueue.splice(index, 1); this.renderExtracted(); },
       saveAllExtracted() {
         if(!STATE.extractedQueue.length) return;
-        STATE.extractedQueue.forEach(t => {
-          STATE.trips.push({
-            id: Storage.uid(),
-            patientName: t.patientName,
-            pickupAddress: t.pickupAddress,
-            dropoffAddress: t.dropoffAddress,
-            pickupTime: t.pickupTime,
-            notes: t.notes,
-            phone: t.phone || '',
-            status: 'Pending',
-            driverId: t.driverId || ''
-          });
-        });
-        Storage.set('trips', STATE.trips);
-        STATE.extractedQueue = [];
-        this.renderExtracted();
-        this.toast("All trips saved to schedule!", "success");
+        STATE.extractedQueue.forEach(t => STATE.trips.push({ id: Storage.uid(), patientName: t.patientName, pickupAddress: t.pickupAddress, dropoffAddress: t.dropoffAddress, pickupTime: t.pickupTime, notes: t.notes, phone: t.phone || '', status: 'Pending', driverId: t.driverId || '' }));
+        Storage.set('trips', STATE.trips); STATE.extractedQueue = []; this.renderExtracted(); this.toast("Trips saved to schedule!", "success");
       },
 
       htmlSettings() {
         return `
-          <div class="card max-w-2xl mb-4">
-            <h3 class="mb-4">System Settings</h3>
-            <div class="input-group">
-              <label class="input-label">Direct OpenAI API Key (Quick Start)</label>
-              <input type="password" id="set-api-key" class="input-field" value="${STATE.settings.apiKey || ''}" placeholder="sk-...">
-              <span class="text-xs text-secondary mt-1">If set, the app will call OpenAI directly (no Cloudflare Worker required).</span>
+          <div class="bg-white border rounded-xl p-6 shadow-sm max-w-2xl">
+            <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="ph ph-gear"></i> System Settings</h2>
+            
+            <div class="space-y-6">
+              <div>
+                <h3 class="font-bold text-slate-700 mb-3">AI Configuration</h3>
+                <div class="mb-4">
+                  <label class="block text-sm font-medium mb-1">Direct OpenAI API Key (Quick Start)</label>
+                  <input type="password" id="set-api-key" class="w-full border p-3 rounded-lg" value="${STATE.settings.apiKey || ''}" placeholder="sk-...">
+                  <p class="text-xs text-slate-500 mt-1">If set, the app calls OpenAI directly.</p>
+                </div>
+                <div class="mb-4">
+                  <label class="block text-sm font-medium mb-1">Cloudflare Worker URL (Production)</label>
+                  <input type="url" id="set-url" class="w-full border p-3 rounded-lg" value="${STATE.settings.workerUrl || ''}" placeholder="https://your-worker.workers.dev">
+                  <p class="text-xs text-slate-500 mt-1">Overrides the direct API key for secure proxying.</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1">OpenAI Model</label>
+                  <select id="set-model" class="w-full border p-3 rounded-lg bg-white">
+                    <option value="gpt-4o-mini" ${STATE.settings.aiModel==='gpt-4o-mini'?'selected':''}>GPT-4o Mini (Fast/Cheap)</option>
+                    <option value="gpt-4o" ${STATE.settings.aiModel==='gpt-4o'?'selected':''}>GPT-4o (Most Accurate/Vision)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="border-t pt-6">
+                <h3 class="font-bold text-slate-700 mb-3">Navigation</h3>
+                <label class="flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition ${STATE.settings.mapApp === 'google' ? 'border-blue-500 bg-blue-50' : 'hover:bg-slate-50'}">
+                  <input type="radio" name="mapApp" value="google" ${STATE.settings.mapApp === 'google' ? 'checked' : ''} class="w-5 h-5 text-blue-600" onchange="document.getElementById('set-map').value='google'">
+                  <span class="font-medium text-slate-700">Google Maps</span>
+                </label>
+                <input type="hidden" id="set-map" value="${STATE.settings.mapApp}">
+              </div>
+
+              <div class="border-t pt-6">
+                <h3 class="font-bold text-slate-700 mb-3">Security</h3>
+                <div>
+                  <label class="block text-sm font-medium mb-1">Admin Login PIN</label>
+                  <input type="text" id="set-admin-pin" class="w-full border p-3 rounded-lg" value="${STATE.settings.adminPin || '1234'}">
+                </div>
+              </div>
+
+              <button class="w-full py-4 bg-blue-600 text-white font-bold rounded-lg mt-4 shadow-md hover:bg-blue-700" onclick="APP.saveSettings()">Save Settings</button>
             </div>
-            <div class="input-group">
-              <label class="input-label">Cloudflare Worker URL (Production)</label>
-              <input type="url" id="set-url" class="input-field" value="${STATE.settings.workerUrl || ''}" placeholder="https://your-worker.workers.dev">
-              <span class="text-xs text-secondary mt-1">Overrides the direct API key for secure production deployments.</span>
-            </div>
-            <div class="input-group mb-4">
-              <label class="input-label">OpenAI Model</label>
-              <select id="set-model" class="input-field">
-                <option value="gpt-4o-mini" ${STATE.settings.aiModel==='gpt-4o-mini'?'selected':''}>GPT-4o Mini (Fast/Cheap)</option>
-                <option value="gpt-4o" ${STATE.settings.aiModel==='gpt-4o'?'selected':''}>GPT-4o (Most Accurate/Vision)</option>
-              </select>
-            </div>
-            <div class="input-group mb-6">
-              <label class="input-label">Admin PIN</label>
-              <input type="text" id="set-admin-pin" class="input-field" value="${STATE.settings.adminPin || '1234'}">
-            </div>
-            <hr class="mb-6 border-subtle">
-            <button class="btn btn-primary" onclick="APP.saveSettings()">Save Settings</button>
           </div>
         `;
       },
@@ -1470,21 +774,23 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
         STATE.settings.workerUrl = document.getElementById('set-url').value;
         STATE.settings.aiModel = document.getElementById('set-model').value;
         STATE.settings.adminPin = document.getElementById('set-admin-pin').value;
+        STATE.settings.mapApp = document.getElementById('set-map').value;
         Storage.set('settings', STATE.settings);
         this.toast("Settings saved successfully.", "success");
+        this.switchView('settings');
       },
 
       htmlDispatch() {
         return `
-          <div class="card p-0 overflow-hidden relative">
-            <div id="map-container"></div>
-            <div class="absolute top-4 right-4 z-20 glass p-4 rounded-lg shadow-lg w-64 max-w-full">
-              <h4 class="mb-2 text-sm">Active Fleet</h4>
-              <div class="flex flex-col gap-2">
+          <div class="bg-white border rounded-xl p-0 overflow-hidden shadow-sm relative">
+            <div id="map-container" style="height: 500px; width: 100%;"></div>
+            <div class="absolute top-4 right-4 z-[400] bg-white p-4 rounded-xl shadow-lg w-64 border border-slate-100">
+              <h4 class="font-bold text-slate-800 mb-3">Live Fleet Status</h4>
+              <div class="space-y-3">
                 ${STATE.drivers.filter(d=>d.status==='active').map(d => `
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-semantic-success"></span> ${d.name}</span>
-                    <span class="text-secondary">On Duty</span>
+                  <div class="flex items-center justify-between text-sm">
+                    <span class="flex items-center gap-2 font-medium text-slate-700"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span> ${d.name}</span>
+                    <span class="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold">ON DUTY</span>
                   </div>
                 `).join('')}
               </div>
@@ -1497,51 +803,91 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
         const mapEl = document.getElementById('map-container');
         if(!mapEl) return;
         STATE.mapInstance = L.map('map-container').setView([39.8283, -98.5795], 4);
-        const tileUrl = STATE.theme === 'dark' 
-          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-          : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-        L.tileLayer(tileUrl, { attribution: '&copy; OpenStreetMap & CARTO' }).addTo(STATE.mapInstance);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap & CARTO' }).addTo(STATE.mapInstance);
       },
 
-
-      // -------------------------------------------------------------------------
-      // DRIVER VIEWS & WIZARD
-      // -------------------------------------------------------------------------
-      htmlDriverHistory() {
-        const hTrips = STATE.trips.filter(t => t.driverId === STATE.user.id && t.status === 'Completed').sort((a,b) => new Date(b.pickupTime) - new Date(a.pickupTime));
-        if(!hTrips.length) return `<div class="card text-center py-8 text-secondary">No completed trips yet.</div>`;
-        return `<div class="grid grid-cols-1 gap-4">${hTrips.map(t => `<div class="card"><h4 class="m-0">${t.patientName}</h4><p class="text-sm text-secondary">${new Date(t.pickupTime).toLocaleString()}</p></div>`).join('')}</div>`;
-      },
-
+      // --- DRIVER VIEWS ---
       htmlDriverWizard() {
-        // Find active trips for this driver
-        const myTrips = STATE.trips.filter(t => t.driverId === STATE.user.id && t.status !== 'Completed')
-                                   .sort((a,b) => new Date(a.pickupTime) - new Date(b.pickupTime));
-        
-        if(!myTrips.length) {
-          return `<div class="card text-center py-12"><i class="ph ph-check-circle text-success" style="font-size:4rem;"></i><h2 class="mt-4">All Caught Up!</h2><p class="text-secondary mt-2">You have no active assignments.</p></div>`;
-        }
+        const myTrips = STATE.trips.filter(t => t.driverId === STATE.user.id && t.status !== 'Completed').sort((a,b) => new Date(a.pickupTime) - new Date(b.pickupTime));
+        if(!myTrips.length) return `<div class="bg-white border rounded-xl p-10 text-center"><i class="ph-fill ph-check-circle text-emerald-500 text-6xl mb-4"></i><h2 class="text-2xl font-bold text-slate-800">All Caught Up!</h2><p class="text-slate-500 mt-2">You have no active assignments.</p></div>`;
 
-        // The top trip is the "Active" one in the wizard, others are queued
         const active = myTrips[0];
         const queued = myTrips.slice(1);
 
+        const isPending = active.status === 'Pending' || active.status === 'Assigned';
+        const isEnRoutePickup = active.status === 'En Route to Pickup';
+        const isAtPickup = active.status === 'Arrived at Pickup';
+        const isEnRouteDropoff = active.status === 'En Route to Dropoff';
+
         return `
-          <div class="mb-6">
-            <h3 class="mb-4 text-brand">Current Trip Execution</h3>
-            ${this.buildWizardCard(active)}
+          <div class="mb-8">
+            <h2 class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Active Trip</h2>
+            <div class="bg-white border-2 border-blue-400 p-5 rounded-xl shadow-md relative overflow-hidden">
+              <div class="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>
+              <div class="flex justify-between items-start mb-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h3 class="font-bold text-xl text-slate-800">${active.patientName}</h3>
+                  <div class="flex items-center gap-3 mt-1 text-sm text-slate-600 font-medium">
+                    <span class="text-blue-600"><i class="ph-fill ph-clock"></i> ${new Date(active.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
+                  </div>
+                </div>
+                <span class="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase text-center max-w-[120px] shadow-sm">
+                  ${active.status}
+                </span>
+              </div>
+              
+              <div class="mb-4 flex gap-2">
+                ${active.phone ? `
+                  <a href="tel:${active.phone}" class="flex-1 flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 py-3 rounded-lg border border-emerald-200 font-bold hover:bg-emerald-100 transition shadow-sm"><i class="ph-fill ph-phone text-lg"></i> Call</a>
+                  <a href="sms:${active.phone}" class="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-700 py-3 rounded-lg border border-blue-200 font-bold hover:bg-blue-100 transition shadow-sm"><i class="ph-fill ph-chat-circle-text text-lg"></i> SMS</a>
+                ` : `<button class="w-full py-3 bg-slate-100 text-slate-400 rounded-lg font-bold border border-slate-200" disabled>No Phone Available</button>`}
+              </div>
+              
+              ${active.notes ? `<div class="flex items-start gap-2 bg-amber-50 text-amber-800 p-3 rounded-lg border border-amber-200 text-sm mb-6 shadow-sm"><i class="ph-fill ph-warning text-lg shrink-0 mt-0.5"></i><p><strong>Notes:</strong> ${active.notes}</p></div>` : ''}
+              
+              <div class="space-y-4 mb-6">
+                <!-- Pickup Card -->
+                <div class="p-4 rounded-xl border-2 transition-all ${isEnRoutePickup ? 'bg-blue-50 border-blue-300 shadow-inner' : 'bg-slate-50 border-slate-200'}">
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs text-slate-500 font-bold tracking-widest uppercase">1. Pickup</span>
+                  </div>
+                  <p class="text-slate-800 font-bold text-lg leading-tight mb-4">${active.pickupAddress}</p>
+                  ${isPending ? `<button onclick="APP.updateTripStatus('${active.id}', 'En Route to Pickup')" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-900 shadow-md active:scale-95 transition"><i class="ph-fill ph-play text-lg"></i> Start Trip to Pickup</button>` : ''}
+                  ${isEnRoutePickup ? `
+                    <div class="flex gap-2">
+                      <button onclick="APP.openNavigation('${active.pickupAddress}')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 shadow-sm"><i class="ph-fill ph-navigation-arrow text-lg text-blue-600"></i> Map</button>
+                      <button onclick="APP.promptArrivePickup('${active.id}')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md active:scale-95"><i class="ph-fill ph-check-circle text-lg"></i> Arrived</button>
+                    </div>
+                  ` : ''}
+                </div>
+                
+                <!-- Dropoff Card -->
+                <div class="p-4 rounded-xl border-2 transition-all ${isEnRouteDropoff ? 'bg-blue-50 border-blue-300 shadow-inner' : 'bg-slate-50 border-slate-200'}">
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs text-slate-500 font-bold tracking-widest uppercase">2. Dropoff</span>
+                  </div>
+                  <p class="text-slate-800 font-bold text-lg leading-tight mb-4">${active.dropoffAddress}</p>
+                  ${isAtPickup ? `<button onclick="APP.updateTripStatus('${active.id}', 'En Route to Dropoff')" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 shadow-md active:scale-95 transition"><i class="ph-fill ph-play text-lg"></i> Begin Leg to Dropoff</button>` : ''}
+                  ${isEnRouteDropoff ? `
+                    <div class="flex gap-2">
+                      <button onclick="APP.openNavigation('${active.dropoffAddress}')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 shadow-sm"><i class="ph-fill ph-navigation-arrow text-lg text-blue-600"></i> Map</button>
+                      <button onclick="APP.promptArriveDropoff('${active.id}')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md active:scale-95"><i class="ph-fill ph-flag-checkered text-lg"></i> Finish</button>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
           </div>
           
           ${queued.length > 0 ? `
-            <h4 class="mb-3 text-secondary uppercase tracking-wide text-xs">Up Next (${queued.length})</h4>
-            <div class="grid grid-cols-1 gap-3 opacity-70">
+            <h4 class="mb-3 text-slate-500 uppercase font-bold text-xs tracking-wider">Up Next (${queued.length})</h4>
+            <div class="grid grid-cols-1 gap-3">
               ${queued.map(t => `
-                <div class="card p-4 flex justify-between items-center cursor-pointer hover:opacity-100 transition-opacity" onclick="APP.makeTripActive('${t.id}')">
+                <div class="bg-white border p-4 rounded-xl shadow-sm flex justify-between items-center opacity-80 hover:opacity-100 transition">
                   <div>
-                    <h4 class="m-0">${t.patientName}</h4>
-                    <div class="text-xs text-secondary">${new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} - ${t.pickupAddress.substring(0,25)}...</div>
+                    <h4 class="font-bold text-slate-800 text-base">${t.patientName}</h4>
+                    <div class="text-xs text-slate-500 font-medium mt-1"><i class="ph-fill ph-clock"></i> ${new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} - ${t.pickupAddress.substring(0,30)}...</div>
                   </div>
-                  <button class="btn btn-ghost btn-sm">Start Now</button>
                 </div>
               `).join('')}
             </div>
@@ -1549,129 +895,32 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
         `;
       },
 
-      buildWizardCard(trip) {
-        // Wizard phases based on status
-        const isPending = trip.status === 'Pending' || trip.status === 'Assigned';
-        const isEnRoutePickup = trip.status === 'En Route to Pickup';
-        const isAtPickup = trip.status === 'Arrived at Pickup';
-        const isEnRouteDropoff = trip.status === 'En Route to Dropoff';
-
-        return `
-          <div class="card p-0 overflow-hidden border-2" style="border-color: var(--brand-primary);">
-            <div class="bg-surface-elevated p-4 border-b border-subtle">
-              <div class="flex justify-between items-start mb-2">
-                <h2 class="m-0 text-xl">${trip.patientName}</h2>
-                <span class="badge badge-${isPending ? 'warning' : 'primary'}">${trip.status}</span>
-              </div>
-              <div class="flex gap-3 text-sm font-semibold mb-3">
-                <span class="text-brand"><i class="ph-fill ph-clock"></i> ${new Date(trip.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
-              </div>
-              <div class="flex gap-2">
-                ${trip.phone ? `<a href="tel:${trip.phone}" class="btn btn-ghost btn-sm flex-1"><i class="ph-fill ph-phone"></i> Call</a>
-                                <a href="sms:${trip.phone}" class="btn btn-ghost btn-sm flex-1"><i class="ph-fill ph-chat-circle-text"></i> SMS</a>` 
-                             : `<button class="btn btn-ghost btn-sm flex-1" disabled>No Phone Provided</button>`}
-              </div>
-            </div>
-            
-            <div class="p-6">
-              <!-- Wizard Steps -->
-              <div class="wizard-step ${isEnRoutePickup||isAtPickup||isEnRouteDropoff ? 'completed' : 'active'}">
-                <div class="step-dot"></div>
-                <div class="w-full">
-                  <h4 class="m-0 text-sm mb-1">Pickup Location</h4>
-                  <p class="text-sm mb-3">${trip.pickupAddress}</p>
-                  ${isPending ? `<button class="btn btn-primary w-full" onclick="APP.updateTripStatus('${trip.id}', 'En Route to Pickup')"><i class="ph-fill ph-navigation-arrow"></i> Start Trip (En Route)</button>` : ''}
-                  ${isEnRoutePickup ? `
-                    <div class="flex gap-2">
-                      <a href="https://maps.google.com/?q=${encodeURIComponent(trip.pickupAddress)}" target="_blank" class="btn btn-ghost flex-1"><i class="ph-fill ph-map-pin"></i> Navigate</a>
-                      <button class="btn btn-success flex-1" onclick="APP.promptArrivePickup('${trip.id}')"><i class="ph-fill ph-check-circle"></i> Arrived</button>
-                    </div>
-                  ` : ''}
-                </div>
-              </div>
-
-              <div class="wizard-step ${isEnRouteDropoff ? 'completed' : (isAtPickup ? 'active' : '')}">
-                <div class="step-dot"></div>
-                <div class="w-full">
-                  <h4 class="m-0 text-sm mb-1">Passenger Onboard</h4>
-                  ${trip.notes ? `<p class="text-sm text-semantic-warning bg-warning-subtle p-2 rounded mb-3"><i class="ph-fill ph-warning"></i> ${trip.notes}</p>` : ''}
-                  ${isAtPickup ? `<button class="btn btn-primary w-full" onclick="APP.updateTripStatus('${trip.id}', 'En Route to Dropoff')"><i class="ph-fill ph-navigation-arrow"></i> Begin Leg to Dropoff</button>` : ''}
-                </div>
-              </div>
-
-              <div class="wizard-step ${isEnRouteDropoff ? 'active' : ''}">
-                <div class="step-dot"></div>
-                <div class="w-full">
-                  <h4 class="m-0 text-sm mb-1">Dropoff Location</h4>
-                  <p class="text-sm mb-3">${trip.dropoffAddress}</p>
-                  ${isEnRouteDropoff ? `
-                    <div class="flex gap-2">
-                      <a href="https://maps.google.com/?q=${encodeURIComponent(trip.dropoffAddress)}" target="_blank" class="btn btn-ghost flex-1"><i class="ph-fill ph-map-pin"></i> Navigate</a>
-                      <button class="btn btn-success flex-1" onclick="APP.promptArriveDropoff('${trip.id}')"><i class="ph-fill ph-flag-checkered"></i> Finish Trip</button>
-                    </div>
-                  ` : ''}
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      },
-
-      makeTripActive(tripId) {
-        // Re-sort the trips array so this trip is placed first logically, but since we rely on time for sorting, 
-        // we can just spoof the pickupTime to be right now if forced, or just leave as is.
-        // Actually, to make it truly active, we can temporarily move it to the front or let the driver know.
-        // For simplicity, we just prompt them:
-        if(confirm("Do you want to switch to this trip now?")) {
-          // Just update status to Assigned so it stays in queue, but we need to put it at the top.
-          // To put it at top, we can adjust its pickup time to be the earliest.
-          const trip = STATE.trips.find(t => t.id === tripId);
-          if(trip) {
-            trip.pickupTime = new Date().toISOString().slice(0,16);
-            Storage.set('trips', STATE.trips);
-            this.switchView('driver-wizard');
-          }
-        }
+      openNavigation(address) {
+        const mapApp = STATE.settings.mapApp || 'google';
+        const encoded = encodeURIComponent(address);
+        let url = `https://www.google.com/maps/search/?api=1&query=${encoded}`; // default
+        if(mapApp === 'apple') url = `http://maps.apple.com/?daddr=${encoded}`;
+        window.open(url, '_blank');
       },
 
       updateTripStatus(id, status) {
         const trip = STATE.trips.find(t => t.id === id);
-        if(trip) {
-          trip.status = status;
-          Storage.set('trips', STATE.trips);
-          this.switchView('driver-wizard');
-          this.toast(`Status updated to ${status}`, 'success');
-        }
+        if(trip) { trip.status = status; Storage.set('trips', STATE.trips); this.switchView('driver-wizard'); }
       },
 
       promptArrivePickup(id) {
-        STATE.wizardTripId = id;
-        STATE.wizardCb = () => this.updateTripStatus(id, 'Arrived at Pickup');
-        
+        STATE.wizardTripId = id; STATE.wizardCb = () => this.updateTripStatus(id, 'Arrived at Pickup');
         document.getElementById('wizard-prompt-title').innerText = "Arrived at Pickup";
-        document.getElementById('wizard-prompt-desc').innerText = "Please enter current odometer reading, time, and verify the signature.";
         document.getElementById('wizard-sig-wrap').classList.remove('hidden');
-        document.getElementById('wizard-odo').value = '';
-        
-        const now = new Date();
-        document.getElementById('wizard-time').value = now.toTimeString().slice(0,5);
-        document.getElementById('wizard-sig-check').checked = false;
-        
+        document.getElementById('wizard-odo').value = ''; document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5); document.getElementById('wizard-sig-check').checked = false;
         this.openModal('modal-wizard-prompt');
       },
 
       promptArriveDropoff(id) {
-        STATE.wizardTripId = id;
-        STATE.wizardCb = () => this.updateTripStatus(id, 'Completed');
-        
+        STATE.wizardTripId = id; STATE.wizardCb = () => this.updateTripStatus(id, 'Completed');
         document.getElementById('wizard-prompt-title').innerText = "Trip Completed";
-        document.getElementById('wizard-prompt-desc').innerText = "Please enter final odometer reading and time to finish the trip.";
         document.getElementById('wizard-sig-wrap').classList.add('hidden');
-        document.getElementById('wizard-odo').value = '';
-        
-        const now = new Date();
-        document.getElementById('wizard-time').value = now.toTimeString().slice(0,5);
-        
+        document.getElementById('wizard-odo').value = ''; document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5);
         this.openModal('modal-wizard-prompt');
       },
 
@@ -1680,31 +929,13 @@ Return ONLY the JSON array. Do not include markdown formatting, extra text, or e
         const time = document.getElementById('wizard-time').value;
         const sigWrap = document.getElementById('wizard-sig-wrap');
         const sigCheck = document.getElementById('wizard-sig-check').checked;
-
-        if(!odo || !time) {
-          this.toast("Please fill in the odometer and time.", "danger");
-          return;
-        }
-
-        if(!sigWrap.classList.contains('hidden') && !sigCheck) {
-          this.toast("Please verify that you collected the paper signature.", "danger");
-          return;
-        }
-
-        // Log to trip (in a real app, we'd save this data)
-        const trip = STATE.trips.find(t => t.id === STATE.wizardTripId);
-        if(trip) {
-          if(!trip.logs) trip.logs = [];
-          trip.logs.push({ status: document.getElementById('wizard-prompt-title').innerText, odo, time });
-          Storage.set('trips', STATE.trips);
-        }
-
+        if(!odo || !time) return this.toast("Please fill in the odometer and time.", "danger");
+        if(!sigWrap.classList.contains('hidden') && !sigCheck) return this.toast("Please verify the paper signature.", "danger");
         this.closeModal('modal-wizard-prompt');
         if(STATE.wizardCb) STATE.wizardCb();
       }
     };
 
-    // Boot
     window.addEventListener('DOMContentLoaded', () => APP.init());
   </script>
 </body>
