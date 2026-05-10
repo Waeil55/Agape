@@ -1,1699 +1,1242 @@
-
-What can I help you with today?
-
-
-The app us design is not good. Needs to be exactly fit without needing to zoom in/out The app does not extract any trips. It should add all the trips from any pdf files or excel or csv or photo Never ever forget any detail or any tasks or any single point. Never mix or mix trips Make the app huge a
-
-pasted
-
-
-
-<!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"> <title>Agape Care NEMT Pro</title> <link rel="preconnect" href="https://fonts.googleapis.com"> <link href="https://fonts.googleapis.com/css2?famil
-
-pasted
-
-
-Do it super faster. No time with me. Stream= false
-
-Claude is AI and can make mistakes. Please double-check responses.
-Your previous message wasn't sent. You can try again.
-Pasted content
-98.51 KB •1,675 lines
-•
-Formatting may be inconsistent from source
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Agape Care NEMT Pro</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
-<style>
-:root {
-  --bg0:#03101e;--bg1:#081b2e;--bg2:#0d2240;--bg3:#132b4f;
-  --border:#1c3550;--border-hi:#2a5080;
-  --primary:#3b82f6;--primary-lo:rgba(59,130,246,.12);--primary-mid:rgba(59,130,246,.25);
-  --success:#10b981;--success-lo:rgba(16,185,129,.12);
-  --warning:#f59e0b;--warning-lo:rgba(245,158,11,.12);
-  --danger:#ef4444;--danger-lo:rgba(239,68,68,.12);
-  --text1:#dceeff;--text2:#6b92b8;--text3:#2e5070;
-}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html{height:-webkit-fill-available;}
-body{font-family:'DM Sans',sans-serif;background:var(--bg0);color:var(--text1);min-height:100vh;min-height:-webkit-fill-available;overscroll-behavior:none;}
-h1,h2,h3,.syne{font-family:'Syne',sans-serif;}
-.mono{font-family:'DM Mono',monospace;}
-::-webkit-scrollbar{width:4px;height:4px;}
-::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:4px;}
-select option{background:#081b2e;color:var(--text1);}
-.hidden{display:none!important;}
-
-/* ── CARD ── */
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;}
-.card-hi{background:var(--bg3);border:1px solid var(--border-hi);border-radius:16px;}
-
-/* ── BUTTONS ── */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;border-radius:10px;cursor:pointer;transition:all .18s;border:none;outline:none;padding:10px 18px;font-size:14px;font-family:'DM Sans',sans-serif;}
-.btn:active{transform:scale(.96);}
-.btn-primary{background:var(--primary);color:#fff;}
-.btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px);}
-.btn-primary:active{transform:scale(.97);}
-.btn-success{background:var(--success);color:#fff;}
-.btn-success:hover{filter:brightness(1.1);}
-.btn-danger{background:var(--danger-lo);color:#f87171;border:1px solid rgba(239,68,68,.3);}
-.btn-danger:hover{background:var(--danger);color:#fff;}
-.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2);}
-.btn-ghost:hover{background:var(--bg3);border-color:var(--border-hi);color:var(--text1);}
-.btn-sm{padding:7px 13px;font-size:13px;border-radius:8px;}
-.btn-xs{padding:5px 10px;font-size:12px;border-radius:7px;}
-.btn-full{width:100%;padding:14px;}
-.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;filter:none!important;}
-
-/* ── INPUTS ── */
-.inp{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text1);width:100%;outline:none;transition:border-color .2s;font-family:'DM Sans',sans-serif;font-size:14px;}
-.inp:focus{border-color:var(--primary);}
-.inp::placeholder{color:var(--text3);}
-.inp-sm{padding:7px 11px;font-size:13px;border-radius:8px;}
-select.inp,select.inp-sm{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b92b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:32px;cursor:pointer;}
-
-/* ── BADGES ── */
-.badge{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;display:inline-flex;align-items:center;gap:4px;}
-.badge-pending{background:var(--warning-lo);color:#fbbf24;border:1px solid rgba(245,158,11,.3);}
-.badge-active{background:var(--primary-lo);color:#60a5fa;border:1px solid rgba(59,130,246,.3);}
-.badge-warn{background:var(--warning-lo);color:#fbbf24;border:1px solid rgba(245,158,11,.3);}
-.badge-success{background:var(--success-lo);color:#34d399;border:1px solid rgba(16,185,129,.3);}
-.badge-danger{background:var(--danger-lo);color:#f87171;border:1px solid rgba(239,68,68,.3);}
-.badge-muted{background:rgba(44,80,112,.3);color:var(--text2);border:1px solid var(--border);}
-.badge-online{background:var(--success-lo);color:#34d399;border:1px solid rgba(16,185,129,.3);}
-
-/* ── TABS ── */
-.nav-tab{padding:8px 14px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;white-space:nowrap;color:var(--text2);background:transparent;border:none;font-family:'DM Sans',sans-serif;}
-.nav-tab:hover{color:var(--text1);background:var(--bg3);}
-.nav-tab.active{color:var(--primary);background:var(--primary-lo);}
-
-/* ── LABELS / SECTION HEADERS ── */
-.lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:5px;display:block;}
-.sec-hdr{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);display:flex;align-items:center;gap:8px;margin-bottom:14px;}
-.sec-hdr::after{content:'';flex:1;height:1px;background:var(--border);}
-.divider{height:1px;background:var(--border);margin:16px 0;}
-.helper{font-size:12px;color:var(--text3);margin-top:4px;}
-.tag{font-family:'DM Mono',monospace;font-size:11px;background:var(--bg1);border:1px solid var(--border);border-radius:6px;padding:2px 8px;color:var(--text2);}
-
-/* ── MODAL ── */
-.modal-bg{position:fixed;inset:0;background:rgba(3,16,30,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:100;display:flex;align-items:flex-end;justify-content:center;padding:0;opacity:0;transition:opacity .25s;pointer-events:none;}
-@media(min-width:600px){.modal-bg{align-items:center;padding:16px;}}
-.modal-bg.open{opacity:1;pointer-events:all;}
-.modal-box{background:var(--bg2);border:1px solid var(--border-hi);border-radius:20px 20px 0 0;width:100%;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;transform:translateY(40px);transition:transform .28s cubic-bezier(.34,1.56,.64,1);}
-@media(min-width:600px){.modal-box{border-radius:20px;max-width:700px;transform:translateY(20px) scale(.97);}}
-.modal-bg.open .modal-box{transform:translateY(0) scale(1);}
-.modal-hdr{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.modal-body{overflow-y:auto;padding:20px;flex:1;overscroll-behavior:contain;}
-
-/* ── ALERTS ── */
-.alert{padding:12px 14px;border-radius:12px;font-size:13px;display:flex;align-items:flex-start;gap:10px;line-height:1.5;}
-.alert-warn{background:var(--warning-lo);border:1px solid rgba(245,158,11,.3);color:#fde68a;}
-.alert-danger{background:var(--danger-lo);border:1px solid rgba(239,68,68,.3);color:#fca5a5;}
-.alert-success{background:var(--success-lo);border:1px solid rgba(16,185,129,.3);color:#6ee7b7;}
-.alert-info{background:var(--primary-lo);border:1px solid rgba(59,130,246,.3);color:#93c5fd;}
-
-/* ── ANIMATIONS ── */
-@keyframes spin{to{transform:rotate(360deg);}}
-@keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(16,185,129,.5);}70%{box-shadow:0 0 0 8px rgba(16,185,129,0);}100%{box-shadow:0 0 0 0 rgba(16,185,129,0);}}
-@keyframes slideUp{from{transform:translateY(12px);opacity:0;}to{transform:translateY(0);opacity:1;}}
-@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
-.spin{animation:spin 1s linear infinite;}
-.pulse-online{animation:pulse-ring 2s ease infinite;}
-.slide-up{animation:slideUp .3s ease both;}
-.fade-in{animation:fadeIn .3s ease both;}
-
-/* ── FLOATING ACTION BAR ── */
-#action-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(120px);background:var(--bg3);border:1.5px solid var(--primary);border-radius:16px;padding:11px 16px;display:flex;align-items:center;gap:10px;z-index:50;box-shadow:0 8px 32px rgba(59,130,246,.25),0 0 0 1px rgba(59,130,246,.1);transition:transform .35s cubic-bezier(.34,1.56,.64,1);width:calc(100% - 32px);max-width:620px;}
-#action-bar.show{transform:translateX(-50%) translateY(0);}
-#action-bar-delete{background:var(--danger-lo);color:#f87171;border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:7px 10px;cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;}
-#action-bar-delete:hover{background:var(--danger);color:#fff;}
-
-/* ── LOADING ── */
-#loading-screen{position:fixed;inset:0;background:var(--bg0);display:flex;align-items:center;justify-content:center;z-index:200;transition:opacity .4s;}
-#loading-screen.hide{opacity:0;pointer-events:none;}
-
-/* ── TOAST ── */
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);z-index:300;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.4);}
-#toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
-#toast.t-success{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.4);color:#34d399;}
-#toast.t-danger{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#f87171;}
-#toast.t-info{background:var(--bg3);border:1px solid var(--border-hi);color:var(--text1);}
-#toast.t-warn{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#fbbf24;}
-
-/* ── LAYOUT ── */
-.app-header{background:var(--bg1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:40;}
-.tab-bar{background:var(--bg1);border-bottom:1px solid var(--border);position:sticky;z-index:30;}
-.admin-main{max-width:900px;margin:0 auto;padding:20px 14px;}
-.driver-main{max-width:480px;margin:0 auto;padding:14px 14px 80px;}
-
-/* ── TRIP CARD ── */
-.trip-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;transition:border-color .2s,background .2s;cursor:default;}
-.trip-card:hover{border-color:var(--border-hi);}
-.trip-card.selected{border-color:var(--primary);background:var(--bg3);}
-.trip-card-active{background:linear-gradient(135deg,var(--bg3) 0%,rgba(19,43,79,.8) 100%);border:1.5px solid var(--primary);box-shadow:0 0 30px rgba(59,130,246,.1);}
-
-/* ── CHECKBOX ── */
-input[type=checkbox]{accent-color:var(--primary);width:17px;height:17px;cursor:pointer;border-radius:4px;}
-input[type=radio]{accent-color:var(--primary);cursor:pointer;}
-
-/* ── SAFE AREA ── */
-.safe-pb{padding-bottom:env(safe-area-inset-bottom,8px);}
-
-/* ── FILE DROP ── */
-.file-drop{border:2px dashed var(--border-hi);border-radius:14px;padding:40px 20px;text-align:center;background:var(--bg1);cursor:pointer;transition:all .2s;position:relative;}
-.file-drop:hover,.file-drop.drag{border-color:var(--primary);background:var(--primary-lo);}
-.file-drop input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;}
-
-/* ── DRIVER STATUS TOP LINE ── */
-.driver-card-line{position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0;}
-
-/* ── STAT BOX ── */
-.stat-box{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
-
-/* ── PICKUP/DROPOFF BLOCKS ── */
-.pu-block{background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.2);border-radius:12px;padding:14px;}
-.do-block{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:12px;padding:14px;}
-.pu-block .lbl{color:var(--primary);}
-.do-block .lbl{color:var(--success);}
-
-/* ── STEP PROGRESS ── */
-.step-track{display:flex;flex-direction:column;gap:0;}
-.step-item{display:flex;align-items:flex-start;gap:12px;padding:10px 0;}
-.step-dot{width:10px;height:10px;border-radius:50%;margin-top:4px;flex-shrink:0;}
-.step-dot-done{background:var(--success);}
-.step-dot-active{background:var(--primary);box-shadow:0 0 8px rgba(59,130,246,.6);}
-.step-dot-idle{background:var(--border-hi);}
-.step-line{width:2px;background:var(--border);height:24px;margin-left:4px;}
-
-@media(max-width:480px){
-  .admin-main{padding:12px 10px;}
-  .modal-hdr{padding:14px 16px;}
-  .modal-body{padding:16px;}
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <title>Agape Care NEMT Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    input,select,textarea,button{font-family:inherit;font-size:16px;outline:none}
+    html,body{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:9999px}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .2s;padding:max(1rem,env(safe-area-inset-top)) max(1rem,env(safe-area-inset-right)) max(1rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left))}
+    .modal-backdrop.open{opacity:1;pointer-events:auto}
+    .modal-panel{transform:scale(.95);transition:transform .2s cubic-bezier(.16,1,.3,1);max-height:96vh;display:flex;flex-direction:column}
+    .modal-backdrop.open .modal-panel{transform:scale(1)}
+    .modal-body{overflow-y:auto}
+    .toast-container{position:fixed;bottom:max(2rem,env(safe-area-inset-bottom));right:2rem;display:flex;flex-direction:column;gap:.5rem;z-index:200}
+    @media(max-width:600px){.toast-container{left:1rem;right:1rem;bottom:max(1rem,env(safe-area-inset-bottom))}}
+    .toast{padding:1rem 1.25rem;border-radius:.5rem;background:#1e293b;color:#fff;box-shadow:0 10px 15px -3px rgba(0,0,0,.1);border-left:4px solid #3b82f6;display:flex;align-items:center;gap:.75rem;transform:translateX(120%);transition:transform .3s cubic-bezier(.16,1,.3,1)}
+    .toast.show{transform:translateX(0)}
+    .toast.success{border-left-color:#10b981}
+    .toast.danger{border-left-color:#ef4444}
+    .toast.warning{border-left-color:#f59e0b}
+    #loading-screen{position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .spinner{width:48px;height:48px;border:4px solid #bfdbfe;border-top-color:#2563eb;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:1rem}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media print{.no-print,header,.tabs-bar{display:none!important}}
+    .key-visible { -webkit-text-security: none !important; }
+  </style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-800">
 
-<!-- ══════════ LOADING ══════════ -->
+<!-- Loading Screen -->
 <div id="loading-screen">
-  <div class="text-center">
-    <div class="w-10 h-10 border-4 spin mx-auto mb-4" style="border-color:rgba(59,130,246,.2);border-top-color:var(--primary);border-radius:50%;"></div>
-    <p style="color:var(--text2);font-size:13px;">Loading NEMT Pro…</p>
+  <div class="spinner"></div>
+  <h2 class="font-bold text-2xl text-slate-800">Agape Care NEMT</h2>
+  <p class="text-slate-500 mt-2" id="loading-msg">Starting up...</p>
+</div>
+
+<!-- Auth Screen -->
+<div id="auth-screen" style="display:none" class="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+    <div class="flex justify-center mb-6 text-blue-600"><i class="ph-fill ph-ambulance text-5xl"></i></div>
+    <h1 class="text-2xl font-bold text-center text-slate-800 mb-8">NEMT Manager Pro</h1>
+    <div class="space-y-6">
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <h2 class="font-semibold text-slate-700 mb-4 flex items-center gap-2"><i class="ph ph-map-pin"></i> Driver Login</h2>
+        <select id="auth-driver-select" class="w-full p-3 border rounded-lg mb-3 bg-white"></select>
+        <input type="password" id="auth-driver-pin" placeholder="Driver PIN" class="w-full p-3 border rounded-lg mb-3" onkeydown="if(event.key==='Enter')APP.loginDriver()">
+        <button onclick="APP.loginDriver()" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">Login as Driver</button>
+      </div>
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <h2 class="font-semibold text-slate-700 mb-4 flex items-center gap-2"><i class="ph ph-gear"></i> Admin Portal</h2>
+        <input type="password" id="auth-admin-pin" placeholder="Admin PIN (default: 1234)" class="w-full p-3 border rounded-lg mb-3" onkeydown="if(event.key==='Enter')APP.loginAdmin()">
+        <button onclick="APP.loginAdmin()" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition">Access Admin Panel</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- ══════════ HEADER ══════════ -->
-<header id="app-header" class="app-header hidden">
-  <div class="admin-main" style="padding-top:12px;padding-bottom:12px;">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:var(--primary-lo);border:1px solid var(--primary-mid);">
-          <i class="ph-fill ph-ambulance" style="font-size:18px;color:var(--primary);"></i>
-        </div>
-        <div>
-          <p id="hdr-title" class="syne font-bold text-sm" style="color:var(--text1);">Agape Care</p>
-          <p id="hdr-sub" class="text-xs" style="color:var(--text3);">NEMT Pro</p>
-        </div>
+<!-- Main App -->
+<div id="app-main" style="display:none" class="min-h-screen bg-slate-50 pb-20">
+  <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-10 w-full" style="padding-top:max(1rem,env(safe-area-inset-top))">
+    <div class="max-w-4xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <i class="ph-fill ph-ambulance text-2xl"></i>
+        <h1 class="font-bold text-lg" id="header-title">Admin Dashboard</h1>
       </div>
       <div class="flex items-center gap-2">
-        <div id="hdr-gps" class="hidden items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full" style="background:var(--bg3);color:var(--text2);">
-          <span id="hdr-gps-dot" class="w-2 h-2 rounded-full" style="background:var(--text3);display:inline-block;"></span>
-          <span id="hdr-gps-txt">Offline</span>
+        <span id="db-badge" class="hidden text-xs bg-white/20 px-2 py-1 rounded-full">🔥 Cloud</span>
+        <button onclick="APP.logout()" class="flex items-center gap-1 bg-white/20 px-3 py-1.5 rounded-full hover:bg-white/30 text-sm font-medium transition"><i class="ph ph-sign-out"></i> Logout</button>
+      </div>
+    </div>
+  </header>
+  <div id="driver-status-bar" style="display:none" class="bg-white shadow-sm border-b px-4 py-3 sticky z-10 flex justify-between items-center max-w-4xl mx-auto">
+    <div><span class="text-sm font-bold text-slate-700 block">GPS Tracking</span><span class="text-xs text-green-600">Transmitting Live Location...</span></div>
+    <button class="px-4 py-2 rounded-full font-bold text-sm bg-green-600 text-white hover:bg-green-700 transition">GO ONLINE</button>
+  </div>
+  <main class="max-w-4xl mx-auto p-4 mt-4">
+    <div class="flex space-x-2 mb-6 bg-white p-1 rounded-xl shadow-sm overflow-x-auto tabs-bar" id="tabs-container"></div>
+    <div id="views-container"></div>
+  </main>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Modal: Wizard -->
+<div class="modal-backdrop" id="modal-wizard-prompt">
+  <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+    <div class="flex justify-between items-center p-4 border-b">
+      <h2 class="text-xl font-bold text-slate-800" id="wizard-prompt-title">Arrived</h2>
+      <button onclick="APP.closeModal('modal-wizard-prompt')" class="p-2 hover:bg-slate-100 rounded-full text-slate-500"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal-body p-6">
+      <p class="text-sm text-slate-500 mb-4">Enter the odometer reading and verify the time.</p>
+      <div class="mb-4"><label class="block text-xs font-medium text-slate-500 mb-1">Odometer</label><input type="number" id="wizard-odo" class="w-full border p-2.5 rounded-lg" placeholder="e.g. 154200"></div>
+      <div class="mb-4"><label class="block text-xs font-medium text-slate-500 mb-1">Actual Time</label><input type="time" id="wizard-time" class="w-full border p-2.5 rounded-lg"></div>
+      <div class="hidden mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-3 items-start" id="wizard-sig-wrap">
+        <input type="checkbox" id="wizard-sig-check" class="mt-1 w-4 h-4 cursor-pointer">
+        <label for="wizard-sig-check" class="text-sm font-semibold text-amber-900 cursor-pointer">I have verified the paper signature for this leg.</label>
+      </div>
+    </div>
+    <div class="p-4 border-t flex justify-end gap-3 bg-slate-50">
+      <button class="px-4 py-2 font-medium text-slate-600 hover:bg-slate-200 rounded-lg" onclick="APP.closeModal('modal-wizard-prompt')">Cancel</button>
+      <button class="px-4 py-2 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg" onclick="APP.confirmWizardPrompt()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Trip Form -->
+<div class="modal-backdrop" id="modal-trip-form" onclick="if(event.target===this)APP.closeModal('modal-trip-form')">
+  <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden">
+    <div class="flex justify-between items-center p-4 border-b">
+      <h2 class="text-xl font-bold text-slate-800"><i class="ph ph-file-plus"></i> Trip Details</h2>
+      <button onclick="APP.closeModal('modal-trip-form')" class="p-2 hover:bg-slate-100 rounded-full text-slate-500"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal-body p-6 space-y-6">
+      <input type="hidden" id="trip-id">
+      <div class="bg-slate-50 p-4 rounded-lg border">
+        <h3 class="font-bold text-slate-700 mb-3"><i class="ph ph-user"></i> Patient</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div><label class="block text-xs font-medium text-slate-500 mb-1">Patient Name</label><input type="text" id="trip-patient" class="w-full border p-2.5 rounded-lg bg-white"></div>
+          <div><label class="block text-xs font-medium text-slate-500 mb-1">Phone</label><input type="tel" id="trip-phone" class="w-full border p-2.5 rounded-lg bg-white"></div>
         </div>
-        <button onclick="APP.logout()" class="btn btn-ghost btn-sm"><i class="ph ph-sign-out"></i> Logout</button>
+      </div>
+      <div class="bg-slate-50 p-4 rounded-lg border space-y-4">
+        <h3 class="font-bold text-slate-700 mb-3"><i class="ph ph-map-pin"></i> Route</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div><label class="block text-xs font-medium text-slate-500 mb-1">Assign Driver</label><select id="trip-driver" class="w-full border p-2.5 rounded-lg bg-white"></select></div>
+          <div><label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
+            <select id="trip-status" class="w-full border p-2.5 rounded-lg bg-white">
+              <option>Pending</option><option>En Route to Pickup</option><option>Arrived at Pickup</option><option>En Route to Dropoff</option><option>Completed</option><option>Cancelled</option>
+            </select>
+          </div>
+        </div>
+        <div><label class="block text-xs font-medium text-slate-500 mb-1">Pickup Time</label><input type="datetime-local" id="trip-time" class="w-full border p-2.5 rounded-lg bg-white"></div>
+        <div><label class="block text-xs font-medium text-slate-500 mb-1">Pickup Address</label><input type="text" id="trip-pickup" class="w-full border p-2.5 rounded-lg bg-white"></div>
+        <div><label class="block text-xs font-medium text-slate-500 mb-1">Dropoff Address</label><input type="text" id="trip-dropoff" class="w-full border p-2.5 rounded-lg bg-white"></div>
+        <div><label class="block text-xs font-medium text-slate-500 mb-1">Notes</label><input type="text" id="trip-notes" class="w-full border p-2.5 rounded-lg bg-white"></div>
       </div>
     </div>
-  </div>
-</header>
-
-<!-- ══════════ LOGIN ══════════ -->
-<div id="view-login" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;">
-  <div style="width:100%;max-width:460px;">
-    <div class="text-center" style="margin-bottom:32px;">
-      <div class="w-20 h-20 rounded-2xl mx-auto flex items-center justify-center mb-4" style="background:var(--primary-lo);border:1px solid var(--primary-mid);">
-        <i class="ph-fill ph-heartbeat" style="font-size:40px;color:var(--primary);"></i>
-      </div>
-      <h1 class="syne" style="font-size:28px;font-weight:800;color:var(--text1);">Agape Care</h1>
-      <p style="color:var(--text2);font-size:14px;margin-top:4px;">Non-Emergency Medical Transport</p>
-    </div>
-
-    <div class="card p-6 mb-4 slide-up">
-      <div class="flex items-center gap-2 mb-5">
-        <i class="ph ph-steering-wheel" style="color:var(--primary);font-size:20px;"></i>
-        <h2 class="syne font-bold" style="color:var(--text1);">Driver Login</h2>
-      </div>
-      <select id="login-driver-select" class="inp mb-3" style="margin-bottom:12px;"></select>
-      <input type="password" id="login-driver-pin" class="inp mb-4" placeholder="Enter your PIN"
-             onkeydown="if(event.key==='Enter')APP.loginDriver()" style="margin-bottom:16px;"/>
-      <button onclick="APP.loginDriver()" class="btn btn-primary btn-full">
-        <i class="ph ph-play-circle"></i> Login as Driver
-      </button>
-    </div>
-
-    <div class="card p-6 slide-up" style="animation-delay:.1s;">
-      <div class="flex items-center gap-2 mb-5">
-        <i class="ph ph-shield-check" style="color:var(--text3);font-size:20px;"></i>
-        <h2 class="syne font-bold" style="color:var(--text2);">Admin / Dispatch</h2>
-      </div>
-      <input type="password" id="login-admin-pin" class="inp mb-4" placeholder="Admin PIN"
-             onkeydown="if(event.key==='Enter')APP.loginAdmin()" style="margin-bottom:16px;"/>
-      <button onclick="APP.loginAdmin()" class="btn btn-ghost btn-full">
-        <i class="ph ph-gear-six"></i> Access Dispatch Panel
-      </button>
-    </div>
-    <p class="text-center text-xs mt-3" style="color:var(--text3);">Default admin PIN: 1234</p>
-  </div>
-</div>
-
-<!-- ══════════ ADMIN VIEW ══════════ -->
-<div id="view-admin" class="hidden">
-  <div class="tab-bar" style="top:57px;">
-    <div class="admin-main" style="padding-top:8px;padding-bottom:0;">
-      <div class="flex gap-1 overflow-x-auto" style="-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:8px;">
-        <button onclick="APP.adminTab('fleet')" id="atab-fleet" class="nav-tab active"><i class="ph ph-radar"></i>Fleet</button>
-        <button onclick="APP.adminTab('trips')" id="atab-trips" class="nav-tab"><i class="ph ph-clipboard-text"></i>Trips</button>
-        <button onclick="APP.adminTab('drivers')" id="atab-drivers" class="nav-tab"><i class="ph ph-users"></i>Drivers</button>
-        <button onclick="APP.adminTab('ai')" id="atab-ai" class="nav-tab"><i class="ph ph-magic-wand"></i>AI Tools</button>
-        <button onclick="APP.adminTab('settings')" id="atab-settings" class="nav-tab"><i class="ph ph-sliders"></i>Settings</button>
-      </div>
-    </div>
-  </div>
-  <div class="admin-main" style="padding-top:20px;">
-    <div id="apanel-fleet" class="apanel"></div>
-    <div id="apanel-trips" class="apanel hidden"></div>
-    <div id="apanel-drivers" class="apanel hidden"></div>
-    <div id="apanel-ai" class="apanel hidden"></div>
-    <div id="apanel-settings" class="apanel hidden"></div>
-  </div>
-</div>
-
-<!-- ══════════ DRIVER VIEW ══════════ -->
-<div id="view-driver" class="hidden">
-  <!-- GPS Bar -->
-  <div class="tab-bar" style="top:57px;z-index:35;">
-    <div style="max-width:480px;margin:0 auto;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <p class="font-bold text-sm" style="color:var(--text1);"><i class="ph ph-broadcast"></i> GPS Tracking</p>
-        <p id="driver-gps-status" class="text-xs" style="color:var(--text3);">Offline – Tap to go online</p>
-      </div>
-      <button id="driver-gps-btn" onclick="APP.toggleGPS()" class="btn btn-success btn-sm">GO ONLINE</button>
-    </div>
-  </div>
-  <!-- Driver tabs -->
-  <div class="tab-bar" style="top:115px;">
-    <div style="max-width:480px;margin:0 auto;padding:0 14px;">
-      <div class="flex gap-1 pb-2 pt-1">
-        <button onclick="APP.driverTab('route')" id="dtab-route" class="nav-tab active" style="flex:1;justify-content:center;"><i class="ph ph-map-trifold"></i>My Route</button>
-        <button onclick="APP.driverTab('available')" id="dtab-available" class="nav-tab" style="flex:1;justify-content:center;"><i class="ph ph-plus-circle"></i>Get Trips</button>
-        <button onclick="APP.driverTab('dsettings')" id="dtab-dsettings" class="nav-tab" style="flex:1;justify-content:center;"><i class="ph ph-sliders"></i>Settings</button>
-      </div>
-    </div>
-  </div>
-  <div class="driver-main safe-pb" style="padding-top:16px;">
-    <div id="dpanel-route" class="dpanel"></div>
-    <div id="dpanel-available" class="dpanel hidden"></div>
-    <div id="dpanel-dsettings" class="dpanel hidden"></div>
-  </div>
-</div>
-
-<!-- ══════════ FLOATING ACTION BAR ══════════ -->
-<div id="action-bar">
-  <span id="ab-count" class="font-bold text-sm" style="color:var(--primary);white-space:nowrap;"></span>
-  <select id="ab-driver" class="inp inp-sm" style="flex:1;"></select>
-  <button onclick="APP.bulkAssign()" class="btn btn-primary btn-sm" style="white-space:nowrap;"><i class="ph ph-check"></i>Assign</button>
-  <button id="action-bar-delete" onclick="APP.bulkDelete()"><i class="ph ph-trash"></i>Delete</button>
-  <button onclick="APP.clearSel()" style="background:transparent;border:none;cursor:pointer;color:var(--text2);padding:4px 2px;"><i class="ph ph-x" style="font-size:18px;"></i></button>
-</div>
-
-<!-- ══════════ TOAST ══════════ -->
-<div id="toast"></div>
-
-<!-- ══════════ MODAL: TRIP ══════════ -->
-<div id="modal-trip" class="modal-bg" onclick="if(event.target===this)APP.closeModal('modal-trip')">
-  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:700px;">
-    <div class="modal-hdr">
-      <h2 class="syne font-bold" style="font-size:17px;color:var(--text1);">
-        <i class="ph ph-file-plus" style="color:var(--primary);"></i>
-        <span id="trip-modal-title">New Trip</span>
-      </h2>
-      <button onclick="APP.closeModal('modal-trip')" class="btn btn-ghost btn-xs"><i class="ph ph-x"></i></button>
-    </div>
-    <div class="modal-body" id="trip-modal-body"></div>
-  </div>
-</div>
-
-<!-- ══════════ MODAL: DRIVER ══════════ -->
-<div id="modal-driver" class="modal-bg" onclick="if(event.target===this)APP.closeModal('modal-driver')">
-  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:420px;">
-    <div class="modal-hdr">
-      <h2 class="syne font-bold" style="font-size:17px;color:var(--text1);">
-        <i class="ph ph-user-plus" style="color:var(--primary);"></i>
-        <span id="driver-modal-title">Add Driver</span>
-      </h2>
-      <button onclick="APP.closeModal('modal-driver')" class="btn btn-ghost btn-xs"><i class="ph ph-x"></i></button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="d-edit-id"/>
-      <div style="margin-bottom:14px;"><span class="lbl">Driver Full Name</span><input id="d-name" class="inp" placeholder="John Doe"/></div>
-      <div style="margin-bottom:20px;"><span class="lbl">Login PIN</span><input id="d-pin" class="inp mono" maxlength="8" placeholder="e.g. 1234"/></div>
-      <button onclick="APP.saveDriver()" class="btn btn-primary btn-full"><i class="ph ph-floppy-disk"></i> Save Driver</button>
+    <div class="p-4 border-t flex justify-end gap-3 bg-slate-50">
+      <button class="px-4 py-2 font-medium text-slate-600 hover:bg-slate-200 rounded-lg" onclick="APP.closeModal('modal-trip-form')">Cancel</button>
+      <button class="px-4 py-2 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg" onclick="APP.saveTrip()">Save Trip</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════ MODAL: AI UPLOAD ══════════ -->
-<div id="modal-ai" class="modal-bg" onclick="if(event.target===this)APP.closeModal('modal-ai')">
-  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:700px;">
-    <div class="modal-hdr">
-      <h2 class="syne font-bold" style="font-size:17px;color:var(--text1);">
-        <i class="ph ph-magic-wand" style="color:var(--primary);"></i> AI Manifest Extraction
-      </h2>
-      <button onclick="APP.closeModal('modal-ai')" class="btn btn-ghost btn-xs"><i class="ph ph-x"></i></button>
+<!-- Modal: Driver Form -->
+<div class="modal-backdrop" id="modal-driver-form" onclick="if(event.target===this)APP.closeModal('modal-driver-form')">
+  <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+    <div class="flex justify-between items-center p-4 border-b">
+      <h2 class="text-xl font-bold text-slate-800"><i class="ph ph-user"></i> Driver Details</h2>
+      <button onclick="APP.closeModal('modal-driver-form')" class="p-2 hover:bg-slate-100 rounded-full text-slate-500"><i class="ph ph-x"></i></button>
     </div>
-    <div class="modal-body" id="ai-modal-body"></div>
-  </div>
-</div>
-
-<!-- ══════════ MODAL: PIN CHANGE ══════════ -->
-<div id="modal-pin" class="modal-bg" onclick="if(event.target===this)APP.closeModal('modal-pin')">
-  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:380px;">
-    <div class="modal-hdr">
-      <h2 class="syne font-bold" style="font-size:17px;color:var(--text1);">
-        <i class="ph ph-lock-key" style="color:var(--warning);"></i>
-        <span id="pin-modal-title">Change PIN</span>
-      </h2>
-      <button onclick="APP.closeModal('modal-pin')" class="btn btn-ghost btn-xs"><i class="ph ph-x"></i></button>
+    <div class="modal-body p-6 space-y-4">
+      <input type="hidden" id="driver-id">
+      <div><label class="block text-xs font-medium text-slate-500 mb-1">Full Name</label><input type="text" id="driver-name" class="w-full border p-2.5 rounded-lg"></div>
+      <div><label class="block text-xs font-medium text-slate-500 mb-1">Phone</label><input type="tel" id="driver-phone" class="w-full border p-2.5 rounded-lg"></div>
+      <div><label class="block text-xs font-medium text-slate-500 mb-1">Login PIN</label><input type="text" id="driver-pin" class="w-full border p-2.5 rounded-lg"></div>
+      <div><label class="block text-xs font-medium text-slate-500 mb-1">Status</label><select id="driver-status" class="w-full border p-2.5 rounded-lg"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
     </div>
-    <div class="modal-body">
-      <input type="hidden" id="pin-target-id"/>
-      <div style="margin-bottom:14px;"><span class="lbl">Current PIN</span><input id="pin-current" type="password" class="inp" placeholder="Current PIN"/></div>
-      <div style="margin-bottom:14px;"><span class="lbl">New PIN</span><input id="pin-new" class="inp mono" maxlength="8" placeholder="New PIN"/></div>
-      <div style="margin-bottom:20px;"><span class="lbl">Confirm New PIN</span><input id="pin-confirm" class="inp mono" maxlength="8" placeholder="Repeat new PIN"/></div>
-      <button onclick="APP.confirmPinChange()" class="btn btn-primary btn-full"><i class="ph ph-lock-key"></i> Update PIN</button>
+    <div class="p-4 border-t flex justify-end gap-3 bg-slate-50">
+      <button class="px-4 py-2 font-medium text-slate-600 hover:bg-slate-200 rounded-lg" onclick="APP.closeModal('modal-driver-form')">Cancel</button>
+      <button class="px-4 py-2 font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg" onclick="APP.saveDriver()">Save Driver</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════ MODAL: SELECT TRIPS (driver claim) ══════════ -->
-<div id="modal-pick-trips" class="modal-bg" onclick="if(event.target===this)APP.closeModal('modal-pick-trips')">
-  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:580px;">
-    <div class="modal-hdr">
-      <h2 class="syne font-bold" style="font-size:17px;color:var(--text1);">
-        <i class="ph ph-plus-circle" style="color:var(--success);"></i> Available Trips
-      </h2>
-      <button onclick="APP.closeModal('modal-pick-trips')" class="btn btn-ghost btn-xs"><i class="ph ph-x"></i></button>
-    </div>
-    <div class="modal-body" id="pick-trips-body"></div>
-  </div>
-</div>
+<!-- CDN scripts at bottom so they don't block rendering -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-<!-- ══════════ SCRIPT ══════════ -->
 <script>
-// ═══════════════════════════════════════════════════════════
-//  AGAPE CARE NEMT PRO v2.0
-//  Single-file app — localStorage by default, Firebase optional
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════════════
+function showAuth() {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('auth-screen').style.display = '';
+  if (window.APP && APP.populateAuthSelect) APP.populateAuthSelect();
+}
 
-// ── STORAGE KEYS ──────────────────────────────────────────
-const LS = {
-  TASKS:'agape_tasks', DRIVERS:'agape_drivers',
-  SETTINGS:'agape_settings', ADMIN_PIN:'agape_admin_pin',
-  FB_CONFIG:'agape_fb_config',
+// ═══════════════════════════════════════════════════════════════════════
+// INDEXEDDB
+// ═══════════════════════════════════════════════════════════════════════
+var IDB = {
+  db: null,
+  open: function(cb) {
+    try {
+      var req = indexedDB.open('AgapeNEMT', 2);
+      req.onupgradeneeded = function(e) {
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains('trips'))   db.createObjectStore('trips',   {keyPath:'id'});
+        if (!db.objectStoreNames.contains('drivers')) db.createObjectStore('drivers', {keyPath:'id'});
+        if (!db.objectStoreNames.contains('kv'))      db.createObjectStore('kv',       {keyPath:'k'});
+      };
+      req.onsuccess = function(e) { IDB.db = e.target.result; cb(null); };
+      req.onerror   = function(e) { cb(e); };
+    } catch(e) { cb(e); }
+  },
+  getAll: function(store, cb) {
+    if (!IDB.db) return cb([]);
+    try {
+      var req = IDB.db.transaction(store,'readonly').objectStore(store).getAll();
+      req.onsuccess = function() { cb(req.result || []); };
+      req.onerror   = function() { cb([]); };
+    } catch(e) { cb([]); }
+  },
+  put: function(store, obj, cb) {
+    cb = cb || function(){};
+    if (!IDB.db) return cb();
+    try {
+      var req = IDB.db.transaction(store,'readwrite').objectStore(store).put(obj);
+      req.onsuccess = cb;
+      req.onerror   = cb;
+    } catch(e) { cb(); }
+  },
+  del: function(store, id, cb) {
+    cb = cb || function(){};
+    if (!IDB.db) return cb();
+    try {
+      var req = IDB.db.transaction(store,'readwrite').objectStore(store).delete(id);
+      req.onsuccess = cb;
+      req.onerror   = cb;
+    } catch(e) { cb(); }
+  },
+  getKV: function(k, def, cb) {
+    if (!IDB.db) return cb(def);
+    try {
+      var req = IDB.db.transaction('kv','readonly').objectStore('kv').get(k);
+      req.onsuccess = function() { cb(req.result ? req.result.v : def); };
+      req.onerror   = function() { cb(def); };
+    } catch(e) { cb(def); }
+  },
+  putKV: function(k, v, cb) {
+    IDB.put('kv', {k:k, v:v}, cb);
+  }
 };
 
-// ── STORE (localStorage layer) ────────────────────────────
-const Store = {
-  tasks:[], drivers:[], settings:{
-    mapApp:'google', aiEndpoint:'https://api.openai.com/v1/chat/completions',
-    aiKey:'', aiModel:'gpt-4o-mini', workerUrl:'',
-  },
-
-  _uid(){ return '_'+Math.random().toString(36).slice(2,11); },
-  _save(key,val){ try{ localStorage.setItem(key,JSON.stringify(val)); }catch(e){} },
-
-  load(){
-    try{ this.tasks = JSON.parse(localStorage.getItem(LS.TASKS)||'[]')||[]; }catch{ this.tasks=[]; }
-    try{ this.drivers = JSON.parse(localStorage.getItem(LS.DRIVERS)||'[]')||[]; }catch{ this.drivers=[]; }
-    try{ const s=JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}'); this.settings={...this.settings,...s}; }catch{}
-    if(!this.drivers.length){
-      this.drivers=[{id:this._uid(),name:'Sample Driver',pin:'1111',location:null,speed:0,lastUpdated:null,createdAt:Date.now()}];
-      this._save(LS.DRIVERS,this.drivers);
-    }
-  },
-
-  // Tasks
-  addTask(data){ const t={id:this._uid(),...data,createdAt:Date.now()}; this.tasks.unshift(t); this._save(LS.TASKS,this.tasks); return t; },
-  updateTask(id,upd){ const i=this.tasks.findIndex(t=>t.id===id); if(i>-1){this.tasks[i]={...this.tasks[i],...upd}; this._save(LS.TASKS,this.tasks); return this.tasks[i];} return null; },
-  deleteTask(id){ this.tasks=this.tasks.filter(t=>t.id!==id); this._save(LS.TASKS,this.tasks); },
-  deleteTasks(ids){ const s=new Set(ids); this.tasks=this.tasks.filter(t=>!s.has(t.id)); this._save(LS.TASKS,this.tasks); },
-  assignTasks(ids,driverId){ ids.forEach(id=>this.updateTask(id,{driverId})); },
-
-  // Drivers
-  addDriver(data){ const d={id:this._uid(),...data,location:null,speed:0,lastUpdated:null,createdAt:Date.now()}; this.drivers.push(d); this._save(LS.DRIVERS,this.drivers); return d; },
-  updateDriver(id,upd){ const i=this.drivers.findIndex(d=>d.id===id); if(i>-1){this.drivers[i]={...this.drivers[i],...upd}; this._save(LS.DRIVERS,this.drivers); return this.drivers[i];} return null; },
-  deleteDriver(id){ this.drivers=this.drivers.filter(d=>d.id!==id); this._save(LS.DRIVERS,this.drivers); },
-
-  // Settings
-  saveSetting(k,v){ this.settings[k]=v; this._save(LS.SETTINGS,this.settings); },
-  getAdminPin(){ return localStorage.getItem(LS.ADMIN_PIN)||'1234'; },
-  setAdminPin(p){ localStorage.setItem(LS.ADMIN_PIN,p); },
+// ═══════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════
+var STATE = {
+  user:     null,
+  trips:    [],
+  drivers:  [{id:'d1', name:'John Doe', pin:'1111', phone:'555-0101', status:'active'}],
+  settings: {workerUrl:'', apiKey:'', aiModel:'gpt-4o-mini', adminPin:'1234', mapApp:'google', firebaseConfig:''},
+  view:     'dashboard',
+  extracted:[],
+  mapInst:  null,
+  wizCb:    null,
+  fbDb:     null,
+  fbUnsubs: []
 };
 
-// ── HELPERS ───────────────────────────────────────────────
-let _toastTimer;
-function toast(msg, type='info'){
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.className='show t-'+type;
-  clearTimeout(_toastTimer);
-  _toastTimer=setTimeout(()=>{ el.className=''; },3200);
-}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
-function timeSince(ts){
-  if(!ts) return 'Never';
-  const s=Math.floor((Date.now()-ts)/1000);
-  if(s<60) return `${s}s ago`;
-  if(s<3600) return `${Math.floor(s/60)}m ago`;
-  return `${Math.floor(s/3600)}h ago`;
-}
-
-function statusBadge(st){
-  const m={pending:'badge-pending',heading_to_pickup:'badge-active',arrived_pickup:'badge-warn',heading_to_dropoff:'badge-active',completed:'badge-success'};
-  const l={pending:'Pending',heading_to_pickup:'En Route→PU',arrived_pickup:'At Pickup',heading_to_dropoff:'En Route→DO',completed:'Completed'};
-  return `<span class="badge ${m[st]||'badge-muted'}">${l[st]||st}</span>`;
-}
-
-function driverName(id){
-  const d=Store.drivers.find(d=>d.id===id);
-  return d?d.name:'<span style="color:var(--warning);">Unassigned</span>';
-}
-
-function driverOptionsHTML(selectedId='', placeholder='Select driver…'){
-  return `<option value="">${placeholder}</option>`+
-    Store.drivers.map(d=>`<option value="${d.id}"${d.id===selectedId?' selected':''}>${d.name}</option>`).join('');
-}
-
-function refreshDriverDropdowns(){
-  ['login-driver-select','t-driver','ab-driver'].forEach(id=>{
-    const el=document.getElementById(id); if(!el) return;
-    const cur=el.value;
-    if(id==='login-driver-select') el.innerHTML=`<option value="">Select your profile…</option>`+Store.drivers.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
-    else el.innerHTML=driverOptionsHTML(cur);
-  });
-}
-
-function navigate(address){
-  const app=Store.settings.mapApp; const enc=encodeURIComponent(address);
-  const urls={google:`https://www.google.com/maps/search/?api=1&query=${enc}`,apple:`http://maps.apple.com/?daddr=${enc}`,waze:`https://waze.com/ul?q=${enc}&navigate=yes`};
-  window.open(urls[app]||urls.google,'_blank');
-}
-
-function navigateCoords(lat,lng){
-  const app=Store.settings.mapApp;
-  const urls={google:`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,apple:`http://maps.apple.com/?ll=${lat},${lng}`,waze:`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`};
-  window.open(urls[app]||urls.google,'_blank');
-}
-
-function exportCSV(){
-  const rows=[['TripID','Patient','Age','Phone','Driver','PU Time','Pickup','PU Unit','DO Time','Dropoff','DO Unit','Miles','Notes','Status','Created']];
-  Store.tasks.forEach(t=>{
-    rows.push([t.tripId||'',t.patientName||'',t.age||'',t.phone||'',
-      Store.drivers.find(d=>d.id===t.driverId)?.name||'Unassigned',
-      t.pickupTime||'',t.pickup||'',t.pickupUnit||'',
-      t.dropoffTime||'',t.dropoff||'',t.dropoffUnit||'',
-      t.miles||'',t.notes||'',t.status||'',
-      t.createdAt?new Date(t.createdAt).toLocaleString():'']);
-  });
-  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
-  a.download='agape_trips_'+Date.now()+'.csv'; a.click();
-  toast('Exported '+Store.tasks.length+' trips to CSV','success');
-}
-
-// ── TRIP FORM HTML ────────────────────────────────────────
-function tripFormHTML(task=null){
-  const v=(id,def='')=>task?task[id]||def:def;
-  return `
-    <div style="margin-bottom:20px;">
-      <p class="sec-hdr"><i class="ph ph-user"></i> Patient Info</p>
-      <div class="grid grid-cols-2 gap-3">
-        <div class="col-span-2"><span class="lbl">Patient Name *</span><input id="t-name" class="inp" value="${v('patientName')}" placeholder="Full name"/></div>
-        <div><span class="lbl">Age</span><input id="t-age" class="inp" value="${v('age')}" placeholder="Age"/></div>
-        <div><span class="lbl">Phone</span><input id="t-phone" class="inp" type="tel" value="${v('phone')}" placeholder="(555) 000-0000"/></div>
-        <div><span class="lbl">Trip ID</span><input id="t-tripId" class="inp mono" value="${v('tripId')}" placeholder="107047321" style="font-family:'DM Mono',monospace;"/></div>
-        <div>
-          <span class="lbl">Assign Driver</span>
-          <select id="t-driver" class="inp">${driverOptionsHTML(v('driverId'))}</select>
-        </div>
-      </div>
-    </div>
-
-    <div style="margin-bottom:20px;">
-      <p class="sec-hdr"><i class="ph ph-map-pin"></i> Route</p>
-      <div class="pu-block" style="margin-bottom:8px;">
-        <span class="lbl">↑ PICKUP</span>
-        <div class="grid grid-cols-12 gap-2">
-          <div class="col-span-3"><span class="lbl">Time</span><input type="time" id="t-puTime" class="inp" value="${v('pickupTime')}"/></div>
-          <div class="col-span-5"><span class="lbl">Address *</span><input id="t-puLoc" class="inp" value="${v('pickup')}" placeholder="123 Main St…"/></div>
-          <div class="col-span-4"><span class="lbl">Unit/Notes</span><input id="t-puUnit" class="inp" value="${v('pickupUnit')}" placeholder="Apt 4B"/></div>
-        </div>
-      </div>
-      <div class="do-block">
-        <span class="lbl">↓ DROPOFF</span>
-        <div class="grid grid-cols-12 gap-2">
-          <div class="col-span-3"><span class="lbl">Time</span><input type="time" id="t-doTime" class="inp" value="${v('dropoffTime')}"/></div>
-          <div class="col-span-5"><span class="lbl">Address *</span><input id="t-doLoc" class="inp" value="${v('dropoff')}" placeholder="Hospital Name…"/></div>
-          <div class="col-span-4"><span class="lbl">Unit/Notes</span><input id="t-doUnit" class="inp" value="${v('dropoffUnit')}" placeholder="Suite 100"/></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-12 gap-3" style="margin-bottom:20px;">
-      <div class="col-span-9"><span class="lbl">Special Notes / Escorts</span><input id="t-notes" class="inp" value="${v('notes')}" placeholder="Wheelchair ramp, escort…"/></div>
-      <div class="col-span-3"><span class="lbl">Miles</span><input type="number" step="0.1" id="t-miles" class="inp" value="${v('miles')}" placeholder="1.5"/></div>
-    </div>
-
-    <button id="trip-save-btn" onclick="APP.saveTrip()" class="btn btn-primary btn-full">
-      <i class="ph ph-floppy-disk"></i> Save Trip
-    </button>`;
-}
-
-// ── APP ───────────────────────────────────────────────────
-window.APP = {
-  role:null, driverProfile:null,
-  currentAdminTab:'fleet', currentDriverTab:'route',
-  sel:new Set(), editingTripId:null,
-
-  // ── AUTH ──────────────────────────────────────────────
-  loginAdmin(){
-    const pin=document.getElementById('login-admin-pin').value;
-    if(pin===Store.getAdminPin()){
-      this.role='admin'; document.getElementById('login-admin-pin').value='';
-      this.render();
-    } else toast('Invalid Admin PIN','danger');
+// ═══════════════════════════════════════════════════════════════════════
+// DB LAYER
+// ═══════════════════════════════════════════════════════════════════════
+var DB = {
+  saveTrip: function(trip, cb) {
+    cb = cb || function(){};
+    IDB.put('trips', trip, function() {
+      var idx = STATE.trips.findIndex(function(t){return t.id===trip.id;});
+      if (idx>-1) STATE.trips[idx]=trip; else STATE.trips.push(trip);
+      if (STATE.fbDb) {
+        var d = Object.assign({},trip); var id=d.id; delete d.id;
+        STATE.fbDb.collection('nemt_trips').doc(id).set(d).catch(function(e){console.warn('FB trip:',e);});
+      }
+      cb();
+    });
   },
-  loginDriver(){
-    const id=document.getElementById('login-driver-select').value;
-    const pin=document.getElementById('login-driver-pin').value;
-    if(!id) return toast('Select your profile first','warn');
-    const d=Store.drivers.find(x=>x.id===id);
-    if(d&&d.pin===pin){
-      this.role='driver'; this.driverProfile=d;
-      document.getElementById('login-driver-pin').value='';
-      this.render();
-    } else toast('Wrong PIN','danger');
+  deleteTrip: function(id, cb) {
+    cb = cb || function(){};
+    IDB.del('trips', id, function() {
+      STATE.trips = STATE.trips.filter(function(t){return t.id!==id;});
+      if (STATE.fbDb) STATE.fbDb.collection('nemt_trips').doc(id).delete().catch(function(){});
+      cb();
+    });
   },
-  logout(){
-    if(this.isGpsActive) this.toggleGPS(true);
-    this.role=null; this.driverProfile=null; this.sel.clear(); this.sel=new Set();
-    this.render();
+  saveDriver: function(driver, cb) {
+    cb = cb || function(){};
+    IDB.put('drivers', driver, function() {
+      var idx = STATE.drivers.findIndex(function(d){return d.id===driver.id;});
+      if (idx>-1) STATE.drivers[idx]=driver; else STATE.drivers.push(driver);
+      if (STATE.fbDb) {
+        var d = Object.assign({},driver); var id=d.id; delete d.id;
+        STATE.fbDb.collection('nemt_drivers').doc(id).set(d).catch(function(){});
+      }
+      cb();
+    });
   },
-
-  // ── ROUTING ───────────────────────────────────────────
-  render(){
-    ['login','admin','driver'].forEach(v=>document.getElementById('view-'+v).classList.add('hidden'));
-    document.getElementById('app-header').classList.add('hidden');
-    document.getElementById('action-bar').classList.remove('show');
-    if(!this.role){
-      document.getElementById('view-login').classList.remove('hidden');
-      refreshDriverDropdowns(); return;
+  saveSettings: function(s, cb) {
+    cb = cb || function(){};
+    IDB.putKV('settings', s, cb);
+    if (STATE.fbDb) {
+      var syncable = Object.assign({}, s);
+      delete syncable.apiKey;
+      STATE.fbDb.collection('nemt_config').doc('settings').set(syncable).catch(function(e){
+        console.warn('Firebase settings sync failed:', e);
+      });
     }
-    document.getElementById('app-header').classList.remove('hidden');
-    if(this.role==='admin'){
-      document.getElementById('hdr-title').textContent='Dispatch Admin';
-      document.getElementById('hdr-sub').textContent='Agape Care NEMT';
-      document.getElementById('hdr-gps').classList.add('hidden');
-      document.getElementById('view-admin').classList.remove('hidden');
-      this.adminTab('fleet');
-    } else {
-      document.getElementById('hdr-title').textContent=this.driverProfile.name;
-      document.getElementById('hdr-sub').textContent='Driver Dashboard';
-      document.getElementById('hdr-gps').classList.remove('hidden');
-      document.getElementById('hdr-gps').style.display='flex';
-      document.getElementById('view-driver').classList.remove('hidden');
-      this.driverTab('route');
-    }
-  },
+  }
+};
 
-  adminTab(tab){
-    document.querySelectorAll('[id^="atab-"]').forEach(b=>b.classList.remove('active'));
-    document.getElementById('atab-'+tab).classList.add('active');
-    document.querySelectorAll('.apanel').forEach(p=>p.classList.add('hidden'));
-    document.getElementById('apanel-'+tab).classList.remove('hidden');
-    this.currentAdminTab=tab;
-    const rend={fleet:()=>this.renderFleet(),trips:()=>this.renderTrips(),drivers:()=>this.renderDriversTab(),ai:()=>this.renderAITab(),settings:()=>this.renderAdminSettings()};
-    rend[tab]&&rend[tab]();
-  },
+// ═══════════════════════════════════════════════════════════════════════
+// FIREBASE
+// ═══════════════════════════════════════════════════════════════════════
+function initFirebase(configJson, onConnected) {
+  if (!configJson || !configJson.trim()) return;
 
-  driverTab(tab){
-    document.querySelectorAll('[id^="dtab-"]').forEach(b=>b.classList.remove('active'));
-    document.getElementById('dtab-'+tab).classList.add('active');
-    document.querySelectorAll('.dpanel').forEach(p=>p.classList.add('hidden'));
-    document.getElementById('dpanel-'+tab).classList.remove('hidden');
-    this.currentDriverTab=tab;
-    const rend={route:()=>this.renderDriverRoute(),available:()=>this.renderAvailableTrips(),dsettings:()=>this.renderDriverSettings()};
-    rend[tab]&&rend[tab]();
-  },
-
-  // ── ADMIN: FLEET ──────────────────────────────────────
-  renderFleet(){
-    const now=Date.now();
-    const stats={
-      online:Store.drivers.filter(d=>d.location&&(now-d.lastUpdated<120000)).length,
-      active:Store.tasks.filter(t=>t.status!=='pending'&&t.status!=='completed').length,
-      pending:Store.tasks.filter(t=>t.status==='pending').length,
-      completed:Store.tasks.filter(t=>t.status==='completed').length,
+  function loadScript(src, cb) {
+    var existing = document.querySelector('script[src="'+src+'"]');
+    if (existing) { cb(); return; }
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = cb;
+    s.onerror = function() {
+      console.warn('Firebase script failed to load:', src);
+      APP.toast('Firebase SDK failed to load. Check your internet.','danger');
     };
-    const statBoxes=[
-      {lbl:'Online',val:stats.online,icon:'ph-broadcast',col:'var(--success)'},
-      {lbl:'Active',val:stats.active,icon:'ph-car',col:'var(--primary)'},
-      {lbl:'Queued',val:stats.pending,icon:'ph-clock',col:'var(--warning)'},
-      {lbl:'Done',val:stats.completed,icon:'ph-check-circle',col:'var(--success)'},
-    ];
-    let h=`<div class="grid grid-cols-4 gap-3" style="margin-bottom:24px;">
-      ${statBoxes.map(s=>`<div class="stat-box">
-        <i class="ph ${s.icon} text-xl" style="color:${s.col};"></i>
-        <p class="syne font-bold text-2xl" style="color:var(--text1);">${s.val}</p>
-        <p class="text-xs" style="color:var(--text3);">${s.lbl}</p>
-      </div>`).join('')}</div>
-    <p class="sec-hdr"><i class="ph ph-users"></i> Driver Status</p>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`;
+    document.head.appendChild(s);
+  }
 
-    if(!Store.drivers.length){
-      h+=`<div class="card p-8 text-center col-span-2"><p style="color:var(--text3);">No drivers yet.</p></div>`;
-    } else {
-      Store.drivers.forEach(drv=>{
-        const online=drv.location&&(now-drv.lastUpdated<120000);
-        const active=Store.tasks.find(t=>t.driverId===drv.id&&t.status!=='completed'&&t.status!=='pending');
-        const done=Store.tasks.filter(t=>t.driverId===drv.id&&t.status==='completed').length;
-        const queued=Store.tasks.filter(t=>t.driverId===drv.id&&t.status==='pending').length;
-        const mph=Math.round((drv.speed||0)*2.23694);
-        h+=`<div class="card p-5 relative overflow-hidden" style="border-top:3px solid ${online?'var(--success)':'var(--border)'};transition:border-color .3s;">
-          <div class="flex justify-between items-start" style="margin-bottom:14px;">
-            <div class="flex items-center gap-3">
-              <div class="w-12 h-12 rounded-xl flex items-center justify-center ${online?'pulse-online':''}"
-                   style="background:${online?'rgba(16,185,129,.1)':'var(--bg1)'};border:1px solid ${online?'rgba(16,185,129,.3)':'var(--border)'};">
-                <i class="ph ph-steering-wheel text-xl" style="color:${online?'var(--success)':'var(--text3)'}"></i>
-              </div>
-              <div>
-                <h3 class="syne font-bold" style="color:var(--text1);">${drv.name}</h3>
-                <span class="badge ${online?'badge-online':'badge-muted'}">${online?'● LIVE':'○ OFFLINE'}</span>
-              </div>
-            </div>
-          </div>
-          <div class="grid grid-cols-3 gap-2 text-center" style="margin-bottom:12px;">
-            <div class="stat-box"><p class="syne font-bold" style="color:var(--text1);">${queued}</p><p class="text-xs" style="color:var(--text3);">Queued</p></div>
-            <div class="stat-box"><p class="syne font-bold" style="color:${done?'var(--success)':'var(--text1)'};">${done}</p><p class="text-xs" style="color:var(--text3);">Done</p></div>
-            <div class="stat-box"><p class="syne font-bold" style="color:var(--text1);">${online?mph:'—'}</p><p class="text-xs" style="color:var(--text3);">mph</p></div>
-          </div>
-          ${active?`<div class="alert alert-info" style="margin-bottom:10px;font-size:12px;"><i class="ph ph-map-pin"></i><div><strong>${active.patientName}</strong><br/>${active.status.replace(/_/g,' ')}</div></div>`
-                  :`<p class="text-xs" style="color:var(--text3);margin-bottom:10px;"><i class="ph ph-coffee"></i> No active trip</p>`}
-          <div class="flex gap-2">
-            <button onclick="APP.openModal('modal-trip');APP.editingTripId=null;document.getElementById('t-driver').value='${drv.id}';"
-              class="btn btn-ghost btn-sm" style="flex:1;"><i class="ph ph-plus"></i>Add Trip</button>
-            <button onclick="${online?`navigateCoords(${drv.location.lat},${drv.location.lng})`:'void 0'}"
-              ${!online?'disabled':''} class="btn btn-ghost btn-sm" style="flex:1;"><i class="ph ph-map-trifold"></i>Map</button>
-          </div>
-        </div>`;
-      });
-    }
-    h+=`</div>`;
-    document.getElementById('apanel-fleet').innerHTML=h;
-  },
+  loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js', function() {
+    loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js', function() {
+      try {
+        var config = JSON.parse(configJson);
 
-  // ── ADMIN: TRIPS ──────────────────────────────────────
-  renderTrips(){
-    const el=document.getElementById('apanel-trips');
-    const sel=this.sel;
-    let h=`
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3" style="margin-bottom:16px;">
-        <div class="flex items-center gap-2">
-          <h2 class="syne font-bold text-xl" style="color:var(--text1);">Dispatch Manifest</h2>
-          <span class="tag">${Store.tasks.length}</span>
-        </div>
-        <div class="flex gap-2 flex-wrap">
-          <button onclick="exportCSV()" class="btn btn-ghost btn-sm"><i class="ph ph-download-simple"></i>Export CSV</button>
-          <button onclick="APP.openAIUpload()" class="btn btn-sm" style="background:rgba(16,185,129,.15);color:var(--success);border:1px solid rgba(16,185,129,.3);"><i class="ph ph-magic-wand"></i>AI Upload</button>
-          <button onclick="APP.openModal('modal-trip');APP.editingTripId=null;" class="btn btn-primary btn-sm"><i class="ph ph-plus"></i>New Trip</button>
-        </div>
-      </div>
+        if (typeof firebase === 'undefined') {
+          APP.toast('Firebase SDK unavailable.','danger');
+          return;
+        }
 
-      <!-- Filter bar -->
-      <div class="flex gap-2 flex-wrap" style="margin-bottom:16px;">
-        <input id="trip-search" class="inp inp-sm" placeholder="🔍 Search patient…" oninput="APP.renderTrips()" style="flex:1;min-width:160px;"/>
-        <select id="trip-filter-status" class="inp inp-sm" onchange="APP.renderTrips()" style="width:auto;">
-          <option value="">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="heading_to_pickup">En Route PU</option>
-          <option value="arrived_pickup">At Pickup</option>
-          <option value="heading_to_dropoff">En Route DO</option>
-          <option value="completed">Completed</option>
-        </select>
-        <select id="trip-filter-driver" class="inp inp-sm" onchange="APP.renderTrips()" style="width:auto;">
-          <option value="">All Drivers</option>
-          <option value="">Unassigned</option>
-          ${Store.drivers.map(d=>`<option value="${d.id}">${d.name}</option>`).join('')}
-        </select>
-        <button onclick="APP.selAll()" class="btn btn-ghost btn-sm"><i class="ph ph-check-square"></i>Select All</button>
-      </div>`;
+        var app;
+        try {
+          app = firebase.app();
+          console.log('Reusing existing Firebase app.');
+        } catch(e) {
+          app = firebase.initializeApp(config);
+        }
 
-    const search=(document.getElementById('trip-search')?.value||'').toLowerCase();
-    const fSt=document.getElementById('trip-filter-status')?.value||'';
-    const fDr=document.getElementById('trip-filter-driver')?.value;
-    let tasks=[...Store.tasks];
-    if(search) tasks=tasks.filter(t=>(t.patientName||'').toLowerCase().includes(search)||(t.tripId||'').toLowerCase().includes(search));
-    if(fSt) tasks=tasks.filter(t=>t.status===fSt);
-    if(fDr!==undefined&&fDr!=='') tasks=tasks.filter(t=>t.driverId===fDr);
+        STATE.fbDb = firebase.firestore(app);
 
-    if(!tasks.length){
-      h+=`<div class="card p-10 text-center"><i class="ph ph-clipboard text-4xl" style="color:var(--text3);"></i><p style="color:var(--text3);margin-top:8px;">No trips found.</p></div>`;
-    } else {
-      h+=`<div class="flex flex-col gap-3">`;
-      tasks.forEach(task=>{
-        const isSel=sel.has(task.id);
-        h+=`<div class="trip-card ${isSel?'selected':''}" id="tc-${task.id}">
-          <div class="flex items-start gap-3">
-            <input type="checkbox" ${isSel?'checked':''} onchange="APP.toggleSel('${task.id}',this.checked)" style="margin-top:3px;flex-shrink:0;"/>
-            <div style="flex:1;min-width:0;">
-              <div class="flex justify-between items-start flex-wrap gap-2" style="margin-bottom:8px;">
-                <div>
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <h3 class="syne font-bold" style="color:var(--text1);">${task.patientName||'—'}</h3>
-                    ${task.tripId?`<span class="tag">#${task.tripId}</span>`:''}
-                    ${statusBadge(task.status)}
-                  </div>
-                  <p class="text-xs" style="color:var(--text2);margin-top:2px;">Driver: <strong>${driverName(task.driverId)}</strong>
-                    ${task.phone?` · <a href="tel:${task.phone}" style="color:var(--primary);">${task.phone}</a>`:''}
-                  </p>
-                </div>
-                <div class="flex gap-1">
-                  <button onclick="APP.editTrip('${task.id}')" class="btn btn-ghost btn-xs"><i class="ph ph-pencil"></i></button>
-                  <button onclick="APP.deleteTrip('${task.id}')" class="btn btn-danger btn-xs"><i class="ph ph-trash"></i></button>
-                </div>
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div class="pu-block" style="padding:10px;">
-                  <span class="lbl" style="margin-bottom:2px;">↑ PU${task.pickupTime?' ('+task.pickupTime+')':''}</span>
-                  <p class="font-semibold text-sm" style="color:var(--text1);">${task.pickup||'—'}</p>
-                  ${task.pickupUnit?`<p class="text-xs" style="color:var(--primary);">${task.pickupUnit}</p>`:''}
-                </div>
-                <div class="do-block" style="padding:10px;">
-                  <span class="lbl" style="margin-bottom:2px;">↓ DO${task.dropoffTime?' ('+task.dropoffTime+')':''}</span>
-                  <p class="font-semibold text-sm" style="color:var(--text1);">${task.dropoff||'—'}</p>
-                  ${task.dropoffUnit?`<p class="text-xs" style="color:var(--success);">${task.dropoffUnit}</p>`:''}
-                </div>
-              </div>
-              ${task.notes?`<p class="text-xs" style="color:var(--warning);margin-top:6px;"><i class="ph ph-warning-circle"></i> ${task.notes}</p>`:''}
-              ${task.miles?`<p class="text-xs" style="color:var(--text3);margin-top:4px;"><i class="ph ph-path"></i> ${task.miles} mi</p>`:''}
-              <!-- Quick assign -->
-              <div class="flex gap-2 items-center" style="margin-top:10px;">
-                <select class="inp inp-sm" style="flex:1;" onchange="APP.quickAssign('${task.id}',this.value)">
-                  ${driverOptionsHTML(task.driverId,'Reassign driver…')}
-                </select>
-                <button onclick="navigate('${task.pickup}')" class="btn btn-ghost btn-xs"><i class="ph ph-navigation-arrow"></i>PU</button>
-                <button onclick="navigate('${task.dropoff}')" class="btn btn-ghost btn-xs"><i class="ph ph-navigation-arrow"></i>DO</button>
-              </div>
-            </div>
-          </div>
-        </div>`;
-      });
-      h+=`</div>`;
-    }
-    el.innerHTML=h;
-    this.updateActionBar();
-  },
+        STATE.fbUnsubs.forEach(function(u){ try{u();}catch(e){} });
+        STATE.fbUnsubs = [];
 
-  // ── ADMIN: DRIVERS ────────────────────────────────────
-  renderDriversTab(){
-    const el=document.getElementById('apanel-drivers');
-    let h=`
-      <div class="flex justify-between items-center" style="margin-bottom:16px;">
-        <h2 class="syne font-bold text-xl" style="color:var(--text1);">Fleet Roster</h2>
-        <button onclick="APP.openAddDriver()" class="btn btn-primary btn-sm"><i class="ph ph-user-plus"></i>Add Driver</button>
-      </div>
-      <div class="flex flex-col gap-4">`;
+        STATE.fbDb.collection('nemt_config').doc('settings').get().then(function(doc) {
+          if (doc.exists) {
+            var remote = doc.data();
+            var localApiKey = STATE.settings.apiKey;
+            STATE.settings = Object.assign(STATE.settings, remote);
+            STATE.settings.apiKey = localApiKey;
+            STATE.settings.firebaseConfig = configJson;
+            IDB.putKV('settings', STATE.settings, function(){});
+            console.log('Remote settings loaded from Firebase');
+          }
+          if (onConnected) onConnected();
+        }).catch(function(e){
+          console.warn('Could not fetch remote settings:', e);
+          if (onConnected) onConnected();
+        });
 
-    Store.drivers.forEach(drv=>{
-      const now=Date.now();
-      const online=drv.location&&(now-drv.lastUpdated<120000);
-      const myTasks=Store.tasks.filter(t=>t.driverId===drv.id);
-      const done=myTasks.filter(t=>t.status==='completed').length;
-      const active=myTasks.filter(t=>t.status!=='completed'&&t.status!=='pending').length;
-      const pending=myTasks.filter(t=>t.status==='pending').length;
-      h+=`<div class="card-hi p-5">
-        <div class="flex items-center justify-between flex-wrap gap-3" style="margin-bottom:14px;">
-          <div class="flex items-center gap-3">
-            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:var(--primary-lo);border:1px solid var(--primary-mid);">
-              <i class="ph ph-steering-wheel text-xl" style="color:var(--primary);"></i>
-            </div>
-            <div>
-              <h3 class="syne font-bold text-lg" style="color:var(--text1);">${drv.name}</h3>
-              <div class="flex gap-2 items-center">
-                <span class="badge ${online?'badge-online':'badge-muted'}">${online?'● Live':'Offline'}</span>
-                <span class="tag">PIN: ${drv.pin}</span>
-              </div>
-            </div>
-          </div>
-          <div class="flex gap-2 flex-wrap">
-            <button onclick="APP.openPinModal('${drv.id}')" class="btn btn-ghost btn-sm"><i class="ph ph-lock-key"></i>Change PIN</button>
-            <button onclick="APP.openEditDriver('${drv.id}')" class="btn btn-ghost btn-sm"><i class="ph ph-pencil"></i>Edit</button>
-            <button onclick="APP.deleteDriver('${drv.id}')" class="btn btn-danger btn-sm"><i class="ph ph-trash"></i></button>
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-3 text-center" style="margin-bottom:14px;">
-          <div class="stat-box"><p class="syne font-bold text-xl" style="color:var(--primary);">${pending}</p><p class="text-xs" style="color:var(--text3);">Queued</p></div>
-          <div class="stat-box"><p class="syne font-bold text-xl" style="color:var(--warning);">${active}</p><p class="text-xs" style="color:var(--text3);">Active</p></div>
-          <div class="stat-box"><p class="syne font-bold text-xl" style="color:var(--success);">${done}</p><p class="text-xs" style="color:var(--text3);">Done</p></div>
-        </div>
-        <div class="flex gap-2">
-          <button onclick="APP.openModal('modal-trip');APP.editingTripId=null;setTimeout(()=>document.getElementById('t-driver').value='${drv.id}',50);"
-            class="btn btn-ghost btn-sm" style="flex:1;"><i class="ph ph-plus"></i>Add Trip</button>
-          <button onclick="APP.openAIUpload('${drv.id}')" class="btn btn-sm" style="flex:1;background:rgba(16,185,129,.1);color:var(--success);border:1px solid rgba(16,185,129,.2);">
-            <i class="ph ph-magic-wand"></i>AI Upload for Driver
-          </button>
-        </div>
-      </div>`;
-    });
-    h+=`</div>`;
-    el.innerHTML=h;
-  },
+        STATE.fbUnsubs.push(
+          STATE.fbDb.collection('nemt_trips').onSnapshot(function(snap) {
+            STATE.trips = [];
+            snap.forEach(function(d){ STATE.trips.push(Object.assign({id:d.id}, d.data())); });
+            STATE.trips.forEach(function(t){ IDB.put('trips', t); });
+            APP.refreshView();
+          }, function(e){
+            console.warn('FB trips listener error:',e);
+            APP.toast('Firebase trips error: '+e.message,'danger');
+          })
+        );
 
-  // ── ADMIN: AI TAB ─────────────────────────────────────
-  renderAITab(){
-    const el=document.getElementById('apanel-ai');
-    el.innerHTML=`
-      <h2 class="syne font-bold text-xl" style="color:var(--text1);margin-bottom:16px;"><i class="ph ph-magic-wand" style="color:var(--primary);"></i> AI Tools</h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div class="card p-5">
-          <i class="ph ph-file-arrow-up text-3xl" style="color:var(--primary);margin-bottom:10px;display:block;"></i>
-          <h3 class="syne font-bold" style="color:var(--text1);margin-bottom:6px;">Manifest Extraction</h3>
-          <p class="text-sm" style="color:var(--text2);margin-bottom:14px;">Upload an image, PDF, or text manifest. AI extracts all trips automatically.</p>
-          <button onclick="APP.openAIUpload()" class="btn btn-primary w-full"><i class="ph ph-magic-wand"></i>Upload Manifest</button>
-        </div>
-        <div class="card p-5">
-          <i class="ph ph-shuffle text-3xl" style="color:var(--success);margin-bottom:10px;display:block;"></i>
-          <h3 class="syne font-bold" style="color:var(--text1);margin-bottom:6px;">Optimize Routes</h3>
-          <p class="text-sm" style="color:var(--text2);margin-bottom:14px;">AI suggests the best pickup order for each driver based on times and locations.</p>
-          <button onclick="APP.optimizeRoutes()" class="btn btn-success w-full"><i class="ph ph-shuffle"></i>Optimize Now</button>
-        </div>
-        <div class="card p-5">
-          <i class="ph ph-translate text-3xl" style="color:var(--warning);margin-bottom:10px;display:block;"></i>
-          <h3 class="syne font-bold" style="color:var(--text1);margin-bottom:6px;">AI Trip Summary</h3>
-          <p class="text-sm" style="color:var(--text2);margin-bottom:14px;">Generate a daily dispatch summary for your team or records.</p>
-          <button onclick="APP.aiSummary()" class="btn" style="width:100%;background:rgba(245,158,11,.12);color:var(--warning);border:1px solid rgba(245,158,11,.3);"><i class="ph ph-file-text"></i>Generate Summary</button>
-        </div>
-        <div class="card p-5">
-          <i class="ph ph-warning-circle text-3xl" style="color:var(--danger);margin-bottom:10px;display:block;"></i>
-          <h3 class="syne font-bold" style="color:var(--text1);margin-bottom:6px;">Conflict Detector</h3>
-          <p class="text-sm" style="color:var(--text2);margin-bottom:14px;">Check for scheduling conflicts, overlapping times, or impossible routes.</p>
-          <button onclick="APP.detectConflicts()" class="btn" style="width:100%;background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.3);"><i class="ph ph-scan"></i>Scan for Conflicts</button>
-        </div>
-      </div>
-      <div class="alert alert-info">
-        <i class="ph ph-info text-xl" style="flex-shrink:0;"></i>
-        <div>Configure your AI API key and endpoint in <strong>Settings → AI Configuration</strong> to enable all AI features. Supports OpenAI, Cloudflare Workers, and custom endpoints.</div>
-      </div>
-      <div id="ai-result" style="margin-top:16px;"></div>`;
-  },
+        STATE.fbUnsubs.push(
+          STATE.fbDb.collection('nemt_drivers').onSnapshot(function(snap) {
+            if (!snap.empty) {
+              STATE.drivers = [];
+              snap.forEach(function(d){ STATE.drivers.push(Object.assign({id:d.id}, d.data())); });
+              STATE.drivers.forEach(function(d){ IDB.put('drivers', d); });
+              if (STATE.view==='drivers') APP.refreshView();
+            }
+          }, function(e){ console.warn('FB drivers listener error:',e); })
+        );
 
-  // ── ADMIN: SETTINGS ───────────────────────────────────
-  renderAdminSettings(){
-    const s=Store.settings;
-    const el=document.getElementById('apanel-settings');
-    el.innerHTML=`
-      <h2 class="syne font-bold text-xl" style="color:var(--text1);margin-bottom:20px;"><i class="ph ph-sliders" style="color:var(--primary);"></i> Settings</h2>
+        document.getElementById('db-badge').classList.remove('hidden');
+        APP.toast('🔥 Firebase connected — cloud sync active','success');
 
-      <!-- Security -->
-      <div class="card p-5" style="margin-bottom:14px;">
-        <p class="sec-hdr"><i class="ph ph-shield-check"></i> Security</p>
-        <p class="text-sm" style="color:var(--text2);margin-bottom:14px;">Change the admin dispatch PIN. Drivers can change their own PINs from the Drivers tab.</p>
-        <button onclick="APP.openPinModal('admin')" class="btn btn-ghost btn-sm"><i class="ph ph-lock-key"></i>Change Admin PIN</button>
-      </div>
-
-      <!-- Navigation -->
-      <div class="card p-5" style="margin-bottom:14px;">
-        <p class="sec-hdr"><i class="ph ph-map-trifold"></i> Navigation App</p>
-        <div class="flex flex-col gap-2">
-          ${['google','apple','waze'].map(opt=>`
-            <label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer" style="border:1px solid ${s.mapApp===opt?'var(--primary)':'var(--border)'};background:${s.mapApp===opt?'var(--primary-lo)':'transparent'};transition:all .2s;">
-              <input type="radio" name="mapApp" value="${opt}" ${s.mapApp===opt?'checked':''} onchange="Store.saveSetting('mapApp','${opt}');APP.renderAdminSettings();"/>
-              <span class="font-semibold" style="color:var(--text1);">${opt==='google'?'Google Maps':opt==='apple'?'Apple Maps':'Waze'}</span>
-            </label>`).join('')}
-        </div>
-      </div>
-
-      <!-- AI Configuration -->
-      <div class="card p-5" style="margin-bottom:14px;">
-        <p class="sec-hdr"><i class="ph ph-robot"></i> AI Configuration</p>
-        <div style="margin-bottom:12px;">
-          <span class="lbl">OpenAI API Key</span>
-          <input class="inp mono" type="password" value="${s.aiKey}" placeholder="sk-…"
-            onchange="Store.saveSetting('aiKey',this.value)"/>
-          <p class="helper">Stored locally on this device only. Never sent to Agape servers.</p>
-        </div>
-        <div style="margin-bottom:12px;">
-          <span class="lbl">API Endpoint URL</span>
-          <input class="inp" value="${s.aiEndpoint}" placeholder="https://api.openai.com/v1/chat/completions"
-            onchange="Store.saveSetting('aiEndpoint',this.value)"/>
-          <p class="helper">Use OpenAI directly, or paste your Cloudflare Worker URL to keep your key private.</p>
-        </div>
-        <div style="margin-bottom:12px;">
-          <span class="lbl">Model</span>
-          <select class="inp" onchange="Store.saveSetting('aiModel',this.value)">
-            ${['gpt-4o','gpt-4o-mini','gpt-4-turbo','gpt-3.5-turbo'].map(m=>`<option ${s.aiModel===m?'selected':''} value="${m}">${m}</option>`).join('')}
-          </select>
-        </div>
-        <button onclick="APP.testAI()" class="btn btn-ghost btn-sm"><i class="ph ph-plug"></i>Test Connection</button>
-        <div id="ai-test-result" style="margin-top:8px;"></div>
-      </div>
-
-      <!-- Data -->
-      <div class="card p-5" style="margin-bottom:14px;">
-        <p class="sec-hdr"><i class="ph ph-database"></i> Data Management</p>
-        <div class="flex gap-2 flex-wrap">
-          <button onclick="exportCSV()" class="btn btn-ghost btn-sm"><i class="ph ph-download-simple"></i>Export All Trips (CSV)</button>
-          <button onclick="APP.importBackup()" class="btn btn-ghost btn-sm"><i class="ph ph-upload-simple"></i>Import Backup</button>
-          <button onclick="APP.exportBackup()" class="btn btn-ghost btn-sm"><i class="ph ph-archive"></i>Backup JSON</button>
-        </div>
-      </div>
-
-      <!-- Danger Zone -->
-      <div class="card p-5" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04);">
-        <p class="sec-hdr" style="color:var(--danger);"><i class="ph ph-warning"></i> Danger Zone</p>
-        <div class="flex gap-2 flex-wrap">
-          <button onclick="APP.clearCompleted()" class="btn btn-danger btn-sm"><i class="ph ph-eraser"></i>Clear Completed</button>
-          <button onclick="APP.clearAllTrips()" class="btn btn-danger btn-sm"><i class="ph ph-trash"></i>Delete ALL Trips</button>
-        </div>
-      </div>`;
-  },
-
-  // ── AI UPLOAD ─────────────────────────────────────────
-  _extractedTrips:[],
-  _aiDefaultDriver:'',
-
-  openAIUpload(defaultDriverId=''){
-    this._extractedTrips=[]; this._aiDefaultDriver=defaultDriverId;
-    this._renderAIModal();
-    this.openModal('modal-ai');
-  },
-
-  _renderAIModal(state='upload'){
-    const body=document.getElementById('ai-modal-body');
-    if(state==='loading'){
-      body.innerHTML=`<div style="text-align:center;padding:40px 0;">
-        <div class="w-12 h-12 border-4 spin mx-auto" style="border-color:rgba(59,130,246,.2);border-top-color:var(--primary);border-radius:50%;margin-bottom:16px;"></div>
-        <p class="font-bold" style="color:var(--text1);">AI is reading the manifest…</p>
-        <p class="text-sm" style="color:var(--text2);margin-top:6px;">Extracting trips, addresses, and schedules.</p>
-      </div>`;
-      return;
-    }
-    if(state==='results'){
-      const trips=this._extractedTrips;
-      body.innerHTML=`
-        <div class="alert alert-success" style="margin-bottom:14px;">
-          <i class="ph ph-check-circle-fill text-xl"></i>
-          <div><strong>${trips.length} trips extracted</strong> — Review and assign drivers, then save.</div>
-        </div>
-        <!-- Bulk assign header -->
-        <div class="card-hi p-4" style="margin-bottom:14px;">
-          <span class="lbl">Bulk Assign All To</span>
-          <select id="ai-bulk-driver" class="inp inp-sm" onchange="APP._applyBulkAI(this.value)" style="margin-top:4px;">
-            ${driverOptionsHTML(this._aiDefaultDriver,'Keep individual assignments…')}
-          </select>
-        </div>
-        <div style="max-height:40vh;overflow-y:auto;border:1px solid var(--border);border-radius:12px;margin-bottom:14px;">
-          ${trips.map((t,i)=>`
-            <div style="padding:14px;border-bottom:1px solid var(--border);">
-              <div class="flex justify-between items-start flex-wrap gap-2" style="margin-bottom:8px;">
-                <div>
-                  <p class="font-bold" style="color:var(--text1);">${t.patientName||'Unknown'}</p>
-                  <p class="text-xs" style="color:var(--text2);">${t.age?'Age '+t.age:''} ${t.phone||''}</p>
-                </div>
-                <select class="inp inp-sm" style="width:auto;" onchange="APP._extractedTrips[${i}].driverId=this.value">
-                  ${driverOptionsHTML(t.driverId||this._aiDefaultDriver,'Unassigned')}
-                </select>
-              </div>
-              <div class="grid grid-cols-2 gap-2">
-                <div class="pu-block" style="padding:8px;"><span class="lbl" style="margin-bottom:1px;">↑ ${t.pickupTime||''}</span><p class="text-xs font-semibold" style="color:var(--text1);">${t.pickup||'—'}</p></div>
-                <div class="do-block" style="padding:8px;"><span class="lbl" style="margin-bottom:1px;">↓ ${t.dropoffTime||''}</span><p class="text-xs font-semibold" style="color:var(--text1);">${t.dropoff||'—'}</p></div>
-              </div>
-              ${t.notes?`<p class="text-xs" style="color:var(--warning);margin-top:6px;"><i class="ph ph-warning-circle"></i> ${t.notes}</p>`:''}
-            </div>`).join('')}
-        </div>
-        <button onclick="APP.saveExtractedTrips()" class="btn btn-primary btn-full">
-          <i class="ph ph-floppy-disk"></i> Save ${trips.length} Trips
-        </button>`;
-      return;
-    }
-    // Upload state
-    body.innerHTML=`
-      <div class="file-drop" ondragover="event.preventDefault();this.classList.add('drag');" ondragleave="this.classList.remove('drag');"
-           ondrop="event.preventDefault();this.classList.remove('drag');APP.handleAIFile(event.dataTransfer.files[0]);">
-        <input type="file" accept="image/*,.txt,.csv,.pdf" onchange="APP.handleAIFile(this.files[0]);this.value=''"/>
-        <div class="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center" style="background:var(--primary-lo);border:1px solid var(--primary-mid);margin-bottom:14px;">
-          <i class="ph ph-upload-simple" style="font-size:32px;color:var(--primary);"></i>
-        </div>
-        <h3 class="syne font-bold" style="color:var(--text1);font-size:18px;">Drop file or tap to upload</h3>
-        <p class="text-sm" style="color:var(--text2);margin-top:6px;">Supports: images, PDF, TXT, CSV — AI extracts trip details automatically.</p>
-      </div>
-      ${!Store.settings.aiKey&&!Store.settings.workerUrl?`
-        <div class="alert alert-warn" style="margin-top:14px;">
-          <i class="ph ph-warning-circle text-xl" style="flex-shrink:0;"></i>
-          <div>No AI key configured. Add your OpenAI API key in <strong>Settings → AI Configuration</strong> first.</div>
-        </div>`:''}`;
-  },
-
-  async handleAIFile(file){
-    if(!file) return;
-    const key=Store.settings.aiKey; const endpoint=Store.settings.aiEndpoint;
-    if(!key&&!endpoint.includes('worker')&&!endpoint.includes('localhost')){
-      toast('Add an OpenAI API key in Settings first','warn'); return;
-    }
-    this._renderAIModal('loading');
-    try{
-      const isImg=file.type.startsWith('image/');
-      let messages;
-      const prompt=`You are an NEMT trip data extractor. Extract ALL trips from this manifest. Return ONLY valid JSON in this exact format: {"trips":[{"tripId":"","patientName":"","age":"","phone":"","pickup":"","pickupTime":"","pickupUnit":"","dropoff":"","dropoffTime":"","dropoffUnit":"","notes":"","miles":""}]}. Use 24h time. If info is missing leave empty string.`;
-
-      if(isImg){
-        const b64=await new Promise(res=>{ const r=new FileReader(); r.onloadend=()=>res(r.result); r.readAsDataURL(file); });
-        messages=[{role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:b64}}]}];
-      } else {
-        const txt=await file.text();
-        messages=[{role:'user',content:`${prompt}\n\nMANIFEST TEXT:\n${txt.slice(0,12000)}`}];
-      }
-
-      const headers={'Content-Type':'application/json'};
-      if(key) headers['Authorization']=`Bearer ${key}`;
-
-      const resp=await fetch(endpoint,{
-        method:'POST', headers,
-        body:JSON.stringify({model:Store.settings.aiModel||'gpt-4o-mini',max_tokens:3000,
-          messages, response_format:{type:'json_object'}})
-      });
-      if(!resp.ok){
-        const err=await resp.json().catch(()=>({error:{message:'HTTP '+resp.status}}));
-        throw new Error(err.error?.message||'HTTP '+resp.status);
-      }
-      const data=await resp.json();
-      const raw=data.choices?.[0]?.message?.content||'';
-      const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
-      this._extractedTrips=(parsed.trips||[]).map(t=>({...t,driverId:this._aiDefaultDriver}));
-      if(!this._extractedTrips.length) throw new Error('No trips found in document');
-      this._renderAIModal('results');
-    } catch(err){
-      toast('Extraction failed: '+err.message,'danger');
-      this._renderAIModal('upload');
-    }
-  },
-
-  _applyBulkAI(driverId){
-    this._extractedTrips=this._extractedTrips.map(t=>({...t,driverId}));
-    this._renderAIModal('results');
-  },
-
-  saveExtractedTrips(){
-    this._extractedTrips.forEach(t=>{
-      Store.addTask({patientName:t.patientName,age:t.age,phone:t.phone,tripId:t.tripId,
-        pickup:t.pickup,pickupTime:t.pickupTime,pickupUnit:t.pickupUnit,
-        dropoff:t.dropoff,dropoffTime:t.dropoffTime,dropoffUnit:t.dropoffUnit,
-        notes:t.notes,miles:t.miles,driverId:t.driverId||'',
-        status:'pending',paperSignatureConfirmed:false});
-    });
-    toast(this._extractedTrips.length+' trips saved!','success');
-    this.closeModal('modal-ai');
-    if(this.currentAdminTab==='trips') this.renderTrips();
-    if(this.currentAdminTab==='fleet') this.renderFleet();
-    if(this.currentAdminTab==='drivers') this.renderDriversTab();
-  },
-
-  // ── AI TOOLS ──────────────────────────────────────────
-  async optimizeRoutes(){
-    const el=document.getElementById('ai-result');
-    if(!Store.settings.aiKey){ toast('Add API key in Settings','warn'); return; }
-    if(!Store.tasks.filter(t=>t.status==='pending').length){ toast('No pending trips to optimize','warn'); return; }
-    el.innerHTML=`<div class="alert alert-info"><div class="w-5 h-5 border-2 spin" style="border-color:rgba(59,130,246,.3);border-top-color:var(--primary);border-radius:50%;flex-shrink:0;"></div><div>Optimizing routes…</div></div>`;
-    try{
-      const pending=Store.tasks.filter(t=>t.status==='pending');
-      const driverMap={}; pending.forEach(t=>{ if(t.driverId){ (driverMap[t.driverId]=driverMap[t.driverId]||[]).push(t); } });
-      const summary=Object.entries(driverMap).map(([id,tasks])=>{
-        const name=Store.drivers.find(d=>d.id===id)?.name||id;
-        return `Driver: ${name}\n`+tasks.map(t=>`  - ${t.patientName}: PU ${t.pickupTime||'?'} at ${t.pickup}, DO at ${t.dropoff}`).join('\n');
-      }).join('\n\n');
-      const resp=await fetch(Store.settings.aiEndpoint,{method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+Store.settings.aiKey},
-        body:JSON.stringify({model:Store.settings.aiModel,max_tokens:800,
-          messages:[{role:'user',content:`Analyze these NEMT trips and suggest the best pickup ORDER for each driver to minimize travel time and meet scheduled times. Be concise.\n\n${summary}`}]})});
-      const data=await resp.json();
-      const text=data.choices?.[0]?.message?.content||'No response';
-      el.innerHTML=`<div class="card-hi p-5" style="margin-top:8px;"><p class="sec-hdr"><i class="ph ph-shuffle"></i> Optimization Suggestions</p><pre style="white-space:pre-wrap;font-size:13px;color:var(--text2);line-height:1.6;">${text}</pre></div>`;
-    } catch(e){ el.innerHTML=`<div class="alert alert-danger"><i class="ph ph-warning-circle"></i><div>${e.message}</div></div>`; }
-  },
-
-  async aiSummary(){
-    const el=document.getElementById('ai-result');
-    if(!Store.settings.aiKey){ toast('Add API key in Settings','warn'); return; }
-    el.innerHTML=`<div class="alert alert-info"><div class="w-5 h-5 border-2 spin" style="border-color:rgba(59,130,246,.3);border-top-color:var(--primary);border-radius:50%;flex-shrink:0;"></div><div>Generating summary…</div></div>`;
-    try{
-      const stats={total:Store.tasks.length,done:Store.tasks.filter(t=>t.status==='completed').length,active:Store.tasks.filter(t=>t.status!=='completed'&&t.status!=='pending').length,pending:Store.tasks.filter(t=>t.status==='pending').length};
-      const driverStats=Store.drivers.map(d=>({name:d.name,done:Store.tasks.filter(t=>t.driverId===d.id&&t.status==='completed').length,pending:Store.tasks.filter(t=>t.driverId===d.id&&t.status==='pending').length}));
-      const prompt=`Generate a professional NEMT dispatch daily summary report. Data: ${JSON.stringify({stats,drivers:driverStats})}. Include highlights, concerns, and recommendations. Keep under 250 words.`;
-      const resp=await fetch(Store.settings.aiEndpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+Store.settings.aiKey},body:JSON.stringify({model:Store.settings.aiModel,max_tokens:500,messages:[{role:'user',content:prompt}]})});
-      const data=await resp.json();
-      const text=data.choices?.[0]?.message?.content||'';
-      el.innerHTML=`<div class="card-hi p-5" style="margin-top:8px;"><p class="sec-hdr"><i class="ph ph-file-text"></i> Daily Summary</p><pre style="white-space:pre-wrap;font-size:13px;color:var(--text2);line-height:1.7;">${text}</pre></div>`;
-    } catch(e){ el.innerHTML=`<div class="alert alert-danger"><i class="ph ph-warning-circle"></i><div>${e.message}</div></div>`; }
-  },
-
-  detectConflicts(){
-    const el=document.getElementById('ai-result');
-    const conflicts=[];
-    Store.drivers.forEach(drv=>{
-      const tasks=Store.tasks.filter(t=>t.driverId===drv.id&&t.status!=='completed'&&t.pickupTime&&t.dropoffTime);
-      for(let i=0;i<tasks.length;i++){
-        for(let j=i+1;j<tasks.length;j++){
-          const a=tasks[i]; const b=tasks[j];
-          const [apu,ado]=[a.pickupTime,a.dropoffTime].map(t=>parseInt(t.replace(':','')));
-          const [bpu,bdo]=[b.pickupTime,b.dropoffTime].map(t=>parseInt(t.replace(':','')));
-          if(apu<bdo&&ado>bpu) conflicts.push(`<strong>${drv.name}</strong>: "${a.patientName}" (${a.pickupTime}–${a.dropoffTime}) overlaps with "${b.patientName}" (${b.pickupTime}–${b.dropoffTime})`);
+      } catch(e) {
+        console.error('Firebase init error:', e);
+        if (e.message && e.message.includes('JSON')) {
+          APP.toast('Firebase config is not valid JSON. Check Settings.','danger');
+        } else {
+          APP.toast('Firebase error: '+e.message,'danger');
         }
       }
     });
-    if(!conflicts.length){ el.innerHTML=`<div class="alert alert-success" style="margin-top:12px;"><i class="ph ph-check-circle text-xl"></i><div>No scheduling conflicts detected!</div></div>`; }
-    else { el.innerHTML=`<div class="card-hi p-5" style="margin-top:12px;"><p class="sec-hdr" style="color:var(--danger);"><i class="ph ph-warning"></i> ${conflicts.length} Conflicts Found</p><div class="flex flex-col gap-3">${conflicts.map(c=>`<div class="alert alert-danger text-sm"><i class="ph ph-clock" style="flex-shrink:0;"></i><div>${c}</div></div>`).join('')}</div></div>`; }
-  },
+  });
+}
 
-  async testAI(){
-    const el=document.getElementById('ai-test-result'); const key=Store.settings.aiKey;
-    if(!key){ el.innerHTML=`<div class="alert alert-warn text-sm"><i class="ph ph-warning-circle"></i><div>No API key configured.</div></div>`; return; }
-    el.innerHTML=`<p class="text-sm" style="color:var(--text2);">Testing…</p>`;
-    try{
-      const r=await fetch(Store.settings.aiEndpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:Store.settings.aiModel,max_tokens:20,messages:[{role:'user',content:'Say "Connected" only.'}]})});
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      el.innerHTML=`<div class="alert alert-success text-sm"><i class="ph ph-check-circle"></i><div>Connection successful!</div></div>`;
-    } catch(e){ el.innerHTML=`<div class="alert alert-danger text-sm"><i class="ph ph-warning-circle"></i><div>Failed: ${e.message}</div></div>`; }
-  },
+// ═══════════════════════════════════════════════════════════════════════
+// APP
+// ═══════════════════════════════════════════════════════════════════════
+var APP = {
 
-  // ── DRIVER: ROUTE ─────────────────────────────────────
-  renderDriverRoute(){
-    const el=document.getElementById('dpanel-route');
-    const dp=this.driverProfile;
-    if(!dp){el.innerHTML='';return;}
-    const myTasks=Store.tasks.filter(t=>t.driverId===dp.id);
-    const active=myTasks.filter(t=>!['completed','pending'].includes(t.status));
-    const pending=myTasks.filter(t=>t.status==='pending');
-    const done=myTasks.filter(t=>t.status==='completed');
-    let h='';
-
-    if(!this.isGpsActive&&active.length){
-      h+=`<div class="alert alert-warn" style="margin-bottom:14px;animation:fadeIn .3s ease;">
-        <i class="ph ph-warning-circle text-xl" style="flex-shrink:0;"></i>
-        <div><strong>GPS is OFF</strong> — Dispatch can't track you. Tap <strong>GO ONLINE</strong> above.</div>
-      </div>`;
-    }
-
-    if(active.length){
-      h+=`<p class="sec-hdr" style="color:var(--primary);"><i class="ph ph-play-circle"></i> Active Trip</p>`;
-      active.forEach(task=>{
-        const steps=[
-          {key:'heading_to_pickup',label:'PICKUP'+( task.pickupTime?' @ '+task.pickupTime:''),addr:task.pickup,unit:task.pickupUnit,col:'var(--primary)'},
-          {key:'arrived_pickup',label:'PATIENT BOARDING',addr:'',unit:'',col:'var(--warning)'},
-          {key:'heading_to_dropoff',label:'DROPOFF'+( task.dropoffTime?' @ '+task.dropoffTime:''),addr:task.dropoff,unit:task.dropoffUnit,col:'var(--success)'},
-          {key:'completed',label:'COMPLETE',addr:'',unit:'',col:'var(--success)'},
-        ];
-        const stepOrder=['heading_to_pickup','arrived_pickup','heading_to_dropoff','completed'];
-        const curIdx=stepOrder.indexOf(task.status);
-
-        h+=`<div class="trip-card-active p-5 rounded-2xl mb-4 slide-up" style="border-radius:16px;overflow:hidden;">
-          <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary);"></div>
-          <div class="flex justify-between items-start" style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">
-            <div>
-              <h3 class="syne font-bold text-2xl" style="color:var(--text1);">${task.patientName}</h3>
-              ${task.age?`<p class="text-sm" style="color:var(--text2);">Age ${task.age}</p>`:''}
-            </div>
-            ${statusBadge(task.status)}
-          </div>
-          ${task.phone?`<a href="tel:${task.phone}" class="btn btn-success btn-full" style="margin-bottom:12px;"><i class="ph ph-phone"></i>Call Patient: ${task.phone}</a>`:''}
-          ${task.notes?`<div class="alert alert-warn" style="margin-bottom:12px;font-size:13px;"><i class="ph ph-warning-circle" style="flex-shrink:0;"></i><div><strong>Notes:</strong> ${task.notes}</div></div>`:''}
-
-          <!-- Step tracker -->
-          <div style="margin-bottom:16px;">
-            ${steps.map((step,i)=>{
-              const done=i<curIdx; const cur=i===curIdx;
-              const addrBlock=step.addr?`
-                <p class="font-bold" style="color:var(--text1);font-size:15px;">${step.addr}</p>
-                ${step.unit?`<p style="font-size:12px;color:${step.col};">${step.unit}</p>`:''}
-                <button onclick="navigate('${step.addr}')" class="btn btn-ghost btn-sm" style="margin-top:6px;"><i class="ph ph-navigation-arrow"></i>Navigate</button>`:'';
-              return `
-                <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;opacity:${done?'.5':cur?'1':'.4'};">
-                  <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">
-                    <div class="step-dot ${done?'step-dot-done':cur?'step-dot-active':'step-dot-idle'}"></div>
-                    ${i<steps.length-1?`<div class="step-line"></div>`:''}
-                  </div>
-                  <div style="flex:1;padding-top:0;">
-                    <p class="lbl" style="color:${step.col};">${step.label}</p>
-                    ${addrBlock}
-                  </div>
-                </div>`;
-            }).join('')}
-          </div>
-
-          <!-- Action buttons -->
-          <div style="background:var(--bg1);margin:-20px -20px -20px;padding:16px 20px;border-top:1px solid var(--border);">
-            ${task.status==='heading_to_pickup'?
-              `<button onclick="APP.updateStatus('${task.id}','arrived_pickup')" class="btn btn-primary btn-full" style="font-size:15px;padding:16px;">
-                <i class="ph ph-map-pin-line text-xl"></i> Arrived at Pickup
-              </button>`:''}
-            ${task.status==='arrived_pickup'?
-              `<div>
-                <div class="alert alert-warn" style="margin-bottom:12px;font-size:13px;">
-                  <i class="ph ph-signature text-xl" style="flex-shrink:0;"></i>
-                  <div><strong>Signature Required</strong> — Have patient sign physical manifest before departing.</div>
-                </div>
-                <button onclick="if(confirm('Patient signed and boarded?'))APP.updateStatus('${task.id}','heading_to_dropoff',{paperSignatureConfirmed:true})"
-                  class="btn btn-primary btn-full" style="font-size:15px;padding:16px;">
-                  <i class="ph ph-check-circle text-xl"></i> Patient Signed — Start Trip
-                </button>
-              </div>`:''}
-            ${task.status==='heading_to_dropoff'?
-              `<button onclick="if(confirm('Complete this trip?'))APP.updateStatus('${task.id}','completed')"
-                class="btn btn-success btn-full" style="font-size:15px;padding:16px;">
-                <i class="ph ph-flag-checkered text-xl"></i> Dropoff Complete
-              </button>`:''}
-          </div>
-        </div>`;
+  init: function() {
+    document.getElementById('loading-msg').textContent = 'Opening local database...';
+    IDB.open(function(err) {
+      if (err) { console.warn('IDB failed, running in memory mode:', err); APP.afterLoad(); return; }
+      document.getElementById('loading-msg').textContent = 'Loading your data...';
+      IDB.getAll('trips', function(trips) {
+        if (trips.length) STATE.trips = trips;
+        IDB.getAll('drivers', function(drivers) {
+          if (drivers.length) STATE.drivers = drivers;
+          else IDB.put('drivers', STATE.drivers[0]);
+          IDB.getKV('settings', null, function(saved) {
+            if (saved) STATE.settings = Object.assign(STATE.settings, saved);
+            APP.afterLoad();
+          });
+        });
       });
+    });
+  },
+
+  afterLoad: function() {
+    showAuth();
+    if (STATE.settings.firebaseConfig && STATE.settings.firebaseConfig.trim()) {
+      initFirebase(STATE.settings.firebaseConfig, null);
     }
+  },
 
-    if(pending.length&&!active.length){
-      h+=`<p class="sec-hdr"><i class="ph ph-list-numbers"></i> Next Up</p>`;
-      pending.forEach(task=>{
-        h+=`<div class="card p-5 mb-3 slide-up">
-          <div class="flex justify-between items-start" style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border);">
-            <div>
-              <h3 class="syne font-bold text-xl" style="color:var(--text1);">${task.patientName}</h3>
-              ${task.phone?`<a href="tel:${task.phone}" style="color:var(--primary);font-size:13px;"><i class="ph ph-phone"></i> ${task.phone}</a>`:''}
-            </div>
-            <span class="tag">${task.pickupTime||'TBD'}</span>
-          </div>
-          <div class="grid grid-cols-2 gap-2" style="margin-bottom:14px;">
-            <div class="pu-block" style="padding:10px;"><span class="lbl" style="margin-bottom:2px;">↑ PICKUP</span><p class="font-semibold text-sm" style="color:var(--text1);">${task.pickup}</p>${task.pickupUnit?`<p style="font-size:11px;color:var(--primary);">${task.pickupUnit}</p>`:''}</div>
-            <div class="do-block" style="padding:10px;"><span class="lbl" style="margin-bottom:2px;">↓ DROPOFF</span><p class="font-semibold text-sm" style="color:var(--text1);">${task.dropoff}</p>${task.dropoffUnit?`<p style="font-size:11px;color:var(--success);">${task.dropoffUnit}</p>`:''}</div>
-          </div>
-          ${task.notes?`<div class="alert alert-warn" style="margin-bottom:12px;font-size:12px;"><i class="ph ph-warning-circle" style="flex-shrink:0;"></i><div>${task.notes}</div></div>`:''}
-          <button onclick="APP.updateStatus('${task.id}','heading_to_pickup')" class="btn btn-primary btn-full">
-            <i class="ph ph-car"></i> Start Heading to Pickup
-          </button>
-        </div>`;
-      });
+  populateAuthSelect: function() {
+    var sel = document.getElementById('auth-driver-select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Select your profile...</option>' +
+      STATE.drivers.filter(function(d){return d.status==='active';})
+        .map(function(d){return '<option value="'+d.id+'">'+d.name+'</option>';}).join('');
+  },
+
+  loginAdmin: function() {
+    var pin = document.getElementById('auth-admin-pin').value;
+    if (pin === (STATE.settings.adminPin||'1234')) {
+      STATE.user = {role:'admin', id:'admin', name:'Administrator'};
+      APP.enterApp();
+    } else APP.toast('Invalid Admin PIN','danger');
+  },
+
+  loginDriver: function() {
+    var sel = document.getElementById('auth-driver-select').value;
+    var pin = document.getElementById('auth-driver-pin').value;
+    if (!sel) return APP.toast('Select a driver profile','warning');
+    var driver = STATE.drivers.find(function(d){return d.id===sel;});
+    if (driver && driver.pin===pin) {
+      STATE.user = {role:'driver', id:driver.id, name:driver.name};
+      APP.enterApp();
+    } else APP.toast('Invalid Driver PIN','danger');
+  },
+
+  logout: function() {
+    STATE.user = null;
+    document.getElementById('app-main').style.display='none';
+    document.getElementById('auth-screen').style.display='';
+    document.getElementById('auth-admin-pin').value='';
+    document.getElementById('auth-driver-pin').value='';
+    APP.populateAuthSelect();
+    APP.toast('Logged out','success');
+  },
+
+  enterApp: function() {
+    document.getElementById('auth-screen').style.display='none';
+    document.getElementById('app-main').style.display='';
+    document.getElementById('header-title').innerText = STATE.user.role==='admin' ? 'Admin Dashboard' : 'Driver: '+STATE.user.name;
+    document.getElementById('driver-status-bar').style.display = STATE.user.role==='driver' ? '' : 'none';
+    APP.toast('Welcome back, '+STATE.user.name,'success');
+    APP.switchView(STATE.user.role==='admin' ? 'dashboard' : 'driver-wizard');
+  },
+
+  toast: function(msg, type) {
+    type = type||'primary';
+    var c = document.getElementById('toast-container');
+    var el = document.createElement('div');
+    el.className = 'toast '+type;
+    var icons = {success:'check-circle', danger:'warning-circle', warning:'warning', primary:'info'};
+    el.innerHTML = '<i class="ph-fill ph-'+(icons[type]||'info')+' text-xl"></i><span>'+msg+'</span>';
+    c.appendChild(el);
+    setTimeout(function(){el.classList.add('show');},10);
+    setTimeout(function(){el.classList.remove('show');setTimeout(function(){el.remove();},300);},4500);
+  },
+
+  openModal:  function(id){document.getElementById(id).classList.add('open');},
+  closeModal: function(id){document.getElementById(id).classList.remove('open');},
+
+  // ── TABS & ROUTING ─────────────────────────────────────────────────
+  renderTabs: function() {
+    var tabs = STATE.user.role==='admin' ? [
+      {id:'dashboard',    icon:'chart-pie-slice', label:'Dashboard'},
+      {id:'dispatch',     icon:'radar',           label:'Live Fleet'},
+      {id:'trips',        icon:'clipboard-text',  label:'Tasks'},
+      {id:'extract',      icon:'magic-wand',      label:'AI Extract'},
+      {id:'drivers',      icon:'users',           label:'Drivers'},
+      {id:'settings',     icon:'gear',            label:'Settings'}
+    ] : [
+      {id:'driver-wizard',icon:'clipboard-text',  label:'My Route'},
+      {id:'settings',     icon:'gear',            label:'Settings'}
+    ];
+    document.getElementById('tabs-container').innerHTML = tabs.map(function(t) {
+      var a = STATE.view===t.id;
+      return '<button onclick="APP.switchView(\''+t.id+'\')" class="flex-1 py-2 px-3 font-medium rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap transition '+(a?'bg-blue-100 text-blue-700':'text-slate-600 hover:bg-slate-100')+'">'
+        +'<i class="ph ph-'+t.icon+' text-lg"></i>'+t.label+'</button>';
+    }).join('');
+  },
+
+  switchView: function(v) {
+    STATE.view = v;
+    APP.renderTabs();
+    APP.refreshView();
+  },
+
+  refreshView: function() {
+    var c = document.getElementById('views-container');
+    if (!c) return;
+    var html = '';
+    switch(STATE.view) {
+      case 'dashboard':    html = APP.vDashboard(); break;
+      case 'trips':        html = APP.vTrips(); break;
+      case 'dispatch':     html = APP.vDispatch(); break;
+      case 'extract':      html = APP.vExtract(); break;
+      case 'settings':     html = APP.vSettings(); break;
+      case 'drivers':      html = APP.vDrivers(); break;
+      case 'driver-wizard':html = APP.vWizard(); break;
+      default: html = '<div class="bg-white p-6 rounded-xl border text-slate-500">View not found.</div>';
     }
+    c.innerHTML = html;
+    if (STATE.view==='dashboard') APP.initChart();
+    if (STATE.view==='dispatch')  APP.initMap();
+    if (STATE.view==='extract')   APP.initDrop();
+  },
 
-    if(done.length){
-      h+=`<p class="sec-hdr" style="margin-top:20px;"><i class="ph ph-check-square"></i> Completed Today (${done.length})</p>
-        <div class="flex flex-col gap-2">`;
-      done.forEach(t=>{
-        h+=`<div style="background:rgba(16,185,129,.04);border:1px solid rgba(16,185,129,.15);border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
-          <div><p class="font-bold" style="color:var(--text2);">${t.patientName}</p>
-          <p class="text-xs" style="color:var(--text3);">${t.pickup} → ${t.dropoff}</p></div>
-          <i class="ph-fill ph-check-circle" style="color:var(--success);font-size:20px;"></i>
-        </div>`;
-      });
-      h+=`</div>`;
+  // ── DASHBOARD ──────────────────────────────────────────────────────
+  vDashboard: function() {
+    var today = new Date().toISOString().split('T')[0];
+    var tt = STATE.trips.filter(function(t){return t.pickupTime&&t.pickupTime.startsWith(today);});
+    var comp = tt.filter(function(t){return t.status==='Completed';}).length;
+    var activeD = STATE.drivers.filter(function(d){return d.status==='active';}).length;
+    function card(label,val,cls) {
+      return '<div class="bg-white border rounded-xl p-5 shadow-sm"><div class="text-xs text-slate-500 uppercase font-bold tracking-wide">'+label+'</div><div class="text-3xl font-bold '+cls+' mt-2">'+val+'</div></div>';
     }
+    var rows = tt.slice(0,6).map(function(t) {
+      var cls = t.status==='Completed'?'bg-green-100 text-green-700':t.status==='Pending'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700';
+      var ts = t.pickupTime ? new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+      return '<div class="flex justify-between items-center pb-3 border-b last:border-0 last:pb-0">'
+        +'<div><div class="font-bold text-slate-800 text-sm">'+t.patientName+'</div><div class="text-xs text-slate-500">'+ts+'</div></div>'
+        +'<span class="px-2 py-1 rounded text-[10px] font-bold uppercase '+cls+'">'+t.status+'</span></div>';
+    }).join('') || '<p class="text-sm text-slate-500 text-center py-4">No trips today yet.</p>';
 
-    if(!myTasks.length){
-      h+=`<div class="card p-10 text-center" style="margin-top:20px;">
-        <i class="ph ph-coffee text-5xl" style="color:var(--text3);display:block;margin-bottom:12px;opacity:.5;"></i>
-        <p class="syne font-bold" style="color:var(--text2);font-size:18px;">No trips assigned</p>
-        <p style="color:var(--text3);font-size:14px;margin-top:4px;">Check "Get Trips" or contact dispatch.</p>
-        <button onclick="APP.driverTab('available')" class="btn btn-ghost" style="margin-top:14px;"><i class="ph ph-plus-circle"></i>Browse Available Trips</button>
-      </div>`;
-    }
-
-    el.innerHTML=h;
+    return '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">'
+      +card('Today\'s Trips',tt.length,'text-slate-800')
+      +card('Completed',comp,'text-emerald-600')
+      +card('Active Drivers',activeD,'text-blue-600')
+      +card('Total Logged',STATE.trips.length,'text-amber-500')
+      +'</div>'
+      +'<div class="grid grid-cols-1 md:grid-cols-3 gap-6">'
+        +'<div class="bg-white border rounded-xl p-5 shadow-sm md:col-span-2"><h3 class="font-bold text-lg text-slate-800 mb-4">Weekly Volume</h3><div style="height:300px;position:relative"><canvas id="dash-chart"></canvas></div></div>'
+        +'<div class="bg-white border rounded-xl p-5 shadow-sm"><h3 class="font-bold text-lg text-slate-800 mb-4">Today\'s Activity</h3><div class="space-y-3">'+rows+'</div></div>'
+      +'</div>';
   },
 
-  // ── DRIVER: AVAILABLE ─────────────────────────────────
-  renderAvailableTrips(){
-    const el=document.getElementById('dpanel-available');
-    const unassigned=Store.tasks.filter(t=>!t.driverId&&t.status==='pending');
-    let h=`
-      <div class="flex items-center justify-between" style="margin-bottom:14px;">
-        <h2 class="syne font-bold text-lg" style="color:var(--text1);">Available Trips</h2>
-        <button onclick="APP.openAIUpload('${this.driverProfile?.id||''}')" class="btn btn-sm" style="background:rgba(16,185,129,.12);color:var(--success);border:1px solid rgba(16,185,129,.25);">
-          <i class="ph ph-magic-wand"></i>AI Upload
-        </button>
-      </div>`;
-
-    if(!unassigned.length){
-      h+=`<div class="card p-8 text-center"><i class="ph ph-clipboard-text text-4xl" style="color:var(--text3);display:block;margin-bottom:10px;"></i><p style="color:var(--text2);">No unassigned trips right now.</p></div>`;
-    } else {
-      h+=`<div class="flex flex-col gap-3">`;
-      unassigned.forEach(task=>{
-        h+=`<div class="card p-5 slide-up">
-          <div class="flex justify-between items-start" style="margin-bottom:10px;">
-            <h3 class="syne font-bold text-lg" style="color:var(--text1);">${task.patientName}</h3>
-            <span class="tag">${task.pickupTime||'TBD'}</span>
-          </div>
-          <div class="grid grid-cols-2 gap-2" style="margin-bottom:12px;">
-            <div class="pu-block" style="padding:8px;"><span class="lbl" style="margin-bottom:1px;">↑ PU</span><p class="text-xs font-semibold" style="color:var(--text1);">${task.pickup}</p></div>
-            <div class="do-block" style="padding:8px;"><span class="lbl" style="margin-bottom:1px;">↓ DO</span><p class="text-xs font-semibold" style="color:var(--text1);">${task.dropoff}</p></div>
-          </div>
-          ${task.notes?`<p class="text-xs" style="color:var(--warning);margin-bottom:10px;"><i class="ph ph-warning-circle"></i> ${task.notes}</p>`:''}
-          <button onclick="APP.claimTrip('${task.id}')" class="btn btn-primary btn-full btn-sm">
-            <i class="ph ph-hand-pointing"></i> Claim This Trip
-          </button>
-        </div>`;
-      });
-      h+=`</div>`;
-    }
-    el.innerHTML=h;
+  initChart: function() {
+    var ctx = document.getElementById('dash-chart'); if(!ctx) return;
+    if (typeof Chart==='undefined') return;
+    var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], counts=[0,0,0,0,0,0,0], now=new Date();
+    STATE.trips.forEach(function(t){
+      if(!t.pickupTime) return;
+      var d=new Date(t.pickupTime), diff=Math.floor((now-d)/86400000);
+      if(diff>=0&&diff<7) counts[d.getDay()]++;
+    });
+    new Chart(ctx,{type:'line',data:{labels:days,datasets:[{label:'Trips',data:counts,borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.1)',fill:true,tension:.4}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}}});
   },
 
-  // ── DRIVER: SETTINGS ──────────────────────────────────
-  renderDriverSettings(){
-    const el=document.getElementById('dpanel-dsettings');
-    const s=Store.settings;
-    el.innerHTML=`
-      <div class="card p-5 mb-4">
-        <p class="sec-hdr"><i class="ph ph-map-trifold"></i> Navigation App</p>
-        <div class="flex flex-col gap-2">
-          ${['google','apple','waze'].map(opt=>`
-            <label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer" style="border:1px solid ${s.mapApp===opt?'var(--primary)':'var(--border)'};background:${s.mapApp===opt?'var(--primary-lo)':'transparent'};transition:all .2s;">
-              <input type="radio" name="mapApp" value="${opt}" ${s.mapApp===opt?'checked':''} onchange="Store.saveSetting('mapApp','${opt}');APP.renderDriverSettings();"/>
-              <span class="font-semibold" style="color:var(--text1);">${opt==='google'?'Google Maps':opt==='apple'?'Apple Maps':'Waze'}</span>
-            </label>`).join('')}
-        </div>
-      </div>
-      <div class="card p-5">
-        <p class="sec-hdr"><i class="ph ph-lock-key"></i> Security</p>
-        <p class="text-sm" style="color:var(--text2);margin-bottom:12px;">Change your personal login PIN.</p>
-        <button onclick="APP.openPinModal('${this.driverProfile?.id||''}')" class="btn btn-ghost btn-sm"><i class="ph ph-lock-key"></i>Change My PIN</button>
-      </div>`;
+  // ── TRIPS ──────────────────────────────────────────────────────────
+  vTrips: function() {
+    return '<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 no-print">'
+      +'<h2 class="text-xl font-bold text-slate-800">All Tasks</h2>'
+      +'<div class="flex gap-2 w-full sm:w-auto">'
+        +'<input type="date" class="border p-2 rounded-lg text-sm bg-white flex-1" id="trip-filter-date" onchange="APP.renderTrips()">'
+        +'<button onclick="APP.editTrip(\'\')" class="flex-none bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-blue-700 shadow-sm transition"><i class="ph ph-plus"></i> Add Trip</button>'
+      +'</div></div>'
+      +'<div id="trips-list">'+APP.tripsHTML()+'</div>';
   },
 
-  // ── CLAIM TRIP ────────────────────────────────────────
-  claimTrip(taskId){
-    Store.updateTask(taskId,{driverId:this.driverProfile.id});
-    toast('Trip added to your route!','success');
-    this.renderAvailableTrips();
-    this.driverProfile=Store.drivers.find(d=>d.id===this.driverProfile.id)||this.driverProfile;
+  tripsHTML: function() {
+    var filterEl = document.getElementById('trip-filter-date');
+    var df = filterEl ? filterEl.value : '';
+    var list = STATE.trips.filter(function(t){return !df||(t.pickupTime&&t.pickupTime.startsWith(df));});
+    list.sort(function(a,b){return new Date(b.pickupTime)-new Date(a.pickupTime);});
+    if (!list.length) return '<div class="bg-white border rounded-xl p-10 text-center text-slate-500">No tasks found.</div>';
+    return list.map(function(t) {
+      var dName = (STATE.drivers.find(function(d){return d.id===t.driverId;})||{}).name||'Unassigned';
+      var ts = t.pickupTime ? new Date(t.pickupTime).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'No Time';
+      var cls = t.status==='Completed'?'bg-green-100 text-green-700':t.status==='Pending'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700';
+      return '<div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 mb-4">'
+        +'<div class="flex justify-between items-start mb-3">'
+          +'<div><h3 class="font-bold text-lg text-slate-800">'+t.patientName+'</h3>'
+          +'<p class="text-sm text-slate-500 mt-1">Driver: <span class="font-medium text-slate-700">'+dName+'</span></p></div>'
+          +'<div class="flex flex-col items-end gap-2">'
+            +'<span class="px-3 py-1 rounded-full text-xs font-bold uppercase '+cls+'">'+t.status+'</span>'
+            +'<div class="flex gap-2 no-print mt-1">'
+              +'<button class="text-blue-600 hover:bg-blue-50 p-1.5 rounded" onclick="APP.editTrip(\''+t.id+'\')"><i class="ph ph-pencil"></i></button>'
+              +'<button class="text-red-600 hover:bg-red-50 p-1.5 rounded" onclick="APP.deleteTrip(\''+t.id+'\')"><i class="ph ph-trash"></i></button>'
+            +'</div></div></div>'
+        +'<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">'
+          +'<div class="bg-slate-50 p-3 rounded-lg border"><span class="text-xs text-slate-500 font-bold block mb-1">PICKUP ('+ts+')</span><p class="text-sm font-medium text-slate-800">'+(t.pickupAddress||'—')+'</p></div>'
+          +'<div class="bg-slate-50 p-3 rounded-lg border"><span class="text-xs text-slate-500 font-bold block mb-1">DROPOFF</span><p class="text-sm font-medium text-slate-800">'+(t.dropoffAddress||'—')+'</p></div>'
+        +'</div>'
+        +(t.notes?'<div class="mt-2 text-sm text-amber-700 bg-amber-50 p-2 rounded flex items-start gap-2"><i class="ph-fill ph-warning mt-0.5"></i>'+t.notes+'</div>':'')
+      +'</div>';
+    }).join('');
   },
 
-  // ── TASK ACTIONS ──────────────────────────────────────
-  updateStatus(taskId,newStatus,extra={}){
-    Store.updateTask(taskId,{status:newStatus,[newStatus+'At']:Date.now(),...extra});
-    if(this.role==='driver') this.renderDriverRoute();
-    if(this.role==='admin'&&this.currentAdminTab==='trips') this.renderTrips();
-    if(this.role==='admin'&&this.currentAdminTab==='fleet') this.renderFleet();
+  renderTrips: function() { var c=document.getElementById('trips-list'); if(c) c.innerHTML=APP.tripsHTML(); },
+
+  editTrip: function(id) {
+    var t = STATE.trips.find(function(x){return x.id===id;});
+    document.getElementById('trip-driver').innerHTML = '<option value="">Unassigned</option>'
+      +STATE.drivers.filter(function(d){return d.status==='active';}).map(function(d){return '<option value="'+d.id+'">'+d.name+'</option>';}).join('');
+    document.getElementById('trip-id').value      = t ? t.id : '';
+    document.getElementById('trip-patient').value = t ? t.patientName : '';
+    document.getElementById('trip-phone').value   = t ? (t.phone||'') : '';
+    document.getElementById('trip-pickup').value  = t ? (t.pickupAddress||'') : '';
+    document.getElementById('trip-dropoff').value = t ? (t.dropoffAddress||'') : '';
+    document.getElementById('trip-time').value    = t ? (t.pickupTime||'') : '';
+    document.getElementById('trip-driver').value  = t ? (t.driverId||'') : '';
+    document.getElementById('trip-status').value  = t ? t.status : 'Pending';
+    document.getElementById('trip-notes').value   = t ? (t.notes||'') : '';
+    APP.openModal('modal-trip-form');
   },
 
-  quickAssign(taskId,driverId){
-    Store.updateTask(taskId,{driverId});
-    toast('Driver assigned','success');
-  },
-
-  deleteTrip(id){
-    if(!confirm('Delete this trip?')) return;
-    Store.deleteTask(id); toast('Trip deleted','info');
-    this.renderTrips();
-  },
-
-  editTrip(id){
-    this.editingTripId=id;
-    const task=Store.tasks.find(t=>t.id===id);
-    document.getElementById('trip-modal-title').textContent='Edit Trip';
-    document.getElementById('trip-modal-body').innerHTML=tripFormHTML(task);
-    this.openModal('modal-trip');
-  },
-
-  saveTrip(){
-    const name=document.getElementById('t-name').value.trim();
-    const pu=document.getElementById('t-puLoc').value.trim();
-    const doLoc=document.getElementById('t-doLoc').value.trim();
-    if(!name||!pu||!doLoc){ toast('Name, Pickup, and Dropoff are required','warn'); return; }
-    const btn=document.getElementById('trip-save-btn');
-    btn.disabled=true;
-    const data={
-      patientName:name, age:document.getElementById('t-age').value,
-      phone:document.getElementById('t-phone').value, tripId:document.getElementById('t-tripId').value,
-      driverId:document.getElementById('t-driver').value,
-      pickupTime:document.getElementById('t-puTime').value, pickup:pu, pickupUnit:document.getElementById('t-puUnit').value,
-      dropoffTime:document.getElementById('t-doTime').value, dropoff:doLoc, dropoffUnit:document.getElementById('t-doUnit').value,
-      notes:document.getElementById('t-notes').value, miles:document.getElementById('t-miles').value,
+  saveTrip: function() {
+    var id = document.getElementById('trip-id').value || uid();
+    var trip = {
+      id:id, patientName:document.getElementById('trip-patient').value,
+      phone:document.getElementById('trip-phone').value,
+      pickupAddress:document.getElementById('trip-pickup').value,
+      dropoffAddress:document.getElementById('trip-dropoff').value,
+      pickupTime:document.getElementById('trip-time').value,
+      driverId:document.getElementById('trip-driver').value,
+      status:document.getElementById('trip-status').value,
+      notes:document.getElementById('trip-notes').value
     };
-    if(this.editingTripId){ Store.updateTask(this.editingTripId,data); toast('Trip updated','success'); }
-    else { data.status='pending'; data.paperSignatureConfirmed=false; Store.addTask(data); toast('Trip saved!','success'); }
-    this.closeModal('modal-trip');
-    if(this.currentAdminTab==='trips') this.renderTrips();
-    if(this.currentAdminTab==='fleet') this.renderFleet();
-    btn.disabled=false;
+    DB.saveTrip(trip, function() {
+      APP.closeModal('modal-trip-form');
+      APP.renderTrips();
+      APP.toast('Trip saved ✓','success');
+    });
   },
 
-  // ── MULTI-SELECT ──────────────────────────────────────
-  toggleSel(id,checked){
-    if(checked) this.sel.add(id); else this.sel.delete(id);
-    this.updateActionBar();
-    const card=document.getElementById('tc-'+id);
-    if(card) card.classList.toggle('selected',checked);
+  deleteTrip: function(id) {
+    if (!confirm('Delete this trip? This cannot be undone.')) return;
+    DB.deleteTrip(id, function() { APP.renderTrips(); APP.toast('Trip deleted','danger'); });
   },
 
-  selAll(){
-    const fSt=document.getElementById('trip-filter-status')?.value||'';
-    let tasks=Store.tasks;
-    if(fSt) tasks=tasks.filter(t=>t.status===fSt);
-    tasks.forEach(t=>this.sel.add(t.id));
-    this.renderTrips();
+  // ── DRIVERS ────────────────────────────────────────────────────────
+  vDrivers: function() {
+    return '<div class="flex justify-between items-center mb-6">'
+      +'<h2 class="text-xl font-bold text-slate-800">Manage Drivers</h2>'
+      +'<button onclick="APP.editDriver(\'\')" class="bg-slate-800 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-900 shadow-sm"><i class="ph ph-user-plus"></i> Add Driver</button>'
+      +'</div>'
+      +'<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">'
+      +STATE.drivers.map(function(d) {
+        return '<div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">'
+          +'<div class="flex items-center gap-4">'
+            +'<div class="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center text-blue-600"><i class="ph-fill ph-user text-2xl"></i></div>'
+            +'<div><h3 class="font-bold text-slate-800 flex items-center gap-2">'+d.name+' <span class="w-2 h-2 rounded-full '+(d.status==='active'?'bg-emerald-500':'bg-red-500')+'"></span></h3>'
+            +'<p class="text-xs text-slate-500">PIN: '+d.pin+' | '+(d.phone||'No phone')+'</p></div>'
+          +'</div>'
+          +'<button class="p-2 text-blue-600 hover:bg-blue-50 rounded" onclick="APP.editDriver(\''+d.id+'\')"><i class="ph ph-pencil"></i></button>'
+        +'</div>';
+      }).join('')
+      +'</div>';
   },
 
-  clearSel(){ this.sel.clear(); this.updateActionBar(); this.renderTrips(); },
-
-  updateActionBar(){
-    const bar=document.getElementById('action-bar');
-    const count=this.sel.size;
-    document.getElementById('ab-count').textContent=count+' selected';
-    document.getElementById('ab-driver').innerHTML=driverOptionsHTML('','Assign to…');
-    bar.classList.toggle('show',count>0);
+  editDriver: function(id) {
+    var d = STATE.drivers.find(function(x){return x.id===id;});
+    document.getElementById('driver-id').value     = d ? d.id : '';
+    document.getElementById('driver-name').value   = d ? d.name : '';
+    document.getElementById('driver-phone').value  = d ? (d.phone||'') : '';
+    document.getElementById('driver-pin').value    = d ? d.pin : '';
+    document.getElementById('driver-status').value = d ? d.status : 'active';
+    APP.openModal('modal-driver-form');
   },
 
-  bulkAssign(){
-    const driverId=document.getElementById('ab-driver').value;
-    if(!driverId){ toast('Select a driver first','warn'); return; }
-    Store.assignTasks([...this.sel],driverId);
-    toast(`${this.sel.size} trips assigned to ${Store.drivers.find(d=>d.id===driverId)?.name}`,'success');
-    this.clearSel();
+  saveDriver: function() {
+    var id = document.getElementById('driver-id').value || uid();
+    var driver = {id:id, name:document.getElementById('driver-name').value, phone:document.getElementById('driver-phone').value, pin:document.getElementById('driver-pin').value, status:document.getElementById('driver-status').value};
+    DB.saveDriver(driver, function() { APP.closeModal('modal-driver-form'); APP.switchView('drivers'); APP.toast('Driver saved ✓','success'); });
   },
 
-  bulkDelete(){
-    if(!confirm(`Delete ${this.sel.size} trips?`)) return;
-    Store.deleteTasks([...this.sel]);
-    toast(this.sel.size+' trips deleted','info');
-    this.clearSel();
+  // ── DISPATCH / MAP ─────────────────────────────────────────────────
+  vDispatch: function() {
+    return '<div class="bg-white border rounded-xl overflow-hidden shadow-sm relative">'
+      +'<div id="map-container" style="height:500px;width:100%"></div>'
+      +'<div class="absolute top-4 right-4 z-[400] bg-white p-4 rounded-xl shadow-lg w-60 border">'
+        +'<h4 class="font-bold text-slate-800 mb-3">Live Fleet</h4>'
+        +'<div class="space-y-3">'
+        +STATE.drivers.filter(function(d){return d.status==='active';}).map(function(d) {
+          return '<div class="flex items-center justify-between text-sm">'
+            +'<span class="flex items-center gap-2 font-medium text-slate-700"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>'+d.name+'</span>'
+            +'<span class="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold">ON DUTY</span></div>';
+        }).join('')
+        +'</div></div></div>';
   },
 
-  // ── DRIVER MANAGEMENT ─────────────────────────────────
-  openAddDriver(){
-    document.getElementById('d-edit-id').value='';
-    document.getElementById('d-name').value='';
-    document.getElementById('d-pin').value='';
-    document.getElementById('driver-modal-title').textContent='Add Driver';
-    this.openModal('modal-driver');
+  initMap: function() {
+    if (STATE.mapInst) { try{STATE.mapInst.remove();}catch(e){} STATE.mapInst=null; }
+    if (typeof L==='undefined') return;
+    var el = document.getElementById('map-container'); if(!el) return;
+    STATE.mapInst = L.map('map-container').setView([39.8283,-98.5795],4);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap'}).addTo(STATE.mapInst);
   },
 
-  openEditDriver(id){
-    const d=Store.drivers.find(x=>x.id===id);
-    if(!d) return;
-    document.getElementById('d-edit-id').value=id;
-    document.getElementById('d-name').value=d.name;
-    document.getElementById('d-pin').value=d.pin;
-    document.getElementById('driver-modal-title').textContent='Edit Driver';
-    this.openModal('modal-driver');
+  // ── AI EXTRACT ─────────────────────────────────────────────────────
+  vExtract: function() {
+    var dOpts = '<option value="">Unassigned</option>'+STATE.drivers.filter(function(d){return d.status==='active';}).map(function(d){return '<option value="'+d.id+'">'+d.name+'</option>';}).join('');
+    var apiStatus = STATE.settings.apiKey
+      ? '<span class="text-emerald-600 font-bold">✓ API Key set</span>'
+      : STATE.settings.workerUrl
+        ? '<span class="text-emerald-600 font-bold">✓ Worker URL set</span>'
+        : '<span class="text-red-500 font-bold">⚠ No API key — configure in Settings</span>';
+
+    return '<div class="grid grid-cols-1 md:grid-cols-3 gap-6">'
+      +'<div class="md:col-span-1"><div class="bg-white border rounded-xl p-6 shadow-sm">'
+        +'<h3 class="font-bold text-lg text-slate-800 mb-1">AI Extraction</h3>'
+        +'<p class="text-sm text-slate-400 mb-2">Status: '+apiStatus+'</p>'
+        +'<p class="text-sm text-slate-500 mb-6">Drop manifests — PDF, Excel, CSV, or photo. AI parses everything.</p>'
+        +'<div class="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center bg-blue-50 relative cursor-pointer hover:bg-blue-100 transition" id="drop-zone">'
+          +'<input type="file" id="file-input" multiple accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" style="cursor:pointer">'
+          +'<i class="ph-fill ph-upload-simple text-blue-500 text-5xl mb-4"></i>'
+          +'<h3 class="font-bold text-slate-700 text-lg">Tap or drag files</h3>'
+          +'<p class="text-xs text-slate-500 mt-2">PDF, Excel, CSV, Images</p>'
+        +'</div>'
+        +'<div id="file-processing-status" class="mt-3 hidden"></div>'
+      +'</div></div>'
+      +'<div class="md:col-span-2"><div class="bg-white border rounded-xl p-6 shadow-sm h-full flex flex-col">'
+        +'<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">'
+          +'<h3 class="font-bold text-lg text-slate-800">Extracted Preview</h3>'
+          +'<div class="flex gap-2 w-full sm:w-auto">'
+            +'<select class="border p-2 rounded-lg text-sm bg-white" onchange="APP.bulkAssign(this.value)"><option value="">Bulk Assign...</option>'+dOpts+'</select>'
+            +'<button class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium whitespace-nowrap" onclick="APP.saveExtracted()"><i class="ph ph-check-square"></i> Save All</button>'
+          +'</div></div>'
+        +'<div id="extract-results" class="flex-1 overflow-y-auto bg-slate-50 rounded-lg p-4 border" style="min-height:300px">'
+          +'<div class="text-center text-slate-400 py-12"><i class="ph ph-file-dashed text-4xl mb-2"></i><br>Awaiting documents...</div>'
+        +'</div></div></div>'
+    +'</div>';
   },
 
-  saveDriver(){
-    const name=document.getElementById('d-name').value.trim();
-    const pin=document.getElementById('d-pin').value.trim();
-    const editId=document.getElementById('d-edit-id').value;
-    if(!name||!pin){ toast('Name and PIN required','warn'); return; }
-    if(editId){ Store.updateDriver(editId,{name,pin}); toast('Driver updated','success'); }
-    else { Store.addDriver({name,pin}); toast('Driver added!','success'); }
-    this.closeModal('modal-driver');
-    refreshDriverDropdowns();
-    this.renderDriversTab();
+  initDrop: function() {
+    var dz = document.getElementById('drop-zone');
+    var fi = document.getElementById('file-input');
+    if (!dz || !fi) return;
+
+    ['dragenter','dragover','dragleave','drop'].forEach(function(ev){
+      dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); });
+    });
+
+    dz.addEventListener('dragover', function(){ dz.classList.add('bg-blue-100'); });
+    dz.addEventListener('dragleave', function(){ dz.classList.remove('bg-blue-100'); });
+
+    dz.addEventListener('drop', function(e) {
+      dz.classList.remove('bg-blue-100');
+      APP.handleFiles(e.dataTransfer.files);
+    });
+
+    fi.addEventListener('change', function(e) {
+      if (!e.target.files || !e.target.files.length) return;
+      var filesCopy = Array.from(e.target.files);
+      fi.value = '';
+      APP.handleFiles(filesCopy);
+    });
   },
 
-  deleteDriver(id){
-    const name=Store.drivers.find(d=>d.id===id)?.name;
-    if(!confirm(`Delete driver ${name}? Their trips will become unassigned.`)) return;
-    Store.updateTask&&Store.tasks.filter(t=>t.driverId===id).forEach(t=>Store.updateTask(t.id,{driverId:''}));
-    Store.deleteDriver(id); toast('Driver removed','info');
-    refreshDriverDropdowns(); this.renderDriversTab();
+  handleFiles: function(files) {
+    if (!files || !files.length) return;
+
+    if (!STATE.settings.apiKey && !STATE.settings.workerUrl) {
+      document.getElementById('extract-results').innerHTML =
+        '<div class="bg-amber-50 border border-amber-200 p-5 rounded-lg text-amber-800">'
+        +'<div class="font-bold text-base mb-2">⚠ API Key Required</div>'
+        +'<p class="text-sm">Go to <strong>Settings</strong> and enter your OpenAI API key (starts with <code>sk-</code>) or a Cloudflare Worker URL before uploading files.</p>'
+        +'</div>';
+      return;
+    }
+
+    var el = document.getElementById('extract-results');
+    var statusEl = document.getElementById('file-processing-status');
+    el.innerHTML = '<div class="text-center py-12"><div class="spinner" style="display:inline-block"></div><p class="text-slate-600 font-medium mt-4">AI is analyzing '+files.length+' document(s)...</p></div>';
+    if (statusEl) { statusEl.classList.remove('hidden'); statusEl.innerHTML = '<p class="text-xs text-blue-600">Reading files...</p>'; }
+    STATE.extracted = [];
+    var arr = Array.from(files);
+    var idx = 0;
+    function next() {
+      if (idx >= arr.length) {
+        if (statusEl) statusEl.classList.add('hidden');
+        APP.renderExtracted();
+        return;
+      }
+      var file = arr[idx++];
+      if (statusEl) statusEl.innerHTML = '<p class="text-xs text-blue-600">Processing: '+file.name+'</p>';
+      APP.readFile(file, function(text, err) {
+        if (err) {
+          APP.toast('Failed to read: '+file.name+' — '+err, 'danger');
+          next(); return;
+        }
+        if (text) APP.callAI(text, file.name, function(){ next(); });
+        else { APP.toast('Could not extract text from: '+file.name,'warning'); next(); }
+      });
+    }
+    next();
   },
 
-  // ── PIN MANAGEMENT ────────────────────────────────────
-  openPinModal(target){
-    document.getElementById('pin-target-id').value=target;
-    document.getElementById('pin-current').value='';
-    document.getElementById('pin-new').value='';
-    document.getElementById('pin-confirm').value='';
-    const name=target==='admin'?'Admin':Store.drivers.find(d=>d.id===target)?.name||'Driver';
-    document.getElementById('pin-modal-title').textContent=`Change ${name} PIN`;
-    this.openModal('modal-pin');
-  },
+  readFile: function(file, cb) {
+    var name = file.name.toLowerCase();
 
-  confirmPinChange(){
-    const target=document.getElementById('pin-target-id').value;
-    const cur=document.getElementById('pin-current').value;
-    const nw=document.getElementById('pin-new').value;
-    const conf=document.getElementById('pin-confirm').value;
-    const currentPin=target==='admin'?Store.getAdminPin():(Store.drivers.find(d=>d.id===target)?.pin||'');
-    if(cur!==currentPin){ toast('Current PIN is wrong','danger'); return; }
-    if(!nw||nw.length<3){ toast('New PIN must be at least 3 digits','warn'); return; }
-    if(nw!==conf){ toast('PINs do not match','warn'); return; }
-    if(target==='admin'){ Store.setAdminPin(nw); }
-    else { Store.updateDriver(target,{pin:nw}); if(this.driverProfile?.id===target) this.driverProfile.pin=nw; }
-    toast('PIN updated successfully!','success');
-    this.closeModal('modal-pin');
-    if(this.currentAdminTab==='drivers') this.renderDriversTab();
-  },
+    if (name.endsWith('.csv')) {
+      if (typeof Papa === 'undefined') {
+        var r = new FileReader();
+        r.onload = function(e){ cb(e.target.result); };
+        r.onerror = function(){ cb('', 'FileReader error'); };
+        r.readAsText(file);
+        return;
+      }
+      Papa.parse(file, {
+        complete: function(r) { cb(JSON.stringify(r.data)); },
+        error: function(e) { cb('', 'CSV parse error: '+e); }
+      });
 
-  // ── DATA OPS ──────────────────────────────────────────
-  clearCompleted(){
-    if(!confirm('Remove all completed trips?')) return;
-    const ids=Store.tasks.filter(t=>t.status==='completed').map(t=>t.id);
-    Store.deleteTasks(ids); toast('Cleared '+ids.length+' completed trips','info');
-    this.renderTrips();
-  },
+    } else if (name.match(/\.(xlsx|xls)$/)) {
+      if (typeof XLSX === 'undefined') {
+        cb('', 'Excel library not loaded yet. Please wait a moment and try again.');
+        return;
+      }
+      file.arrayBuffer().then(function(buf) {
+        try {
+          var wb = XLSX.read(new Uint8Array(buf), {type:'array'});
+          cb(wb.SheetNames.map(function(n){
+            return JSON.stringify(XLSX.utils.sheet_to_json(wb.Sheets[n]));
+          }).join('\n'));
+        } catch(e) {
+          cb('', 'Excel parse error: '+e.message);
+        }
+      }).catch(function(e) {
+        cb('', 'Cannot read Excel file: '+e.message);
+      });
 
-  clearAllTrips(){
-    if(!confirm('DELETE ALL TRIPS? This cannot be undone.')) return;
-    Store.tasks=[]; Store._save(LS.TASKS,[]);
-    toast('All trips deleted','danger'); this.renderTrips();
-  },
+    } else if (name.endsWith('.pdf')) {
+      var pdfAttempts = 0;
+      function tryPdf() {
+        if (typeof pdfjsLib === 'undefined') {
+          pdfAttempts++;
+          if (pdfAttempts > 10) { cb('', 'PDF library failed to load. Check your internet connection.'); return; }
+          setTimeout(tryPdf, 500);
+          return;
+        }
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-  exportBackup(){
-    const data={tasks:Store.tasks,drivers:Store.drivers,settings:Store.settings,exportedAt:new Date().toISOString()};
-    const a=document.createElement('a');
-    a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(data,null,2));
-    a.download='agape_backup_'+Date.now()+'.json'; a.click();
-    toast('Backup downloaded','success');
-  },
+        file.arrayBuffer().then(function(buf) {
+          return pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+        }).then(function(pdf) {
+          var pagePromises = [];
+          for (var i = 1; i <= Math.min(pdf.numPages, 8); i++) {
+            pagePromises.push(pdf.getPage(i).then(function(p){ return p.getTextContent(); }));
+          }
+          return Promise.all(pagePromises);
+        }).then(function(pages) {
+          var text = pages.map(function(p){
+            return p.items.map(function(item){ return item.str; }).join(' ');
+          }).join('\n');
+          if (!text.trim()) {
+            APP.toast('PDF appears to be a scanned image. Try GPT-4o (vision) in Settings.','warning');
+            cb('');
+          } else {
+            cb(text);
+          }
+        }).catch(function(e) {
+          cb('', 'PDF error: '+(e.message||'Unknown error'));
+        });
+      }
+      tryPdf();
 
-  importBackup(){
-    const inp=document.createElement('input'); inp.type='file'; inp.accept='.json';
-    inp.onchange=e=>{
-      const f=e.target.files[0]; if(!f) return;
-      const r=new FileReader();
-      r.onload=ev=>{ try{
-        const d=JSON.parse(ev.target.result);
-        if(d.tasks) { Store.tasks=d.tasks; Store._save(LS.TASKS,d.tasks); }
-        if(d.drivers) { Store.drivers=d.drivers; Store._save(LS.DRIVERS,d.drivers); }
-        if(d.settings) { Store.settings={...Store.settings,...d.settings}; Store._save(LS.SETTINGS,Store.settings); }
-        toast('Backup restored! '+d.tasks.length+' trips, '+d.drivers.length+' drivers.','success');
-        this.adminTab('fleet');
-        refreshDriverDropdowns();
-      } catch(err){ toast('Invalid backup file','danger'); }};
-      r.readAsText(f);
-    };
-    inp.click();
-  },
+    } else if (file.type.startsWith('image/')) {
+      var r = new FileReader();
+      r.onload = function(e) { cb(e.target.result); };
+      r.onerror = function() { cb('', 'Image read error'); };
+      r.readAsDataURL(file);
 
-  // ── GPS ───────────────────────────────────────────────
-  isGpsActive:false, gpsWatchId:null,
-
-  toggleGPS(forceStop=false){
-    if(this.isGpsActive||forceStop){
-      this.isGpsActive=false;
-      if(this.gpsWatchId) navigator.geolocation.clearWatch(this.gpsWatchId);
-      this.gpsWatchId=null;
-      Store.updateDriver(this.driverProfile.id,{location:null,speed:0,lastUpdated:Date.now()});
-      this._updateGPSUI(false,'Offline');
     } else {
-      if(!navigator.geolocation){ toast('GPS not supported on this device','danger'); return; }
-      this.isGpsActive=true;
-      this._updateGPSUI('loading','Locating…');
-      this.gpsWatchId=navigator.geolocation.watchPosition(
-        pos=>{
-          const {latitude:lat,longitude:lng,speed}=pos.coords;
-          Store.updateDriver(this.driverProfile.id,{location:{lat,lng},speed:speed||0,lastUpdated:Date.now()});
-          this._updateGPSUI(true,'● Transmitting Live');
-        },
-        err=>{
-          toast('GPS error: '+err.message,'warn');
-          this.isGpsActive=false;
-          this._updateGPSUI(false,'Signal lost');
-        },
-        {enableHighAccuracy:true,maximumAge:8000,timeout:6000}
-      );
+      cb('', 'Unsupported file type: '+name.split('.').pop());
     }
   },
 
-  _updateGPSUI(active,text){
-    const btn=document.getElementById('driver-gps-btn');
-    const status=document.getElementById('driver-gps-status');
-    const dot=document.getElementById('hdr-gps-dot');
-    const txt=document.getElementById('hdr-gps-txt');
-    if(status) status.textContent=text;
-    if(txt) txt.textContent=text;
-    if(active===true){
-      if(btn){ btn.textContent='GO OFFLINE'; btn.style.background='var(--danger)'; }
-      if(dot){ dot.style.background='var(--success)'; dot.classList.add('pulse-online'); }
-    } else if(active==='loading'){
-      if(btn){ btn.textContent='Locating…'; btn.style.background='var(--warning)'; }
-    } else {
-      if(btn){ btn.textContent='GO ONLINE'; btn.style.background='var(--success)'; }
-      if(dot){ dot.style.background='var(--text3)'; dot.classList.remove('pulse-online'); }
-    }
-  },
-
-  // ── MODALS ────────────────────────────────────────────
-  openModal(id){
-    const modal=document.getElementById(id);
-    if(!modal) return;
-    if(id==='modal-trip'){
-      if(!this.editingTripId){
-        document.getElementById('trip-modal-title').textContent='New Trip';
-        document.getElementById('trip-modal-body').innerHTML=tripFormHTML();
-        refreshDriverDropdowns();
+  callAI: function(content, filename, done) {
+    var url = STATE.settings.workerUrl;
+    var isDirect = false;
+    if (!url) {
+      if (STATE.settings.apiKey) {
+        url = 'https://api.openai.com/v1/chat/completions';
+        isDirect = true;
+      } else {
+        document.getElementById('extract-results').innerHTML =
+          '<div class="bg-amber-50 border border-amber-200 p-4 rounded-lg text-amber-800"><strong>API key required.</strong> Add your OpenAI API key in Settings.</div>';
+        return;
       }
     }
-    modal.classList.remove('hidden');
-    requestAnimationFrame(()=>modal.classList.add('open'));
+    var prompt = 'You are a precise NEMT trip extractor. Extract ALL trips. Return ONLY a JSON array: [{"patientName":"","pickupAddress":"","dropoffAddress":"","pickupTime":"YYYY-MM-DDTHH:mm","phone":"","notes":""}]. No markdown.';
+    var msgs = [{role:'system', content:prompt}];
+    if (content.startsWith('data:image')) {
+      msgs.push({role:'user', content:[
+        {type:'text', text:'Extract all NEMT trips from this document: '+filename},
+        {type:'image_url', image_url:{url:content}}
+      ]});
+    } else {
+      msgs.push({role:'user', content:'Extract all NEMT trips from '+filename+':\n\n'+content.substring(0,12000)});
+    }
+    var hdrs = {'Content-Type':'application/json'};
+    if (isDirect) hdrs['Authorization'] = 'Bearer '+STATE.settings.apiKey;
+
+    fetch(url, {
+      method:'POST',
+      headers: hdrs,
+      body: JSON.stringify({model: STATE.settings.aiModel, messages: msgs, temperature:0})
+    })
+    .then(function(r){
+      if (!r.ok) {
+        return r.text().then(function(t){
+          throw new Error('HTTP '+r.status+': '+(t||r.statusText));
+        });
+      }
+      return r.json();
+    })
+    .then(function(data) {
+      if (data.error) throw new Error(data.error.message);
+      var raw = data.choices[0].message.content;
+      var m = raw.match(/\[[\s\S]*\]/);
+      if (m) {
+        try {
+          var trips = JSON.parse(m[0]);
+          trips.forEach(function(t){ t.driverId=''; STATE.extracted.push(t); });
+        } catch(e) {
+          APP.toast('AI returned invalid JSON for '+filename,'warning');
+        }
+      }
+      done();
+    })
+    .catch(function(e) {
+      console.error('AI call error:', e);
+      document.getElementById('extract-results').innerHTML =
+        '<div class="text-red-700 bg-red-50 p-4 border border-red-200 rounded-lg"><strong>AI Error:</strong> '+e.message+'<br><small class="text-red-500">Check your API key and internet connection.</small></div>';
+    });
   },
 
-  closeModal(id){
-    const modal=document.getElementById(id);
-    if(!modal) return;
-    modal.classList.remove('open');
-    setTimeout(()=>modal.classList.add('hidden'),300);
-    if(id==='modal-trip') this.editingTripId=null;
+  renderExtracted: function() {
+    var el = document.getElementById('extract-results');
+    if (!STATE.extracted.length) {
+      el.innerHTML = '<div class="text-center text-slate-500 py-12">No trips found in documents.</div>';
+      return;
+    }
+    var dOpts = '<option value="">Unassigned</option>'+STATE.drivers.filter(function(d){return d.status==='active';}).map(function(d){return '<option value="'+d.id+'">'+d.name+'</option>';}).join('');
+    el.innerHTML = STATE.extracted.map(function(t,i){
+      return '<div class="bg-white p-4 rounded-lg mb-3 border border-slate-200 shadow-sm relative">'
+        +'<button class="absolute top-2 right-2 text-slate-400 hover:text-red-500" onclick="APP.removeExtracted('+i+')"><i class="ph ph-x"></i></button>'
+        +'<div class="flex justify-between items-start mb-3 pr-6">'
+          +'<div><div class="font-bold text-slate-800">'+(t.patientName||'Unknown')+'</div><div class="text-xs text-slate-500">'+(t.pickupTime||'No Time')+'</div></div>'
+          +'<select class="border rounded p-1 text-sm bg-white" onchange="APP.setExtractedDriver('+i+',this.value)">'+dOpts+'</select>'
+        +'</div>'
+        +'<div class="grid grid-cols-2 gap-2 bg-slate-50 border p-3 rounded">'
+          +'<div><p class="text-xs font-bold text-slate-500 mb-1">PICKUP</p><p class="text-sm text-slate-700">'+(t.pickupAddress||'—')+'</p></div>'
+          +'<div><p class="text-xs font-bold text-slate-500 mb-1">DROPOFF</p><p class="text-sm text-slate-700">'+(t.dropoffAddress||'—')+'</p></div>'
+        +'</div>'
+        +(t.notes?'<div class="text-xs text-blue-700 mt-2 bg-blue-50 p-2 rounded">'+t.notes+'</div>':'')
+      +'</div>';
+    }).join('');
   },
 
-  // ── MAP ───────────────────────────────────────────────
-  openMapWithDriver(driverId){
-    const d=Store.drivers.find(x=>x.id===driverId);
-    if(d?.location) navigateCoords(d.location.lat,d.location.lng);
-    else toast('No location data','warn');
+  setExtractedDriver: function(i,v){ STATE.extracted[i].driverId=v; },
+  bulkAssign: function(v){ STATE.extracted.forEach(function(t){t.driverId=v;}); APP.renderExtracted(); },
+  removeExtracted: function(i){ STATE.extracted.splice(i,1); APP.renderExtracted(); },
+
+  saveExtracted: function() {
+    if (!STATE.extracted.length) return;
+    var list = STATE.extracted.slice(), i = 0;
+    function next(){
+      if (i>=list.length){ STATE.extracted=[]; APP.renderExtracted(); APP.toast('All trips saved!','success'); return; }
+      var t = list[i++];
+      DB.saveTrip({id:uid(),patientName:t.patientName,pickupAddress:t.pickupAddress,dropoffAddress:t.dropoffAddress,pickupTime:t.pickupTime,notes:t.notes||'',phone:t.phone||'',status:'Pending',driverId:t.driverId||''},next);
+    }
+    next();
   },
+
+  // ── SETTINGS ───────────────────────────────────────────────────────
+  // FIX: Rebuilt vSettings as a clean concatenated string — no backtick blocks inside
+  vSettings: function() {
+    var s = STATE.settings;
+    var fbSt = STATE.fbDb
+      ? '<span class="text-emerald-600 text-xs font-bold ml-2">✓ Connected</span>'
+      : '<span class="text-slate-400 text-xs ml-2">Not connected</span>';
+
+    var apiKeySaved   = s.apiKey    ? '<p class="text-xs text-emerald-600 mt-1 font-bold">✓ API key is saved on this device</p>' : '<p class="text-xs text-amber-600 mt-1">⚠ No API key set yet</p>';
+    var workerSaved   = s.workerUrl ? '<p class="text-xs text-emerald-600 mt-1 font-bold">✓ Worker URL is configured</p>' : '';
+    var fbConnected   = STATE.fbDb
+      ? '<p class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded mt-2">🔥 Firebase is currently connected and syncing.</p>'
+      : '<p class="text-xs text-slate-500 mt-2">After entering config and saving, the page will reload to connect.</p>';
+
+    var modelGpt4Mini = s.aiModel === 'gpt-4o-mini' ? ' selected' : '';
+    var modelGpt4o    = s.aiModel === 'gpt-4o'      ? ' selected' : '';
+
+    return '<div class="bg-white border rounded-xl p-6 shadow-sm max-w-2xl mb-20">'
+      + '<h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="ph ph-gear"></i> System Settings</h2>'
+      + '<div class="space-y-6">'
+
+      // ── AI Section ──
+      + '<div>'
+        + '<h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="ph ph-robot text-blue-600"></i> AI (for document extraction)</h3>'
+
+        + '<div class="mb-4">'
+          + '<label class="block text-sm font-medium mb-1">OpenAI API Key</label>'
+          + '<div class="relative">'
+            + '<input type="password" id="set-api-key" class="w-full border p-3 rounded-lg pr-20" placeholder="sk-..." value="'+(s.apiKey||'')+'">'
+            + '<button type="button" onclick="APP.toggleKeyVis(\'set-api-key\',this)" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded font-medium text-slate-600 transition">Show</button>'
+          + '</div>'
+          + '<p class="text-xs text-slate-500 mt-1">Direct browser call to OpenAI. <strong>Stored locally on this device only</strong> — not synced to cloud for security.</p>'
+          + apiKeySaved
+        + '</div>'
+
+        + '<div class="mb-4">'
+          + '<label class="block text-sm font-medium mb-1">Cloudflare Worker URL <span class="text-slate-400 font-normal">(secure proxy — synced to all devices)</span></label>'
+          + '<input type="url" id="set-url" class="w-full border p-3 rounded-lg" value="'+(s.workerUrl||'')+'" placeholder="https://your-worker.workers.dev">'
+          + '<p class="text-xs text-slate-500 mt-1">If set, this is used instead of the API key above. Gets synced across devices via Firebase.</p>'
+          + workerSaved
+        + '</div>'
+
+        + '<div>'
+          + '<label class="block text-sm font-medium mb-1">Model</label>'
+          + '<select id="set-model" class="w-full border p-3 rounded-lg bg-white">'
+            + '<option value="gpt-4o-mini"'+modelGpt4Mini+'>GPT-4o Mini (fast, cheap)</option>'
+            + '<option value="gpt-4o"'+modelGpt4o+'>GPT-4o (best quality + scanned PDF/image OCR)</option>'
+          + '</select>'
+        + '</div>'
+      + '</div>'
+
+      // ── Firebase Section ──
+      + '<div class="border-t pt-6">'
+        + '<h3 class="font-bold text-slate-700 mb-1 flex items-center"><i class="ph-fill ph-database text-blue-600 mr-2"></i>Cloud Firebase' + fbSt + '</h3>'
+        + '<p class="text-xs text-slate-500 mb-3">Paste your Firebase project config JSON. This syncs <strong>trips, drivers, and most settings</strong> across all devices. The OpenAI API key is never synced for security.</p>'
+        + '<textarea id="set-firebase" rows="5" class="w-full border p-3 rounded-lg font-mono text-xs bg-slate-50" placeholder=\'{"apiKey":"AIza...","authDomain":"your-app.firebaseapp.com","projectId":"your-app","storageBucket":"your-app.appspot.com","messagingSenderId":"123","appId":"1:123:web:abc"}\'>'+(s.firebaseConfig||'')+'</textarea>'
+        + '<p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2 rounded mt-2"><strong>⚠ Firestore rules:</strong> In Firebase console → Firestore → Rules, set: <code>allow read, write: if true;</code> for testing.</p>'
+        + fbConnected
+      + '</div>'
+
+      // ── Security ──
+      + '<div class="border-t pt-6">'
+        + '<h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="ph ph-lock-key text-slate-600"></i> Security</h3>'
+        + '<label class="block text-sm font-medium mb-1">Admin PIN</label>'
+        + '<input type="text" id="set-admin-pin" class="w-full border p-3 rounded-lg" value="'+(s.adminPin||'1234')+'">'
+      + '</div>'
+
+      + '<button class="w-full py-4 bg-blue-600 text-white font-bold rounded-lg mt-4 shadow-md hover:bg-blue-700 transition text-lg" onclick="APP.saveSettings()">💾 Save Settings</button>'
+    + '</div></div>';
+  },
+
+  toggleKeyVis: function(inputId, btn) {
+    var inp = document.getElementById(inputId);
+    if (!inp) return;
+    if (inp.type === 'password') {
+      inp.type = 'text';
+      btn.textContent = 'Hide';
+    } else {
+      inp.type = 'password';
+      btn.textContent = 'Show';
+    }
+  },
+
+  saveSettings: function() {
+    var oldFb = STATE.settings.firebaseConfig;
+    var newApiKey    = document.getElementById('set-api-key').value.trim();
+    var newWorkerUrl = document.getElementById('set-url').value.trim();
+    var newFbConfig  = document.getElementById('set-firebase').value.trim();
+
+    if (newFbConfig) {
+      try { JSON.parse(newFbConfig); }
+      catch(e) { APP.toast('Firebase config is not valid JSON. Please check it.','danger'); return; }
+    }
+
+    STATE.settings.apiKey         = newApiKey;
+    STATE.settings.workerUrl      = newWorkerUrl;
+    STATE.settings.aiModel        = document.getElementById('set-model').value;
+    STATE.settings.adminPin       = document.getElementById('set-admin-pin').value;
+    STATE.settings.firebaseConfig = newFbConfig;
+
+    DB.saveSettings(STATE.settings, function(){
+      APP.toast('Settings saved ✓','success');
+    });
+
+    if (oldFb !== newFbConfig) {
+      APP.toast('Firebase config changed — reloading in 2s...','warning');
+      setTimeout(function(){ window.location.reload(); }, 2000);
+    } else {
+      setTimeout(function(){ APP.switchView('settings'); }, 300);
+    }
+  },
+
+  // ── DRIVER WIZARD ──────────────────────────────────────────────────
+  vWizard: function() {
+    var mine = STATE.trips.filter(function(t){return t.driverId===STATE.user.id&&t.status!=='Completed';})
+      .sort(function(a,b){return new Date(a.pickupTime)-new Date(b.pickupTime);});
+    if (!mine.length) return '<div class="bg-white border rounded-xl p-10 text-center"><i class="ph-fill ph-check-circle text-emerald-500 text-6xl mb-4"></i><h2 class="text-2xl font-bold text-slate-800">All Caught Up!</h2><p class="text-slate-500 mt-2">No active assignments.</p></div>';
+
+    var a=mine[0], q=mine.slice(1);
+    var isPend=a.status==='Pending'||a.status==='Assigned';
+    var isERP =a.status==='En Route to Pickup';
+    var isAP  =a.status==='Arrived at Pickup';
+    var isERD =a.status==='En Route to Dropoff';
+    var ts = a.pickupTime?new Date(a.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—';
+
+    function puCard() {
+      var active=isERP?'bg-blue-50 border-blue-300':'bg-slate-50 border-slate-200';
+      var btn='';
+      if(isPend) btn='<button onclick="APP.setStatus(\''+a.id+'\',\'En Route to Pickup\')" class="w-full py-3 bg-slate-800 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-slate-900 shadow-md"><i class="ph-fill ph-play"></i> Start Trip to Pickup</button>';
+      if(isERP)  btn='<div class="flex gap-2"><button onclick="APP.nav(\''+a.pickupAddress+'\')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg flex items-center justify-center gap-2 shadow-sm"><i class="ph-fill ph-navigation-arrow text-blue-600"></i> Map</button><button onclick="APP.promptPickup(\''+a.id+'\')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md"><i class="ph-fill ph-check-circle"></i> Arrived</button></div>';
+      return '<div class="p-4 rounded-xl border-2 transition-all '+active+'"><span class="text-xs text-slate-500 font-bold tracking-widest uppercase">1. Pickup</span><p class="text-slate-800 font-bold text-lg leading-tight my-3">'+(a.pickupAddress||'—')+'</p>'+btn+'</div>';
+    }
+    function doCard() {
+      var active=isERD?'bg-blue-50 border-blue-300':'bg-slate-50 border-slate-200';
+      var btn='';
+      if(isAP)  btn='<button onclick="APP.setStatus(\''+a.id+'\',\'En Route to Dropoff\')" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 shadow-md"><i class="ph-fill ph-play"></i> Begin Leg to Dropoff</button>';
+      if(isERD) btn='<div class="flex gap-2"><button onclick="APP.nav(\''+a.dropoffAddress+'\')" class="flex-1 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg flex items-center justify-center gap-2 shadow-sm"><i class="ph-fill ph-navigation-arrow text-blue-600"></i> Map</button><button onclick="APP.promptDropoff(\''+a.id+'\')" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md"><i class="ph-fill ph-flag-checkered"></i> Finish Trip</button></div>';
+      return '<div class="p-4 rounded-xl border-2 transition-all '+active+'"><span class="text-xs text-slate-500 font-bold tracking-widest uppercase">2. Dropoff</span><p class="text-slate-800 font-bold text-lg leading-tight my-3">'+(a.dropoffAddress||'—')+'</p>'+btn+'</div>';
+    }
+
+    var queue = q.length
+      ? '<h4 class="mb-3 text-slate-500 uppercase font-bold text-xs tracking-wider mt-8">Up Next ('+q.length+')</h4><div class="grid gap-3">'
+        +q.map(function(t){
+          var ts2=t.pickupTime?new Date(t.pickupTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—';
+          return '<div class="bg-white border p-4 rounded-xl shadow-sm flex justify-between items-center opacity-80"><div><h4 class="font-bold text-slate-800">'+t.patientName+'</h4><div class="text-xs text-slate-500 mt-1"><i class="ph-fill ph-clock"></i> '+ts2+' — '+(t.pickupAddress||'').substring(0,35)+'...</div></div></div>';
+        }).join('')+'</div>'
+      : '';
+
+    return '<h2 class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Active Trip</h2>'
+      +'<div class="bg-white border-2 border-blue-400 p-5 rounded-xl shadow-md mb-8">'
+        +'<div class="flex justify-between items-start mb-4 border-b border-slate-100 pb-4">'
+          +'<div><h3 class="font-bold text-xl text-slate-800">'+a.patientName+'</h3><span class="text-blue-600 text-sm font-medium"><i class="ph-fill ph-clock"></i> '+ts+'</span></div>'
+          +'<span class="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase">'+a.status+'</span>'
+        +'</div>'
+        +'<div class="mb-4 flex gap-2">'
+          +(a.phone
+            ?'<a href="tel:'+a.phone+'" class="flex-1 flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 py-3 rounded-lg border border-emerald-200 font-bold"><i class="ph-fill ph-phone"></i> Call</a>'
+             +'<a href="sms:'+a.phone+'" class="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-700 py-3 rounded-lg border border-blue-200 font-bold"><i class="ph-fill ph-chat-circle-text"></i> SMS</a>'
+            :'<button class="w-full py-3 bg-slate-100 text-slate-400 rounded-lg font-bold" disabled>No Phone</button>')
+        +'</div>'
+        +(a.notes?'<div class="flex items-start gap-2 bg-amber-50 text-amber-800 p-3 rounded-lg border border-amber-200 text-sm mb-4"><i class="ph-fill ph-warning shrink-0 mt-0.5"></i><p><strong>Notes:</strong> '+a.notes+'</p></div>':'')
+        +'<div class="space-y-4">'+puCard()+doCard()+'</div>'
+      +'</div>'
+      +queue;
+  },
+
+  nav: function(addr) { window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr),'_blank'); },
+
+  setStatus: function(id, status) {
+    var t = STATE.trips.find(function(x){return x.id===id;});
+    if (!t) return;
+    t.status = status;
+    DB.saveTrip(t, function(){ APP.refreshView(); });
+  },
+
+  promptPickup: function(id) {
+    STATE.wizCb = function(){ APP.setStatus(id,'Arrived at Pickup'); };
+    document.getElementById('wizard-prompt-title').innerText = 'Arrived at Pickup';
+    document.getElementById('wizard-sig-wrap').classList.remove('hidden');
+    document.getElementById('wizard-odo').value = '';
+    document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5);
+    document.getElementById('wizard-sig-check').checked = false;
+    APP.openModal('modal-wizard-prompt');
+  },
+
+  promptDropoff: function(id) {
+    STATE.wizCb = function(){ APP.setStatus(id,'Completed'); };
+    document.getElementById('wizard-prompt-title').innerText = 'Trip Completed';
+    document.getElementById('wizard-sig-wrap').classList.add('hidden');
+    document.getElementById('wizard-odo').value = '';
+    document.getElementById('wizard-time').value = new Date().toTimeString().slice(0,5);
+    APP.openModal('modal-wizard-prompt');
+  },
+
+  confirmWizardPrompt: function() {
+    var odo = document.getElementById('wizard-odo').value;
+    var time = document.getElementById('wizard-time').value;
+    var sigWrap = document.getElementById('wizard-sig-wrap');
+    var sigOk = document.getElementById('wizard-sig-check').checked;
+    if (!odo||!time) return APP.toast('Please fill in odometer and time.','danger');
+    if (!sigWrap.classList.contains('hidden')&&!sigOk) return APP.toast('Please verify the paper signature.','danger');
+    APP.closeModal('modal-wizard-prompt');
+    if (STATE.wizCb){ STATE.wizCb(); STATE.wizCb=null; }
+  }
 };
 
-// ── INIT ──────────────────────────────────────────────────
-(function init(){
-  Store.load();
-  refreshDriverDropdowns();
-  const ls=document.getElementById('loading-screen');
-  ls.classList.add('hide');
-  setTimeout(()=>ls.classList.add('hidden'),500);
-  APP.render();
-})();
+window.APP = APP;
+
+// ═══════════════════════════════════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════════════════════════════════
+APP.init();
+// Failsafe: force auth screen if loading hangs past 4 seconds
+setTimeout(function(){
+  if (document.getElementById('loading-screen').style.display !== 'none') {
+    console.warn('Failsafe triggered — forcing auth screen');
+    showAuth();
+  }
+}, 4000);
 </script>
+
+<!-- Heavy parsers loaded last, non-blocking -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
 </body>
 </html>
