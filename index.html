@@ -177,6 +177,10 @@
         .status-active { background: #d1fae5; color: #065f46; }
         .status-completed { background: #dbeafe; color: #1e40af; }
         .status-cancelled { background: #fee2e2; color: #991b1b; }
+        .status-assigned { background: #dbeafe; color: #1d4ed8; }
+        .status-no-show { background: #fee2e2; color: #b91c1c; }
+        .status-postponed { background: #ffedd5; color: #c2410c; }
+        .status-unable-to-load { background: #fde68a; color: #92400e; }
         
         .signature-canvas {
             width: 100%;
@@ -392,6 +396,18 @@
                             <p class="text-slate-500">No active trip selected</p>
                         </div>
                     </div>
+
+                    <div class="card">
+                        <h3 class="font-bold text-lg mb-4">Live Wait Timer</h3>
+                        <div id="wait-timer" class="text-3xl font-bold text-green-600">00:00</div>
+                        <p class="text-xs text-slate-500 mt-2">Timer starts when driver marks arrival at pickup.</p>
+                    </div>
+
+                    <div class="card">
+                        <h3 class="font-bold text-lg mb-4">Task Switcher</h3>
+                        <div id="driver-trip-switcher" class="flex flex-wrap gap-2"></div>
+                        <p class="text-xs text-slate-500 mt-3">Trips are sorted by the nearest scheduled time. You can still jump between tasks when needed.</p>
+                    </div>
                     
                     <button class="btn btn-primary w-full" onclick="APP.startNavigation()">
                         <i class="ph ph-navigation"></i> Start Navigation
@@ -532,6 +548,12 @@
                         <button class="btn btn-secondary w-full mb-2" onclick="APP.openDirections()">
                             <i class="ph ph-map-pin"></i> Open in Maps
                         </button>
+                        <button class="btn btn-secondary w-full mb-2" onclick="APP.markPatientNoShow()">
+                            <i class="ph ph-user-minus"></i> Mark No Show
+                        </button>
+                        <button class="btn btn-secondary w-full" onclick="APP.postponeCurrentTrip()">
+                            <i class="ph ph-clock-counter-clockwise"></i> Postpone One Hour
+                        </button>
                     </div>
                     
                     <div class="card">
@@ -586,13 +608,23 @@
                 <button class="btn btn-secondary" onclick="APP.showAdminTab('vehicles')">
                     <i class="ph ph-car"></i> Vehicles
                 </button>
+                <button class="btn btn-secondary" onclick="APP.showAdminTab('tools')">
+                    <i class="ph ph-wrench"></i> Tools
+                </button>
                 <button class="btn btn-secondary" onclick="APP.showAdminTab('reports')">
                     <i class="ph ph-chart-bar"></i> Reports
+                </button>
+                <button class="btn btn-secondary" onclick="APP.showAdminTab('settings')">
+                    <i class="ph ph-gear"></i> Settings
                 </button>
             </div>
             
             <!-- Trips Tab -->
             <div id="tab-trips" class="space-y-6">
+                <div class="card">
+                    <h3 class="text-xl font-bold mb-4">Daily Log Summary</h3>
+                    <div id="daily-log-summary" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4"></div>
+                </div>
                 <div class="card">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-xl font-bold">All Trips</h3>
@@ -730,6 +762,22 @@
                     <div id="vehicles-list-admin" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 </div>
             </div>
+
+            <div id="tab-tools" class="hide space-y-6">
+                <div class="card">
+                    <h3 class="text-xl font-bold mb-4">Operational Tools</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <button class="btn btn-secondary justify-start" onclick="APP.openAddTripModal()"><i class="ph ph-lightning"></i> Quick Trip Builder</button>
+                        <button class="btn btn-secondary justify-start" onclick="APP.createReturnTrip()"><i class="ph ph-arrows-left-right"></i> Return Trip Generator</button>
+                        <button class="btn btn-secondary justify-start" onclick="APP.bulkReassignPrompt()"><i class="ph ph-users-three"></i> Bulk Reassign</button>
+                        <button class="btn btn-secondary justify-start" onclick="APP.loadSampleImport()"><i class="ph ph-copy"></i> Template Loader</button>
+                        <button class="btn btn-secondary justify-start" onclick="APP.renderReports(); APP.showAdminTab('reports')"><i class="ph ph-gauge"></i> Odometer Tracker</button>
+                        <button class="btn btn-secondary justify-start" onclick="APP.renderReports(); APP.showAdminTab('reports')"><i class="ph ph-clock"></i> Wait Time Analyzer</button>
+                        <button class="btn btn-secondary justify-start" onclick="window.print()"><i class="ph ph-printer"></i> Manifest Printer</button>
+                        <button class="btn btn-secondary justify-start" onclick="APP.showAdminTab('reports')"><i class="ph ph-pen-nib"></i> Signature Viewer</button>
+                    </div>
+                </div>
+            </div>
             
             <!-- Drivers Tab -->
             <div id="tab-drivers" class="hide space-y-6">
@@ -763,6 +811,54 @@
                         <div class="flex gap-2 flex-wrap">
                             <button class="btn btn-primary" onclick="APP.exportOperationalSnapshot()"><i class="ph ph-download-simple"></i> Export JSON Snapshot</button>
                             <button class="btn btn-secondary" onclick="APP.openFirebaseModal()"><i class="ph ph-cloud-arrow-up"></i> Firebase Setup</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                        <div class="card">
+                            <h4 class="font-bold mb-3">Driver Summary</h4>
+                            <div id="report-driver-summary" class="space-y-2"></div>
+                        </div>
+                        <div class="card">
+                            <h4 class="font-bold mb-3">Vehicle Mileage Summary</h4>
+                            <div id="report-vehicle-summary" class="space-y-2"></div>
+                        </div>
+                    </div>
+                    <div class="card mt-6">
+                        <h4 class="font-bold mb-3">Audit Feed</h4>
+                        <div id="report-audit-feed" class="space-y-2 text-sm"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-settings" class="hide space-y-6">
+                <div class="card space-y-6">
+                    <div>
+                        <h3 class="text-xl font-bold mb-3">Company Settings</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input id="setting-company-name" class="w-full" placeholder="Company name" value="Agape Care">
+                            <input id="setting-company-phone" class="w-full" placeholder="Company phone" value="555-0000">
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-3">Security</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input id="setting-admin-pin" class="w-full" placeholder="Admin PIN" value="111111">
+                            <input id="setting-dispatch-pin" class="w-full" placeholder="Dispatcher PIN" value="111111">
+                            <input id="setting-billing-pin" class="w-full" placeholder="Billing PIN" value="222222">
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-3">Cloud Sync</h3>
+                        <div class="flex gap-2 flex-wrap">
+                            <button class="btn btn-secondary" onclick="APP.openFirebaseModal()"><i class="ph ph-cloud-check"></i> Configure Firebase</button>
+                            <button class="btn btn-primary" onclick="APP.saveSettings()"><i class="ph ph-floppy-disk"></i> Save Settings</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-3">Data Management</h3>
+                        <div class="flex gap-2 flex-wrap">
+                            <button class="btn btn-secondary" onclick="APP.exportOperationalSnapshot()"><i class="ph ph-file-json"></i> Export Data</button>
+                            <button class="btn btn-secondary" onclick="APP.clearLocalCache()"><i class="ph ph-trash"></i> Clear Local Cache</button>
                         </div>
                     </div>
                 </div>
@@ -928,6 +1024,7 @@
             map: null,
             mapReturn: null,
             signatureCanvas: null,
+            waitTimerId: null,
             storageKey: 'agape-enterprise-state-v1',
             sessionKey: 'agape-session',
             firebaseKey: 'agape-firebase-config',
@@ -1120,6 +1217,25 @@
                     this.toast(`Firebase error: ${error.message}`, 'error');
                 }
             },
+
+            saveSettings() {
+                const companyName = document.getElementById('setting-company-name')?.value?.trim() || 'Agape Care';
+                const companyPhone = document.getElementById('setting-company-phone')?.value?.trim() || '';
+                const adminPin = document.getElementById('setting-admin-pin')?.value?.trim() || '111111';
+                const dispatchPin = document.getElementById('setting-dispatch-pin')?.value?.trim() || '111111';
+                const billingPin = document.getElementById('setting-billing-pin')?.value?.trim() || '222222';
+                localStorage.setItem('agape-enterprise-settings', JSON.stringify({ companyName, companyPhone, adminPin, dispatchPin, billingPin }));
+                const titleEl = document.querySelector('header h1');
+                if (titleEl) titleEl.textContent = companyName;
+                this.toast('Settings saved locally', 'success');
+            },
+
+            clearLocalCache() {
+                localStorage.removeItem(this.storageKey);
+                localStorage.removeItem(this.sessionKey);
+                this.toast('Local cache cleared. Reloading defaults.', 'info');
+                location.reload();
+            },
             
             setupSignatureCanvas() {
                 this.signatureCanvas = document.getElementById('signature-canvas');
@@ -1255,6 +1371,14 @@
                     document.getElementById('user-name').textContent = this.user?.name || '';
                     document.getElementById('user-role').textContent = (this.role || '').toUpperCase();
                     document.getElementById('user-initials').textContent = (this.user?.name || 'U').charAt(0).toUpperCase();
+                    if (this.role === 'dispatcher') {
+                        document.querySelectorAll('#view-admin .mb-6.flex.gap-2.overflow-x-auto button').forEach(button => {
+                            const text = button.textContent || '';
+                            button.classList.toggle('hide', /Reports|Settings|Vehicles/.test(text));
+                        });
+                    } else {
+                        document.querySelectorAll('#view-admin .mb-6.flex.gap-2.overflow-x-auto button').forEach(button => button.classList.remove('hide'));
+                    }
                 }
             },
             
@@ -1264,7 +1388,9 @@
                 document.getElementById('tab-dispatch').classList.toggle('hide', tab !== 'dispatch');
                 document.getElementById('tab-import').classList.toggle('hide', tab !== 'import');
                 document.getElementById('tab-vehicles').classList.toggle('hide', tab !== 'vehicles');
+                document.getElementById('tab-tools').classList.toggle('hide', tab !== 'tools');
                 document.getElementById('tab-reports').classList.toggle('hide', tab !== 'reports');
+                document.getElementById('tab-settings').classList.toggle('hide', tab !== 'settings');
                 if (tab === 'dispatch') this.renderDispatchBoard();
                 if (tab === 'import') this.renderImportPreview();
                 if (tab === 'vehicles') this.refreshVehiclesList();
@@ -1365,11 +1491,17 @@
             },
             
             markArrived() {
+                if (this.currentTrip) {
+                    this.currentTrip.status = 'active';
+                    this.currentTrip.arrivalTime = new Date().toISOString();
+                    this.persistData();
+                }
                 this.currentStep = 'arrival';
                 this.updateExecutionUI();
                 
                 const now = new Date();
                 document.getElementById('time-arrival').value = now.toTimeString().slice(0, 5);
+                this.startWaitTimer(this.currentTrip?.arrivalTime || new Date().toISOString());
                 
                 this.toast('Please confirm arrival details', 'info');
             },
@@ -1383,6 +1515,7 @@
 
                 this.currentTrip.pickupOdometer = Number(odometer);
                 this.currentTrip.arrivalTime = document.getElementById('time-arrival').value;
+                this.currentTrip.status = 'assigned';
                 this.persistData();
                 
                 this.currentStep = 'signature';
@@ -1402,6 +1535,10 @@
                 }
                 
                 this.currentStep = 'return';
+                if (this.currentTrip) {
+                    this.currentTrip.status = 'active';
+                    this.persistData();
+                }
                 this.updateExecutionUI();
                 this.initializeMap('map-return', this.currentTrip.dropoffCoords);
             },
@@ -1431,7 +1568,11 @@
                 this.currentTrip.dropoffTime = document.getElementById('time-dropoff').value;
                 this.currentTrip.notes = document.getElementById('trip-notes').value.trim();
                 this.currentTrip.status = 'completed';
+                if (this.currentTrip.pickupOdometer != null) {
+                    this.currentTrip.totalMiles = Math.max(0, this.currentTrip.dropoffOdometer - this.currentTrip.pickupOdometer);
+                }
                 this.persistData();
+                this.stopWaitTimer();
                 this.toast(`Trip ${this.currentTrip.id} completed!`, 'success');
                 
                 const nextTrip = this.trips.find(t => t.driverId === this.user.id && t.status !== 'completed');
@@ -1455,6 +1596,7 @@
                 this.currentTrip.notes = `${this.currentTrip.notes ? `${this.currentTrip.notes}\n` : ''}Marked as no show.`;
                 this.persistData();
                 this.renderReports();
+                this.stopWaitTimer();
                 this.toast(`Trip ${this.currentTrip.id} marked as no show`, 'info');
                 this.exitExecution();
             },
@@ -1463,8 +1605,35 @@
                 if (!this.currentTrip) return;
                 this.currentTrip.scheduledTime = new Date(Date.now() + 3600000).toISOString();
                 this.persistData();
+                this.stopWaitTimer();
                 this.toast(`Trip ${this.currentTrip.id} postponed by 1 hour`, 'info');
                 this.exitExecution();
+            },
+
+            startWaitTimer(arrivalTime) {
+                this.stopWaitTimer();
+                const timerEl = document.getElementById('wait-timer');
+                if (!timerEl) return;
+                const start = new Date(arrivalTime).getTime();
+                this.waitTimerId = setInterval(() => {
+                    const elapsed = Math.max(0, Math.floor((Date.now() - start) / 1000));
+                    const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+                    const ss = String(elapsed % 60).padStart(2, '0');
+                    timerEl.textContent = `${mm}:${ss}`;
+                    timerEl.className = elapsed < 600 ? 'text-3xl font-bold text-green-600' : elapsed < 1200 ? 'text-3xl font-bold text-amber-500' : 'text-3xl font-bold text-red-600';
+                }, 1000);
+            },
+
+            stopWaitTimer() {
+                if (this.waitTimerId) {
+                    clearInterval(this.waitTimerId);
+                    this.waitTimerId = null;
+                }
+                const timerEl = document.getElementById('wait-timer');
+                if (timerEl) {
+                    timerEl.textContent = '00:00';
+                    timerEl.className = 'text-3xl font-bold text-green-600';
+                }
             },
             
             updateExecutionUI() {
@@ -1517,6 +1686,7 @@
             
             exitExecution() {
                 this.currentTrip = null;
+                this.stopWaitTimer();
                 if (this.map) this.map.remove();
                 if (this.mapReturn) this.mapReturn.remove();
                 this.showView('driver');
@@ -1538,6 +1708,34 @@
                 this.refreshDriversList();
                 this.refreshVehiclesList();
                 this.renderReports();
+                this.renderDailyLogs();
+            },
+
+            renderDailyLogs() {
+                const container = document.getElementById('daily-log-summary');
+                if (!container) return;
+                const grouped = this.trips.reduce((acc, trip) => {
+                    const key = new Date(trip.scheduledTime).toISOString().slice(0, 10);
+                    if (!acc[key]) acc[key] = [];
+                    acc[key].push(trip);
+                    return acc;
+                }, {});
+                const ordered = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a)).slice(0, 4);
+                container.innerHTML = ordered.length ? ordered.map(day => {
+                    const trips = grouped[day];
+                    const completed = trips.filter(t => t.status === 'completed').length;
+                    const nonCompleted = trips.filter(t => ['cancelled', 'no-show', 'postponed', 'unable-to-load'].includes(t.status)).length;
+                    const totalMiles = trips.reduce((sum, trip) => sum + (trip.totalMiles || 0), 0);
+                    return `
+                        <div class="card">
+                            <div class="font-bold mb-2">${new Date(day).toLocaleDateString()}</div>
+                            <div class="text-sm text-slate-500">Trips: ${trips.length}</div>
+                            <div class="text-sm text-slate-500">Completed: ${completed}</div>
+                            <div class="text-sm text-slate-500">Non-completed: ${nonCompleted}</div>
+                            <div class="text-sm text-slate-500">Miles: ${totalMiles.toFixed(1)}</div>
+                        </div>
+                    `;
+                }).join('') : '<p class="text-slate-500">No daily logs yet.</p>';
             },
             
             refreshTripsList() {
@@ -1565,25 +1763,51 @@
                 
                 const list = document.getElementById('trips-list-admin');
                 if (!list) return;
-                
-                list.innerHTML = trips.map(t => `
-                    <div class="card">
-                        <div class="flex justify-between items-start mb-3">
-                            <div>
-                                <span class="trip-badge">${t.id}</span>
-                                <h4 class="text-lg font-bold mt-2">${t.id} - ${t.patient}</h4>
+
+                const grouped = trips.reduce((acc, trip) => {
+                    const groupKey = new Date(trip.scheduledTime).toISOString().slice(0, 10);
+                    if (!acc[groupKey]) acc[groupKey] = [];
+                    acc[groupKey].push(trip);
+                    return acc;
+                }, {});
+
+                const orderedGroups = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+                list.innerHTML = orderedGroups.length ? orderedGroups.map(day => {
+                    const dayTrips = grouped[day].sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
+                    const completed = dayTrips.filter(t => t.status === 'completed').length;
+                    const cancelled = dayTrips.filter(t => ['cancelled', 'no-show', 'postponed', 'unable-to-load'].includes(t.status)).length;
+                    return `
+                        <div class="card">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 border-b border-slate-200 pb-3">
+                                <div>
+                                    <h3 class="text-lg font-bold">${new Date(day).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h3>
+                                    <p class="text-sm text-slate-500">${dayTrips.length} trips | ${completed} completed | ${cancelled} non-completed</p>
+                                </div>
                             </div>
-                            <div class="flex gap-2">
-                                <span class="status-badge status-${t.status}">${t.status}</span>
-                                <button class="btn btn-secondary btn-sm" onclick="APP.reassignTripPrompt('${t.id}')">Reassign</button>
-                                <button class="btn btn-secondary btn-sm" onclick="APP.editTripPrompt('${t.id}')">Edit</button>
-                                <button class="btn btn-danger btn-sm" onclick="APP.deleteTrip('${t.id}')">Delete</button>
+                            <div class="space-y-3">
+                                ${dayTrips.map(t => `
+                                    <div class="rounded-xl border ${['cancelled', 'no-show', 'postponed', 'unable-to-load'].includes(t.status) ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-slate-200'} p-4">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <span class="trip-badge">${t.id}</span>
+                                                <h4 class="text-lg font-bold mt-2 ${t.status === 'cancelled' ? 'line-through text-slate-400' : ''}">${t.id} - ${t.patient}</h4>
+                                            </div>
+                                            <div class="flex gap-2 flex-wrap justify-end">
+                                                <span class="status-badge status-${t.status}">${t.status}</span>
+                                                <button class="btn btn-secondary btn-sm" onclick="APP.reassignTripPrompt('${t.id}')">Reassign</button>
+                                                <button class="btn btn-secondary btn-sm" onclick="APP.editTripPrompt('${t.id}')">Edit</button>
+                                                <button class="btn btn-secondary btn-sm" onclick="APP.changeTripOutcome('${t.id}')">Outcome</button>
+                                            </div>
+                                        </div>
+                                        <p class="text-sm text-slate-600">📍 ${t.pickupAddr} → ${t.dropoffAddr}</p>
+                                        <p class="text-xs text-slate-500 mt-1">Driver: ${this.drivers.find(d => d.id === t.driverId)?.name || 'Unassigned'} | Scheduled: ${new Date(t.scheduledTime).toLocaleString()}</p>
+                                        ${t.notes ? `<p class="text-xs text-slate-500 mt-2">Notes: ${t.notes}</p>` : ''}
+                                    </div>
+                                `).join('')}
                             </div>
                         </div>
-                        <p class="text-sm text-slate-600">📍 ${t.pickupAddr} → ${t.dropoffAddr}</p>
-                        <p class="text-xs text-slate-500">Driver: ${this.drivers.find(d => d.id === t.driverId)?.name || 'Unassigned'}</p>
-                    </div>
-                `).join('') || '<p class="text-slate-500">No trips found</p>';
+                    `;
+                }).join('') : '<p class="text-slate-500">No trips found</p>';
             },
             
             refreshDriversList() {
@@ -1766,13 +1990,37 @@
             },
             
             deleteTrip(tripId) {
-                if (!confirm('Are you sure you want to delete this trip?')) return;
-                this.trips = this.trips.filter(t => t.id !== tripId);
+                const trip = this.trips.find(t => t.id === tripId);
+                if (!trip) return;
+                trip.status = 'cancelled';
+                trip.notes = `${trip.notes ? `${trip.notes}\n` : ''}Marked cancelled instead of deleted.`;
                 this.persistData();
                 this.refreshTripsList();
                 this.renderDispatchBoard();
                 this.renderReports();
-                this.toast('Trip deleted', 'success');
+                this.toast('Trip marked as cancelled', 'success');
+            },
+
+            changeTripOutcome(tripId) {
+                const trip = this.trips.find(t => t.id === tripId);
+                if (!trip) return;
+                const outcome = prompt('Set trip outcome: pending, active, completed, cancelled, no-show, postponed, unable-to-load', trip.status || 'pending');
+                if (outcome === null) return;
+                const normalized = outcome.trim().toLowerCase();
+                const allowed = ['pending', 'active', 'completed', 'cancelled', 'no-show', 'postponed', 'unable-to-load'];
+                if (!allowed.includes(normalized)) {
+                    this.toast('Invalid outcome', 'error');
+                    return;
+                }
+                trip.status = normalized;
+                if (normalized === 'postponed') {
+                    trip.scheduledTime = new Date(Date.now() + 86400000).toISOString();
+                }
+                this.persistData();
+                this.refreshTripsList();
+                this.renderDispatchBoard();
+                this.renderReports();
+                this.toast(`Trip ${trip.id} updated to ${normalized}`, 'success');
             },
             
             deleteDriver(driverId) {
@@ -1870,6 +2118,52 @@
                 this.refreshTripsList();
                 this.renderDispatchBoard();
                 this.toast('Pending trips auto-assigned', 'success');
+            },
+
+            createReturnTrip() {
+                if (!this.currentTrip) {
+                    this.toast('Select a trip first to generate a return trip', 'error');
+                    return;
+                }
+                const source = this.currentTrip;
+                const returnTime = new Date(Date.now() + 2 * 3600000).toISOString().slice(0, 16);
+                this.trips.push({
+                    id: `TRIP-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+                    patient: source.patient,
+                    patientPhone: source.patientPhone,
+                    pickupAddr: source.dropoffAddr,
+                    pickupCoords: source.dropoffCoords,
+                    dropoffAddr: source.pickupAddr,
+                    dropoffCoords: source.pickupCoords,
+                    scheduledTime: new Date(returnTime).toISOString(),
+                    driverId: source.driverId,
+                    status: 'pending',
+                    notes: `Return trip for ${source.id}`,
+                    pickupOdometer: null,
+                    dropoffOdometer: null,
+                    arrivalTime: null,
+                    dropoffTime: null
+                });
+                this.persistData();
+                this.refreshTripsList();
+                this.renderDispatchBoard();
+                this.toast('Return trip created', 'success');
+            },
+
+            bulkReassignPrompt() {
+                const pendingTrips = this.trips.filter(t => t.status === 'pending');
+                if (!pendingTrips.length) {
+                    this.toast('No pending trips available for bulk reassignment', 'error');
+                    return;
+                }
+                const driverNames = this.drivers.map(d => `${d.id}:${d.name}`).join('\n');
+                const chosen = prompt(`Assign all pending trips to driver ID:\n${driverNames}`);
+                if (chosen === null) return;
+                pendingTrips.forEach(trip => { trip.driverId = chosen.trim() || null; });
+                this.persistData();
+                this.refreshTripsList();
+                this.renderDispatchBoard();
+                this.toast(`${pendingTrips.length} pending trips updated`, 'success');
             },
 
             importTripsFile() {
@@ -2059,6 +2353,35 @@
                 if (milesEl) milesEl.textContent = billableMiles.toFixed(1);
                 if (unassignedEl) unassignedEl.textContent = String(unassignedTrips);
                 if (cancelledEl) cancelledEl.textContent = String(cancelledTrips);
+
+                const driverSummary = document.getElementById('report-driver-summary');
+                if (driverSummary) {
+                    driverSummary.innerHTML = this.drivers.map(driver => {
+                        const driverTrips = this.trips.filter(t => t.driverId === driver.id);
+                        const completed = driverTrips.filter(t => t.status === 'completed').length;
+                        const totalMiles = driverTrips.reduce((sum, trip) => sum + (trip.totalMiles || 0), 0);
+                        return `<div class="flex items-center justify-between border-b border-slate-100 py-2"><span>${driver.name}</span><span class="text-slate-500">${completed} trips | ${totalMiles.toFixed(1)} mi</span></div>`;
+                    }).join('') || '<p class="text-slate-500">No driver activity yet.</p>';
+                }
+
+                const vehicleSummary = document.getElementById('report-vehicle-summary');
+                if (vehicleSummary) {
+                    vehicleSummary.innerHTML = this.vehicles.map(vehicle => {
+                        const assignedTrips = this.trips.filter(t => t.driverId && vehicle.driverId === t.driverId);
+                        const totalMiles = assignedTrips.reduce((sum, trip) => sum + (trip.totalMiles || 0), 0);
+                        return `<div class="flex items-center justify-between border-b border-slate-100 py-2"><span>${vehicle.name} (${vehicle.plate})</span><span class="text-slate-500">${totalMiles.toFixed(1)} mi</span></div>`;
+                    }).join('') || '<p class="text-slate-500">No vehicle activity yet.</p>';
+                }
+
+                const auditFeed = document.getElementById('report-audit-feed');
+                if (auditFeed) {
+                    const recent = this.trips
+                        .slice()
+                        .sort((a, b) => new Date(b.scheduledTime) - new Date(a.scheduledTime))
+                        .slice(0, 8)
+                        .map(trip => `<div class="border-b border-slate-100 py-2"><strong>${trip.id}</strong> - ${trip.patient} | Status: ${trip.status} | Scheduled: ${new Date(trip.scheduledTime).toLocaleString()}</div>`);
+                    auditFeed.innerHTML = recent.join('') || '<p class="text-slate-500">No audit items yet.</p>';
+                }
             },
 
             renderBillingView() {
