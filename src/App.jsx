@@ -672,6 +672,7 @@ const App = () => {
     // Build map of patient → best client phone (detect home address as one that appears in both pickup and dropoff)
     const patientPhoneMap = {};
     const patientAddresses = {};
+    const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute'];
     selectedTrips.forEach(t => {
       const key = (t.patient || '').trim().toLowerCase();
       if (!patientAddresses[key]) patientAddresses[key] = { pickups: [], dropoffs: [], trips: [] };
@@ -689,6 +690,18 @@ const App = () => {
         if (!clientPhone) {
           const returnTrip = trips.find(t => (t.dropoff || '').trim().toLowerCase() === homeAddr);
           if (returnTrip) clientPhone = returnTrip.dropoffPhone || '';
+        }
+      } else {
+        // No round trip — detect which address is home by facility keywords
+        const trip = trips[0];
+        const isPickupFacility = FACILITY_KEYWORDS.some(k => (trip.pickup || '').toLowerCase().includes(k));
+        const isDropoffFacility = FACILITY_KEYWORDS.some(k => (trip.dropoff || '').toLowerCase().includes(k));
+        if (isPickupFacility && !isDropoffFacility) {
+          clientPhone = trip.dropoffPhone || '';
+        } else if (!isPickupFacility && isDropoffFacility) {
+          clientPhone = trip.pickupPhone || '';
+        } else {
+          clientPhone = trip.pickupPhone || trip.dropoffPhone || '';
         }
       }
       if (!clientPhone) {
