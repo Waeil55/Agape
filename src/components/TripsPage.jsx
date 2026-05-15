@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { tripMatchesCalendarDay } from '../utils/tripDate';
 import { MapPin, Clock, AlertCircle, Users, UserCheck, X, BrainCircuit, Loader2, Plus, Save, Trash2, Edit2, CheckCircle2, Phone, MessageSquare, Flag, Sparkles, Check } from 'lucide-react';
 import { suggestBatchAssignment } from '../config/ai';
-import { to24h, timeToMinutes as calcTimeToMinutes } from '../utils/timeFormat';
 
 const getTodayStr = () => {
   const d = new Date();
@@ -45,7 +44,24 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
 
   const getZip = (addr) => (addr || '').match(/\b(\d{5})\b/)?.[1] || '';
 
-  const timeToMinutes = (t) => calcTimeToMinutes(t);
+  const timeToMinutes = (t) => {
+    if (!t) return 1440;
+    const cleanTime = String(t).toUpperCase().trim();
+    if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
+    
+    // Robust regex: HH:MM AM/PM or HH AM/PM or HH:MM
+    const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+    if (!m) return 1440;
+    
+    let h = parseInt(m[1], 10);
+    let min = parseInt(m[2] || '0', 10);
+    const p = m[3];
+    
+    if (p === 'PM' && h < 12) h += 12;
+    if (p === 'AM' && h === 12) h = 0;
+    
+    return h * 60 + min;
+  };
 
   const filteredTrips = [...trips]
     .filter(t => showAllDates || tripMatchesCalendarDay(t.date, manifestDate))
@@ -81,10 +97,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
 
   const handleUpdate = (e) => {
     e.preventDefault();
-    onUpdateTrip({
-      ...editTrip,
-      time: to24h(editTrip.time)
-    });
+    onUpdateTrip(editTrip);
     setShowEditForm(false);
     setEditTrip(null);
   };
@@ -146,7 +159,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               </div>
             )}
             <button onClick={() => setShowCreateForm(true)} className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition">
-              <Plus size={16} /> New Manifest Booking
+              <Plus size={16} /> New Manifest Trip
             </button>
           </div>
         </div>
@@ -155,10 +168,10 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {/* TABLE / LIST */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-lg font-black text-slate-900">Live Booking Queue</h3>
+          <h3 className="text-lg font-black text-slate-900">Live Manifest Queue</h3>
           <div className="flex items-center gap-3">
             {showAllDates && <span className="text-[10px] font-black bg-amber-50 text-amber-600 px-2.5 py-1 rounded-lg uppercase tracking-widest">Viewing All Dates</span>}
-            <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg uppercase tracking-widest">{filteredTrips.length} Total Bookings</span>
+            <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg uppercase tracking-widest">{filteredTrips.length} Total Trips</span>
           </div>
         </div>
 
@@ -229,7 +242,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                   </div>
 
                   <div className="text-right shrink-0">
-                    <p className="text-xl font-black text-slate-900 font-mono leading-none">{trip.time}</p>
+                    <p className="text-xl font-black text-blue-600 leading-none">{trip.time}</p>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{trip.type}</p>
                     <div className="flex flex-col items-end gap-2 mt-2">
                       <select 
@@ -260,17 +273,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowCreateForm(false)} />
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> Create New Manifest Booking</h3>
-            <form onSubmit={(e) => { 
-              e.preventDefault(); 
-              const normalizedTrip = {
-                ...newTrip,
-                time: to24h(newTrip.time)
-              };
-              onAddTrip(normalizedTrip); 
-              setShowCreateForm(false); 
-              setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '' }); 
-            }} className="space-y-6">
+            <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> Create New Manifest Entry</h3>
+            <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '' }); }} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Patient Full Name</label>

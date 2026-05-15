@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { tripMatchesTodayOrTomorrow } from '../utils/tripDate';
-import { to12h, timeToMinutes as calcTimeToMinutes } from '../utils/timeFormat';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { 
@@ -10,6 +9,20 @@ import {
 } from 'lucide-react';
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
+
+const to12hr = (time) => {
+  if (!time || time === 'Will Call' || time === 'WC') return time || 'Will Call';
+  const m = String(time).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (m && m[3]) return time;
+  const parts = String(time).match(/(\d{1,2}):(\d{2})/);
+  if (!parts) return time;
+  let h = parseInt(parts[1], 10);
+  const min = parts[2];
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${h}:${min} ${ampm}`;
+};
 
 const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, appSettings, phoneNumbers }) => {
   const me = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase());
@@ -42,7 +55,19 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       return (isAssignedToMe && inWindow) || (isAssignedToMe && isActiveStatus);
     })
     .sort((a, b) => {
-      const timeToMinutes = (t) => calcTimeToMinutes(t);
+      const timeToMinutes = (t) => {
+        if (!t) return 1440;
+        const cleanTime = String(t).toUpperCase().trim();
+        if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
+        const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+        if (!m) return 1440;
+        let h = parseInt(m[1], 10);
+        let min = parseInt(m[2] || '0', 10);
+        const p = m[3];
+        if (p === 'PM' && h < 12) h += 12;
+        if (p === 'AM' && h === 12) h = 0;
+        return h * 60 + min;
+      };
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
   
@@ -97,7 +122,20 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           const tripA = myTrips.find(t => t.id === idA);
           const tripB = myTrips.find(t => t.id === idB);
           
-          return calcTimeToMinutes(tripA?.time) - calcTimeToMinutes(tripB?.time);
+          const timeToMinutes = (t) => {
+            if (!t) return 1440;
+            const cleanTime = String(t).toUpperCase().trim();
+            const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+            if (!m) return 1440;
+            let h = parseInt(m[1], 10);
+            let min = parseInt(m[2] || '0', 10);
+            const p = m[3];
+            if (p === 'PM' && h < 12) h += 12;
+            if (p === 'AM' && h === 12) h = 0;
+            return h * 60 + min;
+          };
+          
+          return timeToMinutes(tripA?.time) - timeToMinutes(tripB?.time);
         });
       }
       return prev;
@@ -279,7 +317,16 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     }, 1200);
   };
 
-  const timeToMinutes = (t) => calcTimeToMinutes(t);
+  const timeToMinutes = (t) => {
+    if (!t || t === 'Will Call') return 1440;
+    const m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!m) return 1440;
+    let h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
+    return h * 60 + min;
+  };
 
   const isClockedIn = me?.clockedIn || false;
 
@@ -614,7 +661,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                                 <h4 className="font-black text-slate-900 text-lg truncate leading-tight">{t.patient}</h4>
                                 {t.bookingId ? <p className="text-blue-600 text-xs font-medium -mt-0.5">Booking: {t.bookingId}</p> : null}
                                 <div className="flex items-center gap-3 mt-2">
-                                  <span className="text-2xl font-black text-slate-900 font-mono tabular-nums">{to12h(t.time)}</span>
+                                  <span className="big-time text-blue-600">{to12hr(t.time)}</span>
                                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-100 text-slate-500'}`}>
                                     {t.status}
                                   </span>
@@ -797,7 +844,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       {/* Quick History List (Current Day) */}
       {completedTrips.length > 0 && (
         <div className="px-2">
-          <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-4">Today&apos;s Completed Bookings</h3>
+          <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-4">Today&apos;s Completed Trips</h3>
           <div className="space-y-3">
             {completedTrips.map(t => (
               <div key={t.id} className="bg-white/50 border border-slate-200 p-4 rounded-2xl flex items-center justify-between gap-3">
@@ -806,10 +853,10 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <div>
                     <p className="font-bold text-slate-800 text-sm">{t.patient}</p>
                     {t.bookingId ? <span className="text-blue-600 text-[10px] font-medium">Booking: {t.bookingId}</span> : null}
-                    <p className="text-[10px] text-slate-500 font-mono">{t.time} &bull; {t.dropoffOdometer - t.pickupOdometer || 0} mi</p>
+                    <p className="text-[10px] text-slate-500 font-mono">{to12hr(t.time)} &bull; {t.dropoffOdometer - t.pickupOdometer || 0} mi</p>
                   </div>
                 </div>
-                {t.bookingId && <div className="text-[10px] font-black text-slate-400 uppercase bg-slate-100 px-2 py-1 rounded-md">#{t.bookingId}</div>}
+                <div className="text-[10px] font-black text-slate-400 uppercase bg-slate-100 px-2 py-1 rounded-md">ID {t.id}</div>
               </div>
             ))}
           </div>

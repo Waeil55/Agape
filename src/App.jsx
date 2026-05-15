@@ -24,7 +24,6 @@ import DispatchAssistant from './components/DispatchAssistant';
 import { requestNotificationPermission, showLocalNotification } from './config/notifications';
 import { suggestBatchAssignment, suggestOptimalDriver } from './config/ai';
 import { tripMatchesCalendarDay, tripMatchesTodayOrTomorrow } from './utils/tripDate';
-import { to24h, timeToMinutes as calcTimeToMinutes } from './utils/timeFormat';
 
 const Badge = ({ children, variant = 'info' }) => {
   const variants = {
@@ -115,7 +114,17 @@ const hasPermission = (role, action) => {
 const todayStr = new Date().toISOString().split('T')[0];
 
 function timeToMinutes(t) {
-  return calcTimeToMinutes(t);
+  if (!t) return 1440;
+  const cleanTime = String(t).toUpperCase().trim();
+  if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
+  const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+  if (!m) return 1440;
+  let h = parseInt(m[1], 10);
+  let min = parseInt(m[2] || '0', 10);
+  const p = m[3];
+  if (p === 'PM' && h < 12) h += 12;
+  if (p === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
 }
 
 function isTripLate(tripTime) {
@@ -571,7 +580,7 @@ const App = () => {
   }, []);
 
   const addAuditLog = (title, desc, color) => {
-    const timeStr = to24h(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setLogs(prev => [{ t: title, d: desc, c: color, type: 'audit', timestamp: timeStr }, ...prev].slice(0, 100));
     setTimeout(persistState, 0);
   };
@@ -811,7 +820,7 @@ const App = () => {
       setTrips(trips.filter(t => t.id !== tripId));
       setSelectedTasks(selectedTasks.filter(id => id !== tripId));
       if (role === 'dispatcher') {
-        addAuditLog('Booking Deleted', `${currentUser} deleted booking ${tripId} (${tripToDelete.patient}). Sent to Archive.`, 'rose');
+        addAuditLog('Trip Deleted', `${currentUser} deleted trip ${tripId} (${tripToDelete.patient}). Sent to Archive.`, 'rose');
       } else {
         setTimeout(persistState, 0);
       }
@@ -825,7 +834,7 @@ const App = () => {
       const newTrashed = trashedTrips.filter(t => t.id !== tripId);
       setTrips(newTrips);
       setTrashedTrips(newTrashed);
-      addAuditLog('Booking Restored', `${currentUser || 'Admin'} restored booking ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald');
+      addAuditLog('Trip Restored', `${currentUser || 'Admin'} restored trip ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald');
       persistState({ trips: newTrips, trashedTrips: newTrashed });
     }
   };
@@ -857,7 +866,7 @@ const App = () => {
     setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'Completed', dropoffOdometer: odometer, completedAt: new Date().toISOString() } : t));
     setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer } : d));
     const driver = drivers.find(d => d.id === driverId);
-    addAuditLog('Booking Completed', `${driver?.name || 'Driver'} completed booking ${tripId} (${trip?.patient}). Odometer: ${odometer?.toLocaleString()} mi.`, 'emerald');
+    addAuditLog('Trip Completed', `${driver?.name || 'Driver'} completed trip ${tripId} (${trip?.patient}). Odometer: ${odometer?.toLocaleString()} mi.`, 'emerald');
     // Maintenance check
     if (driver) {
       const dueIn = (driver.nextOilChange || 50000) - odometer;
@@ -866,7 +875,7 @@ const App = () => {
       }
     }
     if (notificationsEnabled) {
-      showLocalNotification('✅ Booking Completed', `${trip?.patient || 'Booking'} marked as completed. Odometer: ${odometer?.toLocaleString()} mi.`);
+      showLocalNotification('✅ Trip Completed', `${trip?.patient || 'Trip'} marked as completed. Odometer: ${odometer?.toLocaleString()} mi.`);
     }
   };
 
@@ -1346,7 +1355,7 @@ const today = getTodayStr();
               <div className="bg-rose-50/50 rounded-[1.5rem] border border-rose-100/50 shadow-sm overflow-hidden w-full">
                 <div className="p-4 border-b border-rose-100/50 flex justify-between items-center bg-rose-100/30">
                   <h3 className="text-sm font-black flex items-center gap-2 text-rose-900">
-                    <Trash2 size={16} className="text-rose-600" /> Deleted Bookings Archive
+                    <Trash2 size={16} className="text-rose-600" /> Deleted Trips Archive
                   </h3>
                 </div>
                 <div className="divide-y divide-rose-100/50">

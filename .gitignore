@@ -7,3 +7,9 @@ dist
 .vscode/
 .idea/
 version_snapshot/
+App5sample/
+API_DOCUMENTATION.md
+AUTH_AND_API_SETUP.md
+DATABASE_STRUCTURE.md
+Excel sample.xlsx
+lint-errors.txt

@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, ArrowRight, Download, Truck, X } from 'lucide-react';
 import { GEMINI_API_CONFIG } from '../config/firebase';
-import { to24h } from '../utils/timeFormat';
 
 const COLUMN_ALIASES = {
   bookingId: ['booking id', 'bookingid', 'reservation id', 'trip id', 'booking number', 'confirmation id'],
@@ -163,11 +162,7 @@ Return ONLY valid JSON array. No markdown. No explanation.`;
         parsed.forEach((p, j) => {
           const origIdx = i + j;
           if (origIdx < rows.length) {
-            results[origIdx] = { 
-              issues: p.issues || [], 
-              confidence: p.confidence || 100,
-              correctedTime: p.correctedTime
-            };
+            results[origIdx] = { issues: p.issues || [], confidence: p.confidence || 100 };
           }
         });
       }
@@ -285,8 +280,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
           bookingId: mapped.bookingId || '',
           patient: mapped.patient || '',
           date: normalizeDateValue(mapped.date) || today,
-          time: to24h(mapped.time),
-          dropoffTime: to24h(mapped.dropoffTime),
+          time: mapped.time || '',
+          dropoffTime: mapped.dropoffTime || '',
           type: mapped.type || row['Space Types'] || '',
           purpose: row['Purpose'] || '',
           providerName: row['Provider Name'] || '',
@@ -317,17 +312,10 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
 
         const updated = mapped.map((trip, idx) => {
           const ai = aiResults[idx];
-          if (ai) {
-            const hasIssues = ai.issues?.length > 0;
-            return { 
-              ...trip, 
-              time: ai.correctedTime ? to24h(ai.correctedTime) : trip.time,
-              _hasIssues: hasIssues, 
-              _issues: ai.issues || [], 
-              _confidence: ai.confidence || 100 
-            };
+          if (ai && ai.issues?.length > 0) {
+            return { ...trip, _hasIssues: true, _issues: ai.issues, _confidence: ai.confidence || 100 };
           }
-          return trip;
+          return { ...trip, _confidence: ai?.confidence || 100 };
         });
 
         setMappedTrips(updated);
@@ -531,7 +519,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs font-semibold text-slate-900 whitespace-nowrap">{trip.patient}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.pickup}>{trip.pickup || <span className="text-rose-400 italic">missing</span>}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.dropoff}>{trip.dropoff || <span className="text-rose-400 italic">missing</span>}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs text-slate-600 hidden sm:table-cell font-mono">{trip.time}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs text-slate-600 hidden sm:table-cell">{trip.time}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
                         <select 
                           value={trip.driverId || ''} 
@@ -570,7 +558,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
             <div className="mt-4 sm:mt-6 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
               <div className="flex items-center justify-between mb-3">
                 <label className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <Truck size={18} className="text-blue-600" /> Assign Bookings to Drivers
+                  <Truck size={18} className="text-blue-600" /> Assign Trips to Drivers
                 </label>
                 <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-blue-100">
                   <input type="checkbox" id="assign-prompt" checked={showAssignPrompt} onChange={(e) => setShowAssignPrompt(e.target.checked)} className="w-4 h-4 accent-blue-600" />
@@ -580,7 +568,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
 
               {showAssignPrompt ? (
                 <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <p className="text-xs text-blue-600 font-bold uppercase tracking-widest opacity-70">Bulk Assign All Uploaded Bookings:</p>
+                  <p className="text-xs text-blue-600 font-bold uppercase tracking-widest opacity-70">Bulk Assign All Uploaded Trips:</p>
                   <div className="flex gap-2">
                     <select value={assignToDriver} onChange={(e) => setAssignToDriver(e.target.value)} className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-white font-bold shadow-sm">
                       <option value="">Leave Most as Unassigned (Or use per-trip selector below)</option>
@@ -599,12 +587,11 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                       <CheckCircle2 size={12} /> All {mappedTrips.length} trips will default to {drivers.find(d => d.id === assignToDriver)?.name}
                     </p>
                   )}
-                  <p className="text-[10px] text-slate-500 font-bold italic">Tip: You can still override individual bookings in the table below.</p>
+                  <p className="text-[10px] text-slate-500 font-bold italic">Tip: You can still override individual trips in the table below.</p>
                 </div>
               ) : (
                 <div className="p-4 border-2 border-dashed border-blue-100 rounded-xl text-center">
-                  <h3 className="text-lg font-black text-slate-900">{mappedTrips.length} booking(s) extracted</h3>
-                  <p className="text-xs font-bold text-slate-400">Assignment disabled. Bookings will be imported as Unassigned.</p>
+                  <p className="text-xs font-bold text-slate-400">Assignment disabled. Trips will be imported as Unassigned.</p>
                 </div>
               )}
             </div>
@@ -615,7 +602,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
               </button>
               <button onClick={confirmImport} className="w-full sm:flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm text-sm">
                 <CheckCircle2 size={18} />
-                Import {totalSelected} Bookings
+                Import {totalSelected} Trips
               </button>
             </div>
           </div>

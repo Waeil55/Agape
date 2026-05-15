@@ -144,7 +144,7 @@ export async function suggestOptimalDriver(trip, drivers, allTrips) {
 
   const prompt = `You are a NEMT fleet dispatch AI. Given a trip that needs assignment, select the OPTIMAL driver considering ALL factors below.
 
-BOOKING TO ASSIGN:
+TRIP TO ASSIGN:
 ${JSON.stringify({ id: trip.id, patient: trip.patient, pickup: trip.pickup, dropoff: trip.dropoff, time: trip.time }, null, 2)}
 
 AVAILABLE DRIVERS (with live schedule, zone, and next-trip context):
