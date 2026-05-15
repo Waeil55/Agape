@@ -10,6 +10,17 @@ import {
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 
+const FACILITY_KEYS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute'];
+
+const clientPhone = (trip) => {
+  if (!trip) return '';
+  const pickupFac = FACILITY_KEYS.some(k => (trip.pickup || '').toLowerCase().includes(k));
+  const dropFac = FACILITY_KEYS.some(k => (trip.dropoff || '').toLowerCase().includes(k));
+  if (pickupFac && !dropFac) return trip.dropoffPhone || trip.pickupPhone || '';
+  if (!pickupFac && dropFac) return trip.pickupPhone || trip.dropoffPhone || '';
+  return trip.pickupPhone || trip.dropoffPhone || '';
+};
+
 const to12hr = (time) => {
   if (!time || time === 'Will Call' || time === 'WC') return time || 'Will Call';
   const m = String(time).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
@@ -759,8 +770,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                         
                         <div className="mt-6 pt-5 border-t border-slate-100 flex justify-between items-center">
                           <div className="flex gap-3">
-                            <a href={`tel:${cleanPhone(t.pickupPhone)}`} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition active:scale-90"><Phone size={16} /></a>
-                            <a href={`sms:${cleanPhone(t.pickupPhone)}`} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition active:scale-90"><MessageCircle size={16} /></a>
+                            <a href={`tel:${cleanPhone(clientPhone(t))}`} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition active:scale-90"><Phone size={16} /></a>
+                            <a href={`sms:${cleanPhone(clientPhone(t))}`} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition active:scale-90"><MessageCircle size={16} /></a>
                             <button onClick={() => setShowEditModal(t)} className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition active:scale-90"><Edit2 size={16} /></button>
                           </div>
                           <div className="flex gap-4">
