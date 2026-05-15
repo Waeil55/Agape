@@ -10,6 +10,9 @@ export default {
         primary: '#2563eb',
         secondary: '#64748b',
       },
+      fontFamily: {
+        outfit: ['Outfit', 'sans-serif'],
+      },
     },
   },
   plugins: [],
