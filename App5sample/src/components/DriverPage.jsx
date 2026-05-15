@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { tripMatchesTodayOrTomorrow } from '../utils/tripDate';
-import { to12h, timeToMinutes as calcTimeToMinutes } from '../utils/timeFormat';
-import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { auth } from '../config/firebase';
 import { 
-  Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, 
-  AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check,
-  ChevronUp, ChevronDown, Edit2, ListChecks, Sparkles, Target, RotateCcw, Lock
+  Truck, MapPin, Phone, MessageSquare, CheckCircle2, XCircle, 
+  AlertCircle, Navigation, BrainCircuit, Map, LogIn, LogOut, 
+  Wrench, Gauge, Clock, Signature, User, ChevronRight, Play, Check, Send,
+  ChevronUp, ChevronDown, Edit2, ListChecks, Sparkles, PhoneCall, MessageCircle, Target, Flag, RotateCcw, ChevronLeft, MoreVertical
 } from 'lucide-react';
+import SignatureCanvas from './SignatureCanvas';
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 
-const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, appSettings, phoneNumbers }) => {
-  const me = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase());
+const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip }) => {
+  const me = drivers.find(d => d.email === currentUser);
+  const getTodayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const today = getTodayStr();
 
   if (!me) {
     return (
@@ -33,16 +36,30 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     );
   }
 
-  // Filter trips assigned to me for today or tomorrow (matches dispatch manifest window)
+  // Filter today's trips assigned to me
+  // Filter today's trips assigned to me and SORT by time
   const myTrips = trips
-    .filter(t => {
-      const isAssignedToMe = (t.driverId === me?.id || ((t.driverEmail || '').toLowerCase() === (me?.email || '').toLowerCase()));
-      const inWindow = tripMatchesTodayOrTomorrow(t.date);
-      const isActiveStatus = !['Completed', 'Cancelled', 'No Show'].includes(t.status);
-      return (isAssignedToMe && inWindow) || (isAssignedToMe && isActiveStatus);
-    })
+    .filter(t => (t.driverId === me?.id || (t.driverEmail && t.driverEmail === me?.email)) && (!t.date || t.date === today))
     .sort((a, b) => {
-      const timeToMinutes = (t) => calcTimeToMinutes(t);
+      // Always sort by time for the driver manifest
+      const timeToMinutes = (t) => {
+        if (!t) return 1440;
+        const cleanTime = String(t).toUpperCase().trim();
+        if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
+        
+        // Robust regex: HH:MM AM/PM or HH AM/PM or HH:MM
+        const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+        if (!m) return 1440;
+        
+        let h = parseInt(m[1], 10);
+        let min = parseInt(m[2] || '0', 10);
+        const p = m[3];
+        
+        if (p === 'PM' && h < 12) h += 12;
+        if (p === 'AM' && h === 12) h = 0;
+        
+        return h * 60 + min;
+      };
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
   
@@ -58,7 +75,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   
   const [pickupOdometer, setPickupOdometer] = useState(me?.odometer || '');
   const [dropoffOdometer, setDropoffOdometer] = useState('');
-  const [paperSignatureConfirmed, setPaperSignatureConfirmed] = useState(false);
+  const [signatureData, setSignatureData] = useState(null);
   const [unableToSign, setUnableToSign] = useState(false);
   const [unableReason, setUnableReason] = useState('');
 
@@ -68,9 +85,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const [isAiOptimizing, setIsAiOptimizing] = useState(false);
   const [activeModalTripId, setActiveModalTripId] = useState(null);
   const [customManifestOrder, setCustomManifestOrder] = useState([]); // Array of trip IDs
-  const [confirmAction, setConfirmAction] = useState(null); // { tripId, type: 'noshow'|'cancel' }
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [confirmError, setConfirmError] = useState('');
 
   // Sync custom order with myTrips IDs
   useEffect(() => {
@@ -97,7 +111,20 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           const tripA = myTrips.find(t => t.id === idA);
           const tripB = myTrips.find(t => t.id === idB);
           
-          return calcTimeToMinutes(tripA?.time) - calcTimeToMinutes(tripB?.time);
+          const timeToMinutes = (t) => {
+            if (!t) return 1440;
+            const cleanTime = String(t).toUpperCase().trim();
+            const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+            if (!m) return 1440;
+            let h = parseInt(m[1], 10);
+            let min = parseInt(m[2] || '0', 10);
+            const p = m[3];
+            if (p === 'PM' && h < 12) h += 12;
+            if (p === 'AM' && h === 12) h = 0;
+            return h * 60 + min;
+          };
+          
+          return timeToMinutes(tripA?.time) - timeToMinutes(tripB?.time);
         });
       }
       return prev;
@@ -134,22 +161,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   };
 
   const openMaps = (address) => {
-    if (!address) return;
-    const navApp = appSettings?.navigationApp || 'google';
-    const encoded = encodeURIComponent(address);
-    let url;
-    switch (navApp) {
-      case 'waze':
-        url = `https://www.waze.com/ul?q=${encoded}&navigate=yes`;
-        break;
-      case 'apple':
-        url = `https://maps.apple.com/?daddr=${encoded}&dirflg=d`;
-        break;
-      case 'google':
-      default:
-        url = `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-    }
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+    window.open(url, '_blank');
   };
 
   const handleStartTrip = () => {
@@ -166,21 +179,17 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   const handleConfirmDepart = () => {
     if (!pickupOdometer) return alert('Please enter pickup odometer.');
-    if (!paperSignatureConfirmed && !unableToSign) return alert('Confirm paper signature or mark patient unable to sign.');
-    if (unableToSign && !unableReason) return alert('Select a reason when patient is unable to sign.');
+    if (!signatureData && !unableToSign) return alert('Please capture signature or select unable to sign.');
     
     onUpdateTrip(activeModalTripId, 'En Route to Dropoff', {
       pickupOdometer: parseInt(pickupOdometer),
-      paperSignatureConfirmed,
+      signature: signatureData,
       unableToSign,
       unableReason,
       departedPickupTime: new Date().toISOString()
     });
     setShowSignatureModal(false);
     setActiveModalTripId(null);
-    setPaperSignatureConfirmed(false);
-    setUnableToSign(false);
-    setUnableReason('');
   };
 
   const handleMarkArrivedDropoff = () => {
@@ -204,37 +213,18 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     setActiveModalTripId(null);
   };
 
-  const handleConfirmAction = async () => {
-    const user = auth.currentUser;
-    if (!user || !user.email) { setConfirmError('Authentication error.'); return; }
-    try {
-      const cred = EmailAuthProvider.credential(user.email, confirmPassword);
-      await reauthenticateWithCredential(user, cred);
-      if (confirmAction.type === 'noshow') {
-        onUpdateTrip(confirmAction.tripId, 'No Show');
-        setCustomManifestOrder(prev => prev.filter(id => id !== confirmAction.tripId));
-      } else if (confirmAction.type === 'cancel') {
-        onUpdateTrip(confirmAction.tripId, 'Cancelled');
-        setCustomManifestOrder(prev => prev.filter(id => id !== confirmAction.tripId));
-      }
-      setConfirmAction(null);
-      setConfirmPassword('');
-      setConfirmError('');
-    } catch {
-      setConfirmError('Invalid password. Action denied.');
+  const handleNoShow = (tripId) => {
+    if (window.confirm('Mark this trip as No Show?')) {
+      onUpdateTrip(tripId, 'No Show');
+      setCustomManifestOrder(prev => prev.filter(id => id !== tripId));
     }
   };
 
-  const handleNoShow = (tripId) => {
-    setConfirmAction({ tripId, type: 'noshow' });
-    setConfirmPassword('');
-    setConfirmError('');
-  };
-
   const handleCancel = (tripId) => {
-    setConfirmAction({ tripId, type: 'cancel' });
-    setConfirmPassword('');
-    setConfirmError('');
+    if (window.confirm('Are you sure you want to CANCEL this trip?')) {
+      onUpdateTrip(tripId, 'Cancelled');
+      setCustomManifestOrder(prev => prev.filter(id => id !== tripId));
+    }
   };
 
   const handleUndoStep = (tripId, currentStatus) => {
@@ -250,9 +240,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     }
   };
 
-  const handleToggleSelection = (id) => {
-    setSelectedTripIds((prev) => prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]);
-  };
+  const handleToggleSelection = (id) => {};
 
   const handleStartBatch = () => {
     if (selectedTripIds.length === 0) return;
@@ -279,7 +267,16 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     }, 1200);
   };
 
-  const timeToMinutes = (t) => calcTimeToMinutes(t);
+  const timeToMinutes = (t) => {
+    if (!t || t === 'Will Call') return 1440;
+    const m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!m) return 1440;
+    let h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
+    return h * 60 + min;
+  };
 
   const isClockedIn = me?.clockedIn || false;
 
@@ -337,10 +334,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${currentLeg.type === 'PICKUP' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
                   {currentLeg.type}
                 </span>
-                <h2 className="text-3xl font-black text-slate-900 leading-tight">
-                  {currentLeg.patient}
-                  {currentLeg.bookingId ? <span className="block text-blue-600 text-base font-medium mt-1">Booking: {currentLeg.bookingId}</span> : null}
-                </h2>
+                <h2 className="text-3xl font-black text-slate-900 leading-tight">{currentLeg.patient}</h2>
                 {currentLeg.notes && (
                   <div className="bg-amber-50/50 px-4 py-2 rounded-xl inline-block border border-amber-100/50">
                     <p className="text-xs font-bold text-amber-700">{currentLeg.notes}</p>
@@ -412,48 +406,46 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   return (
     <div className="space-y-6 max-w-xl mx-auto pb-24">
-      {/* Signature & Pickup Odometer Modal - Paper Signature Confirmation Only */}
+      {/* Signature & Pickup Odometer Modal */}
       {showSignatureModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
           <div className="bg-white w-full max-w-md rounded-[2rem] p-6 sm:p-8 shadow-2xl relative z-10 border border-slate-200 overflow-y-auto max-h-[90vh]">
             <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
-              <CheckCircle2 className="text-blue-600" /> Pickup Confirmation
+              <Signature className="text-blue-600" /> Pickup Verification
             </h3>
             
             <div className="space-y-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                <p className="text-sm font-bold text-blue-900">✓ Confirm Patient Received Service</p>
-                <p className="text-xs text-blue-700 mt-2">The driver confirms they collected the patient's paper signature at pickup.</p>
+              <div>
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-2">Patient Signature</label>
+                {!unableToSign ? (
+                  <SignatureCanvas onSave={setSignatureData} onClear={() => setSignatureData(null)} />
+                ) : (
+                  <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center text-slate-500 text-sm italic">
+                    Patient unable to sign selected
+                  </div>
+                )}
+                
+                <label className="flex items-center gap-3 mt-4 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition">
+                  <input type="checkbox" checked={unableToSign} onChange={(e) => setUnableToSign(e.target.checked)} className="w-5 h-5 rounded border-slate-300 text-blue-600" />
+                  <span className="text-sm font-bold text-slate-700">Patient unable to sign</span>
+                </label>
+                
+                {unableToSign && (
+                  <select 
+                    value={unableReason} 
+                    onChange={(e) => setUnableReason(e.target.value)}
+                    className="w-full mt-2 p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold"
+                  >
+                    <option value="">Select Reason...</option>
+                    <option value="Physical Limitation">Physical Limitation</option>
+                    <option value="Cognitive Impairment">Cognitive Impairment</option>
+                    <option value="Infection Control">Infection Control</option>
+                    <option value="Other">Other</option>
+                  </select>
+                )}
               </div>
-              
-              <label className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition">
-                <input type="checkbox" checked={paperSignatureConfirmed} onChange={(e) => setPaperSignatureConfirmed(e.target.checked)} className="w-5 h-5 rounded border-slate-300 text-blue-600 mt-1 flex-shrink-0" />
-                <div>
-                  <span className="text-sm font-bold text-slate-800 block">Paper Signature Collected</span>
-                  <p className="text-xs text-slate-600 mt-1">I confirm the patient signed the paper form for this service.</p>
-                </div>
-              </label>
 
-              <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition">
-                <input type="checkbox" checked={unableToSign} onChange={(e) => setUnableToSign(e.target.checked)} className="w-5 h-5 rounded border-slate-300 text-blue-600 flex-shrink-0" />
-                <span className="text-sm font-bold text-slate-700">Patient Unable to Sign</span>
-              </label>
-
-              {unableToSign && (
-                <select 
-                  value={unableReason} 
-                  onChange={(e) => setUnableReason(e.target.value)}
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold"
-                >
-                  <option value="">Select Reason...</option>
-                  <option value="Physical Limitation">Physical Limitation</option>
-                  <option value="Cognitive Impairment">Cognitive Impairment</option>
-                  <option value="Refused">Refused</option>
-                  <option value="Other">Other</option>
-                </select>
-              )}
-              
               <div>
                 <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-2">Verify Pickup Odometer</label>
                 <div className="relative">
@@ -518,62 +510,48 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       )}
 
       {/* Clock In/Out Header */}
-      <div className={`p-4 rounded-[1.5rem] text-white shadow-xl ${isClockedIn ? 'bg-gradient-to-br from-blue-600 to-indigo-700' : 'bg-gradient-to-br from-slate-700 to-slate-900'}`}>
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black shrink-0">
+      <div className={`p-6 rounded-[2rem] text-white shadow-xl ${isClockedIn ? 'bg-gradient-to-br from-blue-600 to-indigo-700' : 'bg-gradient-to-br from-slate-700 to-slate-900'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black text-xl">
               {me?.name?.charAt(0)}
             </div>
-            <div className="min-w-0">
-              <h1 className="font-bold text-sm truncate">{me?.name}</h1>
-              <p className="text-[10px] opacity-80 truncate"><Truck size={10} className="inline mr-1" />{me?.vehicle || 'No Vehicle'}</p>
+            <div>
+              <h1 className="font-bold text-lg">{me?.name}</h1>
+              <p className="text-xs opacity-80 flex items-center gap-1"><Truck size={12} /> {me?.vehicle || 'No Vehicle Assigned'}</p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {phoneNumbers?.routing && (
-              <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="px-2.5 py-1.5 rounded-lg bg-blue-500 flex flex-col items-center justify-center hover:bg-blue-400 transition active:scale-90 min-w-[48px]" title="Call Routing">
-                <Phone size={12} />
-                <span className="text-[7px] font-black uppercase leading-tight mt-0.5">Routing</span>
-              </a>
-            )}
-            {phoneNumbers?.dispatcher && (
-              <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="px-2.5 py-1.5 rounded-lg bg-emerald-500 flex flex-col items-center justify-center hover:bg-emerald-400 transition active:scale-90 min-w-[48px]" title="Call Dispatcher">
-                <Phone size={12} />
-                <span className="text-[7px] font-black uppercase leading-tight mt-0.5">Dispatch</span>
-              </a>
-            )}
-            <button 
-              onClick={() => onDriverStatusUpdate(me?.id, !isClockedIn)}
-              className={`px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 ${isClockedIn ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}
-            >
-              {isClockedIn ? 'Offline' : 'Clock In'}
-            </button>
-          </div>
+          <button 
+            onClick={() => onDriverStatusUpdate(me?.id, !isClockedIn)}
+            className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 ${isClockedIn ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}
+          >
+            {isClockedIn ? 'Go Offline' : 'Clock In'}
+          </button>
         </div>
-
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          <div className="bg-white/10 rounded-xl p-2 text-center">
-            <p className="text-base font-black">{myTrips.length}</p>
-            <p className="text-[8px] uppercase font-bold opacity-60">Total</p>
+        
+        <div className="grid grid-cols-3 gap-2 mt-6">
+          <div className="bg-white/10 rounded-2xl p-3 text-center">
+            <p className="text-xl font-black">{myTrips.length}</p>
+            <p className="text-[9px] uppercase font-bold opacity-60">Total</p>
           </div>
-          <div className="bg-white/10 rounded-xl p-2 text-center">
-            <p className="text-base font-black">{completedTrips.length}</p>
-            <p className="text-[8px] uppercase font-bold opacity-60">Done</p>
+          <div className="bg-white/10 rounded-2xl p-3 text-center border border-white/10">
+            <p className="text-xl font-black">{completedTrips.length}</p>
+            <p className="text-[9px] uppercase font-bold opacity-60">Done</p>
           </div>
-          <div className="bg-white/10 rounded-xl p-2 text-center">
-            <p className="text-base font-black">{myTrips.length - completedTrips.length - otherTripsCount}</p>
-            <p className="text-[8px] uppercase font-bold opacity-60">To Go</p>
+          <div className="bg-white/10 rounded-2xl p-3 text-center">
+            <p className="text-xl font-black">{myTrips.length - completedTrips.length - otherTripsCount}</p>
+            <p className="text-[9px] uppercase font-bold opacity-60">To Go</p>
           </div>
         </div>
       </div>
 
       {!isClockedIn ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm">
-          <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-2">
-            <Clock size={24} className="text-slate-400" />
+        <div className="bg-white rounded-[2rem] border border-slate-200 p-12 text-center shadow-sm">
+          <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Clock size={40} className="text-slate-400" />
           </div>
-          <p className="text-sm font-black text-slate-900">Off the Clock</p>
-          <p className="text-[11px] text-slate-500 mt-1">Clock in to view and start your trips.</p>
+          <h2 className="text-xl font-black text-slate-900">Off the Clock</h2>
+          <p className="text-sm text-slate-500 mt-2">Clock in to view and start your trips for today.</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -583,7 +561,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <div className="px-2 space-y-4">
                 <div className="flex justify-between items-center px-4">
                   <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <ListChecks size={14} className="text-blue-500" /> Today &amp; Tomorrow Manifest
+                    <ListChecks size={14} className="text-blue-500" /> Today&apos;s Manifest
                   </h3>
                   <button onClick={optimizeRoute} disabled={isAiOptimizing} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition active:scale-95 disabled:opacity-50">
                     <Sparkles size={12} className={isAiOptimizing ? 'animate-spin' : ''} />
@@ -600,22 +578,12 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                       <div key={t.id} className={`bg-white rounded-3xl border-2 transition-all p-5 ${isActive ? 'border-blue-500 shadow-xl shadow-blue-500/5' : 'border-slate-100'}`}>
                         <div className="flex items-start gap-4">
                           <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-start mb-3 gap-3">
-                              <label className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-slate-500 text-xs font-black cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => handleToggleSelection(t.id)}
-                                  className="w-4 h-4 rounded border-slate-300 text-blue-600"
-                                />
-                                Select
-                              </label>
+                            <div className="flex justify-between items-start mb-3">
                               <div className="min-w-0">
                                 <h4 className="font-black text-slate-900 text-lg truncate leading-tight">{t.patient}</h4>
-                                {t.bookingId ? <p className="text-blue-600 text-xs font-medium -mt-0.5">Booking: {t.bookingId}</p> : null}
-                                <div className="flex items-center gap-3 mt-2">
-                                  <span className="text-2xl font-black text-slate-900 font-mono tabular-nums">{to12h(t.time)}</span>
-                                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-100 text-slate-500'}`}>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[10px] font-bold">{t.time}</span>
+                                  <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${isActive ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
                                     {t.status}
                                   </span>
                                 </div>
@@ -635,10 +603,10 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                                   <MapPin size={14} className="text-blue-600" />
                                 </div>
                                 <div className="flex-1 p-3 rounded-2xl bg-slate-50/50 border border-slate-100/50 group-hover:bg-slate-50 transition-colors">
-                                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.15em] mb-1.5 flex items-center gap-1">
+                                  <p className="text-[9px] font-black text-blue-600 uppercase tracking-[0.15em] mb-1.5 flex items-center gap-1">
                                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" /> Pickup Point
                                   </p>
-                                  <p className="text-base font-bold text-slate-900 leading-snug">{t.pickup}</p>
+                                  <p className="text-[13px] font-bold text-slate-900 leading-snug">{t.pickup}</p>
                                 </div>
                               </div>
 
@@ -647,10 +615,10 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                                   <Target size={14} className="text-emerald-600" />
                                 </div>
                                 <div className="flex-1 p-3 rounded-2xl bg-slate-50/50 border border-slate-100/50 group-hover:bg-slate-50 transition-colors">
-                                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.15em] mb-1.5 flex items-center gap-1">
+                                  <p className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.15em] mb-1.5 flex items-center gap-1">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> Destination
                                   </p>
-                                  <p className="text-base font-bold text-slate-900 leading-snug">{t.dropoff}</p>
+                                  <p className="text-[13px] font-bold text-slate-900 leading-snug">{t.dropoff}</p>
                                 </div>
                               </div>
                             </div>
@@ -717,8 +685,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                             <button onClick={() => setShowEditModal(t)} className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition active:scale-90"><Edit2 size={16} /></button>
                           </div>
                           <div className="flex gap-4">
-                            <button onClick={() => handleNoShow(t.id)} className="text-[10px] font-black text-amber-600 uppercase tracking-widest px-3 py-1.5 hover:bg-amber-50 rounded-xl transition">No Show</button>
-                            <button onClick={() => handleCancel(t.id)} className="text-[10px] font-black text-rose-500 uppercase tracking-widest px-3 py-1.5 hover:bg-rose-50 rounded-xl transition">Cancelled</button>
+                            <button onClick={() => handleNoShow(t.id)} className="text-[10px] font-black text-rose-500 uppercase tracking-widest px-3 py-1.5 hover:bg-rose-50 rounded-xl transition">No Show</button>
+                            <button onClick={() => handleCancel(t.id)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 py-1.5 hover:bg-slate-50 rounded-xl transition">Cancel</button>
                           </div>
                         </div>
                       </div>
@@ -797,7 +765,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       {/* Quick History List (Current Day) */}
       {completedTrips.length > 0 && (
         <div className="px-2">
-          <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-4">Today&apos;s Completed Bookings</h3>
+          <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-4">Today&apos;s Completed Trips</h3>
           <div className="space-y-3">
             {completedTrips.map(t => (
               <div key={t.id} className="bg-white/50 border border-slate-200 p-4 rounded-2xl flex items-center justify-between gap-3">
@@ -805,35 +773,12 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center"><Check size={16} /></div>
                   <div>
                     <p className="font-bold text-slate-800 text-sm">{t.patient}</p>
-                    {t.bookingId ? <span className="text-blue-600 text-[10px] font-medium">Booking: {t.bookingId}</span> : null}
                     <p className="text-[10px] text-slate-500 font-mono">{t.time} &bull; {t.dropoffOdometer - t.pickupOdometer || 0} mi</p>
                   </div>
                 </div>
-                {t.bookingId && <div className="text-[10px] font-black text-slate-400 uppercase bg-slate-100 px-2 py-1 rounded-md">#{t.bookingId}</div>}
+                <div className="text-[10px] font-black text-slate-400 uppercase bg-slate-100 px-2 py-1 rounded-md">ID {t.id}</div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Password Confirmation Modal for No Show / Cancelled */}
-      {confirmAction && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => { setConfirmAction(null); setConfirmPassword(''); setConfirmError(''); }} />
-          <div className="bg-white/90 backdrop-blur-xl w-full max-w-sm rounded-[2rem] p-8 shadow-2xl relative z-10 border border-white/50">
-            <div className="w-16 h-16 bg-gradient-to-tr from-rose-600 to-rose-400 text-white rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-rose-500/30">
-              <Lock size={32} />
-            </div>
-            <h3 className="text-xl font-black text-center text-slate-900 mb-2">Confirm {confirmAction.type === 'noshow' ? 'No Show' : 'Cancellation'}</h3>
-            <p className="text-xs text-center text-slate-500 font-medium mb-2">Enter your password to authorize this action.</p>
-            {confirmError && <p className="text-xs text-center text-rose-600 font-semibold mb-4">{confirmError}</p>}
-            <form onSubmit={(e) => { e.preventDefault(); handleConfirmAction(); }}>
-              <input type="password" required placeholder="Enter your password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-4 bg-slate-100/50 border border-slate-200/50 rounded-[1rem] font-semibold focus:border-rose-500 focus:bg-white mb-4 outline-none" />
-              <div className="flex gap-2">
-                <button type="button" onClick={() => { setConfirmAction(null); setConfirmPassword(''); setConfirmError(''); }} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-[1rem] font-bold active:scale-95 transition-all">Cancel</button>
-                <button type="submit" className={`flex-1 py-3.5 text-white rounded-[1rem] font-bold active:scale-95 transition-all shadow-md ${confirmAction.type === 'noshow' ? 'bg-amber-600 shadow-amber-500/20' : 'bg-rose-600 shadow-rose-500/20'}`}>Confirm</button>
-              </div>
-            </form>
           </div>
         </div>
       )}

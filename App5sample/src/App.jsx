@@ -8,7 +8,7 @@ import {
   ArchiveRestore, RefreshCcw, FileText, BarChart2, Archive, X, Plus, ChevronLeft
 } from 'lucide-react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from './config/firebase';
 import TripsPage from './components/TripsPage';
 import ChatPage from './components/ChatPage';
@@ -23,8 +23,6 @@ import LiveMapPage from './components/LiveMapPage';
 import DispatchAssistant from './components/DispatchAssistant';
 import { requestNotificationPermission, showLocalNotification } from './config/notifications';
 import { suggestBatchAssignment, suggestOptimalDriver } from './config/ai';
-import { tripMatchesCalendarDay, tripMatchesTodayOrTomorrow } from './utils/tripDate';
-import { to24h, timeToMinutes as calcTimeToMinutes } from './utils/timeFormat';
 
 const Badge = ({ children, variant = 'info' }) => {
   const variants = {
@@ -69,42 +67,6 @@ const PERMISSIONS = {
     canEditFleet: false,
     canViewLiveMap: false,
     canOptimizeFleet: false
-  },
-  billing: {
-    canDeleteTrip: false,
-    canAssignTrip: false,
-    canManageUsers: false,
-    canViewReports: true,
-    canEditFleet: false,
-    canViewLiveMap: false,
-    canOptimizeFleet: false
-  },
-  qa_auditor: {
-    canDeleteTrip: false,
-    canAssignTrip: false,
-    canManageUsers: false,
-    canViewReports: true,
-    canEditFleet: false,
-    canViewLiveMap: true,
-    canOptimizeFleet: false
-  },
-  fleet_manager: {
-    canDeleteTrip: false,
-    canAssignTrip: true,
-    canManageUsers: false,
-    canViewReports: true,
-    canEditFleet: true,
-    canViewLiveMap: true,
-    canOptimizeFleet: true
-  },
-  supervisor: {
-    canDeleteTrip: false,
-    canAssignTrip: false,
-    canManageUsers: false,
-    canViewReports: true,
-    canEditFleet: false,
-    canViewLiveMap: true,
-    canOptimizeFleet: false
   }
 };
 
@@ -115,7 +77,17 @@ const hasPermission = (role, action) => {
 const todayStr = new Date().toISOString().split('T')[0];
 
 function timeToMinutes(t) {
-  return calcTimeToMinutes(t);
+  if (!t) return 1440;
+  const cleanTime = String(t).toUpperCase().trim();
+  if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
+  const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+  if (!m) return 1440;
+  let h = parseInt(m[1], 10);
+  let min = parseInt(m[2] || '0', 10);
+  const p = m[3];
+  if (p === 'PM' && h < 12) h += 12;
+  if (p === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
 }
 
 function isTripLate(tripTime) {
@@ -134,32 +106,8 @@ const DEFAULT_DATA = {
   logs: [
     { t: 'System Initialized', d: 'Agape Care Cloud OS is now online.', c: 'emerald', type: 'system' }
   ],
-  trashedTrips: [],
-  phoneNumbers: { routing: '8669823983', dispatcher: '3177777707' }
+  trashedTrips: []
 };
-
-const DEFAULT_APP_SETTINGS = {
-  theme: 'light',
-  fontScale: 'md',
-  navigationApp: 'google',
-};
-
-function sanitizeBookingId(value) {
-  const cleanValue = String(value || '').trim();
-  if (!cleanValue) return null;
-  if (/^BK-\d+-\d+$/i.test(cleanValue)) return null;
-  if (/^TRP-\d+$/i.test(cleanValue)) return null;
-  if (/^TRIP-\d{10,}-\d+$/i.test(cleanValue)) return null;
-  return cleanValue;
-}
-
-function normalizeTrip(trip) {
-  if (!trip) return trip;
-  return {
-    ...trip,
-    bookingId: sanitizeBookingId(trip.bookingId),
-  };
-}
 
 const DATA_DOC = 'appData/agape';
 
@@ -180,9 +128,20 @@ async function saveAppData(data, retries = 3) {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
-  // Keep all trips for now to prevent any accidental data loss. 
-  // We'll implement a manual archive process instead of auto-pruning unassigned trips.
-  const prunedTrips = (data.trips || []).map(normalizeTrip);
+  const today = getTodayStr();
+  
+  // Prune trips: Keep today's, tomorrow's, and any active/assigned trips.
+  const prunedTrips = (data.trips || []).filter(t => {
+    if (!t.date || t.date === today) return true;
+    if (['Assigned', 'En Route to Pickup', 'Arrived at Pickup', 'En Route to Dropoff', 'Arrived at Dropoff'].includes(t.status)) return true;
+    try {
+      if (t.completedAt) {
+        const diff = Date.now() - new Date(t.completedAt).getTime();
+        if (diff < 86400000) return true;
+      }
+    } catch(e) {}
+    return false;
+  });
 
   const sanitized = sanitizeForFirestore({
     drivers: data.drivers || [],
@@ -218,14 +177,12 @@ const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [dataLoaded, setDataLoaded] = useState(false);
-  const dataLoadedRef = useRef(false);
   // State variables (declare before refs to avoid temporal dead zone)
   const [logs, setLogs] = useState(DEFAULT_DATA.logs);
   const [dispatchers, setDispatchers] = useState(DEFAULT_DATA.dispatchers);
   const [drivers, setDrivers] = useState(DEFAULT_DATA.drivers);
   const [trips, setTrips] = useState(DEFAULT_DATA.trips);
   const [trashedTrips, setTrashedTrips] = useState([]);
-  const [phoneNumbers, setPhoneNumbers] = useState(DEFAULT_DATA.phoneNumbers);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   // Refs for latest state — always up to date, no closure issues
   const sTrips = useRef(trips);
@@ -233,42 +190,30 @@ const App = () => {
   const sLogs = useRef(logs);
   const sTrashed = useRef(trashedTrips);
   const sDisp = useRef(dispatchers);
-  const sPhone = useRef(phoneNumbers);
   sTrips.current = trips;
   sDrivers.current = drivers;
   sLogs.current = logs;
   sTrashed.current = trashedTrips;
   sDisp.current = dispatchers;
-  sPhone.current = phoneNumbers;
 
   const fromSnapshot = useRef(false);
 
   const persistState = useCallback((overrides = {}) => {
-    // CRITICAL GUARDS: Don't save if we are still loading, or if we just got a cloud update.
-    // dataLoaded via ref — useCallback([]) would otherwise freeze dataLoaded as false forever.
-    if (!dataLoadedRef.current) return;
-    if (fromSnapshot.current) return;
-
     const data = {
-      trips: overrides.trips || sTrips.current,
-      trashedTrips: overrides.trashedTrips || sTrashed.current,
-      drivers: overrides.drivers || sDrivers.current,
-      logs: overrides.logs || sLogs.current,
-      dispatchers: overrides.dispatchers || sDisp.current,
-      phoneNumbers: overrides.phoneNumbers || sPhone.current,
+      trips: sTrips.current,
+      trashedTrips: sTrashed.current,
+      drivers: sDrivers.current,
+      logs: sLogs.current,
+      dispatchers: sDisp.current,
+      ...overrides
     };
-    // Also save to local storage for instant recovery on refresh before Firestore syncs
-    localStorage.setItem('agape_cached_data', JSON.stringify(data));
     saveAppData(data).catch(err => {
       console.error("Persistence failed:", err);
     });
   }, []);
   const [role, setRole] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
-  const roleRef = useRef(null);
-  const currentUserRef = useRef(null);
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('agape_activeTab') || 'dashboard');
-  const [toasts, setToasts] = useState([]);
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedTasks, setSelectedTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   // eslint-disable-next-line no-unused-vars
@@ -286,38 +231,6 @@ const App = () => {
   const [authPassword, setAuthPassword] = useState('');
   const [reAuthError, setReAuthError] = useState('');
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
-  const [appSettings, setAppSettings] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('agape_app_settings') || '{}');
-      return { ...DEFAULT_APP_SETTINGS, ...saved };
-    } catch {
-      return DEFAULT_APP_SETTINGS;
-    }
-  });
-
-  const addToast = (title, message, type = 'info') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, title, message, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
-  };
-
-  const updateAppSettings = useCallback((updates, isProfileUpdate = false) => {
-    if (isProfileUpdate && role === 'driver' && updates.odometer !== undefined) {
-      setDrivers(prev => {
-        const updated = prev.map(d => d.email === currentUser ? { ...d, odometer: updates.odometer } : d);
-        persistState({ drivers: updated });
-        return updated;
-      });
-      addToast('Profile Updated', 'Your vehicle odometer has been synchronized.', 'success');
-    } else {
-      setAppSettings((prev) => ({ ...prev, ...updates }));
-    }
-  }, [role, currentUser, persistState]);
-
-  const handleUpdatePhoneNumbers = useCallback((updates) => {
-    setPhoneNumbers(prev => ({ ...prev, ...updates }));
-    setTimeout(persistState, 0);
-  }, [persistState]);
 
   const requestAuthAction = (label, callback) => {
     setReAuthError('');
@@ -337,27 +250,8 @@ const App = () => {
   const [pendingRole, setPendingRole] = useState(null);
   const [loginError, setLoginError] = useState('');
 
-  useEffect(() => { dataLoadedRef.current = dataLoaded; }, [dataLoaded]);
-  useEffect(() => { roleRef.current = role; }, [role]);
-  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
-
   // Save activeTab to localStorage on change (survives refresh)
   useEffect(() => { if (activeTab) localStorage.setItem('agape_activeTab', activeTab); }, [activeTab]);
-
-  useEffect(() => {
-    localStorage.setItem('agape_app_settings', JSON.stringify(appSettings));
-    document.documentElement.dataset.theme = appSettings.theme || 'light';
-    document.documentElement.dataset.fontScale = appSettings.fontScale || 'md';
-
-    const themeColor = appSettings.theme === 'dark' ? '#020617' : '#f8fafc';
-    let themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (!themeMeta) {
-      themeMeta = document.createElement('meta');
-      themeMeta.name = 'theme-color';
-      document.head.appendChild(themeMeta);
-    }
-    themeMeta.setAttribute('content', themeColor);
-  }, [appSettings]);
 
   useEffect(() => {
     let unsubData = null;
@@ -369,32 +263,16 @@ const App = () => {
           getDoc(doc(db, 'users', user.uid)).catch(() => null),
           getDoc(doc(db, DATA_DOC)),
         ]);
+        let userRole = (userDoc?.data()?.role || 'admin').toLowerCase();
         if (!userDoc?.exists()) {
-          await signOut(auth).catch(() => {});
-          roleRef.current = null;
-          currentUserRef.current = null;
-          setRole(null);
-          setCurrentUser(null);
-          setIsAuthenticated(false);
-          setActiveTab('dashboard');
-          setLoginError('Account not found in Agape system. Please contact your administrator.');
-          setIsLoading(false);
-          return;
+          await setDoc(doc(db, 'users', user.uid), { role: userRole, email: user.email }).catch(() => {});
         }
-
-        const userRole = String(userDoc.data()?.role || '').toLowerCase();
-        const userEmail = user.email;
-        // Capture in local variables for onSnapshot closure (useEffect has [])
-        const capturedRole = userRole;
-        const capturedEmail = userEmail;
-        roleRef.current = userRole;
-        currentUserRef.current = userEmail || '';
         setRole(userRole);
-        setCurrentUser(userEmail);
+        setCurrentUser(user.email);
         setIsAuthenticated(true);
         const savedTab = localStorage.getItem('agape_activeTab');
-        const driverTabs = ['driverHome', 'chat', 'completed', 'cancelled', 'noshow', 'settings'];
-        const validTab = capturedRole === 'driver'
+        const driverTabs = ['driverHome', 'chat', 'archives', 'settings'];
+        const validTab = userRole === 'driver'
           ? (driverTabs.includes(savedTab) ? savedTab : 'driverHome')
           : (savedTab && savedTab !== 'login' ? savedTab : 'dashboard');
         setActiveTab(validTab);
@@ -409,12 +287,11 @@ const App = () => {
         // Initialize data from Firestore
         if (dataSnap.exists()) {
           const d = dataSnap.data();
-          setTrips((d.trips || DEFAULT_DATA.trips).map(normalizeTrip));
+          setTrips(d.trips || DEFAULT_DATA.trips);
           setTrashedTrips(d.trashedTrips || []);
           setDrivers(d.drivers || DEFAULT_DATA.drivers);
           setLogs(d.logs || DEFAULT_DATA.logs);
           setDispatchers(d.dispatchers || DEFAULT_DATA.dispatchers);
-          setPhoneNumbers(d.phoneNumbers || DEFAULT_DATA.phoneNumbers);
         }
         setDataLoaded(true);
         setIsLoading(false);
@@ -425,98 +302,69 @@ const App = () => {
             if (snap.exists()) {
               fromSnapshot.current = true;
               const d = snap.data();
-              setTrips((d.trips || []).map(normalizeTrip));
+              setTrips(d.trips || []);
               setTrashedTrips(d.trashedTrips || []);
               setLogs(d.logs || []);
               setDispatchers(d.dispatchers || []);
-              setPhoneNumbers(d.phoneNumbers || DEFAULT_DATA.phoneNumbers);
               
               try {
                 // ONLY admins/dispatchers can sync the driver list from the users collection
-                // ONLY admins/dispatchers can sync the driver/dispatcher lists from the users collection
-                const r = roleRef.current;
-                if (r === 'admin' || r === 'dispatcher') {
+                if (userRole === 'admin' || userRole === 'dispatcher') {
                   const usersSnap = await getDocs(collection(db, 'users'));
-                  const allUsers = usersSnap.docs.map(u => ({ id: u.id, ...u.data() }));
-                  
-                  // SYNC DRIVERS
-                  const activeDriverUsers = allUsers
-                    .filter(u => u.role && u.role.toLowerCase() === 'driver')
-                    .map(u => ({ email: u.email, id: u.id, name: (u.email || '').split('@')[0], phone: u.phone || '' }));
+                  const activeDriverUsers = usersSnap.docs
+                    .filter(u => {
+                      const r = u.data().role;
+                      return r && r.toLowerCase() === 'driver';
+                    })
+                    .map(u => ({ email: u.data().email, id: u.id, name: u.data().email.split('@')[0], phone: u.data().phone || '' }));
                   
                   const currentDrivers = d.drivers || [];
                   const legacyNames = ['Alex Johnson', 'Sarah Miller', 'Michael Chen'];
-                  let cleanedDrivers = currentDrivers.filter(p => !legacyNames.includes(p.name) && activeDriverUsers.find(au => au.email === p.email));
+                  let cleaned = currentDrivers.filter(p => !legacyNames.includes(p.name) && activeDriverUsers.find(au => au.email === p.email));
                   
-                  let driversChanged = false;
-                  activeDriverUsers.forEach(au => {
-                    const existing = cleanedDrivers.find(d => d.email === au.email);
-                    if (!existing) {
-                      cleanedDrivers.push({
-                        id: `DRV-${au.id.slice(0, 4)}`,
-                        name: au.name, email: au.email, phone: au.phone || '',
-                        status: 'Available', vehicle: 'Pending Assignment', dist: '--',
-                        currentZone: 'TBD', odometer: 0, nextOilChange: 5000,
-                        assignedTo: '', schedule: [], clockedIn: false
-                      });
-                      driversChanged = true;
-                    } else if (au.phone && existing.phone !== au.phone) {
-                      existing.phone = au.phone;
-                      driversChanged = true;
-                    }
-                  });
+                  let changed = false;
+                  if (activeDriverUsers.length > 0) {
+                    activeDriverUsers.forEach(au => {
+                      const existing = cleaned.find(d => d.email === au.email);
+                      if (!existing) {
+                        cleaned.push({
+                          id: `DRV-${au.id.slice(0, 4)}`,
+                          name: au.name,
+                          email: au.email,
+                          phone: au.phone || '',
+                          status: 'Available',
+                          vehicle: 'Pending Assignment',
+                          dist: '--',
+                          currentZone: 'TBD',
+                          odometer: 0,
+                          nextOilChange: 5000,
+                          assignedTo: 'DSP-01',
+                          schedule: [],
+                          clockedIn: false
+                        });
+                        changed = true;
+                      } else if (au.phone && existing.phone !== au.phone) {
+                        existing.phone = au.phone;
+                        changed = true;
+                      }
+                    });
 
-                  // SYNC DISPATCHERS
-                  const activeDispatcherUsers = allUsers
-                    .filter(u => u.role && u.role.toLowerCase() === 'dispatcher')
-                    .map(u => ({ email: u.email, id: u.id, name: (u.email || '').split('@')[0] }));
-                  
-                  let cleanedDispatchers = (d.dispatchers || []).filter(p => activeDispatcherUsers.find(au => au.email === p.email));
-                  let dispatchersChanged = false;
-                  
-                  activeDispatcherUsers.forEach(au => {
-                    const existing = cleanedDispatchers.find(ds => ds.email === au.email);
-                    if (!existing) {
-                      cleanedDispatchers.push({ id: `DSP-${String(cleanedDispatchers.length + 1).padStart(2, '0')}`, name: au.name, email: au.email });
-                      dispatchersChanged = true;
+                    if (changed || cleaned.length !== currentDrivers.length) {
+                      setDrivers(cleaned);
+                      updateDoc(doc(db, DATA_DOC), { drivers: cleaned }).catch(() => {});
+                    } else {
+                      setDrivers(cleaned);
                     }
-                  });
-
-                  if (driversChanged || dispatchersChanged || cleanedDrivers.length !== currentDrivers.length || cleanedDispatchers.length !== (d.dispatchers || []).length) {
-                    setDrivers(cleanedDrivers);
-                    setDispatchers(cleanedDispatchers);
-                    updateDoc(doc(db, DATA_DOC), { drivers: cleanedDrivers, dispatchers: cleanedDispatchers }).catch(() => {});
                   } else {
-                    setDrivers(cleanedDrivers);
-                    setDispatchers(cleanedDispatchers);
+                    // If no drivers found in users collection, keep existing drivers but still set local state
+                    setDrivers(currentDrivers);
                   }
                 } else {
-                  // Self-sync: ensure the current driver exists in the drivers array
-                  let currentDrivers = d.drivers || [];
-                  const cu = currentUserRef.current || '';
-                  const normalizedCurrentEmail = cu.trim().toLowerCase();
-                  const exists = currentDrivers.some(drv => (drv.email || '').trim().toLowerCase() === normalizedCurrentEmail);
-                  if (!exists && r === 'driver') {
-                    const driverUsers = await getDocs(collection(db, 'users'));
-                    const myUserDoc = driverUsers.docs.find(u => (u.data().email || '').trim().toLowerCase() === normalizedCurrentEmail);
-                    if (myUserDoc) {
-                      const uid = myUserDoc.id;
-                      const newDriver = {
-                        id: `DRV-${uid.slice(0, 4)}`,
-                        name: cu.split('@')[0] || 'Driver', email: cu, phone: '',
-                        status: 'Available', vehicle: 'Pending Assignment', dist: '--',
-                        currentZone: 'TBD', odometer: 0, nextOilChange: 5000,
-                        assignedTo: '', schedule: [], clockedIn: false
-                      };
-                      currentDrivers = [...currentDrivers, newDriver];
-                      updateDoc(doc(db, DATA_DOC), { drivers: currentDrivers }).catch(() => {});
-                    }
-                  }
-                  setDrivers(currentDrivers);
-                  setDispatchers(d.dispatchers || []);
+                  // Drivers just take the list as is from the appData doc
+                  setDrivers(d.drivers || []);
                 }
               } catch (err) {
-                console.error("User list sync failed:", err);
+                console.error("Driver sync failed:", err);
               } finally {
                 setTimeout(() => { fromSnapshot.current = false; }, 500);
               }
@@ -525,8 +373,6 @@ const App = () => {
           error: (err) => { console.error("Snapshot error:", err); },
         });
       } else {
-        roleRef.current = null;
-        currentUserRef.current = null;
         dataLoaded = true;
         setIsLoading(false);
       }
@@ -571,7 +417,7 @@ const App = () => {
   }, []);
 
   const addAuditLog = (title, desc, color) => {
-    const timeStr = to24h(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setLogs(prev => [{ t: title, d: desc, c: color, type: 'audit', timestamp: timeStr }, ...prev].slice(0, 100));
     setTimeout(persistState, 0);
   };
@@ -604,30 +450,14 @@ const App = () => {
   const executeLogin = async (selectedRole, userEmail) => {
     try {
       const userCred = await signInWithEmailAndPassword(auth, email, password);
-      
-      // SECURITY: Fetch the actual role from Firestore instead of trusting the user's selection
-      const userSnap = await getDoc(doc(db, 'users', userCred.user.uid));
-      if (!userSnap.exists()) {
-        await signOut(auth);
-        setLoginError("Account not found in Agape system. Please contact your administrator.");
-        return;
-      }
-      
-      const dbRole = String(userSnap.data().role || '').toLowerCase();
-      const requestedRole = String(selectedRole || '').toLowerCase();
-      if (dbRole !== requestedRole) {
-        await signOut(auth);
-        setLoginError(`Access Denied: Your account is registered as ${dbRole}, not ${selectedRole}.`);
-        return;
-      }
-      
-      setRole(dbRole);
-      setCurrentUser(userCred.user.email || userEmail);
+      await setDoc(doc(db, 'users', userCred.user.uid), { role: selectedRole, email: userEmail }, { merge: true });
+      setRole(selectedRole);
+      setCurrentUser(userEmail);
       setIsAuthenticated(true);
-      setActiveTab(dbRole === 'driver' ? 'driverHome' : 'dashboard');
+      setActiveTab(selectedRole === 'driver' ? 'driverHome' : 'dashboard');
       setLoginError('');
       requestNotificationPermission().then(token => { if (token) { setNotificationsEnabled(true); } });
-      if (requestedRole === 'dispatcher') {
+      if (selectedRole === 'dispatcher') {
         addAuditLog('Dispatcher Logged In', `Dispatcher ${userEmail} accessed the system.`, 'blue');
       }
     } catch (err) {
@@ -638,8 +468,6 @@ const App = () => {
   const handleLogout = async () => {
     if (role === 'dispatcher') addAuditLog('Dispatcher Logged Out', `Dispatcher ${currentUser} left the system.`, 'slate');
     await signOut(auth);
-    roleRef.current = null;
-    currentUserRef.current = null;
     setIsAuthenticated(false);
     setRole(null);
     setCurrentUser(null);
@@ -658,24 +486,18 @@ const App = () => {
   const createLegMission = (driverId) => {
     const selectedTrips = trips.filter(t => selectedTasks.includes(t.id));
     if (selectedTrips.length === 0) return;
-    const driver = drivers.find(d => d.id === driverId);
     
     // Create legs: all pickups then all dropoffs (can be reordered later by driver)
     const legs = [];
-    selectedTrips.forEach(t => legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'PICKUP', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.pickup, notes: t.notes, phone: t.pickupPhone }));
-    selectedTrips.forEach(t => legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'DROPOFF', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.dropoff, notes: t.notes, phone: t.dropoffPhone }));
+    selectedTrips.forEach(t => legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'PICKUP', tripId: t.id, patient: t.patient, address: t.pickup, notes: t.notes, phone: t.pickupPhone }));
+    selectedTrips.forEach(t => legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'DROPOFF', tripId: t.id, patient: t.patient, address: t.dropoff, notes: t.notes, phone: t.dropoffPhone }));
     
     // Update trips status and assign to driver
-    const updatedTrips = trips.map(t => selectedTasks.includes(t.id) ? {
-      ...t,
-      status: 'In Mission',
-      driverId,
-      driverEmail: driver?.email || null,
-      driverName: driver?.name || null,
-    } : t);
+    const updatedTrips = trips.map(t => selectedTasks.includes(t.id) ? { ...t, status: 'In Mission', driverId } : t);
     setTrips(updatedTrips);
     
     // Save mission to driver document or a separate missions collection (using a special field for now)
+    const driver = drivers.find(d => d.id === driverId);
     if (driver) {
       const updatedDrivers = drivers.map(d => d.id === driverId ? { ...d, activeMission: { id: `M-${Date.now()}`, legs, currentLegIndex: 0 } } : d);
       setDrivers(updatedDrivers);
@@ -689,14 +511,7 @@ const App = () => {
 
   const assignTripToDriver = (tripId, driverId) => {
     const driver = drivers.find(d => d.id === driverId);
-    const tripToAssign = trips.find(t => t.id === tripId);
-    const updatedTrips = trips.map(t => t.id === tripId ? {
-      ...t,
-      status: 'Assigned',
-      driverId,
-      driverEmail: driver?.email || null,
-      driverName: driver?.name || null,
-    } : t);
+    const updatedTrips = trips.map(t => t.id === tripId ? { ...t, status: 'Assigned', driverId, driverEmail: driver?.email } : t);
     setTrips(updatedTrips);
     setSmartAssignTrip(null);
     setSmartAssignResult(null);
@@ -711,23 +526,12 @@ const App = () => {
         `${tripToAssign.patient} — ${tripToAssign.pickup} → ${tripToAssign.dropoff}`
       );
     }
-    // Specific alert for the driver if they are online
-    if (driver && driver.email) {
-      // In a real app, this would be a cloud function sending a push notification.
-      // For this demo, we'll assume the driver is listening to the Firestore snapshot.
-    }
   };
 
   const bulkAssignTrips = (driverId) => {
     if (selectedTasks.length === 0) return;
     const driver = drivers.find(d => d.id === driverId);
-    setTrips(prev => prev.map(t => selectedTasks.includes(t.id) ? {
-      ...t,
-      status: 'Assigned',
-      driverId,
-      driverEmail: driver?.email || null,
-      driverName: driver?.name || null,
-    } : t));
+    setTrips(prev => prev.map(t => selectedTasks.includes(t.id) ? { ...t, status: 'Assigned', driverId } : t));
     addAuditLog('Bulk Assignment', `${currentUser} assigned ${selectedTasks.length} trips to ${driver?.name || 'Unknown'}`, 'emerald');
     setSelectedTasks([]);
     setBulkAssignModal(false);
@@ -750,18 +554,7 @@ const App = () => {
       if (unassigned.length > 0 && available.length > 0) {
         const assignments = await suggestBatchAssignment(unassigned, available);
         if (assignments && Object.keys(assignments).length > 0) {
-          setTrips(prev => prev.map(t => {
-            const assignedDriverId = assignments[t.id];
-            if (!assignedDriverId) return t;
-            const assignedDriver = available.find(driver => driver.id === assignedDriverId);
-            return {
-              ...t,
-              status: 'Assigned',
-              driverId: assignedDriverId,
-              driverEmail: assignedDriver?.email || null,
-              driverName: assignedDriver?.name || null,
-            };
-          }));
+          setTrips(prev => prev.map(t => assignments[t.id] ? { ...t, status: 'Assigned', driverId: assignments[t.id] } : t));
           const count = Object.keys(assignments).length;
           addAuditLog('Fleet Optimized', `${currentUser || 'System'} ran AI optimization. ${count} trip${count !== 1 ? 's' : ''} assigned.`, 'indigo');
           Object.entries(assignments).forEach(([tripId]) => {
@@ -811,7 +604,7 @@ const App = () => {
       setTrips(trips.filter(t => t.id !== tripId));
       setSelectedTasks(selectedTasks.filter(id => id !== tripId));
       if (role === 'dispatcher') {
-        addAuditLog('Booking Deleted', `${currentUser} deleted booking ${tripId} (${tripToDelete.patient}). Sent to Archive.`, 'rose');
+        addAuditLog('Trip Deleted', `${currentUser} deleted trip ${tripId} (${tripToDelete.patient}). Sent to Archive.`, 'rose');
       } else {
         setTimeout(persistState, 0);
       }
@@ -825,7 +618,7 @@ const App = () => {
       const newTrashed = trashedTrips.filter(t => t.id !== tripId);
       setTrips(newTrips);
       setTrashedTrips(newTrashed);
-      addAuditLog('Booking Restored', `${currentUser || 'Admin'} restored booking ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald');
+      addAuditLog('Trip Restored', `${currentUser || 'Admin'} restored trip ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald');
       persistState({ trips: newTrips, trashedTrips: newTrashed });
     }
   };
@@ -849,15 +642,11 @@ const App = () => {
   };
 
   const handleCompleteTrip = (tripId, driverId, odometer) => {
-    const trip = sTrips.current.find(t => t.id === tripId);
-    if (!trip?.pickupOdometer || !trip?.arrivalTime || !trip?.departedPickupTime || !trip?.arrivalDropoffTime || (!trip?.paperSignatureConfirmed && !trip?.unableToSign)) {
-      addAuditLog('Trip Completion Blocked', `${currentUser || 'Driver'} attempted to complete ${trip?.patient || tripId} before all required steps were finished.`, 'rose');
-      return;
-    }
     setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'Completed', dropoffOdometer: odometer, completedAt: new Date().toISOString() } : t));
     setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer } : d));
+    const trip = trips.find(t => t.id === tripId);
     const driver = drivers.find(d => d.id === driverId);
-    addAuditLog('Booking Completed', `${driver?.name || 'Driver'} completed booking ${tripId} (${trip?.patient}). Odometer: ${odometer?.toLocaleString()} mi.`, 'emerald');
+    addAuditLog('Trip Completed', `${driver?.name || 'Driver'} completed trip ${tripId} (${trip?.patient}). Odometer: ${odometer?.toLocaleString()} mi.`, 'emerald');
     // Maintenance check
     if (driver) {
       const dueIn = (driver.nextOilChange || 50000) - odometer;
@@ -866,22 +655,13 @@ const App = () => {
       }
     }
     if (notificationsEnabled) {
-      showLocalNotification('✅ Booking Completed', `${trip?.patient || 'Booking'} marked as completed. Odometer: ${odometer?.toLocaleString()} mi.`);
+      showLocalNotification('✅ Trip Completed', `${trip?.patient || 'Trip'} marked as completed. Odometer: ${odometer?.toLocaleString()} mi.`);
     }
   };
 
   const handleUpdateDriverLocation = useCallback((driverId, latitude, longitude) => {
-    setDrivers(prev => {
-      const updated = prev.map(d => d.id === driverId ? {
-        ...d,
-        latitude,
-        longitude,
-        lastLocationUpdate: new Date().toISOString(),
-      } : d);
-      persistState({ drivers: updated });
-      return updated;
-    });
-  }, [persistState]);
+    setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, latitude, longitude } : d));
+  }, []);
 
   const submitAuthAction = async (e) => {
     e.preventDefault();
@@ -1290,12 +1070,8 @@ const App = () => {
   };
 
   const renderDispatcherCommandCenter = () => {
-    const getTodayStr = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-const today = getTodayStr();
-    const dateFiltered = trips.filter(t => tripMatchesCalendarDay(t.date, today));
+    const today = new Date().toISOString().split('T')[0];
+    const dateFiltered = trips.filter(t => !t.date || t.date === today);
     const searchedTrips = dateFiltered.filter(t => t.patient.toLowerCase().includes(searchQuery.toLowerCase()));
     
     // SORTING LOGIC: Closest time first, Unassigned at bottom
@@ -1346,7 +1122,7 @@ const today = getTodayStr();
               <div className="bg-rose-50/50 rounded-[1.5rem] border border-rose-100/50 shadow-sm overflow-hidden w-full">
                 <div className="p-4 border-b border-rose-100/50 flex justify-between items-center bg-rose-100/30">
                   <h3 className="text-sm font-black flex items-center gap-2 text-rose-900">
-                    <Trash2 size={16} className="text-rose-600" /> Deleted Bookings Archive
+                    <Trash2 size={16} className="text-rose-600" /> Deleted Trips Archive
                   </h3>
                 </div>
                 <div className="divide-y divide-rose-100/50">
@@ -1360,7 +1136,7 @@ const today = getTodayStr();
                             <p className="font-black text-rose-900 text-sm truncate line-through">{t.patient}</p>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <Badge variant="danger">Deleted</Badge>
-                              <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">{t.bookingId || '—'} &bull; {t.time}</span>
+                              <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">{t.id} &bull; {t.time}</span>
                             </div>
                           </div>
                         </div>
@@ -1409,7 +1185,7 @@ const today = getTodayStr();
                                 <p className="font-bold text-amber-900 text-sm md:text-base truncate">{t.patient}</p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <Badge variant={t.status === 'Assigned' ? 'success' : 'warning'}>{t.status === 'Assigned' ? 'Assigned' : 'Awaiting Call'}</Badge>
-                                  <span className="text-[10px] font-medium text-amber-700/70">{t.bookingId || '—'} &bull; {t.type}</span>
+                                  <span className="text-[10px] font-medium text-amber-700/70">{t.id} &bull; {t.type}</span>
                                   {isTripLate(t.time) && t.status !== 'Completed' && <Badge variant="danger">Late</Badge>}
                                 </div>
                               </div>
@@ -1661,13 +1437,12 @@ const today = getTodayStr();
                 ];
                 
                 if (role === 'driver') {
+                  // Drivers ONLY see today's trips: Active, Completed, No Show, Cancelled
                   return [
                     { id: 'driverHome', label: 'Active Manifest', icon: Truck },
-                    { id: 'chat', label: 'Chat', icon: MessageCircle },
                     { id: 'completed', label: 'Completed', icon: CheckCircle2 },
-                    { id: 'cancelled', label: 'Cancelled', icon: X },
                     { id: 'noshow', label: 'No Show', icon: AlertCircle },
-                    { id: 'settings', label: 'Settings', icon: Settings },
+                    { id: 'cancelled', label: 'Cancelled', icon: X },
                   ];
                 }
                 
@@ -1704,34 +1479,28 @@ const today = getTodayStr();
           {/* TAB CONTENT */}
           <div className="max-w-full px-3 sm:px-6 py-4 sm:py-8">
             {role === 'driver' ? (() => {
-              const normalizedCurrentUserEmail = (currentUser || '').trim().toLowerCase();
-              const myDriver = drivers.find(d => ((d.email || '').trim().toLowerCase()) === normalizedCurrentUserEmail);
+              const myDriver = drivers.find(d => d.email === currentUser);
               const driverId = myDriver?.id;
-              const isTripForCurrentDriver = (trip) => {
-                const resolvedDriverEmail = (
-                  trip.driverEmail || drivers.find(d => d.id === trip.driverId)?.email || ''
-                ).trim().toLowerCase();
-                return trip.driverId === driverId || resolvedDriverEmail === normalizedCurrentUserEmail;
+              const getTodayStr = () => {
+                const d = new Date();
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
               };
-              const myTrips = trips.filter(t => isTripForCurrentDriver(t) && tripMatchesTodayOrTomorrow(t.date));
-              const completedTrips = trips.filter(t => isTripForCurrentDriver(t) && t.status === 'Completed' && tripMatchesTodayOrTomorrow(t.date));
-              const noShowTrips = trips.filter(t => isTripForCurrentDriver(t) && t.status === 'No Show' && tripMatchesTodayOrTomorrow(t.date));
-              const cancelledTrips = trips.filter(t => isTripForCurrentDriver(t) && t.status === 'Cancelled' && tripMatchesTodayOrTomorrow(t.date));
-              const myDrivers = myDriver ? [myDriver] : [];
-              const myTrashed = trashedTrips.filter(t => isTripForCurrentDriver(t));
+              const today = getTodayStr();
+              const myTrips = trips.filter(t => (t.driverId === driverId || (t.driverEmail && t.driverEmail === currentUser)) && (!t.date || t.date === today));
+              const completedTrips = trips.filter(t => (t.driverId === driverId || (t.driverEmail && t.driverEmail === currentUser)) && t.status === 'Completed' && (!t.date || t.date === today));
+              const noShowTrips = trips.filter(t => (t.driverId === driverId || (t.driverEmail && t.driverEmail === currentUser)) && t.status === 'No Show' && (!t.date || t.date === today));
+              const cancelledTrips = trips.filter(t => (t.driverId === driverId || (t.driverEmail && t.driverEmail === currentUser)) && t.status === 'Cancelled' && (!t.date || t.date === today));
+const myDrivers = myDriver ? [myDriver] : [];
+              const myTrashed = trashedTrips.filter(t => t.driverId === driverId);
               const driverTabContent = (tab) => {
                 switch (tab) {
                   case 'driverHome':
                     return <DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
-                      appSettings={appSettings}
                       activeMission={myDriver?.activeMission}
-                      phoneNumbers={phoneNumbers}
-                      onOpenSettings={() => setActiveTab('settings')}
                       onUpdateMission={(updatedMission) => {
                         setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, activeMission: updatedMission } : d));
                         setTimeout(persistState, 0);
                       }}
-                      onUpdateDriverLocation={handleUpdateDriverLocation}
                       onUpdateTrip={(tripId, status, extraData = {}) => {
                         setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
                         const trip = sTrips.current.find(t => t.id === tripId);
@@ -1739,8 +1508,8 @@ const today = getTodayStr();
                       }}
                       onDriverStatusUpdate={handleDriverStatusUpdate}
                       onCompleteTrip={(tripId, driverId, odometer) => {
-                        handleCompleteTrip(tripId, driverId, odometer);
                         const trip = sTrips.current.find(t => t.id === tripId);
+                        setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'Completed', dropoffOdometer: odometer, completedAt: new Date().toISOString() } : t));
                         addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'Unknown'}). Odo: ${odometer}`, 'emerald');
                       }}
                     />;
@@ -1750,7 +1519,7 @@ const today = getTodayStr();
                         <button onClick={() => setActiveTab('driverHome')} className="flex items-center gap-2 text-blue-600 font-black text-xs uppercase tracking-widest mb-4 hover:translate-x-[-4px] transition-transform">
                           <ChevronLeft size={16} /> Back to Active Manifest
                         </button>
-                        <h2 className="text-2xl font-bold text-slate-900">Completed Trips (Today &amp; Tomorrow)</h2>
+                        <h2 className="text-2xl font-bold text-slate-900">Completed Trips (Today)</h2>
                         {completedTrips.length === 0 ? (
                           <div className="bg-white rounded-xl p-8 text-center text-slate-500">
                             <CheckCircle2 size={48} className="mx-auto text-emerald-300 mb-4" />
@@ -1763,7 +1532,6 @@ const today = getTodayStr();
                                 <div className="flex justify-between items-start mb-2">
                                   <div>
                                     <h3 className="font-bold text-slate-900">{trip.patient}</h3>
-                                    {trip.bookingId ? <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest">{trip.bookingId}</p> : null}
                                     <p className="text-sm text-slate-600 flex items-center gap-1"><MapPin size={14} /> {trip.pickup}</p>
                                     <p className="text-sm text-slate-600 ml-5">↓ {trip.dropoff}</p>
                                   </div>
@@ -1781,7 +1549,7 @@ const today = getTodayStr();
                         <button onClick={() => setActiveTab('driverHome')} className="flex items-center gap-2 text-blue-600 font-black text-xs uppercase tracking-widest mb-4 hover:translate-x-[-4px] transition-transform">
                           <ChevronLeft size={16} /> Back to Active Manifest
                         </button>
-                        <h2 className="text-2xl font-bold text-slate-900">No Show Trips (Today &amp; Tomorrow)</h2>
+                        <h2 className="text-2xl font-bold text-slate-900">No Show Trips (Today)</h2>
                         {noShowTrips.length === 0 ? (
                           <div className="bg-white rounded-xl p-8 text-center text-slate-500">
                             <AlertCircle size={48} className="mx-auto text-amber-300 mb-4" />
@@ -1794,7 +1562,6 @@ const today = getTodayStr();
                                 <div className="flex justify-between items-center mb-2">
                                   <div>
                                     <h3 className="font-bold text-slate-900">{trip.patient}</h3>
-                                    {trip.bookingId ? <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest">{trip.bookingId}</p> : null}
                                     <p className="text-sm text-slate-600 flex items-center gap-1"><MapPin size={14} /> {trip.pickup}</p>
                                     <p className="text-sm text-slate-600 ml-5">↓ {trip.dropoff}</p>
                                   </div>
@@ -1823,7 +1590,7 @@ const today = getTodayStr();
                         <button onClick={() => setActiveTab('driverHome')} className="flex items-center gap-2 text-blue-600 font-black text-xs uppercase tracking-widest mb-4 hover:translate-x-[-4px] transition-transform">
                           <ChevronLeft size={16} /> Back to Active Manifest
                         </button>
-                        <h2 className="text-2xl font-bold text-slate-900">Cancelled Trips (Today &amp; Tomorrow)</h2>
+                        <h2 className="text-2xl font-bold text-slate-900">Cancelled Trips (Today)</h2>
                         {cancelledTrips.length === 0 ? (
                           <div className="bg-white rounded-xl p-8 text-center text-slate-500">
                             <X size={48} className="mx-auto text-rose-300 mb-4" />
@@ -1836,7 +1603,6 @@ const today = getTodayStr();
                                 <div className="flex justify-between items-center mb-2">
                                   <div>
                                     <h3 className="font-bold text-slate-900">{trip.patient}</h3>
-                                    {trip.bookingId ? <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest">{trip.bookingId}</p> : null}
                                     <p className="text-sm text-slate-600 flex items-center gap-1"><MapPin size={14} /> {trip.pickup}</p>
                                     <p className="text-sm text-slate-600 ml-5">↓ {trip.dropoff}</p>
                                   </div>
@@ -1860,17 +1626,13 @@ const today = getTodayStr();
                       </div>
                     );
                   case 'chat':
-                    return <ChatPage currentUser={currentUser} role={role} />;
+                    return <ChatPage currentUser={currentUser} />;
                   case 'archives':
                     return <ArchivesPage trashedTrips={myTrashed} restoreTrip={null} />;
                   case 'settings':
-                    return <SettingsPage currentUser={currentUser} role={role} onLogout={handleLogout} trashedTrips={myTrashed} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} driverProfile={myDriver} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={handleUpdatePhoneNumbers} />;
+                    return <SettingsPage currentUser={currentUser} role={role} onLogout={handleLogout} trashedTrips={myTrashed} />;
                   default:
                     return <DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
-                      appSettings={appSettings}
-                      phoneNumbers={phoneNumbers}
-                      onOpenSettings={() => setActiveTab('settings')}
-                      onUpdateDriverLocation={handleUpdateDriverLocation}
                       onUpdateTrip={(tripId, status, extraData = {}) => {
                         setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
                         const trip = trips.find(t => t.id === tripId);
@@ -2022,34 +1784,20 @@ const today = getTodayStr();
                 selectedTasks={selectedTasks}
                 toggleTaskSelection={toggleTaskSelection}
                 onCreateLegMission={createLegMission}
-                onBulkAssignTrips={bulkAssignTrips}
                 onAssignTrip={(tripId, driverId) => {
+                  setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'Assigned', driverId } : t));
                   const driver = drivers.find(d => d.id === driverId);
-                  setTrips(prev => prev.map(t => t.id === tripId ? {
-                    ...t,
-                    status: 'Assigned',
-                    driverId,
-                    driverEmail: driver?.email || null,
-                    driverName: driver?.name || null,
-                  } : t));
                   const trip = trips.find(t => t.id === tripId);
                   addAuditLog('Assignment Action', `${currentUser} (${role}) assigned ${trip?.patient || 'Trip '+tripId} to ${driver?.name || 'Unknown'}`, 'emerald');
-                  addToast('Trip Assigned', `${trip?.patient}'s trip was assigned to ${driver?.name || 'driver'}.`, 'success');
                 }}
                 onUnassignTrip={(tripId) => {
-                  setTrips(prev => prev.map(t => t.id === tripId ? {
-                    ...t,
-                    status: 'Unassigned',
-                    driverId: null,
-                    driverEmail: null,
-                    driverName: null,
-                  } : t));
+                  setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'Unassigned', driverId: null } : t));
                   const trip = trips.find(t => t.id === tripId);
                   addAuditLog('Unassignment', `${currentUser} (${role}) unassigned trip for ${trip?.patient || 'Unknown'}`, 'amber');
                 }}
                 onAddTrip={(newTrip) => {
                   const id = `TRP-${Date.now().toString().slice(-6)}`;
-                  setTrips(prev => [...prev, { ...newTrip, id, bookingId: sanitizeBookingId(newTrip.bookingId), status: 'Unassigned', driverId: null }]);
+                  setTrips(prev => [...prev, { ...newTrip, id, status: 'Unassigned', driverId: null }]);
                   addAuditLog('Trip Created', `${currentUser} manually added trip for ${newTrip.patient}`, 'emerald');
                 }}
                 onUpdateTrip={updateTrip}
@@ -2058,14 +1806,8 @@ const today = getTodayStr();
             ) : activeTab === 'dispatch' ? (
               <DispatchAssistant drivers={drivers} trips={trips}
                 onAssignTrip={(tripId, driverId) => {
+                  setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'Assigned', driverId } : t));
                   const driver = drivers.find(d => d.id === driverId);
-                  setTrips(prev => prev.map(t => t.id === tripId ? {
-                    ...t,
-                    status: 'Assigned',
-                    driverId,
-                    driverEmail: driver?.email || null,
-                    driverName: driver?.name || null,
-                  } : t));
                   const trip = trips.find(t => t.id === tripId);
                   addAuditLog('AI Dispatch', `${currentUser} (${role}) confirmed AI suggestion for ${trip?.patient || 'Trip '+tripId} to ${driver?.name || 'Unknown'}`, 'indigo');
                 }}
@@ -2073,18 +1815,12 @@ const today = getTodayStr();
                 currentUser={currentUser}
               />
             ) : activeTab === 'chat' ? (
-              <ChatPage currentUser={currentUser} role={role} />
+              <ChatPage currentUser={currentUser} />
             ) : activeTab === 'drivers' ? (
-              <DriversVehiclesPage role={role} drivers={drivers} setDrivers={setDrivers} dispatchers={dispatchers} addAuditLog={addAuditLog} currentUser={currentUser} trips={trips} requestAuthAction={requestAuthAction}
+              <DriversVehiclesPage role={role} drivers={drivers} setDrivers={setDrivers} addAuditLog={addAuditLog} currentUser={currentUser} trips={trips} requestAuthAction={requestAuthAction}
                 onAssignTrip={(tripId, driverId) => {
+                  setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'Assigned', driverId } : t));
                   const driver = drivers.find(d => d.id === driverId);
-                  setTrips(prev => prev.map(t => t.id === tripId ? {
-                    ...t,
-                    status: 'Assigned',
-                    driverId,
-                    driverEmail: driver?.email || null,
-                    driverName: driver?.name || null,
-                  } : t));
                   const trip = trips.find(t => t.id === tripId);
                   addAuditLog('Assignment', `${currentUser} (${role}) assigned ${trip?.patient || 'Trip '+tripId} to ${driver?.name || 'Unknown'}`, 'emerald');
                 }}
@@ -2102,7 +1838,7 @@ const today = getTodayStr();
             ) : activeTab === 'users' ? (
               <UsersPage drivers={drivers} setDrivers={setDrivers} dispatchers={dispatchers} setDispatchers={setDispatchers} addAuditLog={addAuditLog} currentUser={currentUser} role={role} requestAuthAction={requestAuthAction} />
             ) : activeTab === 'settings' ? (
-              <SettingsPage currentUser={currentUser} role={role} onLogout={handleLogout} onResetSystem={resetSystemData} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={handleUpdatePhoneNumbers} />
+              <SettingsPage currentUser={currentUser} role={role} onLogout={handleLogout} onResetSystem={resetSystemData} trashedTrips={trashedTrips} />
             ) : null}
           </div>
 
@@ -2114,47 +1850,22 @@ const today = getTodayStr();
                   <button onClick={() => setShowUploadModal(false)} className="p-2 bg-slate-100 rounded-lg sm:rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={18} /></button>
                 </div>
                 <FileUploadTrips drivers={drivers} preSelectDriver={uploadAssignDriver} onTripsCreated={(newTrips) => { 
-                  const d = new Date();
-                  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
                   setTrips(prev => {
                     const combined = [...prev, ...newTrips];
+                    // Remove duplicates just in case
                     const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-                    persistState({ trips: unique });
                     return unique;
                   }); 
-                setShowUploadModal(false); 
-                setUploadAssignDriver(''); 
-                addAuditLog('Trips Uploaded', `${currentUser} (${role}) imported ${newTrips.length} trips via file upload.`, 'blue'); 
-
-                const hasOtherDates = newTrips.some(t => t.date && t.date !== today);
-                if (hasOtherDates) {
-                  addToast('Trips Uploaded', `${newTrips.length} trips added. Use the Date Filter in the Trips tab to see future manifests.`, 'warning');
-                } else {
-                  addToast('Trips Uploaded', `${newTrips.length} trips added successfully.`, 'success');
-                }
-              }} />
+                  setShowUploadModal(false); 
+                  setUploadAssignDriver(''); 
+                  addAuditLog('Trips Uploaded', `${currentUser} (${role}) imported ${newTrips.length} trips via file upload.`, 'blue'); 
+                }} />
               </div>
             </div>
           )}
           {renderBulkAssignModal()}
           {renderSmartAssignModal()}
           {renderSecurityAuthModal()}
-
-          {/* Toast Notifications */}
-          <div className="fixed bottom-24 right-6 z-[200] flex flex-col gap-3 pointer-events-none">
-            {toasts.map(toast => (
-              <div key={toast.id} className="pointer-events-auto bg-white/90 backdrop-blur-xl border border-slate-200 rounded-2xl p-4 shadow-2xl flex gap-3 items-start animate-in max-w-xs">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                  {toast.type === 'success' ? <CheckCircle2 size={20} /> : <Zap size={20} />}
-                </div>
-                <div>
-                  <h4 className="font-black text-sm text-slate-900">{toast.title}</h4>
-                  <p className="text-xs font-medium text-slate-500 mt-0.5">{toast.message}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </>
       )}
     </div>

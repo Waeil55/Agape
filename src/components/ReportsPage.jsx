@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Calendar, Download, FileText, Filter, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { to24h, timeToMinutes as calcTimeToMinutes } from '../utils/timeFormat';
 
 const STATUS_OPTIONS = ['Completed', 'No Show', 'Cancelled'];
 
@@ -23,35 +24,16 @@ const Badge = ({ children, variant = 'info' }) => {
 
 const formatClock = (value) => {
   if (!value) return '—';
-
-  if (String(value).includes('T')) {
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return value;
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  } catch {
+    return value;
   }
-
-  return String(value);
 };
 
-const timeToMinutes = (value) => {
-  if (!value) return 1440;
-
-  const cleanTime = String(value).toUpperCase().trim();
-  if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
-
-  const match = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
-  if (!match) return 1440;
-
-  let hour = parseInt(match[1], 10);
-  const minutes = parseInt(match[2] || '0', 10);
-  const meridiem = match[3];
-
-  if (meridiem === 'PM' && hour < 12) hour += 12;
-  if (meridiem === 'AM' && hour === 12) hour = 0;
-
-  return hour * 60 + minutes;
-};
+const timeToMinutes = (value) => calcTimeToMinutes(value);
 
 const getDriverRecord = (trip, drivers) => drivers.find((driver) => driver.id === trip.driverId || driver.email === trip.driverEmail);
 
@@ -141,9 +123,9 @@ const ReportsPage = ({ trips = [], drivers = [] }) => {
       buildCsvValue(trip.bookingId || ''),
       buildCsvValue(trip.patient || ''),
       buildCsvValue(trip.pickup || ''),
-      buildCsvValue(trip.time || ''),
+      buildCsvValue(to24h(trip.time) || ''),
       buildCsvValue(trip.dropoff || ''),
-      buildCsvValue(trip.dropoffTime || formatClock(trip.completedAt)),
+      buildCsvValue(to24h(trip.dropoffTime) || formatClock(trip.completedAt)),
       buildCsvValue(trip.pickupOdometer || ''),
       buildCsvValue(trip.dropoffOdometer || ''),
       buildCsvValue(trip.signature ? 'YES' : 'NO'),
@@ -308,9 +290,9 @@ const ReportsPage = ({ trips = [], drivers = [] }) => {
                         <td className="p-2 whitespace-nowrap font-mono text-blue-600">{trip.bookingId || '—'}</td>
                         <td className="p-2 whitespace-nowrap font-bold text-slate-900">{trip.patient || '—'}</td>
                         <td className="p-2 text-slate-700">{trip.pickup || '—'}</td>
-                        <td className="p-2 whitespace-nowrap font-bold text-slate-900">{trip.time || '—'}</td>
+                        <td className="p-2 whitespace-nowrap font-bold text-slate-900 font-mono">{to24h(trip.time) || '—'}</td>
                         <td className="p-2 text-slate-700">{trip.dropoff || '—'}</td>
-                        <td className="p-2 whitespace-nowrap font-bold text-slate-900">{trip.dropoffTime || formatClock(trip.completedAt)}</td>
+                        <td className="p-2 whitespace-nowrap font-bold text-slate-900 font-mono">{to24h(trip.dropoffTime) || formatClock(trip.completedAt)}</td>
                         <td className="p-2 whitespace-nowrap font-mono font-black">{trip.pickupOdometer || '—'}</td>
                         <td className="p-2 whitespace-nowrap font-mono font-black">{trip.dropoffOdometer || '—'}</td>
                         <td className="p-2 whitespace-nowrap font-black text-emerald-600">{trip.signature ? 'YES' : 'NO'}</td>

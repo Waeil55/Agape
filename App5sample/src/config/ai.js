@@ -13,7 +13,7 @@ async function callGemini(prompt) {
       }),
     });
     const data = await resp.json();
-    let text = data?.candidates?.[0]?.parts?.[0]?.text || '';
+    let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     text = text.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
     return text;
   } catch {
@@ -33,11 +33,11 @@ Return a JSON array of trip IDs in optimal order. Consider: nearest pickup first
 
   const text = await callGemini(prompt);
   if (!text) return trips.map(t => t.id);
-    try {
-      return JSON.parse(text);
-    } catch {
-      return trips.map(t => t.id);
-    }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return trips.map(t => t.id);
+  }
 }
 
 export async function suggestDrivers(trip, drivers) {
@@ -52,11 +52,11 @@ Return the single best driver ID as a JSON string. Consider: proximity, vehicle 
 
   const text = await callGemini(prompt);
   if (!text) return null;
-    try {
-      return JSON.parse(text);
-    } catch {
-      return null;
-    }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 export async function suggestBatchAssignment(unassignedTrips, drivers) {
@@ -72,11 +72,11 @@ Return a JSON object where keys are trip IDs and values are driver IDs. Consider
 
   const text = await callGemini(prompt);
   if (!text) return {};
-    try {
-      return JSON.parse(text);
-    } catch {
-      return {};
-    }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
 }
 
 export async function explainAssignment(trip, driver) {
@@ -102,11 +102,11 @@ Return a JSON array of trip IDs sorted by proximity to reference. Return ONLY th
 
   const text = await callGemini(prompt);
   if (!text) return trips.map(t => t.id);
-    try {
-      return JSON.parse(text);
-    } catch {
-      return trips.map(t => t.id);
-    }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return trips.map(t => t.id);
+  }
 }
 
 export async function extractZipCode(address) {
@@ -144,7 +144,7 @@ export async function suggestOptimalDriver(trip, drivers, allTrips) {
 
   const prompt = `You are a NEMT fleet dispatch AI. Given a trip that needs assignment, select the OPTIMAL driver considering ALL factors below.
 
-BOOKING TO ASSIGN:
+TRIP TO ASSIGN:
 ${JSON.stringify({ id: trip.id, patient: trip.patient, pickup: trip.pickup, dropoff: trip.dropoff, time: trip.time }, null, 2)}
 
 AVAILABLE DRIVERS (with live schedule, zone, and next-trip context):

@@ -2,36 +2,17 @@ import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, ArrowRight, Download, Truck, X } from 'lucide-react';
 import { GEMINI_API_CONFIG } from '../config/firebase';
-import { to24h } from '../utils/timeFormat';
 
 const COLUMN_ALIASES = {
-  bookingId: ['booking id', 'bookingid', 'reservation id', 'trip id', 'booking number', 'confirmation id'],
   patient: ['client', 'client name', 'passenger', 'passenger name', 'rider', 'customer', 'patient name', 'name', 'rider name', 'guest', 'user', 'person'],
   pickup: ['pickup', 'pickup address', 'pickup_address', 'pick up', 'origin', 'from', 'from address', 'from_address', 'pu', 'pickup location', 'start address', 'start'],
   dropoff: ['dropoff', 'dropoff address', 'dropoff_address', 'drop off', 'destination', 'to', 'to address', 'to_address', 'do', 'dest', 'dropoff location', 'end address', 'end'],
   pickupPhone: ['pickup phone', 'pickup phone number', 'pickup_phone', 'phone', 'client phone', 'passenger phone', 'primary phone', 'phone number', 'tel', 'telephone', 'contact'],
   dropoffPhone: ['dropoff phone', 'dropoff phone number', 'dropoff_phone', 'facility phone', 'destination phone', 'location phone', 'secondary phone'],
   time: ['time', 'pickup time', 'pickup_time', 'schedule time', 'scheduled time', 'appt time', 'appt', 'appointment time', 'timestamp', 'slot', 'scheduled'],
-  dropoffTime: ['requested late dropoff', 'requested time dropoff', 'dropoff time', 'late dropoff', 'return time'],
-  date: ['date', 'trip date', 'service date', 'requested date'],
   type: ['type', 'trip type', 'am/pm', 'run', 'shift', 'route type', 'service type', 'schedule type', 'trip_type'],
-  notes: ['notes', 'special instructions', 'instructions', 'comment', 'comments', 'note', 'memo', 'remarks', 'additional info', 'info', 'pickup comments', 'dropoff comments', 'message', 'purpose'],
+  notes: ['notes', 'special instructions', 'instructions', 'comment', 'comments', 'note', 'memo', 'remarks', 'additional info', 'info'],
 };
-
-function normalizeDateValue(value) {
-  if (!value) return '';
-  const raw = String(value).trim();
-  const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) {
-    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
-  }
-  const simple = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (!simple) return '';
-  const month = String(simple[1]).padStart(2, '0');
-  const day = String(simple[2]).padStart(2, '0');
-  const year = simple[3].length === 2 ? `20${simple[3]}` : simple[3];
-  return `${year}-${month}-${day}`;
-}
 
 function findColumn(headers, aliases) {
   const lower = headers.map(h => h.toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
@@ -115,15 +96,12 @@ function mapColumns(row) {
     return idx !== -1 ? row[headers[idx]] || '' : '';
   };
   return {
-    bookingId: find(COLUMN_ALIASES.bookingId),
     patient: find(COLUMN_ALIASES.patient),
     pickup: find(COLUMN_ALIASES.pickup),
     dropoff: find(COLUMN_ALIASES.dropoff),
     pickupPhone: find(COLUMN_ALIASES.pickupPhone),
     dropoffPhone: find(COLUMN_ALIASES.dropoffPhone),
     time: find(COLUMN_ALIASES.time),
-    dropoffTime: find(COLUMN_ALIASES.dropoffTime),
-    date: find(COLUMN_ALIASES.date),
     type: find(COLUMN_ALIASES.type),
     notes: find(COLUMN_ALIASES.notes),
   };
@@ -163,11 +141,7 @@ Return ONLY valid JSON array. No markdown. No explanation.`;
         parsed.forEach((p, j) => {
           const origIdx = i + j;
           if (origIdx < rows.length) {
-            results[origIdx] = { 
-              issues: p.issues || [], 
-              confidence: p.confidence || 100,
-              correctedTime: p.correctedTime
-            };
+            results[origIdx] = { issues: p.issues || [], confidence: p.confidence || 100 };
           }
         });
       }
@@ -205,7 +179,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
   const [allColumnNames, setAllColumnNames] = useState([]);
   const [selectedCount, setSelectedCount] = useState(0);
   const [assignToDriver, setAssignToDriver] = useState(preSelectDriver || '');
-  const [showAssignPrompt, setShowAssignPrompt] = useState(true);
   const dropRef = useRef(null);
 
   const handleFileSelect = (selectedFile) => {
@@ -270,34 +243,22 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
 
       setProgressPct(12);
 
-      const getTodayStr = () => {
-        const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      };
-      const today = getTodayStr();
+      const today = new Date().toISOString().split('T')[0];
       const mapped = rows.map((row, idx) => {
         const mapped = mapColumns(row);
-        const notes = [mapped.notes, row['Pickup Comments'], row['Dropoff Comments'], row['Comments'], row['Message']]
-          .filter(Boolean)
-          .join(' | ');
         return {
           id: `TRIP-${Date.now()}-${idx}`,
-          bookingId: mapped.bookingId || '',
-          patient: mapped.patient || '',
-          date: normalizeDateValue(mapped.date) || today,
-          time: to24h(mapped.time),
-          dropoffTime: to24h(mapped.dropoffTime),
-          type: mapped.type || row['Space Types'] || '',
-          purpose: row['Purpose'] || '',
-          providerName: row['Provider Name'] || '',
-          directDistance: row['Direct Distance'] || '',
+          patient: mapped.patient || `Unknown ${idx + 1}`,
+          date: today,
+          time: mapped.time || 'Will Call',
+          type: mapped.type || 'AM1',
           driverId: null,
           pickup: mapped.pickup || '',
           dropoff: mapped.dropoff || '',
           pickupPhone: mapped.pickupPhone || '',
           dropoffPhone: mapped.dropoffPhone || '',
           status: 'Unassigned',
-          notes,
+          notes: mapped.notes || '',
           _originalRow: row,
           _hasIssues: false,
           _issues: [],
@@ -317,17 +278,10 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
 
         const updated = mapped.map((trip, idx) => {
           const ai = aiResults[idx];
-          if (ai) {
-            const hasIssues = ai.issues?.length > 0;
-            return { 
-              ...trip, 
-              time: ai.correctedTime ? to24h(ai.correctedTime) : trip.time,
-              _hasIssues: hasIssues, 
-              _issues: ai.issues || [], 
-              _confidence: ai.confidence || 100 
-            };
+          if (ai && ai.issues?.length > 0) {
+            return { ...trip, _hasIssues: true, _issues: ai.issues, _confidence: ai.confidence || 100 };
           }
-          return trip;
+          return { ...trip, _confidence: ai?.confidence || 100 };
         });
 
         setMappedTrips(updated);
@@ -348,11 +302,9 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
 
   const confirmImport = () => {
     const cleanTrips = mappedTrips.map(({ _originalRow, _hasIssues, _issues, _confidence, ...trip }) => {
-      // Per-trip driver assignment takes precedence, otherwise use global selector
-      const finalDriverId = trip.driverId || assignToDriver;
-      if (finalDriverId) {
-        const driver = drivers.find(d => d.id === finalDriverId);
-        return { ...trip, driverId: finalDriverId, status: driver ? 'Assigned' : trip.status };
+      if (assignToDriver) {
+        const driver = drivers.find(d => d.id === assignToDriver);
+        return { ...trip, driverId: assignToDriver, status: driver ? 'Assigned' : trip.status };
       }
       return trip;
     });
@@ -519,7 +471,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Pickup</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Dropoff</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600 hidden sm:table-cell">Time</th>
-                    <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Assign To</th>
+                    <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600 hidden sm:table-cell">Phone</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Issues</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Conf.</th>
                   </tr>
@@ -531,23 +483,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs font-semibold text-slate-900 whitespace-nowrap">{trip.patient}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.pickup}>{trip.pickup || <span className="text-rose-400 italic">missing</span>}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.dropoff}>{trip.dropoff || <span className="text-rose-400 italic">missing</span>}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs text-slate-600 hidden sm:table-cell font-mono">{trip.time}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
-                        <select 
-                          value={trip.driverId || ''} 
-                          onChange={(e) => {
-                            const newTrips = [...mappedTrips];
-                            newTrips[idx].driverId = e.target.value;
-                            setMappedTrips(newTrips);
-                          }}
-                          className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
-                        >
-                          <option value="">Auto/Unassigned</option>
-                          {drivers.map(d => (
-                            <option key={d.id} value={d.id}>{d.name}</option>
-                          ))}
-                        </select>
-                      </td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs text-slate-600 hidden sm:table-cell">{trip.time}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[9px] sm:text-[10px] text-slate-600 hidden sm:table-cell">{trip.pickupPhone || trip.dropoffPhone || '-'}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
                         {trip._hasIssues ? (
                           <div className="flex flex-col gap-0.5">
@@ -567,45 +504,27 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
               </table>
             </div>
 
-            <div className="mt-4 sm:mt-6 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <Truck size={18} className="text-blue-600" /> Assign Bookings to Drivers
-                </label>
-                <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-blue-100">
-                  <input type="checkbox" id="assign-prompt" checked={showAssignPrompt} onChange={(e) => setShowAssignPrompt(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-                  <label htmlFor="assign-prompt" className="text-[10px] font-bold text-blue-600 uppercase tracking-widest cursor-pointer">Enable Assignment</label>
-                </div>
+            <div className="mt-4 sm:mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+              <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                <Truck size={16} className="text-blue-600" /> Assign All Trips to Driver
+              </label>
+              <div className="flex gap-2">
+                <select value={assignToDriver} onChange={(e) => setAssignToDriver(e.target.value)} className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm bg-white">
+                  <option value="">Leave Unassigned</option>
+                  {drivers.map(d => (
+                    <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
+                  ))}
+                </select>
+                {assignToDriver && (
+                  <button onClick={() => setAssignToDriver('')} className="px-3 py-2 text-slate-600 hover:text-rose-600 border border-slate-300 rounded-lg text-sm font-semibold">
+                    <X size={16} />
+                  </button>
+                )}
               </div>
-
-              {showAssignPrompt ? (
-                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <p className="text-xs text-blue-600 font-bold uppercase tracking-widest opacity-70">Bulk Assign All Uploaded Bookings:</p>
-                  <div className="flex gap-2">
-                    <select value={assignToDriver} onChange={(e) => setAssignToDriver(e.target.value)} className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-white font-bold shadow-sm">
-                      <option value="">Leave Most as Unassigned (Or use per-trip selector below)</option>
-                      {drivers.map(d => (
-                        <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
-                      ))}
-                    </select>
-                    {assignToDriver && (
-                      <button onClick={() => setAssignToDriver('')} className="px-3 py-2 text-slate-400 hover:text-rose-600 border border-slate-200 bg-white rounded-xl transition active:scale-95">
-                        <X size={18} />
-                      </button>
-                    )}
-                  </div>
-                  {assignToDriver && (
-                    <p className="text-[10px] text-emerald-700 font-black flex items-center gap-1.5 uppercase tracking-wider">
-                      <CheckCircle2 size={12} /> All {mappedTrips.length} trips will default to {drivers.find(d => d.id === assignToDriver)?.name}
-                    </p>
-                  )}
-                  <p className="text-[10px] text-slate-500 font-bold italic">Tip: You can still override individual bookings in the table below.</p>
-                </div>
-              ) : (
-                <div className="p-4 border-2 border-dashed border-blue-100 rounded-xl text-center">
-                  <h3 className="text-lg font-black text-slate-900">{mappedTrips.length} booking(s) extracted</h3>
-                  <p className="text-xs font-bold text-slate-400">Assignment disabled. Bookings will be imported as Unassigned.</p>
-                </div>
+              {assignToDriver && (
+                <p className="text-xs text-emerald-700 font-semibold mt-2 flex items-center gap-1">
+                  <CheckCircle2 size={12} /> All {mappedTrips.length} trips will be assigned to {drivers.find(d => d.id === assignToDriver)?.name}
+                </p>
               )}
             </div>
 
@@ -615,7 +534,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
               </button>
               <button onClick={confirmImport} className="w-full sm:flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm text-sm">
                 <CheckCircle2 size={18} />
-                Import {totalSelected} Bookings
+                Import {totalSelected} Trips
               </button>
             </div>
           </div>

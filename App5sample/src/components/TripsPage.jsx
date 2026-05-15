@@ -1,38 +1,21 @@
 import React, { useState } from 'react';
-import { tripMatchesCalendarDay } from '../utils/tripDate';
-import { MapPin, Clock, AlertCircle, Users, UserCheck, X, BrainCircuit, Loader2, Plus, Save, Trash2, Edit2, CheckCircle2, Phone, MessageSquare, Flag, Sparkles, Check } from 'lucide-react';
+import { MapPin, Clock, AlertCircle, Users, UserCheck, X, BrainCircuit, Loader2, Plus, Save, Trash2, Edit2, CheckCircle2, Phone, MessageSquare, Flag } from 'lucide-react';
 import { suggestBatchAssignment } from '../config/ai';
-import { to24h, timeToMinutes as calcTimeToMinutes } from '../utils/timeFormat';
 
-const getTodayStr = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-const today = getTodayStr();
+const today = new Date().toISOString().split('T')[0];
 
-const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onUnassignTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
+const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, onCreateLegMission, onAssignTrip, onUnassignTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
   const [sortBy, setSortBy] = useState('time');
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [showAssign, setShowAssign] = useState(false);
-  const [assignMode, setAssignMode] = useState('assign');
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
-  const [assignmentFeedback, setAssignmentFeedback] = useState('');
-  const [newTrip, setNewTrip] = useState({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '' });
+  const [newTrip, setNewTrip] = useState({ patient: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '' });
   const [editTrip, setEditTrip] = useState(null);
-  const [manifestDate, setManifestDate] = useState(today);
-  const [showAllDates, setShowAllDates] = useState(false);
 
   const handleBulkAssign = (driverId) => {
-    if (assignMode === 'mission') {
-      onCreateLegMission(driverId);
-      return;
-    }
-    if (onBulkAssignTrips) {
-      onBulkAssignTrips(driverId);
-      setShowAssign(false);
-    }
+    onCreateLegMission(driverId);
   };
 
   const handleBulkDelete = () => {
@@ -40,15 +23,32 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
     selectedTasks.forEach(id => {
       onDeleteTrip(id);
     });
-    selectedTasks.forEach(id => toggleTaskSelection(id));
+    setSelectedTasks([]);
   };
 
   const getZip = (addr) => (addr || '').match(/\b(\d{5})\b/)?.[1] || '';
 
-  const timeToMinutes = (t) => calcTimeToMinutes(t);
+  const timeToMinutes = (t) => {
+    if (!t) return 1440;
+    const cleanTime = String(t).toUpperCase().trim();
+    if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
+    
+    // Robust regex: HH:MM AM/PM or HH AM/PM or HH:MM
+    const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+    if (!m) return 1440;
+    
+    let h = parseInt(m[1], 10);
+    let min = parseInt(m[2] || '0', 10);
+    const p = m[3];
+    
+    if (p === 'PM' && h < 12) h += 12;
+    if (p === 'AM' && h === 12) h = 0;
+    
+    return h * 60 + min;
+  };
 
   const filteredTrips = [...trips]
-    .filter(t => showAllDates || tripMatchesCalendarDay(t.date, manifestDate))
+    .filter(t => !t.date || t.date === today)
     .sort((a, b) => {
       if (sortBy === 'time') {
         const timeA = timeToMinutes(a.time);
@@ -70,10 +70,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
 
   const handleAssign = (driverId) => {
     if (onAssignTrip && selectedTrip) {
-      const driver = drivers.find(d => d.id === driverId);
       onAssignTrip(selectedTrip.id, driverId);
-      setAssignmentFeedback(`✓ ${selectedTrip.patient} assigned to ${driver?.name || 'Driver'}`);
-      setTimeout(() => setAssignmentFeedback(''), 3000);
       setShowAssign(false);
       setSelectedTrip(null);
     }
@@ -81,10 +78,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
 
   const handleUpdate = (e) => {
     e.preventDefault();
-    onUpdateTrip({
-      ...editTrip,
-      time: to24h(editTrip.time)
-    });
+    onUpdateTrip(editTrip);
     setShowEditForm(false);
     setEditTrip(null);
   };
@@ -96,14 +90,6 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
 
   return (
     <div className="space-y-6">
-      {/* Assignment Success Feedback */}
-      {assignmentFeedback && (
-        <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-4 fade-in duration-200">
-          <div className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-xl shadow-emerald-500/30 flex items-center gap-2">
-            <Check size={18} /> {assignmentFeedback}
-          </div>
-        </div>
-      )}
       {/* HEADER CONTROLS */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row justify-between gap-4">
@@ -115,38 +101,17 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               <option value="zip">Sort by Zip Area</option>
             </select>
           </div>
-
-          <div className="flex-1 max-w-xs">
-            <div className="flex items-center justify-between mb-1.5 ml-1">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Manifest Date</label>
-              <button onClick={() => setShowAllDates(!showAllDates)} className={`text-[10px] font-black uppercase tracking-widest ${showAllDates ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                {showAllDates ? '✓ Showing All' : 'Show All'}
-              </button>
-            </div>
-            <input 
-              type="date" 
-              value={manifestDate} 
-              disabled={showAllDates}
-              onChange={(e) => setManifestDate(e.target.value)} 
-              className={`w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-sm outline-none transition-opacity ${showAllDates ? 'opacity-50' : 'opacity-100'}`} 
-            />
-          </div>
           
           <div className="flex items-center gap-2">
             {selectedTasks.length > 0 && (
               <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-                <button onClick={() => { setAssignMode('assign'); setShowAssign(true); }} className="px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition">
-                  <Users size={14} /> Assign Trips ({selectedTasks.length})
+                <button onClick={() => setShowAssign(true)} className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 transition">
+                  <Sparkles size={14} /> Create Leg Mission ({selectedTasks.length})
                 </button>
-                {selectedTasks.length > 1 && (
-                  <button onClick={() => { setAssignMode('mission'); setShowAssign(true); }} className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 transition">
-                    <Sparkles size={14} /> Create Leg Mission
-                  </button>
-                )}
               </div>
             )}
             <button onClick={() => setShowCreateForm(true)} className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition">
-              <Plus size={16} /> New Manifest Booking
+              <Plus size={16} /> New Manifest Trip
             </button>
           </div>
         </div>
@@ -155,11 +120,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {/* TABLE / LIST */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-lg font-black text-slate-900">Live Booking Queue</h3>
-          <div className="flex items-center gap-3">
-            {showAllDates && <span className="text-[10px] font-black bg-amber-50 text-amber-600 px-2.5 py-1 rounded-lg uppercase tracking-widest">Viewing All Dates</span>}
-            <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg uppercase tracking-widest">{filteredTrips.length} Total Bookings</span>
-          </div>
+          <h3 className="text-lg font-black text-slate-900">Live Manifest Queue</h3>
+          <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg uppercase tracking-widest">{filteredTrips.length} Total Trips</span>
         </div>
 
         <div className="divide-y divide-slate-100">
@@ -179,11 +141,6 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                   <div className="flex-1 min-w-0" onClick={() => setSelectedTrip(trip)}>
                     <div className="flex items-center gap-3 mb-1">
                       <p className="font-black text-slate-900 text-sm sm:text-base truncate">{trip.patient}</p>
-                      {trip.bookingId ? (
-                        <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500">
-                          {trip.bookingId}
-                        </span>
-                      ) : null}
                       <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${trip.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
                         {trip.status}
                       </span>
@@ -229,23 +186,11 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                   </div>
 
                   <div className="text-right shrink-0">
-                    <p className="text-xl font-black text-slate-900 font-mono leading-none">{trip.time}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{trip.type}</p>
-                    <div className="flex flex-col items-end gap-2 mt-2">
-                      <select 
-                        value={trip.driverId || ''} 
-                        onChange={(e) => onAssignTrip(trip.id, e.target.value)}
-                        className="text-[10px] font-black uppercase tracking-wider bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-emerald-500 text-slate-600"
-                      >
-                        <option value="">Quick Assign</option>
-                        {drivers.map(d => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
-                        ))}
-                      </select>
-                      <div className="flex items-center gap-1">
-                        <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={14} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={14} /></button>
-                      </div>
+                    <p className="text-sm font-black text-slate-900">{trip.time}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{trip.type}</p>
+                    <div className="flex items-center justify-end gap-1 mt-2">
+                      <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={14} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={14} /></button>
                     </div>
                   </div>
                 </div>
@@ -260,25 +205,12 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowCreateForm(false)} />
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> Create New Manifest Booking</h3>
-            <form onSubmit={(e) => { 
-              e.preventDefault(); 
-              const normalizedTrip = {
-                ...newTrip,
-                time: to24h(newTrip.time)
-              };
-              onAddTrip(normalizedTrip); 
-              setShowCreateForm(false); 
-              setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '' }); 
-            }} className="space-y-6">
+            <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> Create New Manifest Entry</h3>
+            <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '' }); }} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Patient Full Name</label>
                   <input type="text" required value={newTrip.patient} onChange={(e) => setNewTrip({...newTrip, patient: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Booking ID</label>
-                  <input type="text" value={newTrip.bookingId} onChange={(e) => setNewTrip({...newTrip, bookingId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" placeholder="Optional" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pickup Time</label>
@@ -351,12 +283,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowAssign(false)} />
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20">
-            <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2"><Users size={24} className="text-blue-600" /> {assignMode === 'mission' ? 'Create Driver Mission' : 'Assign to Driver'}</h3>
-            <p className="text-xs font-bold text-slate-500 mb-6 uppercase tracking-widest">
-              {assignMode === 'mission'
-                ? `Create a multi-stop mission for ${selectedTasks.length || 1} trips`
-                : `Select driver for ${selectedTasks.length || 1} trips`}
-            </p>
+            <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2"><Users size={24} className="text-blue-600" /> Assign to Driver</h3>
+            <p className="text-xs font-bold text-slate-500 mb-6 uppercase tracking-widest">Select driver for {selectedTasks.length || 1} trips</p>
             <div className="space-y-2">
               {drivers.map(d => (
                 <button key={d.id} onClick={() => selectedTasks.length > 0 ? handleBulkAssign(d.id) : handleAssign(d.id)} 
