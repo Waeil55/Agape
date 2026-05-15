@@ -1,0 +1,21 @@
+{
+  "projects": {
+    "default": "agape-95c9f"
+  },
+  "targets": {
+    "agape-95c9f": {
+      "hosting": {
+        "agape-care": [
+          "agape-care"
+        ],
+        "app5sample": [
+          "app5sample"
+        ],
+        "agape-app5": [
+          "agape-app5"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
