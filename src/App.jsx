@@ -672,7 +672,7 @@ const App = () => {
     // Create legs: all pickups then all dropoffs (can be reordered later by driver)
     const legs = [];
     selectedTrips.forEach(t => legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'PICKUP', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.pickup, notes: t.notes, phone: t.pickupPhone }));
-    selectedTrips.forEach(t => legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'DROPOFF', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.dropoff, notes: t.notes, phone: t.dropoffPhone }));
+    selectedTrips.forEach(t => legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'DROPOFF', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.dropoff, notes: t.notes, phone: t.pickupPhone }));
     
     // Update trips status and assign to driver
     const updatedTrips = trips.map(t => selectedTasks.includes(t.id) ? {
