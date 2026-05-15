@@ -669,10 +669,25 @@ const App = () => {
     if (selectedTrips.length === 0) return;
     const driver = drivers.find(d => d.id === driverId);
     
+    // Build map of patient → best client phone (use pickupPhone from first trip for that patient)
+    const patientPhoneMap = {};
+    selectedTrips.forEach(t => {
+      const key = (t.patient || '').trim().toLowerCase();
+      if (!patientPhoneMap[key]) {
+        patientPhoneMap[key] = t.pickupPhone || t.dropoffPhone || '';
+      }
+    });
+    
     // Create legs: all pickups then all dropoffs (can be reordered later by driver)
     const legs = [];
-    selectedTrips.forEach(t => legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'PICKUP', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.pickup, notes: t.notes, phone: t.pickupPhone }));
-    selectedTrips.forEach(t => legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'DROPOFF', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.dropoff, notes: t.notes, phone: t.pickupPhone }));
+    selectedTrips.forEach(t => {
+      const clientPhone = patientPhoneMap[(t.patient || '').trim().toLowerCase()] || t.pickupPhone;
+      legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'PICKUP', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.pickup, notes: t.notes, phone: clientPhone });
+    });
+    selectedTrips.forEach(t => {
+      const clientPhone = patientPhoneMap[(t.patient || '').trim().toLowerCase()] || t.pickupPhone;
+      legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'DROPOFF', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.dropoff, notes: t.notes, phone: clientPhone });
+    });
     
     // Update trips status and assign to driver
     const updatedTrips = trips.map(t => selectedTasks.includes(t.id) ? {
