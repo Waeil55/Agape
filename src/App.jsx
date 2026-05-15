@@ -669,19 +669,36 @@ const App = () => {
     if (selectedTrips.length === 0) return;
     const driver = drivers.find(d => d.id === driverId);
     
-    // Build map of patient → best client phone (pick which address is "home")
+    // Build map of patient → best client phone (detect home address as one that appears in both pickup and dropoff)
     const patientPhoneMap = {};
+    const patientAddresses = {};
     selectedTrips.forEach(t => {
       const key = (t.patient || '').trim().toLowerCase();
-      if (!patientPhoneMap[key]) {
-        if ((t.pickup || '').toLowerCase().includes('home')) {
-          patientPhoneMap[key] = t.pickupPhone || '';
-        } else if ((t.dropoff || '').toLowerCase().includes('home')) {
-          patientPhoneMap[key] = t.dropoffPhone || '';
-        } else {
-          patientPhoneMap[key] = t.pickupPhone || t.dropoffPhone || '';
+      if (!patientAddresses[key]) patientAddresses[key] = { pickups: [], dropoffs: [], trips: [] };
+      if (t.pickup) patientAddresses[key].pickups.push(t.pickup.trim().toLowerCase());
+      if (t.dropoff) patientAddresses[key].dropoffs.push(t.dropoff.trim().toLowerCase());
+      patientAddresses[key].trips.push(t);
+    });
+    Object.values(patientAddresses).forEach(({ pickups, dropoffs, trips }) => {
+      // Find home address (appears in both pickups and dropoffs for same patient)
+      const homeAddr = pickups.find(p => dropoffs.includes(p)) || '';
+      let clientPhone = '';
+      if (homeAddr) {
+        const homeTrip = trips.find(t => (t.pickup || '').trim().toLowerCase() === homeAddr);
+        if (homeTrip) clientPhone = homeTrip.pickupPhone || '';
+        if (!clientPhone) {
+          const returnTrip = trips.find(t => (t.dropoff || '').trim().toLowerCase() === homeAddr);
+          if (returnTrip) clientPhone = returnTrip.dropoffPhone || '';
         }
       }
+      if (!clientPhone) {
+        const first = trips[0];
+        clientPhone = first.pickupPhone || first.dropoffPhone || '';
+      }
+      trips.forEach(t => {
+        const key = (t.patient || '').trim().toLowerCase();
+        patientPhoneMap[key] = clientPhone;
+      });
     });
     
     // Create legs: all pickups then all dropoffs (can be reordered later by driver)
