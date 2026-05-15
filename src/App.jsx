@@ -669,12 +669,18 @@ const App = () => {
     if (selectedTrips.length === 0) return;
     const driver = drivers.find(d => d.id === driverId);
     
-    // Build map of patient → best client phone (use pickupPhone from first trip for that patient)
+    // Build map of patient → best client phone (pick which address is "home")
     const patientPhoneMap = {};
     selectedTrips.forEach(t => {
       const key = (t.patient || '').trim().toLowerCase();
       if (!patientPhoneMap[key]) {
-        patientPhoneMap[key] = t.pickupPhone || t.dropoffPhone || '';
+        if ((t.pickup || '').toLowerCase().includes('home')) {
+          patientPhoneMap[key] = t.pickupPhone || '';
+        } else if ((t.dropoff || '').toLowerCase().includes('home')) {
+          patientPhoneMap[key] = t.dropoffPhone || '';
+        } else {
+          patientPhoneMap[key] = t.pickupPhone || t.dropoffPhone || '';
+        }
       }
     });
     
