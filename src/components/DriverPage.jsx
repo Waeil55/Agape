@@ -661,7 +661,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                                 <h4 className="font-black text-slate-900 text-lg truncate leading-tight">{t.patient}</h4>
                                 {t.bookingId ? <p className="text-blue-600 text-xs font-medium -mt-0.5">Booking: {t.bookingId}</p> : null}
                                 <div className="flex items-center gap-3 mt-2">
-                                  <span className="big-time text-blue-600">{to12hr(t.time)}</span>
+                                  <span className="big-time text-blue-600 whitespace-nowrap">{to12hr(t.time)}</span>
                                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-100 text-slate-500'}`}>
                                     {t.status}
                                   </span>
