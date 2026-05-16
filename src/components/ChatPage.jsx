@@ -306,7 +306,7 @@ const ChatPage = ({ currentUser, role }) => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-160px)] bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in">
+    <div className="flex h-[calc(100dvh-180px)] bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in">
       {/* Sidebar */}
       <div className={`${sidebarOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-80 lg:w-96 border-r border-slate-100 bg-slate-50/50 shrink-0`}>
         <div className="p-4 border-b border-slate-100 bg-white">

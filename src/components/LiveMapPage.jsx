@@ -20,9 +20,26 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
 
   const startGpsTracking = () => {
     if (!navigator.geolocation) return;
+    let lastUpdate = 0;
+    let lastLat = 0;
+    let lastLng = 0;
+    const MIN_INTERVAL = 5000; // 5 seconds minimum between updates
+    const MIN_DISTANCE = 10; // 10 meters minimum movement
+    
     const id = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
+        const now = Date.now();
+        
+        // Throttle: skip if less than MIN_INTERVAL elapsed OR less than MIN_DISTANCE moved
+        if (now - lastUpdate < MIN_INTERVAL) return;
+        const dist = Math.sqrt(Math.pow(latitude - lastLat, 2) + Math.pow(longitude - lastLng, 2)) * 111320;
+        if (dist < MIN_DISTANCE && lastUpdate > 0) return;
+        
+        lastUpdate = now;
+        lastLat = latitude;
+        lastLng = longitude;
+        
         setDriverPositions(prev => ({
           ...prev,
           [me?.id]: { lat: latitude, lng: longitude, name: me?.name || 'Me' },
@@ -30,8 +47,11 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
         if (onUpdateDriverLocation) onUpdateDriverLocation(me?.id, latitude, longitude);
         setGpsActive(true);
       },
-      () => setGpsActive(false),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+      (err) => {
+        console.warn("GPS error:", err.message);
+        setGpsActive(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
     );
     setWatchId(id);
   };

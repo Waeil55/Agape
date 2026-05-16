@@ -1,86 +1,19 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { tripMatchesTodayOrTomorrow } from '../utils/tripDate';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { 
-  Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, Users,
+  Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, 
   AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check,
   ChevronUp, ChevronDown, Edit2, ListChecks, Sparkles, Target, RotateCcw, Lock
 } from 'lucide-react';
-
-const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
-
-const FACILITY_KEYS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute', 'skills', 'senior', 'living', 'manor', 'village'];
-
-const clientPhone = (trip, allTrips = []) => {
-  if (!trip) return '';
-  
-  // 1. Prioritize the pre-calculated patientPhone from import
-  if (trip.patientPhone) return trip.patientPhone;
-
-  const p1Raw = trip.pickupPhone || '';
-  const p2Raw = trip.dropoffPhone || '';
-  const p1 = cleanPhone(p1Raw);
-  const p2 = cleanPhone(p2Raw);
-
-  // 2. Strongest Heuristic: If a phone is shared by multiple patients, it's a facility
-  if (allTrips.length > 0) {
-    const isShared = (p) => {
-      if (!p || p.length < 7) return false;
-      return allTrips.some(t => 
-        (t.patient || '').toLowerCase() !== (trip.patient || '').toLowerCase() && 
-        (cleanPhone(t.pickupPhone) === p || cleanPhone(t.dropoffPhone) === p)
-      );
-    };
-
-    const p1Shared = isShared(p1);
-    const p2Shared = isShared(p2);
-
-    if (p1Shared && !p2Shared) return p2Raw;
-    if (!p1Shared && p2Shared) return p1Raw;
-  }
-
-  // 3. Fallback to keywords in phone string
-  const p1Low = p1Raw.toLowerCase();
-  const p2Low = p2Raw.toLowerCase();
-  const p1IsFac = FACILITY_KEYS.some(k => p1Low.includes(k)) || p1Low.includes('dr ') || p1Low.includes('office');
-  const p2IsFac = FACILITY_KEYS.some(k => p2Low.includes(k)) || p2Low.includes('dr ') || p2Low.includes('office');
-
-  if (p1IsFac && !p2IsFac) return p2Raw;
-  if (!p1IsFac && p2IsFac) return p1Raw;
-
-  // 4. Fallback to address-based facility detection
-  const pickupFac = FACILITY_KEYS.some(k => (trip.pickup || '').toLowerCase().includes(k)) || 
-                    FACILITY_KEYS.some(k => (trip.pickupSiteName || '').toLowerCase().includes(k));
-  const dropFac = FACILITY_KEYS.some(k => (trip.dropoff || '').toLowerCase().includes(k)) || 
-                  FACILITY_KEYS.some(k => (trip.dropoffSiteName || '').toLowerCase().includes(k));
-
-  if (pickupFac && !dropFac) return p2Raw || p1Raw || '';
-  if (!pickupFac && dropFac) return p1Raw || p2Raw || '';
-  
-  return p1Raw || p2Raw || '';
-};
-
-const to12hr = (time) => {
-  if (!time || time === 'Will Call' || time === 'WC') return time || 'Will Call';
-  const m = String(time).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-  if (m && m[3]) return time;
-  const parts = String(time).match(/(\d{1,2}):(\d{2})/);
-  if (!parts) return time;
-  let h = parseInt(parts[1], 10);
-  const min = parts[2];
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  if (h === 0) h = 12;
-  else if (h > 12) h -= 12;
-  return `${h}:${min} ${ampm}`;
-};
 
 const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, appSettings, phoneNumbers }) => {
   const me = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase());
 
   if (!me) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8 text-center">
+      <div className="min-h-[100dvh] bg-slate-50 flex flex-col items-center justify-center p-8 text-center">
         <div className="w-20 h-20 bg-blue-100 rounded-[2rem] flex items-center justify-center mb-6 animate-pulse">
           <Truck size={40} className="text-blue-600" />
         </div>
