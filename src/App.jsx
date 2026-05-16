@@ -17,7 +17,7 @@ import DriversVehiclesPage from './components/DriversVehiclesPage';
 import SettingsPage from './components/SettingsPage';
 import DriverPage from './components/DriverPage';
 import UsersPage from './components/UsersPage';
-import { requestNotificationPermission, showLocalNotification } from './config/notifications';
+import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 import { suggestBatchAssignment, suggestOptimalDriver } from './config/ai';
@@ -394,6 +394,7 @@ const App = () => {
 
   useEffect(() => {
     let unsubData = null;
+    let unsubFcm = null;
     let dataLoaded = false;
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -438,6 +439,13 @@ const App = () => {
             if (token) { setNotificationsEnabled(true); }
           });
         }
+        
+        // Listen for foreground push messages
+        unsubFcm = onForegroundMessage((payload) => {
+          const title = payload.notification?.title || payload.data?.title || 'Agape Care';
+          const body = payload.notification?.body || payload.data?.body || '';
+          if (title && body) showLocalNotification(title, body);
+        });
 
         // Initialize data from Firestore
         if (dataSnap.exists()) {
@@ -569,6 +577,7 @@ const App = () => {
     return () => {
       unsub();
       if (unsubData) unsubData();
+      if (typeof unsubFcm === 'function') unsubFcm();
     };
   }, []);
 
