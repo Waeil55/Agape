@@ -102,23 +102,23 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 <Truck size={18} className="text-blue-600" />
               </div>
               <div>
-                <h1 className="text-base font-bold text-slate-900">Agape Care</h1>
+                <div className="flex items-center gap-1">
+                  <h1 className="text-base font-bold text-slate-900">Agape Care</h1>
+                  {phoneNumbers?.routing && (
+                    <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm active:scale-90 transition-all" title="Call Routing">
+                      <Phone size={10} className="text-white" />
+                    </a>
+                  )}
+                  {phoneNumbers?.dispatcher && (
+                    <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm active:scale-90 transition-all" title="Call Dispatch">
+                      <Phone size={10} className="text-white" />
+                    </a>
+                  )}
+                </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                   <span className="text-[10px] font-medium text-slate-400">{isOnline ? 'Online' : 'Offline'}</span>
                 </div>
-              </div>
-              <div className="flex items-center gap-1 ml-1">
-                {phoneNumbers?.routing && (
-                  <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm active:scale-90 transition-all" title="Call Routing">
-                    <Phone size={12} className="text-white" />
-                  </a>
-                )}
-                {phoneNumbers?.dispatcher && (
-                  <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm active:scale-90 transition-all" title="Call Dispatch">
-                    <Phone size={12} className="text-white" />
-                  </a>
-                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
