@@ -95,22 +95,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       {activeNav === 'trips' && (
         <div className="flex-1 overflow-y-auto pb-28 px-3 pt-3 space-y-3">
 
-          {/* Header */}
-          <div className="flex items-center justify-between px-1 py-2">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-600/20">
-                <span className="text-white font-black text-sm">{me?.name?.charAt(0)}</span>
-              </div>
-              <div>
-                <p className="font-bold text-sm text-slate-900">{me?.name}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                  <span className="text-[10px] font-medium text-slate-400">{isOnline ? 'Online' : 'Offline'} • {me?.vehicle || 'No vehicle'}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Quick Actions 2x2 Grid */}
           <div className="grid grid-cols-2 gap-2">
             <button className="flex items-center gap-2.5 px-3.5 py-3 bg-white rounded-2xl shadow-sm border border-slate-100/50 active:scale-[0.97] transition-all hover:border-indigo-200">
