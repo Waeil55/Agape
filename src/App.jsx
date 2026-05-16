@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense, memo } from 'react';
 import {
   Truck, Users, MapPin, Phone, Clock, Search, ShieldCheck,
   ArrowRight, CheckCircle2, Trash2, Map as MapIcon, LogOut,
@@ -12,20 +12,24 @@ import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc
 import { auth, db } from './config/firebase';
 import TripsPage from './components/TripsPage';
 import ChatPage from './components/ChatPage';
-import ReportsPage from './components/ReportsPage';
 import ArchivesPage from './components/ArchivesPage';
 import DriversVehiclesPage from './components/DriversVehiclesPage';
 import SettingsPage from './components/SettingsPage';
-import FileUploadTrips from './components/FileUploadTrips';
-import UsersPage from './components/UsersPage';
 import DriverPage from './components/DriverPage';
-import LiveMapPage from './components/LiveMapPage';
-import DispatchAssistant from './components/DispatchAssistant';
+import UsersPage from './components/UsersPage';
 import { requestNotificationPermission, showLocalNotification } from './config/notifications';
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 import { suggestBatchAssignment, suggestOptimalDriver } from './config/ai';
 import { tripMatchesCalendarDay, tripMatchesTodayOrTomorrow } from './utils/tripDate';
+
+// Lazy-loaded heavy components
+const LiveMapPage = lazy(() => import('./components/LiveMapPage'));
+const DispatchAssistant = lazy(() => import('./components/DispatchAssistant'));
+const FileUploadTrips = lazy(() => import('./components/FileUploadTrips'));
+const ReportsPage = lazy(() => import('./components/ReportsPage'));
+
+const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
 const Badge = ({ children, variant = 'info' }) => {
   const variants = {
@@ -2163,7 +2167,8 @@ const today = getTodayStr();
                 onDeleteTrip={requestDeleteTrip}
               />
             ) : activeTab === 'dispatch' ? (
-              <DispatchAssistant drivers={drivers} trips={trips}
+              <Suspense fallback={<LazyFallback />}>
+                <DispatchAssistant drivers={drivers} trips={trips}
                 onAssignTrip={(tripId, driverId) => {
                   const driver = drivers.find(d => d.id === driverId);
                   setTrips(prev => prev.map(t => t.id === tripId ? {
@@ -2197,15 +2202,20 @@ const today = getTodayStr();
                 }}
                 onUploadForDriver={(driverId) => { setUploadAssignDriver(driverId); setShowUploadModal(true); }}
               />
+              </Suspense>
             ) : activeTab === 'reports' ? (
+              <Suspense fallback={<LazyFallback />}>
               <ReportsPage trips={trips} drivers={drivers} />
+              </Suspense>
             ) : activeTab === 'archives' ? (
               <ArchivesPage
                 trashedTrips={role === 'driver' ? trashedTrips.filter(t => t.driverId === drivers.find(d => d.email === currentUser)?.id) : trashedTrips}
                 restoreTrip={role === 'driver' ? null : restoreTrip}
               />
             ) : activeTab === 'map' ? (
+              <Suspense fallback={<LazyFallback />}>
               <LiveMapPage drivers={drivers} onUpdateDriverLocation={handleUpdateDriverLocation} />
+              </Suspense>
             ) : activeTab === 'users' ? (
               <UsersPage drivers={drivers} setDrivers={setDrivers} dispatchers={dispatchers} setDispatchers={setDispatchers} addAuditLog={addAuditLog} currentUser={currentUser} role={role} requestAuthAction={requestAuthAction} />
             ) : activeTab === 'settings' ? (
@@ -2220,6 +2230,7 @@ const today = getTodayStr();
                 <div className="flex justify-end mb-2">
                   <button onClick={() => setShowUploadModal(false)} className="p-2 bg-slate-100 rounded-lg sm:rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={18} /></button>
                 </div>
+                <Suspense fallback={<LazyFallback />}>
                 <FileUploadTrips drivers={drivers} preSelectDriver={uploadAssignDriver} onTripsCreated={(newTrips) => { 
                   const d = new Date();
                   const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -2241,6 +2252,7 @@ const today = getTodayStr();
                   addToast('Trips Uploaded', `${newTrips.length} trips added successfully.`, 'success');
                 }
               }} />
+                </Suspense>
               </div>
             </div>
           )}
