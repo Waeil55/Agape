@@ -97,39 +97,17 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
           {/* Header */}
           <div className="flex items-center justify-between px-1 py-2">
-            <div className="flex items-center gap-2">
-              <div className="w-11 h-11 rounded-2xl bg-white shadow-sm border border-slate-100/50 flex items-center justify-center shrink-0">
-                <Truck size={18} className="text-blue-600" />
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-600/20">
+                <span className="text-white font-black text-sm">{me?.name?.charAt(0)}</span>
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-base font-bold text-slate-900 truncate">Agape Care</h1>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {phoneNumbers?.routing && (
-                      <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="flex items-center gap-1 px-2 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm active:scale-90 transition-all" title="Call Routing">
-                        <Phone size={9} /><span className="text-[8px] font-bold uppercase tracking-wider">Rtg</span>
-                      </a>
-                    )}
-                    {phoneNumbers?.dispatcher && (
-                      <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="flex items-center gap-1 px-2 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm active:scale-90 transition-all" title="Call Dispatch">
-                        <Phone size={9} /><span className="text-[8px] font-bold uppercase tracking-wider">Dsp</span>
-                      </a>
-                    )}
-                  </div>
-                </div>
+              <div>
+                <p className="font-bold text-sm text-slate-900">{me?.name}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                  <span className="text-[10px] font-medium text-slate-400">Fleet Management System</span>
+                  <span className="text-[10px] font-medium text-slate-400">{isOnline ? 'Online' : 'Offline'} • {me?.vehicle || 'No vehicle'}</span>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="w-9 h-9 rounded-2xl bg-white shadow-sm border border-slate-100/50 flex items-center justify-center">
-                <Bell size={16} className="text-slate-400" />
-              </button>
-              <button onClick={handleStatusToggle} className={`h-9 px-3.5 rounded-xl font-bold text-[9px] uppercase tracking-wider transition-all active:scale-95 shadow-sm border ${isOnline ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-500 border-slate-200'}`}>
-                {isOnline ? 'Online' : 'Offline'}
-              </button>
             </div>
           </div>
 
