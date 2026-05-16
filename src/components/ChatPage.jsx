@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Send, Search, Plus, ArrowLeft, Phone, Truck, ShieldCheck, X, Trash2, Check, CheckCheck, Smile, User, Clock, Bell } from 'lucide-react';
-import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, getDocs, doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, getDocs, doc, setDoc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const EMOJIS = ['😀','😂','❤️','🔥','👍','🙏','🎉','💯','⭐','💪','😍','🥳','😎','🤝','✅','🙌','👏','🎯','🚀','💡'];
