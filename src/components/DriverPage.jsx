@@ -95,40 +95,31 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       {activeNav === 'trips' && (
         <div className="flex-1 overflow-y-auto pb-28 px-3 pt-3 space-y-3">
 
-          {/* Quick Actions 2x2 Grid */}
-          <div className="grid grid-cols-2 gap-2">
-            <button className="flex items-center gap-2.5 px-3.5 py-3 bg-white rounded-2xl shadow-sm border border-slate-100/50 active:scale-[0.97] transition-all hover:border-indigo-200">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm">
-                <Sparkles size={14} className="text-white" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold text-slate-900">AI Optimize</p>
-                <p className="text-[8px] text-slate-400">Smart routing</p>
-              </div>
-            </button>
-          </div>
-
           {/* Stats Glass Card */}
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/90 to-indigo-700/90 shadow-sm shadow-blue-600/10 backdrop-blur-xl">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.1),transparent_60%)]" />
             <div className="relative px-3 py-2.5">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <p className="text-white/60 text-[9px] font-bold uppercase tracking-[0.12em]">{getTodayStr()}</p>
-                  <p className="text-white/40 text-[8px]">{activeTrips.length} active</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                <div className="bg-white/10 rounded-xl px-2 py-1.5 border border-white/10 col-span-1">
+                  <p className="text-[8px] text-white/60 uppercase font-bold tracking-wider">{getTodayStr().slice(5)}</p>
+                  <p className="text-base font-black text-white">{myTrips.length}</p>
+                  <p className="text-[7px] text-white/60 uppercase font-bold tracking-wider">Total</p>
                 </div>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {[
-                  { label: 'Total', value: myTrips.length, color: 'from-blue-300/30 to-blue-400/10' },
-                  { label: 'Done', value: completedTrips.length, color: 'from-emerald-300/30 to-emerald-400/10' },
-                  { label: 'Remaining', value: Math.max(0, myTrips.length - completedTrips.length - noShowTrips.length - cancelledTrips.length), color: 'from-amber-300/30 to-amber-400/10' },
-                ].map(stat => (
-                  <div key={stat.label} className={`bg-gradient-to-br ${stat.color} rounded-xl px-2 py-1.5 border border-white/10`}>
-                    <p className="text-base font-black text-white">{stat.value}</p>
-                    <p className="text-[7px] text-white/60 uppercase font-bold tracking-wider">{stat.label}</p>
-                  </div>
-                ))}
+                <div className="bg-white/10 rounded-xl px-2 py-1.5 border border-white/10 col-span-1">
+                  <p className="text-[8px] text-white/60 uppercase tracking-wider font-bold">{activeTrips.length} active</p>
+                  <p className="text-base font-black text-white">{completedTrips.length}</p>
+                  <p className="text-[7px] text-white/60 uppercase font-bold tracking-wider">Done</p>
+                </div>
+                <div className="bg-white/10 rounded-xl px-2 py-1.5 border border-white/10 col-span-1">
+                  <p className="text-[8px] text-white/60 uppercase tracking-wider font-bold">&nbsp;</p>
+                  <p className="text-base font-black text-white">{Math.max(0, myTrips.length - completedTrips.length - noShowTrips.length - cancelledTrips.length)}</p>
+                  <p className="text-[7px] text-white/60 uppercase font-bold tracking-wider">Remain</p>
+                </div>
+                <div className="bg-gradient-to-br from-emerald-500/30 to-emerald-600/10 rounded-xl px-2 py-1.5 border border-white/10 col-span-1">
+                  <p className="text-[8px] text-white/60 uppercase tracking-wider font-bold">Active</p>
+                  <p className="text-base font-black text-white">{activeTrips.length}</p>
+                  <p className="text-[7px] text-white/60 uppercase font-bold tracking-wider">Trips</p>
+                </div>
               </div>
             </div>
           </div>
