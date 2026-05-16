@@ -1039,7 +1039,7 @@ const App = () => {
     };
 
     return (
-      <div className="min-h-[100dvh] bg-slate-50 flex flex-col justify-center items-center p-4 relative overflow-hidden font-outfit" style={{paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)'}}>
+      <div className="flex-1 bg-slate-50 flex flex-col justify-center items-center p-4 relative overflow-hidden font-outfit" style={{paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)'}}>
         {/* Subtle Background Orbs */}
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/10 blur-[120px] rounded-full animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/10 blur-[120px] rounded-full animate-pulse delay-700" />
@@ -1729,7 +1729,7 @@ const today = getTodayStr();
       <div className={`offline-banner${isOffline ? ' visible' : ''}`}>
         You are offline — changes will sync when connection returns
       </div>
-      <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
+      <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
       {/* HEADER */}
       <header className="bg-white shadow-sm border-b border-slate-200" style={{paddingTop: 'var(--sat)'}}>
         <div className="max-w-full px-3 sm:px-6 py-2 sm:py-3 flex justify-between items-center">
@@ -1753,7 +1753,7 @@ const today = getTodayStr();
 
       {/* LOADING SCREEN */}
       {isLoading ? (
-        <div className="min-h-[100dvh] bg-slate-50 flex items-center justify-center">
+        <div className="flex-1 bg-slate-50 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
             <p className="text-sm font-bold text-slate-500">Loading...</p>

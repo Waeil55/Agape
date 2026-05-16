@@ -13,7 +13,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   if (!me) {
     return (
-      <div className="min-h-[100dvh] bg-slate-50 flex flex-col items-center justify-center p-8 text-center">
+      <div className="flex-1 bg-slate-50 flex flex-col items-center justify-center p-8 text-center">
         <div className="w-20 h-20 bg-blue-100 rounded-[2rem] flex items-center justify-center mb-6 animate-pulse">
           <Truck size={40} className="text-blue-600" />
         </div>
