@@ -1741,7 +1741,17 @@ const today = getTodayStr();
             </div>
           </div>
           {isAuthenticated && (
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {role === 'driver' && phoneNumbers?.routing && (
+                <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="p-1.5 sm:p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-[9px] font-bold flex items-center gap-1" title="Call Routing">
+                  <Phone size={14} /><span className="hidden sm:inline">Routing</span>
+                </a>
+              )}
+              {role === 'driver' && phoneNumbers?.dispatcher && (
+                <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="p-1.5 sm:p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition text-[9px] font-bold flex items-center gap-1" title="Call Dispatch">
+                  <Phone size={14} /><span className="hidden sm:inline">Dispatch</span>
+                </a>
+              )}
               <span className="hidden sm:inline px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-semibold capitalize">{role}</span>
               <button onClick={handleLogout} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-slate-900 transition">
                 <LogOut size={18} className="sm:w-5 sm:h-5" />
