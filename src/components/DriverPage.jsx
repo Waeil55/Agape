@@ -410,6 +410,28 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
           {/* Actions */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            {phoneNumbers?.routing && (
+              <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-blue-50/50 transition border-b border-slate-100/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                    <Phone size={12} className="text-white" />
+                  </div>
+                  <span className="font-medium text-sm text-slate-800">Call Routing</span>
+                </div>
+                <span className="text-xs text-slate-400 font-mono">{cleanPhone(phoneNumbers.routing)}</span>
+              </a>
+            )}
+            {phoneNumbers?.dispatcher && (
+              <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-emerald-50/50 transition border-b border-slate-100/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                    <Phone size={12} className="text-white" />
+                  </div>
+                  <span className="font-medium text-sm text-slate-800">Call Dispatch</span>
+                </div>
+                <span className="text-xs text-slate-400 font-mono">{cleanPhone(phoneNumbers.dispatcher)}</span>
+              </a>
+            )}
             <button onClick={() => onOpenSettings?.()} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-slate-50/50 transition border-b border-slate-100/50">
               <div className="flex items-center gap-3">
                 <Settings size={17} className="text-slate-400" />
