@@ -80,7 +80,7 @@ const ChatPage = ({ currentUser, role }) => {
     if (!text.trim() || !activeConv) return;
     const msg = text.trim();
     setText(''); setShowEmoji(false);
-    await addDoc(collection(db, 'chat_messages'), { conversationId: activeConv.id, text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp(), readBy: [currentUser] });
+    await addDoc(collection(db, 'chat_messages'), { conversationId: activeConv.id, participants: activeConv.participants || [], text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp(), readBy: [currentUser] });
     const s = await getDoc(doc(db, CONVERSATIONS_DOC));
     const d = s.exists() ? s.data() : { conversations: {} };
     d.conversations = d.conversations || {};
