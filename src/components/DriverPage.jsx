@@ -3,22 +3,62 @@ import { tripMatchesTodayOrTomorrow } from '../utils/tripDate';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { 
-  Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, 
+  Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, Users,
   AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check,
   ChevronUp, ChevronDown, Edit2, ListChecks, Sparkles, Target, RotateCcw, Lock
 } from 'lucide-react';
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 
-const FACILITY_KEYS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute'];
+const FACILITY_KEYS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute', 'skills', 'senior', 'living', 'manor', 'village'];
 
-const clientPhone = (trip) => {
+const clientPhone = (trip, allTrips = []) => {
   if (!trip) return '';
-  const pickupFac = FACILITY_KEYS.some(k => (trip.pickup || '').toLowerCase().includes(k));
-  const dropFac = FACILITY_KEYS.some(k => (trip.dropoff || '').toLowerCase().includes(k));
-  if (pickupFac && !dropFac) return trip.dropoffPhone || trip.pickupPhone || '';
-  if (!pickupFac && dropFac) return trip.pickupPhone || trip.dropoffPhone || '';
-  return trip.pickupPhone || trip.dropoffPhone || '';
+  
+  // 1. Prioritize the pre-calculated patientPhone from import
+  if (trip.patientPhone) return trip.patientPhone;
+
+  const p1Raw = trip.pickupPhone || '';
+  const p2Raw = trip.dropoffPhone || '';
+  const p1 = cleanPhone(p1Raw);
+  const p2 = cleanPhone(p2Raw);
+
+  // 2. Strongest Heuristic: If a phone is shared by multiple patients, it's a facility
+  if (allTrips.length > 0) {
+    const isShared = (p) => {
+      if (!p || p.length < 7) return false;
+      return allTrips.some(t => 
+        (t.patient || '').toLowerCase() !== (trip.patient || '').toLowerCase() && 
+        (cleanPhone(t.pickupPhone) === p || cleanPhone(t.dropoffPhone) === p)
+      );
+    };
+
+    const p1Shared = isShared(p1);
+    const p2Shared = isShared(p2);
+
+    if (p1Shared && !p2Shared) return p2Raw;
+    if (!p1Shared && p2Shared) return p1Raw;
+  }
+
+  // 3. Fallback to keywords in phone string
+  const p1Low = p1Raw.toLowerCase();
+  const p2Low = p2Raw.toLowerCase();
+  const p1IsFac = FACILITY_KEYS.some(k => p1Low.includes(k)) || p1Low.includes('dr ') || p1Low.includes('office');
+  const p2IsFac = FACILITY_KEYS.some(k => p2Low.includes(k)) || p2Low.includes('dr ') || p2Low.includes('office');
+
+  if (p1IsFac && !p2IsFac) return p2Raw;
+  if (!p1IsFac && p2IsFac) return p1Raw;
+
+  // 4. Fallback to address-based facility detection
+  const pickupFac = FACILITY_KEYS.some(k => (trip.pickup || '').toLowerCase().includes(k)) || 
+                    FACILITY_KEYS.some(k => (trip.pickupSiteName || '').toLowerCase().includes(k));
+  const dropFac = FACILITY_KEYS.some(k => (trip.dropoff || '').toLowerCase().includes(k)) || 
+                  FACILITY_KEYS.some(k => (trip.dropoffSiteName || '').toLowerCase().includes(k));
+
+  if (pickupFac && !dropFac) return p2Raw || p1Raw || '';
+  if (!pickupFac && dropFac) return p1Raw || p2Raw || '';
+  
+  return p1Raw || p2Raw || '';
 };
 
 const to12hr = (time) => {
@@ -395,10 +435,20 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${currentLeg.type === 'PICKUP' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
                   {currentLeg.type}
                 </span>
-                <h2 className="text-3xl font-black text-slate-900 leading-tight">
-                  {currentLeg.patient}
-                  {currentLeg.bookingId ? <span className="block text-blue-600 text-base font-medium mt-1">Booking: {currentLeg.bookingId}</span> : null}
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-3xl font-black text-slate-900 leading-tight">
+                    {currentLeg.patient}
+                  </h2>
+                  {(() => {
+                    const legs = myTrips.filter(t => (t.patient || '').toLowerCase() === (currentLeg.patient || '').toLowerCase()).length;
+                    return legs > 1 ? (
+                      <span className="px-2 py-1 rounded-md text-sm font-black bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center gap-1 shrink-0">
+                        <Users size={14} /> {legs}L
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
+                {currentLeg.bookingId ? <span className="block text-blue-600 text-base font-medium mt-1">Booking: {currentLeg.bookingId}</span> : null}
                 {currentLeg.notes && (
                   <div className="bg-amber-50/50 px-4 py-2 rounded-xl inline-block border border-amber-100/50">
                     <p className="text-xs font-bold text-amber-700">{currentLeg.notes}</p>
@@ -669,7 +719,17 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                                 Select
                               </label>
                               <div className="min-w-0">
-                                <h4 className="font-black text-slate-900 text-lg truncate leading-tight">{t.patient}</h4>
+                                <div className="flex items-center gap-2 truncate">
+                                  <h4 className="font-black text-slate-900 text-lg truncate leading-tight">{t.patient}</h4>
+                                  {(() => {
+                                    const legs = myTrips.filter(mt => (mt.patient || '').toLowerCase() === (t.patient || '').toLowerCase()).length;
+                                    return legs > 1 ? (
+                                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center gap-1 shrink-0">
+                                        <Users size={10} /> {legs}L
+                                      </span>
+                                    ) : null;
+                                  })()}
+                                </div>
                                 {t.bookingId ? <p className="text-blue-600 text-xs font-medium -mt-0.5">Booking: {t.bookingId}</p> : null}
                                 <div className="flex items-center gap-3 mt-2">
                                   <span className="big-time text-blue-600 whitespace-nowrap">{to12hr(t.time)}</span>
@@ -770,8 +830,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                         
                         <div className="mt-6 pt-5 border-t border-slate-100 flex justify-between items-center">
                           <div className="flex gap-3">
-                            <a href={`tel:${cleanPhone(clientPhone(t))}`} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition active:scale-90"><Phone size={16} /></a>
-                            <a href={`sms:${cleanPhone(clientPhone(t))}`} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition active:scale-90"><MessageCircle size={16} /></a>
+                            <a href={`tel:${cleanPhone(clientPhone(t, trips))}`} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition active:scale-90"><Phone size={16} /></a>
+                            <a href={`sms:${cleanPhone(clientPhone(t, trips))}`} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition active:scale-90"><MessageCircle size={16} /></a>
                             <button onClick={() => setShowEditModal(t)} className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition active:scale-90"><Edit2 size={16} /></button>
                           </div>
                           <div className="flex gap-4">

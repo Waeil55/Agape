@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, Truck, Plus, Trash2, Edit2, AlertCircle, X, Save, ClipboardList, Upload, CheckSquare, Clock, Phone, MessageSquare } from 'lucide-react';
 
-const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addAuditLog, currentUser, trips, onAssignTrip, onUploadForDriver, requestAuthAction }) => {
+const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addAuditLog, currentUser, trips, onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles }) => {
   const [activeTab, setActiveTab] = useState('drivers');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -14,9 +14,48 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
   const [editScheduleDriver, setEditScheduleDriver] = useState(null);
   const [scheduleForm, setScheduleForm] = useState({ start: '09:00 AM', end: '10:00 AM', status: 'free' });
   const [editingScheduleIdx, setEditingScheduleIdx] = useState(null);
+  const [vehicleForm, setVehicleForm] = useState(false);
+  const [editVehicleId, setEditVehicleId] = useState(null);
+  const [vForm, setVForm] = useState({ name: '', make: '', model: '', year: '', color: '', plate: '', vin: '', odometer: '' });
+  
+  const resetVForm = () => setVForm({ name: '', make: '', model: '', year: '', color: '', plate: '', vin: '', odometer: '' });
+  
+  const openVAdd = () => { setEditVehicleId(null); resetVForm(); setVehicleForm(true); };
+  
+  const openVEdit = (v) => {
+    setEditVehicleId(v.id);
+    setVForm({ name: v.name, make: v.make || '', model: v.model || '', year: v.year || '', color: v.color || '', plate: v.plate || '', vin: v.vin || '', odometer: v.odometer || '' });
+    setVehicleForm(true);
+  };
+  
+  const saveVehicle = () => {
+    if (!vForm.name.trim()) return;
+    if (editVehicleId) {
+      setVehicles(prev => prev.map(v => v.id === editVehicleId ? { ...v, ...vForm } : v));
+      addAuditLog('Vehicle Updated', `${currentUser} updated vehicle ${vForm.name}.`, 'blue');
+    } else {
+      const id = `VHC-${String(vehicles.length + 1).padStart(3, '0')}`;
+      setVehicles(prev => [...prev, { ...vForm, id, status: 'Available' }]);
+      addAuditLog('Vehicle Added', `${currentUser} added vehicle ${vForm.name}.`, 'emerald');
+    }
+    setVehicleForm(false);
+    resetVForm();
+  };
+  
+  const deleteVehicle = (v) => {
+    if (!window.confirm(`Delete vehicle ${v.name}?`)) return;
+    setVehicles(prev => prev.filter(x => x.id !== v.id));
+    addAuditLog('Vehicle Deleted', `${currentUser} deleted vehicle ${v.name}.`, 'rose');
+  };
 
-  const vehicles = drivers.map(d => d.vehicle).filter(Boolean);
-  const vehicleSet = [...new Set(vehicles)];
+  
+  // Filter drivers for dispatcher role — only show drivers assigned to this dispatcher
+  const filteredDrivers = role === 'dispatcher'
+    ? drivers.filter(d => {
+        const disp = dispatchers.find(ds => ds.email === currentUser);
+        return disp && d.assignedDispatcher === disp.id;
+      })
+    : drivers;
 
   const resetForm = () => setForm({ name: '', email: '', phone: '', vehicle: '', status: 'Available', currentZone: '', assignedDispatcher: '' });
 
@@ -163,9 +202,9 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
           {activeTab === 'drivers' ? 'Drivers' : 'Vehicles'}
         </h2>
-        {(role === 'admin' || role === 'dispatcher') && activeTab === 'drivers' && (
-          <button onClick={openAdd} className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm">
-            <Plus size={18} /> Add Driver
+        {(role === 'admin' || role === 'dispatcher') && (
+          <button onClick={activeTab === 'drivers' ? openAdd : openVAdd} className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm">
+            <Plus size={18} /> Add {activeTab === 'drivers' ? 'Driver' : 'Vehicle'}
           </button>
         )}
       </div>
@@ -187,10 +226,10 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                 </tr>
               </thead>
               <tbody>
-                {drivers.length === 0 ? (
-                  <tr><td colSpan="6" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">No drivers yet. Click "Add Driver" to create one.</td></tr>
+                {filteredDrivers.length === 0 ? (
+                  <tr><td colSpan="6" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">{role === 'dispatcher' ? 'No drivers assigned to you yet.' : 'No drivers yet. Click "Add Driver" to create one.'}</td></tr>
                 ) : (
-                  drivers.map((d) => {
+                  filteredDrivers.map((d) => {
                     const assignedCount = trips.filter(t => t.driverId === d.id).length;
                     return (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
@@ -247,33 +286,36 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Vehicle</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Name</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Make / Model</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden md:table-cell">Year / Color</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden lg:table-cell">Plate / VIN</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden lg:table-cell">Odometer</th>
                   <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Driver</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Odometer</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden md:table-cell">Next Oil</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Status</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {vehicleSet.length === 0 ? (
-                  <tr><td colSpan="5" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">No vehicles assigned yet.</td></tr>
+                {vehicles.length === 0 ? (
+                  <tr><td colSpan="7" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">No vehicles yet. Click "Add Vehicle" to create one.</td></tr>
                 ) : (
-                  vehicleSet.map((v) => {
-                    const d = drivers.find(drv => drv.vehicle === v);
-                    const isDue = d && (d.nextOilChange - d.odometer) < 200;
+                  vehicles.map((v) => {
+                    const assignedDriver = drivers.find(d => d.vehicle === v.name);
                     return (
-                      <tr key={v} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900">{v}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600">{d?.name || 'Unassigned'}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden sm:table-cell">{d?.odometer?.toLocaleString() || 0} mi</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm hidden md:table-cell">
-                          <span className={isDue ? 'text-red-600 font-semibold' : 'text-slate-600'}>
-                            {d?.nextOilChange?.toLocaleString() || '-'}
-                            {isDue && <AlertCircle size={14} className="inline ml-2" />}
-                          </span>
-                        </td>
+                      <tr key={v.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900">{v.name}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden sm:table-cell">{v.make || '-'} {v.model || ''}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden md:table-cell">{v.year || '-'} / {v.color || '-'}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden lg:table-cell font-mono">{v.plate || '-'} / {v.vin ? v.vin.slice(-6) : '-'}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden lg:table-cell">{v.odometer ? Number(v.odometer).toLocaleString() : '0'} mi</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600">{assignedDriver?.name || <span className="italic text-slate-400">Unassigned</span>}</td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4">
-                          <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${d?.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d?.status || 'Unknown'}</span>
+                          <div className="flex gap-1">
+                            <button onClick={() => openVEdit(v)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit"><Edit2 size={14} /></button>
+                            {(role === 'admin' || role === 'dispatcher') && (
+                              <button onClick={() => deleteVehicle(v)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete"><Trash2 size={14} /></button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -468,7 +510,12 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Vehicle</label>
-                    <input type="text" value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Van #42" />
+                    <select value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
+                      <option value="">— Select Vehicle —</option>
+                      {vehicles.map(v => (
+                        <option key={v.id} value={v.name}>{v.name} {v.plate ? `(${v.plate})` : ''}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">VIN Number</label>
@@ -506,6 +553,60 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
               <div className="flex gap-3 mt-6">
                 <button onClick={() => { setShowForm(false); resetForm(); }} className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
                 <button onClick={saveDriver} className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"><Save size={16} /> {editing ? 'Update' : 'Add'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Vehicle Form Modal */}
+      {vehicleForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="p-8">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-slate-900">{editVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</h3>
+                <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="p-2 hover:bg-slate-100 rounded-lg"><X size={20} /></button>
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Vehicle Name</label>
+                    <input type="text" required value={vForm.name} onChange={(e) => setVForm({ ...vForm, name: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Van #42" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Make</label>
+                    <input type="text" value={vForm.make} onChange={(e) => setVForm({ ...vForm, make: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Ford" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Model</label>
+                    <input type="text" value={vForm.model} onChange={(e) => setVForm({ ...vForm, model: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Transit" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Year</label>
+                    <input type="text" value={vForm.year} onChange={(e) => setVForm({ ...vForm, year: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="2024" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Color</label>
+                    <input type="text" value={vForm.color} onChange={(e) => setVForm({ ...vForm, color: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="White" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">License Plate</label>
+                    <input type="text" value={vForm.plate} onChange={(e) => setVForm({ ...vForm, plate: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="ABC-1234" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">VIN</label>
+                    <input type="text" value={vForm.vin} onChange={(e) => setVForm({ ...vForm, vin: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="17-digit VIN" maxLength="17" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Odometer</label>
+                    <input type="number" value={vForm.odometer} onChange={(e) => setVForm({ ...vForm, odometer: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="0" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
+                <button onClick={saveVehicle} className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"><Save size={16} /> {editVehicleId ? 'Update' : 'Add'}</button>
               </div>
             </div>
           </div>

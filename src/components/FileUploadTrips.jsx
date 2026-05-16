@@ -17,6 +17,8 @@ const COLUMN_ALIASES = {
   notes: ['notes', 'special instructions', 'instructions', 'comment', 'comments', 'note', 'memo', 'remarks', 'additional info', 'info', 'pickup comments', 'dropoff comments', 'message', 'purpose'],
 };
 
+const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
+
 function normalizeDateValue(value) {
   if (!value) return '';
   const raw = String(value).trim();
@@ -261,6 +263,13 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
         const idx = findColumn(Object.keys(rows[0]), COLUMN_ALIASES[field]);
         colMap[field] = idx !== -1 ? Object.keys(rows[0])[idx] : null;
       });
+      
+      // Detect Site Names
+      const pickupSiteColIdx = findColumn(Object.keys(rows[0]), ['site name origin', 'pickup site', 'origin site', 'pickup location name']);
+      const dropoffSiteColIdx = findColumn(Object.keys(rows[0]), ['site name destination', 'dropoff site', 'destination site', 'dropoff location name']);
+      colMap.pickupSite = pickupSiteColIdx !== -1 ? Object.keys(rows[0])[pickupSiteColIdx] : null;
+      colMap.dropoffSite = dropoffSiteColIdx !== -1 ? Object.keys(rows[0])[dropoffSiteColIdx] : null;
+
       setDetectedColumns(colMap);
 
       setProgressPct(12);
@@ -270,27 +279,115 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       };
       const today = getTodayStr();
+
+      // First pass: group by patient and phone to identify facility numbers and determine the "Earliest Leg" phone
+      const patientData = {};
+      const phoneToPatients = {}; // phone -> Set of patient names
+      
+      // Temporary sort to find earliest trip per patient
+      const sortedByTime = [...rows].sort((a, b) => {
+        const m1 = mapColumns(a);
+        const m2 = mapColumns(b);
+        return timeToMinutes(m1.time) - timeToMinutes(m2.time);
+      });
+
+      sortedByTime.forEach(row => {
+        const m = mapColumns(row);
+        const p = (m.patient || '').trim().toLowerCase();
+        if (!p) return;
+        if (!patientData[p]) {
+          patientData[p] = { 
+            homePhones: new Set(), 
+            allPhones: new Set(),
+            earliestPhone: m.pickupPhone || m.dropoffPhone || '' 
+          };
+        }
+        
+        const pickupPhone = cleanPhone(m.pickupPhone);
+        const dropoffPhone = cleanPhone(m.dropoffPhone);
+        
+        if (pickupPhone) {
+          if (!phoneToPatients[pickupPhone]) phoneToPatients[pickupPhone] = new Set();
+          phoneToPatients[pickupPhone].add(p);
+        }
+        if (dropoffPhone) {
+          if (!phoneToPatients[dropoffPhone]) phoneToPatients[dropoffPhone] = new Set();
+          phoneToPatients[dropoffPhone].add(p);
+        }
+
+        const isPickupHome = (m.pickup || '').toLowerCase().includes('home') || (row[colMap.pickupSite] || '').toLowerCase().includes('home');
+        const isDropoffHome = (m.dropoff || '').toLowerCase().includes('home') || (row[colMap.dropoffSite] || '').toLowerCase().includes('home');
+        
+        if (m.pickupPhone) {
+          patientData[p].allPhones.add(m.pickupPhone);
+          if (isPickupHome) patientData[p].homePhones.add(m.pickupPhone);
+        }
+        if (m.dropoffPhone) {
+          patientData[p].allPhones.add(m.dropoffPhone);
+          if (isDropoffHome) patientData[p].homePhones.add(m.dropoffPhone);
+        }
+      });
+
+      // Identify shared numbers (used by > 1 patient) as facility numbers
+      const facilityPhones = new Set();
+      Object.entries(phoneToPatients).forEach(([phone, patients]) => {
+        if (patients.size > 1) facilityPhones.add(phone);
+      });
+
       const mapped = rows.map((row, idx) => {
-        const mapped = mapColumns(row);
-        const notes = [mapped.notes, row['Pickup Comments'], row['Dropoff Comments'], row['Comments'], row['Message']]
+        const m = mapColumns(row);
+        const pKey = (m.patient || '').trim().toLowerCase();
+        const pInfo = patientData[pKey];
+        
+        let patientPhone = '';
+        if (pInfo) {
+          // Priority 1: A phone number associated with a "home" address that IS NOT a shared facility number
+          const homePhonesList = Array.from(pInfo.homePhones);
+          const nonFacHome = homePhonesList.find(ph => !facilityPhones.has(cleanPhone(ph)));
+          
+          if (nonFacHome) {
+            patientPhone = nonFacHome;
+          } else if (pInfo.earliestPhone && !facilityPhones.has(cleanPhone(pInfo.earliestPhone))) {
+            // Priority 2: Use the phone from the EARLIEST trip (if not a facility)
+            patientPhone = pInfo.earliestPhone;
+          } else if (homePhonesList.length > 0) {
+            patientPhone = homePhonesList[0];
+          } else {
+            // Priority 3: Any phone number for this patient that IS NOT a shared facility number
+            const allPhonesList = Array.from(pInfo.allPhones);
+            const nonFacAny = allPhonesList.find(ph => !facilityPhones.has(cleanPhone(ph)));
+            if (nonFacAny) {
+              patientPhone = nonFacAny;
+            } else {
+              // Fallback
+              patientPhone = m.pickupPhone || m.dropoffPhone || '';
+            }
+          }
+        }
+
+        const notes = [m.notes, row['Pickup Comments'], row['Dropoff Comments'], row['Comments'], row['Message']]
           .filter(Boolean)
           .join(' | ');
+
         return {
           id: `TRIP-${Date.now()}-${idx}`,
-          bookingId: mapped.bookingId || '',
-          patient: mapped.patient || '',
-          date: normalizeDateValue(mapped.date) || today,
-          time: mapped.time || '',
-          dropoffTime: mapped.dropoffTime || '',
-          type: mapped.type || row['Space Types'] || '',
+          bookingId: m.bookingId || '',
+          patient: m.patient || '',
+          patientPhone: patientPhone,
+          date: normalizeDateValue(m.date) || today,
+          time: m.time || '',
+          dropoffTime: m.dropoffTime || '',
+          type: m.type || row['Space Types'] || '',
           purpose: row['Purpose'] || '',
           providerName: row['Provider Name'] || '',
           directDistance: row['Direct Distance'] || '',
           driverId: null,
-          pickup: mapped.pickup || '',
-          dropoff: mapped.dropoff || '',
-          pickupPhone: mapped.pickupPhone || '',
-          dropoffPhone: mapped.dropoffPhone || '',
+          pickup: m.pickup || '',
+          dropoff: m.dropoff || '',
+          pickupSiteName: colMap.pickupSite ? row[colMap.pickupSite] : '',
+          dropoffSiteName: colMap.dropoffSite ? row[colMap.dropoffSite] : '',
+          pickupPhone: m.pickupPhone || '',
+          dropoffPhone: m.dropoffPhone || '',
           status: 'Unassigned',
           notes,
           _originalRow: row,

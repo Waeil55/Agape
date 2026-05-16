@@ -22,6 +22,8 @@ import DriverPage from './components/DriverPage';
 import LiveMapPage from './components/LiveMapPage';
 import DispatchAssistant from './components/DispatchAssistant';
 import { requestNotificationPermission, showLocalNotification } from './config/notifications';
+
+const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 import { suggestBatchAssignment, suggestOptimalDriver } from './config/ai';
 import { tripMatchesCalendarDay, tripMatchesTodayOrTomorrow } from './utils/tripDate';
 
@@ -140,6 +142,7 @@ const DEFAULT_DATA = {
   trips: [],
   drivers: [],
   dispatchers: [],
+  vehicles: [],
   logs: [
     { t: 'System Initialized', d: 'Agape Care Cloud OS is now online.', c: 'emerald', type: 'system' }
   ],
@@ -235,6 +238,7 @@ const App = () => {
   const [trips, setTrips] = useState(DEFAULT_DATA.trips);
   const [trashedTrips, setTrashedTrips] = useState([]);
   const [phoneNumbers, setPhoneNumbers] = useState(DEFAULT_DATA.phoneNumbers);
+  const [vehicles, setVehicles] = useState(DEFAULT_DATA.vehicles);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   // Refs for latest state — always up to date, no closure issues
   const sTrips = useRef(trips);
@@ -243,12 +247,14 @@ const App = () => {
   const sTrashed = useRef(trashedTrips);
   const sDisp = useRef(dispatchers);
   const sPhone = useRef(phoneNumbers);
+  const sVehicles = useRef(vehicles);
   sTrips.current = trips;
   sDrivers.current = drivers;
   sLogs.current = logs;
   sTrashed.current = trashedTrips;
   sDisp.current = dispatchers;
   sPhone.current = phoneNumbers;
+  sVehicles.current = vehicles;
 
   const fromSnapshot = useRef(false);
 
@@ -265,6 +271,7 @@ const App = () => {
       logs: overrides.logs || sLogs.current,
       dispatchers: overrides.dispatchers || sDisp.current,
       phoneNumbers: overrides.phoneNumbers || sPhone.current,
+      vehicles: overrides.vehicles || sVehicles.current,
     };
     // Also save to local storage for instant recovery on refresh before Firestore syncs
     localStorage.setItem('agape_cached_data', JSON.stringify(data));
@@ -424,6 +431,7 @@ const App = () => {
           setLogs(d.logs || DEFAULT_DATA.logs);
           setDispatchers(d.dispatchers || DEFAULT_DATA.dispatchers);
           setPhoneNumbers(d.phoneNumbers || DEFAULT_DATA.phoneNumbers);
+          setVehicles(d.vehicles || DEFAULT_DATA.vehicles);
         }
         setDataLoaded(true);
         setIsLoading(false);
@@ -439,6 +447,7 @@ const App = () => {
               setLogs(d.logs || []);
               setDispatchers(d.dispatchers || []);
               setPhoneNumbers(d.phoneNumbers || DEFAULT_DATA.phoneNumbers);
+              setVehicles(d.vehicles || DEFAULT_DATA.vehicles);
               
               try {
                 // ONLY admins/dispatchers can sync the driver list from the users collection
@@ -672,7 +681,7 @@ const App = () => {
     // Build map of patient → best client phone (detect home address as one that appears in both pickup and dropoff)
     const patientPhoneMap = {};
     const patientAddresses = {};
-    const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute'];
+    const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute', 'skills', 'senior', 'living', 'manor', 'village'];
     selectedTrips.forEach(t => {
       const key = (t.patient || '').trim().toLowerCase();
       if (!patientAddresses[key]) patientAddresses[key] = { pickups: [], dropoffs: [], trips: [] };
@@ -680,35 +689,55 @@ const App = () => {
       if (t.dropoff) patientAddresses[key].dropoffs.push(t.dropoff.trim().toLowerCase());
       patientAddresses[key].trips.push(t);
     });
-    Object.values(patientAddresses).forEach(({ pickups, dropoffs, trips }) => {
+    Object.values(patientAddresses).forEach(({ pickups, dropoffs, trips: pTrips }) => {
       // Find home address (appears in both pickups and dropoffs for same patient)
       const homeAddr = pickups.find(p => dropoffs.includes(p)) || '';
       let clientPhone = '';
+      
+      const allPossiblePhones = pTrips.flatMap(t => [t.pickupPhone, t.dropoffPhone]).filter(Boolean);
+      
+      // Heuristic: A phone is a facility if it's shared by other patients in the main trips list
+      const isShared = (p) => {
+        if (!p) return false;
+        const cleaned = cleanPhone(p);
+        if (cleaned.length < 7) return false;
+        return trips.some(t => 
+          (t.patient || '').toLowerCase() !== (pTrips[0].patient || '').toLowerCase() && 
+          (cleanPhone(t.pickupPhone) === cleaned || cleanPhone(t.dropoffPhone) === cleaned)
+        );
+      };
+
       if (homeAddr) {
-        const homeTrip = trips.find(t => (t.pickup || '').trim().toLowerCase() === homeAddr);
-        if (homeTrip) clientPhone = homeTrip.pickupPhone || '';
+        const homeTrip = pTrips.find(t => (t.pickup || '').trim().toLowerCase() === homeAddr);
+        if (homeTrip && !isShared(homeTrip.pickupPhone)) clientPhone = homeTrip.pickupPhone || '';
         if (!clientPhone) {
-          const returnTrip = trips.find(t => (t.dropoff || '').trim().toLowerCase() === homeAddr);
-          if (returnTrip) clientPhone = returnTrip.dropoffPhone || '';
+          const returnTrip = pTrips.find(t => (t.dropoff || '').trim().toLowerCase() === homeAddr);
+          if (returnTrip && !isShared(returnTrip.dropoffPhone)) clientPhone = returnTrip.dropoffPhone || '';
         }
-      } else {
-        // No round trip — detect which address is home by facility keywords
-        const trip = trips[0];
-        const isPickupFacility = FACILITY_KEYWORDS.some(k => (trip.pickup || '').toLowerCase().includes(k));
-        const isDropoffFacility = FACILITY_KEYWORDS.some(k => (trip.dropoff || '').toLowerCase().includes(k));
+      } 
+      
+      if (!clientPhone) {
+        // Find any phone for this patient that is NOT shared
+        clientPhone = allPossiblePhones.find(p => !isShared(p)) || '';
+      }
+
+      if (!clientPhone) {
+        // Final fallback to existing keyword detection
+        const trip = pTrips[0];
+        const isPickupFacility = FACILITY_KEYWORDS.some(k => (trip.pickup || '').toLowerCase().includes(k)) || 
+                                 FACILITY_KEYWORDS.some(k => (trip.pickupSiteName || '').toLowerCase().includes(k));
+        const isDropoffFacility = FACILITY_KEYWORDS.some(k => (trip.dropoff || '').toLowerCase().includes(k)) || 
+                                  FACILITY_KEYWORDS.some(k => (trip.dropoffSiteName || '').toLowerCase().includes(k));
         if (isPickupFacility && !isDropoffFacility) {
           clientPhone = trip.dropoffPhone || '';
         } else if (!isPickupFacility && isDropoffFacility) {
           clientPhone = trip.pickupPhone || '';
         } else {
-          clientPhone = trip.pickupPhone || trip.dropoffPhone || '';
+          clientPhone = trip.patientPhone || trip.pickupPhone || trip.dropoffPhone || '';
         }
       }
-      if (!clientPhone) {
-        const first = trips[0];
-        clientPhone = first.pickupPhone || first.dropoffPhone || '';
-      }
-      trips.forEach(t => {
+      
+      pTrips.forEach(t => {
         const key = (t.patient || '').trim().toLowerCase();
         patientPhoneMap[key] = clientPhone;
       });
@@ -717,11 +746,11 @@ const App = () => {
     // Create legs: all pickups then all dropoffs (can be reordered later by driver)
     const legs = [];
     selectedTrips.forEach(t => {
-      const clientPhone = patientPhoneMap[(t.patient || '').trim().toLowerCase()] || t.pickupPhone;
+      const clientPhone = t.patientPhone || patientPhoneMap[(t.patient || '').trim().toLowerCase()] || t.pickupPhone;
       legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'PICKUP', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.pickup, notes: t.notes, phone: clientPhone });
     });
     selectedTrips.forEach(t => {
-      const clientPhone = patientPhoneMap[(t.patient || '').trim().toLowerCase()] || t.pickupPhone;
+      const clientPhone = t.patientPhone || patientPhoneMap[(t.patient || '').trim().toLowerCase()] || t.pickupPhone;
       legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'DROPOFF', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.dropoff, notes: t.notes, phone: clientPhone });
     });
     
@@ -2135,7 +2164,7 @@ const today = getTodayStr();
             ) : activeTab === 'chat' ? (
               <ChatPage currentUser={currentUser} role={role} />
             ) : activeTab === 'drivers' ? (
-              <DriversVehiclesPage role={role} drivers={drivers} setDrivers={setDrivers} dispatchers={dispatchers} addAuditLog={addAuditLog} currentUser={currentUser} trips={trips} requestAuthAction={requestAuthAction}
+              <DriversVehiclesPage role={role} drivers={drivers} setDrivers={setDrivers} dispatchers={dispatchers} addAuditLog={addAuditLog} currentUser={currentUser} trips={trips} requestAuthAction={requestAuthAction} vehicles={vehicles} setVehicles={setVehicles}
                 onAssignTrip={(tripId, driverId) => {
                   const driver = drivers.find(d => d.id === driverId);
                   setTrips(prev => prev.map(t => t.id === tripId ? {

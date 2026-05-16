@@ -191,13 +191,23 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                   
                   <div className="flex-1 min-w-0" onClick={() => setSelectedTrip(trip)}>
                     <div className="flex items-center gap-3 mb-1">
-                      <p className="font-black text-slate-900 text-sm sm:text-base truncate">{trip.patient}</p>
+                      <div className="flex items-center gap-2 truncate">
+                        <p className="font-black text-slate-900 text-sm sm:text-base truncate">{trip.patient}</p>
+                        {(() => {
+                          const legs = filteredTrips.filter(t => (t.patient || '').toLowerCase() === (trip.patient || '').toLowerCase()).length;
+                          return legs > 1 ? (
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center gap-1 shrink-0">
+                              <Users size={10} /> {legs}L
+                            </span>
+                          ) : null;
+                        })()}
+                      </div>
                       {trip.bookingId ? (
-                        <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500">
+                        <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0">
                           {trip.bookingId}
                         </span>
                       ) : null}
-                      <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${trip.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                      <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${trip.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
                         {trip.status}
                       </span>
                     </div>
