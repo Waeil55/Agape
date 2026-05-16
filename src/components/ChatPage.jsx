@@ -35,8 +35,9 @@ const ChatPage = ({ currentUser, role }) => {
     setDoc(ref, { email: currentUser, online: true, lastSeen: serverTimestamp() }, { merge: true });
     const interval = setInterval(() => { updateDoc(ref, { lastSeen: serverTimestamp() }).catch(() => {}); }, 30000);
     const unsub = onSnapshot(collection(db, 'presence'), snap => { const m = {}; snap.forEach(d => { m[d.id] = d.data(); }); setOnline(m); });
-    window.addEventListener('beforeunload', () => updateDoc(ref, { online: false, lastSeen: serverTimestamp() }));
-    return () => { unsub(); clearInterval(interval); updateDoc(ref, { online: false, lastSeen: serverTimestamp() }); };
+    const handleBefore = () => updateDoc(ref, { online: false, lastSeen: serverTimestamp() });
+    window.addEventListener('beforeunload', handleBefore);
+    return () => { unsub(); clearInterval(interval); window.removeEventListener('beforeunload', handleBefore); updateDoc(ref, { online: false, lastSeen: serverTimestamp() }); };
   }, [currentUser]);
 
   // Users
@@ -159,7 +160,7 @@ const ChatPage = ({ currentUser, role }) => {
         {activeConv ? (
           <>
             <div className="px-3 py-3 border-b border-slate-100 bg-white flex items-center gap-3 shrink-0">
-              {window.innerWidth < 768 && <button onClick={() => setSidebar(true)} className="p-1 -ml-1 text-slate-500"><ArrowLeft size={18} /></button>}
+              {sidebar && <button onClick={() => setSidebar(false)} className="md:hidden p-1 -ml-1 text-slate-500"><ArrowLeft size={18} /></button>}
               <div className="relative shrink-0"><div className={`w-9 h-9 rounded-xl flex items-center justify-center ${activeConv.type === 'group' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-600'}`}>{icon(activeConv)}</div>{activeConv.type !== 'group' && isOnline(activeConv.participants?.filter(p => p !== currentUser)[0]) && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />}</div>
               <div className="min-w-0 flex-1"><h4 className="font-bold text-sm text-slate-900 truncate">{label(activeConv)}</h4><p className="text-[9px] text-slate-400">{typingText() || (activeConv.type === 'group' ? `${activeConv.participants?.length || 0} members` : isOnline(activeConv.participants?.filter(p => p !== currentUser)[0]) ? 'Online' : 'Offline')}</p></div>
               <button onClick={() => delConv(activeConv.id)} className="w-8 h-8 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition"><Trash2 size={14} /></button>
