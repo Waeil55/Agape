@@ -110,10 +110,20 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button className="w-10 h-10 rounded-2xl bg-white shadow-sm border border-slate-100/50 flex items-center justify-center">
-                <Bell size={17} className="text-slate-400" />
+              {phoneNumbers?.routing && (
+                <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm active:scale-90 transition-all" title="Call Routing">
+                  <Phone size={14} className="text-white" />
+                </a>
+              )}
+              {phoneNumbers?.dispatcher && (
+                <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm active:scale-90 transition-all" title="Call Dispatch">
+                  <Phone size={14} className="text-white" />
+                </a>
+              )}
+              <button className="w-9 h-9 rounded-2xl bg-white shadow-sm border border-slate-100/50 flex items-center justify-center">
+                <Bell size={16} className="text-slate-400" />
               </button>
-              <button onClick={handleStatusToggle} className={`h-10 px-4 rounded-2xl font-bold text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-sm border ${isOnline ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-500 border-slate-200'}`}>
+              <button onClick={handleStatusToggle} className={`h-9 px-3.5 rounded-xl font-bold text-[9px] uppercase tracking-wider transition-all active:scale-95 shadow-sm border ${isOnline ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-500 border-slate-200'}`}>
                 {isOnline ? 'Online' : 'Offline'}
               </button>
             </div>
@@ -121,28 +131,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
           {/* Quick Actions 2x2 Grid */}
           <div className="grid grid-cols-2 gap-2">
-            {phoneNumbers?.routing && (
-              <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="flex items-center gap-2.5 px-3.5 py-3 bg-white rounded-2xl shadow-sm border border-slate-100/50 active:scale-[0.97] transition-all hover:border-blue-200">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
-                  <Phone size={14} className="text-white" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-bold text-slate-900">Routing</p>
-                  <p className="text-[8px] text-slate-400 truncate">{cleanPhone(phoneNumbers.routing)}</p>
-                </div>
-              </a>
-            )}
-            {phoneNumbers?.dispatcher && (
-              <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="flex items-center gap-2.5 px-3.5 py-3 bg-white rounded-2xl shadow-sm border border-slate-100/50 active:scale-[0.97] transition-all hover:border-emerald-200">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm">
-                  <PhoneCall size={14} className="text-white" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-bold text-slate-900">Dispatch</p>
-                  <p className="text-[8px] text-slate-400 truncate">{cleanPhone(phoneNumbers.dispatcher)}</p>
-                </div>
-              </a>
-            )}
             <button className="flex items-center gap-2.5 px-3.5 py-3 bg-white rounded-2xl shadow-sm border border-slate-100/50 active:scale-[0.97] transition-all hover:border-indigo-200">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm">
                 <Sparkles size={14} className="text-white" />
