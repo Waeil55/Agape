@@ -1834,178 +1834,29 @@ const today = getTodayStr();
                 return trip.driverId === driverId || resolvedDriverEmail === normalizedCurrentUserEmail;
               };
               const myTrips = trips.filter(t => isTripForCurrentDriver(t) && tripMatchesTodayOrTomorrow(t.date));
-              const completedTrips = trips.filter(t => isTripForCurrentDriver(t) && t.status === 'Completed' && tripMatchesTodayOrTomorrow(t.date));
-              const noShowTrips = trips.filter(t => isTripForCurrentDriver(t) && t.status === 'No Show' && tripMatchesTodayOrTomorrow(t.date));
-              const cancelledTrips = trips.filter(t => isTripForCurrentDriver(t) && t.status === 'Cancelled' && tripMatchesTodayOrTomorrow(t.date));
               const myDrivers = myDriver ? [myDriver] : [];
-              const myTrashed = trashedTrips.filter(t => isTripForCurrentDriver(t));
-              const driverTabContent = (tab) => {
-                switch (tab) {
-                  case 'driverHome':
-                    return <DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
-                      appSettings={appSettings}
-                      activeMission={myDriver?.activeMission}
-                      phoneNumbers={phoneNumbers}
-                      onOpenSettings={() => setActiveTab('settings')}
-                      onUpdateMission={(updatedMission) => {
-                        setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, activeMission: updatedMission } : d));
-                        setTimeout(persistState, 0);
-                      }}
-                      onUpdateDriverLocation={handleUpdateDriverLocation}
-                      onUpdateTrip={(tripId, status, extraData = {}) => {
-                        setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
-                        const trip = sTrips.current.find(t => t.id === tripId);
-                        addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${tripId} (${trip?.patient || 'Unknown'}) to ${status}`, 'blue');
-                      }}
-                      onDriverStatusUpdate={handleDriverStatusUpdate}
-                      onCompleteTrip={(tripId, driverId, odometer) => {
-                        handleCompleteTrip(tripId, driverId, odometer);
-                        const trip = sTrips.current.find(t => t.id === tripId);
-                        addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'Unknown'}). Odo: ${odometer}`, 'emerald');
-                      }}
-                    />;
-                  case 'completed':
-                    return (
-                      <div className="space-y-4">
-                        <button onClick={() => setActiveTab('driverHome')} className="flex items-center gap-2 text-blue-600 font-black text-xs uppercase tracking-widest mb-4 hover:translate-x-[-4px] transition-transform">
-                          <ChevronLeft size={16} /> Back to Active Manifest
-                        </button>
-                        <h2 className="text-2xl font-bold text-slate-900">Completed Trips (Today &amp; Tomorrow)</h2>
-                        {completedTrips.length === 0 ? (
-                          <div className="bg-white rounded-xl p-8 text-center text-slate-500">
-                            <CheckCircle2 size={48} className="mx-auto text-emerald-300 mb-4" />
-                            <p>No completed trips yet</p>
-                          </div>
-                        ) : (
-                          <div className="divide-y divide-slate-200 bg-white rounded-xl overflow-hidden shadow-sm">
-                            {completedTrips.map(trip => (
-                              <div key={trip.id} className="p-4 hover:bg-slate-50 transition">
-                                <div className="flex justify-between items-start mb-2">
-                                  <div>
-                                    <h3 className="font-bold text-slate-900">{trip.patient}</h3>
-                                    {trip.bookingId ? <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest">{trip.bookingId}</p> : null}
-                                    <p className="text-sm text-slate-600 flex items-center gap-1"><MapPin size={14} /> {trip.pickup}</p>
-                                    <p className="text-sm text-slate-600 ml-5">↓ {trip.dropoff}</p>
-                                  </div>
-                                  <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-semibold">✓ Completed</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  case 'noshow':
-                    return (
-                      <div className="space-y-4">
-                        <button onClick={() => setActiveTab('driverHome')} className="flex items-center gap-2 text-blue-600 font-black text-xs uppercase tracking-widest mb-4 hover:translate-x-[-4px] transition-transform">
-                          <ChevronLeft size={16} /> Back to Active Manifest
-                        </button>
-                        <h2 className="text-2xl font-bold text-slate-900">No Show Trips (Today &amp; Tomorrow)</h2>
-                        {noShowTrips.length === 0 ? (
-                          <div className="bg-white rounded-xl p-8 text-center text-slate-500">
-                            <AlertCircle size={48} className="mx-auto text-amber-300 mb-4" />
-                            <p>No no-show trips</p>
-                          </div>
-                        ) : (
-                          <div className="divide-y divide-slate-200 bg-white rounded-xl overflow-hidden shadow-sm">
-                            {noShowTrips.map(trip => (
-                              <div key={trip.id} className="p-4 hover:bg-slate-50 transition">
-                                <div className="flex justify-between items-center mb-2">
-                                  <div>
-                                    <h3 className="font-bold text-slate-900">{trip.patient}</h3>
-                                    {trip.bookingId ? <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest">{trip.bookingId}</p> : null}
-                                    <p className="text-sm text-slate-600 flex items-center gap-1"><MapPin size={14} /> {trip.pickup}</p>
-                                    <p className="text-sm text-slate-600 ml-5">↓ {trip.dropoff}</p>
-                                  </div>
-                                  <div className="flex flex-col items-end gap-2">
-                                    <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-semibold">⊘ No Show</span>
-                                    <button 
-                                      onClick={() => {
-                                        setTrips(prev => prev.map(t => t.id === trip.id ? { ...t, status: 'Assigned' } : t));
-                                        addAuditLog('Driver Undo', `${currentUser} (Driver) restored No Show trip ${trip.id} (${trip.patient})`, 'blue');
-                                      }}
-                                      className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-2 py-1 bg-blue-50 rounded hover:bg-blue-100 transition"
-                                    >
-                                      Undo
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  case 'cancelled':
-                    return (
-                      <div className="space-y-4">
-                        <button onClick={() => setActiveTab('driverHome')} className="flex items-center gap-2 text-blue-600 font-black text-xs uppercase tracking-widest mb-4 hover:translate-x-[-4px] transition-transform">
-                          <ChevronLeft size={16} /> Back to Active Manifest
-                        </button>
-                        <h2 className="text-2xl font-bold text-slate-900">Cancelled Trips (Today &amp; Tomorrow)</h2>
-                        {cancelledTrips.length === 0 ? (
-                          <div className="bg-white rounded-xl p-8 text-center text-slate-500">
-                            <X size={48} className="mx-auto text-rose-300 mb-4" />
-                            <p>No cancelled trips</p>
-                          </div>
-                        ) : (
-                          <div className="divide-y divide-slate-200 bg-white rounded-xl overflow-hidden shadow-sm">
-                            {cancelledTrips.map(trip => (
-                              <div key={trip.id} className="p-4 hover:bg-slate-50 transition">
-                                <div className="flex justify-between items-center mb-2">
-                                  <div>
-                                    <h3 className="font-bold text-slate-900">{trip.patient}</h3>
-                                    {trip.bookingId ? <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest">{trip.bookingId}</p> : null}
-                                    <p className="text-sm text-slate-600 flex items-center gap-1"><MapPin size={14} /> {trip.pickup}</p>
-                                    <p className="text-sm text-slate-600 ml-5">↓ {trip.dropoff}</p>
-                                  </div>
-                                  <div className="flex flex-col items-end gap-2">
-                                    <span className="bg-rose-100 text-rose-700 px-2 py-1 rounded text-xs font-semibold">✕ Cancelled</span>
-                                    <button 
-                                      onClick={() => {
-                                        setTrips(prev => prev.map(t => t.id === trip.id ? { ...t, status: 'Assigned' } : t));
-                                        addAuditLog('Driver Undo', `${currentUser} (Driver) restored Cancelled trip ${trip.id} (${trip.patient})`, 'blue');
-                                      }}
-                                      className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-2 py-1 bg-blue-50 rounded hover:bg-blue-100 transition"
-                                    >
-                                      Undo
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  case 'chat':
-                    return <ChatPage currentUser={currentUser} role={role} />;
-                  case 'archives':
-                    return <ArchivesPage trashedTrips={myTrashed} restoreTrip={null} />;
-                  case 'settings':
-                    return <SettingsPage currentUser={currentUser} role={role} onLogout={handleLogout} trashedTrips={myTrashed} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} driverProfile={myDriver} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={handleUpdatePhoneNumbers} />;
-                  default:
-                    return <DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
-                      appSettings={appSettings}
-                      phoneNumbers={phoneNumbers}
-                      onOpenSettings={() => setActiveTab('settings')}
-                      onUpdateDriverLocation={handleUpdateDriverLocation}
-                      onUpdateTrip={(tripId, status, extraData = {}) => {
-                        setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
-                        const trip = trips.find(t => t.id === tripId);
-                        addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${tripId} (${trip?.patient || 'Unknown'}) to ${status}`, 'blue');
-                      }}
-                      onDriverStatusUpdate={handleDriverStatusUpdate}
-                      onCompleteTrip={(tripId, dId, odo) => {
-                        handleCompleteTrip(tripId, dId, odo);
-                        const trip = trips.find(t => t.id === tripId);
-                        addAuditLog('Trip Completed', `${currentUser} (Driver) finished mission ${tripId} (${trip?.patient || 'Unknown'}) at ${odo} odo`, 'emerald');
-                      }}
-                    />;
-                }
-              };
-              return driverTabContent(activeTab);
+              return <DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
+                appSettings={appSettings}
+                activeMission={myDriver?.activeMission}
+                phoneNumbers={phoneNumbers}
+                onOpenSettings={() => setActiveTab('settings')}
+                onUpdateMission={(updatedMission) => {
+                  setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, activeMission: updatedMission } : d));
+                  setTimeout(persistState, 0);
+                }}
+                onUpdateDriverLocation={handleUpdateDriverLocation}
+                onUpdateTrip={(tripId, status, extraData = {}) => {
+                  setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
+                  const trip = sTrips.current.find(t => t.id === tripId);
+                  addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${tripId} (${trip?.patient || 'Unknown'}) to ${status}`, 'blue');
+                }}
+                onDriverStatusUpdate={handleDriverStatusUpdate}
+                onCompleteTrip={(tripId, driverId, odometer) => {
+                  handleCompleteTrip(tripId, driverId, odometer);
+                  const trip = sTrips.current.find(t => t.id === tripId);
+                  addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'Unknown'}). Odo: ${odometer}`, 'emerald');
+                }}
+              />;
             })() : role === 'dispatcher' && activeTab === 'dashboard' ? (
               renderDispatcherCommandCenter()
             ) : activeTab === 'dashboard' ? (
