@@ -109,27 +109,24 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           </div>
 
           {/* Stats Glass Card */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/90 to-indigo-700/90 shadow-lg shadow-blue-600/10 backdrop-blur-xl">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/90 to-indigo-700/90 shadow-sm shadow-blue-600/10 backdrop-blur-xl">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.1),transparent_60%)]" />
-            <div className="relative px-4 py-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.15em]">{getTodayStr()}</p>
-                  <p className="text-white/50 text-[9px] mt-0.5">{activeTrips.length} active • {myTrips.length} total</p>
-                </div>
-                <div className="px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-xl border border-white/10">
-                  <span className="text-white text-[11px] font-bold">{me?.name}</span>
+            <div className="relative px-3 py-2.5">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-white/60 text-[9px] font-bold uppercase tracking-[0.12em]">{getTodayStr()}</p>
+                  <p className="text-white/40 text-[8px]">{activeTrips.length} active</p>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {[
                   { label: 'Total', value: myTrips.length, color: 'from-blue-300/30 to-blue-400/10' },
                   { label: 'Done', value: completedTrips.length, color: 'from-emerald-300/30 to-emerald-400/10' },
                   { label: 'Remaining', value: Math.max(0, myTrips.length - completedTrips.length - noShowTrips.length - cancelledTrips.length), color: 'from-amber-300/30 to-amber-400/10' },
                 ].map(stat => (
-                  <div key={stat.label} className={`bg-gradient-to-br ${stat.color} rounded-xl px-2.5 py-2.5 border border-white/10`}>
-                    <p className="text-lg font-black text-white">{stat.value}</p>
-                    <p className="text-[8px] text-white/60 uppercase font-bold tracking-wider mt-0.5">{stat.label}</p>
+                  <div key={stat.label} className={`bg-gradient-to-br ${stat.color} rounded-xl px-2 py-1.5 border border-white/10`}>
+                    <p className="text-base font-black text-white">{stat.value}</p>
+                    <p className="text-[7px] text-white/60 uppercase font-bold tracking-wider">{stat.label}</p>
                   </div>
                 ))}
               </div>
