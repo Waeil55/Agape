@@ -99,7 +99,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/90 to-indigo-700/90 shadow-sm shadow-blue-600/10 backdrop-blur-xl">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.1),transparent_60%)]" />
             <div className="relative px-3 py-2.5">
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 <div className="bg-white/10 rounded-xl px-2 py-1.5 border border-white/10 col-span-1">
                   <p className="text-[8px] text-white/60 uppercase font-bold tracking-wider">{getTodayStr().slice(5)}</p>
                   <p className="text-base font-black text-white">{myTrips.length}</p>
@@ -114,11 +114,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <p className="text-[8px] text-white/60 uppercase tracking-wider font-bold">&nbsp;</p>
                   <p className="text-base font-black text-white">{Math.max(0, myTrips.length - completedTrips.length - noShowTrips.length - cancelledTrips.length)}</p>
                   <p className="text-[7px] text-white/60 uppercase font-bold tracking-wider">Remain</p>
-                </div>
-                <div className="bg-gradient-to-br from-emerald-500/30 to-emerald-600/10 rounded-xl px-2 py-1.5 border border-white/10 col-span-1">
-                  <p className="text-[8px] text-white/60 uppercase tracking-wider font-bold">Active</p>
-                  <p className="text-base font-black text-white">{activeTrips.length}</p>
-                  <p className="text-[7px] text-white/60 uppercase font-bold tracking-wider">Trips</p>
                 </div>
               </div>
             </div>
