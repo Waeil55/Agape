@@ -106,7 +106,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <p className="text-[7px] text-white/60 uppercase font-bold tracking-wider">Total</p>
                 </div>
                 <div className="bg-white/10 rounded-xl px-2 py-1.5 border border-white/10 col-span-1">
-                  <p className="text-[8px] text-white/60 uppercase tracking-wider font-bold">{activeTrips.length} active</p>
+                  <p className="text-[8px] text-white/60 uppercase tracking-wider font-bold">&nbsp;</p>
                   <p className="text-base font-black text-white">{completedTrips.length}</p>
                   <p className="text-[7px] text-white/60 uppercase font-bold tracking-wider">Done</p>
                 </div>
