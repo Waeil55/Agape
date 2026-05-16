@@ -86,6 +86,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     { id: 'history', label: 'History', icon: Clock },
     { id: 'chat', label: 'Chat', icon: MessageCircle },
     { id: 'profile', label: 'Profile', icon: User },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -431,6 +432,48 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               </div>
               <ChevronRight size={15} className="text-slate-300" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== SETTINGS PAGE ===== */}
+      {activeNav === 'settings' && (
+        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-3">
+          <div className="px-1 pt-2 pb-4">
+            <h2 className="text-xl font-bold text-slate-900">Settings</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Account and app preferences</p>
+          </div>
+          <div className="space-y-2.5 px-1">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <button onClick={() => onOpenSettings?.()} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-slate-50/50 transition border-b border-slate-100/50">
+                <div className="flex items-center gap-3">
+                  <Settings size={17} className="text-slate-400" />
+                  <span className="font-medium text-sm text-slate-800">App Settings</span>
+                </div>
+                <ChevronRight size={15} className="text-slate-300" />
+              </button>
+              <button className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-slate-50/50 transition border-b border-slate-100/50">
+                <div className="flex items-center gap-3">
+                  <Bell size={17} className="text-slate-400" />
+                  <span className="font-medium text-sm text-slate-800">Notifications</span>
+                </div>
+                <ChevronRight size={15} className="text-slate-300" />
+              </button>
+              <button className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-slate-50/50 transition border-b border-slate-100/50">
+                <div className="flex items-center gap-3">
+                  <Phone size={17} className="text-slate-400" />
+                  <span className="font-medium text-sm text-slate-800">Contact Support</span>
+                </div>
+                <ChevronRight size={15} className="text-slate-300" />
+              </button>
+              <button onClick={() => signOut(auth)} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-rose-50/50 transition">
+                <div className="flex items-center gap-3">
+                  <LogOut size={17} className="text-rose-400" />
+                  <span className="font-medium text-sm text-rose-600">Sign Out</span>
+                </div>
+                <ChevronRight size={15} className="text-slate-300" />
+              </button>
+            </div>
           </div>
         </div>
       )}

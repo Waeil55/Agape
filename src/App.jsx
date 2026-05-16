@@ -1781,14 +1781,7 @@ const today = getTodayStr();
                 ];
                 
                 if (role === 'driver') {
-                  return [
-                    { id: 'driverHome', label: 'Active Manifest', icon: Truck },
-                    { id: 'chat', label: 'Chat', icon: MessageCircle },
-                    { id: 'completed', label: 'Completed', icon: CheckCircle2 },
-                    { id: 'cancelled', label: 'Cancelled', icon: X },
-                    { id: 'noshow', label: 'No Show', icon: AlertCircle },
-                    { id: 'settings', label: 'Settings', icon: Settings },
-                  ];
+                  return []; // Driver uses its own bottom nav inside DriverPage
                 }
                 
                 if (role === 'dispatcher') {
