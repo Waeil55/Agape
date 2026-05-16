@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { tripMatchesTodayOrTomorrow } from '../utils/tripDate';
 import { EmailAuthProvider, reauthenticateWithCredential, signOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import ChatPage from './ChatPage';
 import { 
   Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, 
   AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check,
@@ -274,20 +275,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== CHAT PAGE ===== */}
       {activeNav === 'chat' && (
-        <div className="flex-1 flex flex-col">
-          <div className="px-4 pt-4 pb-3 bg-white/80 backdrop-blur-md border-b border-slate-100/50">
-            <h2 className="text-xl font-bold text-slate-900">Messages</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Chat with dispatch</p>
-          </div>
-          <div className="flex-1 flex items-center justify-center p-8">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-slate-50 to-slate-100 rounded-[2rem] flex items-center justify-center mx-auto mb-5 shadow-inner">
-                <MessageCircle size={36} className="text-slate-300" />
-              </div>
-              <h3 className="text-base font-bold text-slate-700">No Messages</h3>
-              <p className="text-sm text-slate-400 mt-1 max-w-[200px] mx-auto leading-relaxed">Your conversations with dispatch will show here.</p>
-            </div>
-          </div>
+        <div className="flex-1 flex flex-col bg-white">
+          <ChatPage currentUser={currentUser} role={role} />
         </div>
       )}
 
