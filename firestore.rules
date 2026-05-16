@@ -21,6 +21,7 @@ service cloud.firestore {
     }
     match /chat_messages/{msgId} {
       allow read: if request.auth != null && (
+        resource.data.participants == null ||
         resource.data.participants.hasAny([request.auth.email]) ||
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
       );
