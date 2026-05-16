@@ -8,6 +8,19 @@ import {
   ChevronUp, ChevronDown, Edit2, ListChecks, Sparkles, Target, RotateCcw, Lock
 } from 'lucide-react';
 
+const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
+
+const FACILITY_KEYS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute'];
+
+const clientPhone = (trip) => {
+  if (!trip) return '';
+  const pickupFac = FACILITY_KEYS.some(k => (trip.pickup || '').toLowerCase().includes(k));
+  const dropFac = FACILITY_KEYS.some(k => (trip.dropoff || '').toLowerCase().includes(k));
+  if (pickupFac && !dropFac) return trip.dropoffPhone || trip.pickupPhone || '';
+  if (!pickupFac && dropFac) return trip.pickupPhone || trip.dropoffPhone || '';
+  return trip.pickupPhone || trip.dropoffPhone || '';
+};
+
 const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, appSettings, phoneNumbers }) => {
   const me = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase());
 
