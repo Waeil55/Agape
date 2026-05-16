@@ -97,7 +97,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
           {/* Header */}
           <div className="flex items-center justify-between px-1 py-2">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <div className="w-11 h-11 rounded-2xl bg-white shadow-sm border border-slate-100/50 flex items-center justify-center">
                 <Truck size={18} className="text-blue-600" />
               </div>
@@ -108,18 +108,20 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <span className="text-[10px] font-medium text-slate-400">{isOnline ? 'Online' : 'Offline'}</span>
                 </div>
               </div>
+              <div className="flex items-center gap-1 ml-1">
+                {phoneNumbers?.routing && (
+                  <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm active:scale-90 transition-all" title="Call Routing">
+                    <Phone size={12} className="text-white" />
+                  </a>
+                )}
+                {phoneNumbers?.dispatcher && (
+                  <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm active:scale-90 transition-all" title="Call Dispatch">
+                    <Phone size={12} className="text-white" />
+                  </a>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              {phoneNumbers?.routing && (
-                <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm active:scale-90 transition-all" title="Call Routing">
-                  <Phone size={14} className="text-white" />
-                </a>
-              )}
-              {phoneNumbers?.dispatcher && (
-                <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm active:scale-90 transition-all" title="Call Dispatch">
-                  <Phone size={14} className="text-white" />
-                </a>
-              )}
               <button className="w-9 h-9 rounded-2xl bg-white shadow-sm border border-slate-100/50 flex items-center justify-center">
                 <Bell size={16} className="text-slate-400" />
               </button>
