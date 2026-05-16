@@ -106,15 +106,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 <p className="text-[8px] text-slate-400">Smart routing</p>
               </div>
             </button>
-            <button onClick={handleStatusToggle} className="flex items-center gap-2.5 px-3.5 py-3 bg-white rounded-2xl shadow-sm border border-slate-100/50 active:scale-[0.97] transition-all hover:border-rose-200">
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${isOnline ? 'bg-gradient-to-br from-rose-500 to-rose-600' : 'bg-gradient-to-br from-emerald-500 to-emerald-600'}`}>
-                <X size={14} className="text-white" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold text-slate-900">{isOnline ? 'Offline' : 'Online'}</p>
-                <p className="text-[8px] text-slate-400">Toggle status</p>
-              </div>
-            </button>
           </div>
 
           {/* Stats Glass Card */}

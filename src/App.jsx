@@ -1742,6 +1742,16 @@ const today = getTodayStr();
           </div>
           {isAuthenticated && (
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {role === 'driver' && (() => {
+                const myDriver = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase());
+                const isOnline = myDriver?.clockedIn || false;
+                return (
+                  <button onClick={() => handleDriverStatusUpdate(myDriver?.id, !isOnline)}
+                    className={`h-8 px-3 rounded-lg font-bold text-[9px] uppercase tracking-wider transition-all active:scale-95 border ${isOnline ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-500 border-slate-200'}`}>
+                    {isOnline ? 'Online' : 'Offline'}
+                  </button>
+                );
+              })()}
               {role === 'driver' && phoneNumbers?.routing && (
                 <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="p-1.5 sm:p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-[9px] font-bold flex items-center gap-1" title="Call Routing">
                   <Phone size={14} /><span className="hidden sm:inline">Routing</span>
