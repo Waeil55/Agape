@@ -205,12 +205,14 @@ const ChatPage = ({ currentUser, role }) => {
               )}
             </div>
 
-            <div className="px-4 py-3 bg-white border-t border-slate-100">
-              <form onSubmit={send} className="flex gap-2">
-                <input type="text" placeholder="Type a message..." value={text} onChange={e => setText(e.target.value)}
-                  className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-blue-500"
-                />
-                <button type="submit" disabled={!text.trim()} className="w-10 h-10 bg-blue-600 text-white rounded-2xl flex items-center justify-center hover:bg-blue-700 disabled:opacity-40"><Send size={16} /></button>
+            <div className="px-3 py-2.5 bg-white border-t border-slate-100 shadow-sm">
+              <form onSubmit={send} className="flex items-end gap-1.5">
+                <div className="flex-1 bg-slate-100 rounded-2xl px-4 py-2.5 flex items-center border border-transparent focus-within:bg-white focus-within:border-blue-500 focus-within:shadow-sm transition">
+                  <input type="text" placeholder="Message..." value={text} onChange={e => setText(e.target.value)}
+                    className="flex-1 text-sm outline-none bg-transparent placeholder:text-slate-400"
+                  />
+                </div>
+                <button type="submit" disabled={!text.trim()} className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 active:scale-90 transition disabled:opacity-40 shadow-sm shrink-0"><Send size={16} fill="currentColor" /></button>
               </form>
             </div>
           </>
