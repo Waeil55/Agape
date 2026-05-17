@@ -2033,8 +2033,10 @@ const today = getTodayStr();
                 }}
                 onAddTrip={(newTrip) => {
                   const id = `TRP-${Date.now().toString().slice(-6)}`;
-                  setTrips(prev => [...prev, { ...newTrip, id, bookingId: sanitizeBookingId(newTrip.bookingId), status: 'Unassigned', driverId: null }]);
-                  addAuditLog('Trip Created', `${currentUser} manually added trip for ${newTrip.patient}`, 'emerald');
+                  const driverId = newTrip.driverId || null;
+                  const driver = drivers.find(d => d.id === driverId);
+                  setTrips(prev => [...prev, { ...newTrip, id, bookingId: sanitizeBookingId(newTrip.bookingId), status: driverId ? 'Assigned' : 'Unassigned', driverId, driverEmail: driver?.email || null, driverName: driver?.name || null }]);
+                  addAuditLog('Trip Created', `${currentUser} manually added trip for ${newTrip.patient}${driver ? ` assigned to ${driver.name}` : ''}`, 'emerald');
                 }}
                 onUpdateTrip={updateTrip}
                 onDeleteTrip={requestDeleteTrip}

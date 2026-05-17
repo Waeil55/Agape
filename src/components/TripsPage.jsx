@@ -18,7 +18,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [assignmentFeedback, setAssignmentFeedback] = useState('');
-  const [newTrip, setNewTrip] = useState({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '' });
+  const [newTrip, setNewTrip] = useState({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
   const [editTrip, setEditTrip] = useState(null);
   const [manifestDate, setManifestDate] = useState(today);
   const [showAllDates, setShowAllDates] = useState(false);
@@ -284,7 +284,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowCreateForm(false)} />
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in zoom-in-95 duration-200">
             <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> Create New Manifest Entry</h3>
-            <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '' }); }} className="space-y-6">
+            <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' }); }} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Patient Full Name</label>
@@ -318,6 +318,17 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hospital Phone</label>
                   <input type="text" value={newTrip.dropoffPhone} onChange={(e) => setNewTrip({...newTrip, dropoffPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
                 </div>
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notes</label>
+                <textarea value={newTrip.notes} onChange={(e) => setNewTrip({...newTrip, notes: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" rows="2" placeholder="Special instructions, comments..." />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assign to Driver</label>
+                <select value={newTrip.driverId} onChange={(e) => setNewTrip({...newTrip, driverId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none">
+                  <option value="">— Unassigned —</option>
+                  {drivers.map(d => <option key={d.id} value={d.id}>{d.name} {d.vehicle ? `(${d.vehicle})` : ''}</option>)}
+                </select>
               </div>
               <button type="submit" className="w-full py-5 bg-emerald-600 text-white rounded-2xl font-black shadow-xl shadow-emerald-500/20 active:scale-[0.98] transition">Create manifest entry</button>
             </form>
