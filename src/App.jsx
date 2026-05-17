@@ -1835,7 +1835,7 @@ const today = getTodayStr();
           </div>
 
           {/* TAB CONTENT */}
-          <div className="max-w-full px-3 sm:px-6 py-4 sm:py-8">
+          <div className="max-w-full px-3 sm:px-6 py-4 sm:py-8 flex flex-col flex-1">
             {role === 'driver' ? (() => {
               const normalizedCurrentUserEmail = (currentUser || '').trim().toLowerCase();
               const myDriver = drivers.find(d => ((d.email || '').trim().toLowerCase()) === normalizedCurrentUserEmail);
