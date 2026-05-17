@@ -50,7 +50,7 @@ const ChatPage = ({ currentUser, role }) => {
     setConvs(c);
     const m = {}; c.forEach(x => { const u = (x.unread || {})[currentUser] || 0; m[x.id] = u; }); setUnread(m);
     setLoading(false);
-  }), [currentUser]);
+  }, (err) => console.error('Chat convs snapshot error:', err)), [currentUser]);
 
   useEffect(() => {
     if (!active) { setMsgs([]); return; }
@@ -59,7 +59,7 @@ const ChatPage = ({ currentUser, role }) => {
       const m = []; snap.forEach(d => m.push({ id: d.id, ...d.data() })); setMsgs(m);
       setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 100);
       getDoc(doc(db, CONVERSATIONS_DOC)).then(s => { if (s.exists()) { const d = s.data(); const c = d.conversations?.[active.id]; if (c && (c.unread?.[currentUser] || 0) > 0) updateDoc(doc(db, CONVERSATIONS_DOC), { [`conversations.${active.id}.unread.${currentUser}`]: 0 }); } });
-    });
+    }, (err) => console.error('Chat messages snapshot error:', err));
     const tq = query(collection(db, 'chat_typing'), where('conversationId', '==', active.id));
     const tunsub = onSnapshot(tq, snap => { const m = {}; snap.forEach(d => { const dt = d.data(); if (dt.email !== currentUser) m[dt.email] = true; }); setTyping(m); });
     return () => { unsub(); tunsub(); };
