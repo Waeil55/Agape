@@ -2092,7 +2092,7 @@ const today = getTodayStr();
             ) : activeTab === 'users' ? (
               <UsersPage drivers={drivers} setDrivers={setDrivers} dispatchers={dispatchers} setDispatchers={setDispatchers} addAuditLog={addAuditLog} currentUser={currentUser} role={role} requestAuthAction={requestAuthAction} />
             ) : activeTab === 'settings' ? (
-              <SettingsPage currentUser={currentUser} role={role} onLogout={handleLogout} onResetSystem={resetSystemData} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={handleUpdatePhoneNumbers} />
+              <SettingsPage currentUser={currentUser} role={role} onLogout={handleLogout} onResetSystem={resetSystemData} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={handleUpdatePhoneNumbers} driverProfile={role === 'driver' ? drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase()) : null} />
             ) : null}
           </div>
 
