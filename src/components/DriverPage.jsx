@@ -397,18 +397,18 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== BOTTOM NAVIGATION ===== */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{paddingBottom: 'env(safe-area-inset-bottom, 0px)'}}>
-        <div className="mx-3 mb-2 w-full max-w-md bg-white/80 backdrop-blur-2xl rounded-2xl shadow-xl shadow-black/5 border border-white/50 px-2 py-1">
+        <div className="mx-3 mb-2 w-full max-w-md bg-white/80 backdrop-blur-2xl rounded-2xl shadow-xl shadow-black/5 border border-white/50 px-2 py-0.5">
           <div className="flex items-center justify-around">
             {navItems.map((item, idx) => {
               const Icon = item.icon;
               const isActive = activeNav === item.id;
               return (
                 <button key={item.id} onClick={() => setActiveNav(item.id)}
-                  className={`flex flex-col items-center gap-0.5 py-1.5 px-3 rounded-2xl transition-all relative min-w-[56px] ${isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${isActive ? 'bg-blue-50' : ''}`}>
-                    <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} className="transition-all" />
+                  className={`flex flex-col items-center gap-0 py-1 px-2 rounded-2xl transition-all relative min-w-[48px] ${isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${isActive ? 'bg-blue-50' : ''}`}>
+                    <Icon size={17} strokeWidth={isActive ? 2.5 : 1.5} className="transition-all" />
                   </div>
-                  <span className={`text-[8px] font-bold uppercase tracking-wider transition-all ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>{item.label}</span>
+                  <span className={`text-[7px] font-bold uppercase tracking-wider transition-all leading-none ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>{item.label}</span>
                 </button>
               );
             })}
