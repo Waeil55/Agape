@@ -393,7 +393,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== BOTTOM NAVIGATION ===== */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{paddingBottom: 'env(safe-area-inset-bottom, 0px)'}}>
-        <div className="mx-3 mb-2 w-full max-w-md bg-white/80 backdrop-blur-2xl rounded-2xl shadow-xl shadow-black/5 border border-white/50 px-2 py-0.5">
+        <div className="mx-3 mb-2 w-full max-w-md bg-white/50 backdrop-blur-3xl rounded-3xl shadow-[0_-2px_30px_rgba(0,0,0,0.06)] border border-white/40 px-2 py-0.5">
           <div className="flex items-center justify-around">
             {navItems.map((item, idx) => {
               const Icon = item.icon;
