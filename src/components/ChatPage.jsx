@@ -13,7 +13,14 @@ const ChatPage = ({ currentUser, role }) => {
   const [selected, setSelected] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [sidebar, setSidebar] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const scrollRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'users'), snap => {
@@ -122,7 +129,7 @@ const ChatPage = ({ currentUser, role }) => {
   return (
     <div className="flex flex-1 bg-white overflow-hidden">
       {/* Sidebar */}
-      <div className={`${sidebar ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-80 border-r border-slate-100 shrink-0`}>
+      <div className={`${isMobile ? (sidebar && !activeConv ? 'flex' : 'hidden') : 'flex'} flex-col w-full md:w-80 border-r border-slate-100 shrink-0 bg-white`}>
         <div className="p-4 border-b border-slate-100">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-bold text-slate-900">Chat</h2>
@@ -138,7 +145,7 @@ const ChatPage = ({ currentUser, role }) => {
             </div>
           ) : (
             conversations.map(c => (
-              <button key={c.id} onClick={() => { setActiveConv(c); if (window.innerWidth < 768) setSidebar(false); }}
+              <button key={c.id} onClick={() => { setActiveConv(c); if (isMobile) setSidebar(false); }}
                 className={`w-full text-left p-4 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50 ${activeConv?.id === c.id ? 'bg-blue-50' : ''}`}>
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0">
                   {label(c).charAt(0).toUpperCase()}
@@ -159,11 +166,11 @@ const ChatPage = ({ currentUser, role }) => {
       </div>
 
       {/* Chat */}
-      <div className="flex-1 flex flex-col min-w-0 bg-slate-50">
+      <div className={`flex-1 flex flex-col min-w-0 bg-slate-50 ${isMobile && !activeConv ? 'hidden' : ''}`}>
         {activeConv ? (
           <>
             <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3">
-              {window.innerWidth < 768 && <button onClick={() => setSidebar(true)} className="p-1 text-slate-500"><ArrowLeft size={18} /></button>}
+              {isMobile && <button onClick={() => setSidebar(true)} className="p-1 text-slate-500"><ArrowLeft size={18} /></button>}
               <div className="flex-1">
                 <p className="font-semibold text-sm text-slate-900">{label(activeConv)}</p>
                 <p className="text-[10px] text-slate-400">{activeConv.type === 'group' ? `${activeConv.participants?.length || 0} members` : 'Conversation'}</p>

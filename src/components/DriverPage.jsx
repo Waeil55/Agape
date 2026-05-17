@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { tripMatchesTodayOrTomorrow } from '../utils/tripDate';
 import { EmailAuthProvider, reauthenticateWithCredential, signOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import ChatPage from './ChatPage';
 import { 
   Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, 
@@ -42,6 +44,20 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const me = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase());
   const [activeNav, setActiveNav] = useState('trips');
   const [historyFilter, setHistoryFilter] = useState('all');
+  const [chatUnread, setChatUnread] = useState(0);
+
+  // Real-time unread count for chat
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'chatData/conversations'), snap => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const total = Object.entries(data.conversations || {})
+        .filter(([, c]) => c.participants?.includes(currentUser))
+        .reduce((sum, [, c]) => sum + ((c.unread || {})[currentUser] || 0), 0);
+      setChatUnread(total);
+    });
+    return () => unsub();
+  }, [currentUser]);
 
   if (!me) {
     return (
@@ -401,8 +417,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               return (
                 <button key={item.id} onClick={() => setActiveNav(item.id)}
                   className={`flex flex-col items-center gap-0 py-1 px-2 rounded-2xl transition-all relative min-w-[48px] ${isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${isActive ? 'bg-blue-50' : ''}`}>
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all relative ${isActive ? 'bg-blue-50' : ''}`}>
                     <Icon size={17} strokeWidth={isActive ? 2.5 : 1.5} className="transition-all" />
+                    {item.id === 'chat' && chatUnread > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-white text-[7px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm border border-white">{chatUnread > 99 ? '99+' : chatUnread}</span>
+                    )}
                   </div>
                   <span className={`text-[7px] font-bold uppercase tracking-wider transition-all leading-none ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>{item.label}</span>
                 </button>
