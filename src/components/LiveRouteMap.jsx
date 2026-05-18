@@ -455,7 +455,7 @@ const LiveRouteMap = React.memo(({
                 return (
                   <div key={t.id} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 ${isActive ? 'bg-blue-100 text-blue-700' : done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                     {done ? <Circle size={8} className="fill-emerald-500 text-emerald-500" /> : <span className="w-3.5 h-3.5 rounded-full bg-current text-white flex items-center justify-center text-xs leading-none">{i + 1}</span>}
-                    <span className="truncate max-w-[60px]">{t.patient}</span>
+                    <span className="break-words">{t.patient}</span>
                     {i < ordered.length - 1 && <ChevronRight size={8} className="text-slate-300 shrink-0" />}
                   </div>
                 );
@@ -472,7 +472,7 @@ const LiveRouteMap = React.memo(({
                 {selectedStop.type === 'pickup' ? 'P' : 'D'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-slate-900 truncate">{selectedStop.patient}</p>
+                <p className="text-xs font-bold text-slate-900 break-words">{selectedStop.patient}</p>
                 <p className="text-xs text-slate-500 truncate">{selectedStop.address}</p>
               </div>
               <button onClick={() => onOpenInNav && onOpenInNav(selectedStop.address)}

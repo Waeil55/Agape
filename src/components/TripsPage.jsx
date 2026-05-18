@@ -170,7 +170,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
 
       {/* TABLE / LIST */}
       <div className="card overflow-hidden">
-        <div className="p-5 sm:p-6 border-b border-slate-100 flex justify-between items-center">
+        <div className="p-3 sm:p-6 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-heading text-slate-900">Live Manifest Queue</h3>
           <div className="flex items-center gap-3">
             {showAllDates && <span className="badge badge-warning text-xs">Viewing All Dates</span>}
@@ -189,28 +189,28 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               const driver = drivers.find(d => d.id === trip.driverId);
               const isSelected = selectedTasks.includes(trip.id);
               return (
-                <div key={trip.id} className={`flex items-center gap-4 p-4 sm:px-6 sm:py-5 transition-all ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
-                  <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} className="w-5 h-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0" />
+                <div key={trip.id} className={`flex items-start gap-3 p-3 sm:px-6 sm:py-4 transition-all ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
+                  <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} className="w-5 h-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0 mt-1" />
                   
                   <div className="flex-1 min-w-0" onClick={() => setSelectedTrip(trip)}>
-                    <div className="flex items-center gap-3 mb-1.5">
-                      <div className="flex items-center gap-2 truncate">
-                        <p className="font-extrabold text-slate-900 text-base sm:text-lg truncate">{trip.patient}</p>
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <p className="font-extrabold text-slate-900 text-base sm:text-lg break-words">{trip.patient}</p>
                         {(() => {
                           const legs = filteredTrips.filter(t => (t.patient || '').toLowerCase() === (trip.patient || '').toLowerCase()).length;
                           return legs > 1 ? (
-                            <button onClick={(e) => { e.stopPropagation(); setLegsDetailPatient(trip.patient); }} className="badge badge-info cursor-pointer hover:opacity-80">
+                            <button onClick={(e) => { e.stopPropagation(); setLegsDetailPatient(trip.patient); }} className="badge badge-info cursor-pointer hover:opacity-80 shrink-0">
                               <Users size={12} /> {legs}L
                             </button>
                           ) : null;
                         })()}
                       </div>
                       {trip.bookingId ? (
-                        <span className="badge badge-info bg-slate-100 text-slate-500">
+                        <span className="badge badge-info bg-slate-100 text-slate-500 shrink-0">
                           {trip.bookingId}
                         </span>
                       ) : null}
-                      <span className={`badge ${trip.status === 'Assigned' ? 'badge-success' : 'badge-warning'}`}>
+                      <span className={`badge shrink-0 ${trip.status === 'Assigned' ? 'badge-success' : 'badge-warning'}`}>
                         {trip.status}
                       </span>
                     </div>

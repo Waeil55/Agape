@@ -1544,7 +1544,7 @@ const today = getTodayStr();
                       <div key={t.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/50">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="min-w-0">
-                            <p className="font-black text-rose-900 text-sm truncate line-through">{t.patient}</p>
+                            <p className="font-black text-rose-900 text-sm break-words line-through">{t.patient}</p>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <Badge variant="danger">Deleted</Badge>
                               <span className="text-xs font-bold text-rose-400 uppercase tracking-widest">{t.bookingId || '—'} &bull; {t.time}</span>
@@ -1593,7 +1593,7 @@ const today = getTodayStr();
                             <div className="flex items-center gap-4 min-w-0">
                               <input type="checkbox" checked={selectedTasks.includes(t.id)} onChange={() => toggleTaskSelection(t.id)} className="w-5 h-5 rounded-[0.4rem] border-slate-300 text-amber-600 shrink-0" />
                               <div className="min-w-0">
-                                <p className="font-bold text-amber-900 text-sm md:text-base truncate">{t.patient}</p>
+                                <p className="font-bold text-amber-900 text-sm md:text-base break-words">{t.patient}</p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <Badge variant={t.status === 'Assigned' ? 'success' : 'warning'}>{t.status === 'Assigned' ? 'Assigned' : 'Awaiting Call'}</Badge>
                                   <span className="text-xs font-medium text-amber-700/70">{t.bookingId || '—'} &bull; {t.type}</span>
@@ -1676,7 +1676,7 @@ const today = getTodayStr();
                           <div className="flex items-center gap-4 min-w-0">
                             <input type="checkbox" checked={selectedTasks.includes(t.id)} onChange={() => toggleTaskSelection(t.id)} className="w-5 h-5 rounded-[0.4rem] border-slate-300 text-blue-600 shrink-0" />
                             <div className="min-w-0">
-                              <p className="font-bold text-slate-900 text-sm md:text-base truncate">{t.patient}</p>
+                              <p className="font-bold text-slate-900 text-sm md:text-base break-words">{t.patient}</p>
                               <div className="flex items-center gap-2 mt-1">
                                 <Badge variant={t.status === 'Unassigned' ? 'danger' : 'success'}>{t.status}</Badge>
                                 <span className="text-xs font-medium text-slate-500">{t.time}</span>
@@ -1704,8 +1704,8 @@ const today = getTodayStr();
                           </div>
                         )}
                         <div className="mt-3 pl-9 text-sm font-medium text-slate-500 flex flex-col gap-1">
-                          <p className="flex items-center gap-2 truncate"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span> {t.pickup}</p>
-                          <p className="flex items-center gap-2 truncate"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span> {t.dropoff}</p>
+                          <p className="flex items-center gap-2 break-words"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span> {t.pickup}</p>
+                          <p className="flex items-center gap-2 break-words"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span> {t.dropoff}</p>
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2 pl-9">
                           {t.pickupPhone && (
@@ -1750,8 +1750,8 @@ const today = getTodayStr();
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                           <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-lg sm:rounded-[1rem] bg-blue-100 text-blue-600 flex items-center justify-center font-bold shrink-0 text-xs sm:text-sm">{d.name.charAt(0)}</div>
                           <div className="min-w-0">
-                            <p className="font-bold text-xs sm:text-sm truncate text-slate-900">{d.name}</p>
-                            <p className="text-xs sm:text-xs font-medium text-slate-500 flex items-center gap-1 truncate"><MapPin size={8} className="text-blue-500 shrink-0" /> {d.currentZone}</p>
+                            <p className="font-bold text-xs sm:text-sm break-words text-slate-900">{d.name}</p>
+                            <p className="text-xs sm:text-xs font-medium text-slate-500 flex items-center gap-1 break-words"><MapPin size={8} className="text-blue-500 shrink-0" /> {d.currentZone}</p>
                           </div>
                         </div>
                         <div className={`w-2 h-2.5 rounded-full ${d.status === 'Available' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
@@ -1782,8 +1782,8 @@ const today = getTodayStr();
                   <div key={idx} className="flex items-start gap-2 p-1.5 sm:p-2 rounded-lg hover:bg-slate-50">
                     <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${log.c === 'amber' ? 'bg-amber-500' : log.c === 'blue' ? 'bg-blue-500' : log.c === 'rose' ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
                     <div className="min-w-0">
-                      <p className="text-sm sm:text-xs font-bold text-slate-900 truncate">{log.t}</p>
-                      <p className={`text-xs sm:text-xs ${getLogTextColor(log.c)} truncate`}>{log.d}</p>
+                      <p className="text-sm sm:text-xs font-bold text-slate-900 break-words">{log.t}</p>
+                      <p className={`text-xs sm:text-xs ${getLogTextColor(log.c)} break-words`}>{log.d}</p>
                     </div>
                   </div>
                 ))}
@@ -2079,8 +2079,8 @@ const today = getTodayStr();
                       <div key={idx} className="flex gap-3 items-start p-3 bg-slate-50 rounded-xl border border-slate-100/50">
                         <AlertCircle className="shrink-0 mt-0.5" size={20} style={{ color: log.c === 'amber' ? '#b45309' : log.c === 'blue' ? '#2563eb' : log.c === 'rose' ? '#e11d48' : '#059669' }} />
                         <div className="min-w-0">
-                          <p className="font-bold text-slate-900 text-sm truncate">{log.t}</p>
-                          <p className={`text-sm ${getLogTextColor(log.c)} truncate`}>{log.d}</p>
+                          <p className="font-bold text-slate-900 text-sm break-words">{log.t}</p>
+                          <p className={`text-sm ${getLogTextColor(log.c)} break-words`}>{log.d}</p>
                         </div>
                       </div>
                     ))}

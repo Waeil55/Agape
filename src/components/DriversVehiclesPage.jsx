@@ -401,7 +401,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                       <label key={trip.id} className={`flex items-center gap-3 p-3 sm:p-4 cursor-pointer hover:bg-slate-50 transition ${selectedTrips.includes(trip.id) ? 'bg-blue-50' : ''}`}>
                         <input type="checkbox" checked={selectedTrips.includes(trip.id)} onChange={() => toggleTripSelection(trip.id)} className="w-4 h-4 accent-blue-600 shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs sm:text-sm font-semibold text-slate-900 truncate">{trip.patient}</p>
+                          <p className="text-xs sm:text-sm font-semibold text-slate-900 break-words">{trip.patient}</p>
                           <p className="text-xs sm:text-xs text-slate-500 truncate">{trip.pickup} → {trip.dropoff}</p>
                         </div>
                         <span className="text-xs sm:text-xs text-slate-500 shrink-0">{trip.time}</span>

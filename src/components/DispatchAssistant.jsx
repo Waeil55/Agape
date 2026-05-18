@@ -169,7 +169,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-sm text-slate-900 truncate">{d.name}</p>
+                          <p className="font-bold text-sm text-slate-900 break-words">{d.name}</p>
                           <div className={`w-2 h-2 rounded-full ${statusColor}`} />
                           {!isClockedIn && <span className="text-xs font-bold text-slate-400 uppercase">Offline</span>}
                         </div>
@@ -232,10 +232,10 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                       className={`w-full text-left p-3 hover:bg-slate-50 transition ${selectedTrip?.id === t.id ? 'bg-indigo-50 border-l-4 border-l-indigo-500' : ''}`}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm text-slate-900 truncate">{t.patient}</p>
-                          {t.bookingId ? <p className="text-xs text-indigo-600 font-bold truncate">{t.bookingId}</p> : null}
-                          <p className="text-xs text-slate-500 truncate">{t.pickup} → {t.dropoff}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-sm text-slate-900 break-words">{t.patient}</p>
+                          {t.bookingId ? <p className="text-xs text-indigo-600 font-bold break-words">{t.bookingId}</p> : null}
+                          <p className="text-xs text-slate-500 break-words">{t.pickup} → {t.dropoff}</p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-xs font-bold text-slate-700">{t.time}</p>

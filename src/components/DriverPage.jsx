@@ -723,7 +723,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     <div className="flex-1 flex flex-col bg-[#f5f5f7]">
       {/* ===== TRIPS PAGE ===== */}
       {activeNav === 'trips' && (
-        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-3 space-y-3">
+        <div className="flex-1 overflow-y-auto pb-28 px-2 pt-2 space-y-3">
           {/* Offline Banner */}
           {!isOnline && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 flex items-center gap-2">
@@ -954,7 +954,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                     onTouchEnd={handleTouchEnd}
                     className={`card overflow-hidden ${isActive ? 'border-blue-300 shadow-md shadow-blue-600/10' : 'border-slate-100'} ${isSelected ? 'ring-2 ring-blue-400' : ''} ${hasConflict ? 'ring-2 ring-rose-300' : ''} ${urgencyBorder} ${isGuidedCurrent ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-200/40 scale-[1.01]' : ''} transition-all`}>
                     {/* Card Header — Name / Booking ID / Time */}
-                    <div className="px-5 pt-5 pb-2">
+                    <div className="px-3 pt-3 pb-2">
                       <div className="flex items-start gap-3">
                         <button onClick={() => toggleTripSelect(trip.id)} className="shrink-0 text-slate-400 hover:text-blue-600 mt-1">
                           {isSelected ? <CheckSquare size={22} className="text-blue-600" /> : <Square size={22} />}
@@ -963,10 +963,10 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                           {/* Row 1: Patient name + status */}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <h3 className="text-xl font-extrabold text-slate-900 leading-tight truncate">{trip.patient}</h3>
-                              <span className={`badge ${isActive ? 'badge-info' : 'bg-slate-100 text-slate-500'}`}>{trip.status}</span>
-                              {urgency === 2 && <span className="badge badge-danger animate-pulse">Overdue</span>}
-                              {urgency === 1 && <span className="badge badge-warning">Soon</span>}
+                              <h3 className="text-xl font-extrabold text-slate-900 leading-tight break-words">{trip.patient}</h3>
+                              <span className={`badge ${isActive ? 'badge-info' : 'bg-slate-100 text-slate-500'} shrink-0`}>{trip.status}</span>
+                              {urgency === 2 && <span className="badge badge-danger animate-pulse shrink-0">Overdue</span>}
+                              {urgency === 1 && <span className="badge badge-warning shrink-0">Soon</span>}
                             </div>
                             <div className="flex gap-1.5 shrink-0">
                             <button onClick={() => handleCall(getClientPhone(trip), trip.patient)} className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 active:scale-90 transition-all"><Phone size={18} /></button>
@@ -998,7 +998,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                     </div>
 
                     {/* Pickup / Dropoff Route */}
-                    <div className="px-5 py-3">
+                    <div className="px-3 py-2">
                       <div className="relative pl-8">
                         <div className="absolute left-[9px] top-3 bottom-3 w-[3px] bg-gradient-to-b from-emerald-400 via-blue-200 to-rose-400 rounded-full" />
                         <div className="flex items-start gap-3 mb-4">
@@ -1050,7 +1050,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
                     {/* Expanded Details */}
                     {isExpanded && (
-                      <div className="px-5 pb-3 border-t border-slate-50 pt-4 space-y-3 animate-in">
+                      <div className="px-3 pb-3 border-t border-slate-50 pt-3 space-y-3 animate-in">
                         <div className="grid grid-cols-2 gap-3">
                           <div className="bg-slate-50 rounded-xl p-3">
                             <p className="text-xs text-slate-400 uppercase font-bold">Booking ID</p>
@@ -1091,7 +1091,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                     )}
 
                     {/* Action Buttons */}
-                    <div className="px-5 pb-5 flex gap-2.5 flex-wrap">
+                    <div className="px-3 pb-3 flex gap-2.5 flex-wrap">
                       {trip.status === 'Assigned' || trip.status === 'Unassigned' ? (
                         <>
                           <button onClick={() => { impact('heavy'); handleStartTrip(trip); }} className="btn btn-primary flex-1 text-base">
@@ -1445,8 +1445,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== HISTORY PAGE ===== */}
       {activeNav === 'history' && (
-        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-3">
-          <div className="px-1 pt-2 pb-4">
+        <div className="flex-1 overflow-y-auto pb-28 px-2 pt-2">
+          <div className="px-1 pt-2 pb-3">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">History</h2>
@@ -1500,13 +1500,13 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 const s = styles[trip.status] || styles['Completed'];
                 return (
                   <div key={trip.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden active:scale-[0.99] transition-all cursor-pointer">
-                    <div onClick={() => setShowTripDetails(trip)} className="p-4">
+                    <div onClick={() => setShowTripDetails(trip)} className="p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <div className={`w-2 h-2 rounded-full ${s.dot}`} />
-                            <h4 className="font-bold text-sm text-slate-900 leading-tight">{trip.patient}</h4>
-                            {trip.bookingId && <span className="text-xs text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded">{trip.bookingId}</span>}
+                            <h4 className="font-bold text-sm text-slate-900 leading-tight break-words">{trip.patient}</h4>
+                            {trip.bookingId && <span className="text-xs text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded shrink-0">{trip.bookingId}</span>}
                           </div>
                           <p className="text-sm font-bold text-blue-600 mt-1">{to12hr(trip.time)}</p>
                           <div className="flex items-center gap-1.5 mt-1.5 text-xs text-slate-500">
@@ -1559,7 +1559,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== PROFILE PAGE ===== */}
       {activeNav === 'profile' && (
-        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-3 space-y-3">
+        <div className="flex-1 overflow-y-auto pb-28 px-2 pt-2 space-y-3">
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/90 to-indigo-700/90 shadow-lg shadow-blue-600/10">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.1),transparent_60%)]" />
             <div className="relative px-5 py-5">
@@ -1709,8 +1709,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== SETTINGS PAGE ===== */}
       {activeNav === 'settings' && (
-        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-3">
-          <div className="px-1 pt-2 pb-4">
+        <div className="flex-1 overflow-y-auto pb-28 px-2 pt-2">
+          <div className="px-1 pt-2 pb-3">
             <h2 className="text-xl font-bold text-slate-900">Settings</h2>
             <p className="text-xs text-slate-400 mt-0.5">Account and app preferences</p>
           </div>
