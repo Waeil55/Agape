@@ -5,6 +5,125 @@ const OdometerInput = ({ onSubmit, onCancel, lastReading, isFirstTrip }) => {
   const [odometerValue, setOdometerValue] = useState('');
   const [lastThreeDigits, setLastThreeDigits] = useState('');
   const [inputMode, setInputMode] = useState(isFirstTrip ? 'full' : 'partial');
-    const digits = value.replace(/
 
-  const handleFullInput = (value) => {    if (!isNaN(value) && value >= 0) {\n      setOdometerValue(value);\n    }\n  };\n\n  const handlePartialInput = (value) => {\n    // Only accept last 3 digits\n    const digits = value.replace(/\\D/g, '').slice(-3);\n    setLastThreeDigits(digits);\n  };\n\n  const handleSubmit = () => {\n    let finalValue;\n    if (inputMode === 'full') {\n      finalValue = parseInt(odometerValue) || 0;\n    } else {\n      // Combine last 3 digits with previous reading\n      const lastThree = parseInt(lastThreeDigits) || 0;\n      const prefix = Math.floor(lastReading / 1000) * 1000;\n      finalValue = prefix + lastThree;\n    }\n    onSubmit(finalValue);\n  };\n\n  const handleQuickFill = (offset) => {\n    const newValue = lastReading + offset;\n    handleFullInput(newValue.toString());\n  };\n\n  return (\n    <div className=\"fixed inset-0 bg-black bg-opacity-50 flex items-end z-50 animate-in\">\n      <div className=\"w-full bg-white dark:bg-gray-800 rounded-t-xl p-6 animate-in slide-in-from-bottom\">\n        <div className=\"flex justify-between items-center mb-4\">\n          <h2 className=\"text-2xl font-bold\">Odometer Reading</h2>\n          <button onClick={onCancel} className=\"p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full\">\n            <X size={24} />\n          </button>\n        </div>\n\n        <div className=\"space-y-4\">\n          {/* Mode Selection */}\n          {!isFirstTrip && (\n            <div className=\"flex gap-2\">\n              <button\n                onClick={() => setInputMode('partial')}\n                className={`flex-1 py-2 rounded font-semibold transition-colors ${\n                  inputMode === 'partial'\n                    ? 'bg-blue-600 text-white'\n                    : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white'\n                }`}\n              >\n                Last 3 Digits\n              </button>\n              <button\n                onClick={() => setInputMode('full')}\n                className={`flex-1 py-2 rounded font-semibold transition-colors ${\n                  inputMode === 'full'\n                    ? 'bg-blue-600 text-white'\n                    : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white'\n                }`}\n              >\n                Full Reading\n              </button>\n            </div>\n          )}\n\n          {/* Input Field */}\n          {inputMode === 'full' ? (\n            <div>\n              <label className=\"block text-sm font-semibold mb-2\">Odometer Reading (km)</label>\n              <input\n                type=\"number\"\n                value={odometerValue}\n                onChange={(e) => handleFullInput(e.target.value)}\n                placeholder=\"Enter full odometer reading\"\n                className=\"w-full px-4 py-3 border-2 border-blue-500 rounded-lg text-2xl font-bold text-center focus:outline-none focus:border-blue-600\"\n                autoFocus\n              />\n              {!isFirstTrip && (\n                <p className=\"text-sm text-gray-600 dark:text-gray-400 mt-2\">Last reading: {lastReading} km</p>\n              )}\n            </div>\n          ) : (\n            <div>\n              <label className=\"block text-sm font-semibold mb-2\">Last 3 Digits</label>\n              <div className=\"flex gap-2\">\n                <input\n                  type=\"text\"\n                  value={lastThreeDigits}\n                  onChange={(e) => handlePartialInput(e.target.value)}\n                  placeholder=\"000\"\n                  maxLength=\"3\"\n                  className=\"flex-1 px-4 py-3 border-2 border-blue-500 rounded-lg text-2xl font-bold text-center focus:outline-none focus:border-blue-600\"\n                  autoFocus\n                />\n              </div>\n              <p className=\"text-sm text-gray-600 dark:text-gray-400 mt-2\">\n                Prefix: {Math.floor(lastReading / 1000) * 1000} km + {lastThreeDigits.padStart(3, '0')}\n              </p>\n              <p className=\"text-sm font-bold text-blue-600 dark:text-blue-400 mt-1\">\n                Final: {(Math.floor(lastReading / 1000) * 1000 + parseInt(lastThreeDigits || 0))} km\n              </p>\n            </div>\n          )}\n\n          {/* Quick Fill Buttons */}\n          {!isFirstTrip && inputMode === 'full' && (\n            <div>\n              <p className=\"text-sm font-semibold mb-2\">Quick Fill (Last Reading + km):</p>\n              <div className=\"grid grid-cols-4 gap-2\">\n                {[10, 20, 50, 100].map((offset) => (\n                  <button\n                    key={offset}\n                    onClick={() => handleQuickFill(offset)}\n                    className=\"py-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 font-semibold text-sm\"\n                  >\n                    +{offset}\n                  </button>\n                ))}\n              </div>\n            </div>\n          )}\n\n          {/* Timestamp */}\n          <div className=\"bg-gray-100 dark:bg-gray-700 p-3 rounded\">\n            <p className=\"text-sm text-gray-600 dark:text-gray-400\">📍 Timestamp: {new Date().toLocaleString()}</p>\n          </div>\n\n          {/* Submit & Cancel */}\n          <div className=\"flex gap-3 mt-6\">\n            <button\n              onClick={onCancel}\n              className=\"flex-1 py-3 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg font-bold hover:bg-gray-400 dark:hover:bg-gray-600\"\n            >\n              Cancel\n            </button>\n            <button\n              onClick={handleSubmit}\n              disabled={!odometerValue && !lastThreeDigits}\n              className=\"flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed\"\n            >\n              Start Trip\n            </button>\n          </div>\n        </div>\n      </div>\n    </div>\n  );\n};\n\nexport default OdometerInput;
+  const handleFullInput = (value) => {
+    if (!isNaN(value) && value >= 0) {
+      setOdometerValue(value);
+    }
+  };
+
+  const handlePartialInput = (value) => {
+    const digits = value.replace(/\D/g, '').slice(-3);
+    setLastThreeDigits(digits);
+  };
+
+  const handleSubmit = () => {
+    let finalValue;
+    if (inputMode === 'full') {
+      finalValue = parseInt(odometerValue) || 0;
+    } else {
+      const lastThree = parseInt(lastThreeDigits) || 0;
+      const prefix = Math.floor(lastReading / 1000) * 1000;
+      finalValue = prefix + lastThree;
+    }
+    onSubmit(finalValue);
+  };
+
+  const handleQuickFill = (offset) => {
+    const newValue = lastReading + offset;
+    handleFullInput(newValue.toString());
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end z-50 animate-in">
+      <div className="w-full bg-white dark:bg-gray-800 rounded-t-xl p-6 animate-in slide-in-from-bottom">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">Odometer Reading</h2>
+          <button onClick={onCancel} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {!isFirstTrip && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setInputMode('partial')}
+                className={`flex-1 py-2 rounded font-semibold transition-colors ${
+                  inputMode === 'partial'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white'
+                }`}
+              >
+                Last 3 Digits
+              </button>
+              <button
+                onClick={() => setInputMode('full')}
+                className={`flex-1 py-2 rounded font-semibold transition-colors ${
+                  inputMode === 'full'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white'
+                }`}
+              >
+                Full Reading
+              </button>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-semibold mb-1">
+              {inputMode === 'full' ? 'Current Odometer Reading' : 'Last 3 Digits of Odometer'}
+            </label>
+            {inputMode === 'full' ? (
+              <input
+                type="number"
+                value={odometerValue}
+                onChange={(e) => handleFullInput(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg focus:outline-none focus:border-blue-500 text-lg font-bold"
+                placeholder="Enter full odometer reading"
+                autoFocus
+              />
+            ) : (
+              <input
+                type="text"
+                value={lastThreeDigits}
+                onChange={(e) => handlePartialInput(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg focus:outline-none focus:border-blue-500 text-lg font-bold text-center tracking-widest"
+                placeholder="---"
+                maxLength={3}
+                autoFocus
+              />
+            )}
+          </div>
+
+          {lastReading > 0 && (
+            <div className="flex gap-2">
+              {[10, 50, 100].map(offset => (
+                <button
+                  key={offset}
+                  onClick={() => handleQuickFill(offset)}
+                  className="flex-1 py-2 bg-gray-200 dark:bg-gray-700 rounded font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
+                >
+                  +{offset}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            Last reading: {lastReading.toLocaleString()} mi
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 transition-colors"
+          >
+            Record Reading
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default OdometerInput;

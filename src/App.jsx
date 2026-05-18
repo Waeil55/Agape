@@ -16,6 +16,7 @@ import SettingsPage from './components/SettingsPage';
 import DriverPage from './components/DriverPage';
 import UsersPage from './components/UsersPage';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
+import { playMessageSound, initAudioContext } from './utils/notificationSound';
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 import { suggestBatchAssignment, suggestOptimalDriver } from './config/ai';
@@ -31,13 +32,13 @@ const LazyFallback = () => <div className="flex items-center justify-center p-12
 
 const Badge = ({ children, variant = 'info' }) => {
   const variants = {
-    info: "bg-blue-50 text-blue-700 border-blue-100",
-    success: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    warning: "bg-amber-50 text-amber-700 border-amber-100",
-    danger: "bg-rose-50 text-rose-700 border-rose-100",
-    ai: "bg-indigo-50 text-indigo-700 border-indigo-100",
+    info: "badge-info",
+    success: "badge-success",
+    warning: "badge-warning",
+    danger: "badge-danger",
+    ai: "badge-info",
   };
-  return <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
+  return <span className={`badge ${variants[variant]}`}>{children}</span>;
 };
 
 const getLogTextColor = (color) => {
@@ -53,7 +54,8 @@ const PERMISSIONS = {
     canViewReports: true,
     canEditFleet: true,
     canViewLiveMap: true,
-    canOptimizeFleet: true
+    canOptimizeFleet: true,
+    canResetSystem: true
   },
   dispatcher: {
     canDeleteTrip: true,
@@ -62,7 +64,8 @@ const PERMISSIONS = {
     canViewReports: false,
     canEditFleet: false,
     canViewLiveMap: true,
-    canOptimizeFleet: true
+    canOptimizeFleet: true,
+    canResetSystem: false
   },
   driver: {
     canDeleteTrip: false,
@@ -71,7 +74,8 @@ const PERMISSIONS = {
     canViewReports: false,
     canEditFleet: false,
     canViewLiveMap: false,
-    canOptimizeFleet: false
+    canOptimizeFleet: false,
+    canResetSystem: false
   },
   billing: {
     canDeleteTrip: false,
@@ -80,7 +84,8 @@ const PERMISSIONS = {
     canViewReports: true,
     canEditFleet: false,
     canViewLiveMap: false,
-    canOptimizeFleet: false
+    canOptimizeFleet: false,
+    canResetSystem: false
   },
   qa_auditor: {
     canDeleteTrip: false,
@@ -89,7 +94,8 @@ const PERMISSIONS = {
     canViewReports: true,
     canEditFleet: false,
     canViewLiveMap: true,
-    canOptimizeFleet: false
+    canOptimizeFleet: false,
+    canResetSystem: false
   },
   fleet_manager: {
     canDeleteTrip: false,
@@ -98,7 +104,8 @@ const PERMISSIONS = {
     canViewReports: true,
     canEditFleet: true,
     canViewLiveMap: true,
-    canOptimizeFleet: true
+    canOptimizeFleet: true,
+    canResetSystem: false
   },
   supervisor: {
     canDeleteTrip: false,
@@ -107,7 +114,8 @@ const PERMISSIONS = {
     canViewReports: true,
     canEditFleet: false,
     canViewLiveMap: true,
-    canOptimizeFleet: false
+    canOptimizeFleet: false,
+    canResetSystem: false
   }
 };
 
@@ -155,10 +163,13 @@ const DEFAULT_DATA = {
 const DEFAULT_APP_SETTINGS = {
   theme: 'light',
   fontScale: 'md',
+  readability: 'normal',
   navigationApp: 'google',
 };
 
-function sanitizeBookingId(value) {
+// Returns null for system-generated booking ID patterns (avoids duplicates in Firestore),
+// keeps the original value for custom/user-entered booking IDs.
+function extractCustomBookingId(value) {
   const cleanValue = String(value || '').trim();
   if (!cleanValue) return null;
   if (/^BK-\d+-\d+$/i.test(cleanValue)) return null;
@@ -171,7 +182,7 @@ function normalizeTrip(trip) {
   if (!trip) return trip;
   return {
     ...trip,
-    bookingId: sanitizeBookingId(trip.bookingId),
+    bookingId: extractCustomBookingId(trip.bookingId),
   };
 }
 
@@ -202,7 +213,9 @@ async function saveAppData(data, retries = 3) {
     drivers: data.drivers || [],
     dispatchers: data.dispatchers || [],
     trips: prunedTrips,
-    trashedTrips: data.trashedTrips || []
+    trashedTrips: data.trashedTrips || [],
+    vehicles: data.vehicles || [],
+    phoneNumbers: data.phoneNumbers || {}
   });
 
   let lastErr = null;
@@ -234,6 +247,7 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [dataLoaded, setDataLoaded] = useState(false);
   const dataLoadedRef = useRef(false);
+  const prevChatConvsRef = useRef(null);
   
   // Online/offline listener
   useEffect(() => {
@@ -255,6 +269,7 @@ const App = () => {
   const [phoneNumbers, setPhoneNumbers] = useState(DEFAULT_DATA.phoneNumbers);
   const [vehicles, setVehicles] = useState(DEFAULT_DATA.vehicles);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
   // Refs for latest state — always up to date, no closure issues
   const sTrips = useRef(trips);
   const sDrivers = useRef(drivers);
@@ -378,10 +393,14 @@ const App = () => {
 
   useEffect(() => {
     localStorage.setItem('agape_app_settings', JSON.stringify(appSettings));
-    document.documentElement.dataset.theme = appSettings.theme || 'light';
+    const theme = appSettings.theme === 'system'
+      ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : appSettings.theme || 'light';
+    document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.fontScale = appSettings.fontScale || 'md';
+    document.documentElement.dataset.readability = appSettings.readability || 'normal';
 
-    const themeColor = appSettings.theme === 'dark' ? '#020617' : '#f8fafc';
+    const themeColor = theme === 'dark' ? '#020617' : '#f8fafc';
     let themeMeta = document.querySelector('meta[name="theme-color"]');
     if (!themeMeta) {
       themeMeta = document.createElement('meta');
@@ -443,7 +462,8 @@ const App = () => {
         unsubFcm = onForegroundMessage((payload) => {
           const title = payload.notification?.title || payload.data?.title || 'Agape Care';
           const body = payload.notification?.body || payload.data?.body || '';
-          if (title && body) showLocalNotification(title, body);
+          const type = payload.data?.type === 'chat' || title.toLowerCase().includes('message') ? 'message' : 'notification';
+          if (title && body) showLocalNotification(title, body, type);
         });
 
         // Initialize data from Firestore
@@ -584,7 +604,7 @@ const App = () => {
     if (isAuthenticated && dataLoaded && !fromSnapshot.current) {
       persistState();
     }
-  }, [trips, trashedTrips, drivers, logs, dispatchers, dataLoaded, isAuthenticated, persistState]);
+  }, [trips, trashedTrips, drivers, logs, dispatchers, vehicles, phoneNumbers, dataLoaded, isAuthenticated, persistState]);
 
   useEffect(() => {
     const metaTags = [
@@ -611,7 +631,46 @@ const App = () => {
       document.head.appendChild(linkApple);
     }
     linkApple.href = '/agape.png';
+    initAudioContext();
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser || !role) return;
+    let firstSnapshot = true;
+    const unsub = onSnapshot(doc(db, 'chatData/conversations'), snap => {
+      if (!snap.exists()) { setChatUnreadCount(0); return; }
+      const curr = snap.data().conversations || {};
+      // Calculate unread count for nav badge
+      let totalUnread = 0;
+      for (const c of Object.values(curr)) {
+        if (c?.lastMessage?.sender && c.lastMessage.sender !== currentUser &&
+            !(c.lastMessage?.readBy || []).includes(currentUser)) {
+          totalUnread++;
+        }
+      }
+      setChatUnreadCount(totalUnread);
+      if (firstSnapshot) { firstSnapshot = false; prevChatConvsRef.current = curr; return; }
+      const prev = prevChatConvsRef.current || {};
+      for (const [id, c] of Object.entries(curr)) {
+        const prevLast = prev[id]?.lastMessage;
+        const currLast = c?.lastMessage;
+        if (currLast && currLast.sender && currLast.sender !== currentUser &&
+            (!prevLast || prevLast.text !== currLast.text || prevLast.timestamp !== currLast.timestamp)) {
+          if (activeTab !== 'chat') {
+            playMessageSound();
+            showLocalNotification(
+              `New message from ${currLast.sender.split('@')[0]}`,
+              currLast.text,
+              'message'
+            );
+          }
+          break;
+        }
+      }
+      prevChatConvsRef.current = curr;
+    });
+    return () => { unsub(); };
+  }, [isAuthenticated, currentUser, role, activeTab]);
 
   const addAuditLog = (title, desc, color) => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1056,20 +1115,20 @@ const App = () => {
         
         <div className="w-full max-w-lg bg-white/80 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(15,23,42,0.1)] p-8 sm:p-12 border border-white relative z-10">
           <div className="flex flex-col items-center mb-10 text-center">
-            <div className="w-24 h-24 mb-6 relative">
+            <div className="w-28 h-28 mb-6 relative">
               <div className="absolute inset-0 bg-blue-600 blur-2xl opacity-10 animate-pulse" />
               <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain relative z-10" />
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 mb-2">Agape<span className="text-blue-600">Care</span></h1>
-            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-full border border-blue-100">
-              <ShieldCheck size={14} className="text-blue-600" />
-              <p className="text-[10px] font-black text-blue-800 uppercase tracking-[0.2em]">Enterprise Fleet OS</p>
+            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 mb-3 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
+            <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 rounded-full border border-blue-100">
+              <ShieldCheck size={16} className="text-blue-600" />
+              <p className="text-xs font-black text-blue-800 uppercase tracking-[0.2em]">Enterprise Fleet OS</p>
             </div>
           </div>
 
           {loginStep === 'role_selection' ? (
-            <div className="space-y-4">
-              <h2 className="text-center text-sm font-bold text-slate-500 mb-8 tracking-wide">Secure Access Portal</h2>
+            <div className="space-y-5">
+              <h2 className="text-center text-base font-bold text-slate-500 mb-8 tracking-wide">Secure Access Portal</h2>
               <div className="grid grid-cols-1 gap-4">
                 {[
                   { key: 'admin', Icon: ShieldCheck, label: 'Administrator', sub: 'Master Control & Intelligence', color: 'indigo' },
@@ -1084,51 +1143,51 @@ const App = () => {
                   };
                   return (
                     <button key={r.key} onClick={() => handleRoleSelect(r.key)} 
-                      className="flex items-center gap-5 p-5 bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 hover:border-blue-200 active:scale-[0.98] transition-all duration-300 group text-left shadow-sm">
+                      className="flex items-center gap-5 p-6 bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 hover:border-blue-200 active:scale-[0.98] transition-all duration-300 group text-left shadow-sm">
                       <div className={`${colorMap[r.color]} p-4 rounded-xl text-white shadow-lg shrink-0 transition-transform group-hover:scale-110 flex items-center justify-center w-14 h-14`}>
                         <Icon size={24} strokeWidth={2.5} />
                       </div>
                       <div className="flex-1">
-                        <span className="block text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
-                        <span className="block text-xs font-medium text-slate-500 mt-0.5">{r.sub}</span>
+                        <span className="block text-xl font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
+                        <span className="block text-sm font-medium text-slate-500 mt-0.5">{r.sub}</span>
                       </div>
-                      <ArrowRight size={18} className="text-slate-300 group-hover:text-blue-600 transition-all transform group-hover:translate-x-1" />
+                      <ArrowRight size={20} className="text-slate-300 group-hover:text-blue-600 transition-all transform group-hover:translate-x-1" />
                     </button>
                   );
                 })}
               </div>
             </div>
           ) : (
-            <form onSubmit={submitLogin} className="space-y-5">
-              <div className="flex items-center gap-4 mb-8 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                <button type="button" onClick={() => setLoginStep('role_selection')} className="p-3 bg-white rounded-xl text-slate-400 hover:text-slate-900 shadow-sm active:scale-95 transition-all"><ArrowRight className="rotate-180" size={18} /></button>
+            <form onSubmit={submitLogin} className="space-y-6">
+              <div className="flex items-center gap-4 mb-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <button type="button" onClick={() => setLoginStep('role_selection')} className="p-3 bg-white rounded-xl text-slate-400 hover:text-slate-900 shadow-sm active:scale-95 transition-all"><ArrowRight className="rotate-180" size={20} /></button>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Authenticating as</p>
-                  <p className="text-sm font-black text-slate-900 capitalize">{pendingRole}</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Authenticating as</p>
+                  <p className="text-base font-black text-slate-900 capitalize">{pendingRole}</p>
                 </div>
               </div>
               
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest ml-1">Enterprise Email</label>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Enterprise Email</label>
                 <div className="relative">
                   <input type="email" required placeholder="name@agapecare.com" value={email} onChange={(e) => setEmail(e.target.value)} 
-                    className="w-full p-4 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none" />
+                    className="w-full p-4 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
                 <div className="relative">
                   <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} 
-                    className="w-full p-4 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none" />
+                    className="w-full p-4 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
 
-              {loginError && <p className="text-rose-600 text-xs font-semibold text-center mt-2 bg-rose-50 p-2 rounded-lg border border-rose-100">{loginError}</p>}
+              {loginError && <p className="text-rose-600 text-sm font-semibold text-center mt-2 bg-rose-50 p-3 rounded-lg border border-rose-100">{loginError}</p>}
               
-              <button type="submit" className="w-full py-4 mt-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-500/25 active:scale-[0.98] hover:shadow-blue-500/40 transition-all duration-300">Authorize Access</button>
+              <button type="submit" className="w-full py-5 mt-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-500/25 active:scale-[0.98] hover:shadow-blue-500/40 transition-all duration-300">Authorize Access</button>
               
-              <div className="pt-4 flex items-center justify-between text-xs font-bold">
+              <div className="pt-4 flex items-center justify-between text-sm font-bold">
                 <button type="button" onClick={handleCreateAccount} className="text-slate-400 hover:text-slate-900 transition">New Deployment?</button>
                 <span className="text-slate-200">|</span>
                 <button type="button" className="text-slate-400 hover:text-slate-900 transition">Secure Reset</button>
@@ -1742,12 +1801,12 @@ const today = getTodayStr();
       <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
       {/* HEADER */}
       <header className="bg-white shadow-sm border-b border-slate-200" style={{paddingTop: 'var(--sat)'}}>
-        <div className="max-w-full px-3 sm:px-6 py-2 sm:py-3 flex justify-between items-center">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <img src="/agape.png" alt="Agape Care" className="w-8 sm:w-10 h-8 sm:h-10 rounded-lg shrink-0" />
+        <div className="max-w-full px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <img src="/agape.png" alt="Agape Care" className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl shrink-0 shadow-sm" />
             <div className="min-w-0">
-              <h1 className="text-lg sm:text-2xl font-bold text-slate-900 truncate">Agape Care</h1>
-              <p className="hidden sm:block text-xs text-slate-500">Fleet Management System</p>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 truncate leading-tight tracking-tight">Agape Care</h1>
+              <p className="hidden sm:block text-sm text-slate-500 font-medium">Fleet Management System</p>
             </div>
           </div>
           {isAuthenticated && (
@@ -1757,24 +1816,24 @@ const today = getTodayStr();
                 const isOnline = myDriver?.clockedIn || false;
                 return (
                   <button onClick={() => handleDriverStatusUpdate(myDriver?.id, !isOnline)}
-                    className={`h-8 px-3 rounded-lg font-bold text-[9px] uppercase tracking-wider transition-all active:scale-95 border ${isOnline ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-500 border-slate-200'}`}>
+                    className={`h-10 px-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-all active:scale-95 border-2 ${isOnline ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-200' : 'bg-white text-slate-600 border-slate-300'}`}>
                     {isOnline ? 'Online' : 'Offline'}
                   </button>
                 );
               })()}
               {role === 'driver' && phoneNumbers?.routing && (
-                <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="p-1.5 sm:p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-[9px] font-bold flex items-center gap-1" title="Call Routing">
-                  <Phone size={14} /><span className="hidden sm:inline">Routing</span>
+                <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="h-10 px-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition text-sm font-bold flex items-center gap-1.5 shadow-sm" title="Call Routing">
+                  <Phone size={16} /><span className="hidden sm:inline">Routing</span>
                 </a>
               )}
               {role === 'driver' && phoneNumbers?.dispatcher && (
-                <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="p-1.5 sm:p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition text-[9px] font-bold flex items-center gap-1" title="Call Dispatch">
-                  <Phone size={14} /><span className="hidden sm:inline">Dispatch</span>
+                <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="h-10 px-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition text-sm font-bold flex items-center gap-1.5 shadow-sm" title="Call Dispatch">
+                  <Phone size={16} /><span className="hidden sm:inline">Dispatch</span>
                 </a>
               )}
-              <span className="hidden sm:inline px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-semibold capitalize">{role}</span>
-              <button onClick={handleLogout} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-slate-900 transition">
-                <LogOut size={18} className="sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline-flex items-center px-4 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold capitalize border border-blue-100">{role}</span>
+              <button onClick={handleLogout} className="h-10 px-3 hover:bg-slate-100 rounded-xl text-slate-600 hover:text-slate-900 transition font-semibold text-sm flex items-center gap-1.5">
+                <LogOut size={18} /> <span className="hidden sm:inline">Sign Out</span>
               </button>
             </div>
           )}
@@ -1784,9 +1843,12 @@ const today = getTodayStr();
       {/* LOADING SCREEN */}
       {isLoading ? (
         <div className="flex-1 bg-slate-50 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-            <p className="text-sm font-bold text-slate-500">Loading...</p>
+          <div className="flex flex-col items-center gap-6">
+            <div className="w-20 h-20 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin shadow-lg shadow-blue-100"></div>
+            <div className="text-center">
+              <p className="text-lg font-bold text-slate-700">Loading Agape Care</p>
+              <p className="text-sm font-medium text-slate-400 mt-1">Preparing your workspace...</p>
+            </div>
           </div>
         </div>
       ) : !isAuthenticated ? (
@@ -1794,8 +1856,8 @@ const today = getTodayStr();
       ) : (
         <>
           {/* NAVIGATION TABS */}
-          <div className="bg-white border-b border-slate-200 sticky top-0 z-40 overflow-x-auto">
-            <div className="max-w-full px-2 sm:px-6 flex gap-1 sm:gap-2 whitespace-nowrap">
+          <div className="nav-blur sticky top-0 z-40 overflow-x-auto">
+            <div className="max-w-full px-3 sm:px-6 flex gap-1 sm:gap-2 whitespace-nowrap">
               {(() => {
                 const allTabs = [
                   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -1823,6 +1885,7 @@ const today = getTodayStr();
                 return allTabs;
               })().map(tab => {
                 const Icon = tab.icon;
+                const isChat = tab.id === 'chat';
                 return (
                   <button
                     key={tab.id}
@@ -1830,13 +1893,24 @@ const today = getTodayStr();
                       setActiveTab(tab.id);
                       if (role === 'dispatcher') setSearchQuery('');
                     }}
-                    className={`py-3 sm:py-4 px-2 sm:px-3 border-b-2 font-semibold flex items-center justify-center gap-1 sm:gap-2 transition text-[11px] sm:text-sm ${
+                    className={`py-3 sm:py-4 px-3 sm:px-4 border-b-2 font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition text-sm sm:text-base ${
                       activeTab === tab.id
                         ? 'border-blue-600 text-blue-600'
-                        : 'border-transparent text-slate-600 hover:text-blue-600'
+                        : 'border-transparent text-slate-500 hover:text-blue-600'
                     }`}
                   >
-                    <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
+                    {isChat ? (
+                      <span className="relative inline-flex">
+                        <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
+                        {chatUnreadCount > 0 && (
+                          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1 leading-none shadow-sm">
+                            {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
+                    )}
                     <span className="hidden sm:inline">{tab.label}</span>
                   </button>
                 );
@@ -1845,7 +1919,7 @@ const today = getTodayStr();
           </div>
 
           {/* TAB CONTENT */}
-          <div className="max-w-full px-3 sm:px-6 py-4 sm:py-8 flex flex-col flex-1">
+          <div className="max-w-full px-4 sm:px-8 py-6 sm:py-10 flex flex-col flex-1">
             {role === 'driver' ? (() => {
               const normalizedCurrentUserEmail = (currentUser || '').trim().toLowerCase();
               const myDriver = drivers.find(d => ((d.email || '').trim().toLowerCase()) === normalizedCurrentUserEmail);
@@ -1863,6 +1937,7 @@ const today = getTodayStr();
                 activeMission={myDriver?.activeMission}
                 phoneNumbers={phoneNumbers}
                 onOpenSettings={() => setActiveTab('settings')}
+                onUpdateAppSettings={updateAppSettings}
                 onUpdateMission={(updatedMission) => {
                   setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, activeMission: updatedMission } : d));
                   setTimeout(persistState, 0);
@@ -1905,85 +1980,84 @@ const today = getTodayStr();
                   </div>
                 )}
 
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                    <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5">
+                    <div className="card p-5 sm:p-6 relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
                         <FileText size={48} className="text-blue-600" />
                       </div>
-                      <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Active Manifest</h3>
-                      <p className="text-3xl font-black text-slate-900 mt-2">{trips.length}</p>
-                      <div className="mt-2 flex items-center gap-1 text-[10px] font-bold text-emerald-500">
-                        <Zap size={10} /> +12% from yesterday
+                      <h3 className="text-micro">Active Manifest</h3>
+                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">{trips.length}</p>
+                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-500">
+                        <Zap size={12} /> +12% from yesterday
                       </div>
                     </div>
-                    <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                    <div className="card p-5 sm:p-6 relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Truck size={48} className="text-emerald-600" />
                       </div>
-                      <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Fleet Ready</h3>
-                      <p className="text-3xl font-black text-slate-900 mt-2">{drivers.filter(d => d.status === 'Available').length}/{drivers.length}</p>
-                      <div className="mt-2 flex items-center gap-1 text-[10px] font-bold text-blue-500">
-                        <Activity size={10} /> Operational
+                      <h3 className="text-micro">Fleet Ready</h3>
+                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">{drivers.filter(d => d.status === 'Available').length}/{drivers.length}</p>
+                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-blue-500">
+                        <Activity size={12} /> Operational
                       </div>
                     </div>
-                    <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                    <div className="card p-5 sm:p-6 relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Target size={48} className="text-rose-600" />
                       </div>
-                      <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Completion Rate</h3>
-                      <p className="text-3xl font-black text-slate-900 mt-2">
+                      <h3 className="text-micro">Completion Rate</h3>
+                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">
                         {trips.length > 0 ? Math.round((trips.filter(t => t.status === 'Completed').length / trips.length) * 100) : 0}%
                       </p>
-                      <div className="mt-2 flex items-center gap-1 text-[10px] font-bold text-rose-500">
-                        <ArrowRight size={10} /> Target: 98%
+                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-rose-500">
+                        <ArrowRight size={12} /> Target: 98%
                       </div>
                     </div>
-                    <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                    <div className="card p-5 sm:p-6 relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
                         <ShieldCheck size={48} className="text-indigo-600" />
                       </div>
-                      <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Security Status</h3>
-                      <p className="text-3xl font-black text-slate-900 mt-2">v4.2</p>
-                      <div className="mt-2 flex items-center gap-1 text-[10px] font-bold text-indigo-500">
-                        <Lock size={10} /> HIPAA Encrypted
+                      <h3 className="text-micro">Security Status</h3>
+                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">v4.2</p>
+                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-indigo-500">
+                        <Lock size={12} /> HIPAA Encrypted
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="p-4 sm:p-6 border-b border-slate-200">
-                      <h2 className="text-lg sm:text-xl font-bold text-slate-900">Fleet Overview</h2>
+                  <div className="card overflow-hidden">
+                    <div className="p-5 sm:p-6 border-b border-slate-100">
+                      <h2 className="text-heading text-slate-900">Fleet Overview</h2>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full">
-                        <thead className="bg-slate-50 border-b border-slate-200">
+                        <thead className="bg-slate-50 border-b border-slate-100">
                           <tr>
-                            <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Driver</th>
-                            <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Vehicle</th>
-                            <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Status</th>
-                            <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden md:table-cell">Location</th>
-                            <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden md:table-cell">Odometer</th>
-                            <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Actions</th>
+                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600">Driver</th>
+                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600 hidden sm:table-cell">Vehicle</th>
+                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600">Status</th>
+                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600 hidden md:table-cell">Location</th>
+                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600 hidden md:table-cell">Odometer</th>
+                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {drivers.map((driver) => (
-                            <tr key={driver.id} className="border-b border-slate-100 hover:bg-slate-50">
-                              <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900">{driver.name}</td>
-                              <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden sm:table-cell">{driver.vehicle}</td>
-                              <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm">
+                            <tr key={driver.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-bold text-slate-900">{driver.name}</td>
+                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-slate-600 hidden sm:table-cell">{driver.vehicle}</td>
+                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm">
                                 <Badge variant={driver.status === 'Available' ? 'success' : 'warning'}>{driver.status}</Badge>
                               </td>
-                              <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden md:table-cell">{driver.currentZone}</td>
-                              <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden md:table-cell">{driver.odometer} km</td>
-                              <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden md:table-cell">{driver.odometer} km</td>
-                              <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm">
+                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-slate-600 hidden md:table-cell">{driver.currentZone}</td>
+                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-slate-600 hidden md:table-cell">{driver.odometer} mi</td>
+                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm">
                                 <div className="flex items-center gap-2">
-                                  <button onClick={() => { setActiveTab('drivers'); }} className="text-blue-600 hover:text-blue-800 font-semibold text-xs sm:text-sm">View</button>
+                                  <button onClick={() => { setActiveTab('drivers'); }} className="text-blue-600 hover:text-blue-800 font-bold text-sm">View</button>
                                   {driver.phone && (
                                     <>
-                                      <a href={`tel:${driver.phone}`} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition"><Phone size={14} /></a>
-                                      <a href={`sms:${driver.phone}`} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition"><MessageSquare size={14} /></a>
+                                      <a href={`tel:${driver.phone}`} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition"><Phone size={16} /></a>
+                                      <a href={`sms:${driver.phone}`} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition"><MessageSquare size={16} /></a>
                                     </>
                                   )}
                                 </div>
@@ -1995,15 +2069,15 @@ const today = getTodayStr();
                     </div>
                   </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
-                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-3 sm:mb-4">System Logs (Dispatcher Monitor)</h2>
-                  <div className="space-y-2 sm:space-y-3">
+                <div className="card p-5 sm:p-6">
+                  <h2 className="text-heading text-slate-900 mb-4">System Logs</h2>
+                  <div className="space-y-2">
                     {logs.map((log, idx) => (
-                      <div key={idx} className="flex gap-3 sm:gap-4 items-start p-2 sm:p-3 bg-slate-50 rounded-lg">
-                        <AlertCircle className="shrink-0 mt-0.5 hidden sm:block" size={20} style={{ color: log.c === 'amber' ? '#b45309' : log.c === 'blue' ? '#2563eb' : log.c === 'rose' ? '#e11d48' : '#059669' }} />
+                      <div key={idx} className="flex gap-3 items-start p-3 bg-slate-50 rounded-xl border border-slate-100/50">
+                        <AlertCircle className="shrink-0 mt-0.5" size={20} style={{ color: log.c === 'amber' ? '#b45309' : log.c === 'blue' ? '#2563eb' : log.c === 'rose' ? '#e11d48' : '#059669' }} />
                         <div className="min-w-0">
-                          <p className="font-semibold text-slate-900 text-sm sm:text-base truncate">{log.t}</p>
-                          <p className={`text-xs sm:text-sm ${getLogTextColor(log.c)} truncate`}>{log.d}</p>
+                          <p className="font-bold text-slate-900 text-sm truncate">{log.t}</p>
+                          <p className={`text-sm ${getLogTextColor(log.c)} truncate`}>{log.d}</p>
                         </div>
                       </div>
                     ))}
@@ -2045,7 +2119,7 @@ const today = getTodayStr();
                   const id = `TRP-${Date.now().toString().slice(-6)}`;
                   const driverId = newTrip.driverId || null;
                   const driver = drivers.find(d => d.id === driverId);
-                  setTrips(prev => [...prev, { ...newTrip, id, bookingId: sanitizeBookingId(newTrip.bookingId), status: driverId ? 'Assigned' : 'Unassigned', driverId, driverEmail: driver?.email || null, driverName: driver?.name || null }]);
+                  setTrips(prev => [...prev, { ...newTrip, id, bookingId: extractCustomBookingId(newTrip.bookingId), status: driverId ? 'Assigned' : 'Unassigned', driverId, driverEmail: driver?.email || null, driverName: driver?.name || null }]);
                   addAuditLog('Trip Created', `${currentUser} manually added trip for ${newTrip.patient}${driver ? ` assigned to ${driver.name}` : ''}`, 'emerald');
                 }}
                 onUpdateTrip={updateTrip}
@@ -2054,21 +2128,22 @@ const today = getTodayStr();
             ) : activeTab === 'dispatch' ? (
               <Suspense fallback={<LazyFallback />}>
                 <DispatchAssistant drivers={drivers} trips={trips}
-                onAssignTrip={(tripId, driverId) => {
-                  const driver = drivers.find(d => d.id === driverId);
-                  setTrips(prev => prev.map(t => t.id === tripId ? {
-                    ...t,
-                    status: 'Assigned',
-                    driverId,
-                    driverEmail: driver?.email || null,
-                    driverName: driver?.name || null,
-                  } : t));
-                  const trip = trips.find(t => t.id === tripId);
-                  addAuditLog('AI Dispatch', `${currentUser} (${role}) confirmed AI suggestion for ${trip?.patient || 'Trip '+tripId} to ${driver?.name || 'Unknown'}`, 'indigo');
-                }}
-                addAuditLog={addAuditLog}
-                currentUser={currentUser}
-              />
+                  onAssignTrip={(tripId, driverId) => {
+                    const driver = drivers.find(d => d.id === driverId);
+                    setTrips(prev => prev.map(t => t.id === tripId ? {
+                      ...t,
+                      status: 'Assigned',
+                      driverId,
+                      driverEmail: driver?.email || null,
+                      driverName: driver?.name || null,
+                    } : t));
+                    const trip = trips.find(t => t.id === tripId);
+                    addAuditLog('AI Dispatch', `${currentUser} (${role}) confirmed AI suggestion for ${trip?.patient || 'Trip '+tripId} to ${driver?.name || 'Unknown'}`, 'indigo');
+                  }}
+                  addAuditLog={addAuditLog}
+                  currentUser={currentUser}
+                />
+              </Suspense>
             ) : activeTab === 'chat' ? (
               <ChatPage currentUser={currentUser} role={role} />
             ) : activeTab === 'drivers' ? (
@@ -2087,10 +2162,9 @@ const today = getTodayStr();
                 }}
                 onUploadForDriver={(driverId) => { setUploadAssignDriver(driverId); setShowUploadModal(true); }}
               />
-              </Suspense>
             ) : activeTab === 'reports' ? (
               <Suspense fallback={<LazyFallback />}>
-              <ReportsPage trips={trips} drivers={drivers} />
+              <ReportsPage trips={trips} drivers={drivers} onUpdateTrip={updateTrip} role={role} />
               </Suspense>
             ) : activeTab === 'archives' ? (
               <ArchivesPage
@@ -2104,7 +2178,7 @@ const today = getTodayStr();
             ) : activeTab === 'users' ? (
               <UsersPage drivers={drivers} setDrivers={setDrivers} dispatchers={dispatchers} setDispatchers={setDispatchers} addAuditLog={addAuditLog} currentUser={currentUser} role={role} requestAuthAction={requestAuthAction} />
             ) : activeTab === 'settings' ? (
-              <SettingsPage currentUser={currentUser} role={role} onLogout={handleLogout} onResetSystem={resetSystemData} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={handleUpdatePhoneNumbers} driverProfile={role === 'driver' ? drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase()) : null} />
+              <SettingsPage currentUser={currentUser} role={role} onLogout={handleLogout} onResetSystem={resetSystemData} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={handleUpdatePhoneNumbers} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={role === 'driver' ? drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase()) : null} />
             ) : null}
           </div>
 
@@ -2148,13 +2222,13 @@ const today = getTodayStr();
           {/* Toast Notifications */}
           <div className="fixed bottom-24 right-6 z-[200] flex flex-col gap-3 pointer-events-none">
             {toasts.map(toast => (
-              <div key={toast.id} className="pointer-events-auto bg-white/90 backdrop-blur-xl border border-slate-200 rounded-2xl p-4 shadow-2xl flex gap-3 items-start animate-in max-w-xs">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                  {toast.type === 'success' ? <CheckCircle2 size={20} /> : <Zap size={20} />}
+              <div key={toast.id} className="pointer-events-auto bg-white/90 backdrop-blur-xl border border-slate-200 rounded-2xl p-4 shadow-2xl flex gap-3 items-start animate-in max-w-sm">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                  {toast.type === 'success' ? <CheckCircle2 size={22} /> : <Zap size={22} />}
                 </div>
                 <div>
-                  <h4 className="font-black text-sm text-slate-900">{toast.title}</h4>
-                  <p className="text-xs font-medium text-slate-500 mt-0.5">{toast.message}</p>
+                  <h4 className="font-extrabold text-base text-slate-900">{toast.title}</h4>
+                  <p className="text-sm font-medium text-slate-500 mt-0.5">{toast.message}</p>
                 </div>
               </div>
             ))}

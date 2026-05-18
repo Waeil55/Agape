@@ -3,7 +3,11 @@ import { MapPin, AlertCircle } from 'lucide-react';
 
 const LocationTracker = ({ onLocationUpdate }) => {
   const [location, setLocation] = useState(null);
-  coif (!navigator.geolocation) {
+  const [error, setError] = useState(null);
+  const [accuracy, setAccuracy] = useState(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
       setError('Geolocation not supported');
       return;
     }
@@ -38,10 +42,7 @@ const LocationTracker = ({ onLocationUpdate }) => {
     const interval = setInterval(updateLocation, 5000);
 
     return () => clearInterval(interval);
-  }, [onLocationUpdatenst interval = setInterval(updateLocation, 10000); // Update every 10 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+  }, [onLocationUpdate]);
 
   return (
     <div className="bg-blue-100 dark:bg-blue-900 border-b-2 border-blue-500 p-3">
@@ -54,11 +55,15 @@ const LocationTracker = ({ onLocationUpdate }) => {
           </div>
         ) : location ? (
           <div className="text-sm text-blue-700 dark:text-blue-300">
-            <span>📍 {location.lat.toFixed(4)}, {location.lng.toFixed(4)}</span>
-            {accuracy && <span className="ml-2 text-xs opacity-75">Accuracy: ±{accuracy}m</span>}
+            <span>{location.lat.toFixed(4)}, {location.lng.toFixed(4)}</span>
+            {accuracy && <span className="ml-2 text-xs opacity-75">Accuracy: &plusmn;{accuracy}m</span>}
           </div>
         ) : (
-          <span className="text-sm text-blue-700 dark:text-blue-300">📍 Getting location...</span>\n        )}\n      </div>\n    </div>\n  );
+          <span className="text-sm text-blue-700 dark:text-blue-300">Getting location...</span>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default LocationTracker;

@@ -25,6 +25,8 @@ messaging.onBackgroundMessage((payload) => {
     icon: '/agape.png',
     badge: '/agape.png',
     vibrate: [200, 100, 200],
+    requireInteraction: true,
+    silent: false,
   };
   self.registration.showNotification(notificationTitle, notificationOptions);
 });

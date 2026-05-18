@@ -54,9 +54,10 @@ Return the single best driver ID as a JSON string. Consider: proximity, vehicle 
   if (!text) return null;
     try {
       return JSON.parse(text);
-    } catch {
-      return null;
-    }
+  } catch (err) {
+    console.error('Gemini API call failed:', err);
+    return null;
+  }
 }
 
 export async function suggestBatchAssignment(unassignedTrips, drivers) {
@@ -156,7 +157,7 @@ SCORING CRITERIA (weighted):
 1. CLOCKED IN (highest priority — must be clocked in)
 2. SCHEDULE FIT — driver must have a free slot covering the trip time
 3. PROXIMITY — driver's current zone should be near the pickup
-4. NEXT-TIP PROXIMITY — after finishing this trip's dropoff, the driver should not be far from their next assigned trip's pickup
+4. NEXT-TRIP PROXIMITY — after finishing this trip's dropoff, the driver should not be far from their next assigned trip's pickup
 5. WORKLOAD — prefer drivers with fewer current assigned trips
 
 Return a JSON response with:

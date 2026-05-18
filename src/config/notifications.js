@@ -1,10 +1,11 @@
+import { playNotificationSound, playMessageSound } from '../utils/notificationSound';
 import app, { getMessaging, getToken, onMessage } from './firebase';
 
 const VAPID_KEY = 'BMA5e1UV1qoZ1TDxp4FQ5Q4qCAKVdsGD8yFGvqYpZ9DgF-1FMPQeHNdH7FsqTGEcHl-zUDRWZ0j3EL0tQ8PvBzM';
 const TOKEN_KEY = 'agape_fcm_token';
 
 export async function requestNotificationPermission(retries = 3) {
-  if (!('Notification' in window) && !('serviceWorker' in navigator)) return null;
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return null;
 
   // Check existing permission
   if (Notification.permission === 'denied') return null;
@@ -57,7 +58,7 @@ export function onForegroundMessage(callback) {
   }
 }
 
-export function showLocalNotification(title, body) {
+export function showLocalNotification(title, body, type = 'notification') {
   if (!('Notification' in window)) return;
   
   const doNotify = () => {
@@ -68,10 +69,18 @@ export function showLocalNotification(title, body) {
         badge: '/agape.png',
         vibrate: [200, 100, 200],
         tag: 'agape-care',
-        renotify: true
+        renotify: true,
+        requireInteraction: type === 'message',
+        silent: false,
       });
-    } catch {}
+    } catch { /* Notification may fail in some environments */ }
   };
+
+  if (type === 'message') {
+    playMessageSound();
+  } else {
+    playNotificationSound();
+  }
 
   if (Notification.permission === 'granted') {
     doNotify();

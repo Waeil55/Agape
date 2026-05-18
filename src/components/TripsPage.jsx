@@ -12,6 +12,7 @@ const today = getTodayStr();
 const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onUnassignTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
   const [sortBy, setSortBy] = useState('time');
   const [selectedTrip, setSelectedTrip] = useState(null);
+  const [legsDetailPatient, setLegsDetailPatient] = useState(null);
   const [showAssign, setShowAssign] = useState(false);
   const [assignMode, setAssignMode] = useState('assign');
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
@@ -111,18 +112,18 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
     <div className="space-y-6">
       {/* Assignment Success Feedback */}
       {assignmentFeedback && (
-        <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-4 fade-in duration-200">
-          <div className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-xl shadow-emerald-500/30 flex items-center gap-2">
-            <Check size={18} /> {assignmentFeedback}
+        <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 animate-in">
+          <div className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold text-base shadow-xl shadow-emerald-500/30 flex items-center gap-2">
+            <Check size={20} /> {assignmentFeedback}
           </div>
         </div>
       )}
       {/* HEADER CONTROLS */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
+      <div className="card p-5 sm:p-6">
         <div className="flex flex-col sm:flex-row justify-between gap-4">
           <div className="flex-1 max-w-xs">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Sort Preference</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-sm">
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Sort Preference</label>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-base outline-none">
               <option value="time">Sort by Time</option>
               <option value="patient">Sort by Patient</option>
               <option value="zip">Sort by Zip Area</option>
@@ -131,9 +132,9 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
 
           <div className="flex-1 max-w-xs">
             <div className="flex items-center justify-between mb-1.5 ml-1">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Manifest Date</label>
-              <button onClick={() => setShowAllDates(!showAllDates)} className={`text-[10px] font-black uppercase tracking-widest ${showAllDates ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                {showAllDates ? '✓ Showing All' : 'Show All'}
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Manifest Date</label>
+              <button onClick={() => setShowAllDates(!showAllDates)} className={`text-xs font-bold uppercase tracking-widest ${showAllDates ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                {showAllDates ? 'Showing All' : 'Show All'}
               </button>
             </div>
             <input 
@@ -141,45 +142,45 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               value={manifestDate} 
               disabled={showAllDates}
               onChange={(e) => setManifestDate(e.target.value)} 
-              className={`w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-sm outline-none transition-opacity ${showAllDates ? 'opacity-50' : 'opacity-100'}`} 
+              className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-base outline-none transition-opacity ${showAllDates ? 'opacity-50' : 'opacity-100'}`} 
             />
           </div>
           
           <div className="flex items-center gap-2">
             {selectedTasks.length > 0 && (
-              <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-                <button onClick={() => { setAssignMode('assign'); setShowAssign(true); }} className="px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition">
-                  <Users size={14} /> Assign Trips ({selectedTasks.length})
+              <div className="flex items-center gap-2 animate-in">
+                <button onClick={() => { setAssignMode('assign'); setShowAssign(true); }} className="btn bg-emerald-600 text-white">
+                  <Users size={16} /> Assign ({selectedTasks.length})
                 </button>
                 {selectedTasks.length > 1 && (
-                  <button onClick={() => { setAssignMode('mission'); setShowAssign(true); }} className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 transition">
-                    <Sparkles size={14} /> Create Leg Mission
+                  <button onClick={() => { setAssignMode('mission'); setShowAssign(true); }} className="btn bg-indigo-600 text-white">
+                    <Sparkles size={16} /> Create Mission
                   </button>
                 )}
               </div>
             )}
-            <button onClick={() => setShowCreateForm(true)} className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition">
-              <Plus size={16} /> New Manifest Trip
+            <button onClick={() => setShowCreateForm(true)} className="btn btn-primary">
+              <Plus size={18} /> New Trip
             </button>
           </div>
         </div>
       </div>
 
       {/* TABLE / LIST */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-lg font-black text-slate-900">Live Manifest Queue</h3>
+      <div className="card overflow-hidden">
+        <div className="p-5 sm:p-6 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="text-heading text-slate-900">Live Manifest Queue</h3>
           <div className="flex items-center gap-3">
-            {showAllDates && <span className="text-[10px] font-black bg-amber-50 text-amber-600 px-2.5 py-1 rounded-lg uppercase tracking-widest">Viewing All Dates</span>}
-            <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg uppercase tracking-widest">{filteredTrips.length} Total Trips</span>
+            {showAllDates && <span className="badge badge-warning text-[10px]">Viewing All Dates</span>}
+            <span className="badge badge-info">{filteredTrips.length} Trips</span>
           </div>
         </div>
 
         <div className="divide-y divide-slate-100">
           {filteredTrips.length === 0 ? (
             <div className="p-12 text-center">
-              <AlertCircle size={40} className="mx-auto text-slate-200 mb-4" />
-              <p className="text-slate-400 font-bold">Queue is empty</p>
+              <AlertCircle size={48} className="mx-auto text-slate-200 mb-4" />
+              <p className="text-slate-400 font-bold text-lg">Queue is empty</p>
             </div>
           ) : (
             filteredTrips.map((trip) => {
@@ -187,78 +188,78 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               const isSelected = selectedTasks.includes(trip.id);
               return (
                 <div key={trip.id} className={`flex items-center gap-4 p-4 sm:px-6 sm:py-5 transition-all ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
-                  <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} className="w-5 h-5 rounded-[0.5rem] border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0" />
+                  <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} className="w-5 h-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0" />
                   
                   <div className="flex-1 min-w-0" onClick={() => setSelectedTrip(trip)}>
-                    <div className="flex items-center gap-3 mb-1">
+                    <div className="flex items-center gap-3 mb-1.5">
                       <div className="flex items-center gap-2 truncate">
-                        <p className="font-black text-slate-900 text-sm sm:text-base truncate">{trip.patient}</p>
+                        <p className="font-extrabold text-slate-900 text-base sm:text-lg truncate">{trip.patient}</p>
                         {(() => {
                           const legs = filteredTrips.filter(t => (t.patient || '').toLowerCase() === (trip.patient || '').toLowerCase()).length;
                           return legs > 1 ? (
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center gap-1 shrink-0">
-                              <Users size={10} /> {legs}L
-                            </span>
+                            <button onClick={(e) => { e.stopPropagation(); setLegsDetailPatient(trip.patient); }} className="badge badge-info cursor-pointer hover:opacity-80">
+                              <Users size={12} /> {legs}L
+                            </button>
                           ) : null;
                         })()}
                       </div>
                       {trip.bookingId ? (
-                        <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 shrink-0">
+                        <span className="badge badge-info bg-slate-100 text-slate-500">
                           {trip.bookingId}
                         </span>
                       ) : null}
-                      <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${trip.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                      <span className={`badge ${trip.status === 'Assigned' ? 'badge-success' : 'badge-warning'}`}>
                         {trip.status}
                       </span>
                     </div>
-                    <div className="flex flex-col gap-1.5 mt-1.5">
+                    <div className="flex flex-col gap-2 mt-1.5">
                       <div className="flex items-start gap-2 min-w-0">
-                        <div className="w-4 h-4 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                          <MapPin size={10} className="text-blue-600" />
+                        <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                          <MapPin size={12} className="text-blue-600" />
                         </div>
-                        <p className="text-[11px] font-bold text-slate-500 truncate leading-tight">{trip.pickup}</p>
+                        <p className="text-sm font-semibold text-slate-600 truncate leading-tight">{trip.pickup}</p>
                       </div>
                       <div className="flex items-start gap-2 min-w-0">
-                        <div className="w-4 h-4 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
-                          <Flag size={10} className="text-emerald-600" />
+                        <div className="w-5 h-5 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+                          <Flag size={12} className="text-emerald-600" />
                         </div>
-                        <p className="text-[11px] font-bold text-slate-500 truncate leading-tight">{trip.dropoff}</p>
+                        <p className="text-sm font-semibold text-slate-600 truncate leading-tight">{trip.dropoff}</p>
                       </div>
                     </div>
                     
                     {/* Phone & SMS for Admin/Dispatcher */}
                     {(role === 'admin' || role === 'dispatcher') && (
-                      <div className="flex flex-wrap gap-2 mt-2">
+                      <div className="flex flex-wrap gap-2 mt-3">
                         {trip.pickupPhone && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] font-black text-slate-400 uppercase mr-1">Client:</span>
-                            <a href={`tel:${trip.pickupPhone}`} className="text-[10px] font-black text-blue-600 hover:underline">{trip.pickupPhone}</a>
-                            <a href={`sms:${trip.pickupPhone}`} className="p-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100"><MessageSquare size={10} /></a>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-400 uppercase">Client:</span>
+                            <a href={`tel:${trip.pickupPhone}`} className="text-xs font-bold text-blue-600 hover:underline">{trip.pickupPhone}</a>
+                            <a href={`sms:${trip.pickupPhone}`} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><MessageSquare size={12} /></a>
                           </div>
                         )}
                         {trip.notes && (
                           <div className="flex items-center gap-1 ml-2">
-                            <span className="text-[10px] font-black text-amber-600 uppercase bg-amber-50 px-1.5 py-0.5 rounded">Note: {trip.notes}</span>
+                            <span className="text-xs font-bold text-amber-600 uppercase bg-amber-50 px-2 py-1 rounded-lg">Note: {trip.notes}</span>
                           </div>
                         )}
                       </div>
                     )}
 
                     {driver && (
-                      <p className="mt-2 text-[10px] font-black text-emerald-600 flex items-center gap-1.5 uppercase">
-                         <UserCheck size={12} /> {driver.name} • {driver.vehicle}
+                      <p className="mt-2 text-xs font-bold text-emerald-600 flex items-center gap-1.5 uppercase">
+                         <UserCheck size={14} /> {driver.name} &bull; {driver.vehicle}
                       </p>
                     )}
                   </div>
 
                   <div className="text-right shrink-0">
-                    <p className="text-xl font-black text-blue-600 leading-none">{trip.time}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{trip.type}</p>
+                    <p className="text-2xl font-black text-blue-600 leading-none">{trip.time}</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{trip.type}</p>
                     <div className="flex flex-col items-end gap-2 mt-2">
                       <select 
                         value={trip.driverId || ''} 
                         onChange={(e) => onAssignTrip(trip.id, e.target.value)}
-                        className="text-[10px] font-black uppercase tracking-wider bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-emerald-500 text-slate-600"
+                        className="text-xs font-bold uppercase tracking-wider bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-emerald-500 text-slate-600"
                       >
                         <option value="">Quick Assign</option>
                         {drivers.map(d => (
@@ -266,8 +267,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                         ))}
                       </select>
                       <div className="flex items-center gap-1">
-                        <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={14} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={14} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"><Edit2 size={16} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"><Trash2 size={16} /></button>
                       </div>
                     </div>
                   </div>
@@ -282,58 +283,58 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {showCreateForm && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-8 overflow-y-auto">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowCreateForm(false)} />
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in zoom-in-95 duration-200 my-auto">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in my-auto">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> Create New Manifest Entry</h3>
-              <button onClick={() => setShowCreateForm(false)} className="p-2 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
+              <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> New Manifest Entry</h3>
+              <button onClick={() => setShowCreateForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
             </div>
             <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' }); }} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Patient Full Name</label>
-                  <input type="text" required value={newTrip.patient} onChange={(e) => setNewTrip({...newTrip, patient: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Patient Name</label>
+                  <input type="text" required value={newTrip.patient} onChange={(e) => setNewTrip({...newTrip, patient: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Booking ID</label>
-                  <input type="text" value={newTrip.bookingId} onChange={(e) => setNewTrip({...newTrip, bookingId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" placeholder="Optional" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Booking ID</label>
+                  <input type="text" value={newTrip.bookingId} onChange={(e) => setNewTrip({...newTrip, bookingId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" placeholder="Optional" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pickup Time</label>
-                  <input type="text" required placeholder="08:00 AM" value={newTrip.time} onChange={(e) => setNewTrip({...newTrip, time: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Pickup Time</label>
+                  <input type="text" required placeholder="08:00 AM" value={newTrip.time} onChange={(e) => setNewTrip({...newTrip, time: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Service Type</label>
-                  <input type="text" required placeholder="AM1" value={newTrip.type} onChange={(e) => setNewTrip({...newTrip, type: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Service Type</label>
+                  <input type="text" required placeholder="AM1" value={newTrip.type} onChange={(e) => setNewTrip({...newTrip, type: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pickup Address</label>
-                  <input type="text" required value={newTrip.pickup} onChange={(e) => setNewTrip({...newTrip, pickup: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Pickup Address</label>
+                  <input type="text" required value={newTrip.pickup} onChange={(e) => setNewTrip({...newTrip, pickup: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dropoff Address</label>
-                  <input type="text" required value={newTrip.dropoff} onChange={(e) => setNewTrip({...newTrip, dropoff: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Dropoff Address</label>
+                  <input type="text" required value={newTrip.dropoff} onChange={(e) => setNewTrip({...newTrip, dropoff: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Patient Phone</label>
-                  <input type="text" value={newTrip.pickupPhone} onChange={(e) => setNewTrip({...newTrip, pickupPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Patient Phone</label>
+                  <input type="text" value={newTrip.pickupPhone} onChange={(e) => setNewTrip({...newTrip, pickupPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hospital Phone</label>
-                  <input type="text" value={newTrip.dropoffPhone} onChange={(e) => setNewTrip({...newTrip, dropoffPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Hospital Phone</label>
+                  <input type="text" value={newTrip.dropoffPhone} onChange={(e) => setNewTrip({...newTrip, dropoffPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
                 </div>
-              </div>
-              <div className="col-span-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notes</label>
-                <textarea value={newTrip.notes} onChange={(e) => setNewTrip({...newTrip, notes: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" rows="2" placeholder="Special instructions, comments..." />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assign to Driver</label>
-                <select value={newTrip.driverId} onChange={(e) => setNewTrip({...newTrip, driverId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none">
-                  <option value="">— Unassigned —</option>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Notes</label>
+                <textarea value={newTrip.notes} onChange={(e) => setNewTrip({...newTrip, notes: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" rows="2" placeholder="Special instructions, comments..." />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Assign to Driver</label>
+                <select value={newTrip.driverId} onChange={(e) => setNewTrip({...newTrip, driverId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none">
+                  <option value="">Unassigned</option>
                   {drivers.map(d => <option key={d.id} value={d.id}>{d.name} {d.vehicle ? `(${d.vehicle})` : ''}</option>)}
                 </select>
               </div>
-              <button type="submit" className="w-full py-5 bg-emerald-600 text-white rounded-2xl font-black shadow-xl shadow-emerald-500/20 active:scale-[0.98] transition">Create manifest entry</button>
+              <button type="submit" className="w-full py-5 bg-emerald-600 text-white rounded-2xl font-bold text-base shadow-xl shadow-emerald-500/20 active:scale-[0.98] transition">Create Manifest Entry</button>
             </form>
           </div>
         </div>
@@ -343,35 +344,62 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {showEditForm && editTrip && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowEditForm(false)} />
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3"><Edit2 size={28} className="text-blue-500" /> Modify Trip Details</h3>
-              <button onClick={() => setShowEditForm(false)} className="p-2 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
+              <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Edit2 size={28} className="text-blue-500" /> Modify Trip Details</h3>
+              <button onClick={() => setShowEditForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
             </div>
             <form onSubmit={handleUpdate} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Patient Full Name</label>
-                  <input type="text" required value={editTrip.patient} onChange={(e) => setEditTrip({...editTrip, patient: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Patient Name</label>
+                  <input type="text" required value={editTrip.patient} onChange={(e) => setEditTrip({...editTrip, patient: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Time</label>
-                  <input type="text" required value={editTrip.time} onChange={(e) => setEditTrip({...editTrip, time: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Booking ID</label>
+                  <input type="text" value={editTrip.bookingId || ''} onChange={(e) => setEditTrip({...editTrip, bookingId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" placeholder="Optional" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Service Type</label>
-                  <input type="text" required value={editTrip.type} onChange={(e) => setEditTrip({...editTrip, type: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Date</label>
+                  <input type="date" required value={editTrip.date || ''} onChange={(e) => setEditTrip({...editTrip, date: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Pickup Time</label>
+                  <input type="text" required placeholder="08:00 AM" value={editTrip.time || ''} onChange={(e) => setEditTrip({...editTrip, time: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Service Type</label>
+                  <input type="text" required placeholder="AM1" value={editTrip.type || ''} onChange={(e) => setEditTrip({...editTrip, type: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pickup Address</label>
-                  <input type="text" required value={editTrip.pickup} onChange={(e) => setEditTrip({...editTrip, pickup: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Pickup Address</label>
+                  <input type="text" required value={editTrip.pickup || ''} onChange={(e) => setEditTrip({...editTrip, pickup: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dropoff Address</label>
-                  <input type="text" required value={editTrip.dropoff} onChange={(e) => setEditTrip({...editTrip, dropoff: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Dropoff Address</label>
+                  <input type="text" required value={editTrip.dropoff || ''} onChange={(e) => setEditTrip({...editTrip, dropoff: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Patient Phone</label>
+                  <input type="text" value={editTrip.pickupPhone || ''} onChange={(e) => setEditTrip({...editTrip, pickupPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Hospital Phone</label>
+                  <input type="text" value={editTrip.dropoffPhone || ''} onChange={(e) => setEditTrip({...editTrip, dropoffPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" />
                 </div>
               </div>
-              <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-500/20 active:scale-[0.98] transition">Update trip information</button>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Notes</label>
+                <textarea value={editTrip.notes || ''} onChange={(e) => setEditTrip({...editTrip, notes: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none" rows="2" placeholder="Special instructions, comments..." />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Assign to Driver</label>
+                <select value={editTrip.driverId || ''} onChange={(e) => setEditTrip({...editTrip, driverId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base focus:border-blue-500 outline-none">
+                  <option value="">Unassigned</option>
+                  {drivers.map(d => <option key={d.id} value={d.id}>{d.name} {d.vehicle ? `(${d.vehicle})` : ''}</option>)}
+                </select>
+              </div>
+              <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-bold text-base shadow-xl shadow-blue-500/20 active:scale-[0.98] transition">Update Trip Information</button>
             </form>
           </div>
         </div>
@@ -409,6 +437,61 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
           </div>
         </div>
       )}
+
+      {/* Legs Detail Modal */}
+      {legsDetailPatient && (() => {
+        const patientName = legsDetailPatient;
+        const legs = filteredTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientName.trim().toLowerCase());
+        return (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" onClick={() => setLegsDetailPatient(null)}>
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <div className="bg-white w-full max-w-lg rounded-3xl p-5 relative z-10 shadow-2xl border border-white/20 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-slate-900">{patientName}</h3>
+                <button onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200"><X size={16} /></button>
+              </div>
+              <p className="text-xs text-slate-500 font-medium mb-4">{legs.length} legs</p>
+              <div className="space-y-2">
+                {legs.map((leg, idx) => (
+                  <div key={leg.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Leg {idx + 1}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
+                    </div>
+                    <p className="text-[11px] font-bold text-slate-400 mb-1">Booking: {leg.bookingId || '—'}</p>
+                    <div className="space-y-1.5">
+                      <div className="flex items-start gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold text-slate-500">Pickup</p>
+                          <p className="text-[11px] text-slate-500 truncate">{leg.pickup}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold text-slate-500">Dropoff</p>
+                          <p className="text-[11px] text-slate-500 truncate">{leg.dropoff}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
+                      <span>Time: {leg.time || '—'}</span>
+                      <span>Type: {leg.type || '—'}</span>
+                    </div>
+                    {leg.notes && <p className="mt-2 text-[10px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{leg.notes}</p>}
+                    {leg.pickupPhone && <p className="mt-1.5 text-[10px] text-slate-400">Phone: {leg.pickupPhone}</p>}
+                    {leg.driverId && (() => {
+                      const d = drivers.find(drv => drv.id === leg.driverId);
+                      return d ? <p className="mt-1.5 text-[10px] text-slate-400">Driver: {d.name}</p> : null;
+                    })()}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

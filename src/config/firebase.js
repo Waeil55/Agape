@@ -1,5 +1,5 @@
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, deleteDoc, query, where, orderBy } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy } from 'firebase/firestore';
 import { getAuth, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
@@ -25,12 +25,12 @@ const analytics = getAnalytics(app);
 setPersistence(auth, browserLocalPersistence).catch(() => {});
 
 let messaging;
-try { messaging = getMessaging(app); } catch {}
+try { messaging = getMessaging(app); } catch { /* FCM not available in all environments */ }
 
 export default app;
 export { app, db, auth, analytics, messaging, deleteApp, initializeApp, firebaseConfig,
   getFirestore, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp,
-  writeBatch, setDoc, getDoc, deleteDoc, query, where, orderBy,
+  writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
   EmailAuthProvider, reauthenticateWithCredential, updatePassword, setPersistence,
   browserLocalPersistence, getAuth, getMessaging, getToken, onMessage, logEvent };
@@ -117,7 +117,7 @@ export const logDriverAnalytics = async (driverId, analytics) => {
 
 export const getDriverProfile = async (driverId) => {
   const driverRef = doc(db, 'drivers', driverId);
-  const snapshot = await getDocs(driverRef);
+  const snapshot = await getDoc(driverRef);
   return snapshot.data();
 };
 

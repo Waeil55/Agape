@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { tripMatchesTodayOrTomorrow } from '../utils/tripDate';
-import { auth, db, doc, onSnapshot, getDoc, setDoc, signOut, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading } from '../config/firebase';
+import { auth, db, doc, onSnapshot, getDoc, setDoc, signOut, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
-import { getDistanceMiles } from '../config/maps';
-import LiveRouteMap from './LiveRouteMap';
+import { getDistanceMiles, buildStaticMapUrl } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
 import ChatPage from './ChatPage';
 import {
@@ -15,7 +14,7 @@ import {
   Star, Activity, Repeat, Zap, X, Route, PhoneCall, Radio, CircleDot,
   CheckSquare, Square, BrainCircuit, Map, BarChart3, Sun, Moon,
   Download, Trash2, FileText, AlertTriangle, Info, GripVertical,
-  Timer, Copy
+  Timer
 } from 'lucide-react';
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
@@ -33,17 +32,6 @@ const to12hr = (time) => {
   if (h === 0) h = 12;
   else if (h > 12) h -= 12;
   return `${h}:${min} ${ampm}`;
-};
-
-const formatTimeInput = (v) => {
-  if (!v) return '';
-  const d = new Date(v);
-  if (!isNaN(d.getTime())) {
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
-  const m = String(v).match(/(\d{1,2}):(\d{2})/);
-  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : v;
 };
 
 const timeToMinutes = (t) => {
@@ -90,15 +78,12 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const [signatureConfirmed, setSignatureConfirmed] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(null);
   const [completeOdometer, setCompleteOdometer] = useState('');
-  const [departedTime, setDepartedTime] = useState('');
-  const [arrivalDropoffTime, setArrivalDropoffTime] = useState('');
   const [showTripDetails, setShowTripDetails] = useState(null);
   const [isGpsTracking, setIsGpsTracking] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlineQueue, setOfflineQueue] = useState([]);
   const [driverPosition, setDriverPosition] = useState(null);
   const [analytics, setAnalytics] = useState({ tripsCompleted: 0, totalDistance: 0, timeSaved: 0, totalDriveTime: 0, efficiency: 0 });
-  const [legsDetailPatient, setLegsDetailPatient] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [etas, setEtas] = useState({});
   const [backgroundLocation, setBackgroundLocation] = useState(false);
@@ -179,7 +164,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       const level = getUrgency(t) === 2 ? 'Overdue' : 'Due Soon';
       showLocalNotification(`🚨 ${level}: ${t.patient}`, `${t.time} — ${t.pickup} → ${t.dropoff}`);
     });
-  }, [trips]);
+  }, [trips.length]);
 
   const setUndoable = (trip, previousStatus, newStatus) => {
     if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
@@ -463,9 +448,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   const runAiOptimization = async (silent = false) => {
     if (selectedTrips.length < 2 && !silent) return;
-    const tripsToOptimize = selectedTrips.length >= 2
+    const tripsToOptimize = silent && selectedTrips.length >= 2
       ? activeTrips.filter(t => selectedTrips.includes(t.id))
-      : activeTrips;
+      : selectedTrips.length >= 2
+        ? activeTrips.filter(t => selectedTrips.includes(t.id))
+        : activeTrips;
     if (tripsToOptimize.length < 2) return;
     if (!silent) setAiOptimizing(true);
     try {
@@ -524,40 +511,14 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const openInNavApp = (address, app) => {
     const encoded = encodeURIComponent(address);
     const origin = driverPosition ? `${driverPosition.lat},${driverPosition.lng}` : '';
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    const isAndroid = /android/i.test(navigator.userAgent);
-    
-    const urls = {};
-    
-    if (isIOS) {
-      urls.google = `comgooglemaps://?daddr=${encoded}`;
-      urls.waze = `waze://?q=${encoded}&navigate=yes`;
-      urls.apple = `http://maps.apple.com/?daddr=${encoded}`;
-      urls.googleFallback = `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`;
-      urls.wazeFallback = `https://www.waze.com/ul?q=${encoded}&navigate=yes`;
-    } else if (isAndroid) {
-      urls.google = `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`;
-      urls.waze = `waze://?q=${encoded}&navigate=yes`;
-      urls.apple = `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`;
-    } else {
-      urls.google = `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`;
-      urls.waze = `https://www.waze.com/ul?q=${encoded}&navigate=yes`;
-      urls.apple = `https://maps.apple.com/?daddr=${encoded}`;
-    }
-    
+    const urls = {
+      google: `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`,
+      waze: `https://www.waze.com/ul?q=${encoded}&navigate=yes`,
+      apple: `https://maps.apple.com/?daddr=${encoded}`,
+    };
     const url = urls[app] || urls.google;
-    const fallbackUrl = urls[app + 'Fallback'];
-    
-    if (isIOS && (app === 'google' || app === 'waze')) {
-      window.location.href = url;
-      setTimeout(() => {
-        if (document.hidden) return;
-        window.location.href = fallbackUrl || urls.googleFallback || urls.google;
-      }, 3000);
-    } else {
-      const win = window.open(url, '_blank');
-      if (!win) window.location.href = url;
-    }
+    const win = window.open(url, '_blank');
+    if (!win) window.location.href = url;
   };
 
   const handleStartTrip = (trip) => {
@@ -632,11 +593,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const openCompleteModal = (trip) => {
     setShowCompleteModal(trip);
     setCompleteOdometer(String(lastOdometer || ''));
-    const nowLocal = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const defaultTime = `${pad(nowLocal.getHours())}:${pad(nowLocal.getMinutes())}`;
-    setDepartedTime(trip.departedPickupTime ? formatTimeInput(trip.departedPickupTime) : defaultTime);
-    setArrivalDropoffTime(trip.arrivalDropoffTime ? formatTimeInput(trip.arrivalDropoffTime) : defaultTime);
   };
 
   const submitComplete = () => {
@@ -646,19 +602,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
     setUndoable(showCompleteModal, showCompleteModal.status, 'Completed');
     const now = new Date().toISOString();
-    const toIso = (timeStr) => {
-      if (!timeStr) return now;
-      const parts = timeStr.match(/(\d{1,2}):(\d{2})/);
-      if (!parts) return now;
-      const d = new Date();
-      d.setHours(parseInt(parts[1], 10), parseInt(parts[2], 10), 0, 0);
-      return d.toISOString();
-    };
     onUpdateTrip(showCompleteModal.id, 'Completed', {
       dropoffOdometer: odo,
       completedAt: now,
-      departedPickupTime: toIso(departedTime),
-      arrivalDropoffTime: toIso(arrivalDropoffTime),
+      departedPickupTime: showCompleteModal.departedPickupTime || now,
+      arrivalDropoffTime: showCompleteModal.arrivalDropoffTime || now,
       completedVehicle: me?.vehicle || '',
     });
     setLastOdometer(odo);
@@ -710,6 +658,17 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   const getTodayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
+  // Build static map with markers for current view
+  const getMapUrl = () => {
+    const markers = [];
+    if (driverPosition) markers.push({ lat: driverPosition.lat, lng: driverPosition.lng, color: 'red', label: 'M' });
+    orderedTrips.slice(0, 5).forEach((t, i) => {
+      if (t.pickupLat) markers.push({ lat: t.pickupLat, lng: t.pickupLng, color: 'green', label: `${i + 1}` });
+      if (t.dropoffLat) markers.push({ lat: t.dropoffLat, lng: t.dropoffLng, color: 'blue', label: `${i + 1}D` });
+    });
+    return buildStaticMapUrl(markers);
+  };
+
   const navItems = [
     { id: 'trips', label: 'Trips', icon: Home },
     { id: 'history', label: 'History', icon: Clock },
@@ -729,10 +688,26 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           </div>
           <h2 className="text-lg font-bold text-slate-900">Loading profile...</h2>
           <p className="text-sm text-slate-400 mt-1">Connecting to your driver account</p>
-        </div>
-      </div>
-    );
-  };
+                    </div>
+
+                    {/* Guided Mode: Next Up chip */}
+                    {isGuidedCurrent && guidedStepIndex + 1 < aiSequence.length && (() => {
+                      const nextId = aiSequence[guidedStepIndex + 1];
+                      const nextTrip = trips.find(t => t.id === nextId);
+                      if (!nextTrip || ['Completed','Cancelled','No Show'].includes(nextTrip.status)) return null;
+                      return (
+                        <div className="mx-4 mb-3 -mt-1">
+                          <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2 flex items-center gap-2">
+                            <ChevronRight size={12} className="text-indigo-400 shrink-0" />
+                            <span className="text-[9px] font-medium text-indigo-700">Next up: <strong>{nextTrip.patient}</strong> — {to12hr(nextTrip.time)}</span>
+                            <button onClick={() => { setGuidedStepIndex(guidedStepIndex + 1); guidedLastAdvance.current = -1; }} className="ml-auto text-[8px] text-indigo-500 font-bold uppercase hover:text-indigo-700 shrink-0">Skip</button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+  }
 
   return (
     <div className="flex-1 flex flex-col bg-[#f5f5f7]">
@@ -914,17 +889,28 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
           )}
 
-          {/* Live Route Map */}
-          <LiveRouteMap
-            driverPosition={driverPosition}
-            trips={activeTrips}
-            aiSequence={aiSequence}
-            activeTripId={aiSequence?.[guidedStepIndex] || null}
-            theme={appSettings?.theme || 'light'}
-            onOpenInNav={(addr) => openInNavApp(addr, suggestNavApp(addr))}
-            currentUser={currentUser}
-            role={role}
-          />
+          {/* Route Overview Map */}
+          {getMapUrl() ? (
+            <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-sm">
+              <img src={getMapUrl()} alt="Route map" className="w-full h-32 object-cover" />
+            </div>
+          ) : orderedTrips.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white/80 p-3">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Route</p>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => openInNavApp(orderedTrips[0]?.pickup, suggestNavApp(orderedTrips[0]?.pickup))}
+                  className="flex-1 h-8 bg-blue-600 text-white rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 active:scale-95 min-w-[100px]">
+                  <Navigation size={12} /> Start Route
+                </button>
+                {orderedTrips.length > 1 && (
+                  <button onClick={() => openInNavApp(orderedTrips[orderedTrips.length - 1]?.dropoff, suggestNavApp(orderedTrips[orderedTrips.length - 1]?.dropoff))}
+                    className="flex-1 h-8 bg-rose-600 text-white rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 active:scale-95 min-w-[100px]">
+                    <Navigation size={12} /> Last Dropoff
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Manifest Header */}
           <div className="flex items-center justify-between px-1 pt-1">
@@ -961,72 +947,66 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 const urgency = getUrgency(trip);
                 const urgencyBorder = urgency === 2 ? 'border-rose-400 shadow-rose-200/50 animate-pulse' : urgency === 1 ? 'border-amber-400 shadow-amber-200/50' : '';
                 const isGuidedCurrent = guidedMode && aiSequence && aiSequence[guidedStepIndex] === trip.id;
-                const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
+                
 
                 return (
                   <div key={trip.id}
                     onTouchStart={(e) => handleTouchStart(e, trip)}
                     onTouchEnd={handleTouchEnd}
-                    className={`card overflow-hidden ${isActive ? 'border-blue-300 shadow-md shadow-blue-600/10' : 'border-slate-100'} ${isSelected ? 'ring-2 ring-blue-400' : ''} ${hasConflict ? 'ring-2 ring-rose-300' : ''} ${urgencyBorder} ${isGuidedCurrent ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-200/40 scale-[1.01]' : ''} transition-all`}>
-                    {/* Card Header — Name / Booking ID / Time */}
-                    <div className="px-5 pt-5 pb-2">
-                      <div className="flex items-start gap-3">
-                        <button onClick={() => toggleTripSelect(trip.id)} className="shrink-0 text-slate-400 hover:text-blue-600 mt-1">
-                          {isSelected ? <CheckSquare size={22} className="text-blue-600" /> : <Square size={22} />}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          {/* Row 1: Patient name + status */}
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <h3 className="text-xl font-extrabold text-slate-900 leading-tight truncate">{trip.patient}</h3>
-                              <span className={`badge ${isActive ? 'badge-info' : 'bg-slate-100 text-slate-500'}`}>{trip.status}</span>
-                              {urgency === 2 && <span className="badge badge-danger animate-pulse">Overdue</span>}
-                              {urgency === 1 && <span className="badge badge-warning">Soon</span>}
+                    className={`bg-white rounded-3xl shadow-sm border transition-all overflow-hidden ${isActive ? 'border-blue-200 shadow-md shadow-blue-600/5' : 'border-slate-100'} ${isSelected ? 'ring-2 ring-blue-400' : ''} ${hasConflict ? 'ring-2 ring-rose-300' : ''} ${urgencyBorder} ${isGuidedCurrent ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-200/40 scale-[1.01]' : ''} active:scale-[0.99] transition-transform`}>
+                    {/* Card Header */}
+                    <div className="px-4 pt-4 pb-1">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
+                          <button onClick={() => toggleTripSelect(trip.id)} className="shrink-0 text-slate-400 hover:text-blue-600">
+                            {isSelected ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} />}
+                          </button>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-bold text-base text-slate-900 leading-tight">{trip.patient}</h3>
+                              {trip.bookingId && <span className="text-[8px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded-md">{trip.bookingId}</span>}
+                              
+                              {aiRank && <span className="text-[8px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded-md shrink-0">#{aiRank}</span>}
+                              {hasConflict && <AlertTriangle size={12} className="text-rose-500 shrink-0" />}
+                              {rideShareTrip && <Repeat size={12} className="text-emerald-500 shrink-0" />}
+                              {urgency === 2 && <span className="text-[7px] bg-rose-500 text-white font-bold px-1.5 py-0.5 rounded-md shrink-0 animate-pulse">OVERDUE</span>}
+                              {urgency === 1 && <span className="text-[7px] bg-amber-500 text-white font-bold px-1.5 py-0.5 rounded-md shrink-0">SOON</span>}
                             </div>
-                            <div className="flex gap-1.5 shrink-0">
-                              <a href={`tel:${cleanPhone(getClientPhone(trip))}`} className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 active:scale-90 transition-all"><Phone size={18} /></a>
-                              <a href={`sms:${cleanPhone(getClientPhone(trip))}`} className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 active:scale-90 transition-all"><MessageCircle size={18} /></a>
-                              <button onClick={() => setExpandedTrip(isExpanded ? null : trip.id)} className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isExpanded ? 'bg-blue-100 text-blue-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>
-                                <ChevronDown size={18} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                              </button>
+                            <div className="flex items-baseline gap-2 mt-1">
+                              <span className="text-[28px] font-black text-blue-600 tracking-tight leading-none">{to12hr(trip.time)}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider ${isActive ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{trip.status}</span>
                             </div>
-                          </div>
-                          {/* Row 2: Booking ID + badges */}
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            {trip.bookingId && <span className="badge badge-info text-[10px]">{trip.bookingId}</span>}
-                            {legsCount > 1 && <button onClick={() => setLegsDetailPatient(trip.patient)} className="badge badge-info cursor-pointer hover:opacity-80">{legsCount} legs</button>}
-                            {aiRank && <span className="badge badge-info">#{aiRank}</span>}
-                            {hasConflict && <AlertTriangle size={14} className="text-rose-500 shrink-0" />}
-                            {rideShareTrip && <Repeat size={14} className="text-emerald-500 shrink-0" />}
-                          </div>
-                          {/* Row 3: Time + ETA */}
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className="text-4xl sm:text-5xl font-black text-blue-600 tracking-tight leading-none">{to12hr(trip.time)}</span>
                             {eta !== undefined && (
-                              <span className="flex items-center gap-1.5 text-sm text-slate-500 font-semibold">
-                                <Timer size={14} /> ETA: {formatDuration(eta)}
-                              </span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <Timer size={10} className="text-slate-400" />
+                                <span className="text-[9px] text-slate-400 font-medium">ETA: {formatDuration(eta)}</span>
+                              </div>
                             )}
                           </div>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <a href={`tel:${cleanPhone(getClientPhone(trip))}`} className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 active:scale-90 transition-all"><Phone size={15} /></a>
+                          <a href={`sms:${cleanPhone(getClientPhone(trip))}`} className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 active:scale-90 transition-all"><MessageCircle size={15} /></a>
+                          <button onClick={() => setExpandedTrip(isExpanded ? null : trip.id)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isExpanded ? 'bg-blue-100 text-blue-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>
+                            <ChevronDown size={15} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </button>
                         </div>
                       </div>
                     </div>
 
                     {/* Pickup / Dropoff Route */}
-                    <div className="px-5 py-3">
-                      <div className="relative pl-8">
-                        <div className="absolute left-[9px] top-3 bottom-3 w-[3px] bg-gradient-to-b from-emerald-400 via-blue-200 to-rose-400 rounded-full" />
-                        <div className="flex items-start gap-3 mb-4">
-                          <div className="w-5 h-5 rounded-full bg-emerald-500 border-[3px] border-emerald-100 shrink-0 mt-0.5 shadow-sm" />
+                    <div className="px-4 py-2">
+                      <div className="relative pl-6">
+                        <div className="absolute left-[7px] top-2 bottom-2 w-[2px] bg-gradient-to-b from-emerald-400 via-blue-200 to-rose-400 rounded-full" />
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="w-[18px] h-[18px] rounded-full bg-emerald-500 border-[3px] border-emerald-100 shrink-0 mt-0.5 shadow-sm" />
                           <div className="min-w-0 flex-1">
-                            <p className="text-base font-bold text-slate-800 leading-snug">{trip.pickup}</p>
-                            <div className="flex items-center gap-2 mt-1.5">
-                              {trip.pickupPhone && <p className="text-sm font-medium text-slate-500">{trip.pickupPhone}</p>}
-                              <button onClick={() => openInNavApp(trip.pickup, suggestNavApp(trip.pickup))} className="text-xs text-blue-600 font-bold flex items-center gap-1 hover:underline px-2 py-1 bg-blue-50 rounded-lg" title={`Open in ${suggestNavApp(trip.pickup)}`}><Navigation size={12} /> Nav</button>
-                              <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.pickup).catch(() => {}); }} className="text-xs text-slate-400 hover:text-blue-600 px-2 py-1 hover:bg-blue-50 rounded-lg" title="Copy address"><Copy size={12} /></button>
-                              <div className="flex gap-1">
+                            <p className="text-xs font-semibold text-slate-700 leading-tight">{trip.pickup}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {trip.pickupPhone && <p className="text-[9px] text-slate-400">{trip.pickupPhone}</p>}
+                              <button onClick={() => openInNavApp(trip.pickup, suggestNavApp(trip.pickup))} className="text-[9px] text-blue-600 font-bold flex items-center gap-0.5 hover:underline" title={`Open in ${suggestNavApp(trip.pickup)}`}><Navigation size={9} /> Nav</button>
+                              <div className="flex gap-0.5">
                                 {['google','waze','apple'].filter(a => a !== suggestNavApp(trip.pickup)).slice(0,2).map(app => (
-                                  <button key={app} onClick={() => openInNavApp(trip.pickup, app)} className="text-[10px] text-slate-400 hover:text-blue-600 underline px-1.5 py-1 rounded-lg hover:bg-blue-50" title={app}>{app[0].toUpperCase()}</button>
+                                  <button key={app} onClick={() => openInNavApp(trip.pickup, app)} className="text-[8px] text-slate-400 hover:text-blue-600 underline px-0.5" title={app}>{app[0].toUpperCase()}</button>
                                 ))}
                               </div>
                             </div>
@@ -1034,16 +1014,15 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                         </div>
 
                         <div className="flex items-start gap-3">
-                          <div className="w-5 h-5 rounded-full bg-rose-500 border-[3px] border-rose-100 shrink-0 mt-0.5 shadow-sm" />
+                          <div className="w-[18px] h-[18px] rounded-full bg-rose-500 border-[3px] border-rose-100 shrink-0 mt-0.5 shadow-sm" />
                           <div className="min-w-0 flex-1">
-                            <p className="text-base font-bold text-slate-800 leading-snug">{trip.dropoff}</p>
-                            <div className="flex items-center gap-2 mt-1.5">
-                              {trip.dropoffPhone && <p className="text-sm font-medium text-slate-500">{trip.dropoffPhone}</p>}
-                              <button onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="text-xs text-rose-600 font-bold flex items-center gap-1 hover:underline px-2 py-1 bg-rose-50 rounded-lg" title={`Open in ${suggestNavApp(trip.dropoff)}`}><Navigation size={12} /> Nav</button>
-                              <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.dropoff).catch(() => {}); }} className="text-xs text-slate-400 hover:text-rose-600 px-2 py-1 hover:bg-rose-50 rounded-lg" title="Copy address"><Copy size={12} /></button>
-                              <div className="flex gap-1">
+                            <p className="text-xs font-semibold text-slate-700 leading-tight">{trip.dropoff}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {trip.dropoffPhone && <p className="text-[9px] text-slate-400">{trip.dropoffPhone}</p>}
+                              <button onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="text-[9px] text-rose-600 font-bold flex items-center gap-0.5 hover:text-rose-700 hover:underline" title={`Open in ${suggestNavApp(trip.dropoff)}`}><Navigation size={9} /> Nav</button>
+                              <div className="flex gap-0.5">
                                 {['google','waze','apple'].filter(a => a !== suggestNavApp(trip.dropoff)).slice(0,2).map(app => (
-                                  <button key={app} onClick={() => openInNavApp(trip.dropoff, app)} className="text-[10px] text-slate-400 hover:text-rose-600 underline px-1.5 py-1 rounded-lg hover:bg-rose-50" title={app}>{app[0].toUpperCase()}</button>
+                                  <button key={app} onClick={() => openInNavApp(trip.dropoff, app)} className="text-[8px] text-slate-400 hover:text-rose-600 underline px-0.5" title={app}>{app[0].toUpperCase()}</button>
                                 ))}
                               </div>
                             </div>
@@ -1051,13 +1030,13 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                         </div>
                       </div>
                       {trip.notes && (
-                        <div className="mt-3 bg-amber-50/80 rounded-xl px-4 py-3 border border-amber-100/50">
-                          <p className="text-sm text-amber-800 font-medium leading-relaxed">{trip.notes}</p>
+                        <div className="mt-2 bg-amber-50/80 rounded-xl px-3 py-2 border border-amber-100/50">
+                          <p className="text-[10px] text-amber-700 font-medium leading-relaxed">{trip.notes}</p>
                         </div>
                       )}
                       {trip.distance && (
-                        <div className="mt-2 flex items-center gap-1.5 text-sm text-slate-400 font-medium ml-1">
-                          <MapPin size={12} />
+                        <div className="mt-2 flex items-center gap-1 text-[9px] text-slate-400">
+                          <MapPin size={9} />
                           <span>{trip.distance} mi estimated</span>
                         </div>
                       )}
@@ -1065,86 +1044,86 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
                     {/* Expanded Details */}
                     {isExpanded && (
-                      <div className="px-5 pb-3 border-t border-slate-50 pt-4 space-y-3 animate-in">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-slate-50 rounded-xl p-3">
-                            <p className="text-xs text-slate-400 uppercase font-bold">Booking ID</p>
-                            <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.bookingId || '—'}</p>
+                      <div className="px-4 pb-2 border-t border-slate-50 pt-3 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                          <div className="bg-slate-50 rounded-xl p-2.5">
+                            <p className="text-[9px] text-slate-400 uppercase font-bold">Booking ID</p>
+                            <p className="font-semibold text-slate-800">{trip.bookingId || '—'}</p>
                           </div>
-                          <div className="bg-slate-50 rounded-xl p-3">
-                            <p className="text-xs text-slate-400 uppercase font-bold">Service Type</p>
-                            <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.type || '—'}</p>
+                          <div className="bg-slate-50 rounded-xl p-2.5">
+                            <p className="text-[9px] text-slate-400 uppercase font-bold">Service Type</p>
+                            <p className="font-semibold text-slate-800">{trip.type || '—'}</p>
                           </div>
-                          <div className="bg-slate-50 rounded-xl p-3">
-                            <p className="text-xs text-slate-400 uppercase font-bold">Patient Phone</p>
-                            <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.pickupPhone || '—'}</p>
+                          <div className="bg-slate-50 rounded-xl p-2.5">
+                            <p className="text-[9px] text-slate-400 uppercase font-bold">Patient Phone</p>
+                            <p className="font-semibold text-slate-800">{trip.pickupPhone || '—'}</p>
                           </div>
-                          <div className="bg-slate-50 rounded-xl p-3">
-                            <p className="text-xs text-slate-400 uppercase font-bold">Hospital Phone</p>
-                            <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.dropoffPhone || '—'}</p>
+                          <div className="bg-slate-50 rounded-xl p-2.5">
+                            <p className="text-[9px] text-slate-400 uppercase font-bold">Hospital Phone</p>
+                            <p className="font-semibold text-slate-800">{trip.dropoffPhone || '—'}</p>
                           </div>
                         </div>
                         {trip.pickupOdometer && (
-                          <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
-                            <Gauge size={14} className="text-slate-400" />
-                            <span className="text-sm text-slate-600">Pickup Odometer: <strong className="text-slate-800">{trip.pickupOdometer?.toLocaleString()} mi</strong></span>
+                          <div className="bg-slate-50 rounded-xl p-2.5 flex items-center gap-2">
+                            <Gauge size={12} className="text-slate-400" />
+                            <span className="text-[11px] text-slate-600">Pickup Odometer: <strong className="text-slate-800">{trip.pickupOdometer?.toLocaleString()} mi</strong></span>
                           </div>
                         )}
                         {trip.startTime && (
-                          <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
-                            <Clock size={14} className="text-slate-400" />
-                            <span className="text-sm text-slate-600">Started: <strong className="text-slate-800">{new Date(trip.startTime).toLocaleTimeString()}</strong></span>
+                          <div className="bg-slate-50 rounded-xl p-2.5 flex items-center gap-2">
+                            <Clock size={12} className="text-slate-400" />
+                            <span className="text-[11px] text-slate-600">Started: <strong className="text-slate-800">{new Date(trip.startTime).toLocaleTimeString()}</strong></span>
                           </div>
                         )}
                         {eta !== undefined && (
-                          <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
-                            <Timer size={14} className="text-slate-400" />
-                            <span className="text-sm text-slate-600">ETA: <strong className="text-slate-800">{formatDuration(eta)}</strong></span>
+                          <div className="bg-slate-50 rounded-xl p-2.5 flex items-center gap-2">
+                            <Timer size={12} className="text-slate-400" />
+                            <span className="text-[11px] text-slate-600">ETA: <strong className="text-slate-800">{formatDuration(eta)}</strong></span>
                           </div>
                         )}
                       </div>
                     )}
 
                     {/* Action Buttons */}
-                    <div className="px-5 pb-5 flex gap-2.5 flex-wrap">
+                    <div className="px-4 pb-4 flex gap-2 flex-wrap">
                       {trip.status === 'Assigned' || trip.status === 'Unassigned' ? (
                         <>
-                          <button onClick={() => handleStartTrip(trip)} className="btn btn-primary flex-1 text-base">
-                            <Play size={18} /> Start Trip
+                          <button onClick={() => handleStartTrip(trip)} className="flex-1 h-11 bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-blue-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-blue-600/30 flex items-center justify-center gap-2">
+                            <Play size={13} /> Start Trip
                           </button>
-                          <button onClick={() => setShowTripDetails(trip)} className="btn btn-ghost w-12 p-0" title="Full details"><FileText size={20} /></button>
-                          <button onClick={() => handleNoShow(trip)} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-sm">No Show</button>
-                          <button onClick={() => handleCancel(trip)} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-sm">Cancel</button>
+                          <button onClick={() => setShowTripDetails(trip)} className="h-11 w-11 bg-slate-100 text-slate-600 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Full details"><FileText size={15} /></button>
+                          <button onClick={() => handleNoShow(trip)} className="h-11 px-4 bg-amber-50 text-amber-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-amber-100 border border-amber-100/50">No Show</button>
+                          <button onClick={() => handleCancel(trip)} className="h-11 px-4 bg-rose-50 text-rose-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-rose-100 border border-rose-100/50">Cancel</button>
                         </>
                       ) : trip.status === 'In Transit' ? (
                         <>
-                          <button onClick={() => openInNavApp(trip.pickup, suggestNavApp(trip.pickup))} className="btn btn-primary flex-1 text-base">
-                            <Navigation size={18} /> Pickup
+                          <button onClick={() => openInNavApp(trip.pickup, suggestNavApp(trip.pickup))} className="flex-1 h-11 bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-blue-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-blue-600/30 flex items-center justify-center gap-2">
+                            <Navigation size={13} /> Pickup
                           </button>
-                          <button onClick={() => handleArrive(trip)} className="btn bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 text-base">
-                            <MapPin size={18} /> Arrived
+                          <button onClick={() => handleArrive(trip)} className="h-11 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-emerald-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-emerald-600/30 flex items-center justify-center gap-2 px-4">
+                            <MapPin size={13} /> Arrived
                           </button>
-                          <button onClick={() => revertTripStatus(trip)} className="btn btn-ghost w-12 p-0" title="Back to Assigned">
-                            <RotateCcw size={18} />
+                          <button onClick={() => revertTripStatus(trip)} className="h-11 w-11 bg-slate-100 text-slate-500 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Back to Assigned">
+                            <RotateCcw size={14} />
                           </button>
-                          <button onClick={() => setShowTripDetails(trip)} className="btn btn-ghost w-12 p-0" title="Full details"><FileText size={20} /></button>
-                          <button onClick={() => handleNoShow(trip)} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-sm">No Show</button>
-                          <button onClick={() => handleCancel(trip)} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-sm">Cancel</button>
+                          <button onClick={() => setShowTripDetails(trip)} className="h-11 w-11 bg-slate-100 text-slate-600 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Full details"><FileText size={15} /></button>
+                          <button onClick={() => handleNoShow(trip)} className="h-11 px-4 bg-amber-50 text-amber-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-amber-100 border border-amber-100/50">No Show</button>
+                          <button onClick={() => handleCancel(trip)} className="h-11 px-4 bg-rose-50 text-rose-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-rose-100 border border-rose-100/50">Cancel</button>
                         </>
                       ) : trip.status === 'Arrived' ? (
                         <>
-                          <button onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="btn bg-rose-600 text-white shadow-sm hover:bg-rose-700 flex-1 text-base">
-                            <Navigation size={18} /> Dropoff
+                          <button onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="flex-1 h-11 bg-gradient-to-br from-rose-600 to-rose-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-rose-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-rose-600/30 flex items-center justify-center gap-2">
+                            <Navigation size={13} /> Dropoff
                           </button>
-                          <button onClick={() => openCompleteModal(trip)} className="btn bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 text-base">
-                            <Check size={18} /> Complete
+                          <button onClick={() => openCompleteModal(trip)} className="h-11 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-emerald-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-emerald-600/30 flex items-center justify-center gap-2 px-4">
+                            <Check size={13} /> Complete
                           </button>
-                          <button onClick={() => revertTripStatus(trip)} className="btn btn-ghost w-12 p-0" title="Back to In Transit">
-                            <RotateCcw size={18} />
+                          <button onClick={() => revertTripStatus(trip)} className="h-11 w-11 bg-slate-100 text-slate-500 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Back to In Transit">
+                            <RotateCcw size={14} />
                           </button>
-                          <button onClick={() => setShowTripDetails(trip)} className="btn btn-ghost w-12 p-0" title="Full details"><FileText size={20} /></button>
-                          <button onClick={() => handleNoShow(trip)} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-sm">No Show</button>
-                          <button onClick={() => handleCancel(trip)} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-sm">Cancel</button>
+                          <button onClick={() => setShowTripDetails(trip)} className="h-11 w-11 bg-slate-100 text-slate-600 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Full details"><FileText size={15} /></button>
+                          <button onClick={() => handleNoShow(trip)} className="h-11 px-4 bg-amber-50 text-amber-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-amber-100 border border-amber-100/50">No Show</button>
+                          <button onClick={() => handleCancel(trip)} className="h-11 px-4 bg-rose-50 text-rose-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-rose-100 border border-rose-100/50">Cancel</button>
                         </>
                       ) : null}
                     </div>
@@ -1159,39 +1138,39 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== ODOMETER PROMPT MODAL ===== */}
       {showOdometerPrompt && (
-        <div className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative z-10 border border-white/20">
+        <div className="fixed inset-0 z-[120] bg-black/40 flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative z-10">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/20">
-                <Gauge size={28} className="text-white" />
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <Gauge size={24} className="text-white" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Odometer Reading</h3>
-              <p className="text-sm text-slate-500 mt-1 font-medium">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
+              <h3 className="text-lg font-bold text-slate-900">Odometer Reading</h3>
+              <p className="text-xs text-slate-500 mt-1">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
               {lastOdometer > 0 && (
-                <p className="text-sm text-slate-400 mt-2">Last reading: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
+                <p className="text-[10px] text-slate-400 mt-1">Last reading: <strong>{lastOdometer?.toLocaleString()} mi</strong></p>
               )}
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Current Odometer (mi)</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Current Odometer (mi)</label>
                 <input
                   type="number"
                   inputMode="numeric"
                   value={odometerValue}
                   onChange={(e) => setOdometerValue(e.target.value)}
                   placeholder='Enter full odometer reading'
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-blue-500 outline-none"
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-lg text-center focus:border-blue-500 outline-none"
                   autoFocus
                 />
                 {lastOdometer > 0 && odometerValue && parseInt(odometerValue, 10) < lastOdometer && (
-                  <p className="text-sm text-amber-700 font-semibold mt-2 text-center bg-amber-50 rounded-xl px-4 py-3 border border-amber-200">
-                    {parseInt(odometerValue, 10).toLocaleString()} mi is less than last reading of {lastOdometer.toLocaleString()} mi. You can continue if you're sure.
+                  <p className="text-[10px] text-amber-700 font-semibold mt-2 text-center bg-amber-50 rounded-xl px-3 py-2 border border-amber-200">
+                    ⚠️ {parseInt(odometerValue, 10).toLocaleString()} mi is less than last reading of {lastOdometer.toLocaleString()} mi. You can continue if you're sure.
                   </p>
                 )}
               </div>
-              <div className="flex gap-3">
-                <button onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all">Cancel</button>
-                <button onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-blue-600 text-white rounded-2xl font-bold text-base disabled:opacity-40 active:scale-95 shadow-sm transition-all">Start Trip</button>
+              <div className="flex gap-2">
+                <button onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm active:scale-95">Cancel</button>
+                <button onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3 bg-blue-600 text-white rounded-2xl font-bold text-sm disabled:opacity-40 active:scale-95 shadow-sm">Start Trip</button>
               </div>
             </div>
           </div>
@@ -1200,67 +1179,67 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== ARRIVAL CONFIRM MODAL ===== */}
       {showArrivalConfirm && (
-        <div className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative z-10 border border-white/20">
+        <div className="fixed inset-0 z-[120] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative z-10">
             <div className="text-center mb-5">
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
-                <MapPin size={28} className="text-white" />
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <MapPin size={24} className="text-white" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Arrived at Location</h3>
-              <p className="text-sm text-slate-500 mt-1 font-medium">{showArrivalConfirm.patient}</p>
+              <h3 className="text-lg font-bold text-slate-900">Arrived at Location</h3>
+              <p className="text-xs text-slate-500 mt-1">{showArrivalConfirm.patient}</p>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
+            <div className="bg-slate-50 rounded-2xl p-4 mb-4 space-y-2">
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Odometer at Arrival (mi)</label>
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Odometer at Arrival (mi)</label>
                 <input type="number" inputMode="numeric" value={arrivalOdometer} onChange={e => setArrivalOdometer(e.target.value)}
-                  className="w-full mt-1.5 p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none"
+                  className="w-full mt-1 p-2.5 bg-white border border-slate-200 rounded-xl font-bold text-sm text-center focus:border-blue-500 outline-none"
                 />
               </div>
               {showArrivalConfirm.bookingId && (
                 <div className="flex justify-between">
-                  <span className="text-xs text-slate-400 font-bold uppercase">Booking</span>
-                  <span className="text-sm font-bold text-slate-800">{showArrivalConfirm.bookingId}</span>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase">Booking</span>
+                  <span className="text-xs font-bold text-slate-800">{showArrivalConfirm.bookingId}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-xs text-slate-400 font-bold uppercase">Client</span>
-                <span className="text-sm font-bold text-slate-800">{showArrivalConfirm.patient}</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Client</span>
+                <span className="text-xs font-bold text-slate-800">{showArrivalConfirm.patient}</span>
               </div>
               {showArrivalConfirm.pickupPhone && (
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-400 font-bold uppercase">Phone</span>
-                  <a href={`tel:${cleanPhone(showArrivalConfirm.pickupPhone)}`} className="text-sm font-bold text-blue-600 flex items-center gap-1 hover:underline">
-                    <Phone size={14} /> {showArrivalConfirm.pickupPhone}
+                  <span className="text-[10px] text-slate-400 font-bold uppercase">Phone</span>
+                  <a href={`tel:${cleanPhone(showArrivalConfirm.pickupPhone)}`} className="text-xs font-bold text-blue-600 flex items-center gap-1">
+                    <Phone size={10} /> {showArrivalConfirm.pickupPhone}
                   </a>
                 </div>
               )}
               {showArrivalConfirm.notes && (
-                <div className="pt-3 border-t border-slate-200">
-                  <p className="text-xs text-slate-400 font-bold uppercase mb-1.5">Notes</p>
-                  <p className="text-sm text-slate-700">{showArrivalConfirm.notes}</p>
+                <div className="pt-2 border-t border-slate-200">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Notes</p>
+                  <p className="text-xs text-slate-700">{showArrivalConfirm.notes}</p>
                 </div>
               )}
-              <div className="pt-3 border-t border-slate-200 space-y-2">
-                <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 rounded-xl px-4 py-3">
-                  <Info size={16} className="shrink-0" />
-                  <span className="font-medium">Obtain paper signature from client before proceeding.</span>
+              <div className="pt-2 border-t border-slate-200 space-y-2">
+                <div className="flex items-center gap-2 text-[10px] text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                  <Info size={12} className="shrink-0" />
+                  <span>Obtain paper signature from client before proceeding.</span>
                 </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-                  <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1.5">Dispatcher Confirmation</p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                  <p className="text-[9px] font-bold text-blue-700 uppercase tracking-wider mb-1">Dispatcher Confirmation</p>
                   <div className="flex items-center gap-2">
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={signatureConfirmed} onChange={e => setSignatureConfirmed(e.target.checked)} className="w-4 h-4 rounded" />
-                      <span className="text-sm text-slate-600 font-medium">Paper signature obtained from client</span>
+                      <input type="checkbox" checked={signatureConfirmed} onChange={e => setSignatureConfirmed(e.target.checked)} className="w-3.5 h-3.5 rounded" />
+                      <span className="text-[9px] text-slate-600">Paper signature obtained from client</span>
                     </label>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3">
-              <button onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all">Back</button>
-              <button onClick={confirmArrival} disabled={!signatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base active:scale-95 shadow-sm disabled:opacity-40 transition-all">
+            <div className="flex gap-2">
+              <button onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm active:scale-95">Back</button>
+              <button onClick={confirmArrival} disabled={!signatureConfirmed} className="flex-1 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-sm active:scale-95 shadow-sm disabled:opacity-40">
                 {showArrivalConfirm.status === 'In Transit' ? 'Confirm Arrival' : 'Confirm Complete'}
               </button>
             </div>
@@ -1270,57 +1249,47 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== COMPLETE TRIP MODAL ===== */}
       {showCompleteModal && (
-        <div className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative z-10 border border-white/20">
+        <div className="fixed inset-0 z-[120] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative z-10">
             <div className="text-center mb-5">
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
-                <Check size={28} className="text-white" />
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <Check size={24} className="text-white" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Complete Trip</h3>
-              <p className="text-sm text-slate-500 mt-1 font-medium">{showCompleteModal.patient} — {showCompleteModal.bookingId || ''}</p>
+              <h3 className="text-lg font-bold text-slate-900">Complete Trip</h3>
+              <p className="text-xs text-slate-500 mt-1">{showCompleteModal.patient} — {showCompleteModal.bookingId || ''}</p>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
+            <div className="bg-slate-50 rounded-2xl p-4 mb-4 space-y-3">
               <div className="flex justify-between">
-                <span className="text-xs text-slate-400 font-bold uppercase">Pickup Odometer</span>
-                <span className="text-sm font-bold text-slate-800">{showCompleteModal.pickupOdometer?.toLocaleString() || '—'} mi</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Pickup Odometer</span>
+                <span className="text-xs font-bold text-slate-800">{showCompleteModal.pickupOdometer?.toLocaleString() || '—'} mi</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-xs text-slate-400 font-bold uppercase">Started At</span>
-                <span className="text-sm font-bold text-slate-800">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '—'}</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Started At</span>
+                <span className="text-xs font-bold text-slate-800">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '—'}</span>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase">Departed Pickup Time</label>
-                <input type="time" value={departedTime} onChange={(e) => setDepartedTime(e.target.value)}
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase">Arrival Dropoff Time</label>
-                <input type="time" value={arrivalDropoffTime} onChange={(e) => setArrivalDropoffTime(e.target.value)}
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Final Odometer (mi)</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Final Odometer (mi)</label>
                 <input
                   type="number"
                   inputMode="numeric"
                   value={completeOdometer}
                   onChange={(e) => setCompleteOdometer(e.target.value)}
                   placeholder="Enter final odometer"
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5"
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm text-center focus:border-blue-500 outline-none mt-1"
                   autoFocus
                 />
               </div>
               {showCompleteModal.pickupOdometer && completeOdometer && (
-                <div className="text-center text-sm text-blue-600 font-bold">
+                <div className="text-center text-[11px] text-blue-600 font-bold">
                   Distance: {(parseInt(completeOdometer) - (showCompleteModal.pickupOdometer || 0)).toLocaleString()} mi
                 </div>
               )}
             </div>
 
-            <div className="flex gap-3">
-              <button onClick={() => setShowCompleteModal(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all">Cancel</button>
-              <button onClick={submitComplete} disabled={!completeOdometer} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base disabled:opacity-40 active:scale-95 shadow-sm transition-all">Complete Trip</button>
+            <div className="flex gap-2">
+              <button onClick={() => setShowCompleteModal(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm active:scale-95">Cancel</button>
+              <button onClick={submitComplete} disabled={!completeOdometer} className="flex-1 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-sm disabled:opacity-40 active:scale-95 shadow-sm">Complete Trip</button>
             </div>
           </div>
         </div>
@@ -1900,54 +1869,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           Swipe left on Arrived trips to complete
         </div>
       )}
-
-      {/* Legs Detail Modal */}
-      {legsDetailPatient && (() => {
-        const patientName = legsDetailPatient;
-        const legs = orderedTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientName.trim().toLowerCase());
-        return (
-          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" onClick={() => setLegsDetailPatient(null)}>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className="bg-white w-full max-w-lg rounded-3xl p-5 relative z-10 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-slate-900">{patientName}</h3>
-                <button onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200"><X size={16} /></button>
-              </div>
-              <p className="text-xs text-slate-500 font-medium mb-4">{legs.length} legs</p>
-              <div className="space-y-2">
-                {legs.map((leg, idx) => (
-                  <div key={leg.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">Leg {idx + 1}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'In Transit' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{leg.status}</span>
-                    </div>
-                    <p className="text-[11px] font-bold text-slate-400 mb-1">Booking: {leg.bookingId || '—'}</p>
-                    <div className="space-y-1.5">
-                      <div className="flex items-start gap-2">
-                        <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-600">Pickup</p>
-                          <p className="text-[11px] text-slate-500 truncate">{leg.pickup}</p>
-                          <p className="text-[9px] text-slate-400">{leg.time ? to12hr(leg.time) : ''}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="w-3 h-3 rounded-full bg-rose-500 shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-600">Dropoff</p>
-                          <p className="text-[11px] text-slate-500 truncate">{leg.dropoff}</p>
-                        </div>
-                      </div>
-                    </div>
-                    {leg.notes && <p className="mt-2 text-[10px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{leg.notes}</p>}
-                    {leg.pickupPhone && <p className="mt-1.5 text-[10px] text-slate-400">Phone: {leg.pickupPhone}</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 };

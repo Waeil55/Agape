@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Calendar, Download, FileText, Filter, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { Calendar, Download, FileText, Filter, CheckCircle2, AlertTriangle, XCircle, Edit2, Save, X, Check, Camera } from 'lucide-react';
 
 const STATUS_OPTIONS = ['Completed', 'No Show', 'Cancelled'];
 
@@ -21,17 +21,31 @@ const Badge = ({ children, variant = 'info' }) => {
   );
 };
 
-const formatClock = (value) => {
+const formatClock24 = (value) => {
   if (!value) return '—';
+  const s = String(value).trim();
 
-  if (String(value).includes('T')) {
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // ISO date string → convert UTC to local time
+  if (s.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     }
   }
 
-  return String(value);
+  const timeExtract = s.match(/(\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)/i);
+  const timePart = timeExtract ? timeExtract[1] : s;
+
+  const match = timePart.toUpperCase().match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/);
+  if (match) {
+    let hour = parseInt(match[1], 10);
+    const min = match[2];
+    const meridiem = match[3];
+    if (meridiem === 'PM' && hour < 12) hour += 12;
+    if (meridiem === 'AM' && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, '0')}:${min}`;
+  }
+  return s;
 };
 
 const timeToMinutes = (value) => {
@@ -57,15 +71,20 @@ const getDriverRecord = (trip, drivers) => drivers.find((driver) => driver.id ==
 
 const getDriverLabel = (trip, drivers) => getDriverRecord(trip, drivers)?.name || trip.driverName || '—';
 
-const getVehicleLabel = (trip, drivers) => getDriverRecord(trip, drivers)?.vehicle || '—';
+const getVehicleLabel = (trip, drivers) => trip.completedVehicle || getDriverRecord(trip, drivers)?.vehicle || '—';
 
 const buildCsvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
-const ReportsPage = ({ trips = [], drivers = [] }) => {
+const REPORTS_ICON = 'data:image/svg+xml,...';
+
+const ReportsPage = ({ trips = [], drivers = [], onUpdateTrip, role }) => {
   const [startDate, setStartDate] = useState(weekAgo);
   const [endDate, setEndDate] = useState(today);
   const [statusFilter, setStatusFilter] = useState('Completed');
   const [driverFilter, setDriverFilter] = useState('all');
+  const [editingId, setEditingId] = useState(null);
+  const [editValues, setEditValues] = useState({});
+  const canEdit = role === 'admin' || role === 'dispatcher';
 
   const reportTrips = useMemo(() => {
     return trips
@@ -117,6 +136,43 @@ const ReportsPage = ({ trips = [], drivers = [] }) => {
     return Object.entries(groups).sort(([leftDate], [rightDate]) => leftDate.localeCompare(rightDate));
   }, [reportTrips]);
 
+  const startEdit = (trip) => {
+    setEditValues({
+      bookingId: trip.bookingId || '',
+      patient: trip.patient || '',
+      pickup: trip.pickup || '',
+      time: trip.time || '',
+      dropoff: trip.dropoff || '',
+      driverId: trip.driverId || '',
+      driverEmail: trip.driverEmail || '',
+      driverName: trip.driverName || '',
+      completedVehicle: trip.completedVehicle || '',
+      purpose: trip.purpose || '',
+      notes: trip.notes || '',
+      status: trip.status || '',
+      paperSignatureConfirmed: trip.paperSignatureConfirmed || false,
+      pickupOdometer: trip.pickupOdometer || '',
+      dropoffOdometer: trip.dropoffOdometer || '',
+      arrivalTime: trip.arrivalTime || '',
+      departedPickupTime: trip.departedPickupTime || '',
+      arrivalDropoffTime: trip.arrivalDropoffTime || '',
+      completedAt: trip.completedAt || '',
+    });
+    setEditingId(trip.id);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValues({});
+  };
+
+  const saveEdit = (trip) => {
+    if (!trip || !onUpdateTrip) return;
+    onUpdateTrip({ ...trip, ...editValues });
+    setEditingId(null);
+    setEditValues({});
+  };
+
   const exportCsv = () => {
     const headers = [
       'Date',
@@ -124,11 +180,13 @@ const ReportsPage = ({ trips = [], drivers = [] }) => {
       'Booking ID',
       'Client Name',
       'Pickup Address',
-      'Pickup Time',
+      'Scheduled Pickup Time',
+      'Actual Pickup Time',
+      'Departed Pickup Time',
       'Dropoff Address',
-      'Dropoff Time',
-      'Pickup Odometer',
+      'Arrival Dropoff Time',
       'Dropoff Odometer',
+      'Pickup Odometer',
       'Client Signed',
       'Driver',
       'Vehicle',
@@ -141,12 +199,14 @@ const ReportsPage = ({ trips = [], drivers = [] }) => {
       buildCsvValue(trip.bookingId || ''),
       buildCsvValue(trip.patient || ''),
       buildCsvValue(trip.pickup || ''),
-      buildCsvValue(trip.time || ''),
+      buildCsvValue(formatClock24(trip.time) || ''),
+      buildCsvValue(formatClock24(trip.arrivalTime)),
+      buildCsvValue(formatClock24(trip.departedPickupTime)),
       buildCsvValue(trip.dropoff || ''),
-      buildCsvValue(trip.dropoffTime || formatClock(trip.completedAt)),
-      buildCsvValue(trip.pickupOdometer || ''),
+      buildCsvValue(formatClock24(trip.arrivalDropoffTime || trip.completedAt)),
       buildCsvValue(trip.dropoffOdometer || ''),
-      buildCsvValue(trip.signature ? 'YES' : 'NO'),
+      buildCsvValue(trip.pickupOdometer || ''),
+      buildCsvValue(trip.paperSignatureConfirmed ? 'YES' : 'NO'),
       buildCsvValue(getDriverLabel(trip, drivers)),
       buildCsvValue(getVehicleLabel(trip, drivers)),
       buildCsvValue(trip.purpose || ''),
@@ -282,17 +342,20 @@ const ReportsPage = ({ trips = [], drivers = [] }) => {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1450px] text-[11px]">
+              <table className="w-full min-w-[1850px] text-[11px]">
                 <thead className="bg-slate-800 text-white">
                   <tr>
+                    <th className="p-2 text-left whitespace-nowrap w-10"></th>
                     <th className="p-2 text-left whitespace-nowrap">Booking ID</th>
                     <th className="p-2 text-left whitespace-nowrap">Client Name</th>
-                    <th className="p-2 text-left whitespace-nowrap min-w-[240px]">Pickup Address</th>
-                    <th className="p-2 text-left whitespace-nowrap">Pickup Time</th>
-                    <th className="p-2 text-left whitespace-nowrap min-w-[240px]">Dropoff Address</th>
-                    <th className="p-2 text-left whitespace-nowrap">Dropoff Time</th>
-                    <th className="p-2 text-left whitespace-nowrap">Pickup Odometer</th>
-                    <th className="p-2 text-left whitespace-nowrap">Dropoff Odometer</th>
+                    <th className="p-2 text-left whitespace-nowrap min-w-[200px]">Pickup Address</th>
+                    <th className="p-2 text-left whitespace-nowrap">Scheduled Pickup</th>
+                    <th className="p-2 text-left whitespace-nowrap">Actual Pickup</th>
+                    <th className="p-2 text-left whitespace-nowrap">Departed Pickup</th>
+                    <th className="p-2 text-left whitespace-nowrap min-w-[200px]">Dropoff Address</th>
+                    <th className="p-2 text-left whitespace-nowrap">Arrival Dropoff</th>
+                    <th className="p-2 text-left whitespace-nowrap">Pickup Odo</th>
+                    <th className="p-2 text-left whitespace-nowrap">Dropoff Odo</th>
                     <th className="p-2 text-left whitespace-nowrap">Client Signed</th>
                     <th className="p-2 text-left whitespace-nowrap">Status</th>
                     <th className="p-2 text-left whitespace-nowrap">Driver</th>
@@ -302,22 +365,171 @@ const ReportsPage = ({ trips = [], drivers = [] }) => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {dayTrips.map((trip) => {
+                    const isEditing = editingId === trip.id;
                     const statusVariant = trip.status === 'Completed' ? 'success' : trip.status === 'No Show' ? 'danger' : 'warning';
+                    const inputClass = "w-full min-w-[70px] px-1.5 py-1 border border-blue-300 rounded text-[11px] focus:outline-none focus:border-blue-500 bg-blue-50/50";
+                    const selectClass = "w-full min-w-[70px] px-1.5 py-1 border border-blue-300 rounded text-[11px] focus:outline-none focus:border-blue-500 bg-blue-50/50";
+                    const tsVal = (v) => {
+                      if (!v) return '';
+                      const d = new Date(v);
+                      if (isNaN(d.getTime())) return v.replace('Z', '').slice(0, 16);
+                      const pad = (n) => String(n).padStart(2, '0');
+                      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    };
                     return (
-                      <tr key={trip.id} className="hover:bg-slate-50">
-                        <td className="p-2 whitespace-nowrap font-mono text-blue-600">{trip.bookingId || '—'}</td>
-                        <td className="p-2 whitespace-nowrap font-bold text-slate-900">{trip.patient || '—'}</td>
-                        <td className="p-2 text-slate-700">{trip.pickup || '—'}</td>
-                        <td className="p-2 whitespace-nowrap font-bold text-slate-900">{trip.time || '—'}</td>
-                        <td className="p-2 text-slate-700">{trip.dropoff || '—'}</td>
-                        <td className="p-2 whitespace-nowrap font-bold text-slate-900">{trip.dropoffTime || formatClock(trip.completedAt)}</td>
-                        <td className="p-2 whitespace-nowrap font-mono font-black">{trip.pickupOdometer || '—'}</td>
-                        <td className="p-2 whitespace-nowrap font-mono font-black">{trip.dropoffOdometer || '—'}</td>
-                        <td className="p-2 whitespace-nowrap font-black text-emerald-600">{trip.signature ? 'YES' : 'NO'}</td>
-                        <td className="p-2 whitespace-nowrap"><Badge variant={statusVariant}>{trip.status}</Badge></td>
-                        <td className="p-2 whitespace-nowrap font-semibold">{getDriverLabel(trip, drivers)}</td>
-                        <td className="p-2 whitespace-nowrap text-slate-500">{getVehicleLabel(trip, drivers)}</td>
-                        <td className="p-2 whitespace-nowrap text-slate-500">{trip.purpose || '—'}</td>
+                      <tr key={trip.id} className={`hover:bg-slate-50 group ${isEditing ? 'bg-blue-50/30' : ''}`}>
+                        <td className="p-2 whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            {canEdit && !isEditing && (
+                              <button onClick={() => startEdit(trip)}
+                                className="p-1 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition opacity-0 group-hover:opacity-100"
+                                title="Edit trip">
+                                <Edit2 size={14} />
+                              </button>
+                            )}
+                            {isEditing && (
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => saveEdit(trip)}
+                                  className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                                  title="Save">
+                                  <Check size={14} />
+                                </button>
+                                <button onClick={cancelEdit}
+                                  className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                  title="Cancel">
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <input type="text" value={editValues.bookingId} onChange={(e) => setEditValues({ ...editValues, bookingId: e.target.value })} className={inputClass} />
+                          ) : (
+                            <span className="font-mono text-blue-600">{trip.bookingId || '—'}</span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <input type="text" value={editValues.patient} onChange={(e) => setEditValues({ ...editValues, patient: e.target.value })} className={inputClass} />
+                          ) : (
+                            <span className="font-bold text-slate-900">{trip.patient || '—'}</span>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {isEditing ? (
+                            <input type="text" value={editValues.pickup} onChange={(e) => setEditValues({ ...editValues, pickup: e.target.value })} className={inputClass} />
+                          ) : (
+                            <span className="text-slate-700">{trip.pickup || '—'}</span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <input type="text" value={editValues.time} onChange={(e) => setEditValues({ ...editValues, time: e.target.value })} className={inputClass} />
+                          ) : (
+                            <span className="font-bold text-slate-900">{formatClock24(trip.time) || '—'}</span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <Calendar size={12} className="text-blue-500 shrink-0" />
+                              <input type="datetime-local" value={tsVal(editValues.arrivalTime)} onChange={(e) => setEditValues({ ...editValues, arrivalTime: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                                className={inputClass} />
+                            </div>
+                          ) : (
+                            <span className="font-bold text-slate-900 whitespace-nowrap">{formatClock24(trip.arrivalTime)}</span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <Calendar size={12} className="text-blue-500 shrink-0" />
+                              <input type="datetime-local" value={tsVal(editValues.departedPickupTime)} onChange={(e) => setEditValues({ ...editValues, departedPickupTime: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                                className={inputClass} />
+                            </div>
+                          ) : (
+                            <span className="font-bold text-slate-900 whitespace-nowrap">{formatClock24(trip.departedPickupTime)}</span>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {isEditing ? (
+                            <input type="text" value={editValues.dropoff} onChange={(e) => setEditValues({ ...editValues, dropoff: e.target.value })} className={inputClass} />
+                          ) : (
+                            <span className="text-slate-700">{trip.dropoff || '—'}</span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <Calendar size={12} className="text-blue-500 shrink-0" />
+                              <input type="datetime-local" value={tsVal(editValues.arrivalDropoffTime)} onChange={(e) => setEditValues({ ...editValues, arrivalDropoffTime: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                                className={inputClass} />
+                            </div>
+                          ) : (
+                            <span className="font-bold text-slate-900 whitespace-nowrap">{formatClock24(trip.arrivalDropoffTime || trip.completedAt)}</span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <input type="number" value={editValues.pickupOdometer} onChange={(e) => setEditValues({ ...editValues, pickupOdometer: e.target.value })} className={inputClass} />
+                          ) : (
+                            <span className="font-mono font-black">{trip.pickupOdometer || '—'}</span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <input type="number" value={editValues.dropoffOdometer} onChange={(e) => setEditValues({ ...editValues, dropoffOdometer: e.target.value })} className={inputClass} />
+                          ) : (
+                            <span className="font-mono font-black">{trip.dropoffOdometer || '—'}</span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <label className="flex items-center justify-center cursor-pointer">
+                              <input type="checkbox" checked={!!editValues.paperSignatureConfirmed} onChange={(e) => setEditValues({ ...editValues, paperSignatureConfirmed: e.target.checked })} className="w-4 h-4 accent-blue-600" />
+                            </label>
+                          ) : (
+                            <span className="font-black text-emerald-600">{trip.paperSignatureConfirmed ? 'YES' : 'NO'}</span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <select value={editValues.status} onChange={(e) => setEditValues({ ...editValues, status: e.target.value })} className={selectClass}>
+                              {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          ) : (
+                            <Badge variant={statusVariant}>{trip.status}</Badge>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <select value={editValues.driverId || editValues.driverEmail} onChange={(e) => {
+                              const d = drivers.find(drv => drv.id === e.target.value || drv.email === e.target.value);
+                              setEditValues({ ...editValues, driverId: d?.id || '', driverEmail: d?.email || '', driverName: d?.name || '' });
+                            }} className={selectClass}>
+                              <option value="">—</option>
+                              {drivers.map(d => <option key={d.id} value={d.id || d.email}>{d.name}</option>)}
+                            </select>
+                          ) : (
+                            <span className="font-semibold">{getDriverLabel(trip, drivers)}</span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <input type="text" value={editValues.completedVehicle} onChange={(e) => setEditValues({ ...editValues, completedVehicle: e.target.value })} className={inputClass} />
+                          ) : (
+                            <span className="text-slate-500">{getVehicleLabel(trip, drivers)}</span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <input type="text" value={editValues.purpose} onChange={(e) => setEditValues({ ...editValues, purpose: e.target.value })} className={inputClass} />
+                          ) : (
+                            <span className="text-slate-500">{trip.purpose || '—'}</span>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}

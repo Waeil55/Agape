@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, getDocs, doc, setDoc, getDoc, updateDoc } from '../config/firebase';
+import { db, collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, getDocs, doc, setDoc, getDoc, updateDoc, deleteField, arrayUnion } from '../config/firebase';
 import { MessageCircle, Send, Plus, ArrowLeft, X, Truck, ShieldCheck, Users, Phone, Trash2, Search } from 'lucide-react';
+import { playMessageSound } from '../utils/notificationSound';
 
 const ChatPage = ({ currentUser, role }) => {
   const [conversations, setConversations] = useState([]);
@@ -14,6 +15,7 @@ const ChatPage = ({ currentUser, role }) => {
   const [sidebar, setSidebar] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const scrollRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -33,55 +35,127 @@ const ChatPage = ({ currentUser, role }) => {
     return () => unsub();
   }, [currentUser]);
 
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'chatData/conversations'), snap => {
-      if (!snap.exists()) {
-        setDoc(doc(db, 'chatData/conversations'), { conversations: {} }, { merge: true }).catch(() => {});
-        setConversations([]);
-        return;
-      }
-      const data = snap.data();
-      const convs = Object.entries(data.conversations || {})
-        .map(([id, c]) => ({ id, ...c }))
-        .filter(c => role === 'admin' || c.participants?.includes(currentUser))
-        .sort((a, b) => (b.lastMessage?.timestamp?.toMillis?.() || 0) - (a.lastMessage?.timestamp?.toMillis?.() || 0));
-      setConversations(convs);
-    });
-    return () => unsub();
-  }, [currentUser, role]);
+    useEffect(() => {
+      let isFirst = true;
+      const prevConvs = {};
+      const unsub = onSnapshot(doc(db, 'chatData/conversations'), snap => {
+        if (!snap.exists()) {
+          setDoc(doc(db, 'chatData/conversations'), { conversations: {} }, { merge: true }).catch(() => {});
+          setConversations([]);
+          return;
+        }
+        const data = snap.data();
+        const convs = Object.entries(data.conversations || {})
+          .map(([id, c]) => ({ id, ...c }))
+          .filter(c => role === 'admin' || c.participants?.includes(currentUser))
+          .sort((a, b) => (b.lastMessage?.timestamp?.toMillis?.() || 0) - (a.lastMessage?.timestamp?.toMillis?.() || 0));
+        
+        if (!isFirst) {
+          convs.forEach(conv => {
+            const prev = prevConvs[conv.id];
+            if (prev && prev.lastMessage?.text !== conv.lastMessage?.text && conv.lastMessage?.sender !== currentUser) {
+              if (activeConv?.id !== conv.id) {
+                playMessageSound();
+              }
+            }
+            prevConvs[conv.id] = conv;
+          });
+        } else {
+          convs.forEach(conv => { prevConvs[conv.id] = conv; });
+          isFirst = false;
+        }
+        
+        // Calculate unread counts for each conversation
+        const convsWithUnread = convs.map(conv => {
+          const unreadCount = (conv.lastMessage || {}).sender !== currentUser && 
+            !(conv.lastMessage?.readBy || []).includes(currentUser) ? 1 : 0;
+          return { ...conv, unreadCount };
+        });
+        
+        setConversations(convsWithUnread);
+      });
+      return () => unsub();
+    }, [currentUser, role, activeConv?.id]);
 
+  // Mark conversation as read when messages snapshot arrives
+  const markConvRead = useRef(null);
   useEffect(() => {
     if (!activeConv) { setMessages([]); return; }
+    let firstSnapshot = true;
+    markConvRead.current = activeConv.id;
     const q = query(collection(db, 'chat_messages'), where('conversationId', '==', activeConv.id));
     const unsub = onSnapshot(q, snap => {
       const msgs = [];
-      snap.forEach(d => msgs.push({ id: d.id, ...d.data() }));
+      snap.docChanges().forEach(change => {
+        if (change.type === 'added' && !firstSnapshot) {
+          const newMsg = { id: change.doc.id, ...change.doc.data() };
+          if (newMsg.sender !== currentUser) {
+            playMessageSound();
+          }
+        }
+      });
+      firstSnapshot = false;
+      snap.forEach(d => {
+        const msg = { id: d.id, ...d.data() };
+        if (msg.sender !== currentUser && (!msg.readBy || !msg.readBy.includes(currentUser))) {
+          updateDoc(doc(db, 'chat_messages', d.id), {
+            readBy: [...(msg.readBy || []), currentUser]
+          });
+        }
+        msgs.push(msg);
+      });
       msgs.sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));
       setMessages(msgs);
-      setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, 100);
+      // Mark conversation lastMessage as read
+      const convId = markConvRead.current;
+      if (convId) {
+        updateDoc(doc(db, 'chatData/conversations'), {
+          [`conversations.${convId}.lastMessage.readBy`]: arrayUnion(currentUser)
+        }).catch(() => {});
+      }
     });
     return () => unsub();
-  }, [activeConv?.id]);
+  }, [activeConv?.id, currentUser]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+    }
+  }, [messages]);
 
   const send = async (e) => {
     e.preventDefault();
     if (!text.trim() || !activeConv) return;
     const msg = text.trim();
     setText('');
-    await addDoc(collection(db, 'chat_messages'), {
-      conversationId: activeConv.id,
-      text: msg,
-      sender: currentUser,
-      senderRole: role,
-      timestamp: serverTimestamp(),
-    });
-    const snap = await getDoc(doc(db, 'chatData/conversations'));
-    const data = snap.exists() ? snap.data() : { conversations: {} };
-    data.conversations = data.conversations || {};
-    const conv = data.conversations[activeConv.id] || {};
-    conv.lastMessage = { text: msg, sender: currentUser, timestamp: serverTimestamp() };
-    data.conversations[activeConv.id] = conv;
-    await setDoc(doc(db, 'chatData/conversations'), data);
+    try {
+      await addDoc(collection(db, 'chat_messages'), {
+        conversationId: activeConv.id,
+        text: msg,
+        sender: currentUser,
+        senderRole: role,
+        timestamp: serverTimestamp(),
+      });
+      const snap = await getDoc(doc(db, 'chatData/conversations'));
+      if (snap.exists()) {
+        const data = snap.data();
+        data.conversations = data.conversations || {};
+        data.conversations[activeConv.id] = data.conversations[activeConv.id] || {};
+        data.conversations[activeConv.id].lastMessage = { text: msg, sender: currentUser, timestamp: serverTimestamp() };
+        await setDoc(doc(db, 'chatData/conversations'), data, { merge: true });
+      } else {
+        await setDoc(doc(db, 'chatData/conversations'), {
+          conversations: {
+            [activeConv.id]: {
+              lastMessage: { text: msg, sender: currentUser, timestamp: serverTimestamp() }
+            }
+          }
+        }, { merge: true });
+      }
+    } catch (err) {
+      console.error('Failed to send message:', err);
+    }
   };
 
   const createConv = async () => {
@@ -95,11 +169,14 @@ const ChatPage = ({ currentUser, role }) => {
       createdAt: serverTimestamp(),
       lastMessage: { text: 'Started', sender: currentUser, timestamp: serverTimestamp() },
     };
-    const snap = await getDoc(doc(db, 'chatData/conversations'));
-    const d = snap.exists() ? snap.data() : { conversations: {} };
-    d.conversations = d.conversations || {};
-    d.conversations[id] = data;
-    await setDoc(doc(db, 'chatData/conversations'), d);
+    try {
+      await setDoc(doc(db, 'chatData/conversations'), {
+        [`conversations.${id}`]: data
+      }, { merge: true });
+    } catch (err) {
+      console.error('Failed to create conversation:', err);
+      return;
+    }
     setShowNew(false);
     setSelected([]);
     setActiveConv({ id, ...data });
@@ -108,10 +185,13 @@ const ChatPage = ({ currentUser, role }) => {
 
   const deleteConv = async (convId) => {
     if (!window.confirm('Delete this conversation?')) return;
-    const snap = await getDoc(doc(db, 'chatData/conversations'));
-    const d = snap.data();
-    delete d.conversations[convId];
-    await setDoc(doc(db, 'chatData/conversations'), d);
+    try {
+      await updateDoc(doc(db, 'chatData/conversations'), {
+        [`conversations.${convId}`]: deleteField()
+      });
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
+    }
     if (activeConv?.id === convId) setActiveConv(null);
   };
 
@@ -150,15 +230,22 @@ const ChatPage = ({ currentUser, role }) => {
             conversations.map(c => (
               <button key={c.id} onClick={() => { setActiveConv(c); if (isMobile) setSidebar(false); }}
                 className={`w-full text-left p-4 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50 ${activeConv?.id === c.id ? 'bg-blue-50' : ''}`}>
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0">
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-bold shrink-0 ${c.unreadCount > 0 ? 'bg-gradient-to-br from-red-100 to-rose-100 text-red-700' : 'bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700'}`}>
                   {label(c).charAt(0).toUpperCase()}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-sm text-slate-900 truncate">{label(c)}</p>
-                  <p className="text-xs text-slate-400 truncate mt-0.5">
+              <div className="min-w-0 flex-1">
+                <p className={`font-semibold text-sm truncate ${c.unreadCount > 0 ? 'text-red-600' : 'text-slate-900'}`}>{label(c)}</p>
+                <div className="flex items-center justify-between w-full">
+                  <p className="text-xs text-slate-400 truncate">
                     {c.lastMessage?.sender === currentUser ? 'You: ' : ''}{c.lastMessage?.text || 'No messages'}
                   </p>
+                  {c.unreadCount > 0 && (
+                    <span className="ml-2 px-2 py-0.5 bg-red-500 text-xs text-white rounded-full font-bold shadow-sm">
+                      {c.unreadCount}
+                    </span>
+                  )}
                 </div>
+              </div>
                 {c.lastMessage?.timestamp && (
                   <span className="text-[9px] text-slate-400 shrink-0">{timeStr(c.lastMessage.timestamp)}</span>
                 )}
@@ -172,8 +259,8 @@ const ChatPage = ({ currentUser, role }) => {
       <div className={`flex-1 flex flex-col min-w-0 bg-slate-50 ${isMobile && !activeConv ? 'hidden' : ''}`}>
         {activeConv ? (
           <>
-            <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3">
-              {isMobile && <button onClick={() => setSidebar(true)} className="p-1 text-slate-500"><ArrowLeft size={18} /></button>}
+            <div className="sticky top-0 z-10 px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3">
+              {isMobile && <button onClick={() => { setActiveConv(null); setSidebar(true); }} className="p-1 text-slate-500"><ArrowLeft size={18} /></button>}
               <div className="flex-1">
                 <p className="font-semibold text-sm text-slate-900">{label(activeConv)}</p>
                 <p className="text-[10px] text-slate-400">{activeConv.type === 'group' ? `${activeConv.participants?.length || 0} members` : 'Conversation'}</p>
@@ -206,9 +293,10 @@ const ChatPage = ({ currentUser, role }) => {
                   );
                 })
               )}
+              <div ref={messagesEndRef} />
             </div>
 
-            <div className="px-3 py-2.5 bg-white border-t border-slate-100 shadow-sm pb-20" style={{paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))'}}>
+            <div className="sticky bottom-0 z-10 px-3 py-2.5 bg-white border-t border-slate-100 shadow-sm pb-20" style={{paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))'}}>
               <form onSubmit={send} className="flex items-end gap-1.5">
                 <div className="flex-1 bg-slate-100 rounded-2xl px-4 py-2.5 flex items-center border border-transparent focus-within:bg-white focus-within:border-blue-500 focus-within:shadow-sm transition">
                   <input type="text" placeholder="Message..." value={text} onChange={e => setText(e.target.value)}

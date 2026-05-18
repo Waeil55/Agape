@@ -238,7 +238,32 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                     return (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900">{d.name}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden sm:table-cell">{d.vehicle || '-'}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden sm:table-cell">
+                          <select value={d.vehicle || ''} onChange={(e) => {
+                            const newV = e.target.value;
+                            // Unassign previous driver from this vehicle
+                            if (d.vehicle) {
+                              const prevDriver = drivers.find(x => x.vehicle === d.vehicle && x.id !== d.id);
+                              if (prevDriver) {
+                                setDrivers(prev => prev.map(x => x.id === prevDriver.id ? { ...x, vehicle: '' } : x));
+                              }
+                            }
+                            // If new vehicle is taken, unassign that driver
+                            if (newV) {
+                              const currentOccupant = drivers.find(x => x.vehicle === newV && x.id !== d.id);
+                              if (currentOccupant) {
+                                setDrivers(prev => prev.map(x => x.id === currentOccupant.id ? { ...x, vehicle: '' } : x));
+                              }
+                            }
+                            setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, vehicle: newV } : x));
+                            addAuditLog('Vehicle Assigned', `${currentUser} assigned ${newV || 'no vehicle'} to ${d.name}.`, 'indigo');
+                          }} className="px-2 py-1 border border-slate-300 rounded-lg text-xs font-semibold bg-white w-full max-w-[140px]">
+                            <option value="">— None —</option>
+                            {vehicles.filter(v => !drivers.find(x => x.vehicle === v.name && x.id !== d.id) || v.name === d.vehicle).map(v => (
+                              <option key={v.id} value={v.name}>{v.name} {v.plate ? `(${v.plate})` : ''}</option>
+                            ))}
+                          </select>
+                        </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden md:table-cell">{d.currentZone || '-'}</td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden lg:table-cell">
                           {d.assignedDispatcher ? (dispatchers.find(ds => ds.id === d.assignedDispatcher)?.name || d.assignedDispatcher) : '-'}
@@ -312,7 +337,25 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                         <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden md:table-cell">{v.year || '-'} / {v.color || '-'}</td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden lg:table-cell font-mono">{v.plate || '-'} / {v.vin ? v.vin.slice(-6) : '-'}</td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden lg:table-cell">{v.odometer ? Number(v.odometer).toLocaleString() : '0'} mi</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600">{assignedDriver?.name || <span className="italic text-slate-400">Unassigned</span>}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600">
+                          <select value={assignedDriver?.id || ''} onChange={(e) => {
+                            const driverId = e.target.value;
+                            const oldDriverId = assignedDriver?.id;
+                            if (driverId === oldDriverId) return; // no change
+                            if (oldDriverId) {
+                              setDrivers(prev => prev.map(d => d.id === oldDriverId ? { ...d, vehicle: '' } : d));
+                            }
+                            if (driverId) {
+                              setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, vehicle: v.name } : d));
+                            }
+                            addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'indigo');
+                          }} className="px-2 py-1 border border-slate-300 rounded-lg text-xs font-semibold bg-white w-full max-w-[140px]">
+                            <option value="">— Unassigned —</option>
+                            {drivers.map(d => (
+                              <option key={d.id} value={d.id}>{d.name} {d.vehicle && d.vehicle !== v.name ? `(${d.vehicle})` : ''}</option>
+                            ))}
+                          </select>
+                        </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4">
                           <div className="flex gap-1">
                             <button onClick={() => openVEdit(v)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit"><Edit2 size={14} /></button>
