@@ -405,18 +405,18 @@ body {
 
 /* ===== TYPOGRAPHY HELPERS ===== */
 .text-display {
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-weight: var(--font-black);
   line-height: var(--leading-tight);
   letter-spacing: -0.02em;
 }
 .text-heading {
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: var(--font-bold);
   line-height: var(--leading-snug);
 }
 .text-subheading {
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
   font-weight: var(--font-semibold);
   line-height: var(--leading-snug);
 }
