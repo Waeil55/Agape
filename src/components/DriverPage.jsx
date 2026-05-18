@@ -940,14 +940,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
           )}
 
-          {/* Undo Toast */}
-          {undoableAction && (
-            <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[140] bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 backdrop-blur-sm text-xs font-semibold animate-slide-up">
-              <RotateCcw size={14} className="text-amber-300 shrink-0" />
-              <span>{undoableAction.trip.patient} marked as <strong>{undoableAction.newStatus}</strong></span>
-              <button onClick={handleUndo} className="ml-2 px-3 h-7 bg-white/20 hover:bg-white/30 rounded-xl text-[11px] font-bold text-white active:scale-95 transition-all">Undo</button>
-            </div>
-          )}
         </div>
       )}
 
@@ -1533,6 +1525,15 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ===== UNDO TOAST ===== */}
+      {undoableAction && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[140] bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 backdrop-blur-sm text-xs font-semibold animate-slide-up">
+          <RotateCcw size={14} className="text-amber-300 shrink-0" />
+          <span>{undoableAction.trip.patient} marked as <strong>{undoableAction.newStatus}</strong></span>
+          <button onClick={handleUndo} className="ml-2 px-3 h-7 bg-white/20 hover:bg-white/30 rounded-xl text-[11px] font-bold text-white active:scale-95 transition-all">Undo</button>
         </div>
       )}
 
