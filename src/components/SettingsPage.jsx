@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Palette, Navigation, Type, Moon, Sun, Route, Phone } from 'lucide-react';
-import { updatePassword } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { auth, updatePassword } from '../config/firebase';
 
 const SETTINGS_GROUPS = {
   theme: [
@@ -63,6 +62,7 @@ const SettingsPage = ({
     { id: 'profile', label: 'Profile' },
     { id: 'appearance', label: 'Appearance' },
     { id: 'navigation', label: 'Navigation' },
+    { id: 'notifications', label: 'Notifications' },
     { id: 'security', label: 'Security' },
     ...(role === 'admin' || role === 'dispatcher' ? [{ id: 'deleted', label: 'Deleted' }] : []),
     ...(role === 'admin' ? [{ id: 'system', label: 'System' }] : []),
@@ -141,7 +141,7 @@ const SettingsPage = ({
               </div>
             )}
             <div className="pt-4 sm:pt-6 border-t border-slate-200">
-              <button onClick={onLogout} className="w-full sm:w-auto px-6 py-3 border border-red-300 text-red-600 font-semibold rounded-lg hover:bg-red-50 transition flex items-center justify-center gap-2 text-sm">
+              <button onClick={() => onLogout?.()} className="w-full sm:w-auto px-6 py-3 border border-red-300 text-red-600 font-semibold rounded-lg hover:bg-red-50 transition flex items-center justify-center gap-2 text-sm">
                 <LogOut size={18} /> Sign Out
               </button>
             </div>
@@ -227,6 +227,36 @@ const SettingsPage = ({
         </div>
       )}
 
+      {activeTab === 'notifications' && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-8 space-y-6">
+          <div>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">Notifications</h3>
+            <p className="text-sm text-slate-500">Choose which alerts you receive while on duty.</p>
+          </div>
+          <div className="space-y-4 max-w-lg">
+            {[
+              { key: 'tripUpdates', label: 'Trip Updates', desc: 'New assignments, status changes, and cancellations' },
+              { key: 'dispatcherMessages', label: 'Dispatcher Messages', desc: 'Direct messages and urgent instructions' },
+              { key: 'scheduleChanges', label: 'Schedule Changes', desc: 'Urgent schedule changes and route updates' },
+            ].map((item) => {
+              const checked = appSettings?.notifications?.[item.key] !== false;
+              return (
+                <label key={item.key} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer">
+                  <input type="checkbox" checked={checked} onChange={(e) => {
+                    const n = { ...(appSettings?.notifications || {}), [item.key]: e.target.checked };
+                    onUpdateAppSettings?.({ notifications: n });
+                  }} className="w-4 h-4 mt-0.5 rounded" />
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">{item.label}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'security' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-8">
           <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-6">Security</h3>
@@ -303,7 +333,7 @@ const SettingsPage = ({
             <div className="p-4 sm:p-6 border border-slate-200 rounded-lg">
               <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Database size={20} /> System Logs</h4>
               <p className="text-sm text-slate-600 mb-4">View all system logs and user activities.</p>
-              <button className="w-full sm:w-auto px-6 py-2 bg-blue-100 text-blue-700 font-semibold rounded-lg hover:bg-blue-200 transition text-sm">View System Logs</button>
+              <button onClick={() => alert('View system logs from the Dashboard page.')} className="w-full sm:w-auto px-6 py-2 bg-blue-100 text-blue-700 font-semibold rounded-lg hover:bg-blue-200 transition text-sm">View System Logs</button>
             </div>
 
             <div className="p-4 sm:p-6 border border-rose-200 bg-rose-50 rounded-lg">

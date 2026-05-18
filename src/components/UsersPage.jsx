@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, ShieldCheck, Briefcase, Truck, Save, X, Users, AlertCircle } from 'lucide-react';
-import { collection, getDocs, setDoc, doc, deleteDoc } from 'firebase/firestore';
-import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from 'firebase/auth';
-import { db, firebaseConfig } from '../config/firebase';
+import { db, firebaseConfig, collection, getDocs, setDoc, doc, deleteDoc, deleteApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from '../config/firebase';
 
 const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers, addAuditLog, currentUser, role, requestAuthAction }) => {
   const [users, setUsers] = useState([]);
@@ -207,7 +204,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             </thead>
             <tbody>
               {drivers.length === 0 ? (
-                <tr><td colSpan="3" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">No drivers yet.</td></tr>
+                <tr><td colSpan="4" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">No drivers yet.</td></tr>
               ) : (
                 drivers.map(d => {
                   const dispatcher = dispatchers.find(ds => ds.id === d.assignedTo);
@@ -234,7 +231,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         )}
                       </td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4">
-                        <button onClick={() => setShowAssign(d.id)} className="px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-blue-200">
+                        <button onClick={() => setShowAssign(showAssign === d.id ? null : d.id)} className="px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-blue-200">
                           {showAssign === d.id ? 'Cancel' : 'Assign'}
                         </button>
                       </td>
@@ -271,7 +268,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900">Create User</h3>
                 <button onClick={() => { setShowForm(false); setFormError(''); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
               </div>
-              <div className="space-y-3 sm:space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); createUser(); }} className="space-y-3 sm:space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Email</label>
                   <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -307,10 +304,10 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                     })}
                   </div>
                 </div>
-              </div>
+              </form>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-6">
-                <button onClick={() => { setShowForm(false); setFormError(''); }} className="w-full sm:flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 text-sm">Cancel</button>
-                <button onClick={createUser} className="w-full sm:flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm"><Save size={16} /> Create</button>
+                <button type="button" onClick={() => { setShowForm(false); setFormError(''); }} className="w-full sm:flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 text-sm">Cancel</button>
+                <button type="submit" onClick={createUser} className="w-full sm:flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm"><Save size={16} /> Create</button>
               </div>
             </div>
           </div>

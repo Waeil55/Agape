@@ -54,7 +54,7 @@ const ScheduleBar = ({ schedule, currentMinutes }) => {
   );
 };
 
-const DispatchAssistant = ({ drivers, trips, onAssignTrip, addAuditLog, currentUser }) => {
+const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog = () => {}, currentUser = '' }) => {
   const getTodayStr = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

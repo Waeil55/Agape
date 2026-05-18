@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, getDocs, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db, collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, getDocs, doc, setDoc, getDoc, updateDoc } from '../config/firebase';
 import { MessageCircle, Send, Plus, ArrowLeft, X, Truck, ShieldCheck, Users, Phone, Trash2, Search } from 'lucide-react';
 
 const ChatPage = ({ currentUser, role }) => {
@@ -36,16 +35,20 @@ const ChatPage = ({ currentUser, role }) => {
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'chatData/conversations'), snap => {
-      if (!snap.exists()) return;
+      if (!snap.exists()) {
+        setDoc(doc(db, 'chatData/conversations'), { conversations: {} }, { merge: true }).catch(() => {});
+        setConversations([]);
+        return;
+      }
       const data = snap.data();
       const convs = Object.entries(data.conversations || {})
         .map(([id, c]) => ({ id, ...c }))
-        .filter(c => c.participants?.includes(currentUser))
+        .filter(c => role === 'admin' || c.participants?.includes(currentUser))
         .sort((a, b) => (b.lastMessage?.timestamp?.toMillis?.() || 0) - (a.lastMessage?.timestamp?.toMillis?.() || 0));
       setConversations(convs);
     });
     return () => unsub();
-  }, [currentUser]);
+  }, [currentUser, role]);
 
   useEffect(() => {
     if (!activeConv) { setMessages([]); return; }
@@ -205,7 +208,7 @@ const ChatPage = ({ currentUser, role }) => {
               )}
             </div>
 
-            <div className="px-3 py-2.5 bg-white border-t border-slate-100 shadow-sm">
+            <div className="px-3 py-2.5 bg-white border-t border-slate-100 shadow-sm pb-20" style={{paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))'}}>
               <form onSubmit={send} className="flex items-end gap-1.5">
                 <div className="flex-1 bg-slate-100 rounded-2xl px-4 py-2.5 flex items-center border border-transparent focus-within:bg-white focus-within:border-blue-500 focus-within:shadow-sm transition">
                   <input type="text" placeholder="Message..." value={text} onChange={e => setText(e.target.value)}

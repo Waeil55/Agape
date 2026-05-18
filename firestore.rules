@@ -1,6 +1,18 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper: check if user is admin via users/{uid} doc
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    // Helper: check if user is participant in a given conversation
+    function isParticipant(conversationId) {
+      let convData = get(/databases/$(database)/documents/chatData/conversations).data;
+      return convData.conversations != null
+          && convData.conversations[conversationId] != null
+          && convData.conversations[conversationId].participants.hasAny([request.auth.token.email]);
+    }
+
     match /users/{userId} {
       allow read, write: if request.auth != null;
     }
@@ -13,14 +25,23 @@ service cloud.firestore {
     match /trips/{tripId} {
       allow read, write: if request.auth != null;
     }
+    // Driver location documents for real-time GPS tracking
+    match /drivers/{driverId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == driverId;
+    }
     match /global_chat/{msgId} {
       allow read, write: if request.auth != null;
     }
+    // Single-doc map — client-side filtering enforces participant privacy
     match /chatData/{document} {
       allow read, write: if request.auth != null;
     }
+    // Messages: participants-only read, sender-only create, admin-only update/delete
     match /chat_messages/{msgId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null && (isAdmin() || (resource.data.conversationId != null && isParticipant(resource.data.conversationId)));
+      allow create: if request.auth != null && request.resource.data.sender == request.auth.token.email;
+      allow update, delete: if request.auth != null && isAdmin();
     }
     match /presence/{email} {
       allow read, write: if request.auth != null;

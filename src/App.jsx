@@ -7,9 +7,7 @@ import {
   Activity, Wand2, Wrench, Lock, Briefcase,
   ArchiveRestore, RefreshCcw, FileText, BarChart2, Archive, X, Plus, ChevronLeft
 } from 'lucide-react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp } from './config/firebase';
 import TripsPage from './components/TripsPage';
 import ChatPage from './components/ChatPage';
 import ArchivesPage from './components/ArchivesPage';
@@ -319,6 +317,7 @@ const App = () => {
   const [authPassword, setAuthPassword] = useState('');
   const [reAuthError, setReAuthError] = useState('');
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
+  const [showDispatcherArchive, setShowDispatcherArchive] = useState(false);
   const [appSettings, setAppSettings] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('agape_app_settings') || '{}');
@@ -697,6 +696,17 @@ const App = () => {
 
   const toggleTaskSelection = (id) => {
     setSelectedTasks(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
+  };
+
+  const createSharedRide = () => {
+    const selectedTrips = trips.filter(t => selectedTasks.includes(t.id));
+    if (selectedTrips.length < 2) return;
+    const sharedGroupId = `SR-${Date.now().toString().slice(-6)}`;
+    setTrips(prev => prev.map(t => selectedTasks.includes(t.id) ? { ...t, sharedRideGroup: sharedGroupId, status: t.status === 'Unassigned' ? 'Unassigned' : t.status } : t));
+    addAuditLog('Shared Ride Created', `${currentUser} grouped ${selectedTrips.length} trips as shared ride ${sharedGroupId}.`, 'blue');
+    setSelectedTasks([]);
+    setBulkAssignModal(false);
+    setTimeout(persistState, 0);
   };
 
   const createLegMission = (driverId) => {
@@ -1441,8 +1451,8 @@ const today = getTodayStr();
                   <input type="text" placeholder="Search Agape Care manifests..." className="w-full pl-12 pr-4 py-3 bg-slate-100/50 border border-slate-200/50 rounded-[1rem] focus:bg-white focus:border-blue-500 font-semibold text-sm transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 </div>
                 <div className="bg-slate-100/50 p-1 rounded-[1.2rem] flex shrink-0">
-                  <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-2 rounded-[0.8rem] text-[11px] font-bold transition-all ${activeTab === 'dashboard' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>Live</button>
-                  <button onClick={() => setActiveTab('archive')} className={`px-4 py-2 rounded-[0.8rem] text-[11px] font-bold transition-all flex items-center gap-1 ${activeTab === 'archive' ? 'bg-white shadow-sm text-rose-600' : 'text-slate-500'}`}>
+                  <button onClick={() => setShowDispatcherArchive(false)} className={`px-4 py-2 rounded-[0.8rem] text-[11px] font-bold transition-all ${!showDispatcherArchive ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>Live</button>
+                  <button onClick={() => setShowDispatcherArchive(true)} className={`px-4 py-2 rounded-[0.8rem] text-[11px] font-bold transition-all flex items-center gap-1 ${showDispatcherArchive ? 'bg-white shadow-sm text-rose-600' : 'text-slate-500'}`}>
                     <ArchiveRestore size={12} /> ({trashedTrips.length})
                   </button>
                 </div>
@@ -1457,7 +1467,7 @@ const today = getTodayStr();
               </div>
             </div>
 
-            {activeTab === 'archive' ? (
+            {showDispatcherArchive ? (
               <div className="bg-rose-50/50 rounded-[1.5rem] border border-rose-100/50 shadow-sm overflow-hidden w-full">
                 <div className="p-4 border-b border-rose-100/50 flex justify-between items-center bg-rose-100/30">
                   <h3 className="text-sm font-black flex items-center gap-2 text-rose-900">

@@ -6,6 +6,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ 
+    name: '', email: '', phone: '', vehicle: '', status: 'Available',
     currentZone: '', vin: '', insuranceExpiry: '', capacity: '1',
     licenseNumber: '', cdlStatus: 'Active', assignedDispatcher: ''
   });
@@ -57,7 +58,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
       })
     : drivers;
 
-  const resetForm = () => setForm({ name: '', email: '', phone: '', vehicle: '', status: 'Available', currentZone: '', assignedDispatcher: '' });
+  const resetForm = () => setForm({ name: '', email: '', phone: '', vehicle: '', status: 'Available', currentZone: '', assignedDispatcher: '', vin: '', insuranceExpiry: '', capacity: '1', licenseNumber: '', cdlStatus: 'Active' });
 
   const openAdd = () => { setEditing(null); resetForm(); setShowForm(true); };
 
@@ -88,6 +89,9 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
         currentZone: form.currentZone, odometer: 0, nextOilChange: 5000,
         assignedTo: '', schedule: [],
         email: form.email, phone: form.phone,
+        vin: form.vin || '', insuranceExpiry: form.insuranceExpiry || '',
+        capacity: form.capacity || '1', licenseNumber: form.licenseNumber || '',
+        cdlStatus: form.cdlStatus || 'Active', assignedDispatcher: form.assignedDispatcher || '',
       }]);
       addAuditLog('Driver Added', `${currentUser} added driver ${form.name}.`, 'emerald');
     }
@@ -227,7 +231,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
               </thead>
               <tbody>
                 {filteredDrivers.length === 0 ? (
-                  <tr><td colSpan="6" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">{role === 'dispatcher' ? 'No drivers assigned to you yet.' : 'No drivers yet. Click "Add Driver" to create one.'}</td></tr>
+                  <tr><td colSpan="8" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">{role === 'dispatcher' ? 'No drivers assigned to you yet.' : 'No drivers yet. Click "Add Driver" to create one.'}</td></tr>
                 ) : (
                   filteredDrivers.map((d) => {
                     const assignedCount = trips.filter(t => t.driverId === d.id).length;

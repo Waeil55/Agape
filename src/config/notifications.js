@@ -1,5 +1,4 @@
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import app from './firebase';
+import app, { getMessaging, getToken, onMessage } from './firebase';
 
 const VAPID_KEY = 'BMA5e1UV1qoZ1TDxp4FQ5Q4qCAKVdsGD8yFGvqYpZ9DgF-1FMPQeHNdH7FsqTGEcHl-zUDRWZ0j3EL0tQ8PvBzM';
 const TOKEN_KEY = 'agape_fcm_token';

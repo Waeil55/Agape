@@ -7,10 +7,16 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
   const [gpsActive, setGpsActive] = useState(false);
   const [watchId, setWatchId] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
+  const [mapError, setMapError] = useState(false);
   const me = drivers.length > 0 ? drivers[0] : null;
   const mapContainerRef = useRef(null);
+  const meRef = useRef(me);
+  const onUpdateRef = useRef(onUpdateDriverLocation);
+  meRef.current = me;
+  onUpdateRef.current = onUpdateDriverLocation;
 
   useEffect(() => {
+    setMapError(false);
     drivers.forEach(d => {
       if (d.latitude && d.longitude) {
         setDriverPositions(prev => ({ ...prev, [d.id]: { lat: d.latitude, lng: d.longitude, name: d.name } }));
@@ -42,9 +48,9 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
         
         setDriverPositions(prev => ({
           ...prev,
-          [me?.id]: { lat: latitude, lng: longitude, name: me?.name || 'Me' },
+          [meRef.current?.id]: { lat: latitude, lng: longitude, name: meRef.current?.name || 'Me' },
         }));
-        if (onUpdateDriverLocation) onUpdateDriverLocation(me?.id, latitude, longitude);
+        if (onUpdateRef.current) onUpdateRef.current(meRef.current?.id, latitude, longitude);
         setGpsActive(true);
       },
       (err) => {
@@ -140,10 +146,10 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
 
         <div className="lg:col-span-8">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative" ref={mapContainerRef}>
-            {staticMapUrl ? (
+            {staticMapUrl && !mapError ? (
                 <div className="relative">
                   <img src={staticMapUrl} alt="Live Fleet Map" className="w-full h-auto min-h-[500px] object-cover"
-                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                    onError={() => setMapError(true)} />
                   
                   {/* Telemetry Overlay */}
                   <div className="absolute top-4 right-4 space-y-2 pointer-events-none">

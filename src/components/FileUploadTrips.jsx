@@ -3,6 +3,20 @@ import * as XLSX from 'xlsx';
 import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, ArrowRight, Download, Truck, X } from 'lucide-react';
 import { GEMINI_API_CONFIG } from '../config/firebase';
 
+const timeToMinutes = (t) => {
+  if (!t) return 1440;
+  const cleanTime = String(t).toUpperCase().trim();
+  if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
+  const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+  if (!m) return 1440;
+  let h = parseInt(m[1], 10);
+  let min = parseInt(m[2] || '0', 10);
+  const p = m[3];
+  if (p === 'PM' && h < 12) h += 12;
+  if (p === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
+};
+
 const COLUMN_ALIASES = {
   bookingId: ['booking id', 'bookingid', 'reservation id', 'trip id', 'booking number', 'confirmation id'],
   patient: ['client', 'client name', 'passenger', 'passenger name', 'rider', 'customer', 'patient name', 'name', 'rider name', 'guest', 'user', 'person'],

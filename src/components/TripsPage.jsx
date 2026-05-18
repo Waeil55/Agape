@@ -283,7 +283,10 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-8 overflow-y-auto">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowCreateForm(false)} />
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in zoom-in-95 duration-200 my-auto">
-            <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> Create New Manifest Entry</h3>
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> Create New Manifest Entry</h3>
+              <button onClick={() => setShowCreateForm(false)} className="p-2 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
+            </div>
             <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' }); }} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
@@ -341,7 +344,10 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowEditForm(false)} />
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3"><Edit2 size={28} className="text-blue-500" /> Modify Trip Details</h3>
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3"><Edit2 size={28} className="text-blue-500" /> Modify Trip Details</h3>
+              <button onClick={() => setShowEditForm(false)} className="p-2 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
+            </div>
             <form onSubmit={handleUpdate} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
@@ -376,7 +382,10 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowAssign(false)} />
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20">
-            <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2"><Users size={24} className="text-blue-600" /> {assignMode === 'mission' ? 'Create Driver Mission' : 'Assign to Driver'}</h3>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><Users size={24} className="text-blue-600" /> {assignMode === 'mission' ? 'Create Driver Mission' : 'Assign to Driver'}</h3>
+              <button onClick={() => setShowAssign(false)} className="p-2 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
+            </div>
             <p className="text-xs font-bold text-slate-500 mb-6 uppercase tracking-widest">
               {assignMode === 'mission'
                 ? `Create a multi-stop mission for ${selectedTasks.length || 1} trips`

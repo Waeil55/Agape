@@ -253,3 +253,49 @@ export function timeToMinutes(timeStr) {
   if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
   return h * 60 + min;
 }
+
+export const useGeminiOptimization = () => {
+  const optimizeRoute = async (trips, currentLocation) => {
+    if (!trips || trips.length === 0) return null;
+
+    const prompt = `You are an intelligent route optimization AI for a transportation company.
+    
+Current Driver Location: Latitude ${currentLocation.lat}, Longitude ${currentLocation.lng}
+
+Trips to Optimize:
+${trips.map((trip, idx) => `
+Trip ${idx + 1}:
+- Client: ${trip.clientName}
+- Booking ID: ${trip.id}
+- Pickup: (${trip.pickupLat}, ${trip.pickupLng})
+- Dropoff: (${trip.dropoffLat}, ${trip.dropoffLng})
+- Urgency: ${trip.urgency}
+- Time Window: ${trip.timeWindow || 'Flexible'}
+`).join('\n')}
+
+Please analyze these trips and provide:
+1. The optimal order to complete these trips
+2. Key suggestions for the driver
+3. Estimated time savings
+
+Respond in JSON:
+{
+  "optimizedSequence": ["trip_id1", "trip_id2", ...],
+  "suggestions": ["suggestion1", "suggestion2", ...],
+  "estimatedTimeSavings": "X minutes"
+}`;
+
+    try {
+      const text = await callGemini(prompt);
+      if (text) {
+        return JSON.parse(text);
+      }
+      return null;
+    } catch (error) {
+      console.error('AI optimization error:', error);
+      return null;
+    }
+  };
+
+  return { optimizeRoute };
+};
