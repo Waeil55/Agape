@@ -1729,7 +1729,7 @@ const today = getTodayStr();
           <div className="lg:col-span-4 space-y-4 sm:space-y-6">
             <div className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] p-4 sm:p-6 border border-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
-                <h3 className="text-xs sm:text-sm font-black text-slate-900">Live Fleet</h3>
+                <h3 className="text-[11px] sm:text-xs font-black text-slate-900">Live Fleet</h3>
                 <div className="flex items-center gap-3">
                   {role === 'admin' && <button className="p-1.5 sm:p-2 bg-slate-100 hover:bg-slate-200 rounded-lg sm:rounded-[1rem] text-slate-600 active:scale-95 transition-all" title="Add Driver/Vehicle"><Plus size={14} /></button>}
                   <span className="relative flex h-2 w-2.5">
@@ -1745,9 +1745,9 @@ const today = getTodayStr();
                     <div key={d.id} className={`p-3 sm:p-4 rounded-xl sm:rounded-[1.5rem] active:scale-[0.98] transition-all cursor-pointer ${isMaintenanceDue ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100/50'}`}>
                       <div className="flex items-center justify-between mb-2 sm:mb-3">
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                          <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-lg sm:rounded-[1rem] bg-blue-100 text-blue-600 flex items-center justify-center font-bold shrink-0 text-xs sm:text-sm">{d.name.charAt(0)}</div>
+                          <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-lg sm:rounded-[1rem] bg-blue-100 text-blue-600 flex items-center justify-center font-bold shrink-0 text-[11px] sm:text-xs">{d.name.charAt(0)}</div>
                           <div className="min-w-0">
-                            <p className="font-bold text-xs sm:text-sm truncate text-slate-900">{d.name}</p>
+                            <p className="font-bold text-[11px] sm:text-xs truncate text-slate-900">{d.name}</p>
                             <p className="text-xs sm:text-xs font-medium text-slate-500 flex items-center gap-1 truncate"><MapPin size={8} className="text-blue-500 shrink-0" /> {d.currentZone}</p>
                           </div>
                         </div>
@@ -1773,7 +1773,7 @@ const today = getTodayStr();
             </div>
 
             <div className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] p-4 sm:p-6 border border-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
-              <h3 className="text-xs sm:text-sm font-black text-slate-900 mb-3 sm:mb-4 flex items-center gap-2"><Activity size={16} className="text-indigo-600" /> System Pulse</h3>
+              <h3 className="text-[11px] sm:text-xs font-black text-slate-900 mb-3 sm:mb-4 flex items-center gap-2"><Activity size={16} className="text-indigo-600" /> System Pulse</h3>
               <div className="space-y-1 sm:space-y-2 max-h-48 sm:max-h-60 overflow-y-auto">
                 {logs.slice(0, 5).map((log, idx) => (
                   <div key={idx} className="flex items-start gap-2 p-1.5 sm:p-2 rounded-lg hover:bg-slate-50">
@@ -1805,7 +1805,7 @@ const today = getTodayStr();
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <img src="/agape.png" alt="Agape Care" className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl shrink-0 shadow-sm" />
             <div className="min-w-0">
-              <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 truncate leading-tight tracking-tight">Agape Care</h1>
+              <h1 className="text-sm sm:text-base font-extrabold text-slate-900 truncate leading-tight tracking-tight">Agape Care</h1>
               <p className="hidden sm:block text-sm text-slate-500 font-medium">Fleet Management System</p>
             </div>
           </div>
@@ -1893,7 +1893,7 @@ const today = getTodayStr();
                       setActiveTab(tab.id);
                       if (role === 'dispatcher') setSearchQuery('');
                     }}
-                    className={`py-3 sm:py-4 px-3 sm:px-4 border-b-2 font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition text-xs sm:text-sm ${
+                    className={`py-2 sm:py-3 px-2.5 sm:px-3 border-b-2 font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition text-[11px] sm:text-xs ${
                       activeTab === tab.id
                         ? 'border-blue-600 text-blue-600'
                         : 'border-transparent text-slate-500 hover:text-blue-600'
@@ -1967,7 +1967,7 @@ const today = getTodayStr();
                     >
                       <Upload size={24} className="mb-2 sm:mb-3" />
                       <h3 className="text-base sm:text-lg font-bold mb-1">Upload Trips</h3>
-                      <p className="text-xs sm:text-sm opacity-90">Import from CSV/Excel</p>
+                      <p className="text-[11px] sm:text-xs opacity-90">Import from CSV/Excel</p>
                     </button>
                     <button
                       onClick={() => setActiveTab('trips')}
@@ -1975,7 +1975,7 @@ const today = getTodayStr();
                     >
                       <Zap size={24} className="mb-2 sm:mb-3" />
                       <h3 className="text-base sm:text-lg font-bold mb-1">Create Trip</h3>
-                      <p className="text-xs sm:text-sm opacity-90">Manually create a new trip</p>
+                      <p className="text-[11px] sm:text-xs opacity-90">Manually create a new trip</p>
                     </button>
                   </div>
                 )}
