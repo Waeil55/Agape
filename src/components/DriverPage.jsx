@@ -44,12 +44,13 @@ const to12hr = (time) => {
 
 const openInNavApp = (address, app) => {
   const encoded = encodeURIComponent(address);
+  const origin = driverPosition ? `${driverPosition.lat},${driverPosition.lng}` : '';
   const urls = {
-    google: `https://www.google.com/maps/dir/?api=1&destination=${encoded}`,
+    google: `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`,
     waze: `https://www.waze.com/ul?q=${encoded}&navigate=yes`,
     apple: `https://maps.apple.com/?daddr=${encoded}`,
   };
-  window.open(urls[app] || urls.google, '_blank');
+  window.location.href = urls[app] || urls.google;
 };
 
 const timeToMinutes = (t) => {
@@ -105,6 +106,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const [conflicts, setConflicts] = useState([]);
   const [touchStart, setTouchStart] = useState(null);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [undoableAction, setUndoableAction] = useState(null);
+  const undoTimeoutRef = useRef(null);
   const gpsWatchId = useRef(null);
   const meRef = useRef(me);
   const lastUpdateRef = useRef(0);
@@ -113,6 +116,25 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const positionRef = useRef(null);
   meRef.current = me;
   positionRef.current = driverPosition;
+
+  const setUndoable = (trip, previousStatus, newStatus) => {
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    setUndoableAction({ trip, previousStatus, newStatus });
+    undoTimeoutRef.current = setTimeout(() => setUndoableAction(null), 10000);
+  };
+
+  const handleUndo = () => {
+    if (!undoableAction) return;
+    onUpdateTrip(undoableAction.trip.id, undoableAction.previousStatus, {});
+    setUndoableAction(null);
+    if (undoTimeoutRef.current) { clearTimeout(undoTimeoutRef.current); undoTimeoutRef.current = null; }
+  };
+
+  const revertTripStatus = (trip) => {
+    const prevStatus = trip.status === 'Arrived' ? 'In Transit' : trip.status === 'In Transit' ? 'Assigned' : null;
+    if (!prevStatus) return;
+    onUpdateTrip(trip.id, prevStatus, {});
+  };
 
   // Online/offline detection
   useEffect(() => {
@@ -170,6 +192,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     if (navigator.geolocation) startGpsTracking();
     return () => { if (gpsWatchId.current) navigator.geolocation.clearWatch(gpsWatchId.current); };
   }, [me?.id]);
+
+  // Clean up undo timeout on unmount
+  useEffect(() => {
+    return () => { if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current); };
+  }, []);
 
   // Analytics calculation
   useEffect(() => {
@@ -446,7 +473,9 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const confirmArrival = () => {
     if (!showArrivalConfirm) return;
     const odo = parseInt(arrivalOdometer, 10) || lastOdometer;
-    onUpdateTrip(showArrivalConfirm.id, showArrivalConfirm.status === 'In Transit' ? 'Arrived' : 'Completed', {
+    const arrivalNewStatus = showArrivalConfirm.status === 'In Transit' ? 'Arrived' : 'Completed';
+    setUndoable(showArrivalConfirm, showArrivalConfirm.status, arrivalNewStatus);
+    onUpdateTrip(showArrivalConfirm.id, arrivalNewStatus, {
       arrivalTime: new Date().toISOString(),
       arrivalOdometer: odo,
     });
@@ -457,12 +486,14 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   const handleNoShow = (trip) => {
     if (window.confirm(`Mark ${trip.patient} as No Show?`)) {
+      setUndoable(trip, trip.status, 'No Show');
       onUpdateTrip(trip.id, 'No Show', { completedAt: new Date().toISOString() });
     }
   };
 
   const handleCancel = (trip) => {
     if (window.confirm(`Cancel trip for ${trip.patient}?`)) {
+      setUndoable(trip, trip.status, 'Cancelled');
       onUpdateTrip(trip.id, 'Cancelled', { completedAt: new Date().toISOString() });
     }
   };
@@ -476,6 +507,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     if (!showCompleteModal || !completeOdometer) return;
     const odo = parseInt(completeOdometer, 10);
     if (isNaN(odo) || odo <= 0) return;
+    setUndoable(showCompleteModal, showCompleteModal.status, 'Completed');
     onUpdateTrip(showCompleteModal.id, 'Completed', {
       dropoffOdometer: odo,
       completedAt: new Date().toISOString(),
@@ -870,6 +902,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                           <Check size={13} /> Complete Trip
                         </button>
                       ) : null}
+                      {(trip.status === 'In Transit' || trip.status === 'Arrived') && (
+                        <button onClick={() => revertTripStatus(trip)} className="h-11 w-11 bg-slate-100 text-slate-500 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title={`Back to ${trip.status === 'Arrived' ? 'In Transit' : 'Assigned'}`}>
+                          <RotateCcw size={14} />
+                        </button>
+                      )}
                       <button onClick={() => setShowTripDetails(trip)} className="h-11 w-11 bg-slate-100 text-slate-600 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Full details"><FileText size={15} /></button>
                       {trip.status !== 'Completed' && (
                         <>
@@ -881,6 +918,15 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Undo Toast */}
+          {undoableAction && (
+            <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[140] bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 backdrop-blur-sm text-xs font-semibold animate-slide-up">
+              <RotateCcw size={14} className="text-amber-300 shrink-0" />
+              <span>{undoableAction.trip.patient} marked as <strong>{undoableAction.newStatus}</strong></span>
+              <button onClick={handleUndo} className="ml-2 px-3 h-7 bg-white/20 hover:bg-white/30 rounded-xl text-[11px] font-bold text-white active:scale-95 transition-all">Undo</button>
             </div>
           )}
         </div>
