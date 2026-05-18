@@ -101,7 +101,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">User Management</h2>
+        <h2 className="text-lg sm:text-lg font-bold text-slate-900">User Management</h2>
         <button onClick={() => setShowForm(true)} className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm">
           <Plus size={18} /> Add User
         </button>
@@ -130,7 +130,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm font-semibold text-slate-600">{c.label}s</p>
-                  <p className="text-xl sm:text-2xl font-bold text-slate-900">{users.filter(u => u.role === c.key).length}</p>
+                  <p className="text-lg sm:text-lg font-bold text-slate-900">{users.filter(u => u.role === c.key).length}</p>
                 </div>
               </div>
             </div>
@@ -141,7 +141,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* All Users Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-200">
-          <h3 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> All Users ({users.length})</h3>
+          <h3 className="text-lg sm:text-lg font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> All Users ({users.length})</h3>
         </div>
         {loading ? (
           <div className="p-8 sm:p-12 text-center text-slate-500 text-sm">Loading users...</div>
@@ -189,7 +189,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* Dispatcher Assignments */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-200">
-          <h3 className="text-lg sm:text-xl font-bold text-slate-900">Driver Assignments</h3>
+          <h3 className="text-lg sm:text-lg font-bold text-slate-900">Driver Assignments</h3>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">Assign drivers to dispatchers</p>
         </div>
         <div className="overflow-x-auto">
@@ -265,7 +265,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
-                <h3 className="text-lg sm:text-xl font-bold text-slate-900">Create User</h3>
+                <h3 className="text-lg sm:text-lg font-bold text-slate-900">Create User</h3>
                 <button onClick={() => { setShowForm(false); setFormError(''); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
               </div>
               <form onSubmit={(e) => { e.preventDefault(); createUser(); }} className="space-y-3 sm:space-y-4">

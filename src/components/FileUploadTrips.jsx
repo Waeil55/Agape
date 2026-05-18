@@ -469,7 +469,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
       {step === 'upload' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-8">
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">Upload Trips</h2>
+            <h2 className="text-lg sm:text-lg font-bold text-slate-900 mb-2">Upload Trips</h2>
             <p className="text-sm sm:text-base text-slate-600 mb-2">Import from CSV (.csv) or Excel (.xlsx / .xls).</p>
             <p className="text-xs sm:text-xs text-slate-500 mb-6 flex items-center gap-1"><BrainCircuit size={12} className="text-indigo-500 shrink-0" /> AI auto-validates addresses, times, and fields for accuracy.</p>
 
@@ -532,7 +532,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
               <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
               <FileText className="absolute inset-0 m-auto text-blue-600 animate-pulse" size={24} />
             </div>
-            <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">Processing File</h3>
+            <h3 className="text-lg sm:text-lg font-bold text-slate-900 mb-2">Processing File</h3>
             <p className="text-slate-500 text-xs sm:text-sm mb-4">{progressMsg}</p>
             <div className="w-full bg-slate-100 rounded-full h-2 mb-4">
               <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }}></div>
@@ -554,7 +554,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                 {withIssues === 0 ? <CheckCircle2 size={22} className="text-emerald-600" /> : <AlertTriangle size={22} className="text-amber-600" />}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-lg sm:text-xl font-bold text-slate-900">Import Review</h3>
+                <h3 className="text-lg sm:text-lg font-bold text-slate-900">Import Review</h3>
                 <p className="text-xs sm:text-sm text-slate-500 truncate">
                   {mappedTrips.length} trip{ mappedTrips.length !== 1 ? 's' : '' } extracted
                   {withIssues > 0 ? ` — ${withIssues} with warnings` : ' — all clean' }

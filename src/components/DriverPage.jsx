@@ -978,7 +978,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                           {/* Row 1: Patient name + status */}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <h3 className="text-xl font-extrabold text-slate-900 leading-tight truncate">{trip.patient}</h3>
+                              <h3 className="text-lg font-extrabold text-slate-900 leading-tight truncate">{trip.patient}</h3>
                               <span className={`badge ${isActive ? 'badge-info' : 'bg-slate-100 text-slate-500'}`}>{trip.status}</span>
                               {urgency === 2 && <span className="badge badge-danger animate-pulse">Overdue</span>}
                               {urgency === 1 && <span className="badge badge-warning">Soon</span>}
@@ -1001,7 +1001,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                           </div>
                           {/* Row 3: Time + ETA */}
                           <div className="flex items-center gap-3 mt-2">
-                            <span className="text-4xl sm:text-5xl font-black text-blue-600 tracking-tight leading-none">{to12hr(trip.time)}</span>
+                            <span className="text-3xl sm:text-3xl font-black text-blue-600 tracking-tight leading-none">{to12hr(trip.time)}</span>
                             {eta !== undefined && (
                               <span className="flex items-center gap-1.5 text-sm text-slate-500 font-semibold">
                                 <Timer size={14} /> ETA: {formatDuration(eta)}
@@ -1165,7 +1165,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/20">
                 <Gauge size={28} className="text-white" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Odometer Reading</h3>
+              <h3 className="text-lg font-bold text-slate-900">Odometer Reading</h3>
               <p className="text-sm text-slate-500 mt-1 font-medium">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
               {lastOdometer > 0 && (
                 <p className="text-sm text-slate-400 mt-2">Last reading: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
@@ -1206,7 +1206,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
                 <MapPin size={28} className="text-white" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Arrived at Location</h3>
+              <h3 className="text-lg font-bold text-slate-900">Arrived at Location</h3>
               <p className="text-sm text-slate-500 mt-1 font-medium">{showArrivalConfirm.patient}</p>
             </div>
 
@@ -1276,7 +1276,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
                 <Check size={28} className="text-white" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Complete Trip</h3>
+              <h3 className="text-lg font-bold text-slate-900">Complete Trip</h3>
               <p className="text-sm text-slate-500 mt-1 font-medium">{showCompleteModal.patient} — {showCompleteModal.bookingId || ''}</p>
             </div>
 
@@ -1339,7 +1339,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 text-white">
               <div className="flex items-baseline gap-2 mb-3">
-                <span className="text-4xl font-black tracking-tight">{to12hr(showTripDetails.time)}</span>
+                <span className="text-3xl font-black tracking-tight">{to12hr(showTripDetails.time)}</span>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${showTripDetails.status === 'Completed' ? 'bg-emerald-400/30 text-emerald-100' : showTripDetails.status === 'In Transit' ? 'bg-blue-400/30' : 'bg-white/20'}`}>{showTripDetails.status}</span>
               </div>
               <div className="h-px bg-white/20 my-3" />
@@ -1464,7 +1464,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           <div className="px-1 pt-2 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">History</h2>
+                <h2 className="text-lg font-bold text-slate-900">History</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Review past trips and activity</p>
               </div>
               {allHistory.length > 0 && (
@@ -1579,11 +1579,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.1),transparent_60%)]" />
             <div className="relative px-5 py-5">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl font-black text-white shadow-inner border border-white/10">
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl font-black text-white shadow-inner border border-white/10">
                   {me?.name?.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-xl font-bold text-white truncate">{me?.name}</h2>
+                  <h2 className="text-base font-bold text-white truncate">{me?.name}</h2>
                   <p className="text-sm text-white/70 truncate">{me?.email}</p>
                   <p className="text-xs text-white/50 mt-0.5">{me?.vehicle || 'No vehicle'} • {me?.currentZone || '—'}</p>
                 </div>
@@ -1678,7 +1678,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.12em]">Odometer</p>
-                <p className="text-2xl font-bold text-slate-900 mt-1">{me?.odometer?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-400">mi</span></p>
+                <p className="text-xl font-bold text-slate-900 mt-1">{me?.odometer?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-400">mi</span></p>
                 <p className="text-xs text-slate-400 mt-1">Next service at {me?.nextOilChange?.toLocaleString() || '5,000'} mi</p>
               </div>
               <Gauge size={32} className="text-slate-200" />
@@ -1726,7 +1726,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       {activeNav === 'settings' && (
         <div className="flex-1 overflow-y-auto pb-28 px-3 pt-3">
           <div className="px-1 pt-2 pb-4">
-            <h2 className="text-xl font-bold text-slate-900">Settings</h2>
+            <h2 className="text-lg font-bold text-slate-900">Settings</h2>
             <p className="text-xs text-slate-400 mt-0.5">Account and app preferences</p>
           </div>
           <div className="space-y-4 px-1">

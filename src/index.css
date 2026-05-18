@@ -405,13 +405,13 @@ body {
 
 /* ===== TYPOGRAPHY HELPERS ===== */
 .text-display {
-  font-size: var(--text-3xl);
+  font-size: var(--text-2xl);
   font-weight: var(--font-black);
   line-height: var(--leading-tight);
   letter-spacing: -0.02em;
 }
 .text-heading {
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-weight: var(--font-bold);
   line-height: var(--leading-snug);
 }

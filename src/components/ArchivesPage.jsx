@@ -11,7 +11,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">Archives</h2>
+        <h2 className="text-lg sm:text-lg font-bold text-slate-900">Archives</h2>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
@@ -30,7 +30,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip }) => {
         <div className="p-4 sm:p-6 border-b border-slate-200 flex items-center gap-3">
           <Archive size={20} className="text-slate-600 shrink-0" />
           <div className="min-w-0">
-            <h3 className="text-lg sm:text-xl font-bold text-slate-900">Deleted Trips</h3>
+            <h3 className="text-lg sm:text-lg font-bold text-slate-900">Deleted Trips</h3>
             <p className="text-xs sm:text-sm text-slate-600">{trashedTrips.length} archived trip{trashedTrips.length !== 1 ? 's' : ''}</p>
           </div>
         </div>

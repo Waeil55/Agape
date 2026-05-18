@@ -87,7 +87,7 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">Live Fleet Tracking</h2>
+        <h2 className="text-lg sm:text-lg font-bold text-slate-900">Live Fleet Tracking</h2>
         <div className="flex gap-2">
           {gpsActive ? (
             <button onClick={stopGpsTracking} className="px-4 py-2 bg-rose-600 text-white rounded-lg font-bold text-sm hover:bg-rose-700 flex items-center gap-2">

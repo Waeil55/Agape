@@ -127,7 +127,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
             <Zap size={20} />
           </div>
           <div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900">Dispatch Assistant</h2>
+            <h2 className="text-xl sm:text-xl font-black text-slate-900">Dispatch Assistant</h2>
             <p className="text-xs text-slate-500 font-semibold flex items-center gap-1">
               <Clock size={10} /> Live: {nowStr} &bull; {drivers.length} drivers &bull; {unassignedTrips.length} unassigned
             </p>

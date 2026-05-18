@@ -253,7 +253,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                   </div>
 
                   <div className="text-right shrink-0">
-                    <p className="text-2xl font-black text-blue-600 leading-none">{trip.time}</p>
+                    <p className="text-xl font-black text-blue-600 leading-none">{trip.time}</p>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{trip.type}</p>
                     <div className="flex flex-col items-end gap-2 mt-2">
                       <select 
@@ -285,7 +285,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowCreateForm(false)} />
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in my-auto">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> New Manifest Entry</h3>
+              <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> New Manifest Entry</h3>
               <button onClick={() => setShowCreateForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
             </div>
             <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' }); }} className="space-y-6">
@@ -346,7 +346,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowEditForm(false)} />
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Edit2 size={28} className="text-blue-500" /> Modify Trip Details</h3>
+              <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-3"><Edit2 size={28} className="text-blue-500" /> Modify Trip Details</h3>
               <button onClick={() => setShowEditForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
             </div>
             <form onSubmit={handleUpdate} className="space-y-6">

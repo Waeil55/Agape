@@ -203,7 +203,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+        <h2 className="text-lg sm:text-lg font-bold text-slate-900">
           {activeTab === 'drivers' ? 'Drivers' : 'Vehicles'}
         </h2>
         {(role === 'admin' || role === 'dispatcher') && (
@@ -381,7 +381,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">Assign Trips to {assignDriver.name}</h3>
+                  <h3 className="text-lg sm:text-lg font-bold text-slate-900">Assign Trips to {assignDriver.name}</h3>
                   <p className="text-xs sm:text-sm text-slate-500">{unassignedTrips.length} unassigned trips available</p>
                 </div>
                 <button onClick={() => { setAssignDriver(null); setSelectedTrips([]); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
@@ -431,7 +431,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">Schedule: {editScheduleDriver.name}</h3>
+                  <h3 className="text-lg sm:text-lg font-bold text-slate-900">Schedule: {editScheduleDriver.name}</h3>
                   <p className="text-xs sm:text-sm text-slate-500">Manage time blocks (6 AM – 8 PM)</p>
                 </div>
                 <button onClick={() => { setEditScheduleDriver(null); setEditingScheduleIdx(null); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
@@ -538,7 +538,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
             <div className="p-8">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-slate-900">{editing ? 'Edit Driver' : 'Add Driver'}</h3>
+                <h3 className="text-lg font-bold text-slate-900">{editing ? 'Edit Driver' : 'Add Driver'}</h3>
                 <button onClick={() => { setShowForm(false); resetForm(); }} className="p-2 hover:bg-slate-100 rounded-lg"><X size={20} /></button>
               </div>
               <div className="space-y-4">
@@ -612,7 +612,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
             <div className="p-8">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-slate-900">{editVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</h3>
+                <h3 className="text-lg font-bold text-slate-900">{editVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</h3>
                 <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="p-2 hover:bg-slate-100 rounded-lg"><X size={20} /></button>
               </div>
               <div className="space-y-4">

@@ -1119,7 +1119,7 @@ const App = () => {
               <div className="absolute inset-0 bg-blue-600 blur-2xl opacity-10 animate-pulse" />
               <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain relative z-10" />
             </div>
-            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 mb-3 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 mb-3 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
             <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 rounded-full border border-blue-100">
               <ShieldCheck size={16} className="text-blue-600" />
               <p className="text-xs font-black text-blue-800 uppercase tracking-[0.2em]">Enterprise Fleet OS</p>
@@ -1148,7 +1148,7 @@ const App = () => {
                         <Icon size={24} strokeWidth={2.5} />
                       </div>
                       <div className="flex-1">
-                        <span className="block text-xl font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
+                        <span className="block text-lg font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
                         <span className="block text-sm font-medium text-slate-500 mt-0.5">{r.sub}</span>
                       </div>
                       <ArrowRight size={20} className="text-slate-300 group-hover:text-blue-600 transition-all transform group-hover:translate-x-1" />
@@ -1729,7 +1729,7 @@ const today = getTodayStr();
           <div className="lg:col-span-4 space-y-4 sm:space-y-6">
             <div className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] p-4 sm:p-6 border border-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
-                <h3 className="text-sm sm:text-base font-black text-slate-900">Live Fleet</h3>
+                <h3 className="text-xs sm:text-sm font-black text-slate-900">Live Fleet</h3>
                 <div className="flex items-center gap-3">
                   {role === 'admin' && <button className="p-1.5 sm:p-2 bg-slate-100 hover:bg-slate-200 rounded-lg sm:rounded-[1rem] text-slate-600 active:scale-95 transition-all" title="Add Driver/Vehicle"><Plus size={14} /></button>}
                   <span className="relative flex h-2 w-2.5">
@@ -1773,7 +1773,7 @@ const today = getTodayStr();
             </div>
 
             <div className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] p-4 sm:p-6 border border-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
-              <h3 className="text-sm sm:text-base font-black text-slate-900 mb-3 sm:mb-4 flex items-center gap-2"><Activity size={16} className="text-indigo-600" /> System Pulse</h3>
+              <h3 className="text-xs sm:text-sm font-black text-slate-900 mb-3 sm:mb-4 flex items-center gap-2"><Activity size={16} className="text-indigo-600" /> System Pulse</h3>
               <div className="space-y-1 sm:space-y-2 max-h-48 sm:max-h-60 overflow-y-auto">
                 {logs.slice(0, 5).map((log, idx) => (
                   <div key={idx} className="flex items-start gap-2 p-1.5 sm:p-2 rounded-lg hover:bg-slate-50">
@@ -1805,7 +1805,7 @@ const today = getTodayStr();
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <img src="/agape.png" alt="Agape Care" className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl shrink-0 shadow-sm" />
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 truncate leading-tight tracking-tight">Agape Care</h1>
+              <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 truncate leading-tight tracking-tight">Agape Care</h1>
               <p className="hidden sm:block text-sm text-slate-500 font-medium">Fleet Management System</p>
             </div>
           </div>
@@ -1893,7 +1893,7 @@ const today = getTodayStr();
                       setActiveTab(tab.id);
                       if (role === 'dispatcher') setSearchQuery('');
                     }}
-                    className={`py-3 sm:py-4 px-3 sm:px-4 border-b-2 font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition text-sm sm:text-base ${
+                    className={`py-3 sm:py-4 px-3 sm:px-4 border-b-2 font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition text-xs sm:text-sm ${
                       activeTab === tab.id
                         ? 'border-blue-600 text-blue-600'
                         : 'border-transparent text-slate-500 hover:text-blue-600'
@@ -1986,7 +1986,7 @@ const today = getTodayStr();
                         <FileText size={48} className="text-blue-600" />
                       </div>
                       <h3 className="text-micro">Active Manifest</h3>
-                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">{trips.length}</p>
+                      <p className="text-3xl font-black text-slate-900 mt-2 tracking-tight">{trips.length}</p>
                       <div className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-500">
                         <Zap size={12} /> +12% from yesterday
                       </div>
@@ -1996,7 +1996,7 @@ const today = getTodayStr();
                         <Truck size={48} className="text-emerald-600" />
                       </div>
                       <h3 className="text-micro">Fleet Ready</h3>
-                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">{drivers.filter(d => d.status === 'Available').length}/{drivers.length}</p>
+                      <p className="text-3xl font-black text-slate-900 mt-2 tracking-tight">{drivers.filter(d => d.status === 'Available').length}/{drivers.length}</p>
                       <div className="mt-2 flex items-center gap-1 text-xs font-bold text-blue-500">
                         <Activity size={12} /> Operational
                       </div>
@@ -2006,7 +2006,7 @@ const today = getTodayStr();
                         <Target size={48} className="text-rose-600" />
                       </div>
                       <h3 className="text-micro">Completion Rate</h3>
-                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">
+                      <p className="text-3xl font-black text-slate-900 mt-2 tracking-tight">
                         {trips.length > 0 ? Math.round((trips.filter(t => t.status === 'Completed').length / trips.length) * 100) : 0}%
                       </p>
                       <div className="mt-2 flex items-center gap-1 text-xs font-bold text-rose-500">
@@ -2018,7 +2018,7 @@ const today = getTodayStr();
                         <ShieldCheck size={48} className="text-indigo-600" />
                       </div>
                       <h3 className="text-micro">Security Status</h3>
-                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">v4.2</p>
+                      <p className="text-3xl font-black text-slate-900 mt-2 tracking-tight">v4.2</p>
                       <div className="mt-2 flex items-center gap-1 text-xs font-bold text-indigo-500">
                         <Lock size={12} /> HIPAA Encrypted
                       </div>
