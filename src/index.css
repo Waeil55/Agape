@@ -12,15 +12,15 @@
   --sab: env(safe-area-inset-bottom, 0px);
 
   /* ===== TYPOGRAPHY SCALE — Larger defaults for operational readability ===== */
-  --text-xs: 0.8125rem;     /* 13px — labels, metadata (was 12px) */
-  --text-sm: 0.9375rem;     /* 15px — secondary body (was 14px) */
-  --text-base: 1.0625rem;   /* 17px — body text (was 16px) */
-  --text-lg: 1.1875rem;     /* 19px — large body (was 18px) */
-  --text-xl: 1.375rem;      /* 22px — subheadings (was 20px) */
-  --text-2xl: 1.625rem;     /* 26px — section headings (was 24px) */
-  --text-3xl: 2rem;         /* 32px — page titles (was 30px) */
-  --text-4xl: 2.5rem;       /* 40px — hero / large stats (was 36px) */
-  --text-5xl: 3.5rem;       /* 56px — trip times (big display) (was 48px) */
+  --text-xs: 0.788rem;     /* 12.6px — labels, metadata */
+  --text-sm: 0.909rem;     /* 14.5px — secondary body */
+  --text-base: 1.031rem;   /* 16.5px — body text */
+  --text-lg: 1.152rem;     /* 18.4px — large body */
+  --text-xl: 1.334rem;      /* 21.3px — subheadings */
+  --text-2xl: 1.576rem;     /* 25.2px — section headings */
+  --text-3xl: 1.94rem;         /* 31px — page titles */
+  --text-4xl: 2.425rem;       /* 38.8px — hero / large stats */
+  --text-5xl: 3.395rem;       /* 54.3px — trip times (big display) */
 
   /* ===== FONT WEIGHTS ===== */
   --font-normal: 400;
@@ -208,54 +208,54 @@
 
 /* ===== FONT SCALE: Small ===== */
 [data-fontscale="sm"] {
-  --text-xs: 0.6875rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.9375rem;
-  --text-lg: 1.0625rem;
-  --text-xl: 1.1875rem;
-  --text-2xl: 1.375rem;
-  --text-3xl: 1.625rem;
-  --text-4xl: 2rem;
-  --text-5xl: 2.5rem;
+  --text-xs: 0.667rem;
+  --text-sm: 0.788rem;
+  --text-base: 0.909rem;
+  --text-lg: 1.031rem;
+  --text-xl: 1.152rem;
+  --text-2xl: 1.334rem;
+  --text-3xl: 1.576rem;
+  --text-4xl: 1.94rem;
+  --text-5xl: 2.425rem;
 }
 
 /* ===== FONT SCALE: Large ===== */
 [data-fontscale="lg"] {
-  --text-xs: 0.875rem;
-  --text-sm: 1rem;
-  --text-base: 1.1875rem;
-  --text-lg: 1.3125rem;
-  --text-xl: 1.5rem;
-  --text-2xl: 1.75rem;
-  --text-3xl: 2.125rem;
-  --text-4xl: 2.75rem;
-  --text-5xl: 3.75rem;
+  --text-xs: 0.849rem;
+  --text-sm: 0.97rem;
+  --text-base: 1.152rem;
+  --text-lg: 1.273rem;
+  --text-xl: 1.455rem;
+  --text-2xl: 1.698rem;
+  --text-3xl: 2.061rem;
+  --text-4xl: 2.668rem;
+  --text-5xl: 3.638rem;
 }
 
 /* ===== FONT SCALE: Extra Large ===== */
 [data-fontscale="xl"] {
-  --text-xs: 0.9375rem;
-  --text-sm: 1.0625rem;
-  --text-base: 1.3125rem;
-  --text-lg: 1.4375rem;
-  --text-xl: 1.625rem;
-  --text-2xl: 1.875rem;
-  --text-3xl: 2.375rem;
-  --text-4xl: 3rem;
-  --text-5xl: 4rem;
+  --text-xs: 0.909rem;
+  --text-sm: 1.031rem;
+  --text-base: 1.273rem;
+  --text-lg: 1.394rem;
+  --text-xl: 1.576rem;
+  --text-2xl: 1.819rem;
+  --text-3xl: 2.304rem;
+  --text-4xl: 2.91rem;
+  --text-5xl: 3.88rem;
 }
 
 /* ===== FONT SCALE: Driver Mode (maximum readability) ===== */
 [data-fontscale="driver"] {
-  --text-xs: 1.0625rem;
-  --text-sm: 1.1875rem;
-  --text-base: 1.4375rem;
-  --text-lg: 1.625rem;
-  --text-xl: 1.75rem;
-  --text-2xl: 2rem;
-  --text-3xl: 2.5rem;
-  --text-4xl: 3.125rem;
-  --text-5xl: 4rem;
+  --text-xs: 1.031rem;
+  --text-sm: 1.152rem;
+  --text-base: 1.394rem;
+  --text-lg: 1.576rem;
+  --text-xl: 1.698rem;
+  --text-2xl: 1.94rem;
+  --text-3xl: 2.425rem;
+  --text-4xl: 3.031rem;
+  --text-5xl: 3.88rem;
   --touch-min: 56px;
 }
 
