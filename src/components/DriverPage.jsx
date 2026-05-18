@@ -42,17 +42,6 @@ const to12hr = (time) => {
   return `${h}:${min} ${ampm}`;
 };
 
-const openInNavApp = (address, app) => {
-  const encoded = encodeURIComponent(address);
-  const origin = driverPosition ? `${driverPosition.lat},${driverPosition.lng}` : '';
-  const urls = {
-    google: `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`,
-    waze: `https://www.waze.com/ul?q=${encoded}&navigate=yes`,
-    apple: `https://maps.apple.com/?daddr=${encoded}`,
-  };
-  window.location.href = urls[app] || urls.google;
-};
-
 const timeToMinutes = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return 1440;
   const m = String(t).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
@@ -444,21 +433,29 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     return navApp;
   };
 
+  const openInNavApp = (address, app) => {
+    const encoded = encodeURIComponent(address);
+    const origin = driverPosition ? `${driverPosition.lat},${driverPosition.lng}` : '';
+    const urls = {
+      google: `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`,
+      waze: `https://www.waze.com/ul?q=${encoded}&navigate=yes`,
+      apple: `https://maps.apple.com/?daddr=${encoded}`,
+    };
+    const a = document.createElement('a');
+    a.href = urls[app] || urls.google;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.click();
+  };
+
   const handleStartTrip = (trip) => {
-    const todayCompleted = completedTrips.length;
-    if (todayCompleted === 0 && !lastOdometer) {
-      setShowOdometerPrompt(trip);
-      setOdometerValue('');
-    } else {
-      const prefillLast3 = lastOdometer ? String(lastOdometer).slice(0, -3) : '';
-      setShowOdometerPrompt(trip);
-      setOdometerValue(prefillLast3 ? `${prefillLast3}___` : '');
-    }
+    setShowOdometerPrompt(trip);
+    setOdometerValue(lastOdometer ? String(lastOdometer) : '');
   };
 
   const submitOdometer = () => {
     if (!showOdometerPrompt || !odometerValue) return;
-    const odo = parseInt(odometerValue.replace(/_/g, ''), 10);
+    const odo = parseInt(odometerValue, 10);
     if (isNaN(odo)) return;
     onUpdateTrip(showOdometerPrompt.id, 'In Transit', {
       pickupOdometer: odo,
@@ -980,7 +977,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   inputMode="numeric"
                   value={odometerValue}
                   onChange={(e) => setOdometerValue(e.target.value)}
-                  placeholder={lastOdometer > 0 ? `Enter last 3 digits` : 'Enter full odometer reading'}
+                  placeholder='Enter full odometer reading'
                   className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-lg text-center focus:border-blue-500 outline-none"
                   autoFocus
                 />
