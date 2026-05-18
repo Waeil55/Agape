@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { tripMatchesTodayOrTomorrow } from '../utils/tripDate';
-import { auth, db, updateDriverLocation, saveOdometerReading, doc, onSnapshot, getDoc, setDoc, signOut } from '../config/firebase';
+import { auth, db, updateDriverLocation, saveOdometerReading, doc, onSnapshot, getDoc, setDoc, signOut, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { geocodeAddress, getDistanceMiles, buildStaticMapUrl, hasGoogleMapsConfigured, haversineMiles } from '../config/maps';
 import ChatPage from './ChatPage';
@@ -108,6 +108,10 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [undoableAction, setUndoableAction] = useState(null);
   const undoTimeoutRef = useRef(null);
+  const [passwordPrompt, setPasswordPrompt] = useState(null);
+  const [passwordValue, setPasswordValue] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordVerifying, setPasswordVerifying] = useState(false);
   const gpsWatchId = useRef(null);
   const meRef = useRef(me);
   const lastUpdateRef = useRef(0);
@@ -125,6 +129,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   const handleUndo = () => {
     if (!undoableAction) return;
+    if (!window.confirm(`Are you sure you want to restore ${undoableAction.trip.patient} to "${undoableAction.previousStatus}"?`)) return;
     onUpdateTrip(undoableAction.trip.id, undoableAction.previousStatus, {});
     setUndoableAction(null);
     if (undoTimeoutRef.current) { clearTimeout(undoTimeoutRef.current); undoTimeoutRef.current = null; }
@@ -485,17 +490,31 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   };
 
   const handleNoShow = (trip) => {
-    if (window.confirm(`Mark ${trip.patient} as No Show?`)) {
-      setUndoable(trip, trip.status, 'No Show');
-      onUpdateTrip(trip.id, 'No Show', { completedAt: new Date().toISOString() });
-    }
+    setPasswordPrompt({ type: 'noshow', trip });
   };
 
   const handleCancel = (trip) => {
-    if (window.confirm(`Cancel trip for ${trip.patient}?`)) {
-      setUndoable(trip, trip.status, 'Cancelled');
-      onUpdateTrip(trip.id, 'Cancelled', { completedAt: new Date().toISOString() });
+    setPasswordPrompt({ type: 'cancel', trip });
+  };
+
+  const verifyPasswordAndProceed = async () => {
+    if (!passwordPrompt || !passwordValue) return;
+    setPasswordVerifying(true);
+    setPasswordError('');
+    try {
+      const credential = EmailAuthProvider.credential(auth.currentUser.email, passwordValue);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      const { type, trip } = passwordPrompt;
+      const newStatus = type === 'noshow' ? 'No Show' : 'Cancelled';
+      setUndoable(trip, trip.status, newStatus);
+      onUpdateTrip(trip.id, newStatus, { completedAt: new Date().toISOString() });
+      setPasswordPrompt(null);
+      setPasswordValue('');
+      setPasswordError('');
+    } catch {
+      setPasswordError('Incorrect password. Try again.');
     }
+    setPasswordVerifying(false);
   };
 
   const openCompleteModal = (trip) => {
@@ -1512,6 +1531,41 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 </div>
                 <ChevronRight size={15} className="text-slate-300" />
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== PASSWORD CONFIRM MODAL ===== */}
+      {passwordPrompt && (
+        <div className="fixed inset-0 z-[150] bg-black/40 flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative z-10">
+            <div className="text-center mb-5">
+              <div className="w-14 h-14 bg-gradient-to-br from-rose-600 to-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <Lock size={24} className="text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Confirm {passwordPrompt.type === 'noshow' ? 'No Show' : 'Cancel'}</h3>
+              <p className="text-xs text-slate-500 mt-1">Enter your password to mark {passwordPrompt.trip.patient} as {passwordPrompt.type === 'noshow' ? 'No Show' : 'Cancelled'}</p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <input
+                  type="password"
+                  value={passwordValue}
+                  onChange={(e) => setPasswordValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && verifyPasswordAndProceed()}
+                  placeholder="Your password"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-center focus:border-rose-500 outline-none"
+                  autoFocus
+                />
+                {passwordError && <p className="text-xs text-rose-600 font-semibold mt-1 text-center">{passwordError}</p>}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm active:scale-95">Cancel</button>
+                <button onClick={verifyPasswordAndProceed} disabled={!passwordValue || passwordVerifying} className="flex-1 py-3 bg-rose-600 text-white rounded-2xl font-bold text-sm disabled:opacity-40 active:scale-95 shadow-sm">
+                  {passwordVerifying ? 'Verifying...' : passwordPrompt.type === 'noshow' ? 'Mark No Show' : 'Cancel Trip'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
