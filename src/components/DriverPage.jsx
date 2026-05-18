@@ -462,6 +462,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     if (!showOdometerPrompt || !odometerValue) return;
     const odo = parseInt(odometerValue, 10);
     if (isNaN(odo)) return;
+    if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
     onUpdateTrip(showOdometerPrompt.id, 'In Transit', {
       pickupOdometer: odo,
       startTime: new Date().toISOString(),
@@ -480,6 +481,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const confirmArrival = () => {
     if (!showArrivalConfirm) return;
     const odo = parseInt(arrivalOdometer, 10) || lastOdometer;
+    if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
     const arrivalNewStatus = showArrivalConfirm.status === 'In Transit' ? 'Arrived' : 'Completed';
     setUndoable(showArrivalConfirm, showArrivalConfirm.status, arrivalNewStatus);
     onUpdateTrip(showArrivalConfirm.id, arrivalNewStatus, {
@@ -528,6 +530,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     if (!showCompleteModal || !completeOdometer) return;
     const odo = parseInt(completeOdometer, 10);
     if (isNaN(odo) || odo <= 0) return;
+    if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
     setUndoable(showCompleteModal, showCompleteModal.status, 'Completed');
     onUpdateTrip(showCompleteModal.id, 'Completed', {
       dropoffOdometer: odo,
@@ -986,6 +989,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-lg text-center focus:border-blue-500 outline-none"
                   autoFocus
                 />
+                {lastOdometer > 0 && odometerValue && parseInt(odometerValue, 10) < lastOdometer && (
+                  <p className="text-[10px] text-amber-700 font-semibold mt-2 text-center bg-amber-50 rounded-xl px-3 py-2 border border-amber-200">
+                    ⚠️ {parseInt(odometerValue, 10).toLocaleString()} mi is less than last reading of {lastOdometer.toLocaleString()} mi. You can continue if you're sure.
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm active:scale-95">Cancel</button>
