@@ -85,7 +85,7 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
   const staticMapUrl = buildStaticMapUrl();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <h2 className="text-lg sm:text-lg font-bold text-slate-900">Live Fleet Tracking</h2>
         <div className="flex gap-2">

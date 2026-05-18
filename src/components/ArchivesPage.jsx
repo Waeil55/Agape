@@ -9,7 +9,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip }) => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex justify-between items-center">
         <h2 className="text-lg sm:text-lg font-bold text-slate-900">Archives</h2>
       </div>

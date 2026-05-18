@@ -1801,9 +1801,9 @@ const today = getTodayStr();
       <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
       {/* HEADER */}
       <header className="bg-white shadow-sm border-b border-slate-200" style={{paddingTop: 'var(--sat)'}}>
-        <div className="max-w-full px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+        <div className="max-w-full px-3 sm:px-4 py-2.5 sm:py-3 flex justify-between items-center">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <img src="/agape.png" alt="Agape Care" className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl shrink-0 shadow-sm" />
+            <img src="/agape.png" alt="Agape Care" className="w-9 sm:w-10 h-9 sm:h-10 rounded-lg shrink-0 shadow-sm" />
             <div className="min-w-0">
               <h1 className="text-xs sm:text-sm font-extrabold text-slate-900 truncate leading-tight tracking-tight">Agape Care</h1>
               <p className="hidden sm:block text-sm text-slate-500 font-medium">Fleet Management System</p>
@@ -1857,7 +1857,7 @@ const today = getTodayStr();
         <>
           {/* NAVIGATION TABS */}
           <div className="nav-blur sticky top-0 z-40 overflow-x-auto">
-            <div className="max-w-full px-3 sm:px-6 flex gap-1 sm:gap-2 whitespace-nowrap">
+            <div className="max-w-full px-1.5 sm:px-3 flex gap-0.5 sm:gap-1 whitespace-nowrap">
               {(() => {
                 const allTabs = [
                   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -1893,7 +1893,7 @@ const today = getTodayStr();
                       setActiveTab(tab.id);
                       if (role === 'dispatcher') setSearchQuery('');
                     }}
-                    className={`py-2 sm:py-3 px-2.5 sm:px-3 border-b-2 font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition text-[9px] sm:text-[10px] ${
+                    className={`py-2 sm:py-2.5 px-2 sm:px-2.5 border-b-2 font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition text-[9px] sm:text-[10px] ${
                       activeTab === tab.id
                         ? 'border-blue-600 text-blue-600'
                         : 'border-transparent text-slate-500 hover:text-blue-600'

@@ -465,7 +465,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
     : 100;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {step === 'upload' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-8">
           <div className="max-w-2xl mx-auto">
@@ -547,7 +547,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
       )}
 
       {step === 'review' && (
-        <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-4 sm:space-y-3">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
             <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
               <div className={`w-10 sm:w-12 h-10 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${withIssues === 0 ? 'bg-emerald-100' : 'bg-amber-100'}`}>

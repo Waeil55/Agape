@@ -97,7 +97,7 @@ const SettingsPage = ({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex gap-1 sm:gap-2 border-b border-slate-200 overflow-x-auto">
         {tabs.map((tab) => (
           <button
@@ -184,7 +184,7 @@ const SettingsPage = ({
             <p className="text-body text-slate-500">Choose the theme and reading size that work best for you.</p>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-3">
             <div>
               <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-base"><Palette size={20} /> Theme</div>
               <div className="grid grid-cols-3 gap-3 max-w-lg">
@@ -325,7 +325,7 @@ const SettingsPage = ({
       )}
 
       {activeTab === 'navigation' && (
-        <div className="card p-5 sm:p-8 space-y-6">
+        <div className="card p-5 sm:p-8 space-y-3">
           <div>
             <h3 className="text-heading text-slate-900 mb-2">Navigation</h3>
             <p className="text-body text-slate-500">Choose which GPS app opens first for turn-by-turn directions.</p>
@@ -359,7 +359,7 @@ const SettingsPage = ({
       )}
 
       {activeTab === 'notifications' && (
-        <div className="card p-5 sm:p-8 space-y-6">
+        <div className="card p-5 sm:p-8 space-y-3">
           <div>
             <h3 className="text-heading text-slate-900 mb-2">Notifications</h3>
             <p className="text-body text-slate-500">Choose which alerts you receive while on duty.</p>

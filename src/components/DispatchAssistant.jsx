@@ -119,7 +119,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
   const isNowInRange = (startMin, endMin) => currentMinutes >= startMin && currentMinutes < endMin;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Live Dispatch Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div className="flex items-center gap-3">
