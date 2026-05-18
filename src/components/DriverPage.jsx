@@ -130,6 +130,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     onUpdateTrip(trip.id, prevStatus, {});
   };
 
+  const restoreHistoryTrip = (trip) => {
+    const prevStatus = trip.status === 'Completed' ? 'Arrived' : 'Assigned';
+    onUpdateTrip(trip.id, prevStatus, {});
+  };
+
   // Online/offline detection
   useEffect(() => {
     const goOnline = () => { setIsOnline(true); syncOfflineQueue(); };
@@ -1297,42 +1302,48 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 };
                 const s = styles[trip.status] || styles['Completed'];
                 return (
-                  <div key={trip.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 active:scale-[0.99] transition-all">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${s.dot}`} />
-                          <h4 className="font-bold text-sm text-slate-900 truncate">{trip.patient}</h4>
-                          {trip.bookingId && <span className="text-[8px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded">{trip.bookingId}</span>}
-                        </div>
-                        <p className="text-sm font-bold text-blue-600 mt-1">{to12hr(trip.time)}</p>
-                        <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-slate-500">
-                          <ArrowRight size={10} className="text-emerald-500 shrink-0" />
-                          <span className="truncate">{trip.pickup}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
-                          <ArrowRight size={10} className="text-rose-500 shrink-0" />
-                          <span className="truncate">{trip.dropoff}</span>
-                        </div>
-                        {(trip.pickupOdometer || trip.dropoffOdometer) && (
-                          <div className="flex items-center gap-3 mt-1.5 text-[9px] text-slate-400">
-                            {trip.pickupOdometer && <span>Start: {trip.pickupOdometer?.toLocaleString()} mi</span>}
-                            {trip.dropoffOdometer && <span>End: {trip.dropoffOdometer?.toLocaleString()} mi</span>}
-                            {trip.pickupOdometer && trip.dropoffOdometer && (
-                              <span className="text-blue-500">+{(trip.dropoffOdometer - trip.pickupOdometer)?.toLocaleString()} mi</span>
-                            )}
+                  <div key={trip.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden active:scale-[0.99] transition-all cursor-pointer">
+                    <div onClick={() => setShowTripDetails(trip)} className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${s.dot}`} />
+                            <h4 className="font-bold text-sm text-slate-900 truncate">{trip.patient}</h4>
+                            {trip.bookingId && <span className="text-[8px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded">{trip.bookingId}</span>}
                           </div>
-                        )}
-                        {trip.distance && (
-                          <p className="text-[9px] text-slate-400 mt-0.5">Distance: {trip.distance} mi</p>
-                        )}
-                        {trip.completedAt && (
-                          <p className="text-[9px] text-slate-400 mt-1">{new Date(trip.completedAt).toLocaleString()}</p>
-                        )}
+                          <p className="text-sm font-bold text-blue-600 mt-1">{to12hr(trip.time)}</p>
+                          <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-slate-500">
+                            <ArrowRight size={10} className="text-emerald-500 shrink-0" />
+                            <span className="truncate">{trip.pickup}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
+                            <ArrowRight size={10} className="text-rose-500 shrink-0" />
+                            <span className="truncate">{trip.dropoff}</span>
+                          </div>
+                          {(trip.pickupOdometer || trip.dropoffOdometer) && (
+                            <div className="flex items-center gap-3 mt-1.5 text-[9px] text-slate-400">
+                              {trip.pickupOdometer && <span>Start: {trip.pickupOdometer?.toLocaleString()} mi</span>}
+                              {trip.dropoffOdometer && <span>End: {trip.dropoffOdometer?.toLocaleString()} mi</span>}
+                              {trip.pickupOdometer && trip.dropoffOdometer && (
+                                <span className="text-blue-500">+{(trip.dropoffOdometer - trip.pickupOdometer)?.toLocaleString()} mi</span>
+                              )}
+                            </div>
+                          )}
+                          {trip.distance && (
+                            <p className="text-[9px] text-slate-400 mt-0.5">Distance: {trip.distance} mi</p>
+                          )}
+                          {trip.completedAt && (
+                            <p className="text-[9px] text-slate-400 mt-1">{new Date(trip.completedAt).toLocaleString()}</p>
+                          )}
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-lg text-[8px] font-bold uppercase tracking-wider shrink-0 ${s.bg}`}>
+                          {trip.status}
+                        </span>
                       </div>
-                      <span className={`px-2.5 py-1 rounded-lg text-[8px] font-bold uppercase tracking-wider shrink-0 ${s.bg}`}>
-                        {trip.status}
-                      </span>
+                    </div>
+                    <div className="px-4 pb-3 flex gap-2">
+                      <button onClick={() => setShowTripDetails(trip)} className="h-9 px-4 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold flex items-center gap-1.5 active:scale-95"><FileText size={12} /> Details</button>
+                      <button onClick={() => restoreHistoryTrip(trip)} className="h-9 px-4 bg-blue-100 text-blue-700 rounded-xl text-[10px] font-bold flex items-center gap-1.5 active:scale-95"><RotateCcw size={12} /> Restore</button>
                     </div>
                   </div>
                 );
