@@ -17,6 +17,8 @@ import DriverPage from './components/DriverPage';
 import UsersPage from './components/UsersPage';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
 import { playMessageSound, initAudioContext } from './utils/notificationSound';
+import { makeCall, sendSMS, showCallActionSheet } from './utils/nativeActions';
+import { isNativeShell } from './utils/platform';
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 import { suggestBatchAssignment, suggestOptimalDriver } from './config/ai';
@@ -255,6 +257,7 @@ const App = () => {
     const goOffline = () => setIsOffline(true);
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
+    import('./utils/platform').then(m => m.initPlatform());
     return () => {
       window.removeEventListener('online', goOnline);
       window.removeEventListener('offline', goOffline);
@@ -1617,20 +1620,20 @@ const today = getTodayStr();
                                </div>
                             </div>
                           )}
-                          <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100 pl-9">
-                            {t.pickupPhone && (
-                              <>
-                                <a href={`tel:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-bold active:bg-emerald-200 transition-colors"><Phone size={12} /> {t.pickupPhone} <span className="text-[9px] font-medium opacity-70">Client</span></a>
-                                <a href={`sms:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold active:bg-blue-200 transition-colors"><MessageSquare size={12} /> SMS Client</a>
-                              </>
-                            )}
-                            {t.dropoffPhone && (
-                              <>
-                                <a href={`tel:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold active:bg-slate-200 transition-colors"><Building2 size={12} /> {t.dropoffPhone} <span className="text-[9px] font-medium opacity-70">Hospital</span></a>
-                                <a href={`sms:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold active:bg-slate-200 transition-colors"><MessageSquare size={12} /> SMS Hosp</a>
-                              </>
-                            )}
-                          </div>
+                           <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100 pl-9">
+                             {t.pickupPhone && (
+                               <>
+                                 <button onClick={() => makeCall(t.pickupPhone, t.patient)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-bold active:bg-emerald-200 transition-colors"><Phone size={12} /> {t.pickupPhone} <span className="text-[9px] font-medium opacity-70">Client</span></button>
+                                 <button onClick={() => sendSMS(t.pickupPhone, t.patient)} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold active:bg-blue-200 transition-colors"><MessageSquare size={12} /> SMS Client</button>
+                               </>
+                             )}
+                             {t.dropoffPhone && (
+                               <>
+                                 <button onClick={() => makeCall(t.dropoffPhone, t.patient)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold active:bg-slate-200 transition-colors"><Building2 size={12} /> {t.dropoffPhone} <span className="text-[9px] font-medium opacity-70">Hospital</span></button>
+                                 <button onClick={() => sendSMS(t.dropoffPhone, t.patient)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold active:bg-slate-200 transition-colors"><MessageSquare size={12} /> SMS Hosp</button>
+                               </>
+                             )}
+                           </div>
                         </div>
                       ))}
                     </div>
@@ -1707,14 +1710,14 @@ const today = getTodayStr();
                         <div className="flex flex-wrap gap-2 mt-2 pl-9">
                           {t.pickupPhone && (
                             <>
-                              <a href={`tel:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold active:bg-emerald-200 transition-colors"><Phone size={11} /> Client</a>
-                              <a href={`sms:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold active:bg-blue-200 transition-colors"><MessageSquare size={11} /> SMS</a>
+                              <button onClick={() => makeCall(t.pickupPhone, t.patient)} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold active:bg-emerald-200 transition-colors"><Phone size={11} /> Client</button>
+                              <button onClick={() => sendSMS(t.pickupPhone, t.patient)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold active:bg-blue-200 transition-colors"><MessageSquare size={11} /> SMS</button>
                             </>
                           )}
                           {t.dropoffPhone && (
                             <>
-                              <a href={`tel:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold active:bg-slate-200 transition-colors"><Building2 size={11} /> Hospital</a>
-                              <a href={`sms:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold active:bg-slate-200 transition-colors"><MessageSquare size={11} /> SMS</a>
+                              <button onClick={() => makeCall(t.dropoffPhone, t.patient)} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold active:bg-slate-200 transition-colors"><Building2 size={11} /> Hospital</button>
+                              <button onClick={() => sendSMS(t.dropoffPhone, t.patient)} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold active:bg-slate-200 transition-colors"><MessageSquare size={11} /> SMS</button>
                             </>
                           )}
                         </div>
@@ -1758,8 +1761,8 @@ const today = getTodayStr();
                           <span>{d.vehicle}</span>
                           {d.phone && (
                             <div className="flex gap-1 ml-1">
-                              <a href={`tel:${d.phone}`} className="p-1 bg-emerald-50 text-emerald-600 rounded hover:bg-emerald-100"><Phone size={8} /></a>
-                              <a href={`sms:${d.phone}`} className="p-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><MessageSquare size={8} /></a>
+                              <button onClick={() => makeCall(d.phone, d.name)} className="p-1 bg-emerald-50 text-emerald-600 rounded hover:bg-emerald-100"><Phone size={8} /></button>
+                              <button onClick={() => sendSMS(d.phone, d.name)} className="p-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><MessageSquare size={8} /></button>
                             </div>
                           )}
                         </div>
@@ -1822,14 +1825,14 @@ const today = getTodayStr();
                 );
               })()}
               {role === 'driver' && phoneNumbers?.routing && (
-                <a href={`tel:${cleanPhone(phoneNumbers.routing)}`} className="h-10 px-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition text-sm font-bold flex items-center gap-1.5 shadow-sm" title="Call Routing">
+                <button onClick={() => makeCall(phoneNumbers.routing, 'Routing')} className="h-10 px-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition text-sm font-bold flex items-center gap-1.5 shadow-sm" title="Call Routing">
                   <Phone size={16} /><span className="hidden sm:inline">Routing</span>
-                </a>
+                </button>
               )}
               {role === 'driver' && phoneNumbers?.dispatcher && (
-                <a href={`tel:${cleanPhone(phoneNumbers.dispatcher)}`} className="h-10 px-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition text-sm font-bold flex items-center gap-1.5 shadow-sm" title="Call Dispatch">
+                <button onClick={() => makeCall(phoneNumbers.dispatcher, 'Dispatch')} className="h-10 px-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition text-sm font-bold flex items-center gap-1.5 shadow-sm" title="Call Dispatch">
                   <Phone size={16} /><span className="hidden sm:inline">Dispatch</span>
-                </a>
+                </button>
               )}
               <span className="hidden sm:inline-flex items-center px-4 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold capitalize border border-blue-100">{role}</span>
               <button onClick={handleLogout} className="h-10 px-3 hover:bg-slate-100 rounded-xl text-slate-600 hover:text-slate-900 transition font-semibold text-sm flex items-center gap-1.5">
@@ -2056,8 +2059,8 @@ const today = getTodayStr();
                                   <button onClick={() => { setActiveTab('drivers'); }} className="text-blue-600 hover:text-blue-800 font-bold text-sm">View</button>
                                   {driver.phone && (
                                     <>
-                                      <a href={`tel:${driver.phone}`} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition"><Phone size={16} /></a>
-                                      <a href={`sms:${driver.phone}`} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition"><MessageSquare size={16} /></a>
+                                      <button onClick={() => makeCall(driver.phone, driver.name)} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition"><Phone size={16} /></button>
+                                      <button onClick={() => sendSMS(driver.phone, driver.name)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition"><MessageSquare size={16} /></button>
                                     </>
                                   )}
                                 </div>

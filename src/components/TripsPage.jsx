@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { tripMatchesCalendarDay } from '../utils/tripDate';
 import { MapPin, Clock, AlertCircle, Users, UserCheck, X, BrainCircuit, Loader2, Plus, Save, Trash2, Edit2, CheckCircle2, Phone, MessageSquare, Flag, Sparkles, Check } from 'lucide-react';
 import { suggestBatchAssignment } from '../config/ai';
+import { makeCall, sendSMS } from '../utils/nativeActions';
+import { isNativeShell } from '../utils/platform';
 
 const getTodayStr = () => {
   const d = new Date();
@@ -233,8 +235,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                         {trip.pickupPhone && (
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-bold text-slate-400 uppercase">Client:</span>
-                            <a href={`tel:${trip.pickupPhone}`} className="text-xs font-bold text-blue-600 hover:underline">{trip.pickupPhone}</a>
-                            <a href={`sms:${trip.pickupPhone}`} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><MessageSquare size={12} /></a>
+                            <button onClick={() => makeCall(trip.pickupPhone, trip.patient)} className="text-xs font-bold text-blue-600 hover:underline">{trip.pickupPhone}</button>
+                            <button onClick={() => sendSMS(trip.pickupPhone, trip.patient)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><MessageSquare size={12} /></button>
                           </div>
                         )}
                         {trip.notes && (

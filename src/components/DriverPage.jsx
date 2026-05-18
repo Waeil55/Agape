@@ -17,6 +17,9 @@ import {
   Download, Trash2, FileText, AlertTriangle, Info, GripVertical,
   Timer, Copy
 } from 'lucide-react';
+import { openNavigation, showNavActionSheet, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
+import { impact } from '../utils/haptics';
+import { isNativeShell } from '../utils/platform';
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 const FACILITY_KEYS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute'];
@@ -521,43 +524,25 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     return navApp;
   };
 
-  const openInNavApp = (address, app) => {
-    const encoded = encodeURIComponent(address);
+  const openInNavApp = async (address, app) => {
     const origin = driverPosition ? `${driverPosition.lat},${driverPosition.lng}` : '';
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    const isAndroid = /android/i.test(navigator.userAgent);
-    
-    const urls = {};
-    
-    if (isIOS) {
-      urls.google = `comgooglemaps://?daddr=${encoded}`;
-      urls.waze = `waze://?q=${encoded}&navigate=yes`;
-      urls.apple = `http://maps.apple.com/?daddr=${encoded}`;
-      urls.googleFallback = `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`;
-      urls.wazeFallback = `https://www.waze.com/ul?q=${encoded}&navigate=yes`;
-    } else if (isAndroid) {
-      urls.google = `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`;
-      urls.waze = `waze://?q=${encoded}&navigate=yes`;
-      urls.apple = `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`;
+    if (isNativeShell()) {
+      await showNavActionSheet(address, origin, app || navApp);
     } else {
-      urls.google = `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encoded}`;
-      urls.waze = `https://www.waze.com/ul?q=${encoded}&navigate=yes`;
-      urls.apple = `https://maps.apple.com/?daddr=${encoded}`;
+      await openNavigation(address, app || navApp, origin);
     }
-    
-    const url = urls[app] || urls.google;
-    const fallbackUrl = urls[app + 'Fallback'];
-    
-    if (isIOS && (app === 'google' || app === 'waze')) {
-      window.location.href = url;
-      setTimeout(() => {
-        if (document.hidden) return;
-        window.location.href = fallbackUrl || urls.googleFallback || urls.google;
-      }, 3000);
+  };
+
+  const handleCall = async (phone, name) => {
+    if (isNativeShell()) {
+      await showCallActionSheet(phone, name);
     } else {
-      const win = window.open(url, '_blank');
-      if (!win) window.location.href = url;
+      await makeCall(phone, name);
     }
+  };
+
+  const handleSMS = async (phone, name) => {
+    await sendSMS(phone, name);
   };
 
   const handleStartTrip = (trip) => {
@@ -839,8 +824,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                         <p className="text-[10px] text-emerald-700 font-semibold">{r.patients.join(' & ')} — nearby locations</p>
                         <p className="text-[9px] text-emerald-600 mt-0.5">Pick up {aTrip?.patient} first, then {bTrip?.patient} — same area</p>
                         <div className="flex gap-1.5 mt-1.5">
-                          <button onClick={() => openInNavApp(aTrip?.pickup, suggestNavApp(aTrip?.pickup))} className="flex-1 h-6 bg-emerald-600 text-white rounded-lg text-[8px] font-bold flex items-center justify-center gap-1 active:scale-95"><Navigation size={8} /> {aTrip?.patient}</button>
-                          <button onClick={() => openInNavApp(bTrip?.pickup, suggestNavApp(bTrip?.pickup))} className="flex-1 h-6 bg-emerald-600 text-white rounded-lg text-[8px] font-bold flex items-center justify-center gap-1 active:scale-95"><Navigation size={8} /> {bTrip?.patient}</button>
+                           <button onClick={() => { impact('medium'); openInNavApp(aTrip?.pickup, suggestNavApp(aTrip?.pickup)); }} className="flex-1 h-6 bg-emerald-600 text-white rounded-lg text-[8px] font-bold flex items-center justify-center gap-1 active:scale-95"><Navigation size={8} /> {aTrip?.patient}</button>
+                           <button onClick={() => { impact('medium'); openInNavApp(bTrip?.pickup, suggestNavApp(bTrip?.pickup)); }} className="flex-1 h-6 bg-emerald-600 text-white rounded-lg text-[8px] font-bold flex items-center justify-center gap-1 active:scale-95"><Navigation size={8} /> {bTrip?.patient}</button>
                         </div>
                       </div>
                     );
@@ -921,7 +906,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             aiSequence={aiSequence}
             activeTripId={aiSequence?.[guidedStepIndex] || null}
             theme={appSettings?.theme || 'light'}
-            onOpenInNav={(addr) => openInNavApp(addr, suggestNavApp(addr))}
+            onOpenInNav={(addr) => { impact('medium'); openInNavApp(addr, suggestNavApp(addr)); }}
             currentUser={currentUser}
             role={role}
           />
@@ -984,8 +969,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                               {urgency === 1 && <span className="badge badge-warning">Soon</span>}
                             </div>
                             <div className="flex gap-1.5 shrink-0">
-                              <a href={`tel:${cleanPhone(getClientPhone(trip))}`} className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 active:scale-90 transition-all"><Phone size={18} /></a>
-                              <a href={`sms:${cleanPhone(getClientPhone(trip))}`} className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 active:scale-90 transition-all"><MessageCircle size={18} /></a>
+                            <button onClick={() => handleCall(getClientPhone(trip), trip.patient)} className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 active:scale-90 transition-all"><Phone size={18} /></button>
+                              <button onClick={() => handleSMS(getClientPhone(trip), trip.patient)} className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 active:scale-90 transition-all"><MessageCircle size={18} /></button>
                               <button onClick={() => setExpandedTrip(isExpanded ? null : trip.id)} className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isExpanded ? 'bg-blue-100 text-blue-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>
                                 <ChevronDown size={18} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                               </button>
@@ -1109,42 +1094,42 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                     <div className="px-5 pb-5 flex gap-2.5 flex-wrap">
                       {trip.status === 'Assigned' || trip.status === 'Unassigned' ? (
                         <>
-                          <button onClick={() => handleStartTrip(trip)} className="btn btn-primary flex-1 text-base">
+                          <button onClick={() => { impact('heavy'); handleStartTrip(trip); }} className="btn btn-primary flex-1 text-base">
                             <Play size={18} /> Start Trip
                           </button>
-                          <button onClick={() => setShowTripDetails(trip)} className="btn btn-ghost w-12 p-0" title="Full details"><FileText size={20} /></button>
-                          <button onClick={() => handleNoShow(trip)} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-sm">No Show</button>
-                          <button onClick={() => handleCancel(trip)} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-sm">Cancel</button>
+                          <button onClick={() => { impact('light'); setShowTripDetails(trip); }} className="btn btn-ghost w-12 p-0" title="Full details"><FileText size={20} /></button>
+                          <button onClick={() => { impact('medium'); handleNoShow(trip); }} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-sm">No Show</button>
+                          <button onClick={() => { impact('medium'); handleCancel(trip); }} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-sm">Cancel</button>
                         </>
                       ) : trip.status === 'In Transit' ? (
                         <>
-                          <button onClick={() => openInNavApp(trip.pickup, suggestNavApp(trip.pickup))} className="btn btn-primary flex-1 text-base">
+                          <button onClick={() => { impact('heavy'); openInNavApp(trip.pickup, suggestNavApp(trip.pickup)); }} className="btn btn-primary flex-1 text-base">
                             <Navigation size={18} /> Pickup
                           </button>
-                          <button onClick={() => handleArrive(trip)} className="btn bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 text-base">
+                          <button onClick={() => { impact('heavy'); handleArrive(trip); }} className="btn bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 text-base">
                             <MapPin size={18} /> Arrived
                           </button>
-                          <button onClick={() => revertTripStatus(trip)} className="btn btn-ghost w-12 p-0" title="Back to Assigned">
+                          <button onClick={() => { impact('light'); revertTripStatus(trip); }} className="btn btn-ghost w-12 p-0" title="Back to Assigned">
                             <RotateCcw size={18} />
                           </button>
-                          <button onClick={() => setShowTripDetails(trip)} className="btn btn-ghost w-12 p-0" title="Full details"><FileText size={20} /></button>
-                          <button onClick={() => handleNoShow(trip)} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-sm">No Show</button>
-                          <button onClick={() => handleCancel(trip)} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-sm">Cancel</button>
+                          <button onClick={() => { impact('light'); setShowTripDetails(trip); }} className="btn btn-ghost w-12 p-0" title="Full details"><FileText size={20} /></button>
+                          <button onClick={() => { impact('medium'); handleNoShow(trip); }} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-sm">No Show</button>
+                          <button onClick={() => { impact('medium'); handleCancel(trip); }} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-sm">Cancel</button>
                         </>
                       ) : trip.status === 'Arrived' ? (
                         <>
-                          <button onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="btn bg-rose-600 text-white shadow-sm hover:bg-rose-700 flex-1 text-base">
+                          <button onClick={() => { impact('heavy'); openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff)); }} className="btn bg-rose-600 text-white shadow-sm hover:bg-rose-700 flex-1 text-base">
                             <Navigation size={18} /> Dropoff
                           </button>
-                          <button onClick={() => openCompleteModal(trip)} className="btn bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 text-base">
+                          <button onClick={() => { impact('heavy'); openCompleteModal(trip); }} className="btn bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 text-base">
                             <Check size={18} /> Complete
                           </button>
-                          <button onClick={() => revertTripStatus(trip)} className="btn btn-ghost w-12 p-0" title="Back to In Transit">
+                          <button onClick={() => { impact('light'); revertTripStatus(trip); }} className="btn btn-ghost w-12 p-0" title="Back to In Transit">
                             <RotateCcw size={18} />
                           </button>
-                          <button onClick={() => setShowTripDetails(trip)} className="btn btn-ghost w-12 p-0" title="Full details"><FileText size={20} /></button>
-                          <button onClick={() => handleNoShow(trip)} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-sm">No Show</button>
-                          <button onClick={() => handleCancel(trip)} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-sm">Cancel</button>
+                          <button onClick={() => { impact('light'); setShowTripDetails(trip); }} className="btn btn-ghost w-12 p-0" title="Full details"><FileText size={20} /></button>
+                          <button onClick={() => { impact('medium'); handleNoShow(trip); }} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-sm">No Show</button>
+                          <button onClick={() => { impact('medium'); handleCancel(trip); }} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-sm">Cancel</button>
                         </>
                       ) : null}
                     </div>
@@ -1230,9 +1215,9 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               {showArrivalConfirm.pickupPhone && (
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-400 font-bold uppercase">Phone</span>
-                  <a href={`tel:${cleanPhone(showArrivalConfirm.pickupPhone)}`} className="text-sm font-bold text-blue-600 flex items-center gap-1 hover:underline">
+                  <button onClick={() => handleCall(showArrivalConfirm.pickupPhone, showArrivalConfirm.patient)} className="text-sm font-bold text-blue-600 flex items-center gap-1 hover:underline">
                     <Phone size={14} /> {showArrivalConfirm.pickupPhone}
-                  </a>
+                  </button>
                 </div>
               )}
               {showArrivalConfirm.notes && (
@@ -1349,7 +1334,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <div>
                     <p className="text-[10px] text-white/60 uppercase font-bold">Pickup</p>
                     <p className="text-sm font-semibold">{showTripDetails.pickup}</p>
-                    {showTripDetails.pickupPhone && <a href={`tel:${cleanPhone(showTripDetails.pickupPhone)}`} className="text-[11px] text-blue-200 font-bold flex items-center gap-1 mt-0.5"><Phone size={10} /> {showTripDetails.pickupPhone}</a>}
+                    {showTripDetails.pickupPhone && <button onClick={() => handleCall(showTripDetails.pickupPhone, showTripDetails.patient)} className="text-[11px] text-blue-200 font-bold flex items-center gap-1 mt-0.5"><Phone size={10} /> {showTripDetails.pickupPhone}</button>}
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -1357,14 +1342,14 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <div>
                     <p className="text-[10px] text-white/60 uppercase font-bold">Dropoff</p>
                     <p className="text-sm font-semibold">{showTripDetails.dropoff}</p>
-                    {showTripDetails.dropoffPhone && <a href={`tel:${cleanPhone(showTripDetails.dropoffPhone)}`} className="text-[11px] text-blue-200 font-bold flex items-center gap-1 mt-0.5"><Phone size={10} /> {showTripDetails.dropoffPhone}</a>}
+                    {showTripDetails.dropoffPhone && <button onClick={() => handleCall(showTripDetails.dropoffPhone, showTripDetails.patient)} className="text-[11px] text-blue-200 font-bold flex items-center gap-1 mt-0.5"><Phone size={10} /> {showTripDetails.dropoffPhone}</button>}
                   </div>
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
                 <button onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="flex-1 h-9 bg-blue-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><Navigation size={12} /> Pickup</button>
                 <button onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="flex-1 h-9 bg-rose-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><Navigation size={12} /> Dropoff</button>
-                <a href={`tel:${cleanPhone(getClientPhone(showTripDetails))}`} className="flex-1 h-9 bg-emerald-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><Phone size={12} /> Call</a>
+                <button onClick={() => handleCall(getClientPhone(showTripDetails), showTripDetails.patient)} className="flex-1 h-9 bg-emerald-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><Phone size={12} /> Call</button>
               </div>
             </div>
 

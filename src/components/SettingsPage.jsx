@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Palette, Navigation, Type, Moon, Sun, Monitor, Route, Phone, ShieldCheck, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus } from 'lucide-react';
+import { makeCall } from '../utils/nativeActions';
 
 const FONT_SCALE_OPTIONS = [
   { value: 'sm', label: 'Small', desc: 'Compact view — more content on screen', icon: Minus },
@@ -131,7 +132,7 @@ const SettingsPage = ({
                     <div className="flex gap-2">
                       <input type="tel" value={phoneNumbers?.routing || ''} onChange={(e) => onUpdatePhoneNumbers?.({ routing: e.target.value })}
                         className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="8669823983" />
-                      <a href={`tel:${(phoneNumbers?.routing || '').replace(/[^0-9]/g, '')}`} className="px-3 py-2.5 bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-200 transition flex items-center"><Phone size={16} /></a>
+                       <button onClick={() => makeCall(phoneNumbers?.routing || '', 'Routing')} className="px-3 py-2.5 bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-200 transition flex items-center"><Phone size={16} /></button>
                     </div>
                   </div>
                   <div>
@@ -139,7 +140,7 @@ const SettingsPage = ({
                     <div className="flex gap-2">
                       <input type="tel" value={phoneNumbers?.dispatcher || ''} onChange={(e) => onUpdatePhoneNumbers?.({ dispatcher: e.target.value })}
                         className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777707" />
-                      <a href={`tel:${(phoneNumbers?.dispatcher || '').replace(/[^0-9]/g, '')}`} className="px-3 py-2.5 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition flex items-center"><Phone size={16} /></a>
+                       <button onClick={() => makeCall(phoneNumbers?.dispatcher || '', 'Dispatcher')} className="px-3 py-2.5 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition flex items-center"><Phone size={16} /></button>
                     </div>
                   </div>
                 </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, Truck, Plus, Trash2, Edit2, AlertCircle, X, Save, ClipboardList, Upload, CheckSquare, Clock, Phone, MessageSquare } from 'lucide-react';
+import { makeCall, sendSMS } from '../utils/nativeActions';
 
 const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addAuditLog, currentUser, trips, onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles }) => {
   const [activeTab, setActiveTab] = useState('drivers');
@@ -273,10 +274,10 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                           {assignedCount > 0 && <span className="ml-1 text-[10px] text-blue-600 font-semibold">({assignedCount})</span>}
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4">
-                          {d.phone ? (
+                           {d.phone ? (
                             <div className="flex gap-2">
-                              <a href={`tel:${d.phone}`} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition"><Phone size={14} /></a>
-                              <a href={`sms:${d.phone}`} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition"><MessageSquare size={14} /></a>
+                              <button onClick={() => makeCall(d.phone, d.name)} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition"><Phone size={14} /></button>
+                              <button onClick={() => sendSMS(d.phone, d.name)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition"><MessageSquare size={14} /></button>
                             </div>
                           ) : <span className="text-[10px] text-slate-400 italic">No Phone</span>}
                         </td>
