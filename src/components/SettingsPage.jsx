@@ -241,7 +241,7 @@ const SettingsPage = ({
                     <div className="font-bold text-sm text-slate-900">{option.label}</div>
                     <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
                     {active && (
-                      <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isDriverMode ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                      <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${isDriverMode ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                         Active
                       </span>
                     )}
@@ -281,7 +281,7 @@ const SettingsPage = ({
                 <div className="font-bold text-sm text-slate-900">Standard</div>
                 <p className="text-xs text-slate-500 mt-0.5">Normal contrast and font weights</p>
                 {appSettings?.readability !== 'enhanced' && (
-                  <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>
+                  <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>
                 )}
               </button>
               <button
@@ -294,7 +294,7 @@ const SettingsPage = ({
                 <div className="font-bold text-sm text-slate-900">Enhanced</div>
                 <p className="text-xs text-slate-500 mt-0.5">Bolder text, stronger contrast, better spacing</p>
                 {appSettings?.readability === 'enhanced' && (
-                  <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700">Active</span>
+                  <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-700">Active</span>
                 )}
               </button>
             </div>
@@ -305,19 +305,19 @@ const SettingsPage = ({
             <h4 className="font-bold text-sm text-slate-700 mb-3">Current Configuration</h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-white rounded-xl p-3 border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Font Scale</p>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Font Scale</p>
                 <p className="text-sm font-bold text-slate-800 mt-1 capitalize">{appSettings?.fontScale || 'Default'}</p>
               </div>
               <div className="bg-white rounded-xl p-3 border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Readability</p>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Readability</p>
                 <p className="text-sm font-bold text-slate-800 mt-1 capitalize">{appSettings?.readability || 'Normal'}</p>
               </div>
               <div className="bg-white rounded-xl p-3 border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Theme</p>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Theme</p>
                 <p className="text-sm font-bold text-slate-800 mt-1 capitalize">{appSettings?.theme || 'Light'}</p>
               </div>
               <div className="bg-white rounded-xl p-3 border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Navigation</p>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Navigation</p>
                 <p className="text-sm font-bold text-slate-800 mt-1 capitalize">{appSettings?.navigationApp || 'Google'}</p>
               </div>
             </div>
@@ -349,7 +349,7 @@ const SettingsPage = ({
                     </div>
                     <div className="font-bold text-sm text-slate-900">{option.label}</div>
                     {active && (
-                      <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>
+                      <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>
                     )}
                   </button>
                 );
