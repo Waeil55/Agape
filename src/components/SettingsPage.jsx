@@ -97,7 +97,7 @@ const SettingsPage = ({
   ];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex gap-1 sm:gap-2 border-b border-slate-200 overflow-x-auto">
         {tabs.map((tab) => (
           <button
@@ -184,7 +184,7 @@ const SettingsPage = ({
             <p className="text-body text-slate-500">Choose the theme and reading size that work best for you.</p>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-6">
             <div>
               <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-base"><Palette size={20} /> Theme</div>
               <div className="grid grid-cols-3 gap-3 max-w-lg">
@@ -240,7 +240,7 @@ const SettingsPage = ({
                     <div className="font-bold text-sm text-slate-900">{option.label}</div>
                     <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
                     {active && (
-                      <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${isDriverMode ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                      <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isDriverMode ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                         Active
                       </span>
                     )}
@@ -280,7 +280,7 @@ const SettingsPage = ({
                 <div className="font-bold text-sm text-slate-900">Standard</div>
                 <p className="text-xs text-slate-500 mt-0.5">Normal contrast and font weights</p>
                 {appSettings?.readability !== 'enhanced' && (
-                  <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>
+                  <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>
                 )}
               </button>
               <button
@@ -293,7 +293,7 @@ const SettingsPage = ({
                 <div className="font-bold text-sm text-slate-900">Enhanced</div>
                 <p className="text-xs text-slate-500 mt-0.5">Bolder text, stronger contrast, better spacing</p>
                 {appSettings?.readability === 'enhanced' && (
-                  <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-700">Active</span>
+                  <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700">Active</span>
                 )}
               </button>
             </div>
@@ -304,19 +304,19 @@ const SettingsPage = ({
             <h4 className="font-bold text-sm text-slate-700 mb-3">Current Configuration</h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-white rounded-xl p-3 border border-slate-100">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Font Scale</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Font Scale</p>
                 <p className="text-sm font-bold text-slate-800 mt-1 capitalize">{appSettings?.fontScale || 'Default'}</p>
               </div>
               <div className="bg-white rounded-xl p-3 border border-slate-100">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Readability</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Readability</p>
                 <p className="text-sm font-bold text-slate-800 mt-1 capitalize">{appSettings?.readability || 'Normal'}</p>
               </div>
               <div className="bg-white rounded-xl p-3 border border-slate-100">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Theme</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Theme</p>
                 <p className="text-sm font-bold text-slate-800 mt-1 capitalize">{appSettings?.theme || 'Light'}</p>
               </div>
               <div className="bg-white rounded-xl p-3 border border-slate-100">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Navigation</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Navigation</p>
                 <p className="text-sm font-bold text-slate-800 mt-1 capitalize">{appSettings?.navigationApp || 'Google'}</p>
               </div>
             </div>
@@ -325,7 +325,7 @@ const SettingsPage = ({
       )}
 
       {activeTab === 'navigation' && (
-        <div className="card p-5 sm:p-8 space-y-3">
+        <div className="card p-5 sm:p-8 space-y-6">
           <div>
             <h3 className="text-heading text-slate-900 mb-2">Navigation</h3>
             <p className="text-body text-slate-500">Choose which GPS app opens first for turn-by-turn directions.</p>
@@ -348,7 +348,7 @@ const SettingsPage = ({
                     </div>
                     <div className="font-bold text-sm text-slate-900">{option.label}</div>
                     {active && (
-                      <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>
+                      <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>
                     )}
                   </button>
                 );
@@ -359,7 +359,7 @@ const SettingsPage = ({
       )}
 
       {activeTab === 'notifications' && (
-        <div className="card p-5 sm:p-8 space-y-3">
+        <div className="card p-5 sm:p-8 space-y-6">
           <div>
             <h3 className="text-heading text-slate-900 mb-2">Notifications</h3>
             <p className="text-body text-slate-500">Choose which alerts you receive while on duty.</p>

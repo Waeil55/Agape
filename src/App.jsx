@@ -1119,7 +1119,7 @@ const App = () => {
               <div className="absolute inset-0 bg-blue-600 blur-2xl opacity-10 animate-pulse" />
               <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain relative z-10" />
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 mb-3 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
+            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 mb-3 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
             <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 rounded-full border border-blue-100">
               <ShieldCheck size={16} className="text-blue-600" />
               <p className="text-xs font-black text-blue-800 uppercase tracking-[0.2em]">Enterprise Fleet OS</p>
@@ -1148,7 +1148,7 @@ const App = () => {
                         <Icon size={24} strokeWidth={2.5} />
                       </div>
                       <div className="flex-1">
-                        <span className="block text-lg font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
+                        <span className="block text-xl font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
                         <span className="block text-sm font-medium text-slate-500 mt-0.5">{r.sub}</span>
                       </div>
                       <ArrowRight size={20} className="text-slate-300 group-hover:text-blue-600 transition-all transform group-hover:translate-x-1" />
@@ -1197,7 +1197,7 @@ const App = () => {
         </div>
         
         <div className="mt-12 flex flex-col items-center gap-4 relative z-10">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.3em] text-center opacity-60">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] text-center opacity-60">
             Agape Care Cloud Infrastructure<br />
             Certified Enterprise Environment
           </p>
@@ -1245,11 +1245,11 @@ const App = () => {
           
           <div className="bg-emerald-50 rounded-2xl p-4 mb-6 border border-emerald-100">
             <p className="text-sm font-bold text-emerald-900">Assigning {selectedTasks.length} Trips</p>
-            <p className="text-sm font-medium text-emerald-700 mt-0.5">Select a driver below to assign all selected tasks.</p>
+            <p className="text-[11px] font-medium text-emerald-700 mt-0.5">Select a driver below to assign all selected tasks.</p>
           </div>
 
           <div className="space-y-3">
-            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Available Fleet</h4>
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Available Fleet</h4>
             <div className="grid grid-cols-1 gap-2">
               {drivers.map(d => (
                 <button key={d.id} onClick={() => bulkAssignTrips(d.id)} className="w-full flex items-center justify-between p-4 bg-white/50 border border-slate-200 rounded-2xl hover:bg-white hover:border-blue-300 hover:shadow-md transition-all group text-left">
@@ -1259,12 +1259,12 @@ const App = () => {
                     </div>
                     <div>
                       <p className="text-sm font-bold text-slate-900">{d.name}</p>
-                      <p className="text-xs font-medium text-slate-500">{d.vehicle || 'No Vehicle'} &bull; {d.status}</p>
+                      <p className="text-[10px] font-medium text-slate-500">{d.vehicle || 'No Vehicle'} &bull; {d.status}</p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <Badge variant={d.status === 'Available' ? 'success' : 'warning'}>{d.status}</Badge>
-                    <span className="text-xs font-bold text-blue-600">Assign &rarr;</span>
+                    <span className="text-[9px] font-bold text-blue-600">Assign &rarr;</span>
                   </div>
                 </button>
               ))}
@@ -1289,7 +1289,7 @@ const App = () => {
               </div>
               <div>
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900">AI Chain-Route</h3>
-                <p className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-widest">Target: {smartAssignTrip.patient}</p>
+                <p className="text-[11px] font-bold text-slate-500 mt-1 uppercase tracking-widest">Target: {smartAssignTrip.patient}</p>
               </div>
             </div>
             <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
@@ -1315,7 +1315,7 @@ const App = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Target size={14} /> AI Assignment Result</h4>
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Target size={14} /> AI Assignment Result</h4>
               {smartAssignResult && smartAssignResult.driverId ? (
                 (() => {
                   const d = drivers.find(drv => drv.id === smartAssignResult.driverId);
@@ -1327,13 +1327,13 @@ const App = () => {
                   const btnClass = isHighScore ? 'bg-emerald-600 shadow-emerald-500/20' : isMidScore ? 'bg-amber-600 shadow-amber-500/20' : 'bg-slate-600 shadow-slate-500/20';
                   return (
                     <div className={`border ${borderClass} rounded-[1.5rem] p-5 shadow-sm relative overflow-hidden`}>
-                      <div className={`absolute top-0 right-0 ${badgeClass} text-white px-3 py-1 rounded-bl-xl font-bold text-xs tracking-wider`}>{smartAssignResult.score}% Match</div>
+                      <div className={`absolute top-0 right-0 ${badgeClass} text-white px-3 py-1 rounded-bl-xl font-bold text-[10px] tracking-wider`}>{smartAssignResult.score}% Match</div>
                       <div className="flex justify-between items-start gap-4">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 rounded-[1rem] bg-slate-200/50 text-slate-700 flex items-center justify-center font-black">{d.name.split(' ').map(n => n[0]).join('')}</div>
                           <div>
                             <h4 className="text-lg font-black text-slate-900">{d.name}</h4>
-                            <p className="text-sm font-bold text-slate-500">{d.vehicle} &bull; {d.dist}</p>
+                            <p className="text-[11px] font-bold text-slate-500">{d.vehicle} &bull; {d.dist}</p>
                           </div>
                         </div>
                         <button onClick={() => assignTripToDriver(smartAssignTrip.id, d.id)} className={`${btnClass} text-white px-5 py-2.5 rounded-[1rem] font-bold text-sm active:scale-95 transition-all shadow-md`}>Assign</button>
@@ -1378,7 +1378,7 @@ const App = () => {
               </div>
               <div>
                 <h3 className="text-xl font-black text-slate-900">Manual Assignment</h3>
-                <p className="text-xs font-bold text-slate-500 mt-0.5 uppercase tracking-widest">Assign: {manualAssignTrip.patient}</p>
+                <p className="text-[10px] font-bold text-slate-500 mt-0.5 uppercase tracking-widest">Assign: {manualAssignTrip.patient}</p>
               </div>
             </div>
             <button onClick={() => setManualAssignTrip(null)} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
@@ -1387,7 +1387,7 @@ const App = () => {
           <div className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-thin">
             {availableDrivers.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5"><CheckCircle2 size={12} /> Available Fleet</h4>
+                <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5"><CheckCircle2 size={12} /> Available Fleet</h4>
                 <div className="grid grid-cols-1 gap-2">
                   {availableDrivers.map(d => (
                     <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
@@ -1396,7 +1396,7 @@ const App = () => {
                         <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">{d.name.charAt(0)}</div>
                         <div className="text-left">
                           <p className="text-sm font-bold text-slate-900">{d.name}</p>
-                          <p className="text-xs font-medium text-slate-500">{d.vehicle} • {d.currentZone}</p>
+                          <p className="text-[10px] font-medium text-slate-500">{d.vehicle} • {d.currentZone}</p>
                         </div>
                       </div>
                       <ArrowRight size={16} className="text-emerald-400 group-hover:translate-x-1 transition-transform" />
@@ -1408,7 +1408,7 @@ const App = () => {
             
             {otherDrivers.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><Clock size={12} /> Other Drivers ({otherDrivers.length})</h4>
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><Clock size={12} /> Other Drivers ({otherDrivers.length})</h4>
                 <div className="grid grid-cols-1 gap-2">
                   {otherDrivers.map(d => (
                     <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
@@ -1417,7 +1417,7 @@ const App = () => {
                         <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold">{d.name.charAt(0)}</div>
                         <div className="text-left">
                           <p className="text-sm font-bold text-slate-900">{d.name}</p>
-                          <p className="text-xs font-medium text-slate-500">{d.status} • {d.vehicle}</p>
+                          <p className="text-[10px] font-medium text-slate-500">{d.status} • {d.vehicle}</p>
                         </div>
                       </div>
                       <ArrowRight size={16} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
@@ -1510,8 +1510,8 @@ const today = getTodayStr();
                   <input type="text" placeholder="Search Agape Care manifests..." className="w-full pl-12 pr-4 py-3 bg-slate-100/50 border border-slate-200/50 rounded-[1rem] focus:bg-white focus:border-blue-500 font-semibold text-sm transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 </div>
                 <div className="bg-slate-100/50 p-1 rounded-[1.2rem] flex shrink-0">
-                  <button onClick={() => setShowDispatcherArchive(false)} className={`px-4 py-2 rounded-[0.8rem] text-sm font-bold transition-all ${!showDispatcherArchive ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>Live</button>
-                  <button onClick={() => setShowDispatcherArchive(true)} className={`px-4 py-2 rounded-[0.8rem] text-sm font-bold transition-all flex items-center gap-1 ${showDispatcherArchive ? 'bg-white shadow-sm text-rose-600' : 'text-slate-500'}`}>
+                  <button onClick={() => setShowDispatcherArchive(false)} className={`px-4 py-2 rounded-[0.8rem] text-[11px] font-bold transition-all ${!showDispatcherArchive ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>Live</button>
+                  <button onClick={() => setShowDispatcherArchive(true)} className={`px-4 py-2 rounded-[0.8rem] text-[11px] font-bold transition-all flex items-center gap-1 ${showDispatcherArchive ? 'bg-white shadow-sm text-rose-600' : 'text-slate-500'}`}>
                     <ArchiveRestore size={12} /> ({trashedTrips.length})
                   </button>
                 </div>
@@ -1544,12 +1544,12 @@ const today = getTodayStr();
                             <p className="font-black text-rose-900 text-sm truncate line-through">{t.patient}</p>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <Badge variant="danger">Deleted</Badge>
-                              <span className="text-xs font-bold text-rose-400 uppercase tracking-widest">{t.bookingId || '—'} &bull; {t.time}</span>
+                              <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">{t.bookingId || '—'} &bull; {t.time}</span>
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-4 shrink-0">
-                          <button onClick={() => restoreTrip(t.id)} className="bg-emerald-100 text-emerald-800 px-3 py-2 rounded-[0.8rem] text-sm font-bold active:scale-95 flex items-center gap-1.5 transition-all">
+                          <button onClick={() => restoreTrip(t.id)} className="bg-emerald-100 text-emerald-800 px-3 py-2 rounded-[0.8rem] text-[11px] font-bold active:scale-95 flex items-center gap-1.5 transition-all">
                             <RefreshCcw size={14} /> Restore
                           </button>
                         </div>
@@ -1593,7 +1593,7 @@ const today = getTodayStr();
                                 <p className="font-bold text-amber-900 text-sm md:text-base truncate">{t.patient}</p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <Badge variant={t.status === 'Assigned' ? 'success' : 'warning'}>{t.status === 'Assigned' ? 'Assigned' : 'Awaiting Call'}</Badge>
-                                  <span className="text-xs font-medium text-amber-700/70">{t.bookingId || '—'} &bull; {t.type}</span>
+                                  <span className="text-[10px] font-medium text-amber-700/70">{t.bookingId || '—'} &bull; {t.type}</span>
                                   {isTripLate(t.time) && t.status !== 'Completed' && <Badge variant="danger">Late</Badge>}
                                 </div>
                               </div>
@@ -1601,11 +1601,11 @@ const today = getTodayStr();
                             <div className="flex items-center justify-between md:justify-end gap-2 md:gap-4 shrink-0">
                             {t.status === 'Unassigned' ? (
                                 <div className="flex gap-2 w-full md:w-auto">
-                                  <button onClick={() => triggerSmartAssign(t)} className="flex-1 md:flex-none bg-indigo-600 text-white px-3 py-2.5 rounded-[1rem] text-xs sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-500/10"><BrainCircuit size={14} /> AI</button>
-                                  <button onClick={() => setManualAssignTrip(t)} className="flex-1 md:flex-none bg-blue-600 text-white px-3 py-2.5 rounded-[1rem] text-xs sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/10"><Users size={14} /> Assign</button>
+                                  <button onClick={() => triggerSmartAssign(t)} className="flex-1 md:flex-none bg-indigo-600 text-white px-3 py-2.5 rounded-[1rem] text-[10px] sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-500/10"><BrainCircuit size={14} /> AI</button>
+                                  <button onClick={() => setManualAssignTrip(t)} className="flex-1 md:flex-none bg-blue-600 text-white px-3 py-2.5 rounded-[1rem] text-[10px] sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/10"><Users size={14} /> Assign</button>
                                 </div>
                               ) : (
-                                <div className="bg-emerald-50 text-emerald-800 px-3 py-2 rounded-[1rem] border border-emerald-100 text-xs sm:text-xs font-bold flex items-center gap-1.5"><CheckCircle2 size={12} /> {drivers.find(d => d.id === t.driverId)?.name}</div>
+                                <div className="bg-emerald-50 text-emerald-800 px-3 py-2 rounded-[1rem] border border-emerald-100 text-[10px] sm:text-xs font-bold flex items-center gap-1.5"><CheckCircle2 size={12} /> {drivers.find(d => d.id === t.driverId)?.name}</div>
                               )}
                               <button onClick={() => requestDeleteTrip(t.id)} className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-[1rem] active:scale-95 transition-all" title="Delete Trip"><Trash2 size={18} /></button>
                             </div>
@@ -1620,14 +1620,14 @@ const today = getTodayStr();
                           <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100 pl-9">
                             {t.pickupPhone && (
                               <>
-                                <a href={`tel:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-bold active:bg-emerald-200 transition-colors"><Phone size={12} /> {t.pickupPhone} <span className="text-xs font-medium opacity-70">Client</span></a>
-                                <a href={`sms:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm font-bold active:bg-blue-200 transition-colors"><MessageSquare size={12} /> SMS Client</a>
+                                <a href={`tel:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-bold active:bg-emerald-200 transition-colors"><Phone size={12} /> {t.pickupPhone} <span className="text-[9px] font-medium opacity-70">Client</span></a>
+                                <a href={`sms:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold active:bg-blue-200 transition-colors"><MessageSquare size={12} /> SMS Client</a>
                               </>
                             )}
                             {t.dropoffPhone && (
                               <>
-                                <a href={`tel:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold active:bg-slate-200 transition-colors"><Building2 size={12} /> {t.dropoffPhone} <span className="text-xs font-medium opacity-70">Hospital</span></a>
-                                <a href={`sms:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold active:bg-slate-200 transition-colors"><MessageSquare size={12} /> SMS Hosp</a>
+                                <a href={`tel:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold active:bg-slate-200 transition-colors"><Building2 size={12} /> {t.dropoffPhone} <span className="text-[9px] font-medium opacity-70">Hospital</span></a>
+                                <a href={`sms:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold active:bg-slate-200 transition-colors"><MessageSquare size={12} /> SMS Hosp</a>
                               </>
                             )}
                           </div>
@@ -1676,7 +1676,7 @@ const today = getTodayStr();
                               <p className="font-bold text-slate-900 text-sm md:text-base truncate">{t.patient}</p>
                               <div className="flex items-center gap-2 mt-1">
                                 <Badge variant={t.status === 'Unassigned' ? 'danger' : 'success'}>{t.status}</Badge>
-                                <span className="text-xs font-medium text-slate-500">{t.time}</span>
+                                <span className="text-[10px] font-medium text-slate-500">{t.time}</span>
                                 {isTripLate(t.time) && t.status !== 'Completed' && <Badge variant="danger">Late</Badge>}
                               </div>
                             </div>
@@ -1684,11 +1684,11 @@ const today = getTodayStr();
                           <div className="flex items-center justify-between md:justify-end gap-2 md:gap-4 shrink-0">
                             {t.status === 'Unassigned' ? (
                                 <div className="flex gap-2 w-full md:w-auto">
-                                  <button onClick={() => triggerSmartAssign(t)} className="flex-1 md:flex-none bg-indigo-600 text-white px-3 py-2.5 rounded-[1rem] text-xs sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-500/10"><BrainCircuit size={14} /> AI</button>
-                                  <button onClick={() => setManualAssignTrip(t)} className="flex-1 md:flex-none bg-blue-600 text-white px-3 py-2.5 rounded-[1rem] text-xs sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/10"><Users size={14} /> Assign</button>
+                                  <button onClick={() => triggerSmartAssign(t)} className="flex-1 md:flex-none bg-indigo-600 text-white px-3 py-2.5 rounded-[1rem] text-[10px] sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-500/10"><BrainCircuit size={14} /> AI</button>
+                                  <button onClick={() => setManualAssignTrip(t)} className="flex-1 md:flex-none bg-blue-600 text-white px-3 py-2.5 rounded-[1rem] text-[10px] sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/10"><Users size={14} /> Assign</button>
                                 </div>
                               ) : (
-                                <div className="bg-emerald-50 text-emerald-800 px-3 py-2 rounded-[1rem] border border-emerald-100 text-xs sm:text-xs font-bold flex items-center gap-1.5"><CheckCircle2 size={12} /> {drivers.find(d => d.id === t.driverId)?.name || 'Assigned'}</div>
+                                <div className="bg-emerald-50 text-emerald-800 px-3 py-2 rounded-[1rem] border border-emerald-100 text-[10px] sm:text-xs font-bold flex items-center gap-1.5"><CheckCircle2 size={12} /> {drivers.find(d => d.id === t.driverId)?.name || 'Assigned'}</div>
                               )}
                             <button onClick={() => requestDeleteTrip(t.id)} className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-[1rem] active:scale-95 transition-all" title="Delete Trip"><Trash2 size={18} /></button>
                           </div>
@@ -1700,21 +1700,21 @@ const today = getTodayStr();
                              </div>
                           </div>
                         )}
-                        <div className="mt-3 pl-9 text-sm font-medium text-slate-500 flex flex-col gap-1">
+                        <div className="mt-3 pl-9 text-[11px] font-medium text-slate-500 flex flex-col gap-1">
                           <p className="flex items-center gap-2 truncate"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span> {t.pickup}</p>
                           <p className="flex items-center gap-2 truncate"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span> {t.dropoff}</p>
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2 pl-9">
                           {t.pickupPhone && (
                             <>
-                              <a href={`tel:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold active:bg-emerald-200 transition-colors"><Phone size={11} /> Client</a>
-                              <a href={`sms:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold active:bg-blue-200 transition-colors"><MessageSquare size={11} /> SMS</a>
+                              <a href={`tel:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold active:bg-emerald-200 transition-colors"><Phone size={11} /> Client</a>
+                              <a href={`sms:${t.pickupPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold active:bg-blue-200 transition-colors"><MessageSquare size={11} /> SMS</a>
                             </>
                           )}
                           {t.dropoffPhone && (
                             <>
-                              <a href={`tel:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold active:bg-slate-200 transition-colors"><Building2 size={11} /> Hospital</a>
-                              <a href={`sms:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold active:bg-slate-200 transition-colors"><MessageSquare size={11} /> SMS</a>
+                              <a href={`tel:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold active:bg-slate-200 transition-colors"><Building2 size={11} /> Hospital</a>
+                              <a href={`sms:${t.dropoffPhone.replace(/[^0-9]/g, '')}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold active:bg-slate-200 transition-colors"><MessageSquare size={11} /> SMS</a>
                             </>
                           )}
                         </div>
@@ -1729,7 +1729,7 @@ const today = getTodayStr();
           <div className="lg:col-span-4 space-y-4 sm:space-y-6">
             <div className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] p-4 sm:p-6 border border-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
-                <h3 className="text-[9px] sm:text-[10px] font-black text-slate-900">Live Fleet</h3>
+                <h3 className="text-sm sm:text-base font-black text-slate-900">Live Fleet</h3>
                 <div className="flex items-center gap-3">
                   {role === 'admin' && <button className="p-1.5 sm:p-2 bg-slate-100 hover:bg-slate-200 rounded-lg sm:rounded-[1rem] text-slate-600 active:scale-95 transition-all" title="Add Driver/Vehicle"><Plus size={14} /></button>}
                   <span className="relative flex h-2 w-2.5">
@@ -1745,15 +1745,15 @@ const today = getTodayStr();
                     <div key={d.id} className={`p-3 sm:p-4 rounded-xl sm:rounded-[1.5rem] active:scale-[0.98] transition-all cursor-pointer ${isMaintenanceDue ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100/50'}`}>
                       <div className="flex items-center justify-between mb-2 sm:mb-3">
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                          <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-lg sm:rounded-[1rem] bg-blue-100 text-blue-600 flex items-center justify-center font-bold shrink-0 text-[9px] sm:text-[10px]">{d.name.charAt(0)}</div>
+                          <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-lg sm:rounded-[1rem] bg-blue-100 text-blue-600 flex items-center justify-center font-bold shrink-0 text-xs sm:text-sm">{d.name.charAt(0)}</div>
                           <div className="min-w-0">
-                            <p className="font-bold text-[9px] sm:text-[10px] truncate text-slate-900">{d.name}</p>
-                            <p className="text-xs sm:text-xs font-medium text-slate-500 flex items-center gap-1 truncate"><MapPin size={8} className="text-blue-500 shrink-0" /> {d.currentZone}</p>
+                            <p className="font-bold text-xs sm:text-sm truncate text-slate-900">{d.name}</p>
+                            <p className="text-[9px] sm:text-[10px] font-medium text-slate-500 flex items-center gap-1 truncate"><MapPin size={8} className="text-blue-500 shrink-0" /> {d.currentZone}</p>
                           </div>
                         </div>
                         <div className={`w-2 h-2.5 rounded-full ${d.status === 'Available' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
                       </div>
-                      <div className="flex items-center justify-between text-xs sm:text-xs font-bold text-slate-500">
+                      <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-bold text-slate-500">
                         <div className="flex items-center gap-2">
                           <span>{d.vehicle}</span>
                           {d.phone && (
@@ -1773,14 +1773,14 @@ const today = getTodayStr();
             </div>
 
             <div className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] p-4 sm:p-6 border border-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
-              <h3 className="text-[9px] sm:text-[10px] font-black text-slate-900 mb-3 sm:mb-4 flex items-center gap-2"><Activity size={16} className="text-indigo-600" /> System Pulse</h3>
+              <h3 className="text-sm sm:text-base font-black text-slate-900 mb-3 sm:mb-4 flex items-center gap-2"><Activity size={16} className="text-indigo-600" /> System Pulse</h3>
               <div className="space-y-1 sm:space-y-2 max-h-48 sm:max-h-60 overflow-y-auto">
                 {logs.slice(0, 5).map((log, idx) => (
                   <div key={idx} className="flex items-start gap-2 p-1.5 sm:p-2 rounded-lg hover:bg-slate-50">
                     <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${log.c === 'amber' ? 'bg-amber-500' : log.c === 'blue' ? 'bg-blue-500' : log.c === 'rose' ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
                     <div className="min-w-0">
-                      <p className="text-sm sm:text-xs font-bold text-slate-900 truncate">{log.t}</p>
-                      <p className={`text-xs sm:text-xs ${getLogTextColor(log.c)} truncate`}>{log.d}</p>
+                      <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">{log.t}</p>
+                      <p className={`text-[9px] sm:text-[10px] ${getLogTextColor(log.c)} truncate`}>{log.d}</p>
                     </div>
                   </div>
                 ))}
@@ -1801,11 +1801,11 @@ const today = getTodayStr();
       <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
       {/* HEADER */}
       <header className="bg-white shadow-sm border-b border-slate-200" style={{paddingTop: 'var(--sat)'}}>
-        <div className="max-w-full px-3 sm:px-4 py-2.5 sm:py-3 flex justify-between items-center">
+        <div className="max-w-full px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <img src="/agape.png" alt="Agape Care" className="w-9 sm:w-10 h-9 sm:h-10 rounded-lg shrink-0 shadow-sm" />
+            <img src="/agape.png" alt="Agape Care" className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl shrink-0 shadow-sm" />
             <div className="min-w-0">
-              <h1 className="text-xs sm:text-sm font-extrabold text-slate-900 truncate leading-tight tracking-tight">Agape Care</h1>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 truncate leading-tight tracking-tight">Agape Care</h1>
               <p className="hidden sm:block text-sm text-slate-500 font-medium">Fleet Management System</p>
             </div>
           </div>
@@ -1857,7 +1857,7 @@ const today = getTodayStr();
         <>
           {/* NAVIGATION TABS */}
           <div className="nav-blur sticky top-0 z-40 overflow-x-auto">
-            <div className="max-w-full px-1.5 sm:px-3 flex gap-0.5 sm:gap-1 whitespace-nowrap">
+            <div className="max-w-full px-3 sm:px-6 flex gap-1 sm:gap-2 whitespace-nowrap">
               {(() => {
                 const allTabs = [
                   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -1893,7 +1893,7 @@ const today = getTodayStr();
                       setActiveTab(tab.id);
                       if (role === 'dispatcher') setSearchQuery('');
                     }}
-                    className={`py-2 sm:py-2.5 px-2 sm:px-2.5 border-b-2 font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition text-[9px] sm:text-[10px] ${
+                    className={`py-3 sm:py-4 px-3 sm:px-4 border-b-2 font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition text-sm sm:text-base ${
                       activeTab === tab.id
                         ? 'border-blue-600 text-blue-600'
                         : 'border-transparent text-slate-500 hover:text-blue-600'
@@ -1903,7 +1903,7 @@ const today = getTodayStr();
                       <span className="relative inline-flex">
                         <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
                         {chatUnreadCount > 0 && (
-                          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1 leading-none shadow-sm">
+                          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1 leading-none shadow-sm">
                             {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
                           </span>
                         )}
@@ -1967,7 +1967,7 @@ const today = getTodayStr();
                     >
                       <Upload size={24} className="mb-2 sm:mb-3" />
                       <h3 className="text-base sm:text-lg font-bold mb-1">Upload Trips</h3>
-                      <p className="text-[9px] sm:text-[10px] opacity-90">Import from CSV/Excel</p>
+                      <p className="text-xs sm:text-sm opacity-90">Import from CSV/Excel</p>
                     </button>
                     <button
                       onClick={() => setActiveTab('trips')}
@@ -1975,7 +1975,7 @@ const today = getTodayStr();
                     >
                       <Zap size={24} className="mb-2 sm:mb-3" />
                       <h3 className="text-base sm:text-lg font-bold mb-1">Create Trip</h3>
-                      <p className="text-[9px] sm:text-[10px] opacity-90">Manually create a new trip</p>
+                      <p className="text-xs sm:text-sm opacity-90">Manually create a new trip</p>
                     </button>
                   </div>
                 )}
@@ -1986,7 +1986,7 @@ const today = getTodayStr();
                         <FileText size={48} className="text-blue-600" />
                       </div>
                       <h3 className="text-micro">Active Manifest</h3>
-                      <p className="text-3xl font-black text-slate-900 mt-2 tracking-tight">{trips.length}</p>
+                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">{trips.length}</p>
                       <div className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-500">
                         <Zap size={12} /> +12% from yesterday
                       </div>
@@ -1996,7 +1996,7 @@ const today = getTodayStr();
                         <Truck size={48} className="text-emerald-600" />
                       </div>
                       <h3 className="text-micro">Fleet Ready</h3>
-                      <p className="text-3xl font-black text-slate-900 mt-2 tracking-tight">{drivers.filter(d => d.status === 'Available').length}/{drivers.length}</p>
+                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">{drivers.filter(d => d.status === 'Available').length}/{drivers.length}</p>
                       <div className="mt-2 flex items-center gap-1 text-xs font-bold text-blue-500">
                         <Activity size={12} /> Operational
                       </div>
@@ -2006,7 +2006,7 @@ const today = getTodayStr();
                         <Target size={48} className="text-rose-600" />
                       </div>
                       <h3 className="text-micro">Completion Rate</h3>
-                      <p className="text-3xl font-black text-slate-900 mt-2 tracking-tight">
+                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">
                         {trips.length > 0 ? Math.round((trips.filter(t => t.status === 'Completed').length / trips.length) * 100) : 0}%
                       </p>
                       <div className="mt-2 flex items-center gap-1 text-xs font-bold text-rose-500">
@@ -2018,7 +2018,7 @@ const today = getTodayStr();
                         <ShieldCheck size={48} className="text-indigo-600" />
                       </div>
                       <h3 className="text-micro">Security Status</h3>
-                      <p className="text-3xl font-black text-slate-900 mt-2 tracking-tight">v4.2</p>
+                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">v4.2</p>
                       <div className="mt-2 flex items-center gap-1 text-xs font-bold text-indigo-500">
                         <Lock size={12} /> HIPAA Encrypted
                       </div>

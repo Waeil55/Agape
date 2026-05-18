@@ -15,7 +15,7 @@ const Badge = ({ children, variant = 'info' }) => {
   };
 
   return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>
+    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>
       {children}
     </span>
   );
@@ -230,10 +230,10 @@ const ReportsPage = ({ trips = [], drivers = [], onUpdateTrip, role }) => {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl sm:text-xl font-black text-slate-900 tracking-tight">Reports</h2>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Reports</h2>
           <p className="text-sm text-slate-500 mt-1">Daily completed-work reports with optional no-show and cancelled review.</p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
@@ -252,20 +252,20 @@ const ReportsPage = ({ trips = [], drivers = [], onUpdateTrip, role }) => {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-xs uppercase tracking-widest text-slate-500 font-black">Rows</p>
-          <p className="text-xl font-black text-slate-900 mt-1">{stats.total}</p>
+          <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Rows</p>
+          <p className="text-2xl font-black text-slate-900 mt-1">{stats.total}</p>
         </div>
         <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 shadow-sm">
-          <p className="text-xs uppercase tracking-widest text-emerald-600 font-black">Completed</p>
-          <p className="text-xl font-black text-emerald-700 mt-1">{stats.completed}</p>
+          <p className="text-[10px] uppercase tracking-widest text-emerald-600 font-black">Completed</p>
+          <p className="text-2xl font-black text-emerald-700 mt-1">{stats.completed}</p>
         </div>
         <div className="bg-rose-50 p-4 rounded-xl border border-rose-200 shadow-sm">
-          <p className="text-xs uppercase tracking-widest text-rose-600 font-black">No Show</p>
-          <p className="text-xl font-black text-rose-700 mt-1">{stats.noShow}</p>
+          <p className="text-[10px] uppercase tracking-widest text-rose-600 font-black">No Show</p>
+          <p className="text-2xl font-black text-rose-700 mt-1">{stats.noShow}</p>
         </div>
         <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 shadow-sm">
-          <p className="text-xs uppercase tracking-widest text-amber-600 font-black">Cancelled</p>
-          <p className="text-xl font-black text-amber-700 mt-1">{stats.cancelled}</p>
+          <p className="text-[10px] uppercase tracking-widest text-amber-600 font-black">Cancelled</p>
+          <p className="text-2xl font-black text-amber-700 mt-1">{stats.cancelled}</p>
         </div>
       </div>
 
@@ -294,7 +294,7 @@ const ReportsPage = ({ trips = [], drivers = [], onUpdateTrip, role }) => {
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-slate-600 mb-1">Status</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Status</label>
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
@@ -307,7 +307,7 @@ const ReportsPage = ({ trips = [], drivers = [], onUpdateTrip, role }) => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-slate-600 mb-1">Driver</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Driver</label>
             <select
               value={driverFilter}
               onChange={(event) => setDriverFilter(event.target.value)}
@@ -342,7 +342,7 @@ const ReportsPage = ({ trips = [], drivers = [], onUpdateTrip, role }) => {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1850px] text-sm">
+              <table className="w-full min-w-[1850px] text-[11px]">
                 <thead className="bg-slate-800 text-white">
                   <tr>
                     <th className="p-2 text-left whitespace-nowrap w-10"></th>
@@ -367,8 +367,8 @@ const ReportsPage = ({ trips = [], drivers = [], onUpdateTrip, role }) => {
                   {dayTrips.map((trip) => {
                     const isEditing = editingId === trip.id;
                     const statusVariant = trip.status === 'Completed' ? 'success' : trip.status === 'No Show' ? 'danger' : 'warning';
-                    const inputClass = "w-full min-w-[70px] px-1.5 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:border-blue-500 bg-blue-50/50";
-                    const selectClass = "w-full min-w-[70px] px-1.5 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:border-blue-500 bg-blue-50/50";
+                    const inputClass = "w-full min-w-[70px] px-1.5 py-1 border border-blue-300 rounded text-[11px] focus:outline-none focus:border-blue-500 bg-blue-50/50";
+                    const selectClass = "w-full min-w-[70px] px-1.5 py-1 border border-blue-300 rounded text-[11px] focus:outline-none focus:border-blue-500 bg-blue-50/50";
                     const tsVal = (v) => {
                       if (!v) return '';
                       const d = new Date(v);

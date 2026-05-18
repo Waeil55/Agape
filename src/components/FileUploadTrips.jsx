@@ -199,7 +199,7 @@ const Badge = ({ children, variant = 'info' }) => {
     info: "bg-blue-50 text-blue-700 border-blue-100",
     ai: "bg-indigo-50 text-indigo-700 border-indigo-100",
   };
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
+  return <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
 };
 
 const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' }) => {
@@ -465,13 +465,13 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
     : 100;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       {step === 'upload' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-8">
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-lg sm:text-lg font-bold text-slate-900 mb-2">Upload Trips</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">Upload Trips</h2>
             <p className="text-sm sm:text-base text-slate-600 mb-2">Import from CSV (.csv) or Excel (.xlsx / .xls).</p>
-            <p className="text-xs sm:text-xs text-slate-500 mb-6 flex items-center gap-1"><BrainCircuit size={12} className="text-indigo-500 shrink-0" /> AI auto-validates addresses, times, and fields for accuracy.</p>
+            <p className="text-[10px] sm:text-xs text-slate-500 mb-6 flex items-center gap-1"><BrainCircuit size={12} className="text-indigo-500 shrink-0" /> AI auto-validates addresses, times, and fields for accuracy.</p>
 
             {error && (
               <div className="p-3 sm:p-4 bg-rose-50 border border-rose-200 rounded-lg flex gap-3 items-start mb-6">
@@ -486,7 +486,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
               </div>
               <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-1">Drag & drop your file here</h3>
               <p className="text-slate-500 text-xs sm:text-sm mb-3 sm:mb-4">or click to browse</p>
-              <p className="text-xs sm:text-sm text-slate-400 font-medium">Supports .csv, .xlsx, .xls &bull; Auto-detects columns</p>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium">Supports .csv, .xlsx, .xls &bull; Auto-detects columns</p>
               <input id="fu-file-input" type="file" accept=".csv,.xlsx,.xls" onChange={handleInputChange} className="hidden" />
             </div>
 
@@ -495,7 +495,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                 <FileText size={20} className="text-blue-600 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-slate-900 text-sm truncate">{file.name}</p>
-                  <p className="text-xs sm:text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
+                  <p className="text-[10px] sm:text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
                 </div>
                 <button onClick={() => setFile(null)} className="text-slate-400 hover:text-rose-600 p-1 shrink-0">&times;</button>
               </div>
@@ -514,7 +514,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
 
             <details className="mt-4 sm:mt-6 text-xs sm:text-sm text-slate-500">
               <summary className="cursor-pointer font-medium text-slate-600 hover:text-slate-800">Column name guide</summary>
-              <div className="mt-3 p-3 sm:p-4 bg-slate-50 rounded-lg text-xs sm:text-xs font-mono text-slate-600 space-y-1">
+              <div className="mt-3 p-3 sm:p-4 bg-slate-50 rounded-lg text-[10px] sm:text-xs font-mono text-slate-600 space-y-1">
                 <p><span className="font-bold text-slate-800">Auto-detected</span> &mdash; just use common labels like:</p>
                 <p className="pl-3">Client Name, Pickup Address, Dropoff Address, Phone, Pickup Time, etc.</p>
                 <p className="mt-2 text-slate-400">Any column layout is supported.</p>
@@ -532,12 +532,12 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
               <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
               <FileText className="absolute inset-0 m-auto text-blue-600 animate-pulse" size={24} />
             </div>
-            <h3 className="text-lg sm:text-lg font-bold text-slate-900 mb-2">Processing File</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">Processing File</h3>
             <p className="text-slate-500 text-xs sm:text-sm mb-4">{progressMsg}</p>
             <div className="w-full bg-slate-100 rounded-full h-2 mb-4">
               <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }}></div>
             </div>
-            <div className="space-y-1.5 text-xs sm:text-xs text-left text-slate-500">
+            <div className="space-y-1.5 text-[10px] sm:text-xs text-left text-slate-500">
               <p className="flex items-center gap-2"><CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> File read successfully</p>
               <p className="flex items-center gap-2">{progressPct >= 12 ? <CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> : <Loader size={12} className="animate-spin text-blue-500 shrink-0" />} Rows parsed &amp; columns mapped</p>
               <p className="flex items-center gap-2">{progressPct >= 15 ? <Loader size={12} className={`animate-spin ${aiEnabled ? 'text-indigo-500' : 'text-slate-300'} shrink-0`} /> : <Info size={12} className="text-slate-300 shrink-0" />} {aiEnabled ? 'AI validating data...' : 'Ready for review'}</p>
@@ -547,14 +547,14 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
       )}
 
       {step === 'review' && (
-        <div className="space-y-4 sm:space-y-3">
+        <div className="space-y-4 sm:space-y-6">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
             <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
               <div className={`w-10 sm:w-12 h-10 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${withIssues === 0 ? 'bg-emerald-100' : 'bg-amber-100'}`}>
                 {withIssues === 0 ? <CheckCircle2 size={22} className="text-emerald-600" /> : <AlertTriangle size={22} className="text-amber-600" />}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-lg sm:text-lg font-bold text-slate-900">Import Review</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-slate-900">Import Review</h3>
                 <p className="text-xs sm:text-sm text-slate-500 truncate">
                   {mappedTrips.length} trip{ mappedTrips.length !== 1 ? 's' : '' } extracted
                   {withIssues > 0 ? ` — ${withIssues} with warnings` : ' — all clean' }
@@ -564,33 +564,33 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
 
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
               <div className="bg-blue-50 p-3 sm:p-4 rounded-xl">
-                <p className="text-xs sm:text-xs text-blue-600 font-semibold mb-1">Total</p>
+                <p className="text-[10px] sm:text-xs text-blue-600 font-semibold mb-1">Total</p>
                 <p className="text-lg sm:text-2xl font-bold text-blue-700">{mappedTrips.length}</p>
-                <p className="text-xs sm:text-xs text-blue-500">from file</p>
+                <p className="text-[9px] sm:text-[10px] text-blue-500">from file</p>
               </div>
               <div className="bg-emerald-50 p-3 sm:p-4 rounded-xl">
-                <p className="text-xs sm:text-xs text-emerald-600 font-semibold mb-1">Clean</p>
+                <p className="text-[10px] sm:text-xs text-emerald-600 font-semibold mb-1">Clean</p>
                 <p className="text-lg sm:text-2xl font-bold text-emerald-700">{mappedTrips.length - withIssues}</p>
-                <p className="text-xs sm:text-xs text-emerald-500">no issues</p>
+                <p className="text-[9px] sm:text-[10px] text-emerald-500">no issues</p>
               </div>
               <div className={`p-3 sm:p-4 rounded-xl ${withIssues > 0 ? 'bg-amber-50' : 'bg-slate-50'}`}>
-                <p className="text-xs sm:text-xs text-slate-600 font-semibold mb-1">Warnings</p>
+                <p className="text-[10px] sm:text-xs text-slate-600 font-semibold mb-1">Warnings</p>
                 <p className={`text-lg sm:text-2xl font-bold ${withIssues > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{withIssues}</p>
-                <p className="text-xs sm:text-xs text-slate-500">flagged</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-500">flagged</p>
               </div>
               <div className="bg-indigo-50 p-3 sm:p-4 rounded-xl">
-                <p className="text-xs sm:text-xs text-indigo-600 font-semibold mb-1">AI Confidence</p>
+                <p className="text-[10px] sm:text-xs text-indigo-600 font-semibold mb-1">AI Confidence</p>
                 <p className="text-lg sm:text-2xl font-bold text-indigo-700">{avgConfidence}%</p>
-                <p className="text-xs sm:text-xs text-indigo-500">avg score</p>
+                <p className="text-[9px] sm:text-[10px] text-indigo-500">avg score</p>
               </div>
             </div>
 
             {allColumnNames.length > 0 && (
               <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-slate-50 rounded-xl">
-                <p className="text-xs sm:text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1"><Info size={12} /> Detected columns:</p>
+                <p className="text-[10px] sm:text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1"><Info size={12} /> Detected columns:</p>
                 <div className="flex flex-wrap gap-1 sm:gap-2">
                   {Object.entries(detectedColumns).map(([field, col]) => (
-                    <span key={field} className={`text-xs sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded font-semibold ${col ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <span key={field} className={`text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded font-semibold ${col ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                       {field}: {col || 'not found'}
                     </span>
                   ))}
@@ -600,17 +600,17 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
 
             {allColumnNames.length > 0 && (
               <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2">
-                <span className="text-xs sm:text-xs font-semibold text-slate-600">All columns:</span>
+                <span className="text-[10px] sm:text-xs font-semibold text-slate-600">All columns:</span>
                 <div className="flex flex-wrap gap-1">
                   {allColumnNames.map((col, idx) => (
-                    <span key={idx} className="text-xs sm:text-xs px-1 sm:px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-mono">{col}</span>
+                    <span key={idx} className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-mono">{col}</span>
                   ))}
                 </div>
               </div>
             )}
 
             <div className="overflow-x-auto border border-slate-200 rounded-xl">
-              <table className="w-full text-xs sm:text-xs">
+              <table className="w-full text-[10px] sm:text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">#</th>
@@ -627,10 +627,10 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                   {mappedTrips.map((trip, idx) => (
                     <tr key={idx} className={`border-b border-slate-100 hover:bg-slate-50 ${trip._hasIssues ? 'bg-amber-50/50' : ''}`}>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 font-mono text-slate-500">{idx + 1}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs font-semibold text-slate-900 whitespace-nowrap">{trip.patient}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.pickup}>{trip.pickup || <span className="text-rose-400 italic">missing</span>}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.dropoff}>{trip.dropoff || <span className="text-rose-400 italic">missing</span>}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 hidden sm:table-cell">{trip.time}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs font-semibold text-slate-900 whitespace-nowrap">{trip.patient}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.pickup}>{trip.pickup || <span className="text-rose-400 italic">missing</span>}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.dropoff}>{trip.dropoff || <span className="text-rose-400 italic">missing</span>}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs text-slate-600 hidden sm:table-cell">{trip.time}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
                         <select 
                           value={trip.driverId || ''} 
@@ -639,7 +639,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                             newTrips[idx].driverId = e.target.value;
                             setMappedTrips(newTrips);
                           }}
-                          className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
+                          className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
                         >
                           <option value="">Auto/Unassigned</option>
                           {drivers.map(d => (
@@ -651,11 +651,11 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                         {trip._hasIssues ? (
                           <div className="flex flex-col gap-0.5">
                             {trip._issues.slice(0, 1).map((issue, i) => (
-                              <span key={i} className="text-xs sm:text-xs text-amber-700 font-medium flex items-center gap-1"><AlertTriangle size={8} /> {issue}</span>
+                              <span key={i} className="text-[8px] sm:text-[9px] text-amber-700 font-medium flex items-center gap-1"><AlertTriangle size={8} /> {issue}</span>
                             ))}
-                            {trip._issues.length > 1 && <span className="text-xs sm:text-xs text-amber-500">+{trip._issues.length - 1} more</span>}
+                            {trip._issues.length > 1 && <span className="text-[8px] sm:text-[9px] text-amber-500">+{trip._issues.length - 1} more</span>}
                           </div>
-                        ) : <span className="text-emerald-500 text-xs sm:text-xs">&mdash;</span>}
+                        ) : <span className="text-emerald-500 text-[9px] sm:text-[10px]">&mdash;</span>}
                       </td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
                         <Badge variant={trip._confidence >= 90 ? 'success' : trip._confidence >= 70 ? 'warning' : 'danger'}>{trip._confidence}%</Badge>
@@ -673,7 +673,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                 </label>
                 <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-blue-100">
                   <input type="checkbox" id="assign-prompt" checked={showAssignPrompt} onChange={(e) => setShowAssignPrompt(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-                  <label htmlFor="assign-prompt" className="text-xs font-bold text-blue-600 uppercase tracking-widest cursor-pointer">Enable Assignment</label>
+                  <label htmlFor="assign-prompt" className="text-[10px] font-bold text-blue-600 uppercase tracking-widest cursor-pointer">Enable Assignment</label>
                 </div>
               </div>
 
@@ -694,11 +694,11 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                     )}
                   </div>
                   {assignToDriver && (
-                    <p className="text-xs text-emerald-700 font-black flex items-center gap-1.5 uppercase tracking-wider">
+                    <p className="text-[10px] text-emerald-700 font-black flex items-center gap-1.5 uppercase tracking-wider">
                       <CheckCircle2 size={12} /> All {mappedTrips.length} trips will default to {drivers.find(d => d.id === assignToDriver)?.name}
                     </p>
                   )}
-                  <p className="text-xs text-slate-500 font-bold italic">Tip: You can still override individual trips in the table below.</p>
+                  <p className="text-[10px] text-slate-500 font-bold italic">Tip: You can still override individual trips in the table below.</p>
                 </div>
               ) : (
                 <div className="p-4 border-2 border-dashed border-blue-100 rounded-xl text-center">

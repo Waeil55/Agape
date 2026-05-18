@@ -9,9 +9,9 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip }) => {
   );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg sm:text-lg font-bold text-slate-900">Archives</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">Archives</h2>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
@@ -30,7 +30,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip }) => {
         <div className="p-4 sm:p-6 border-b border-slate-200 flex items-center gap-3">
           <Archive size={20} className="text-slate-600 shrink-0" />
           <div className="min-w-0">
-            <h3 className="text-lg sm:text-lg font-bold text-slate-900">Deleted Trips</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-slate-900">Deleted Trips</h3>
             <p className="text-xs sm:text-sm text-slate-600">{trashedTrips.length} archived trip{trashedTrips.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
@@ -39,12 +39,12 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip }) => {
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Booking ID</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Patient</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Pickup</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Dropoff</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Time</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Booking ID</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Patient</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Pickup</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Dropoff</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Time</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -53,14 +53,14 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip }) => {
               ) : (
                 filtered.map(trip => (
                   <tr key={trip.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 font-mono text-sm sm:text-sm text-slate-600">{trip.bookingId || '—'}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 font-mono text-[11px] sm:text-sm text-slate-600">{trip.bookingId || '—'}</td>
                     <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900 line-through">{trip.patient}</td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-sm sm:text-sm text-slate-600 max-w-[120px] sm:max-w-[200px] truncate hidden sm:table-cell">{trip.pickup}</td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-sm sm:text-sm text-slate-600 max-w-[120px] sm:max-w-[200px] truncate hidden sm:table-cell">{trip.dropoff}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-[11px] sm:text-sm text-slate-600 max-w-[120px] sm:max-w-[200px] truncate hidden sm:table-cell">{trip.pickup}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-[11px] sm:text-sm text-slate-600 max-w-[120px] sm:max-w-[200px] truncate hidden sm:table-cell">{trip.dropoff}</td>
                     <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600">{trip.time}</td>
                     <td className="px-3 sm:px-6 py-2 sm:py-4">
                       {restoreTrip && (
-                        <button onClick={() => restoreTrip(trip.id)} className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs sm:text-xs font-semibold hover:bg-emerald-200">
+                        <button onClick={() => restoreTrip(trip.id)} className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-emerald-200">
                           <RefreshCcw size={12} /> Restore
                         </button>
                       )}

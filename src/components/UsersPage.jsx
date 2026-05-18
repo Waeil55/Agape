@@ -99,9 +99,9 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   const byRole = (role) => users.filter(u => u.role === role);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
-        <h2 className="text-lg sm:text-lg font-bold text-slate-900">User Management</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">User Management</h2>
         <button onClick={() => setShowForm(true)} className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm">
           <Plus size={18} /> Add User
         </button>
@@ -130,7 +130,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm font-semibold text-slate-600">{c.label}s</p>
-                  <p className="text-lg sm:text-lg font-bold text-slate-900">{users.filter(u => u.role === c.key).length}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900">{users.filter(u => u.role === c.key).length}</p>
                 </div>
               </div>
             </div>
@@ -141,7 +141,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* All Users Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-200">
-          <h3 className="text-lg sm:text-lg font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> All Users ({users.length})</h3>
+          <h3 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> All Users ({users.length})</h3>
         </div>
         {loading ? (
           <div className="p-8 sm:p-12 text-center text-slate-500 text-sm">Loading users...</div>
@@ -152,9 +152,9 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Email</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Role</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Email</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Role</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,10 +165,10 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                     <tr key={user.uid} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900 truncate max-w-[150px] sm:max-w-none">{user.email}</td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4">
-                        <span className={`flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-xs font-bold w-fit ${roleStyle}`}>
+                        <span className={`flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold w-fit ${roleStyle}`}>
                           <RoleIcon size={10} /> {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                         </span>
-                        {user.phone && <p className="text-xs text-slate-500 font-mono mt-1">{user.phone}</p>}
+                        {user.phone && <p className="text-[10px] text-slate-500 font-mono mt-1">{user.phone}</p>}
                       </td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4">
                         {role === 'admin' && user.email !== currentUser && (
@@ -189,17 +189,17 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* Dispatcher Assignments */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-200">
-          <h3 className="text-lg sm:text-lg font-bold text-slate-900">Driver Assignments</h3>
+          <h3 className="text-lg sm:text-xl font-bold text-slate-900">Driver Assignments</h3>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">Assign drivers to dispatchers</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Driver</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Assigned To</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Remove</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Driver</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Assigned To</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Actions</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Remove</th>
               </tr>
             </thead>
             <tbody>
@@ -231,7 +231,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         )}
                       </td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4">
-                        <button onClick={() => setShowAssign(showAssign === d.id ? null : d.id)} className="px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs sm:text-xs font-semibold hover:bg-blue-200">
+                        <button onClick={() => setShowAssign(showAssign === d.id ? null : d.id)} className="px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-blue-200">
                           {showAssign === d.id ? 'Cancel' : 'Assign'}
                         </button>
                       </td>
@@ -265,7 +265,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
-                <h3 className="text-lg sm:text-lg font-bold text-slate-900">Create User</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-slate-900">Create User</h3>
                 <button onClick={() => { setShowForm(false); setFormError(''); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
               </div>
               <form onSubmit={(e) => { e.preventDefault(); createUser(); }} className="space-y-3 sm:space-y-4">
@@ -298,7 +298,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         <button key={c.key} onClick={() => setForm({ ...form, role: c.key })}
                           className={`p-2 sm:p-3 rounded-lg border-2 text-center transition ${isActive ? `${c.activeBorder} ${c.activeBg}` : 'border-slate-200 hover:border-slate-300'}`}>
                           <Icon size={16} className={`mx-auto mb-1 ${c.text}`} />
-                          <p className={`text-xs sm:text-xs font-bold ${c.textBold}`}>{c.label}</p>
+                          <p className={`text-[10px] sm:text-xs font-bold ${c.textBold}`}>{c.label}</p>
                         </button>
                       );
                     })}

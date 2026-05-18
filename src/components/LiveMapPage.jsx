@@ -85,9 +85,9 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
   const staticMapUrl = buildStaticMapUrl();
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <h2 className="text-lg sm:text-lg font-bold text-slate-900">Live Fleet Tracking</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">Live Fleet Tracking</h2>
         <div className="flex gap-2">
           {gpsActive ? (
             <button onClick={stopGpsTracking} className="px-4 py-2 bg-rose-600 text-white rounded-lg font-bold text-sm hover:bg-rose-700 flex items-center gap-2">
@@ -121,20 +121,20 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
                       <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">{d.name.charAt(0)}</div>
                       <div>
                         <p className="font-bold text-sm text-slate-900">{d.name}</p>
-                        <p className="text-xs text-slate-500">{d.vehicle} &bull; {d.currentZone}</p>
+                        <p className="text-[10px] text-slate-500">{d.vehicle} &bull; {d.currentZone}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {pos ? (
-                        <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1"><MapPin size={10} /> Live</span>
+                        <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1"><MapPin size={10} /> Live</span>
                       ) : (
-                        <span className="text-xs text-slate-400">No signal</span>
+                        <span className="text-[10px] text-slate-400">No signal</span>
                       )}
                       <div className={`w-2 h-2 rounded-full ${d.status === 'Available' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                     </div>
                   </div>
                   {pos && isSelected && (
-                    <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-500 font-mono">
+                    <div className="mt-2 pt-2 border-t border-slate-200 text-[10px] text-slate-500 font-mono">
                       {pos.lat.toFixed(6)}, {pos.lng.toFixed(6)}
                     </div>
                   )}
@@ -156,17 +156,17 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
                     {drivers.filter(d => driverPositions[d.id]).slice(0, 3).map(d => (
                       <div key={d.id} className="bg-slate-900/80 backdrop-blur-md p-3 rounded-xl border border-white/10 text-white min-w-[160px] animate-in fade-in slide-in-from-right-4 duration-500">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-black uppercase tracking-widest text-blue-400">{d.name}</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">{d.name}</span>
                           <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div>
-                            <p className="text-xs text-slate-400 uppercase font-bold">Speed</p>
-                            <p className="text-xs font-black">{Math.floor(Math.random() * 45)} <span className="text-xs font-medium opacity-60">MPH</span></p>
+                            <p className="text-[8px] text-slate-400 uppercase font-bold">Speed</p>
+                            <p className="text-xs font-black">{Math.floor(Math.random() * 45)} <span className="text-[8px] font-medium opacity-60">MPH</span></p>
                           </div>
                           <div>
-                            <p className="text-xs text-slate-400 uppercase font-bold">Signal</p>
-                            <p className="text-xs font-black">-{Math.floor(Math.random() * 20 + 80)} <span className="text-xs font-medium opacity-60">dBm</span></p>
+                            <p className="text-[8px] text-slate-400 uppercase font-bold">Signal</p>
+                            <p className="text-xs font-black">-{Math.floor(Math.random() * 20 + 80)} <span className="text-[8px] font-medium opacity-60">dBm</span></p>
                           </div>
                         </div>
                       </div>
@@ -179,7 +179,7 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
                         <Activity size={24} strokeWidth={2.5} />
                       </div>
                       <div>
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Fleet Telemetry</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Fleet Telemetry</p>
                         <p className="text-sm font-black uppercase">{drivers.length} UNITS ONLINE</p>
                       </div>
                     </div>

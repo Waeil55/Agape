@@ -184,7 +184,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex gap-2 sm:gap-4 flex-wrap">
         {[
           { id: 'drivers', label: 'Drivers', icon: User },
@@ -203,7 +203,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
-        <h2 className="text-lg sm:text-lg font-bold text-slate-900">
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
           {activeTab === 'drivers' ? 'Drivers' : 'Vehicles'}
         </h2>
         {(role === 'admin' || role === 'dispatcher') && (
@@ -219,14 +219,14 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Name</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Vehicle</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600 hidden md:table-cell">Zone</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600 hidden lg:table-cell">Dispatcher</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Status</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Assign</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Contact</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Name</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Vehicle</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden md:table-cell">Zone</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden lg:table-cell">Dispatcher</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Status</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Assign</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Contact</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -269,8 +269,8 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                           {d.assignedDispatcher ? (dispatchers.find(ds => ds.id === d.assignedDispatcher)?.name || d.assignedDispatcher) : '-'}
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4">
-                          <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-xs sm:text-xs font-semibold ${d.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
-                          {assignedCount > 0 && <span className="ml-1 text-xs text-blue-600 font-semibold">({assignedCount})</span>}
+                          <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${d.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
+                          {assignedCount > 0 && <span className="ml-1 text-[10px] text-blue-600 font-semibold">({assignedCount})</span>}
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4">
                           {d.phone ? (
@@ -278,15 +278,15 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                               <a href={`tel:${d.phone}`} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition"><Phone size={14} /></a>
                               <a href={`sms:${d.phone}`} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition"><MessageSquare size={14} /></a>
                             </div>
-                          ) : <span className="text-xs text-slate-400 italic">No Phone</span>}
+                          ) : <span className="text-[10px] text-slate-400 italic">No Phone</span>}
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4">
                           <div className="flex gap-1">
-                            <button onClick={() => setAssignDriver(d)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 flex items-center gap-1" title="Assign trips">
+                            <button onClick={() => setAssignDriver(d)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-semibold hover:bg-blue-200 flex items-center gap-1" title="Assign trips">
                               <ClipboardList size={12} /> Trips
                             </button>
                             {onUploadForDriver && (
-                              <button onClick={() => onUploadForDriver(d.id)} className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold hover:bg-indigo-200 flex items-center gap-1" title="Upload & assign">
+                              <button onClick={() => onUploadForDriver(d.id)} className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-semibold hover:bg-indigo-200 flex items-center gap-1" title="Upload & assign">
                                 <Upload size={12} /> Upload
                               </button>
                             )}
@@ -315,13 +315,13 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Name</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Make / Model</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600 hidden md:table-cell">Year / Color</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600 hidden lg:table-cell">Plate / VIN</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600 hidden lg:table-cell">Odometer</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Driver</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Name</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Make / Model</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden md:table-cell">Year / Color</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden lg:table-cell">Plate / VIN</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden lg:table-cell">Odometer</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Driver</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -381,7 +381,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <div>
-                  <h3 className="text-lg sm:text-lg font-bold text-slate-900">Assign Trips to {assignDriver.name}</h3>
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">Assign Trips to {assignDriver.name}</h3>
                   <p className="text-xs sm:text-sm text-slate-500">{unassignedTrips.length} unassigned trips available</p>
                 </div>
                 <button onClick={() => { setAssignDriver(null); setSelectedTrips([]); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
@@ -401,9 +401,9 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                         <input type="checkbox" checked={selectedTrips.includes(trip.id)} onChange={() => toggleTripSelection(trip.id)} className="w-4 h-4 accent-blue-600 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs sm:text-sm font-semibold text-slate-900 truncate">{trip.patient}</p>
-                          <p className="text-xs sm:text-xs text-slate-500 truncate">{trip.pickup} → {trip.dropoff}</p>
+                          <p className="text-[10px] sm:text-xs text-slate-500 truncate">{trip.pickup} → {trip.dropoff}</p>
                         </div>
-                        <span className="text-xs sm:text-xs text-slate-500 shrink-0">{trip.time}</span>
+                        <span className="text-[10px] sm:text-xs text-slate-500 shrink-0">{trip.time}</span>
                       </label>
                     ))}
                   </div>
@@ -431,7 +431,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <div>
-                  <h3 className="text-lg sm:text-lg font-bold text-slate-900">Schedule: {editScheduleDriver.name}</h3>
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">Schedule: {editScheduleDriver.name}</h3>
                   <p className="text-xs sm:text-sm text-slate-500">Manage time blocks (6 AM – 8 PM)</p>
                 </div>
                 <button onClick={() => { setEditScheduleDriver(null); setEditingScheduleIdx(null); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
@@ -439,7 +439,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
 
               {/* Timeline Preview */}
               <div className="bg-slate-50 rounded-xl p-4 mb-4 border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Schedule Timeline</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Schedule Timeline</p>
                 <div className="relative h-6 bg-slate-200 rounded-lg overflow-hidden">
                   {(() => {
                     const blocks = getScheduleBlocks(editScheduleDriver.schedule);
@@ -461,7 +461,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                     const pos = ((h * 60 - 360) / 840) * 100;
                     return (
                       <div key={h} className="absolute top-0 h-full border-l border-white/40" style={{ left: `${pos}%` }}>
-                        <span className="text-xs text-slate-400 absolute -bottom-3.5 -translate-x-1/2 font-mono">{h > 12 ? h - 12 : h}{h >= 12 ? 'p' : 'a'}</span>
+                        <span className="text-[7px] text-slate-400 absolute -bottom-3.5 -translate-x-1/2 font-mono">{h > 12 ? h - 12 : h}{h >= 12 ? 'p' : 'a'}</span>
                       </div>
                     );
                   })}
@@ -470,7 +470,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
 
               {/* Existing Schedule Blocks */}
               <div className="space-y-2 mb-4">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Time Blocks</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Time Blocks</p>
                 {(editScheduleDriver.schedule || []).length === 0 && (
                   <p className="text-xs text-slate-400 text-center py-4">No schedule blocks yet. Add one below.</p>
                 )}
@@ -480,7 +480,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                       <div className={`w-2 h-2 rounded-full shrink-0 ${block.status === 'free' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-900">{block.start} – {block.end}</p>
-                        <p className="text-xs text-slate-500 capitalize">{block.status}</p>
+                        <p className="text-[10px] text-slate-500 capitalize">{block.status}</p>
                       </div>
                     </div>
                     <div className="flex gap-1 shrink-0">
@@ -496,7 +496,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                 <p className="text-xs font-bold text-slate-700 mb-3">{editingScheduleIdx !== null ? 'Edit Block' : 'Add New Block'}</p>
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Start</label>
+                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">Start</label>
                     <select value={scheduleForm.start} onChange={(e) => setScheduleForm({ ...scheduleForm, start: e.target.value })} className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold">
                       {['06:00 AM','07:00 AM','08:00 AM','09:00 AM','10:00 AM','11:00 AM','12:00 PM','01:00 PM','02:00 PM','03:00 PM','04:00 PM','05:00 PM','06:00 PM','07:00 PM','08:00 PM'].map(t => (
                         <option key={t} value={t}>{t}</option>
@@ -504,7 +504,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">End</label>
+                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">End</label>
                     <select value={scheduleForm.end} onChange={(e) => setScheduleForm({ ...scheduleForm, end: e.target.value })} className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold">
                       {['06:00 AM','07:00 AM','08:00 AM','09:00 AM','10:00 AM','11:00 AM','12:00 PM','01:00 PM','02:00 PM','03:00 PM','04:00 PM','05:00 PM','06:00 PM','07:00 PM','08:00 PM'].map(t => (
                         <option key={t} value={t}>{t}</option>
@@ -512,7 +512,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Status</label>
+                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">Status</label>
                     <select value={scheduleForm.status} onChange={(e) => setScheduleForm({ ...scheduleForm, status: e.target.value })} className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold">
                       <option value="free">Free</option>
                       <option value="busy">Busy</option>
@@ -538,7 +538,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
             <div className="p-8">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-slate-900">{editing ? 'Edit Driver' : 'Add Driver'}</h3>
+                <h3 className="text-xl font-bold text-slate-900">{editing ? 'Edit Driver' : 'Add Driver'}</h3>
                 <button onClick={() => { setShowForm(false); resetForm(); }} className="p-2 hover:bg-slate-100 rounded-lg"><X size={20} /></button>
               </div>
               <div className="space-y-4">
@@ -612,7 +612,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
             <div className="p-8">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-slate-900">{editVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</h3>
+                <h3 className="text-xl font-bold text-slate-900">{editVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</h3>
                 <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="p-2 hover:bg-slate-100 rounded-lg"><X size={20} /></button>
               </div>
               <div className="space-y-4">

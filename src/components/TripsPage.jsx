@@ -109,7 +109,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       {/* Assignment Success Feedback */}
       {assignmentFeedback && (
         <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 animate-in">
@@ -119,7 +119,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         </div>
       )}
       {/* HEADER CONTROLS */}
-      <div className="card p-3.5 sm:p-4">
+      <div className="card p-5 sm:p-6">
         <div className="flex flex-col sm:flex-row justify-between gap-4">
           <div className="flex-1 max-w-xs">
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Sort Preference</label>
@@ -168,17 +168,17 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
 
       {/* TABLE / LIST */}
       <div className="card overflow-hidden">
-        <div className="p-3.5 sm:p-4 border-b border-slate-100 flex justify-between items-center">
+        <div className="p-5 sm:p-6 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-heading text-slate-900">Live Manifest Queue</h3>
           <div className="flex items-center gap-3">
-            {showAllDates && <span className="badge badge-warning text-xs">Viewing All Dates</span>}
+            {showAllDates && <span className="badge badge-warning text-[10px]">Viewing All Dates</span>}
             <span className="badge badge-info">{filteredTrips.length} Trips</span>
           </div>
         </div>
 
         <div className="divide-y divide-slate-100">
           {filteredTrips.length === 0 ? (
-            <div className="p-8 text-center">
+            <div className="p-12 text-center">
               <AlertCircle size={48} className="mx-auto text-slate-200 mb-4" />
               <p className="text-slate-400 font-bold text-lg">Queue is empty</p>
             </div>
@@ -187,7 +187,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               const driver = drivers.find(d => d.id === trip.driverId);
               const isSelected = selectedTasks.includes(trip.id);
               return (
-                <div key={trip.id} className={`flex items-center gap-3 p-3 sm:px-4 sm:py-3.5 transition-all ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
+                <div key={trip.id} className={`flex items-center gap-4 p-4 sm:px-6 sm:py-5 transition-all ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
                   <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} className="w-5 h-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0" />
                   
                   <div className="flex-1 min-w-0" onClick={() => setSelectedTrip(trip)}>
@@ -253,7 +253,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                   </div>
 
                   <div className="text-right shrink-0">
-                    <p className="text-xl font-black text-blue-600 leading-none">{trip.time}</p>
+                    <p className="text-2xl font-black text-blue-600 leading-none">{trip.time}</p>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{trip.type}</p>
                     <div className="flex flex-col items-end gap-2 mt-2">
                       <select 
@@ -285,10 +285,10 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowCreateForm(false)} />
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in my-auto">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> New Manifest Entry</h3>
+              <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> New Manifest Entry</h3>
               <button onClick={() => setShowCreateForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' }); }} className="space-y-3">
+            <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' }); }} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Patient Name</label>
@@ -346,10 +346,10 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowEditForm(false)} />
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-3"><Edit2 size={28} className="text-blue-500" /> Modify Trip Details</h3>
+              <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Edit2 size={28} className="text-blue-500" /> Modify Trip Details</h3>
               <button onClick={() => setShowEditForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
             </div>
-            <form onSubmit={handleUpdate} className="space-y-3">
+            <form onSubmit={handleUpdate} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Patient Name</label>
@@ -427,10 +427,10 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                     <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 font-black shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-colors">{d.name.charAt(0)}</div>
                     <div className="text-left">
                       <p className="text-sm font-black text-slate-900">{d.name}</p>
-                      <p className="text-xs font-bold text-slate-400">{d.vehicle || 'No Vehicle'}</p>
+                      <p className="text-[10px] font-bold text-slate-400">{d.vehicle || 'No Vehicle'}</p>
                     </div>
                   </div>
-                  <span className="text-xs font-black text-blue-600 uppercase">Select &rarr;</span>
+                  <span className="text-[10px] font-black text-blue-600 uppercase">Select &rarr;</span>
                 </button>
               ))}
             </div>
@@ -455,35 +455,35 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                 {legs.map((leg, idx) => (
                   <div key={leg.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-slate-400 uppercase">Leg {idx + 1}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Leg {idx + 1}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-400 mb-1">Booking: {leg.bookingId || '—'}</p>
+                    <p className="text-[11px] font-bold text-slate-400 mb-1">Booking: {leg.bookingId || '—'}</p>
                     <div className="space-y-1.5">
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-blue-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-500">Pickup</p>
-                          <p className="text-sm text-slate-500 truncate">{leg.pickup}</p>
+                          <p className="text-[10px] font-bold text-slate-500">Pickup</p>
+                          <p className="text-[11px] text-slate-500 truncate">{leg.pickup}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-500">Dropoff</p>
-                          <p className="text-sm text-slate-500 truncate">{leg.dropoff}</p>
+                          <p className="text-[10px] font-bold text-slate-500">Dropoff</p>
+                          <p className="text-[11px] text-slate-500 truncate">{leg.dropoff}</p>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
+                    <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
                       <span>Time: {leg.time || '—'}</span>
                       <span>Type: {leg.type || '—'}</span>
                     </div>
-                    {leg.notes && <p className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{leg.notes}</p>}
-                    {leg.pickupPhone && <p className="mt-1.5 text-xs text-slate-400">Phone: {leg.pickupPhone}</p>}
+                    {leg.notes && <p className="mt-2 text-[10px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{leg.notes}</p>}
+                    {leg.pickupPhone && <p className="mt-1.5 text-[10px] text-slate-400">Phone: {leg.pickupPhone}</p>}
                     {leg.driverId && (() => {
                       const d = drivers.find(drv => drv.id === leg.driverId);
-                      return d ? <p className="mt-1.5 text-xs text-slate-400">Driver: {d.name}</p> : null;
+                      return d ? <p className="mt-1.5 text-[10px] text-slate-400">Driver: {d.name}</p> : null;
                     })()}
                   </div>
                 ))}
