@@ -468,8 +468,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     setLastOdometer(odo);
     setShowOdometerPrompt(null);
     setOdometerValue('');
-    // Auto-navigate to pickup after starting trip
-    if (showOdometerPrompt?.pickup) openInNavApp(showOdometerPrompt.pickup, suggestNavApp(showOdometerPrompt.pickup));
   };
 
   const handleArrive = (trip) => {
@@ -486,8 +484,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       arrivalTime: new Date().toISOString(),
       arrivalOdometer: odo,
     });
-    // Auto-navigate to dropoff after confirming arrival
-    if (arrivalNewStatus === 'Arrived' && showArrivalConfirm?.dropoff) openInNavApp(showArrivalConfirm.dropoff, suggestNavApp(showArrivalConfirm.dropoff));
     setShowArrivalConfirm(null);
     setArrivalOdometer('');
     setSignatureConfirmed(false);
@@ -911,32 +907,47 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                     )}
 
                     {/* Action Buttons */}
-                    <div className="px-4 pb-4 flex gap-2">
+                    <div className="px-4 pb-4 flex gap-2 flex-wrap">
                       {trip.status === 'Assigned' || trip.status === 'Unassigned' ? (
-                        <button onClick={() => handleStartTrip(trip)} className="flex-1 h-11 bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-blue-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-blue-600/30 flex items-center justify-center gap-2">
-                          <Play size={13} /> Start Trip
-                        </button>
-                      ) : trip.status === 'In Transit' ? (
-                        <button onClick={() => handleArrive(trip)} className="flex-1 h-11 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-emerald-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-emerald-600/30 flex items-center justify-center gap-2">
-                          <MapPin size={13} /> Arrived
-                        </button>
-                      ) : trip.status === 'Arrived' ? (
-                        <button onClick={() => openCompleteModal(trip)} className="flex-1 h-11 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-emerald-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-emerald-600/30 flex items-center justify-center gap-2">
-                          <Check size={13} /> Complete Trip
-                        </button>
-                      ) : null}
-                      {(trip.status === 'In Transit' || trip.status === 'Arrived') && (
-                        <button onClick={() => revertTripStatus(trip)} className="h-11 w-11 bg-slate-100 text-slate-500 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title={`Back to ${trip.status === 'Arrived' ? 'In Transit' : 'Assigned'}`}>
-                          <RotateCcw size={14} />
-                        </button>
-                      )}
-                      <button onClick={() => setShowTripDetails(trip)} className="h-11 w-11 bg-slate-100 text-slate-600 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Full details"><FileText size={15} /></button>
-                      {trip.status !== 'Completed' && (
                         <>
+                          <button onClick={() => handleStartTrip(trip)} className="flex-1 h-11 bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-blue-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-blue-600/30 flex items-center justify-center gap-2">
+                            <Play size={13} /> Start Trip
+                          </button>
+                          <button onClick={() => setShowTripDetails(trip)} className="h-11 w-11 bg-slate-100 text-slate-600 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Full details"><FileText size={15} /></button>
                           <button onClick={() => handleNoShow(trip)} className="h-11 px-4 bg-amber-50 text-amber-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-amber-100 border border-amber-100/50">No Show</button>
                           <button onClick={() => handleCancel(trip)} className="h-11 px-4 bg-rose-50 text-rose-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-rose-100 border border-rose-100/50">Cancel</button>
                         </>
-                      )}
+                      ) : trip.status === 'In Transit' ? (
+                        <>
+                          <button onClick={() => openInNavApp(trip.pickup, suggestNavApp(trip.pickup))} className="flex-1 h-11 bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-blue-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-blue-600/30 flex items-center justify-center gap-2">
+                            <Navigation size={13} /> Pickup
+                          </button>
+                          <button onClick={() => handleArrive(trip)} className="h-11 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-emerald-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-emerald-600/30 flex items-center justify-center gap-2 px-4">
+                            <MapPin size={13} /> Arrived
+                          </button>
+                          <button onClick={() => revertTripStatus(trip)} className="h-11 w-11 bg-slate-100 text-slate-500 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Back to Assigned">
+                            <RotateCcw size={14} />
+                          </button>
+                          <button onClick={() => setShowTripDetails(trip)} className="h-11 w-11 bg-slate-100 text-slate-600 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Full details"><FileText size={15} /></button>
+                          <button onClick={() => handleNoShow(trip)} className="h-11 px-4 bg-amber-50 text-amber-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-amber-100 border border-amber-100/50">No Show</button>
+                          <button onClick={() => handleCancel(trip)} className="h-11 px-4 bg-rose-50 text-rose-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-rose-100 border border-rose-100/50">Cancel</button>
+                        </>
+                      ) : trip.status === 'Arrived' ? (
+                        <>
+                          <button onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="flex-1 h-11 bg-gradient-to-br from-rose-600 to-rose-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-rose-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-rose-600/30 flex items-center justify-center gap-2">
+                            <Navigation size={13} /> Dropoff
+                          </button>
+                          <button onClick={() => openCompleteModal(trip)} className="h-11 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl font-bold text-xs shadow-sm shadow-emerald-600/20 active:scale-[0.97] transition-all hover:shadow-md hover:shadow-emerald-600/30 flex items-center justify-center gap-2 px-4">
+                            <Check size={13} /> Complete
+                          </button>
+                          <button onClick={() => revertTripStatus(trip)} className="h-11 w-11 bg-slate-100 text-slate-500 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Back to In Transit">
+                            <RotateCcw size={14} />
+                          </button>
+                          <button onClick={() => setShowTripDetails(trip)} className="h-11 w-11 bg-slate-100 text-slate-600 rounded-2xl font-bold text-[10px] active:scale-95 transition-all hover:bg-slate-200 flex items-center justify-center" title="Full details"><FileText size={15} /></button>
+                          <button onClick={() => handleNoShow(trip)} className="h-11 px-4 bg-amber-50 text-amber-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-amber-100 border border-amber-100/50">No Show</button>
+                          <button onClick={() => handleCancel(trip)} className="h-11 px-4 bg-rose-50 text-rose-700 rounded-2xl font-bold text-[10px] uppercase tracking-wider active:scale-95 transition-all hover:bg-rose-100 border border-rose-100/50">Cancel</button>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 );
