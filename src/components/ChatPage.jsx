@@ -247,7 +247,7 @@ const ChatPage = ({ currentUser, role }) => {
                 </div>
               </div>
                 {c.lastMessage?.timestamp && (
-                  <span className="text-[9px] text-slate-400 shrink-0">{timeStr(c.lastMessage.timestamp)}</span>
+                  <span className="text-xs text-slate-400 shrink-0">{timeStr(c.lastMessage.timestamp)}</span>
                 )}
               </button>
             ))
@@ -263,7 +263,7 @@ const ChatPage = ({ currentUser, role }) => {
               {isMobile && <button onClick={() => { setActiveConv(null); setSidebar(true); }} className="p-1 text-slate-500"><ArrowLeft size={18} /></button>}
               <div className="flex-1">
                 <p className="font-semibold text-sm text-slate-900">{label(activeConv)}</p>
-                <p className="text-[10px] text-slate-400">{activeConv.type === 'group' ? `${activeConv.participants?.length || 0} members` : 'Conversation'}</p>
+                <p className="text-xs text-slate-400">{activeConv.type === 'group' ? `${activeConv.participants?.length || 0} members` : 'Conversation'}</p>
               </div>
               <button onClick={() => deleteConv(activeConv.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl"><Trash2 size={15} /></button>
             </div>
@@ -283,9 +283,9 @@ const ChatPage = ({ currentUser, role }) => {
                   return (
                     <div key={msg.id || i} className={`flex ${me ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl ${me ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white text-slate-800 rounded-bl-sm shadow-sm border border-slate-50'}`}>
-                        {!me && <p className="text-[10px] font-bold text-blue-600 mb-1">{msg.sender?.split('@')[0]}</p>}
+                        {!me && <p className="text-xs font-bold text-blue-600 mb-1">{msg.sender?.split('@')[0]}</p>}
                         <p className="text-sm leading-relaxed">{msg.text}</p>
-                        <p className={`text-[9px] mt-1 ${me ? 'text-blue-200 text-right' : 'text-slate-400'}`}>
+                        <p className={`text-xs mt-1 ${me ? 'text-blue-200 text-right' : 'text-slate-400'}`}>
                           {msg.timestamp ? timeStr(msg.timestamp) : ''}
                         </p>
                       </div>
@@ -335,7 +335,7 @@ const ChatPage = ({ currentUser, role }) => {
                     <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold">{email.charAt(0).toUpperCase()}</div>
                     <div className="text-left">
                       <p className="text-sm font-medium">{email.split('@')[0]}</p>
-                      <p className="text-[10px] text-slate-400">{email}</p>
+                      <p className="text-xs text-slate-400">{email}</p>
                     </div>
                     {sel && <span className="ml-auto text-blue-600 text-xs font-bold">✓</span>}
                   </button>

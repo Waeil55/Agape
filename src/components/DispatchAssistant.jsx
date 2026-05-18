@@ -15,14 +15,14 @@ const Badge = ({ children, variant = 'info' }) => {
     danger: "bg-rose-50 text-rose-700 border-rose-100",
     ai: "bg-indigo-50 text-indigo-700 border-indigo-100",
   };
-  return <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
 };
 
 const ScheduleBar = ({ schedule, currentMinutes }) => {
-  if (!schedule || schedule.length === 0) return <div className="h-4 bg-slate-100 rounded text-[8px] text-slate-400 flex items-center px-2">No schedule</div>;
+  if (!schedule || schedule.length === 0) return <div className="h-4 bg-slate-100 rounded text-xs text-slate-400 flex items-center px-2">No schedule</div>;
 
   const blocks = getScheduleBlocks(schedule);
-  if (blocks.length === 0) return <div className="h-4 bg-slate-100 rounded text-[8px] text-slate-400 flex items-center px-2">No schedule</div>;
+  if (blocks.length === 0) return <div className="h-4 bg-slate-100 rounded text-xs text-slate-400 flex items-center px-2">No schedule</div>;
 
   const currentPos = Math.max(0, Math.min(100, ((currentMinutes - HOURS_START) / TOTAL_MINUTES) * 100));
 
@@ -46,7 +46,7 @@ const ScheduleBar = ({ schedule, currentMinutes }) => {
         const pos = ((h * 60 - HOURS_START) / TOTAL_MINUTES) * 100;
         return (
           <div key={h} className="absolute top-0 h-full border-l border-white/40" style={{ left: `${pos}%` }}>
-            <span className="text-[7px] text-slate-400 absolute -bottom-3.5 -translate-x-1/2 font-mono">{h > 12 ? h - 12 : h}{h >= 12 ? 'p' : 'a'}</span>
+            <span className="text-xs text-slate-400 absolute -bottom-3.5 -translate-x-1/2 font-mono">{h > 12 ? h - 12 : h}{h >= 12 ? 'p' : 'a'}</span>
           </div>
         );
       })}
@@ -128,7 +128,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
           </div>
           <div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900">Dispatch Assistant</h2>
-            <p className="text-[10px] text-slate-500 font-semibold flex items-center gap-1">
+            <p className="text-xs text-slate-500 font-semibold flex items-center gap-1">
               <Clock size={10} /> Live: {nowStr} &bull; {drivers.length} drivers &bull; {unassignedTrips.length} unassigned
             </p>
           </div>
@@ -140,7 +140,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Live View</span>
+              <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Live View</span>
             </>
           )}
         </div>
@@ -151,7 +151,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
         <div className="lg:col-span-7 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2"><Truck size={16} /> Driver Schedule Board</h3>
-            <span className="text-[9px] text-slate-400 font-mono">Updated live every second</span>
+            <span className="text-xs text-slate-400 font-mono">Updated live every second</span>
           </div>
 
           <div className="space-y-2">
@@ -171,9 +171,9 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-sm text-slate-900 truncate">{d.name}</p>
                           <div className={`w-2 h-2 rounded-full ${statusColor}`} />
-                          {!isClockedIn && <span className="text-[9px] font-bold text-slate-400 uppercase">Offline</span>}
+                          {!isClockedIn && <span className="text-xs font-bold text-slate-400 uppercase">Offline</span>}
                         </div>
-                        <p className="text-[10px] text-slate-500 flex flex-wrap items-center gap-1">
+                        <p className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
                           <MapPin size={10} className="shrink-0" /> {d.currentZone} &bull; {d.vehicle}
                           {d.assignedDispatcher && (
                             <>
@@ -192,7 +192,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                   <ScheduleBar schedule={d.schedule} currentMinutes={manifestDate === today ? currentMinutes : -100} />
 
                   {/* Next trip / availability detail */}
-                  <div className="flex flex-wrap gap-2 mt-2 text-[10px] text-slate-500">
+                  <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-500">
                     {d.schedule?.map((slot, idx) => {
                       const sl = getScheduleBlocks([slot])[0];
                       if (!sl) return null;
@@ -234,8 +234,8 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="font-semibold text-sm text-slate-900 truncate">{t.patient}</p>
-                          {t.bookingId ? <p className="text-[10px] text-indigo-600 font-bold truncate">{t.bookingId}</p> : null}
-                          <p className="text-[10px] text-slate-500 truncate">{t.pickup} → {t.dropoff}</p>
+                          {t.bookingId ? <p className="text-xs text-indigo-600 font-bold truncate">{t.bookingId}</p> : null}
+                          <p className="text-xs text-slate-500 truncate">{t.pickup} → {t.dropoff}</p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-xs font-bold text-slate-700">{t.time}</p>
@@ -258,7 +258,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                 <BrainCircuit className="absolute inset-0 m-auto text-indigo-600 animate-pulse" size={18} />
               </div>
               <p className="text-sm font-bold text-slate-800">Analyzing...</p>
-              <p className="text-[11px] text-slate-500 mt-1">Checking schedules, proximity, and next-trip fit</p>
+              <p className="text-sm text-slate-500 mt-1">Checking schedules, proximity, and next-trip fit</p>
             </div>
           )}
 
@@ -274,7 +274,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
               </div>
               <div className="p-3 space-y-3">
                 {/* Selected Trip Info */}
-                <div className="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2.5 space-y-1">
+                <div className="text-sm text-slate-600 bg-slate-50 rounded-lg p-2.5 space-y-1">
                   <p className="font-bold text-slate-900">{selectedTrip.patient}</p>
                   <p className="flex items-center gap-1"><MapPin size={10} className="text-emerald-600" /> {selectedTrip.pickup}</p>
                   <p className="flex items-center gap-1"><MapPin size={10} className="text-rose-600" /> {selectedTrip.dropoff}</p>
@@ -295,21 +295,21 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                                   <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">{d?.name?.charAt(0) || '?'}</div>
                                   <div>
                                     <p className="font-bold text-sm text-slate-900">{d?.name || aiSuggestion.driverId}</p>
-                                    <p className="text-[10px] text-slate-500">{d?.vehicle} &bull; {d?.currentZone}</p>
+                                    <p className="text-xs text-slate-500">{d?.vehicle} &bull; {d?.currentZone}</p>
                                   </div>
                                 </div>
                                 <div className="text-right">
                                   <span className={`text-lg font-black ${aiSuggestion.score >= 80 ? 'text-emerald-600' : aiSuggestion.score >= 50 ? 'text-amber-600' : 'text-slate-500'}`}>
                                     {aiSuggestion.score}%
                                   </span>
-                                  <p className="text-[8px] text-slate-400 uppercase">Match</p>
+                                  <p className="text-xs text-slate-400 uppercase">Match</p>
                                 </div>
                               </div>
                               <div className="w-full bg-slate-200 rounded-full h-1.5 mb-2">
                                 <div className={`h-1.5 rounded-full ${aiSuggestion.score >= 80 ? 'bg-emerald-500' : aiSuggestion.score >= 50 ? 'bg-amber-500' : 'bg-slate-400'}`}
                                   style={{ width: `${aiSuggestion.score}%` }} />
                               </div>
-                              <p className="text-[11px] text-slate-600 leading-snug">{aiSuggestion.reason}</p>
+                              <p className="text-sm text-slate-600 leading-snug">{aiSuggestion.reason}</p>
                             </div>
                             <button onClick={handleAssign} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 active:scale-[0.98] transition flex items-center justify-center gap-2">
                               <UserCheck size={16} /> Assign to {d?.name || aiSuggestion.driverId}

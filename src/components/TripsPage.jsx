@@ -171,7 +171,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         <div className="p-5 sm:p-6 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-heading text-slate-900">Live Manifest Queue</h3>
           <div className="flex items-center gap-3">
-            {showAllDates && <span className="badge badge-warning text-[10px]">Viewing All Dates</span>}
+            {showAllDates && <span className="badge badge-warning text-xs">Viewing All Dates</span>}
             <span className="badge badge-info">{filteredTrips.length} Trips</span>
           </div>
         </div>
@@ -427,10 +427,10 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                     <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 font-black shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-colors">{d.name.charAt(0)}</div>
                     <div className="text-left">
                       <p className="text-sm font-black text-slate-900">{d.name}</p>
-                      <p className="text-[10px] font-bold text-slate-400">{d.vehicle || 'No Vehicle'}</p>
+                      <p className="text-xs font-bold text-slate-400">{d.vehicle || 'No Vehicle'}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-black text-blue-600 uppercase">Select &rarr;</span>
+                  <span className="text-xs font-black text-blue-600 uppercase">Select &rarr;</span>
                 </button>
               ))}
             </div>
@@ -455,35 +455,35 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                 {legs.map((leg, idx) => (
                   <div key={leg.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">Leg {idx + 1}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase">Leg {idx + 1}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                     </div>
-                    <p className="text-[11px] font-bold text-slate-400 mb-1">Booking: {leg.bookingId || '—'}</p>
+                    <p className="text-sm font-bold text-slate-400 mb-1">Booking: {leg.bookingId || '—'}</p>
                     <div className="space-y-1.5">
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-blue-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
-                          <p className="text-[10px] font-bold text-slate-500">Pickup</p>
-                          <p className="text-[11px] text-slate-500 truncate">{leg.pickup}</p>
+                          <p className="text-xs font-bold text-slate-500">Pickup</p>
+                          <p className="text-sm text-slate-500 truncate">{leg.pickup}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
-                          <p className="text-[10px] font-bold text-slate-500">Dropoff</p>
-                          <p className="text-[11px] text-slate-500 truncate">{leg.dropoff}</p>
+                          <p className="text-xs font-bold text-slate-500">Dropoff</p>
+                          <p className="text-sm text-slate-500 truncate">{leg.dropoff}</p>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
+                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
                       <span>Time: {leg.time || '—'}</span>
                       <span>Type: {leg.type || '—'}</span>
                     </div>
-                    {leg.notes && <p className="mt-2 text-[10px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{leg.notes}</p>}
-                    {leg.pickupPhone && <p className="mt-1.5 text-[10px] text-slate-400">Phone: {leg.pickupPhone}</p>}
+                    {leg.notes && <p className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{leg.notes}</p>}
+                    {leg.pickupPhone && <p className="mt-1.5 text-xs text-slate-400">Phone: {leg.pickupPhone}</p>}
                     {leg.driverId && (() => {
                       const d = drivers.find(drv => drv.id === leg.driverId);
-                      return d ? <p className="mt-1.5 text-[10px] text-slate-400">Driver: {d.name}</p> : null;
+                      return d ? <p className="mt-1.5 text-xs text-slate-400">Driver: {d.name}</p> : null;
                     })()}
                   </div>
                 ))}

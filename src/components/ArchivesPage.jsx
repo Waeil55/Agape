@@ -39,12 +39,12 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip }) => {
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Booking ID</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Patient</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Pickup</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Dropoff</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Time</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Actions</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Booking ID</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Patient</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Pickup</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Dropoff</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Time</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -53,14 +53,14 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip }) => {
               ) : (
                 filtered.map(trip => (
                   <tr key={trip.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 font-mono text-[11px] sm:text-sm text-slate-600">{trip.bookingId || '—'}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 font-mono text-sm sm:text-sm text-slate-600">{trip.bookingId || '—'}</td>
                     <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900 line-through">{trip.patient}</td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-[11px] sm:text-sm text-slate-600 max-w-[120px] sm:max-w-[200px] truncate hidden sm:table-cell">{trip.pickup}</td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-[11px] sm:text-sm text-slate-600 max-w-[120px] sm:max-w-[200px] truncate hidden sm:table-cell">{trip.dropoff}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-sm sm:text-sm text-slate-600 max-w-[120px] sm:max-w-[200px] truncate hidden sm:table-cell">{trip.pickup}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-sm sm:text-sm text-slate-600 max-w-[120px] sm:max-w-[200px] truncate hidden sm:table-cell">{trip.dropoff}</td>
                     <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600">{trip.time}</td>
                     <td className="px-3 sm:px-6 py-2 sm:py-4">
                       {restoreTrip && (
-                        <button onClick={() => restoreTrip(trip.id)} className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-emerald-200">
+                        <button onClick={() => restoreTrip(trip.id)} className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs sm:text-xs font-semibold hover:bg-emerald-200">
                           <RefreshCcw size={12} /> Restore
                         </button>
                       )}

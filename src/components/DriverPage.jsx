@@ -767,12 +767,12 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               ].map(stat => (
                 <div key={stat.label} className="flex-1 bg-white/10 rounded-lg px-2 py-1 border border-white/10 text-center">
                   <p className="text-xs font-black text-white leading-none">{stat.value}</p>
-                  <p className="text-[7px] text-white/50 uppercase font-bold tracking-wider leading-tight mt-0.5">{stat.label}</p>
+                  <p className="text-xs text-white/50 uppercase font-bold tracking-wider leading-tight mt-0.5">{stat.label}</p>
                 </div>
               ))}
               <div className="flex-shrink-0 border-l border-white/10 pl-2 flex items-center gap-1">
                 {isOnline ? <Wifi size={10} className="text-emerald-300" /> : <WifiOff size={10} className="text-amber-300" />}
-                <p className="text-[8px] text-white/60 uppercase font-bold whitespace-nowrap">{getTodayStr().slice(5)}</p>
+                <p className="text-xs text-white/60 uppercase font-bold whitespace-nowrap">{getTodayStr().slice(5)}</p>
               </div>
             </div>
           </div>
@@ -788,21 +788,21 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-3 shadow-md shadow-indigo-200/40 sticky top-0 z-10">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-[9px] font-black text-white">{guidedStepIndex + 1}</span>
-                    <span className="text-[9px] font-bold text-white/80 uppercase tracking-wider">of {aiSequence.length}</span>
+                    <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-black text-white">{guidedStepIndex + 1}</span>
+                    <span className="text-xs font-bold text-white/80 uppercase tracking-wider">of {aiSequence.length}</span>
                   </div>
-                  <button onClick={() => { setGuidedMode(false); }} className="text-[8px] text-white/60 font-bold uppercase hover:text-white/90">Exit</button>
+                  <button onClick={() => { setGuidedMode(false); }} className="text-xs text-white/60 font-bold uppercase hover:text-white/90">Exit</button>
                 </div>
                 <div className="h-1 bg-white/20 rounded-full overflow-hidden mb-1.5">
                   <div className="h-full bg-white rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold text-white truncate flex-1 min-w-0">
+                  <p className="text-xs font-bold text-white truncate flex-1 min-w-0">
                     {currentTrip?.patient || 'Loading...'}
-                    <span className="text-white/60 font-medium ml-1 text-[9px]">· {currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : ''}</span>
+                    <span className="text-white/60 font-medium ml-1 text-xs">· {currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : ''}</span>
                   </p>
                   {nextTrip && (
-                    <span className="text-[8px] text-white/50 font-medium ml-2 shrink-0">Next: {nextTrip.patient}</span>
+                    <span className="text-xs text-white/50 font-medium ml-2 shrink-0">Next: {nextTrip.patient}</span>
                   )}
                 </div>
               </div>
@@ -815,9 +815,9 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <div className="flex items-start gap-2">
                 <AlertTriangle size={14} className="text-rose-600 mt-0.5 shrink-0" />
                 <div className="flex-1">
-                  <p className="text-[11px] font-bold text-rose-800">Time Conflicts Detected</p>
+                  <p className="text-sm font-bold text-rose-800">Time Conflicts Detected</p>
                   {conflicts.map((c, i) => (
-                    <p key={i} className="text-[10px] text-rose-700 mt-0.5">{c.aName} ({c.timeA}) overlaps with {c.bName} ({c.timeB})</p>
+                    <p key={i} className="text-xs text-rose-700 mt-0.5">{c.aName} ({c.timeA}) overlaps with {c.bName} ({c.timeB})</p>
                   ))}
                 </div>
               </div>
@@ -830,17 +830,17 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <div className="flex items-start gap-2">
                 <Repeat size={14} className="text-emerald-600 mt-0.5 shrink-0" />
                 <div className="flex-1">
-                  <p className="text-[11px] font-bold text-emerald-800">Ride Sharing Opportunity</p>
+                  <p className="text-sm font-bold text-emerald-800">Ride Sharing Opportunity</p>
                   {aiRideShare.map((r, i) => {
                     const aTrip = trips.find(t => t.id === r.tripA);
                     const bTrip = trips.find(t => t.id === r.tripB);
                     return (
                       <div key={i} className="mt-1.5 bg-white/70 rounded-xl p-2 border border-emerald-100">
-                        <p className="text-[10px] text-emerald-700 font-semibold">{r.patients.join(' & ')} — nearby locations</p>
-                        <p className="text-[9px] text-emerald-600 mt-0.5">Pick up {aTrip?.patient} first, then {bTrip?.patient} — same area</p>
+                        <p className="text-xs text-emerald-700 font-semibold">{r.patients.join(' & ')} — nearby locations</p>
+                        <p className="text-xs text-emerald-600 mt-0.5">Pick up {aTrip?.patient} first, then {bTrip?.patient} — same area</p>
                         <div className="flex gap-1.5 mt-1.5">
-                          <button onClick={() => openInNavApp(aTrip?.pickup, suggestNavApp(aTrip?.pickup))} className="flex-1 h-6 bg-emerald-600 text-white rounded-lg text-[8px] font-bold flex items-center justify-center gap-1 active:scale-95"><Navigation size={8} /> {aTrip?.patient}</button>
-                          <button onClick={() => openInNavApp(bTrip?.pickup, suggestNavApp(bTrip?.pickup))} className="flex-1 h-6 bg-emerald-600 text-white rounded-lg text-[8px] font-bold flex items-center justify-center gap-1 active:scale-95"><Navigation size={8} /> {bTrip?.patient}</button>
+                          <button onClick={() => openInNavApp(aTrip?.pickup, suggestNavApp(aTrip?.pickup))} className="flex-1 h-6 bg-emerald-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 active:scale-95"><Navigation size={8} /> {aTrip?.patient}</button>
+                          <button onClick={() => openInNavApp(bTrip?.pickup, suggestNavApp(bTrip?.pickup))} className="flex-1 h-6 bg-emerald-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 active:scale-95"><Navigation size={8} /> {bTrip?.patient}</button>
                         </div>
                       </div>
                     );
@@ -857,11 +857,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <div className="flex gap-2">
                 {selectedTrips.length >= 2 && (
                   <button onClick={() => runAiOptimization()} disabled={aiOptimizing}
-                    className="px-3 h-8 bg-indigo-600 text-white rounded-xl text-[10px] font-bold flex items-center gap-1.5 active:scale-95 transition">
+                    className="px-3 h-8 bg-indigo-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95 transition">
                     <BrainCircuit size={12} /> {aiOptimizing ? 'Analyzing...' : 'AI Optimize'}
                   </button>
                 )}
-                <button onClick={() => setSelectedTrips([])} className="px-3 h-8 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold active:scale-95 transition">Clear</button>
+                <button onClick={() => setSelectedTrips([])} className="px-3 h-8 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold active:scale-95 transition">Clear</button>
               </div>
             </div>
           )}
@@ -872,7 +872,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <div className="bg-white rounded-2xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <BrainCircuit size={16} className="text-indigo-600" />
-                  <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Smart Route</span>
+                  <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Smart Route</span>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap mb-3">
                   {aiSequence.map((id, i) => {
@@ -880,7 +880,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                     return (
                       <React.Fragment key={id}>
                         {i > 0 && <ChevronRight size={11} className="text-slate-300 shrink-0" />}
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${t && !['Assigned','Unassigned'].includes(t.status) ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${t && !['Assigned','Unassigned'].includes(t.status) ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
                           {t?.patient || id}
                         </span>
                       </React.Fragment>
@@ -893,7 +893,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                     <Play size={13} /> Start Smart Route
                   </button>
                   <button onClick={() => { setAiSequence(null); setAiSuggestions([]); }}
-                    className="h-10 px-3 bg-slate-100 text-slate-500 rounded-xl text-[10px] font-bold active:scale-95">Dismiss</button>
+                    className="h-10 px-3 bg-slate-100 text-slate-500 rounded-xl text-xs font-bold active:scale-95">Dismiss</button>
                 </div>
               </div>
             </div>
@@ -906,7 +906,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 <BrainCircuit size={14} className="text-indigo-600 mt-0.5 shrink-0" />
                 <div className="flex-1">
                   {aiSuggestions.map((s, i) => (
-                    <p key={i} className="text-[11px] font-medium text-indigo-800 leading-relaxed">{s}</p>
+                    <p key={i} className="text-sm font-medium text-indigo-800 leading-relaxed">{s}</p>
                   ))}
                 </div>
                 <button onClick={() => setAiSuggestions([])} className="text-indigo-400"><X size={14} /></button>
@@ -928,14 +928,14 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
           {/* Manifest Header */}
           <div className="flex items-center justify-between px-1 pt-1">
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.12em]">Today & Tomorrow</h3>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-[0.12em]">Today & Tomorrow</h3>
             <div className="flex items-center gap-2">
               {activeTrips.length > 0 && (
-                <button onClick={exportDailyLog} className="text-[10px] text-blue-600 font-bold flex items-center gap-1 active:scale-95">
+                <button onClick={exportDailyLog} className="text-xs text-blue-600 font-bold flex items-center gap-1 active:scale-95">
                   <Download size={10} /> Export
                 </button>
               )}
-              <span className="text-[10px] text-slate-300 font-medium">{activeTrips.length} trip{activeTrips.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-slate-300 font-medium">{activeTrips.length} trip{activeTrips.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
 
@@ -993,7 +993,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                           </div>
                           {/* Row 2: Booking ID + badges */}
                           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            {trip.bookingId && <span className="badge badge-info text-[10px]">{trip.bookingId}</span>}
+                            {trip.bookingId && <span className="badge badge-info text-xs">{trip.bookingId}</span>}
                             {legsCount > 1 && <button onClick={() => setLegsDetailPatient(trip.patient)} className="badge badge-info cursor-pointer hover:opacity-80">{legsCount} legs</button>}
                             {aiRank && <span className="badge badge-info">#{aiRank}</span>}
                             {hasConflict && <AlertTriangle size={14} className="text-rose-500 shrink-0" />}
@@ -1026,7 +1026,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                               <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.pickup).catch(() => {}); }} className="text-xs text-slate-400 hover:text-blue-600 px-2 py-1 hover:bg-blue-50 rounded-lg" title="Copy address"><Copy size={12} /></button>
                               <div className="flex gap-1">
                                 {['google','waze','apple'].filter(a => a !== suggestNavApp(trip.pickup)).slice(0,2).map(app => (
-                                  <button key={app} onClick={() => openInNavApp(trip.pickup, app)} className="text-[10px] text-slate-400 hover:text-blue-600 underline px-1.5 py-1 rounded-lg hover:bg-blue-50" title={app}>{app[0].toUpperCase()}</button>
+                                  <button key={app} onClick={() => openInNavApp(trip.pickup, app)} className="text-xs text-slate-400 hover:text-blue-600 underline px-1.5 py-1 rounded-lg hover:bg-blue-50" title={app}>{app[0].toUpperCase()}</button>
                                 ))}
                               </div>
                             </div>
@@ -1043,7 +1043,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                               <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.dropoff).catch(() => {}); }} className="text-xs text-slate-400 hover:text-rose-600 px-2 py-1 hover:bg-rose-50 rounded-lg" title="Copy address"><Copy size={12} /></button>
                               <div className="flex gap-1">
                                 {['google','waze','apple'].filter(a => a !== suggestNavApp(trip.dropoff)).slice(0,2).map(app => (
-                                  <button key={app} onClick={() => openInNavApp(trip.dropoff, app)} className="text-[10px] text-slate-400 hover:text-rose-600 underline px-1.5 py-1 rounded-lg hover:bg-rose-50" title={app}>{app[0].toUpperCase()}</button>
+                                  <button key={app} onClick={() => openInNavApp(trip.dropoff, app)} className="text-xs text-slate-400 hover:text-rose-600 underline px-1.5 py-1 rounded-lg hover:bg-rose-50" title={app}>{app[0].toUpperCase()}</button>
                                 ))}
                               </div>
                             </div>
@@ -1333,31 +1333,31 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             <button onClick={() => setShowTripDetails(null)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90"><ChevronLeft size={18} /></button>
             <div className="flex-1">
               <h2 className="font-bold text-sm text-slate-900 leading-tight">{showTripDetails.patient}</h2>
-              <p className="text-[10px] text-slate-400">{showTripDetails.bookingId || '—'}</p>
+              <p className="text-xs text-slate-400">{showTripDetails.bookingId || '—'}</p>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 text-white">
               <div className="flex items-baseline gap-2 mb-3">
                 <span className="text-4xl font-black tracking-tight">{to12hr(showTripDetails.time)}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${showTripDetails.status === 'Completed' ? 'bg-emerald-400/30 text-emerald-100' : showTripDetails.status === 'In Transit' ? 'bg-blue-400/30' : 'bg-white/20'}`}>{showTripDetails.status}</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${showTripDetails.status === 'Completed' ? 'bg-emerald-400/30 text-emerald-100' : showTripDetails.status === 'In Transit' ? 'bg-blue-400/30' : 'bg-white/20'}`}>{showTripDetails.status}</span>
               </div>
               <div className="h-px bg-white/20 my-3" />
               <div className="space-y-2.5">
                 <div className="flex items-start gap-3">
                   <MapPin size={14} className="mt-0.5 shrink-0 text-emerald-300" />
                   <div>
-                    <p className="text-[10px] text-white/60 uppercase font-bold">Pickup</p>
+                    <p className="text-xs text-white/60 uppercase font-bold">Pickup</p>
                     <p className="text-sm font-semibold">{showTripDetails.pickup}</p>
-                    {showTripDetails.pickupPhone && <a href={`tel:${cleanPhone(showTripDetails.pickupPhone)}`} className="text-[11px] text-blue-200 font-bold flex items-center gap-1 mt-0.5"><Phone size={10} /> {showTripDetails.pickupPhone}</a>}
+                    {showTripDetails.pickupPhone && <a href={`tel:${cleanPhone(showTripDetails.pickupPhone)}`} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5"><Phone size={10} /> {showTripDetails.pickupPhone}</a>}
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <MapPin size={14} className="mt-0.5 shrink-0 text-rose-300" />
                   <div>
-                    <p className="text-[10px] text-white/60 uppercase font-bold">Dropoff</p>
+                    <p className="text-xs text-white/60 uppercase font-bold">Dropoff</p>
                     <p className="text-sm font-semibold">{showTripDetails.dropoff}</p>
-                    {showTripDetails.dropoffPhone && <a href={`tel:${cleanPhone(showTripDetails.dropoffPhone)}`} className="text-[11px] text-blue-200 font-bold flex items-center gap-1 mt-0.5"><Phone size={10} /> {showTripDetails.dropoffPhone}</a>}
+                    {showTripDetails.dropoffPhone && <a href={`tel:${cleanPhone(showTripDetails.dropoffPhone)}`} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5"><Phone size={10} /> {showTripDetails.dropoffPhone}</a>}
                   </div>
                 </div>
               </div>
@@ -1369,43 +1369,43 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Trip Information</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Trip Information</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[9px] text-slate-400 uppercase font-bold">Booking ID</p>
+                  <p className="text-xs text-slate-400 uppercase font-bold">Booking ID</p>
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.bookingId || '—'}</p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[9px] text-slate-400 uppercase font-bold">Service Type</p>
+                  <p className="text-xs text-slate-400 uppercase font-bold">Service Type</p>
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.type || '—'}</p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[9px] text-slate-400 uppercase font-bold">Patient Phone</p>
+                  <p className="text-xs text-slate-400 uppercase font-bold">Patient Phone</p>
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.pickupPhone || '—'}</p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[9px] text-slate-400 uppercase font-bold">Dropoff Phone</p>
+                  <p className="text-xs text-slate-400 uppercase font-bold">Dropoff Phone</p>
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.dropoffPhone || '—'}</p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[9px] text-slate-400 uppercase font-bold">Distance</p>
+                  <p className="text-xs text-slate-400 uppercase font-bold">Distance</p>
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.distance ? `${showTripDetails.distance} mi` : '—'}</p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[9px] text-slate-400 uppercase font-bold">Driver</p>
+                  <p className="text-xs text-slate-400 uppercase font-bold">Driver</p>
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.driverId || '—'}</p>
                 </div>
               </div>
               {showTripDetails.notes && (
                 <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
-                  <p className="text-[9px] text-amber-600 uppercase font-bold mb-1">Notes</p>
+                  <p className="text-xs text-amber-600 uppercase font-bold mb-1">Notes</p>
                   <p className="text-xs text-amber-800">{showTripDetails.notes}</p>
                 </div>
               )}
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Timeline & Odometer</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Timeline & Odometer</h3>
               <div className="space-y-2.5">
                 {showTripDetails.startTime && (
                   <div className="flex justify-between items-center">
@@ -1447,11 +1447,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Actions</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Actions</h3>
               <div className="flex gap-2">
-                <button onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-10 bg-slate-100 rounded-xl text-[10px] font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95"><Map size={12} /> Google Maps</button>
-                <button onClick={() => openInNavApp(showTripDetails.pickup, 'waze')} className="flex-1 h-10 bg-slate-100 rounded-xl text-[10px] font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95"><Navigation size={12} /> Waze</button>
-                <button onClick={() => openInNavApp(showTripDetails.pickup, 'apple')} className="flex-1 h-10 bg-slate-100 rounded-xl text-[10px] font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95"><Map size={12} /> Apple</button>
+                <button onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95"><Map size={12} /> Google Maps</button>
+                <button onClick={() => openInNavApp(showTripDetails.pickup, 'waze')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95"><Navigation size={12} /> Waze</button>
+                <button onClick={() => openInNavApp(showTripDetails.pickup, 'apple')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95"><Map size={12} /> Apple</button>
               </div>
             </div>
           </div>
@@ -1468,7 +1468,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 <p className="text-xs text-slate-400 mt-0.5">Review past trips and activity</p>
               </div>
               {allHistory.length > 0 && (
-                <button onClick={exportDailyLog} className="px-3 h-8 bg-blue-600 text-white rounded-xl text-[10px] font-bold flex items-center gap-1.5 active:scale-95 shadow-sm">
+                <button onClick={exportDailyLog} className="px-3 h-8 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95 shadow-sm">
                   <Download size={12} /> Export
                 </button>
               )}
@@ -1521,19 +1521,19 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                           <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${s.dot}`} />
                             <h4 className="font-bold text-sm text-slate-900 leading-tight">{trip.patient}</h4>
-                            {trip.bookingId && <span className="text-[8px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded">{trip.bookingId}</span>}
+                            {trip.bookingId && <span className="text-xs text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded">{trip.bookingId}</span>}
                           </div>
                           <p className="text-sm font-bold text-blue-600 mt-1">{to12hr(trip.time)}</p>
-                          <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-slate-500">
+                          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-slate-500">
                             <ArrowRight size={10} className="text-emerald-500 shrink-0" />
                             <span className="truncate">{trip.pickup}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
                             <ArrowRight size={10} className="text-rose-500 shrink-0" />
                             <span className="truncate">{trip.dropoff}</span>
                           </div>
                           {(trip.pickupOdometer || trip.dropoffOdometer) && (
-                            <div className="flex items-center gap-3 mt-1.5 text-[9px] text-slate-400">
+                            <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
                               {trip.pickupOdometer && <span>Start: {trip.pickupOdometer?.toLocaleString()} mi</span>}
                               {trip.dropoffOdometer && <span>End: {trip.dropoffOdometer?.toLocaleString()} mi</span>}
                               {trip.pickupOdometer && trip.dropoffOdometer && (
@@ -1542,20 +1542,20 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                             </div>
                           )}
                           {trip.distance && (
-                            <p className="text-[9px] text-slate-400 mt-0.5">Distance: {trip.distance} mi</p>
+                            <p className="text-xs text-slate-400 mt-0.5">Distance: {trip.distance} mi</p>
                           )}
                           {trip.completedAt && (
-                            <p className="text-[9px] text-slate-400 mt-1">{new Date(trip.completedAt).toLocaleString()}</p>
+                            <p className="text-xs text-slate-400 mt-1">{new Date(trip.completedAt).toLocaleString()}</p>
                           )}
                         </div>
-                        <span className={`px-2.5 py-1 rounded-lg text-[8px] font-bold uppercase tracking-wider shrink-0 ${s.bg}`}>
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider shrink-0 ${s.bg}`}>
                           {trip.status}
                         </span>
                       </div>
                     </div>
                     <div className="px-4 pb-3 flex gap-2">
-                      <button onClick={() => setShowTripDetails(trip)} className="h-9 px-4 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold flex items-center gap-1.5 active:scale-95"><FileText size={12} /> Details</button>
-                      <button onClick={() => restoreHistoryTrip(trip)} className="h-9 px-4 bg-blue-100 text-blue-700 rounded-xl text-[10px] font-bold flex items-center gap-1.5 active:scale-95"><RotateCcw size={12} /> Restore</button>
+                      <button onClick={() => setShowTripDetails(trip)} className="h-9 px-4 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95"><FileText size={12} /> Details</button>
+                      <button onClick={() => restoreHistoryTrip(trip)} className="h-9 px-4 bg-blue-100 text-blue-700 rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95"><RotateCcw size={12} /> Restore</button>
                     </div>
                   </div>
                 );
@@ -1608,7 +1608,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 </div>
                 <div>
                   <p className="text-sm font-bold text-slate-900">{isOnline ? 'Connected' : 'Offline'}</p>
-                  <p className="text-[10px] text-slate-400">Location sharing active</p>
+                  <p className="text-xs text-slate-400">Location sharing active</p>
                 </div>
               </div>
               <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'} ${isOnline ? 'animate-pulse' : ''}`} />
@@ -1623,7 +1623,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 </div>
                 <div>
                   <p className="text-sm font-bold text-slate-900">Today's Analytics</p>
-                  <p className="text-[10px] text-slate-400">{analytics.tripsCompleted} trips completed</p>
+                  <p className="text-xs text-slate-400">{analytics.tripsCompleted} trips completed</p>
                 </div>
               </div>
               <ChevronDown size={16} className={`text-slate-300 transition-transform ${showAnalytics ? 'rotate-180' : ''}`} />
@@ -1642,16 +1642,16 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                       <div key={stat.label} className={`${stat.bg} rounded-xl p-3 text-center`}>
                         <Icon size={16} className={`mx-auto mb-1 ${stat.color}`} />
                         <p className="text-sm font-black text-slate-900">{stat.value}</p>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
                       </div>
                     );
                   })}
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Time Distribution</p>
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">Time Distribution</p>
                   <div className="space-y-1.5">
                     <div>
-                      <div className="flex justify-between text-[9px] text-slate-500 mb-0.5">
+                      <div className="flex justify-between text-xs text-slate-500 mb-0.5">
                         <span>Driving</span>
                         <span>{analytics.totalDriveTime > 0 ? `${Math.round((analytics.totalDriveTime / (analytics.totalDriveTime || 1)) * 100)}%` : '0%'}</span>
                       </div>
@@ -1660,7 +1660,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                       </div>
                     </div>
                     <div>
-                      <div className="flex justify-between text-[9px] text-slate-500 mb-0.5">
+                      <div className="flex justify-between text-xs text-slate-500 mb-0.5">
                         <span>Idle/Waiting</span>
                         <span>30%</span>
                       </div>
@@ -1677,16 +1677,16 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em]">Odometer</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.12em]">Odometer</p>
                 <p className="text-2xl font-bold text-slate-900 mt-1">{me?.odometer?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-400">mi</span></p>
-                <p className="text-[10px] text-slate-400 mt-1">Next service at {me?.nextOilChange?.toLocaleString() || '5,000'} mi</p>
+                <p className="text-xs text-slate-400 mt-1">Next service at {me?.nextOilChange?.toLocaleString() || '5,000'} mi</p>
               </div>
               <Gauge size={32} className="text-slate-200" />
             </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em] mb-3">Vehicle Info</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.12em] mb-3">Vehicle Info</p>
             <div className="space-y-2.5 text-sm">
               {[
                 ['Vehicle', me?.vehicle || 'N/A'],
@@ -1736,7 +1736,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-lg">{me?.name?.charAt(0) || 'D'}</div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm text-slate-900 truncate">{me?.name || 'Driver'}</p>
-                  <p className="text-[11px] text-slate-500 truncate">{me?.vehicle || 'No vehicle'} &bull; {me?.status}</p>
+                  <p className="text-sm text-slate-500 truncate">{me?.vehicle || 'No vehicle'} &bull; {me?.status}</p>
                 </div>
               </div>
             </div>
@@ -1822,7 +1822,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[140] bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 backdrop-blur-sm text-xs font-semibold animate-slide-up">
           <RotateCcw size={14} className="text-amber-300 shrink-0" />
           <span>{undoableAction.trip.patient} marked as <strong>{undoableAction.newStatus}</strong></span>
-          <button onClick={handleUndo} className="ml-2 px-3 h-7 bg-white/20 hover:bg-white/30 rounded-xl text-[11px] font-bold text-white active:scale-95 transition-all">Undo</button>
+          <button onClick={handleUndo} className="ml-2 px-3 h-7 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-bold text-white active:scale-95 transition-all">Undo</button>
         </div>
       )}
 
@@ -1874,10 +1874,10 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all relative ${isActiveTab ? 'bg-blue-50' : ''}`}>
                     <Icon size={17} strokeWidth={isActiveTab ? 2.5 : 1.5} className="transition-all" />
                     {item.id === 'chat' && chatUnread > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-white text-[7px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm border border-white">{chatUnread > 99 ? '99+' : chatUnread}</span>
+                      <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-white text-xs font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm border border-white">{chatUnread > 99 ? '99+' : chatUnread}</span>
                     )}
                   </div>
-                  <span className={`text-[7px] font-bold uppercase tracking-wider transition-all leading-none ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>{item.label}</span>
+                  <span className={`text-xs font-bold uppercase tracking-wider transition-all leading-none ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>{item.label}</span>
                 </button>
               );
             })}
@@ -1895,7 +1895,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* Swipe hint toast */}
       {activeNav === 'trips' && orderedTrips.some(t => t.status === 'Arrived') && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[90] bg-slate-800/80 text-white px-4 py-2 rounded-2xl shadow-lg text-[10px] font-medium flex items-center gap-2 backdrop-blur-sm">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[90] bg-slate-800/80 text-white px-4 py-2 rounded-2xl shadow-lg text-xs font-medium flex items-center gap-2 backdrop-blur-sm">
           <GripVertical size={12} />
           Swipe left on Arrived trips to complete
         </div>
@@ -1918,29 +1918,29 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 {legs.map((leg, idx) => (
                   <div key={leg.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">Leg {idx + 1}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'In Transit' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{leg.status}</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase">Leg {idx + 1}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'In Transit' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{leg.status}</span>
                     </div>
-                    <p className="text-[11px] font-bold text-slate-400 mb-1">Booking: {leg.bookingId || '—'}</p>
+                    <p className="text-sm font-bold text-slate-400 mb-1">Booking: {leg.bookingId || '—'}</p>
                     <div className="space-y-1.5">
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-600">Pickup</p>
-                          <p className="text-[11px] text-slate-500 truncate">{leg.pickup}</p>
-                          <p className="text-[9px] text-slate-400">{leg.time ? to12hr(leg.time) : ''}</p>
+                          <p className="text-sm text-slate-500 truncate">{leg.pickup}</p>
+                          <p className="text-xs text-slate-400">{leg.time ? to12hr(leg.time) : ''}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-rose-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-600">Dropoff</p>
-                          <p className="text-[11px] text-slate-500 truncate">{leg.dropoff}</p>
+                          <p className="text-sm text-slate-500 truncate">{leg.dropoff}</p>
                         </div>
                       </div>
                     </div>
-                    {leg.notes && <p className="mt-2 text-[10px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{leg.notes}</p>}
-                    {leg.pickupPhone && <p className="mt-1.5 text-[10px] text-slate-400">Phone: {leg.pickupPhone}</p>}
+                    {leg.notes && <p className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{leg.notes}</p>}
+                    {leg.pickupPhone && <p className="mt-1.5 text-xs text-slate-400">Phone: {leg.pickupPhone}</p>}
                   </div>
                 ))}
               </div>

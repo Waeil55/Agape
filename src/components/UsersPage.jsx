@@ -152,9 +152,9 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Email</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Role</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Actions</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Email</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Role</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,10 +165,10 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                     <tr key={user.uid} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900 truncate max-w-[150px] sm:max-w-none">{user.email}</td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4">
-                        <span className={`flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold w-fit ${roleStyle}`}>
+                        <span className={`flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-xs font-bold w-fit ${roleStyle}`}>
                           <RoleIcon size={10} /> {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                         </span>
-                        {user.phone && <p className="text-[10px] text-slate-500 font-mono mt-1">{user.phone}</p>}
+                        {user.phone && <p className="text-xs text-slate-500 font-mono mt-1">{user.phone}</p>}
                       </td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4">
                         {role === 'admin' && user.email !== currentUser && (
@@ -196,10 +196,10 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Driver</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Assigned To</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Actions</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] sm:text-sm font-semibold text-slate-600">Remove</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Driver</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Assigned To</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Remove</th>
               </tr>
             </thead>
             <tbody>
@@ -231,7 +231,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         )}
                       </td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4">
-                        <button onClick={() => setShowAssign(showAssign === d.id ? null : d.id)} className="px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-blue-200">
+                        <button onClick={() => setShowAssign(showAssign === d.id ? null : d.id)} className="px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs sm:text-xs font-semibold hover:bg-blue-200">
                           {showAssign === d.id ? 'Cancel' : 'Assign'}
                         </button>
                       </td>
@@ -298,7 +298,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         <button key={c.key} onClick={() => setForm({ ...form, role: c.key })}
                           className={`p-2 sm:p-3 rounded-lg border-2 text-center transition ${isActive ? `${c.activeBorder} ${c.activeBg}` : 'border-slate-200 hover:border-slate-300'}`}>
                           <Icon size={16} className={`mx-auto mb-1 ${c.text}`} />
-                          <p className={`text-[10px] sm:text-xs font-bold ${c.textBold}`}>{c.label}</p>
+                          <p className={`text-xs sm:text-xs font-bold ${c.textBold}`}>{c.label}</p>
                         </button>
                       );
                     })}
