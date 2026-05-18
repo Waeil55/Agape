@@ -12,15 +12,15 @@
   --sab: env(safe-area-inset-bottom, 0px);
 
   /* ===== TYPOGRAPHY SCALE — Larger defaults for operational readability ===== */
-  --text-xs: 0.788rem;     /* 12.6px — labels, metadata */
-  --text-sm: 0.909rem;     /* 14.5px — secondary body */
-  --text-base: 1.031rem;   /* 16.5px — body text */
-  --text-lg: 1.152rem;     /* 18.4px — large body */
-  --text-xl: 1.334rem;      /* 21.3px — subheadings */
-  --text-2xl: 1.576rem;     /* 25.2px — section headings */
-  --text-3xl: 1.94rem;         /* 31px — page titles */
-  --text-4xl: 2.425rem;       /* 38.8px — hero / large stats */
-  --text-5xl: 3.395rem;       /* 54.3px — trip times (big display) */
+  --text-xs: 0.749rem;     /* 12px — labels, metadata */
+  --text-sm: 0.864rem;     /* 13.8px — secondary body */
+  --text-base: 0.979rem;   /* 15.7px — body text */
+  --text-lg: 1.094rem;     /* 17.5px — large body */
+  --text-xl: 1.267rem;     /* 20.3px — subheadings */
+  --text-2xl: 1.497rem;    /* 24px — section headings */
+  --text-3xl: 1.843rem;    /* 29.5px — page titles */
+  --text-4xl: 2.304rem;    /* 36.9px — hero / large stats */
+  --text-5xl: 3.225rem;    /* 51.6px — trip times (big display) */
 
   /* ===== FONT WEIGHTS ===== */
   --font-normal: 400;
@@ -208,54 +208,54 @@
 
 /* ===== FONT SCALE: Small ===== */
 [data-fontscale="sm"] {
-  --text-xs: 0.667rem;
-  --text-sm: 0.788rem;
-  --text-base: 0.909rem;
-  --text-lg: 1.031rem;
-  --text-xl: 1.152rem;
-  --text-2xl: 1.334rem;
-  --text-3xl: 1.576rem;
-  --text-4xl: 1.94rem;
-  --text-5xl: 2.425rem;
+  --text-xs: 0.634rem;
+  --text-sm: 0.749rem;
+  --text-base: 0.864rem;
+  --text-lg: 0.979rem;
+  --text-xl: 1.094rem;
+  --text-2xl: 1.267rem;
+  --text-3xl: 1.497rem;
+  --text-4xl: 1.843rem;
+  --text-5xl: 2.304rem;
 }
 
 /* ===== FONT SCALE: Large ===== */
 [data-fontscale="lg"] {
-  --text-xs: 0.849rem;
-  --text-sm: 0.97rem;
-  --text-base: 1.152rem;
-  --text-lg: 1.273rem;
-  --text-xl: 1.455rem;
-  --text-2xl: 1.698rem;
-  --text-3xl: 2.061rem;
-  --text-4xl: 2.668rem;
-  --text-5xl: 3.638rem;
+  --text-xs: 0.807rem;
+  --text-sm: 0.922rem;
+  --text-base: 1.094rem;
+  --text-lg: 1.209rem;
+  --text-xl: 1.382rem;
+  --text-2xl: 1.613rem;
+  --text-3xl: 1.958rem;
+  --text-4xl: 2.535rem;
+  --text-5xl: 3.456rem;
 }
 
 /* ===== FONT SCALE: Extra Large ===== */
 [data-fontscale="xl"] {
-  --text-xs: 0.909rem;
-  --text-sm: 1.031rem;
-  --text-base: 1.273rem;
-  --text-lg: 1.394rem;
-  --text-xl: 1.576rem;
-  --text-2xl: 1.819rem;
-  --text-3xl: 2.304rem;
-  --text-4xl: 2.91rem;
-  --text-5xl: 3.88rem;
+  --text-xs: 0.864rem;
+  --text-sm: 0.979rem;
+  --text-base: 1.209rem;
+  --text-lg: 1.324rem;
+  --text-xl: 1.497rem;
+  --text-2xl: 1.728rem;
+  --text-3xl: 2.189rem;
+  --text-4xl: 2.765rem;
+  --text-5xl: 3.686rem;
 }
 
 /* ===== FONT SCALE: Driver Mode (maximum readability) ===== */
 [data-fontscale="driver"] {
-  --text-xs: 1.031rem;
-  --text-sm: 1.152rem;
-  --text-base: 1.394rem;
-  --text-lg: 1.576rem;
-  --text-xl: 1.698rem;
-  --text-2xl: 1.94rem;
-  --text-3xl: 2.425rem;
-  --text-4xl: 3.031rem;
-  --text-5xl: 3.88rem;
+  --text-xs: 0.979rem;
+  --text-sm: 1.094rem;
+  --text-base: 1.324rem;
+  --text-lg: 1.497rem;
+  --text-xl: 1.613rem;
+  --text-2xl: 1.843rem;
+  --text-3xl: 2.304rem;
+  --text-4xl: 2.879rem;
+  --text-5xl: 3.686rem;
   --touch-min: 56px;
 }
 
