@@ -468,6 +468,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     setLastOdometer(odo);
     setShowOdometerPrompt(null);
     setOdometerValue('');
+    // Auto-navigate to pickup after starting trip
+    if (showOdometerPrompt?.pickup) openInNavApp(showOdometerPrompt.pickup, suggestNavApp(showOdometerPrompt.pickup));
   };
 
   const handleArrive = (trip) => {
@@ -484,6 +486,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       arrivalTime: new Date().toISOString(),
       arrivalOdometer: odo,
     });
+    // Auto-navigate to dropoff after confirming arrival
+    if (arrivalNewStatus === 'Arrived' && showArrivalConfirm?.dropoff) openInNavApp(showArrivalConfirm.dropoff, suggestNavApp(showArrivalConfirm.dropoff));
     setShowArrivalConfirm(null);
     setArrivalOdometer('');
     setSignatureConfirmed(false);
@@ -841,10 +845,10 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                             <p className="text-xs font-semibold text-slate-700 leading-tight">{trip.dropoff}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               {trip.dropoffPhone && <p className="text-[9px] text-slate-400">{trip.dropoffPhone}</p>}
-                              <button onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="text-[9px] text-blue-600 font-bold flex items-center gap-0.5 hover:underline" title={`Open in ${suggestNavApp(trip.dropoff)}`}><Navigation size={9} /> Nav</button>
+                              <button onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="text-[9px] text-rose-600 font-bold flex items-center gap-0.5 hover:text-rose-700 hover:underline" title={`Open in ${suggestNavApp(trip.dropoff)}`}><Navigation size={9} /> Nav</button>
                               <div className="flex gap-0.5">
                                 {['google','waze','apple'].filter(a => a !== suggestNavApp(trip.dropoff)).slice(0,2).map(app => (
-                                  <button key={app} onClick={() => openInNavApp(trip.dropoff, app)} className="text-[8px] text-slate-400 hover:text-blue-600 underline px-0.5" title={app}>{app[0].toUpperCase()}</button>
+                                  <button key={app} onClick={() => openInNavApp(trip.dropoff, app)} className="text-[8px] text-slate-400 hover:text-rose-600 underline px-0.5" title={app}>{app[0].toUpperCase()}</button>
                                 ))}
                               </div>
                             </div>
@@ -1133,7 +1137,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
-                <button onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="flex-1 h-9 bg-white/20 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><Navigation size={12} /> Navigate</button>
+                <button onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="flex-1 h-9 bg-blue-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><Navigation size={12} /> Pickup</button>
+                <button onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="flex-1 h-9 bg-rose-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><Navigation size={12} /> Dropoff</button>
                 <a href={`tel:${cleanPhone(clientPhone(showTripDetails))}`} className="flex-1 h-9 bg-emerald-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><Phone size={12} /> Call</a>
               </div>
             </div>
