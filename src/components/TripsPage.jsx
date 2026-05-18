@@ -189,12 +189,24 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               const driver = drivers.find(d => d.id === trip.driverId);
               const isSelected = selectedTasks.includes(trip.id);
               return (
-                <div key={trip.id} className={`flex items-start gap-3 p-3 sm:px-6 sm:py-4 transition-all ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
-                  <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} className="w-5 h-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0 mt-1" />
-                  
-                  <div className="flex-1 min-w-0" onClick={() => setSelectedTrip(trip)}>
-                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div key={trip.id} className={`p-3 sm:p-4 transition-all border-b border-slate-50 last:border-b-0 ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
+                  <div className="flex items-start gap-3">
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} className="w-5 h-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0 mt-1" />
+                    <div className="flex-1 min-w-0">
+                      {/* Time + Status row */}
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-2xl font-black text-blue-600 leading-none">{trip.time}</span>
+                          <span className={`badge shrink-0 ${trip.status === 'Assigned' ? 'badge-success' : 'badge-warning'}`}>{trip.status}</span>
+                          {trip.type && <span className="badge badge-info shrink-0 text-xs">{trip.type}</span>}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"><Edit2 size={16} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"><Trash2 size={16} /></button>
+                        </div>
+                      </div>
+                      {/* Patient name */}
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-extrabold text-slate-900 text-base sm:text-lg break-words">{trip.patient}</p>
                         {(() => {
                           const legs = filteredTrips.filter(t => (t.patient || '').toLowerCase() === (trip.patient || '').toLowerCase()).length;
@@ -204,74 +216,59 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                             </button>
                           ) : null;
                         })()}
-                      </div>
-                      {trip.bookingId ? (
-                        <span className="badge badge-info bg-slate-100 text-slate-500 shrink-0">
-                          {trip.bookingId}
-                        </span>
-                      ) : null}
-                      <span className={`badge shrink-0 ${trip.status === 'Assigned' ? 'badge-success' : 'badge-warning'}`}>
-                        {trip.status}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-2 mt-1.5">
-                      <div className="flex items-start gap-2 min-w-0">
-                        <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                          <MapPin size={12} className="text-blue-600" />
-                        </div>
-                        <p className="text-sm font-semibold text-slate-600 truncate leading-tight">{trip.pickup}</p>
-                      </div>
-                      <div className="flex items-start gap-2 min-w-0">
-                        <div className="w-5 h-5 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
-                          <Flag size={12} className="text-emerald-600" />
-                        </div>
-                        <p className="text-sm font-semibold text-slate-600 truncate leading-tight">{trip.dropoff}</p>
-                      </div>
-                    </div>
-                    
-                    {/* Phone & SMS for Admin/Dispatcher */}
-                    {(role === 'admin' || role === 'dispatcher') && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {trip.pickupPhone && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-slate-400 uppercase">Client:</span>
-                            <button onClick={() => makeCall(trip.pickupPhone, trip.patient)} className="text-xs font-bold text-blue-600 hover:underline">{trip.pickupPhone}</button>
-                            <button onClick={() => sendSMS(trip.pickupPhone, trip.patient)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><MessageSquare size={12} /></button>
-                          </div>
+                        {trip.bookingId && (
+                          <span className="badge badge-info bg-slate-100 text-slate-500 shrink-0">{trip.bookingId}</span>
                         )}
-                        {trip.notes && (
-                          <div className="flex items-center gap-1 ml-2">
+                      </div>
+                      {/* Route */}
+                      <div className="flex flex-col gap-1.5 mt-2">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+                            <MapPin size={11} className="text-blue-600" />
+                          </div>
+                          <p className="text-sm font-semibold text-slate-600 break-words leading-tight">{trip.pickup}</p>
+                        </div>
+                        <div className="flex items-start gap-2 min-w-0">
+                          <div className="w-5 h-5 rounded-full bg-emerald-50 flex items-center justify-center shrink-0 mt-0.5">
+                            <Flag size={11} className="text-emerald-600" />
+                          </div>
+                          <p className="text-sm font-semibold text-slate-600 break-words leading-tight">{trip.dropoff}</p>
+                        </div>
+                      </div>
+                      {/* Driver assignment */}
+                      <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                        <select 
+                          value={trip.driverId || ''} 
+                          onChange={(e) => onAssignTrip(trip.id, e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs font-bold uppercase tracking-wider bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-emerald-500 text-slate-600"
+                        >
+                          <option value="">Quick Assign</option>
+                          {drivers.map(d => (
+                            <option key={d.id} value={d.id}>{d.name}</option>
+                          ))}
+                        </select>
+                        {driver && (
+                          <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                             <UserCheck size={12} /> {driver.name} &bull; {driver.vehicle}
+                          </span>
+                        )}
+                      </div>
+                      {/* Phone & Notes for Admin/Dispatcher */}
+                      {(role === 'admin' || role === 'dispatcher') && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {trip.pickupPhone && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-slate-400 uppercase">Client:</span>
+                              <button onClick={() => makeCall(trip.pickupPhone, trip.patient)} className="text-xs font-bold text-blue-600 hover:underline">{trip.pickupPhone}</button>
+                              <button onClick={() => sendSMS(trip.pickupPhone, trip.patient)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><MessageSquare size={12} /></button>
+                            </div>
+                          )}
+                          {trip.notes && (
                             <span className="text-xs font-bold text-amber-600 uppercase bg-amber-50 px-2 py-1 rounded-lg">Note: {trip.notes}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {driver && (
-                      <p className="mt-2 text-xs font-bold text-emerald-600 flex items-center gap-1.5 uppercase">
-                         <UserCheck size={14} /> {driver.name} &bull; {driver.vehicle}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <p className="text-2xl font-black text-blue-600 leading-none">{trip.time}</p>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{trip.type}</p>
-                    <div className="flex flex-col items-end gap-2 mt-2">
-                      <select 
-                        value={trip.driverId || ''} 
-                        onChange={(e) => onAssignTrip(trip.id, e.target.value)}
-                        className="text-xs font-bold uppercase tracking-wider bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-emerald-500 text-slate-600"
-                      >
-                        <option value="">Quick Assign</option>
-                        {drivers.map(d => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
-                        ))}
-                      </select>
-                      <div className="flex items-center gap-1">
-                        <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"><Edit2 size={16} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"><Trash2 size={16} /></button>
-                      </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

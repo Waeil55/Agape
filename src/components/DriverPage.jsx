@@ -295,6 +295,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     }
   }, [trips, me?.id, me?.email]);
 
+  const getTodayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+
   const myTrips = trips
     .filter(t => {
       const isAssignedToMe = (t.driverId === me?.id || ((t.driverEmail || '').toLowerCase() === (me?.email || '').toLowerCase()));
@@ -303,8 +305,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       return (isAssignedToMe && inWindow) || (isAssignedToMe && isActiveStatus);
     })
     .sort((a, b) => {
-      const tm = (t) => { if (!t || !t.time) return 1440; const m = String(t.time).match(/(\d{1,2}):(\d{2})/); if (!m) return 1440; let h = parseInt(m[1],10); let mn = parseInt(m[2],10); const p = String(t.time).match(/(AM|PM)/i); if (p) { if (p[1].toUpperCase()==='PM'&&h!==12) h+=12; if (p[1].toUpperCase()==='AM'&&h===12) h=0; } return h*60+mn; };
-      return tm(a.time) - tm(b.time);
+      const today = getTodayStr();
+      const aToday = a.date === today ? 0 : 1;
+      const bToday = b.date === today ? 0 : 1;
+      if (aToday !== bToday) return aToday - bToday;
+      return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
 
   const completedTrips = trips.filter(t => (t.driverId === me?.id || (t.driverEmail||'').toLowerCase() === (me?.email||'').toLowerCase()) && t.status === 'Completed');
@@ -693,8 +698,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     URL.revokeObjectURL(url);
   };
 
-  const getTodayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-
   const navItems = [
     { id: 'trips', label: 'Trips', icon: Home },
     { id: 'history', label: 'History', icon: Clock },
@@ -934,7 +937,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <p className="text-sm text-slate-400 mt-1.5 max-w-[200px] mx-auto leading-relaxed">No trips assigned. Your manifest is up to date.</p>
             </div>
           ) : (
-            <div className="space-y-3 pb-2">
+            <div className="space-y-2.5 pb-2">
               {orderedTrips.map((trip) => {
                 const isActive = !['Assigned', 'Unassigned'].includes(trip.status);
                 const isSelected = selectedTrips.includes(trip.id);
@@ -944,104 +947,101 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 const hasConflict = conflicts.some(c => c.tripA === trip.id || c.tripB === trip.id);
                 const rideShareTrip = aiRideShare.find(r => r.tripA === trip.id || r.tripB === trip.id);
                 const urgency = getUrgency(trip);
-                const urgencyBorder = urgency === 2 ? 'border-rose-400 shadow-rose-200/50 animate-pulse' : urgency === 1 ? 'border-amber-400 shadow-amber-200/50' : '';
+                const urgencyBorder = urgency === 2 ? 'border-l-4 border-l-rose-500 shadow-lg shadow-rose-200/50' : urgency === 1 ? 'border-l-4 border-l-amber-500 shadow-md shadow-amber-200/40' : '';
                 const isGuidedCurrent = guidedMode && aiSequence && aiSequence[guidedStepIndex] === trip.id;
                 const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
+                const today = getTodayStr();
+                const isTomorrow = trip.date !== today;
 
                 return (
                   <div key={trip.id}
                     onTouchStart={(e) => handleTouchStart(e, trip)}
                     onTouchEnd={handleTouchEnd}
-                    className={`card overflow-hidden ${isActive ? 'border-blue-300 shadow-md shadow-blue-600/10' : 'border-slate-100'} ${isSelected ? 'ring-2 ring-blue-400' : ''} ${hasConflict ? 'ring-2 ring-rose-300' : ''} ${urgencyBorder} ${isGuidedCurrent ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-200/40 scale-[1.01]' : ''} transition-all`}>
-                    {/* Card Header — Name / Booking ID / Time */}
-                    <div className="px-3 pt-3 pb-2">
-                      <div className="flex items-start gap-3">
-                        <button onClick={() => toggleTripSelect(trip.id)} className="shrink-0 text-slate-400 hover:text-blue-600 mt-1">
-                          {isSelected ? <CheckSquare size={22} className="text-blue-600" /> : <Square size={22} />}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          {/* Row 1: Patient name + status */}
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <h3 className="text-xl font-extrabold text-slate-900 leading-tight break-words">{trip.patient}</h3>
-                              <span className={`badge ${isActive ? 'badge-info' : 'bg-slate-100 text-slate-500'} shrink-0`}>{trip.status}</span>
+                    className={`card overflow-hidden rounded-2xl ${isActive ? 'border-2 border-blue-200' : 'border border-slate-100'} ${isSelected ? 'ring-2 ring-blue-400' : ''} ${hasConflict ? 'ring-2 ring-rose-300' : ''} ${urgencyBorder} ${isGuidedCurrent ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-200/40' : ''} transition-all`}>
+                    {/* Top Bar: Time + Status + Actions */}
+                    <div className={`px-3 pt-3 pb-2 ${isActive ? 'bg-blue-50/50' : ''}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                          <button onClick={() => toggleTripSelect(trip.id)} className="shrink-0 text-slate-400 hover:text-blue-600 mt-0.5">
+                            {isSelected ? <CheckSquare size={20} className="text-blue-600" /> : <Square size={20} />}
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            {/* Time row */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-3xl font-black text-blue-600 tracking-tight leading-none">{to12hr(trip.time)}</span>
+                              {isTomorrow && <span className="badge badge-warning shrink-0">Tomorrow</span>}
                               {urgency === 2 && <span className="badge badge-danger animate-pulse shrink-0">Overdue</span>}
                               {urgency === 1 && <span className="badge badge-warning shrink-0">Soon</span>}
                             </div>
-                            <div className="flex gap-1.5 shrink-0">
-                            <button onClick={() => handleCall(getClientPhone(trip), trip.patient)} className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 active:scale-90 transition-all"><Phone size={18} /></button>
-                              <button onClick={() => handleSMS(getClientPhone(trip), trip.patient)} className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 active:scale-90 transition-all"><MessageCircle size={18} /></button>
-                              <button onClick={() => setExpandedTrip(isExpanded ? null : trip.id)} className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isExpanded ? 'bg-blue-100 text-blue-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>
-                                <ChevronDown size={18} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                              </button>
+                            {/* Patient name */}
+                            <h3 className="text-lg font-extrabold text-slate-900 leading-tight mt-1 break-words">{trip.patient}</h3>
+                            {/* Badges row */}
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                              <span className={`badge shrink-0 ${isActive ? 'badge-info' : 'bg-slate-100 text-slate-500'}`}>{trip.status}</span>
+                              {trip.bookingId && <span className="badge badge-info shrink-0 text-xs">{trip.bookingId}</span>}
+                              {legsCount > 1 && <button onClick={() => setLegsDetailPatient(trip.patient)} className="badge badge-info shrink-0 cursor-pointer hover:opacity-80">{legsCount} legs</button>}
+                              {aiRank && <span className="badge badge-info shrink-0">#{aiRank}</span>}
+                              {hasConflict && <AlertTriangle size={14} className="text-rose-500 shrink-0" />}
+                              {rideShareTrip && <Repeat size={14} className="text-emerald-500 shrink-0" />}
+                              {eta !== undefined && (
+                                <span className="flex items-center gap-1 text-xs text-slate-500 font-semibold shrink-0">
+                                  <Timer size={12} /> {formatDuration(eta)}
+                                </span>
+                              )}
                             </div>
                           </div>
-                          {/* Row 2: Booking ID + badges */}
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            {trip.bookingId && <span className="badge badge-info text-xs">{trip.bookingId}</span>}
-                            {legsCount > 1 && <button onClick={() => setLegsDetailPatient(trip.patient)} className="badge badge-info cursor-pointer hover:opacity-80">{legsCount} legs</button>}
-                            {aiRank && <span className="badge badge-info">#{aiRank}</span>}
-                            {hasConflict && <AlertTriangle size={14} className="text-rose-500 shrink-0" />}
-                            {rideShareTrip && <Repeat size={14} className="text-emerald-500 shrink-0" />}
-                          </div>
-                          {/* Row 3: Time + ETA */}
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className="text-4xl sm:text-5xl font-black text-blue-600 tracking-tight leading-none">{to12hr(trip.time)}</span>
-                            {eta !== undefined && (
-                              <span className="flex items-center gap-1.5 text-sm text-slate-500 font-semibold">
-                                <Timer size={14} /> ETA: {formatDuration(eta)}
-                              </span>
-                            )}
-                          </div>
+                        </div>
+                        {/* Quick actions */}
+                        <div className="flex flex-col gap-1.5 shrink-0">
+                          <button onClick={() => handleCall(getClientPhone(trip), trip.patient)} className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 active:scale-90 transition-all"><Phone size={16} /></button>
+                          <button onClick={() => handleSMS(getClientPhone(trip), trip.patient)} className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 active:scale-90 transition-all"><MessageCircle size={16} /></button>
+                          <button onClick={() => setExpandedTrip(isExpanded ? null : trip.id)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isExpanded ? 'bg-blue-100 text-blue-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>
+                            <ChevronDown size={16} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </button>
                         </div>
                       </div>
                     </div>
 
-                    {/* Pickup / Dropoff Route */}
-                    <div className="px-3 py-2">
-                      <div className="relative pl-8">
-                        <div className="absolute left-[9px] top-3 bottom-3 w-[3px] bg-gradient-to-b from-emerald-400 via-blue-200 to-rose-400 rounded-full" />
-                        <div className="flex items-start gap-3 mb-4">
-                          <div className="w-5 h-5 rounded-full bg-emerald-500 border-[3px] border-emerald-100 shrink-0 mt-0.5 shadow-sm" />
+                    {/* Route Section */}
+                    <div className="px-3 py-2.5">
+                      <div className="relative pl-7">
+                        <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-slate-200 rounded-full" />
+                        {/* Pickup */}
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="w-5 h-5 rounded-full bg-emerald-500 border-2 border-emerald-100 shrink-0 mt-0.5 flex items-center justify-center shadow-sm">
+                            <span className="text-[8px] font-black text-white leading-none">P</span>
+                          </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-base font-bold text-slate-800 leading-snug">{trip.pickup}</p>
-                            <div className="flex items-center gap-2 mt-1.5">
-                              {trip.pickupPhone && <p className="text-sm font-medium text-slate-500">{trip.pickupPhone}</p>}
-                              <button onClick={() => openInNavApp(trip.pickup, suggestNavApp(trip.pickup))} className="text-xs text-blue-600 font-bold flex items-center gap-1 hover:underline px-2 py-1 bg-blue-50 rounded-lg" title={`Open in ${suggestNavApp(trip.pickup)}`}><Navigation size={12} /> Nav</button>
-                              <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.pickup).catch(() => {}); }} className="text-xs text-slate-400 hover:text-blue-600 px-2 py-1 hover:bg-blue-50 rounded-lg" title="Copy address"><Copy size={12} /></button>
-                              <div className="flex gap-1">
-                                {['google','waze','apple'].filter(a => a !== suggestNavApp(trip.pickup)).slice(0,2).map(app => (
-                                  <button key={app} onClick={() => openInNavApp(trip.pickup, app)} className="text-xs text-slate-400 hover:text-blue-600 underline px-1.5 py-1 rounded-lg hover:bg-blue-50" title={app}>{app[0].toUpperCase()}</button>
-                                ))}
-                              </div>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pickup</p>
+                            <p className="text-sm font-bold text-slate-800 leading-snug mt-0.5 break-words">{trip.pickup}</p>
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <button onClick={() => openInNavApp(trip.pickup, suggestNavApp(trip.pickup))} className="text-xs text-blue-600 font-bold flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg active:scale-95"><Navigation size={12} /> Nav</button>
+                              <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.pickup).catch(() => {}); }} className="text-xs text-slate-400 hover:text-blue-600 px-2 py-1 hover:bg-blue-50 rounded-lg" title="Copy"><Copy size={12} /></button>
                             </div>
                           </div>
                         </div>
-
+                        {/* Dropoff */}
                         <div className="flex items-start gap-3">
-                          <div className="w-5 h-5 rounded-full bg-rose-500 border-[3px] border-rose-100 shrink-0 mt-0.5 shadow-sm" />
+                          <div className="w-5 h-5 rounded-full bg-rose-500 border-2 border-rose-100 shrink-0 mt-0.5 flex items-center justify-center shadow-sm">
+                            <span className="text-[8px] font-black text-white leading-none">D</span>
+                          </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-base font-bold text-slate-800 leading-snug">{trip.dropoff}</p>
-                            <div className="flex items-center gap-2 mt-1.5">
-                              {trip.dropoffPhone && <p className="text-sm font-medium text-slate-500">{trip.dropoffPhone}</p>}
-                              <button onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="text-xs text-rose-600 font-bold flex items-center gap-1 hover:underline px-2 py-1 bg-rose-50 rounded-lg" title={`Open in ${suggestNavApp(trip.dropoff)}`}><Navigation size={12} /> Nav</button>
-                              <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.dropoff).catch(() => {}); }} className="text-xs text-slate-400 hover:text-rose-600 px-2 py-1 hover:bg-rose-50 rounded-lg" title="Copy address"><Copy size={12} /></button>
-                              <div className="flex gap-1">
-                                {['google','waze','apple'].filter(a => a !== suggestNavApp(trip.dropoff)).slice(0,2).map(app => (
-                                  <button key={app} onClick={() => openInNavApp(trip.dropoff, app)} className="text-xs text-slate-400 hover:text-rose-600 underline px-1.5 py-1 rounded-lg hover:bg-rose-50" title={app}>{app[0].toUpperCase()}</button>
-                                ))}
-                              </div>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Dropoff</p>
+                            <p className="text-sm font-bold text-slate-800 leading-snug mt-0.5 break-words">{trip.dropoff}</p>
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <button onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="text-xs text-rose-600 font-bold flex items-center gap-1 px-2 py-1 bg-rose-50 rounded-lg active:scale-95"><Navigation size={12} /> Nav</button>
+                              <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.dropoff).catch(() => {}); }} className="text-xs text-slate-400 hover:text-rose-600 px-2 py-1 hover:bg-rose-50 rounded-lg" title="Copy"><Copy size={12} /></button>
                             </div>
                           </div>
                         </div>
                       </div>
                       {trip.notes && (
-                        <div className="mt-3 bg-amber-50/80 rounded-xl px-4 py-3 border border-amber-100/50">
-                          <p className="text-sm text-amber-800 font-medium leading-relaxed">{trip.notes}</p>
+                        <div className="mt-2.5 bg-amber-50/80 rounded-xl px-3 py-2 border border-amber-100/50">
+                          <p className="text-xs text-amber-800 font-medium leading-relaxed">{trip.notes}</p>
                         </div>
                       )}
                       {trip.distance && (
-                        <div className="mt-2 flex items-center gap-1.5 text-sm text-slate-400 font-medium ml-1">
+                        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-400 font-medium ml-1">
                           <MapPin size={12} />
                           <span>{trip.distance} mi estimated</span>
                         </div>
@@ -1481,7 +1481,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             ))}
           </div>
 
-          <div className="space-y-2.5 px-1">
+          <div className="space-y-2">
             {filteredHistory.length === 0 ? (
               <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-slate-100/50 p-12 text-center shadow-sm">
                 <div className="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner">
@@ -1511,11 +1511,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                           <p className="text-sm font-bold text-blue-600 mt-1">{to12hr(trip.time)}</p>
                           <div className="flex items-center gap-1.5 mt-1.5 text-xs text-slate-500">
                             <ArrowRight size={10} className="text-emerald-500 shrink-0" />
-                            <span className="truncate">{trip.pickup}</span>
+                            <span className="break-words">{trip.pickup}</span>
                           </div>
                           <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
                             <ArrowRight size={10} className="text-rose-500 shrink-0" />
-                            <span className="truncate">{trip.dropoff}</span>
+                            <span className="break-words">{trip.dropoff}</span>
                           </div>
                           {(trip.pickupOdometer || trip.dropoffOdometer) && (
                             <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
