@@ -4,7 +4,7 @@ import {
   ArrowRight, CheckCircle2, Trash2, Map as MapIcon, LogOut,
   Settings, Repeat, BrainCircuit, Zap, BarChart3,
   MessageCircle, MessageSquare, Target, Upload, AlertCircle, Building2,
-  Activity, Wand2, Wrench, Lock, Briefcase,
+  Activity, Wand2, Wrench, Lock, Briefcase, User,
   ArchiveRestore, RefreshCcw, FileText, BarChart2, Archive, X, Plus, ChevronLeft
 } from 'lucide-react';
 import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp } from './config/firebase';
@@ -15,6 +15,7 @@ import DriversVehiclesPage from './components/DriversVehiclesPage';
 import SettingsPage from './components/SettingsPage';
 import DriverPage from './components/DriverPage';
 import UsersPage from './components/UsersPage';
+import EnterpriseDashboard from './components/EnterpriseDashboard';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
 import { playMessageSound, initAudioContext } from './utils/notificationSound';
 import { makeCall, sendSMS, showCallActionSheet } from './utils/nativeActions';
@@ -251,16 +252,34 @@ const App = () => {
   const dataLoadedRef = useRef(false);
   const prevChatConvsRef = useRef(null);
   
-  // Online/offline listener
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Online/offline listener + PWA auto-refresh
   useEffect(() => {
     const goOnline = () => setIsOffline(false);
     const goOffline = () => setIsOffline(true);
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
     import('./utils/platform').then(m => m.initPlatform());
+
+    // PWA auto-refresh: soft re-render every 30s to keep data fresh
+    const refreshInterval = setInterval(() => {
+      setRefreshTick(t => t + 1);
+    }, 30000);
+
+    // Force re-render when app comes back to foreground (iOS PWA fix)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        setRefreshTick(t => t + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       window.removeEventListener('online', goOnline);
       window.removeEventListener('offline', goOffline);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(refreshInterval);
     };
   }, []);
   // State variables (declare before refs to avoid temporal dead zone)
@@ -989,6 +1008,7 @@ const App = () => {
     setDrivers([]);
     setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]);
     addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose');
+    setTimeout(() => persistState({ trips: [], trashedTrips: [], drivers: [] }), 0);
   };
 
   const executeDeleteTrip = (tripId) => {
@@ -1858,380 +1878,113 @@ const today = getTodayStr();
         renderLoginScreen()
       ) : (
         <>
-          {/* NAVIGATION TABS */}
-          <div className="nav-blur sticky top-0 z-40 overflow-x-auto">
-            <div className="max-w-full px-3 sm:px-6 flex gap-1 sm:gap-2 whitespace-nowrap">
-              {(() => {
-                const allTabs = [
-                  { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-                  { id: 'trips', label: 'Trips', icon: FileText },
-                  { id: 'dispatch', label: 'Dispatch', icon: Zap },
-                  { id: 'map', label: 'Live Map', icon: MapIcon },
-                  { id: 'chat', label: 'Chat', icon: MessageCircle },
-                  { id: 'drivers', label: 'Drivers & Vehicles', icon: Truck },
-                  { id: 'reports', label: 'Reports', icon: BarChart2 },
-                  { id: 'archives', label: 'Archives', icon: Archive },
-                  ...(role === 'admin' ? [{ id: 'users', label: 'Users', icon: Users }] : []),
-                  { id: 'settings', label: 'Settings', icon: Settings },
-                ];
-                
-                if (role === 'driver') {
-                  return []; // Driver uses its own bottom nav inside DriverPage
-                }
-                
-                if (role === 'dispatcher') {
-                  // Dispatchers see: Dashboard, Trips, Chat, Archives, Settings
-                  // STRICTLY NO: Users, Reports, Live Map, Drivers & Vehicles
-                  return allTabs.filter(t => ['dashboard', 'trips', 'chat', 'archives', 'settings'].includes(t.id));
-                }
-                
-                return allTabs;
-              })().map(tab => {
-                const Icon = tab.icon;
-                const isChat = tab.id === 'chat';
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setActiveTab(tab.id);
-                      if (role === 'dispatcher') setSearchQuery('');
-                    }}
-                    className={`py-3 sm:py-4 px-3 sm:px-4 border-b-2 font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition text-sm sm:text-base ${
-                      activeTab === tab.id
-                        ? 'border-blue-600 text-blue-600'
-                        : 'border-transparent text-slate-500 hover:text-blue-600'
-                    }`}
-                  >
-                    {isChat ? (
-                      <span className="relative inline-flex">
-                        <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
-                        {chatUnreadCount > 0 && (
-                          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1 leading-none shadow-sm">
-                            {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
-                          </span>
-                        )}
-                      </span>
-                    ) : (
-                      <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
-                    )}
-                    <span className="hidden sm:inline">{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* TAB CONTENT */}
-          <div className="max-w-full px-4 sm:px-8 py-6 sm:py-10 flex flex-col flex-1">
-            {role === 'driver' ? (() => {
-              const normalizedCurrentUserEmail = (currentUser || '').trim().toLowerCase();
-              const myDriver = drivers.find(d => ((d.email || '').trim().toLowerCase()) === normalizedCurrentUserEmail);
-              const driverId = myDriver?.id;
-              const isTripForCurrentDriver = (trip) => {
-                const resolvedDriverEmail = (
-                  trip.driverEmail || drivers.find(d => d.id === trip.driverId)?.email || ''
-                ).trim().toLowerCase();
-                return trip.driverId === driverId || resolvedDriverEmail === normalizedCurrentUserEmail;
-              };
-              const myTrips = trips.filter(t => isTripForCurrentDriver(t) && tripMatchesTodayOrTomorrow(t.date));
-              const myDrivers = myDriver ? [myDriver] : [];
-              return <DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
-                appSettings={appSettings}
-                activeMission={myDriver?.activeMission}
-                phoneNumbers={phoneNumbers}
-                onOpenSettings={() => setActiveTab('settings')}
-                onUpdateAppSettings={updateAppSettings}
-                onUpdateMission={(updatedMission) => {
-                  setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, activeMission: updatedMission } : d));
-                  setTimeout(persistState, 0);
-                }}
-                onUpdateDriverLocation={handleUpdateDriverLocation}
-                onUpdateTrip={(tripId, status, extraData = {}) => {
-                  setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
-                  const trip = sTrips.current.find(t => t.id === tripId);
-                  addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${tripId} (${trip?.patient || 'Unknown'}) to ${status}`, 'blue');
-                }}
-                onDriverStatusUpdate={handleDriverStatusUpdate}
-                onCompleteTrip={(tripId, driverId, odometer) => {
-                  handleCompleteTrip(tripId, driverId, odometer);
-                  const trip = sTrips.current.find(t => t.id === tripId);
-                  addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'Unknown'}). Odo: ${odometer}`, 'emerald');
-                }}
-              />;
-            })() : role === 'dispatcher' && activeTab === 'dashboard' ? (
-              renderDispatcherCommandCenter()
-            ) : activeTab === 'dashboard' ? (
-              <div className="space-y-6">
-                {(role === 'admin') && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    <button
-                      onClick={() => setShowUploadModal(true)}
-                      className="p-4 sm:p-6 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl hover:shadow-lg transition text-left"
-                    >
-                      <Upload size={24} className="mb-2 sm:mb-3" />
-                      <h3 className="text-base sm:text-lg font-bold mb-1">Upload Trips</h3>
-                      <p className="text-xs sm:text-sm opacity-90">Import from CSV/Excel</p>
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('trips')}
-                      className="p-4 sm:p-6 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl hover:shadow-lg transition text-left"
-                    >
-                      <Zap size={24} className="mb-2 sm:mb-3" />
-                      <h3 className="text-base sm:text-lg font-bold mb-1">Create Trip</h3>
-                      <p className="text-xs sm:text-sm opacity-90">Manually create a new trip</p>
-                    </button>
-                  </div>
-                )}
-
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5">
-                    <div className="card p-5 sm:p-6 relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <FileText size={48} className="text-blue-600" />
-                      </div>
-                      <h3 className="text-micro">Active Manifest</h3>
-                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">{trips.length}</p>
-                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-500">
-                        <Zap size={12} /> +12% from yesterday
-                      </div>
-                    </div>
-                    <div className="card p-5 sm:p-6 relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Truck size={48} className="text-emerald-600" />
-                      </div>
-                      <h3 className="text-micro">Fleet Ready</h3>
-                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">{drivers.filter(d => d.status === 'Available').length}/{drivers.length}</p>
-                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-blue-500">
-                        <Activity size={12} /> Operational
-                      </div>
-                    </div>
-                    <div className="card p-5 sm:p-6 relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Target size={48} className="text-rose-600" />
-                      </div>
-                      <h3 className="text-micro">Completion Rate</h3>
-                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">
-                        {trips.length > 0 ? Math.round((trips.filter(t => t.status === 'Completed').length / trips.length) * 100) : 0}%
-                      </p>
-                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-rose-500">
-                        <ArrowRight size={12} /> Target: 98%
-                      </div>
-                    </div>
-                    <div className="card p-5 sm:p-6 relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <ShieldCheck size={48} className="text-indigo-600" />
-                      </div>
-                      <h3 className="text-micro">Security Status</h3>
-                      <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">v4.2</p>
-                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-indigo-500">
-                        <Lock size={12} /> HIPAA Encrypted
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="card overflow-hidden">
-                    <div className="p-5 sm:p-6 border-b border-slate-100">
-                      <h2 className="text-heading text-slate-900">Fleet Overview</h2>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-slate-50 border-b border-slate-100">
-                          <tr>
-                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600">Driver</th>
-                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600 hidden sm:table-cell">Vehicle</th>
-                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600">Status</th>
-                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600 hidden md:table-cell">Location</th>
-                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600 hidden md:table-cell">Odometer</th>
-                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left text-sm font-bold text-slate-600">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {drivers.map((driver) => (
-                            <tr key={driver.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-bold text-slate-900">{driver.name}</td>
-                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-slate-600 hidden sm:table-cell">{driver.vehicle}</td>
-                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm">
-                                <Badge variant={driver.status === 'Available' ? 'success' : 'warning'}>{driver.status}</Badge>
-                              </td>
-                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-slate-600 hidden md:table-cell">{driver.currentZone}</td>
-                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-slate-600 hidden md:table-cell">{driver.odometer} mi</td>
-                              <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <button onClick={() => { setActiveTab('drivers'); }} className="text-blue-600 hover:text-blue-800 font-bold text-sm">View</button>
-                                  {driver.phone && (
-                                    <>
-                                      <button onClick={() => makeCall(driver.phone, driver.name)} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition"><Phone size={16} /></button>
-                                      <button onClick={() => sendSMS(driver.phone, driver.name)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition"><MessageSquare size={16} /></button>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                <div className="card p-5 sm:p-6">
-                  <h2 className="text-heading text-slate-900 mb-4">System Logs</h2>
-                  <div className="space-y-2">
-                    {logs.map((log, idx) => (
-                      <div key={idx} className="flex gap-3 items-start p-3 bg-slate-50 rounded-xl border border-slate-100/50">
-                        <AlertCircle className="shrink-0 mt-0.5" size={20} style={{ color: log.c === 'amber' ? '#b45309' : log.c === 'blue' ? '#2563eb' : log.c === 'rose' ? '#e11d48' : '#059669' }} />
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-900 text-sm break-words">{log.t}</p>
-                          <p className={`text-sm ${getLogTextColor(log.c)} break-words`}>{log.d}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-            ) : activeTab === 'trips' ? (
-              <TripsPage trips={trips} role={role} drivers={drivers}
-                selectedTasks={selectedTasks}
-                toggleTaskSelection={toggleTaskSelection}
-                onCreateLegMission={createLegMission}
-                onBulkAssignTrips={bulkAssignTrips}
-                onAssignTrip={(tripId, driverId) => {
-                  const driver = drivers.find(d => d.id === driverId);
-                  setTrips(prev => prev.map(t => t.id === tripId ? {
-                    ...t,
-                    status: 'Assigned',
-                    driverId,
-                    driverEmail: driver?.email || null,
-                    driverName: driver?.name || null,
-                  } : t));
-                  const trip = trips.find(t => t.id === tripId);
-                  addAuditLog('Assignment Action', `${currentUser} (${role}) assigned ${trip?.patient || 'Trip '+tripId} to ${driver?.name || 'Unknown'}`, 'emerald');
-                  addToast('Trip Assigned', `${trip?.patient}'s trip was assigned to ${driver?.name || 'driver'}.`, 'success');
-                }}
-                onUnassignTrip={(tripId) => {
-                  setTrips(prev => prev.map(t => t.id === tripId ? {
-                    ...t,
-                    status: 'Unassigned',
-                    driverId: null,
-                    driverEmail: null,
-                    driverName: null,
-                  } : t));
-                  const trip = trips.find(t => t.id === tripId);
-                  addAuditLog('Unassignment', `${currentUser} (${role}) unassigned trip for ${trip?.patient || 'Unknown'}`, 'amber');
-                }}
-                onAddTrip={(newTrip) => {
-                  const id = `TRP-${Date.now().toString().slice(-6)}`;
-                  const driverId = newTrip.driverId || null;
-                  const driver = drivers.find(d => d.id === driverId);
-                  setTrips(prev => [...prev, { ...newTrip, id, bookingId: extractCustomBookingId(newTrip.bookingId), status: driverId ? 'Assigned' : 'Unassigned', driverId, driverEmail: driver?.email || null, driverName: driver?.name || null }]);
-                  addAuditLog('Trip Created', `${currentUser} manually added trip for ${newTrip.patient}${driver ? ` assigned to ${driver.name}` : ''}`, 'emerald');
-                }}
-                onUpdateTrip={updateTrip}
-                onDeleteTrip={requestDeleteTrip}
-              />
-            ) : activeTab === 'dispatch' ? (
-              <Suspense fallback={<LazyFallback />}>
-                <DispatchAssistant drivers={drivers} trips={trips}
-                  onAssignTrip={(tripId, driverId) => {
-                    const driver = drivers.find(d => d.id === driverId);
-                    setTrips(prev => prev.map(t => t.id === tripId ? {
-                      ...t,
-                      status: 'Assigned',
-                      driverId,
-                      driverEmail: driver?.email || null,
-                      driverName: driver?.name || null,
-                    } : t));
-                    const trip = trips.find(t => t.id === tripId);
-                    addAuditLog('AI Dispatch', `${currentUser} (${role}) confirmed AI suggestion for ${trip?.patient || 'Trip '+tripId} to ${driver?.name || 'Unknown'}`, 'indigo');
-                  }}
-                  addAuditLog={addAuditLog}
-                  currentUser={currentUser}
-                />
-              </Suspense>
-            ) : activeTab === 'chat' ? (
-              <ChatPage currentUser={currentUser} role={role} />
-            ) : activeTab === 'drivers' ? (
-              <DriversVehiclesPage role={role} drivers={drivers} setDrivers={setDrivers} dispatchers={dispatchers} addAuditLog={addAuditLog} currentUser={currentUser} trips={trips} requestAuthAction={requestAuthAction} vehicles={vehicles} setVehicles={setVehicles}
-                onAssignTrip={(tripId, driverId) => {
-                  const driver = drivers.find(d => d.id === driverId);
-                  setTrips(prev => prev.map(t => t.id === tripId ? {
-                    ...t,
-                    status: 'Assigned',
-                    driverId,
-                    driverEmail: driver?.email || null,
-                    driverName: driver?.name || null,
-                  } : t));
-                  const trip = trips.find(t => t.id === tripId);
-                  addAuditLog('Assignment', `${currentUser} (${role}) assigned ${trip?.patient || 'Trip '+tripId} to ${driver?.name || 'Unknown'}`, 'emerald');
-                }}
-                onUploadForDriver={(driverId) => { setUploadAssignDriver(driverId); setShowUploadModal(true); }}
-              />
-            ) : activeTab === 'reports' ? (
-              <Suspense fallback={<LazyFallback />}>
-              <ReportsPage trips={trips} drivers={drivers} onUpdateTrip={updateTrip} role={role} />
-              </Suspense>
-            ) : activeTab === 'archives' ? (
-              <ArchivesPage
-                trashedTrips={role === 'driver' ? trashedTrips.filter(t => t.driverId === drivers.find(d => d.email === currentUser)?.id) : trashedTrips}
-                restoreTrip={role === 'driver' ? null : restoreTrip}
-              />
-            ) : activeTab === 'map' ? (
-              <Suspense fallback={<LazyFallback />}>
-              <LiveMapPage drivers={drivers} onUpdateDriverLocation={handleUpdateDriverLocation} />
-              </Suspense>
-            ) : activeTab === 'users' ? (
-              <UsersPage drivers={drivers} setDrivers={setDrivers} dispatchers={dispatchers} setDispatchers={setDispatchers} addAuditLog={addAuditLog} currentUser={currentUser} role={role} requestAuthAction={requestAuthAction} />
-            ) : activeTab === 'settings' ? (
-              <SettingsPage currentUser={currentUser} role={role} onLogout={handleLogout} onResetSystem={resetSystemData} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={handleUpdatePhoneNumbers} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={role === 'driver' ? drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase()) : null} />
-            ) : null}
-          </div>
-
-          {showUploadModal && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-12">
-              <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setShowUploadModal(false)} />
-              <div className="bg-white/90 backdrop-blur-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-xl sm:rounded-[2.5rem] p-4 sm:p-10 shadow-2xl relative z-10 border border-white/50 mx-0 sm:mx-4">
-                <div className="flex justify-end mb-2">
-                  <button onClick={() => setShowUploadModal(false)} className="p-2 bg-slate-100 rounded-lg sm:rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={18} /></button>
-                </div>
-                <Suspense fallback={<LazyFallback />}>
-                <FileUploadTrips drivers={drivers} preSelectDriver={uploadAssignDriver} onTripsCreated={(newTrips) => { 
-                  const d = new Date();
-                  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-                  setTrips(prev => {
-                    const combined = [...prev, ...newTrips];
-                    const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-                    persistState({ trips: unique });
-                    return unique;
-                  }); 
-                setShowUploadModal(false); 
-                setUploadAssignDriver(''); 
-                addAuditLog('Trips Uploaded', `${currentUser} (${role}) imported ${newTrips.length} trips via file upload.`, 'blue'); 
-
-                const hasOtherDates = newTrips.some(t => t.date && t.date !== today);
-                if (hasOtherDates) {
-                  addToast('Trips Uploaded', `${newTrips.length} trips added. Use the Date Filter in the Trips tab to see future manifests.`, 'warning');
-                } else {
-                  addToast('Trips Uploaded', `${newTrips.length} trips added successfully.`, 'success');
-                }
-              }} />
-                </Suspense>
-              </div>
-            </div>
+          {role === 'driver' ? (() => {
+            const normalizedCurrentUserEmail = (currentUser || '').trim().toLowerCase();
+            const myDriver = drivers.find(d => ((d.email || '').trim().toLowerCase()) === normalizedCurrentUserEmail);
+            const driverId = myDriver?.id;
+            const isTripForCurrentDriver = (trip) => {
+              const resolvedDriverEmail = (
+                trip.driverEmail || drivers.find(d => d.id === trip.driverId)?.email || ''
+              ).trim().toLowerCase();
+              return trip.driverId === driverId || resolvedDriverEmail === normalizedCurrentUserEmail;
+            };
+            const myTrips = trips.filter(t => isTripForCurrentDriver(t) && tripMatchesTodayOrTomorrow(t.date));
+            const myDrivers = myDriver ? [myDriver] : [];
+            return <DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
+              appSettings={appSettings}
+              activeMission={myDriver?.activeMission}
+              phoneNumbers={phoneNumbers}
+              onOpenSettings={() => setActiveTab('settings')}
+              onUpdateAppSettings={updateAppSettings}
+              onUpdateMission={(updatedMission) => {
+                setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, activeMission: updatedMission } : d));
+                setTimeout(persistState, 0);
+              }}
+              onUpdateDriverLocation={handleUpdateDriverLocation}
+              onUpdateTrip={(tripId, status, extraData = {}) => {
+                setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
+                const trip = sTrips.current.find(t => t.id === tripId);
+                addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${tripId} (${trip?.patient || 'Unknown'}) to ${status}`, 'blue');
+              }}
+              onDriverStatusUpdate={handleDriverStatusUpdate}
+              onCompleteTrip={(tripId, driverId, odometer) => {
+                handleCompleteTrip(tripId, driverId, odometer);
+                const trip = sTrips.current.find(t => t.id === tripId);
+                addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'Unknown'}). Odo: ${odometer}`, 'emerald');
+              }}
+            />;
+          })() : (
+            <EnterpriseDashboard
+              role={role}
+              currentUser={currentUser}
+              trips={trips}
+              setTrips={setTrips}
+              drivers={drivers}
+              setDrivers={setDrivers}
+              dispatchers={dispatchers}
+              setDispatchers={setDispatchers}
+              vehicles={vehicles}
+              setVehicles={setVehicles}
+              trashedTrips={trashedTrips}
+              restoreTrip={restoreTrip}
+              logs={logs}
+              setLogs={setLogs}
+              phoneNumbers={phoneNumbers}
+              setPhoneNumbers={setPhoneNumbers}
+              appSettings={appSettings}
+              updateAppSettings={updateAppSettings}
+              selectedTasks={selectedTasks}
+              setSelectedTasks={setSelectedTasks}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              smartAssignTrip={smartAssignTrip}
+              setSmartAssignTrip={setSmartAssignTrip}
+              manualAssignTrip={manualAssignTrip}
+              setManualAssignTrip={setManualAssignTrip}
+              smartAssignResult={smartAssignResult}
+              setSmartAssignResult={setSmartAssignResult}
+              aiAnalyzing={aiAnalyzing}
+              setAiAnalyzing={setAiAnalyzing}
+              showOptimizeModal={showOptimizeModal}
+              setShowOptimizeModal={setShowOptimizeModal}
+              showUploadModal={showUploadModal}
+              setShowUploadModal={setShowUploadModal}
+              uploadAssignDriver={uploadAssignDriver}
+              setUploadAssignDriver={setUploadAssignDriver}
+              bulkAssignModal={bulkAssignModal}
+              setBulkAssignModal={setBulkAssignModal}
+              showDispatcherArchive={showDispatcherArchive}
+              setShowDispatcherArchive={setShowDispatcherArchive}
+              addToast={addToast}
+              addAuditLog={addAuditLog}
+              persistState={persistState}
+              hasPermission={hasPermission}
+              requestAuthAction={requestAuthAction}
+              triggerSmartAssign={triggerSmartAssign}
+              triggerFleetOptimization={triggerFleetOptimization}
+              assignTripToDriver={assignTripToDriver}
+              bulkAssignTrips={bulkAssignTrips}
+              createSharedRide={createSharedRide}
+              createLegMission={createLegMission}
+              requestDeleteTrip={requestDeleteTrip}
+              updateTrip={updateTrip}
+              chatUnreadCount={chatUnreadCount}
+              makeCall={makeCall}
+              sendSMS={sendSMS}
+              handleUpdateDriverLocation={handleUpdateDriverLocation}
+            />
           )}
-          {renderBulkAssignModal()}
-          {renderSmartAssignModal()}
-          {renderSecurityAuthModal()}
 
-          {/* Toast Notifications */}
-          <div className="fixed bottom-24 right-6 z-[200] flex flex-col gap-3 pointer-events-none">
+          {/* Toast Notifications - Global */}
+          <div className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-[200] flex flex-col gap-3 pointer-events-none">
             {toasts.map(toast => (
-              <div key={toast.id} className="pointer-events-auto bg-white/90 backdrop-blur-xl border border-slate-200 rounded-2xl p-4 shadow-2xl flex gap-3 items-start animate-in max-w-sm">
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                  {toast.type === 'success' ? <CheckCircle2 size={22} /> : <Zap size={22} />}
+              <div key={toast.id} className="pointer-events-auto bg-white/90 backdrop-blur-xl border border-slate-200 rounded-xl p-4 shadow-2xl flex gap-3 items-start animate-in max-w-sm">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                  {toast.type === 'success' ? <CheckCircle2 size={20} /> : <Zap size={20} />}
                 </div>
                 <div>
-                  <h4 className="font-extrabold text-base text-slate-900">{toast.title}</h4>
-                  <p className="text-sm font-medium text-slate-500 mt-0.5">{toast.message}</p>
+                  <h4 className="font-bold text-sm text-slate-900">{toast.title}</h4>
+                  <p className="text-xs font-medium text-slate-500 mt-0.5">{toast.message}</p>
                 </div>
               </div>
             ))}
