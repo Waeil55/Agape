@@ -88,7 +88,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const [showOdometerPrompt, setShowOdometerPrompt] = useState(null);
   const [odometerValue, setOdometerValue] = useState('');
   const [lastOdometer, setLastOdometer] = useState(0);
-  const [expandedTrip, setExpandedTrip] = useState(null);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(null);
   const [arrivalOdometer, setArrivalOdometer] = useState('');
   const [signatureConfirmed, setSignatureConfirmed] = useState(false);
@@ -949,7 +948,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 const isActive = !['Assigned', 'Unassigned'].includes(trip.status);
                 const isSelected = selectedTrips.includes(trip.id);
                 const aiRank = aiSequence ? aiSequence.indexOf(trip.id) + 1 : null;
-                const isExpanded = expandedTrip === trip.id;
                 const eta = etas[trip.id];
                 const hasConflict = conflicts.some(c => c.tripA === trip.id || c.tripB === trip.id);
                 const rideShareTrip = aiRideShare.find(r => r.tripA === trip.id || r.tripB === trip.id);
@@ -1002,9 +1000,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                         <div className="flex flex-col gap-1.5 shrink-0">
                           <button onClick={() => handleCall(getClientPhone(trip), trip.patient)} className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 active:scale-90 transition-all"><Phone size={16} /></button>
                           <button onClick={() => handleSMS(getClientPhone(trip), trip.patient)} className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 active:scale-90 transition-all"><MessageCircle size={16} /></button>
-                          <button onClick={() => setExpandedTrip(isExpanded ? null : trip.id)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isExpanded ? 'bg-blue-100 text-blue-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>
-                            <ChevronDown size={16} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                          </button>
+                          <button onClick={() => setShowTripDetails(trip)} className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 flex items-center justify-center active:scale-90 transition-all"><ChevronDown size={16} /></button>
                         </div>
                       </div>
                     </div>
@@ -1055,48 +1051,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                       )}
                     </div>
 
-                    {/* Expanded Details */}
-                    {isExpanded && (
-                      <div className="px-3 pb-3 border-t border-slate-50 pt-3 space-y-3 animate-in">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-slate-50 rounded-xl p-3">
-                            <p className="text-xs text-slate-400 uppercase font-bold">Booking ID</p>
-                            <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.bookingId || '—'}</p>
-                          </div>
-                          <div className="bg-slate-50 rounded-xl p-3">
-                            <p className="text-xs text-slate-400 uppercase font-bold">Service Type</p>
-                            <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.type || '—'}</p>
-                          </div>
-                          <div className="bg-slate-50 rounded-xl p-3">
-                            <p className="text-xs text-slate-400 uppercase font-bold">Patient Phone</p>
-                            <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.pickupPhone || '—'}</p>
-                          </div>
-                          <div className="bg-slate-50 rounded-xl p-3">
-                            <p className="text-xs text-slate-400 uppercase font-bold">Hospital Phone</p>
-                            <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.dropoffPhone || '—'}</p>
-                          </div>
-                        </div>
-                        {trip.pickupOdometer && (
-                          <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
-                            <Gauge size={14} className="text-slate-400" />
-                            <span className="text-sm text-slate-600">Pickup Odometer: <strong className="text-slate-800">{trip.pickupOdometer?.toLocaleString()} mi</strong></span>
-                          </div>
-                        )}
-                        {trip.startTime && (
-                          <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
-                            <Clock size={14} className="text-slate-400" />
-                            <span className="text-sm text-slate-600">Started: <strong className="text-slate-800">{new Date(trip.startTime).toLocaleTimeString()}</strong></span>
-                          </div>
-                        )}
-                        {eta !== undefined && (
-                          <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
-                            <Timer size={14} className="text-slate-400" />
-                            <span className="text-sm text-slate-600">ETA: <strong className="text-slate-800">{formatDuration(eta)}</strong></span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
                     {/* Action Buttons */}
                     <div className="px-2 pb-2">
                       {trip.status === 'Assigned' || trip.status === 'Unassigned' ? (
@@ -1120,7 +1074,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                           <button onClick={() => { impact('light'); revertTripStatus(trip); }} className="btn btn-ghost w-12 p-0" title="Back to Assigned">
                             <RotateCcw size={16} />
                           </button>
-                          <button onClick={() => { impact('light'); setShowTripDetails(trip); }} className="btn btn-ghost w-12 p-0" title="Full details"><FileText size={18} /></button>
                         </div>
                       ) : trip.status === 'Arrived' ? (
                         <div className="grid grid-cols-4 gap-2">
@@ -1135,7 +1088,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                           <button onClick={() => { impact('light'); revertTripStatus(trip); }} className="btn btn-ghost w-12 p-0" title="Back to In Transit">
                             <RotateCcw size={16} />
                           </button>
-                          <button onClick={() => { impact('light'); setShowTripDetails(trip); }} className="btn btn-ghost w-12 p-0" title="Full details"><FileText size={18} /></button>
                         </div>
                       ) : null}
                     </div>
