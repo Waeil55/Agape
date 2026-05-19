@@ -56,9 +56,10 @@ const timeToMinutes = (t) => {
   let h = parseInt(m[1], 10);
   let min = parseInt(m[2] || '0', 10);
   const p = m[3];
-  if (p && p.toUpperCase() === 'PM' && h < 12) h += 12;
-  if (p && p.toUpperCase() === 'AM' && h === 12) h = 0;
-  if (!p && h < 6) h += 12;
+  if (p) {
+    if (p.toUpperCase() === 'PM' && h < 12) h += 12;
+    if (p.toUpperCase() === 'AM' && h === 12) h = 0;
+  }
   return h * 60 + min;
 };
 
@@ -335,39 +336,52 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     }
   }, [trips, driverPosition?.lat, driverPosition?.lng]);
 
-  // Detect ride-sharing opportunities
+  // Detect ride-sharing opportunities — deduplicated, max 3
   useEffect(() => {
     if (activeTrips.length < 2) { setAiRideShare([]); return; }
+    const seen = new Set();
     const nearby = [];
-    for (let i = 0; i < activeTrips.length; i++) {
-      for (let j = i + 1; j < activeTrips.length; j++) {
+    for (let i = 0; i < activeTrips.length && nearby.length < 3; i++) {
+      for (let j = i + 1; j < activeTrips.length && nearby.length < 3; j++) {
         const a = activeTrips[i];
         const b = activeTrips[j];
+        if (a.patient === b.patient) continue;
+        const key = [a.patient, b.patient].sort().join('|');
+        if (seen.has(key)) continue;
         const sameArea = a.pickup?.toLowerCase().includes(b.pickup?.toLowerCase().slice(0, 10)) ||
                          b.pickup?.toLowerCase().includes(a.pickup?.toLowerCase().slice(0, 10)) ||
                          a.dropoff?.toLowerCase().includes(b.dropoff?.toLowerCase().slice(0, 10));
         if (sameArea) {
-          nearby.push({ tripA: a.id, tripB: b.id, patients: [a.patient, b.patient] });
+          seen.add(key);
+          nearby.push({ tripA: a, tripB: b });
         }
       }
     }
     setAiRideShare(nearby);
   }, [activeTrips]);
 
-  // Detect time conflicts
+  // Detect time conflicts — deduplicated summary, max 5
   useEffect(() => {
+    const flagged = new Set();
     const detected = [];
     for (let i = 0; i < activeTrips.length; i++) {
       for (let j = i + 1; j < activeTrips.length; j++) {
         const a = activeTrips[i];
         const b = activeTrips[j];
-        if (a.time === 'Will Call' || b.time === 'Will Call') continue;
+        if (!a.time || !b.time || a.time === 'Will Call' || b.time === 'Will Call') continue;
         const tA = timeToMinutes(a.time);
         const tB = timeToMinutes(b.time);
+        if (tA === 1440 || tB === 1440) continue;
         if (Math.abs(tA - tB) < 30) {
-          detected.push({ tripA: a.id, tripB: b.id, aName: a.patient, bName: b.patient, timeA: a.time, timeB: b.time });
+          const key = [a.patient, b.patient].sort().join('|');
+          if (!flagged.has(key)) {
+            flagged.add(key);
+            detected.push({ aName: a.patient, bName: b.patient, timeA: a.time, timeB: b.time });
+            if (detected.length >= 5) break;
+          }
         }
       }
+      if (detected.length >= 5) break;
     }
     setConflicts(detected);
   }, [activeTrips]);
@@ -799,14 +813,16 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
           {/* Conflict Warning */}
           {conflicts.length > 0 && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
+            <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
               <div className="flex items-start gap-2">
                 <AlertTriangle size={14} className="text-rose-600 mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-rose-800">Time Conflicts Detected</p>
-                  {conflicts.map((c, i) => (
-                    <p key={i} className="text-xs text-rose-700 mt-0.5">{c.aName} ({c.timeA}) overlaps with {c.bName} ({c.timeB})</p>
-                  ))}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-rose-800">{conflicts.length} time conflict{conflicts.length > 1 ? 's' : ''}</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {conflicts.map((c, i) => (
+                      <span key={i} className="text-xs text-rose-700 bg-white/60 rounded-lg px-2 py-0.5">{c.aName} · {c.bName}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -814,25 +830,16 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
           {/* Ride Share Suggestions */}
           {aiRideShare.length > 0 && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
               <div className="flex items-start gap-2">
                 <Repeat size={14} className="text-emerald-600 mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-emerald-800">Ride Sharing Opportunity</p>
-                  {aiRideShare.map((r, i) => {
-                    const aTrip = trips.find(t => t.id === r.tripA);
-                    const bTrip = trips.find(t => t.id === r.tripB);
-                    return (
-                      <div key={i} className="mt-1.5 bg-white/70 rounded-xl p-2 border border-emerald-100">
-                        <p className="text-xs text-emerald-700 font-semibold">{r.patients.join(' & ')} — nearby locations</p>
-                        <p className="text-xs text-emerald-600 mt-0.5">Pick up {aTrip?.patient} first, then {bTrip?.patient} — same area</p>
-                        <div className="flex gap-1.5 mt-1.5">
-                           <button onClick={() => { impact('medium'); openInNavApp(aTrip?.pickup, suggestNavApp(aTrip?.pickup)); }} className="flex-1 h-6 bg-emerald-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 active:scale-95"><Navigation size={8} /> {aTrip?.patient}</button>
-                           <button onClick={() => { impact('medium'); openInNavApp(bTrip?.pickup, suggestNavApp(bTrip?.pickup)); }} className="flex-1 h-6 bg-emerald-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 active:scale-95"><Navigation size={8} /> {bTrip?.patient}</button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-emerald-800">Ride-share possible</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {aiRideShare.map((r, i) => (
+                      <span key={i} className="text-xs text-emerald-700 bg-white/60 rounded-lg px-2 py-0.5">{r.tripA.patient} + {r.tripB.patient}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
