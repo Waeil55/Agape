@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, ShieldCheck, Briefcase, Truck, Save, X, Users, AlertCircle } from 'lucide-react';
-import { db, firebaseConfig, collection, getDocs, setDoc, doc, deleteDoc, deleteApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from '../config/firebase';
+import { db, firebaseConfig, collection, getDocs, setDoc, doc, deleteDoc, deleteApp, initializeApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from '../config/firebase';
 
 const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers, addAuditLog, currentUser, role, requestAuthAction }) => {
   const [users, setUsers] = useState([]);
@@ -10,20 +10,23 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   const [form, setForm] = useState({ email: '', password: '', role: 'driver', phone: '' });
   const [formError, setFormError] = useState('');
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
       const snap = await getDocs(collection(db, 'users'));
       const list = [];
       snap.forEach(d => list.push({ uid: d.id, ...d.data() }));
       setUsers(list);
-    } catch {}
+    } catch (err) {
+      console.error('Failed to load users:', err);
+      setFormError('Could not load users. Check your Firestore permissions.');
+    }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const createUser = async () => {
     setFormError('');
@@ -61,7 +64,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       setShowForm(false);
       setForm({ email: '', password: '', role: 'driver', phone: '' });
     } catch (err) {
-      if (secondaryApp) await deleteApp(secondaryApp);
+      if (secondaryApp) await deleteApp(secondaryApp).catch(() => {});
       setFormError(err.message.replace('Firebase: ', ''));
     }
   };
@@ -95,8 +98,6 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
     addAuditLog('Driver Assigned', `${currentUser} reassigned a driver to ${dispatcher?.name || 'Unassigned'}`, 'blue');
     setShowAssign(null);
   };
-
-  const byRole = (role) => users.filter(u => u.role === role);
 
   return (
     <div className="space-y-6">
@@ -295,7 +296,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                       const Icon = c.Icon;
                       const isActive = form.role === c.key;
                       return (
-                        <button key={c.key} onClick={() => setForm({ ...form, role: c.key })}
+                        <button key={c.key} type="button" onClick={() => setForm({ ...form, role: c.key })}
                           className={`p-2 sm:p-3 rounded-lg border-2 text-center transition ${isActive ? `${c.activeBorder} ${c.activeBg}` : 'border-slate-200 hover:border-slate-300'}`}>
                           <Icon size={16} className={`mx-auto mb-1 ${c.text}`} />
                           <p className={`text-xs sm:text-xs font-bold ${c.textBold}`}>{c.label}</p>

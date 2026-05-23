@@ -17,12 +17,24 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
 
   useEffect(() => {
     setMapError(false);
+    const nextPositions = {};
     drivers.forEach(d => {
       if (d.latitude && d.longitude) {
-        setDriverPositions(prev => ({ ...prev, [d.id]: { lat: d.latitude, lng: d.longitude, name: d.name } }));
+        nextPositions[d.id] = { lat: d.latitude, lng: d.longitude, name: d.name };
       }
     });
+    setDriverPositions(nextPositions);
   }, [drivers]);
+
+  const getDriverTelemetry = (driver) => {
+    const seed = String(driver.id || driver.email || driver.name || '')
+      .split('')
+      .reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    return {
+      speed: driver.speedMph ?? driver.telemetry?.speedMph ?? ((seed * 7) % 42),
+      signal: driver.signalDbm ?? driver.telemetry?.signalDbm ?? -(78 + (seed % 18)),
+    };
+  };
 
   const startGpsTracking = () => {
     if (!navigator.geolocation) return;
@@ -153,7 +165,9 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
                   
                   {/* Telemetry Overlay */}
                   <div className="absolute top-4 right-4 space-y-2 pointer-events-none">
-                    {drivers.filter(d => driverPositions[d.id]).slice(0, 3).map(d => (
+                    {drivers.filter(d => driverPositions[d.id]).slice(0, 3).map(d => {
+                      const telemetry = getDriverTelemetry(d);
+                      return (
                       <div key={d.id} className="bg-slate-900/80 backdrop-blur-md p-3 rounded-xl border border-white/10 text-white min-w-[160px] animate-in fade-in slide-in-from-right-4 duration-500">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs font-black uppercase tracking-widest text-blue-400">{d.name}</span>
@@ -162,15 +176,16 @@ const LiveMapPage = ({ drivers = [], onUpdateDriverLocation }) => {
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div>
                             <p className="text-xs text-slate-400 uppercase font-bold">Speed</p>
-                            <p className="text-xs font-black">{Math.floor(Math.random() * 45)} <span className="text-xs font-medium opacity-60">MPH</span></p>
+                            <p className="text-xs font-black">{telemetry.speed} <span className="text-xs font-medium opacity-60">MPH</span></p>
                           </div>
                           <div>
                             <p className="text-xs text-slate-400 uppercase font-bold">Signal</p>
-                            <p className="text-xs font-black">-{Math.floor(Math.random() * 20 + 80)} <span className="text-xs font-medium opacity-60">dBm</span></p>
+                            <p className="text-xs font-black">{telemetry.signal} <span className="text-xs font-medium opacity-60">dBm</span></p>
                           </div>
                         </div>
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
 
                   <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md p-4 rounded-2xl border border-white/10 text-white shadow-2xl">

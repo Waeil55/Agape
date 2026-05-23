@@ -5,9 +5,9 @@ import {
   Settings, Repeat, BrainCircuit, Zap, BarChart3,
   MessageCircle, MessageSquare, Target, Upload, AlertCircle, Building2,
   Activity, Wand2, Wrench, Lock, Briefcase, User,
-  ArchiveRestore, RefreshCcw, FileText, BarChart2, Archive, X, Plus, ChevronLeft
+  ArchiveRestore, RefreshCcw, FileText, BarChart2, Archive, X, Plus, ChevronLeft, Wifi, WifiOff
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp } from './config/firebase';
 import TripsPage from './components/TripsPage';
 import ChatPage from './components/ChatPage';
 import ArchivesPage from './components/ArchivesPage';
@@ -19,11 +19,13 @@ import EnterpriseDashboard from './components/EnterpriseDashboard';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
 import { playMessageSound, initAudioContext } from './utils/notificationSound';
 import { makeCall, sendSMS, showCallActionSheet } from './utils/nativeActions';
-import { isNativeShell } from './utils/platform';
+import { initPlatform } from './utils/platform';
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 import { suggestBatchAssignment, suggestOptimalDriver } from './config/ai';
 import { tripMatchesCalendarDay, tripMatchesTodayOrTomorrow } from './utils/tripDate';
+
+const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 // Lazy-loaded heavy components
 const LiveMapPage = lazy(() => import('./components/LiveMapPage'));
@@ -170,6 +172,27 @@ const DEFAULT_APP_SETTINGS = {
   navigationApp: 'google',
 };
 
+function buildDriverProfileFromEmail(email, uid = '') {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const seed = (uid || normalizedEmail.replace(/[^a-z0-9]/gi, '')).slice(0, 4).toUpperCase() || 'USER';
+  const name = normalizedEmail.split('@')[0] || 'Driver';
+  return {
+    id: `DRV-${seed}`,
+    name,
+    email: normalizedEmail,
+    phone: '',
+    status: 'Offline',
+    vehicle: 'Pending Assignment',
+    dist: '--',
+    currentZone: 'TBD',
+    odometer: 0,
+    nextOilChange: 5000,
+    assignedTo: '',
+    schedule: [],
+    clockedIn: false,
+  };
+}
+
 // Returns null for system-generated booking ID patterns (avoids duplicates in Firestore),
 // keeps the original value for custom/user-entered booking IDs.
 function extractCustomBookingId(value) {
@@ -190,6 +213,41 @@ function normalizeTrip(trip) {
 }
 
 const DATA_DOC = 'appData/agape';
+const FIRESTORE_BOOT_TIMEOUT_MS = 12000;
+const AUTH_WATCHDOG_TIMEOUT_MS = 18000;
+
+function withTimeout(promise, timeoutMs, label) {
+  let timeoutId;
+  return Promise.race([
+    promise.then(value => ({ ok: true, value, label })),
+    new Promise(resolve => {
+      timeoutId = setTimeout(() => resolve({ ok: false, timeout: true, label }), timeoutMs);
+    }),
+  ]).catch(error => ({ ok: false, error, label })).finally(() => clearTimeout(timeoutId));
+}
+
+function readLocalJson(key) {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalJson(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Local storage may be unavailable in private or restricted browser contexts.
+  }
+}
+
+function readCachedProfile(email) {
+  const cached = readLocalJson('agape_cached_profile');
+  if (!cached?.email || !email) return null;
+  return cached.email.toLowerCase() === email.toLowerCase() ? cached : null;
+}
 
 async function loadAppData() {
   try {
@@ -245,11 +303,14 @@ async function logToCloud(log) {
 }
 
 const App = () => {
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [startupIssue, setStartupIssue] = useState('');
+  const [showLoadingRecovery, setShowLoadingRecovery] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const dataLoadedRef = useRef(false);
+  const authBootResolvedRef = useRef(false);
   const prevChatConvsRef = useRef(null);
   
   const [refreshTick, setRefreshTick] = useState(0);
@@ -260,7 +321,7 @@ const App = () => {
     const goOffline = () => setIsOffline(true);
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
-    import('./utils/platform').then(m => m.initPlatform());
+    initPlatform();
 
     // PWA auto-refresh: soft re-render every 30s to keep data fresh
     const refreshInterval = setInterval(() => {
@@ -292,6 +353,17 @@ const App = () => {
   const [vehicles, setVehicles] = useState(DEFAULT_DATA.vehicles);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  const hydrateAppData = useCallback((rawData) => {
+    const d = { ...DEFAULT_DATA, ...(rawData || {}) };
+    setTrips((d.trips || DEFAULT_DATA.trips).map(normalizeTrip));
+    setTrashedTrips(d.trashedTrips || []);
+    setDrivers(d.drivers || DEFAULT_DATA.drivers);
+    setLogs(d.logs || DEFAULT_DATA.logs);
+    setDispatchers(d.dispatchers || DEFAULT_DATA.dispatchers);
+    setPhoneNumbers(d.phoneNumbers || DEFAULT_DATA.phoneNumbers);
+    setVehicles(d.vehicles || DEFAULT_DATA.vehicles);
+  }, []);
   // Refs for latest state — always up to date, no closure issues
   const sTrips = useRef(trips);
   const sDrivers = useRef(drivers);
@@ -410,6 +482,15 @@ const App = () => {
   useEffect(() => { roleRef.current = role; }, [role]);
   useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
 
+  useEffect(() => {
+    if (!isLoading) {
+      setShowLoadingRecovery(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowLoadingRecovery(true), 8000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
   // Save activeTab to localStorage on change (survives refresh)
   useEffect(() => { if (activeTab) localStorage.setItem('agape_activeTab', activeTab); }, [activeTab]);
 
@@ -419,6 +500,7 @@ const App = () => {
       ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
       : appSettings.theme || 'light';
     document.documentElement.dataset.theme = theme;
+    document.documentElement.classList.toggle('dark', theme === 'dark');
     document.documentElement.dataset.fontScale = appSettings.fontScale || 'md';
     document.documentElement.dataset.readability = appSettings.readability || 'normal';
 
@@ -435,15 +517,45 @@ const App = () => {
   useEffect(() => {
     let unsubData = null;
     let unsubFcm = null;
-    let dataLoaded = false;
+    let cancelled = false;
+    authBootResolvedRef.current = false;
+    const bootWatchdog = setTimeout(() => {
+      if (cancelled || authBootResolvedRef.current) return;
+      setStartupIssue('Startup took too long. Use Retry or Return to Access Portal.');
+      setLoginError('Could not verify your session quickly enough. Please sign in again.');
+      setIsAuthenticated(false);
+      setRole(null);
+      setCurrentUser(null);
+      setDataLoaded(false);
+      setIsLoading(false);
+      signOut(auth).catch(() => {});
+    }, AUTH_WATCHDOG_TIMEOUT_MS);
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
         // Load user role — ensure doc exists for Firestore security rules
-        const [userDoc, dataSnap] = await Promise.all([
-          getDoc(doc(db, 'users', user.uid)).catch(() => null),
-          getDoc(doc(db, DATA_DOC)),
+        const [userDocResult, dataSnapResult] = await Promise.all([
+          withTimeout(getDoc(doc(db, 'users', user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'user profile'),
+          withTimeout(getDoc(doc(db, DATA_DOC)), FIRESTORE_BOOT_TIMEOUT_MS, 'operations data'),
         ]);
-        if (!userDoc?.exists()) {
+        if (cancelled) return;
+
+        const userDoc = userDocResult.ok ? userDocResult.value : null;
+        const dataSnap = dataSnapResult.ok ? dataSnapResult.value : null;
+        const cachedProfile = readCachedProfile(user.email || '');
+        let userRole = '';
+        if (userDoc?.exists()) {
+          userRole = String(userDoc.data()?.role || '').toLowerCase();
+          writeLocalJson('agape_cached_profile', {
+            uid: user.uid,
+            email: user.email || '',
+            role: userRole,
+            cachedAt: new Date().toISOString(),
+          });
+        } else if (cachedProfile?.role && (userDocResult.timeout || userDocResult.error)) {
+          userRole = String(cachedProfile.role).toLowerCase();
+          setStartupIssue('Cloud profile verification is slow. Running from trusted local session while sync reconnects.');
+        } else {
           await signOut(auth).catch(() => {});
           roleRef.current = null;
           currentUserRef.current = null;
@@ -452,15 +564,14 @@ const App = () => {
           setIsAuthenticated(false);
           setActiveTab('dashboard');
           setLoginError('Account not found in Agape system. Please contact your administrator.');
+          authBootResolvedRef.current = true;
           setIsLoading(false);
           return;
         }
 
-        const userRole = String(userDoc.data()?.role || '').toLowerCase();
         const userEmail = user.email;
         // Capture in local variables for onSnapshot closure (useEffect has [])
         const capturedRole = userRole;
-        const capturedEmail = userEmail;
         roleRef.current = userRole;
         currentUserRef.current = userEmail || '';
         setRole(userRole);
@@ -488,18 +599,19 @@ const App = () => {
           if (title && body) showLocalNotification(title, body, type);
         });
 
-        // Initialize data from Firestore
-        if (dataSnap.exists()) {
-          const d = dataSnap.data();
-          setTrips((d.trips || DEFAULT_DATA.trips).map(normalizeTrip));
-          setTrashedTrips(d.trashedTrips || []);
-          setDrivers(d.drivers || DEFAULT_DATA.drivers);
-          setLogs(d.logs || DEFAULT_DATA.logs);
-          setDispatchers(d.dispatchers || DEFAULT_DATA.dispatchers);
-          setPhoneNumbers(d.phoneNumbers || DEFAULT_DATA.phoneNumbers);
-          setVehicles(d.vehicles || DEFAULT_DATA.vehicles);
+        // Initialize data from Firestore, then fall back to the last known good local cache.
+        const cachedData = readLocalJson('agape_cached_data');
+        if (dataSnap?.exists()) {
+          hydrateAppData(dataSnap.data());
+        } else if (cachedData) {
+          hydrateAppData(cachedData);
+          setStartupIssue('Using local cached workspace data while cloud sync reconnects.');
+        } else {
+          hydrateAppData(DEFAULT_DATA);
+          setStartupIssue('Cloud data is still connecting. Workspace opened with a clean operational shell.');
         }
         setDataLoaded(true);
+        authBootResolvedRef.current = true;
         setIsLoading(false);
 
         // Real-time listener for cross-tab / multi-user sync
@@ -514,14 +626,24 @@ const App = () => {
               setDispatchers(d.dispatchers || []);
               setPhoneNumbers(d.phoneNumbers || DEFAULT_DATA.phoneNumbers);
               setVehicles(d.vehicles || DEFAULT_DATA.vehicles);
+              writeLocalJson('agape_cached_data', {
+                trips: d.trips || [],
+                trashedTrips: d.trashedTrips || [],
+                drivers: d.drivers || [],
+                logs: d.logs || [],
+                dispatchers: d.dispatchers || [],
+                phoneNumbers: d.phoneNumbers || DEFAULT_DATA.phoneNumbers,
+                vehicles: d.vehicles || DEFAULT_DATA.vehicles,
+              });
               
               try {
                 // ONLY admins/dispatchers can sync the driver list from the users collection
                 // ONLY admins/dispatchers can sync the driver/dispatcher lists from the users collection
                 const r = roleRef.current;
                 if (r === 'admin' || r === 'dispatcher') {
-                  const usersSnap = await getDocs(collection(db, 'users'));
-                  const allUsers = usersSnap.docs.map(u => ({ id: u.id, ...u.data() }));
+                  const usersResult = await withTimeout(getDocs(collection(db, 'users')), FIRESTORE_BOOT_TIMEOUT_MS, 'user sync');
+                  if (!usersResult.ok) throw usersResult.error || new Error('User sync timed out');
+                  const allUsers = usersResult.value.docs.map(u => ({ id: u.id, ...u.data() }));
                   
                   // SYNC DRIVERS
                   const activeDriverUsers = allUsers
@@ -581,8 +703,10 @@ const App = () => {
                   const normalizedCurrentEmail = cu.trim().toLowerCase();
                   const exists = currentDrivers.some(drv => (drv.email || '').trim().toLowerCase() === normalizedCurrentEmail);
                   if (!exists && r === 'driver') {
-                    const driverUsers = await getDocs(collection(db, 'users'));
-                    const myUserDoc = driverUsers.docs.find(u => (u.data().email || '').trim().toLowerCase() === normalizedCurrentEmail);
+                    const driverUsersResult = await withTimeout(getDocs(collection(db, 'users')), FIRESTORE_BOOT_TIMEOUT_MS, 'driver self-sync');
+                    const myUserDoc = driverUsersResult.ok
+                      ? driverUsersResult.value.docs.find(u => (u.data().email || '').trim().toLowerCase() === normalizedCurrentEmail)
+                      : null;
                     if (myUserDoc) {
                       const uid = myUserDoc.id;
                       const newDriver = {
@@ -601,32 +725,55 @@ const App = () => {
                 }
               } catch (err) {
                 console.error("User list sync failed:", err);
+                setStartupIssue('Realtime data is open, but user list sync is delayed.');
               } finally {
                 setTimeout(() => { fromSnapshot.current = false; }, 500);
               }
             }
           },
-          error: (err) => { console.error("Snapshot error:", err); },
+          error: (err) => {
+            console.error("Snapshot error:", err);
+            setStartupIssue('Realtime cloud sync is disconnected. Local changes are still cached.');
+          },
         });
       } else {
         roleRef.current = null;
         currentUserRef.current = null;
-        dataLoaded = true;
+        setDataLoaded(false);
+        setStartupIssue('');
+        authBootResolvedRef.current = true;
         setIsLoading(false);
       }
     });
     return () => {
+      cancelled = true;
+      clearTimeout(bootWatchdog);
       unsub();
       if (unsubData) unsubData();
       if (typeof unsubFcm === 'function') unsubFcm();
     };
-  }, []);
+  }, [hydrateAppData]);
 
   useEffect(() => {
     if (isAuthenticated && dataLoaded && !fromSnapshot.current) {
       persistState();
     }
   }, [trips, trashedTrips, drivers, logs, dispatchers, vehicles, phoneNumbers, dataLoaded, isAuthenticated, persistState]);
+
+  useEffect(() => {
+    if (role !== 'driver' || !currentUser || !dataLoaded) return;
+    const normalizedEmail = currentUser.trim().toLowerCase();
+    const exists = drivers.some(d => (d.email || '').trim().toLowerCase() === normalizedEmail);
+    if (exists) return;
+
+    setDrivers(prev => {
+      if (prev.some(d => (d.email || '').trim().toLowerCase() === normalizedEmail)) return prev;
+      const updated = [...prev, buildDriverProfileFromEmail(normalizedEmail, auth.currentUser?.uid || '')];
+      persistState({ drivers: updated });
+      return updated;
+    });
+    setStartupIssue('Driver profile was missing and has been provisioned locally while cloud records sync.');
+  }, [role, currentUser, dataLoaded, drivers, persistState]);
 
   useEffect(() => {
     const metaTags = [
@@ -702,6 +849,10 @@ const App = () => {
 
 
   const handleCreateAccount = async () => {
+    if (!ALLOW_SELF_PROVISIONING) {
+      setLoginError('Self-provisioning is disabled for this enterprise deployment. Ask an administrator to create the account from User Management.');
+      return;
+    }
     if (!email || !password) { setLoginError('Enter email and password first.'); return; }
     if (password.length < 6) { setLoginError('Password must be at least 6 characters.'); return; }
     try {
@@ -725,12 +876,32 @@ const App = () => {
     }
   };
 
+  const handlePasswordReset = async () => {
+    setLoginError('');
+    if (!email) {
+      setLoginError('Enter your email first, then use Secure Reset.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setLoginError('Password reset email sent. Check your inbox.');
+    } catch (err) {
+      setLoginError(err.message.replace('Firebase: ', ''));
+    }
+  };
+
   const executeLogin = async (selectedRole, userEmail) => {
     try {
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       
       // SECURITY: Fetch the actual role from Firestore instead of trusting the user's selection
-      const userSnap = await getDoc(doc(db, 'users', userCred.user.uid));
+      const userSnapResult = await withTimeout(getDoc(doc(db, 'users', userCred.user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'login role verification');
+      if (!userSnapResult.ok) {
+        await signOut(auth);
+        setLoginError('Could not verify this account quickly enough. Please check connection and retry.');
+        return;
+      }
+      const userSnap = userSnapResult.value;
       if (!userSnap.exists()) {
         await signOut(auth);
         setLoginError("Account not found in Agape system. Please contact your administrator.");
@@ -747,6 +918,12 @@ const App = () => {
       
       setRole(dbRole);
       setCurrentUser(userCred.user.email || userEmail);
+      writeLocalJson('agape_cached_profile', {
+        uid: userCred.user.uid,
+        email: userCred.user.email || userEmail,
+        role: dbRole,
+        cachedAt: new Date().toISOString(),
+      });
       setIsAuthenticated(true);
       setActiveTab(dbRole === 'driver' ? 'driverHome' : 'dashboard');
       setLoginError('');
@@ -889,7 +1066,7 @@ const App = () => {
     }
     
     setSelectedTasks([]);
-    setShowAssign(false);
+    setBulkAssignModal(false);
     setTimeout(persistState, 0);
   };
 
@@ -1039,7 +1216,10 @@ const App = () => {
 
   const handleDriverStatusUpdate = (driverId, clockedIn) => {
     setDrivers(prevDrivers => {
-      const updated = prevDrivers.map(d => d.id === driverId ? {
+      const workingDrivers = prevDrivers.some(d => d.id === driverId)
+        ? prevDrivers
+        : [...prevDrivers, buildDriverProfileFromEmail(currentUser || '', auth.currentUser?.uid || '')];
+      const updated = workingDrivers.map(d => d.id === driverId ? {
         ...d,
         clockedIn,
         lastUpdate: new Date().toISOString(),
@@ -1079,7 +1259,10 @@ const App = () => {
 
   const handleUpdateDriverLocation = useCallback((driverId, latitude, longitude) => {
     setDrivers(prev => {
-      const updated = prev.map(d => d.id === driverId ? {
+      const workingDrivers = prev.some(d => d.id === driverId)
+        ? prev
+        : [...prev, buildDriverProfileFromEmail(currentUserRef.current || '', auth.currentUser?.uid || '')];
+      const updated = workingDrivers.map(d => d.id === driverId ? {
         ...d,
         latitude,
         longitude,
@@ -1131,28 +1314,25 @@ const App = () => {
     };
 
     return (
-      <div className="flex-1 bg-slate-50 flex flex-col justify-center items-center p-4 relative overflow-hidden font-outfit" style={{paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)'}}>
-        {/* Subtle Background Orbs */}
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/10 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/10 blur-[120px] rounded-full animate-pulse delay-700" />
+      <div className="flex-1 bg-slate-50 flex flex-col justify-start lg:justify-center items-center px-4 py-6 relative overflow-y-auto font-outfit" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(241,245,249,0.72)),linear-gradient(90deg,rgba(37,99,235,0.06)_1px,transparent_1px),linear-gradient(180deg,rgba(37,99,235,0.05)_1px,transparent_1px)] bg-[length:auto,48px_48px,48px_48px]" />
         
-        <div className="w-full max-w-lg bg-white/80 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(15,23,42,0.1)] p-8 sm:p-12 border border-white relative z-10">
-          <div className="flex flex-col items-center mb-10 text-center">
-            <div className="w-28 h-28 mb-6 relative">
-              <div className="absolute inset-0 bg-blue-600 blur-2xl opacity-10 animate-pulse" />
+        <div className="w-full max-w-lg bg-white/90 backdrop-blur-xl rounded-[1.75rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.22)] p-6 sm:p-8 border border-white relative z-10">
+          <div className="flex flex-col items-center mb-6 text-center">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 mb-4 relative">
               <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain relative z-10" />
             </div>
-            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 mb-3 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
-            <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 rounded-full border border-blue-100">
-              <ShieldCheck size={16} className="text-blue-600" />
-              <p className="text-xs font-black text-blue-800 uppercase tracking-[0.2em]">Enterprise Fleet OS</p>
+            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 mb-2 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
+              <ShieldCheck size={14} className="text-blue-600" />
+              <p className="text-[11px] font-black text-blue-800 uppercase tracking-[0.18em]">Enterprise Fleet OS</p>
             </div>
           </div>
 
           {loginStep === 'role_selection' ? (
-            <div className="space-y-5">
-              <h2 className="text-center text-base font-bold text-slate-500 mb-8 tracking-wide">Secure Access Portal</h2>
-              <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-4">
+              <h2 className="text-center text-sm font-bold text-slate-500 tracking-wide">Secure Access Portal</h2>
+              <div className="grid grid-cols-1 gap-3">
                 {[
                   { key: 'admin', Icon: ShieldCheck, label: 'Administrator', sub: 'Master Control & Intelligence', color: 'indigo' },
                   { key: 'dispatcher', Icon: Briefcase, label: 'Dispatcher', sub: 'Fleet Logistics & Command', color: 'blue' },
@@ -1166,12 +1346,12 @@ const App = () => {
                   };
                   return (
                     <button key={r.key} onClick={() => handleRoleSelect(r.key)} 
-                      className="flex items-center gap-5 p-6 bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 hover:border-blue-200 active:scale-[0.98] transition-all duration-300 group text-left shadow-sm">
-                      <div className={`${colorMap[r.color]} p-4 rounded-xl text-white shadow-lg shrink-0 transition-transform group-hover:scale-110 flex items-center justify-center w-14 h-14`}>
-                        <Icon size={24} strokeWidth={2.5} />
+                      className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 hover:border-blue-200 active:scale-[0.98] transition-all duration-300 group text-left shadow-sm min-h-[84px]">
+                      <div className={`${colorMap[r.color]} rounded-xl text-white shadow-lg shrink-0 transition-transform group-hover:scale-105 flex items-center justify-center w-12 h-12`}>
+                        <Icon size={22} strokeWidth={2.5} />
                       </div>
                       <div className="flex-1">
-                        <span className="block text-xl font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
+                        <span className="block text-lg font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
                         <span className="block text-sm font-medium text-slate-500 mt-0.5">{r.sub}</span>
                       </div>
                       <ArrowRight size={20} className="text-slate-300 group-hover:text-blue-600 transition-all transform group-hover:translate-x-1" />
@@ -1181,9 +1361,9 @@ const App = () => {
               </div>
             </div>
           ) : (
-            <form onSubmit={submitLogin} className="space-y-6">
-              <div className="flex items-center gap-4 mb-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <button type="button" onClick={() => setLoginStep('role_selection')} className="p-3 bg-white rounded-xl text-slate-400 hover:text-slate-900 shadow-sm active:scale-95 transition-all"><ArrowRight className="rotate-180" size={20} /></button>
+            <form onSubmit={submitLogin} className="space-y-4">
+              <div className="flex items-center gap-4 mb-5 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <button type="button" onClick={() => setLoginStep('role_selection')} className="p-2.5 bg-white rounded-xl text-slate-400 hover:text-slate-900 shadow-sm active:scale-95 transition-all"><ArrowRight className="rotate-180" size={18} /></button>
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Authenticating as</p>
                   <p className="text-base font-black text-slate-900 capitalize">{pendingRole}</p>
@@ -1194,7 +1374,7 @@ const App = () => {
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Enterprise Email</label>
                 <div className="relative">
                   <input type="email" required placeholder="name@agapecare.com" value={email} onChange={(e) => setEmail(e.target.value)} 
-                    className="w-full p-4 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
+                    className="w-full p-3.5 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
 
@@ -1202,24 +1382,24 @@ const App = () => {
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
                 <div className="relative">
                   <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} 
-                    className="w-full p-4 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
+                    className="w-full p-3.5 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
 
-              {loginError && <p className="text-rose-600 text-sm font-semibold text-center mt-2 bg-rose-50 p-3 rounded-lg border border-rose-100">{loginError}</p>}
+              {loginError && <p className={`text-sm font-semibold text-center mt-2 p-3 rounded-lg border ${loginError.toLowerCase().includes('sent') ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100'}`}>{loginError}</p>}
               
-              <button type="submit" className="w-full py-5 mt-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-500/25 active:scale-[0.98] hover:shadow-blue-500/40 transition-all duration-300">Authorize Access</button>
+              <button type="submit" className="w-full py-4 mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-500/25 active:scale-[0.98] hover:shadow-blue-500/40 transition-all duration-300">Authorize Access</button>
               
-              <div className="pt-4 flex items-center justify-between text-sm font-bold">
-                <button type="button" onClick={handleCreateAccount} className="text-slate-400 hover:text-slate-900 transition">New Deployment?</button>
+              <div className="pt-2 flex items-center justify-between text-sm font-bold">
+                <button type="button" onClick={handleCreateAccount} className="text-slate-400 hover:text-slate-900 transition">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>
                 <span className="text-slate-200">|</span>
-                <button type="button" className="text-slate-400 hover:text-slate-900 transition">Secure Reset</button>
+                <button type="button" onClick={handlePasswordReset} className="text-slate-400 hover:text-slate-900 transition">Secure Reset</button>
               </div>
             </form>
           )}
         </div>
         
-        <div className="mt-12 flex flex-col items-center gap-4 relative z-10">
+        <div className="mt-5 flex flex-col items-center gap-3 relative z-10">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.3em] text-center opacity-60">
             Agape Care Cloud Infrastructure<br />
             Certified Enterprise Environment
@@ -1839,19 +2019,26 @@ const today = getTodayStr();
                 const isOnline = myDriver?.clockedIn || false;
                 return (
                   <button onClick={() => handleDriverStatusUpdate(myDriver?.id, !isOnline)}
-                    className={`h-10 px-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-all active:scale-95 border-2 ${isOnline ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-200' : 'bg-white text-slate-600 border-slate-300'}`}>
-                    {isOnline ? 'Online' : 'Offline'}
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
+                      isOnline
+                        ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200'
+                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                    }`}
+                    title={isOnline ? 'Go Offline' : 'Go Online'}>
+                    {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
                   </button>
                 );
               })()}
               {role === 'driver' && phoneNumbers?.routing && (
-                <button onClick={() => makeCall(phoneNumbers.routing, 'Routing')} className="h-10 px-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition text-sm font-bold flex items-center gap-1.5 shadow-sm" title="Call Routing">
-                  <Phone size={16} /><span className="hidden sm:inline">Routing</span>
+                <button onClick={() => makeCall(phoneNumbers.routing, 'Routing')} className="h-8 px-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center gap-1 shadow-sm" title="Call Routing">
+                  <Phone size={12} />
+                  <span className="text-[9px] font-bold">Rout</span>
                 </button>
               )}
               {role === 'driver' && phoneNumbers?.dispatcher && (
-                <button onClick={() => makeCall(phoneNumbers.dispatcher, 'Dispatch')} className="h-10 px-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition text-sm font-bold flex items-center gap-1.5 shadow-sm" title="Call Dispatch">
-                  <Phone size={16} /><span className="hidden sm:inline">Dispatch</span>
+                <button onClick={() => makeCall(phoneNumbers.dispatcher, 'Dispatch')} className="h-8 px-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition flex items-center gap-1 shadow-sm" title="Call Dispatch">
+                  <Phone size={12} />
+                  <span className="text-[9px] font-bold">Disp</span>
                 </button>
               )}
               <span className="hidden sm:inline-flex items-center px-4 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold capitalize border border-blue-100">{role}</span>
@@ -1863,15 +2050,51 @@ const today = getTodayStr();
         </div>
       </header>
 
+      {startupIssue && !isLoading && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-2 text-xs sm:text-sm font-semibold text-amber-800 flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2 min-w-0"><AlertCircle size={16} className="shrink-0" /> <span className="truncate">{startupIssue}</span></span>
+          <button onClick={() => setStartupIssue('')} className="text-amber-700 hover:text-amber-900 font-bold shrink-0">Dismiss</button>
+        </div>
+      )}
+
       {/* LOADING SCREEN */}
       {isLoading ? (
-        <div className="flex-1 bg-slate-50 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-6">
-            <div className="w-20 h-20 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin shadow-lg shadow-blue-100"></div>
+        <div className="flex-1 bg-slate-50 flex items-center justify-center px-4">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.45)] flex flex-col items-center gap-6 text-center">
+            <div className="relative">
+              <div className="w-20 h-20 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin shadow-lg shadow-blue-100"></div>
+              <div className="absolute inset-3 rounded-full bg-blue-50 flex items-center justify-center">
+                <ShieldCheck size={24} className="text-blue-600" />
+              </div>
+            </div>
             <div className="text-center">
               <p className="text-lg font-bold text-slate-700">Loading Agape Care</p>
               <p className="text-sm font-medium text-slate-400 mt-1">Preparing your workspace...</p>
+              {startupIssue && <p className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mt-4">{startupIssue}</p>}
             </div>
+            {showLoadingRecovery && (
+              <div className="w-full border-t border-slate-100 pt-5 space-y-3">
+                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. You can retry the cloud connection or return to the access portal without waiting.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => window.location.reload()} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
+                    <RefreshCcw size={15} /> Retry
+                  </button>
+                  <button onClick={async () => {
+                    await signOut(auth).catch(() => {});
+                    roleRef.current = null;
+                    currentUserRef.current = null;
+                    setRole(null);
+                    setCurrentUser(null);
+                    setIsAuthenticated(false);
+                    setDataLoaded(false);
+                    setLoginError('Session reset. Please sign in again.');
+                    setIsLoading(false);
+                  }} className="h-11 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm active:scale-95 transition">
+                    Access Portal
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : !isAuthenticated ? (
@@ -1880,7 +2103,8 @@ const today = getTodayStr();
         <>
           {role === 'driver' ? (() => {
             const normalizedCurrentUserEmail = (currentUser || '').trim().toLowerCase();
-            const myDriver = drivers.find(d => ((d.email || '').trim().toLowerCase()) === normalizedCurrentUserEmail);
+            const matchedDriver = drivers.find(d => ((d.email || '').trim().toLowerCase()) === normalizedCurrentUserEmail);
+            const myDriver = matchedDriver || (normalizedCurrentUserEmail ? buildDriverProfileFromEmail(normalizedCurrentUserEmail, auth.currentUser?.uid || '') : null);
             const driverId = myDriver?.id;
             const isTripForCurrentDriver = (trip) => {
               const resolvedDriverEmail = (
@@ -1931,6 +2155,7 @@ const today = getTodayStr();
               setLogs={setLogs}
               phoneNumbers={phoneNumbers}
               setPhoneNumbers={setPhoneNumbers}
+              setTrashedTrips={setTrashedTrips}
               appSettings={appSettings}
               updateAppSettings={updateAppSettings}
               selectedTasks={selectedTasks}

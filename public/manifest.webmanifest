@@ -1,0 +1,26 @@
+{
+  "name": "Agape Care Fleet Management",
+  "short_name": "Agape Care",
+  "description": "Enterprise fleet management, dispatch, routing, and driver operations for Agape Care.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "categories": ["business", "productivity", "navigation"],
+  "icons": [
+    {
+      "src": "/agape.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/agape.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -449,7 +449,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                 <h3 className="text-lg font-bold text-slate-900">{patientName}</h3>
                 <button onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200"><X size={16} /></button>
               </div>
-              <p className="text-xs text-slate-500 font-medium mb-4">{legs.length} legs</p>
+              <p className="text-xs text-slate-500 font-medium mb-4">{legs.length} leg{legs.length !== 1 ? 's' : ''}</p>
               <div className="space-y-2">
                 {legs.map((leg, idx) => (
                   <div key={leg.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">

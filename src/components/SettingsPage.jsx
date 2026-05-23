@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Palette, Navigation, Type, Moon, Sun, Monitor, Route, Phone, ShieldCheck, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
+import { auth, updatePassword } from '../config/firebase';
 
 const FONT_SCALE_OPTIONS = [
   { value: 'sm', label: 'Small', desc: 'Compact view — more content on screen', icon: Minus },
@@ -75,7 +76,6 @@ const SettingsPage = ({
       return;
     }
     try {
-      const { updatePassword, auth } = await import('../config/firebase');
       await updatePassword(auth.currentUser, newPw);
       setPwMsg('Password updated successfully.');
       setNewPw('');

@@ -69,8 +69,8 @@ const ChatPage = ({ currentUser, role }) => {
         .map(([id, c]) => ({ id, ...c }))
         .filter(c => role === 'admin' || c.participants?.includes(currentUser))
         .sort((a, b) => {
-          const aTime = b.lastMessage?.timestamp?.toMillis?.() || 0;
-          const bTime = a.lastMessage?.timestamp?.toMillis?.() || 0;
+          const aTime = a.lastMessage?.timestamp?.toMillis?.() || 0;
+          const bTime = b.lastMessage?.timestamp?.toMillis?.() || 0;
           return bTime - aTime;
         });
 
@@ -105,7 +105,7 @@ const ChatPage = ({ currentUser, role }) => {
 
   // Mark conversation as read
   useEffect(() => {
-    if (!activeConv) { setMessages([]); return; }
+    if (!activeConv?.id) { setMessages([]); return; }
     let firstSnapshot = true;
     const q = query(collection(db, 'chat_messages'), where('conversationId', '==', activeConv.id));
     const unsub = onSnapshot(q, snap => {

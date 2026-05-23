@@ -9,7 +9,7 @@
     "plugin:react/recommended",
     "plugin:react-hooks/recommended"
   ],
-  "ignorePatterns": ["App5sample/**", "version_snapshot/**", "dist/**", "node_modules/**"],
+  "ignorePatterns": ["App5sample/**", "version_snapshot/**", "dist/**", "node_modules/**", "test_*.jsx"],
   "parserOptions": {
     "ecmaVersion": "latest",
     "sourceType": "module",
@@ -23,7 +23,15 @@
   ],
   "rules": {
     "react/react-in-jsx-scope": "off",
-    "react/prop-types": "off"
+    "react/prop-types": "off",
+    "react/no-unescaped-entities": "off",
+    "no-empty": ["warn", { "allowEmptyCatch": true }],
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "react-hooks/immutability": "warn",
+    "react-hooks/preserve-manual-memoization": "warn",
+    "react-hooks/purity": "warn",
+    "react-hooks/refs": "warn",
+    "react-hooks/set-state-in-effect": "warn"
   },
   "settings": {
     "react": {

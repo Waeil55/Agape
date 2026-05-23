@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   FileText, Users, AlertCircle, Clock, CheckCircle2, Truck,
-  BrainCircuit, Wand2, Upload, Search, Filter, ArrowUpRight,
+  BrainCircuit, Search, Filter, ArrowUpRight,
   ArrowDownRight, Navigation, Phone, MessageSquare, MoreHorizontal,
   ChevronDown, ChevronUp, Zap, AlertTriangle, Repeat, MapPin,
   Square, CheckSquare, X, Plus, ArrowRight, TrendingUp, TrendingDown
@@ -48,8 +48,6 @@ const OperationsCommandCenter = ({
   operationsTab, setOperationsTab,
   smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
   smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing,
-  showOptimizeModal, setShowOptimizeModal, showUploadModal, setShowUploadModal,
-  uploadAssignDriver, setUploadAssignDriver, bulkAssignModal, setBulkAssignModal,
   addToast, addAuditLog, persistState, hasPermission, requestAuthAction,
   triggerSmartAssign, triggerFleetOptimization, assignTripToDriver,
   bulkAssignTrips, requestDeleteTrip, updateTrip,
@@ -174,7 +172,7 @@ const OperationsCommandCenter = ({
           placeholder="Search trips, patients, addresses..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-8 pr-3 py-1.5 text-xs bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 transition"
+          className="w-full pl-8 pr-3 py-1.5 text-xs bg-white/5 border border-white/10 rounded-lg text-[var(--text-primary)] placeholder-slate-500 focus:outline-none focus:border-blue-500/50 transition"
         />
       </div>
 
@@ -211,29 +209,6 @@ const OperationsCommandCenter = ({
         </select>
       </div>
 
-      <div className="flex-1" />
-
-      {/* Actions */}
-      {selectedTasks.length > 0 && (
-        <button
-          onClick={() => setBulkAssignModal(true)}
-          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition flex items-center gap-1.5"
-        >
-          <Users size={13} /> Assign {selectedTasks.length}
-        </button>
-      )}
-      <button
-        onClick={() => setShowOptimizeModal(true)}
-        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition flex items-center gap-1.5"
-      >
-        <Wand2 size={13} /> Optimize
-      </button>
-      <button
-        onClick={() => setShowUploadModal(true)}
-        className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-medium transition flex items-center gap-1.5"
-      >
-        <Upload size={13} /> Upload
-      </button>
     </div>
   );
 
@@ -247,7 +222,7 @@ const OperationsCommandCenter = ({
           <p className="text-xs mt-1">Try adjusting filters or upload new trips</p>
         </div>
       ) : (
-        <div className="bg-[#0d1117] border border-white/5 rounded-xl overflow-hidden mx-3 mb-3">
+        <div className="admin-bg-surface border border-white/5 rounded-xl overflow-hidden mx-3 mb-3">
           {/* Table header */}
           <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-white/[0.02] border-b border-white/5 text-[10px] uppercase tracking-wider text-slate-500 font-semibold sticky top-0 z-10">
             <div className="col-span-1"></div>
@@ -287,7 +262,7 @@ const OperationsCommandCenter = ({
                   </span>
                   {isLate && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />}
                 </div>
-                <div className="col-span-2 flex items-center font-medium text-white truncate">{t.patient}</div>
+                <div className="col-span-2 flex items-center font-medium text-[var(--text-primary)] truncate">{t.patient}</div>
                 <div className="col-span-3 flex items-center text-slate-400 truncate text-[11px]">{t.pickup}</div>
                 <div className="col-span-2 flex items-center text-slate-400 truncate text-[11px]">{t.dropoff}</div>
                 <div className="col-span-1 flex items-center">
@@ -339,7 +314,7 @@ const OperationsCommandCenter = ({
           const isExpanded = expandedDriver === d.id;
           const isMaintenanceDue = d.nextOilChange - d.odometer < 200;
           return (
-            <div key={d.id} className={`bg-[#0d1117] border rounded-xl overflow-hidden transition ${
+            <div key={d.id} className={`admin-bg-surface border rounded-xl overflow-hidden transition ${
               d.status === 'Available' ? 'border-emerald-500/20' : 'border-white/5'
             } ${isMaintenanceDue ? 'border-rose-500/30' : ''}`}>
               {/* Driver header */}
@@ -352,7 +327,7 @@ const OperationsCommandCenter = ({
                       {d.name.charAt(0)}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-white">{d.name}</p>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{d.name}</p>
                       <p className="text-[11px] text-slate-500">{d.vehicle}</p>
                     </div>
                   </div>
@@ -380,7 +355,7 @@ const OperationsCommandCenter = ({
                       {driverTrips.map(t => (
                         <div key={t.id} className="p-2 rounded-lg bg-white/[0.02] border border-white/5 cursor-pointer hover:bg-white/[0.04] transition" onClick={() => setTripDetails(t)}>
                           <div className="flex items-center justify-between">
-                            <p className="text-xs font-medium text-white">{t.patient}</p>
+                            <p className="text-xs font-medium text-[var(--text-primary)]">{t.patient}</p>
                             <span className="text-[10px] font-mono text-slate-400">{to12hr(t.time)}</span>
                           </div>
                           <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-500">
@@ -424,9 +399,9 @@ const OperationsCommandCenter = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {willCallTrips.map(t => (
-            <div key={t.id} className="bg-[#0d1117] border border-white/5 rounded-xl p-3 hover:border-white/10 transition cursor-pointer" onClick={() => setTripDetails(t)}>
+            <div key={t.id} className="admin-bg-surface border border-white/5 rounded-xl p-3 hover:border-white/10 transition cursor-pointer" onClick={() => setTripDetails(t)}>
               <div className="flex items-start justify-between mb-2">
-                <p className="text-sm font-semibold text-white">{t.patient}</p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">{t.patient}</p>
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-500/15 text-slate-400">Will Call</span>
               </div>
               <div className="space-y-1 text-[11px] text-slate-400">

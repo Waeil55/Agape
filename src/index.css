@@ -133,6 +133,13 @@
   --gradient-warning: linear-gradient(135deg, #d97706, #f59e0b);
   --gradient-danger: linear-gradient(135deg, #dc2626, #ef4444);
   --gradient-surface: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(241,245,249,0.5) 100%);
+
+  /* Admin/Enterprise theme */
+  --admin-bg: #f1f5f9;
+  --admin-surface: #ffffff;
+  --admin-elevated: #f8fafc;
+  --admin-hover-subtle: rgba(0, 0, 0, 0.03);
+  --admin-hover-mid: rgba(0, 0, 0, 0.06);
 }
 
 /* ===== DARK THEME ===== */
@@ -191,6 +198,13 @@
   --gradient-warning: linear-gradient(135deg, #f59e0b, #fbbf24);
   --gradient-danger: linear-gradient(135deg, #ef4444, #f87171);
   --gradient-surface: linear-gradient(180deg, rgba(15,20,34,0) 0%, rgba(10,14,26,0.8) 100%);
+
+  /* Admin/Enterprise theme */
+  --admin-bg: #0a0e1a;
+  --admin-surface: #0d1117;
+  --admin-elevated: #161b22;
+  --admin-hover-subtle: rgba(255, 255, 255, 0.03);
+  --admin-hover-mid: rgba(255, 255, 255, 0.06);
 
   /* Image / icon adjustments */
   color-scheme: dark;
@@ -560,3 +574,28 @@ body {
 .input::placeholder {
   color: var(--text-tertiary);
 }
+
+/* ===== ADMIN/ENTERPRISE UTILITY CLASSES ===== */
+.admin-bg-main { background-color: var(--admin-bg); }
+.admin-bg-surface { background-color: var(--admin-surface); }
+.admin-bg-elevated { background-color: var(--admin-elevated); }
+
+/* Admin text follows theme */
+.admin-bg-main, .admin-bg-surface, .admin-bg-elevated { color: var(--text-primary); }
+.admin-bg-main .text-slate-300, .admin-bg-surface .text-slate-300, .admin-bg-elevated .text-slate-300 { color: var(--text-primary); }
+.admin-bg-main .text-slate-400, .admin-bg-surface .text-slate-400, .admin-bg-elevated .text-slate-400 { color: var(--text-secondary); }
+.admin-bg-main .text-slate-500, .admin-bg-surface .text-slate-500, .admin-bg-elevated .text-slate-500 { color: var(--text-tertiary); }
+.admin-bg-main .text-slate-600, .admin-bg-surface .text-slate-600, .admin-bg-elevated .text-slate-600 { color: var(--text-tertiary); }
+
+/* Admin borders & surfaces follow theme */
+.admin-bg-main .border-white\/5, .admin-bg-surface .border-white\/5, .admin-bg-elevated .border-white\/5 { border-color: var(--border-subtle); }
+.admin-bg-main .border-white\/10, .admin-bg-surface .border-white\/10, .admin-bg-elevated .border-white\/10 { border-color: var(--border-default); }
+.admin-bg-main .bg-white\/5, .admin-bg-surface .bg-white\/5, .admin-bg-elevated .bg-white\/5 { background-color: var(--bg-hover); }
+.admin-bg-main .hover\:bg-white\/5:hover, .admin-bg-surface .hover\:bg-white\/5:hover, .admin-bg-elevated .hover\:bg-white\/5:hover { background-color: var(--bg-hover); }
+.admin-bg-main .hover\:text-slate-200:hover, .admin-bg-surface .hover\:text-slate-200:hover, .admin-bg-elevated .hover\:text-slate-200:hover { color: var(--text-primary); }
+
+/* Additional admin overrides for OperationsCommandCenter patterns */
+.admin-bg-main .bg-white\/\[0\.02\] { background-color: var(--admin-hover-subtle); }
+.admin-bg-main .hover\:bg-white\/\[0\.02\]:hover { background-color: var(--admin-hover-mid); }
+.admin-bg-main .hover\:bg-white\/\[0\.04\]:hover { background-color: var(--admin-hover-mid); }
+.admin-bg-main .bg-slate-500\/15 { background-color: color-mix(in srgb, var(--text-tertiary) 15%, transparent); }

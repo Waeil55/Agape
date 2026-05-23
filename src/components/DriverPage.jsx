@@ -16,14 +16,12 @@ import {
   Star, Activity, Repeat, Zap, X, Route, PhoneCall, Radio, CircleDot,
   CheckSquare, Square, BrainCircuit, Map, BarChart3, Sun, Moon,
   Download, Trash2, FileText, AlertTriangle, Info,
-  Timer, Copy
+  Timer, Copy, PhoneForwarded, Shield, Headphones
 } from 'lucide-react';
 import { openNavigation, showNavActionSheet, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
-
-const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
-const FACILITY_KEYS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute'];
+import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone } from '../utils/smartContacts';
 
 const to12hr = (time) => {
   if (!time || time === 'Will Call' || time === 'WC') return time || 'Will Call';
@@ -92,11 +90,14 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(null);
   const [arrivalOdometer, setArrivalOdometer] = useState('');
   const [signatureConfirmed, setSignatureConfirmed] = useState(false);
+  const [showSignatureConfirm, setShowSignatureConfirm] = useState(null);
   const [showCompleteModal, setShowCompleteModal] = useState(null);
   const [completeOdometer, setCompleteOdometer] = useState('');
   const [departedTime, setDepartedTime] = useState('');
   const [arrivalDropoffTime, setArrivalDropoffTime] = useState('');
   const [showTripDetails, setShowTripDetails] = useState(null);
+  const [legActionPrompt, setLegActionPrompt] = useState(null);
+  const [selectedLegsForAction, setSelectedLegsForAction] = useState(new Set());
   const [isGpsTracking, setIsGpsTracking] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlineQueue, setOfflineQueue] = useState([]);
@@ -115,6 +116,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const [passwordValue, setPasswordValue] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordVerifying, setPasswordVerifying] = useState(false);
+  const [showContactSelector, setShowContactSelector] = useState(null);
+  const [restorePrompt, setRestorePrompt] = useState(null);
   const gpsWatchId = useRef(null);
   const meRef = useRef(me);
   const lastUpdateRef = useRef(0);
@@ -124,31 +127,18 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   meRef.current = me;
   positionRef.current = driverPosition;
 
-  // Build consistent phone per patient across all trips
-  const patientPhoneMap = useMemo(() => {
+  // Smart contact system: build contact list per trip with type detection
+  const tripContacts = useMemo(() => {
     const map = {};
-    const byName = {};
     trips.forEach(t => {
-      const key = (t.patient || '').trim().toLowerCase();
-      if (!key) return;
-      if (!byName[key]) byName[key] = [];
-      byName[key].push(t);
-    });
-    Object.entries(byName).forEach(([name, pts]) => {
-      const phones = pts.map(t => t.pickupPhone).filter(Boolean);
-      const unique = [...new Set(phones)];
-      const counts = unique.map(p => ({ phone: p, count: phones.filter(x => x === p).length }));
-      counts.sort((a, b) => b.count - a.count);
-      map[name] = counts[0]?.phone || pts[0]?.pickupPhone || pts[0]?.dropoffPhone || '';
+      map[t.id] = buildContactList(t, trips, phoneNumbers);
     });
     return map;
-  }, [trips]);
+  }, [trips, phoneNumbers]);
 
-  const getClientPhone = (trip) => {
-    if (!trip) return '';
-    const key = (trip.patient || '').trim().toLowerCase();
-    return trip.pickupPhone || patientPhoneMap[key] || trip.dropoffPhone || '';
-  };
+  const getPrimaryContactForTrip = (trip) => getPrimaryContact(trip, trips, phoneNumbers);
+
+  const getContactsForTrip = (trip) => tripContacts[trip?.id] || [];
 
   // Count legs per patient for today
   const patientLegs = useMemo(() => {
@@ -156,6 +146,20 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     trips.forEach(t => {
       const isAssignedToMe = (t.driverId === me?.id || ((t.driverEmail || '').toLowerCase() === (me?.email || '').toLowerCase()));
       if (!isAssignedToMe) return;
+      const key = (t.patient || '').trim().toLowerCase();
+      if (!key) return;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }, [trips, me?.id, me?.email]);
+
+  // Count ACTIVE legs per patient (for no-show/cancel decision)
+  const patientActiveLegs = useMemo(() => {
+    const counts = {};
+    trips.forEach(t => {
+      const isAssignedToMe = (t.driverId === me?.id || ((t.driverEmail || '').toLowerCase() === (me?.email || '').toLowerCase()));
+      if (!isAssignedToMe) return;
+      if (['Completed','Cancelled','No Show'].includes(t.status)) return;
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
       counts[key] = (counts[key] || 0) + 1;
@@ -203,15 +207,19 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   };
 
   const revertTripStatus = (trip) => {
-    const prevStatus = trip.status === 'Arrived' ? 'In Transit' : trip.status === 'In Transit' ? 'Assigned' : null;
+    const prevStatus = trip.status === 'Navigating Dropoff' ? 'In Transit' : trip.status === 'At Dropoff' ? 'In Transit' : trip.status === 'In Transit' ? 'At Pickup' : trip.status === 'At Pickup' ? 'In Progress' : trip.status === 'Navigating Pickup' ? 'In Progress' : trip.status === 'In Progress' ? 'Assigned' : trip.status === 'Arrived' ? 'In Transit' : null;
     if (!prevStatus) return;
     onUpdateTrip(trip.id, prevStatus, {});
   };
 
   const restoreHistoryTrip = (trip) => {
-    if (!window.confirm(`Restore ${trip.patient} from "${trip.status}" to "${trip.status === 'Completed' ? 'Arrived' : 'Assigned'}"?`)) return;
-    const prevStatus = trip.status === 'Completed' ? 'Arrived' : 'Assigned';
-    onUpdateTrip(trip.id, prevStatus, {});
+    const patientKey = (trip.patient || '').trim().toLowerCase();
+    const relatedLegs = trips.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && (t.driverId === me?.id || (t.driverEmail || '').toLowerCase() === (me?.email || '').toLowerCase()) && ['Completed','Cancelled','No Show'].includes(t.status));
+    if (relatedLegs.length > 1) {
+      setRestorePrompt({ trip, legs: relatedLegs });
+    } else {
+      setPasswordPrompt({ type: 'restore', trip });
+    }
   };
 
   // Online/offline detection
@@ -484,7 +492,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     setSelectedTrips(prev =>
       prev.includes(tripId) ? prev.filter(id => id !== tripId) : [...prev, tripId]
     );
-  };
+  }
 
   const runAiOptimization = async (silent = false) => {
     if (selectedTrips.length < 2 && !silent) return;
@@ -540,19 +548,33 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
 
   const suggestNavApp = (address) => {
-    const lower = (address || '').toLowerCase();
-    if (lower.includes('hospital') || lower.includes('medical center') || lower.includes('clinic')) return 'waze';
-    if (lower.includes('ave') || lower.includes('st') || lower.includes('street') || lower.includes('drive')) return 'apple';
     return navApp;
   };
 
   const openInNavApp = async (address, app) => {
     const origin = driverPosition ? `${driverPosition.lat},${driverPosition.lng}` : '';
+    const preferredApp = app || navApp;
     if (isNativeShell()) {
-      await showNavActionSheet(address, origin, app || navApp);
+      await showNavActionSheet(address, origin, preferredApp);
     } else {
-      await openNavigation(address, app || navApp, origin);
+      await openNavigation(address, preferredApp, origin);
     }
+  };
+
+  const handleNavigateToPickup = (trip) => {
+    impact('heavy');
+    onUpdateTrip(trip.id, 'Navigating Pickup', {});
+    openInNavApp(trip.pickup, navApp);
+  };
+
+  const handleNavigateToDropoff = (trip) => {
+    impact('heavy');
+    onUpdateTrip(trip.id, 'Navigating Dropoff', {});
+    openInNavApp(trip.dropoff, navApp);
+  };
+
+  const handleStartTrip = (trip) => {
+    openInNavApp(trip.pickup, suggestNavApp(trip.pickup));
   };
 
   const handleCall = async (phone, name) => {
@@ -563,13 +585,30 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     }
   };
 
-  const handleSMS = async (phone, name) => {
-    await sendSMS(phone, name);
+  const handleSmartCall = (trip) => {
+    const primary = getPrimaryContactForTrip(trip);
+    if (!primary) return;
+    handleCall(primary.phone, `${primary.label}: ${primary.name}`);
   };
 
-  const handleStartTrip = (trip) => {
+  const handleSmartSMS = (trip) => {
+    const primary = getPrimaryContactForTrip(trip);
+    if (!primary) return;
+    sendSMS(primary.phone, primary.name);
+  };
+
+  const openContactSelector = (trip) => {
+    setShowContactSelector(trip);
+  };
+
+  const handleSMS = async (phone, name) => {
+    await sendSMS(phone, name);
+  }
+
+  const handleArrivePickup = (trip) => {
+    const autoOdo = lastOdometer > 0 ? String(lastOdometer) : '';
+    setOdometerValue(autoOdo);
     setShowOdometerPrompt(trip);
-    setOdometerValue(lastOdometer ? String(lastOdometer) : '');
   };
 
   const submitOdometer = () => {
@@ -577,7 +616,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     const odo = parseInt(odometerValue, 10);
     if (isNaN(odo)) return;
     if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
-    onUpdateTrip(showOdometerPrompt.id, 'In Transit', {
+    onUpdateTrip(showOdometerPrompt.id, 'At Pickup', {
       pickupOdometer: odo,
       startTime: new Date().toISOString(),
       departureTime: new Date().toISOString(),
@@ -587,49 +626,96 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     setOdometerValue('');
   };
 
-  const handleArrive = (trip) => {
-    setShowArrivalConfirm(trip);
-    setArrivalOdometer(odometerValue || '');
+  const handleArriveDropoff = (trip) => {
+    setUndoable(trip, trip.status, 'At Dropoff');
+    onUpdateTrip(trip.id, 'At Dropoff', {
+      arrivalTime: new Date().toISOString(),
+    });
   };
 
   const confirmArrival = () => {
     if (!showArrivalConfirm) return;
     const odo = parseInt(arrivalOdometer, 10) || lastOdometer;
     if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
-    const arrivalNewStatus = showArrivalConfirm.status === 'In Transit' ? 'Arrived' : 'Completed';
-    setUndoable(showArrivalConfirm, showArrivalConfirm.status, arrivalNewStatus);
-    onUpdateTrip(showArrivalConfirm.id, arrivalNewStatus, {
-      arrivalTime: new Date().toISOString(),
-      arrivalOdometer: odo,
-      paperSignatureConfirmed: signatureConfirmed,
+    setUndoable(showArrivalConfirm, showArrivalConfirm.status, 'At Pickup');
+    onUpdateTrip(showArrivalConfirm.id, 'At Pickup', {
+      pickupOdometer: odo,
+      startTime: new Date().toISOString(),
+      departureTime: new Date().toISOString(),
     });
+    setLastOdometer(odo);
     setShowArrivalConfirm(null);
     setArrivalOdometer('');
+  };
+
+  const confirmSignatureAndBegin = () => {
+    if (!showSignatureConfirm || !signatureConfirmed) return;
+    setUndoable(showSignatureConfirm, showSignatureConfirm.status, 'In Transit');
+    onUpdateTrip(showSignatureConfirm.id, 'In Transit', {
+      pickupDepartedAt: new Date().toISOString(),
+      paperSignatureConfirmed: true,
+    });
+    setShowSignatureConfirm(null);
     setSignatureConfirmed(false);
   };
 
   const handleNoShow = (trip) => {
-    setPasswordPrompt({ type: 'noshow', trip });
+    const patientKey = (trip.patient || '').trim().toLowerCase();
+    const activeLegsCount = patientActiveLegs[patientKey] || 1;
+    if (activeLegsCount > 1) {
+      setLegActionPrompt({ type: 'noshow', trip, legsCount: activeLegsCount });
+    } else {
+      setPasswordPrompt({ type: 'noshow', trip });
+    }
   };
 
   const handleCancel = (trip) => {
-    setPasswordPrompt({ type: 'cancel', trip });
+    const patientKey = (trip.patient || '').trim().toLowerCase();
+    const activeLegsCount = patientActiveLegs[patientKey] || 1;
+    if (activeLegsCount > 1) {
+      setLegActionPrompt({ type: 'cancel', trip, legsCount: activeLegsCount });
+    } else {
+      setPasswordPrompt({ type: 'cancel', trip });
+    }
   };
 
   const verifyPasswordAndProceed = async () => {
     if (!passwordPrompt || !passwordValue) return;
+    if (!auth.currentUser) { setPasswordError('Not authenticated. Please sign in again.'); return; }
     setPasswordVerifying(true);
     setPasswordError('');
     try {
       const credential = EmailAuthProvider.credential(auth.currentUser.email, passwordValue);
       await reauthenticateWithCredential(auth.currentUser, credential);
-      const { type, trip } = passwordPrompt;
-      const newStatus = type === 'noshow' ? 'No Show' : 'Cancelled';
-      setUndoable(trip, trip.status, newStatus);
-      onUpdateTrip(trip.id, newStatus, { completedAt: new Date().toISOString() });
+      const { type, trip, selectedLegIds, reason } = passwordPrompt;
+      if (type === 'restore') {
+        const legsToRestore = selectedLegIds && selectedLegIds.length > 0
+          ? trips.filter(t => selectedLegIds.includes(t.id))
+          : [trip];
+        legsToRestore.forEach(leg => {
+          const prevStatus = leg.status === 'Completed' ? 'Arrived' : 'Assigned';
+          onUpdateTrip(leg.id, prevStatus, {});
+        });
+      } else {
+        const newStatus = type === 'noshow' ? 'No Show' : 'Cancelled';
+        const legsToProcess = selectedLegIds && selectedLegIds.length > 0
+          ? trips.filter(t => selectedLegIds.includes(t.id))
+          : [trip];
+        legsToProcess.forEach(leg => {
+          setUndoable(leg, leg.status, newStatus);
+          onUpdateTrip(leg.id, newStatus, {
+            completedAt: new Date().toISOString(),
+            cancellationReason: reason || undefined,
+            cancelledBy: me?.email || '',
+            cancelledAt: new Date().toISOString(),
+          });
+        });
+      }
       setPasswordPrompt(null);
       setPasswordValue('');
       setPasswordError('');
+      setRestorePrompt(null);
+      setSelectedLegsForAction(new Set());
     } catch {
       setPasswordError('Incorrect password. Try again.');
     }
@@ -720,7 +806,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     { id: 'tools', label: 'Tools', icon: Zap },
     { id: 'history', label: 'History', icon: Clock },
     { id: 'chat', label: 'Chat', icon: MessageCircle },
-    { id: 'profile', label: 'Profile', icon: User },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -738,12 +823,35 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
         </div>
       </div>
     );
-  };
+  }
 
   return (
     <div className="flex-1 flex flex-col bg-[#f5f5f7]">
+      {/* Go Online Gate - driver must be clocked in to see trips */}
+      {!isClockedIn && activeNav !== 'settings' && activeNav !== 'chat' && (
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center max-w-sm">
+            <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-200">
+              <Wifi size={32} className="text-white" />
+            </div>
+            <h2 className="text-xl font-extrabold text-slate-900 mb-2">Go Online to Start Working</h2>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">You need to be online to view trips and start your shifts. Tap the button below to go online.</p>
+            <button
+              onClick={handleStatusToggle}
+              className="px-8 h-12 bg-emerald-500 text-white rounded-2xl font-bold text-base active:scale-95 transition-all shadow-lg shadow-emerald-200 flex items-center gap-2 mx-auto">
+              <Wifi size={18} /> Go Online
+            </button>
+            <div className="mt-6 flex items-center justify-center">
+              <button onClick={() => setActiveNav('settings')} className="text-xs text-slate-400 hover:text-blue-600 font-semibold flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-blue-50 transition">
+                <Settings size={12} /> Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== TRIPS PAGE ===== */}
-      {activeNav === 'trips' && (
+      {isClockedIn && activeNav === 'trips' && (
         <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2">
           {/* Offline Banner */}
           {!isOnline && (
@@ -791,7 +899,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             const nextTrip = nextTripId ? trips.find(t => t.id === nextTripId) : null;
             const pct = Math.round((guidedStepIndex / aiSequence.length) * 100);
             return (
-              <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-3 shadow-md shadow-indigo-200/40 sticky top-0 z-10">
+              <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-3 shadow-md shadow-indigo-200/40 sticky top-0" style={{ zIndex: 10 }}>
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-black text-white">{guidedStepIndex + 1}</span>
@@ -890,13 +998,15 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <div key={trip.id}
                     onTouchStart={(e) => handleTouchStart(e, trip)}
                     onTouchEnd={handleTouchEnd}
-                    className={`card overflow-hidden rounded-2xl ${isActive ? 'border-2 border-blue-200' : 'border border-slate-100'} ${isSelected ? 'ring-2 ring-blue-400' : ''} ${hasConflict ? 'ring-2 ring-rose-300' : ''} ${urgencyBorder} ${isGuidedCurrent ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-200/40' : ''} transition-all`}>
+                    className={`card overflow-hidden rounded-2xl active:scale-[0.985] transition-all duration-200 ${
+                      isActive ? 'border-2 border-blue-200' : 'border border-slate-100'
+                    } ${isSelected ? 'ring-2 ring-blue-400' : ''} ${hasConflict ? 'ring-2 ring-rose-300' : ''} ${urgencyBorder} ${isGuidedCurrent ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-200/40' : ''} transition-all`}>
                     {/* Compact unified layout */}
-                    <div className={`px-3 pt-2.5 pb-2 ${isActive ? 'bg-blue-50/50' : ''}`}>
+                    <div className={`px-3 pt-2.5 pb-1.5 ${isActive ? 'bg-blue-50/50' : ''}`}>
                       {/* Row 1: Checkbox + Time + Actions */}
                       <div className="flex items-center gap-2">
-                        <button onClick={() => toggleTripSelect(trip.id)} className="shrink-0 text-slate-400 hover:text-blue-600">
-                          {isSelected ? <CheckSquare size={17} className="text-blue-600" /> : <Square size={17} />}
+                        <button type="button" onClick={() => toggleTripSelect(trip.id)} className="shrink-0 text-slate-400 hover:text-blue-600 active:scale-90 transition-all duration-150 cursor-pointer">
+                          {isSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} />}
                         </button>
                         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
                           <span className="text-xl font-black text-blue-600 tracking-tight leading-none">{to12hr(trip.time)}</span>
@@ -905,52 +1015,67 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                           {urgency === 1 && <span className="badge badge-warning shrink-0 text-[9px] px-1.5 py-0.5">Soon</span>}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <button onClick={() => handleCall(getClientPhone(trip), trip.patient)} className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 active:scale-90 transition-all"><Phone size={14} /></button>
-                          <button onClick={() => handleSMS(getClientPhone(trip), trip.patient)} className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 active:scale-90 transition-all"><MessageCircle size={14} /></button>
-                          <button onClick={() => setShowTripDetails(trip)} className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 flex items-center justify-center active:scale-90 transition-all"><ChevronDown size={14} /></button>
+                          <button type="button" onClick={() => handleSmartCall(trip)} className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 active:scale-85 transition-all duration-150 cursor-pointer"><Phone size={13} /></button>
+                          <button type="button" onClick={() => handleSmartSMS(trip)} className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 active:scale-85 transition-all duration-150 cursor-pointer"><MessageCircle size={13} /></button>
+                          <button type="button" onClick={() => openContactSelector(trip)} className="w-7 h-7 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 flex items-center justify-center active:scale-85 transition-all duration-150 cursor-pointer" title="All contacts"><PhoneForwarded size={13} /></button>
+                          <button type="button" onClick={() => setShowTripDetails(showTripDetails?.id === trip.id ? null : trip)} className="w-7 h-7 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 flex items-center justify-center active:scale-85 transition-all duration-150 cursor-pointer">
+                            {showTripDetails?.id === trip.id ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          </button>
                         </div>
                       </div>
 
-                      {/* Row 2: Patient + Booking ID */}
-                      <div className="flex items-center gap-2 mt-1 ml-[21px] flex-wrap">
-                        <h3 className="text-sm font-extrabold text-slate-900 leading-tight break-words">{trip.patient}</h3>
-                        {trip.bookingId && <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">{trip.bookingId}</span>}
-                        {isActive && <span className="badge shrink-0 badge-info text-[9px] px-1.5 py-0.5">{trip.status}</span>}
-                        {legsCount > 1 && <button onClick={() => setLegsDetailPatient(trip.patient)} className="badge badge-info shrink-0 text-[9px] px-1.5 py-0.5 cursor-pointer hover:opacity-80">{legsCount} legs</button>}
-                        {hasConflict && <AlertTriangle size={12} className="text-rose-500 shrink-0" />}
-                        {rideShareTrip && <Repeat size={12} className="text-emerald-500 shrink-0" />}
+                      {/* Row 2: Patient + Booking ID + Status + Contact Type */}
+                      <div className="flex items-center gap-1.5 mt-0.5 ml-[22px] flex-wrap">
+                        <h3 className="text-base font-extrabold text-slate-900 leading-tight break-words">{trip.patient}</h3>
+                        {trip.bookingId && <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-lg shrink-0">{trip.bookingId}</span>}
+                        {isActive && <span className="badge shrink-0 badge-info text-[8px] px-1.5 py-0.5 leading-none">{trip.status}</span>}
+                        {legsCount > 1 && <button type="button" onClick={() => setLegsDetailPatient(trip.patient)} className="badge badge-info shrink-0 text-[8px] px-1.5 py-0.5 cursor-pointer hover:opacity-80 leading-none">{legsCount} leg{legsCount !== 1 ? 's' : ''}</button>}
+                        {(() => {
+                          const primary = getPrimaryContactForTrip(trip);
+                          if (!primary) return null;
+                          const contactColors = {
+                            patient: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                            facility: 'bg-amber-50 text-amber-700 border-amber-200',
+                            escort: 'bg-purple-50 text-purple-700 border-purple-200',
+                            dispatcher: 'bg-blue-50 text-blue-700 border-blue-200',
+                            routing: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                          };
+                          return <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${contactColors[primary.role] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>{primary.label}</span>;
+                        })()}
+                        {hasConflict && <AlertTriangle size={11} className="text-rose-500 shrink-0" />}
+                        {rideShareTrip && <Repeat size={11} className="text-emerald-500 shrink-0" />}
                       </div>
                     </div>
 
-                    {/* Route Section - no gap above */}
-                    <div className="px-3 pt-1.5 pb-2">
+                    {/* Route Section */}
+                    <div className="px-3 pb-2">
                       <div className="relative pl-5">
                         <div className="absolute left-[8px] top-0.5 bottom-0.5 w-0.5 bg-slate-200 rounded-full" />
                         {/* Pickup */}
                         <div className="flex items-start gap-2">
-                          <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-emerald-100 shrink-0 mt-0.5 flex items-center justify-center">
-                            <span className="text-[6px] font-black text-white leading-none">P</span>
+                          <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-emerald-100 shrink-0 mt-1 flex items-center justify-center">
+                            <span className="text-[5px] font-black text-white leading-none">P</span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none">Pickup</p>
-                            <p className="text-[13px] font-semibold text-slate-800 leading-snug mt-0.5 break-words">{trip.pickup}</p>
+                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none">Pickup</p>
+                            <p className="text-[13px] font-medium text-slate-700 leading-snug break-words">{trip.pickup}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <button onClick={() => openInNavApp(trip.pickup, suggestNavApp(trip.pickup))} className="text-[10px] text-blue-600 font-bold flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 rounded active:scale-95"><Navigation size={10} /> Nav</button>
-                              <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.pickup).catch(() => {}); }} className="text-slate-400 hover:text-blue-600 p-0.5 hover:bg-blue-50 rounded" title="Copy"><Copy size={11} /></button>
+                              <button type="button" onClick={() => openInNavApp(trip.pickup, suggestNavApp(trip.pickup))} className="text-[10px] text-blue-600 font-semibold flex items-center gap-1 px-2 py-0.5 bg-blue-50/60 rounded-full active:scale-90 transition-all duration-150 cursor-pointer"><Navigation size={9} /> Nav</button>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.pickup).catch(() => {}); }} className="text-slate-400 hover:text-blue-600 p-0.5 hover:bg-blue-50 rounded active:scale-90 transition-all duration-150 cursor-pointer" title="Copy"><Copy size={10} /></button>
                             </div>
                           </div>
                         </div>
                         {/* Dropoff */}
                         <div className="flex items-start gap-2 mt-1.5">
-                          <div className="w-4 h-4 rounded-full bg-rose-500 border-2 border-rose-100 shrink-0 mt-0.5 flex items-center justify-center">
-                            <span className="text-[6px] font-black text-white leading-none">D</span>
+                          <div className="w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-rose-100 shrink-0 mt-1 flex items-center justify-center">
+                            <span className="text-[5px] font-black text-white leading-none">D</span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none">Dropoff</p>
-                            <p className="text-[13px] font-semibold text-slate-800 leading-snug mt-0.5 break-words">{trip.dropoff}</p>
+                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none">Dropoff</p>
+                            <p className="text-[13px] font-medium text-slate-700 leading-snug break-words">{trip.dropoff}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <button onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="text-[10px] text-rose-600 font-bold flex items-center gap-1 px-1.5 py-0.5 bg-rose-50 rounded active:scale-95"><Navigation size={10} /> Nav</button>
-                              <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.dropoff).catch(() => {}); }} className="text-slate-400 hover:text-rose-600 p-0.5 hover:bg-rose-50 rounded" title="Copy"><Copy size={11} /></button>
+                              <button type="button" onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="text-[10px] text-rose-600 font-semibold flex items-center gap-1 px-2 py-0.5 bg-rose-50/60 rounded-full active:scale-90 transition-all duration-150 cursor-pointer"><Navigation size={9} /> Nav</button>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.dropoff).catch(() => {}); }} className="text-slate-400 hover:text-rose-600 p-0.5 hover:bg-rose-50 rounded active:scale-90 transition-all duration-150 cursor-pointer" title="Copy"><Copy size={10} /></button>
                             </div>
                           </div>
                         </div>
@@ -968,45 +1093,125 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                       )}
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="px-2 pb-2">
-                      {trip.status === 'Assigned' || trip.status === 'Unassigned' ? (
-                        <div className="grid grid-cols-4 gap-1.5">
-                          <button onClick={() => { impact('heavy'); handleStartTrip(trip); }} className="btn btn-primary text-xs col-span-2">
-                            <Play size={14} /> Start Trip
-                          </button>
-                          <button onClick={() => { impact('medium'); handleNoShow(trip); }} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-[11px]">No Show</button>
-                          <button onClick={() => { impact('medium'); handleCancel(trip); }} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-[11px]">Cancelled</button>
-                        </div>
-                      ) : trip.status === 'In Transit' ? (
-                        <div className="grid grid-cols-4 gap-1.5">
-                          <button onClick={() => { impact('heavy'); openInNavApp(trip.pickup, suggestNavApp(trip.pickup)); }} className="btn btn-primary text-xs col-span-2">
-                            <Navigation size={14} /> Pickup
-                          </button>
-                          <button onClick={() => { impact('heavy'); handleArrive(trip); }} className="btn bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 text-xs">
-                            <MapPin size={14} /> Arrived
-                          </button>
-                          <button onClick={() => { impact('light'); revertTripStatus(trip); }} className="btn btn-ghost w-8 p-0" title="Back to Assigned">
-                            <RotateCcw size={13} />
-                          </button>
-                          <button onClick={() => { impact('medium'); handleNoShow(trip); }} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-[11px]">No Show</button>
-                          <button onClick={() => { impact('medium'); handleCancel(trip); }} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-[11px] col-span-2">Cancelled</button>
-                        </div>
-                      ) : trip.status === 'Arrived' ? (
-                        <div className="grid grid-cols-4 gap-1.5">
-                          <button onClick={() => { impact('heavy'); openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff)); }} className="btn bg-rose-600 text-white shadow-sm hover:bg-rose-700 text-xs col-span-2">
-                            <Navigation size={14} /> Dropoff
-                          </button>
-                          <button onClick={() => { impact('heavy'); openCompleteModal(trip); }} className="btn bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 text-xs">
-                            <Check size={14} /> Complete
-                          </button>
-                          <button onClick={() => { impact('medium'); handleNoShow(trip); }} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-[11px]">No Show</button>
-                          <button onClick={() => { impact('medium'); handleCancel(trip); }} className="btn bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-[11px] col-span-2">Cancelled</button>
-                          <button onClick={() => { impact('light'); revertTripStatus(trip); }} className="btn btn-ghost w-10 p-0" title="Back to In Transit">
-                            <RotateCcw size={14} />
-                          </button>
-                        </div>
-                      ) : null}
+                    {/* Smart Step-by-Step Workflow */}
+                    <div className="px-3 pb-2.5">
+                      {(() => {
+                        const workflowSteps = [
+                          { key: 'start', label: 'Start Trip', done: !['Assigned','Unassigned'].includes(trip.status), phase: 'pickup' },
+                          { key: 'nav-pickup', label: 'Navigate to Pickup', done: !['In Progress'].includes(trip.status), phase: 'pickup' },
+                          { key: 'arrive-pickup', label: 'Arrive at Pickup', done: !['Navigating Pickup'].includes(trip.status), phase: 'pickup' },
+                          { key: 'begin-transport', label: 'Begin Transport', done: !['At Pickup'].includes(trip.status), phase: 'pickup' },
+                          { key: 'nav-dropoff', label: 'Navigate to Dropoff', done: !['In Transit'].includes(trip.status), phase: 'dropoff' },
+                          { key: 'arrive-dropoff', label: 'Arrive at Dropoff', done: !['Navigating Dropoff'].includes(trip.status), phase: 'dropoff' },
+                          { key: 'complete', label: 'Complete Trip', done: ['Completed','Cancelled','No Show','At Dropoff','Arrived'].includes(trip.status), phase: 'dropoff' },
+                        ];
+                        const currentStepIdx = workflowSteps.findIndex(s => !s.done);
+                        const totalSteps = workflowSteps.length;
+                        const isDropoffPhase = workflowSteps[currentStepIdx]?.phase === 'dropoff';
+                        const activeBarColor = isDropoffPhase ? 'bg-orange-400' : 'bg-blue-400';
+                        const doneBarColor = 'bg-emerald-400';
+
+                        const renderPrimaryBtn = (label, icon, gradient, shadow, onClick) => (
+                          <div>
+                            {/* Progress bar */}
+                            <div className="flex items-center gap-0.5 mb-1.5">
+                              {workflowSteps.map((step, idx) => (
+                                <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
+                              ))}
+                            </div>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-center">Step {Math.min(currentStepIdx + 1, totalSteps)} of {totalSteps}</p>
+                            <div className="flex items-center gap-1.5">
+                              <button type="button" onClick={onClick} className={`flex-1 h-9 ${gradient} text-white ${shadow} rounded-xl text-xs font-bold active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer`}>
+                                {icon} {label}
+                              </button>
+                              <button type="button" onClick={() => { impact('medium'); handleNoShow(trip); }} className="h-9 px-3 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 rounded-xl text-[10px] font-bold active:scale-95 transition-all duration-150 shrink-0 cursor-pointer">No Show</button>
+                              <button type="button" onClick={() => { impact('medium'); handleCancel(trip); }} className="h-9 px-3 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 rounded-xl text-[10px] font-bold active:scale-95 transition-all duration-150 shrink-0 cursor-pointer">Cancelled</button>
+                              {currentStepIdx > 0 && (
+                                <button type="button" onClick={() => revertTripStatus(trip)} className="h-9 px-2 text-slate-300 hover:text-blue-500 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition-all duration-150 shrink-0 cursor-pointer"><RotateCcw size={12} /></button>
+                              )}
+                            </div>
+                          </div>
+                        );
+
+                        // STEP 1: Start Trip (blue - pickup phase)
+                        if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
+                          return renderPrimaryBtn(
+                            'Start Trip',
+                            <Play size={13} />,
+                            'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600',
+                            'shadow-md shadow-blue-200/40',
+                            () => { impact('heavy'); onUpdateTrip(trip.id, 'In Progress', { startedAt: new Date().toISOString() }); }
+                          );
+                        }
+
+                        // STEP 2: Navigate to Pickup (blue)
+                        if (trip.status === 'In Progress') {
+                          return renderPrimaryBtn(
+                            'Navigate to Pickup',
+                            <Navigation size={13} />,
+                            'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600',
+                            'shadow-md shadow-blue-200/40',
+                            () => handleNavigateToPickup(trip)
+                          );
+                        }
+
+                        // STEP 3: Arrive at Pickup (blue-green)
+                        if (trip.status === 'Navigating Pickup') {
+                          return renderPrimaryBtn(
+                            'Arrive at Pickup',
+                            <MapPin size={13} />,
+                            'bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600',
+                            'shadow-md shadow-blue-200/40',
+                            () => { impact('heavy'); handleArrivePickup(trip); }
+                          );
+                        }
+
+                        // STEP 4: Begin Transport (green) - requires signature
+                        if (trip.status === 'At Pickup') {
+                          return renderPrimaryBtn(
+                            'Begin Transport',
+                            <Play size={13} />,
+                            'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600',
+                            'shadow-md shadow-green-200/40',
+                            () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); }
+                          );
+                        }
+
+                        // STEP 5: Navigate to Dropoff (orange)
+                        if (trip.status === 'In Transit') {
+                          return renderPrimaryBtn(
+                            'Navigate to Dropoff',
+                            <Navigation size={13} />,
+                            'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600',
+                            'shadow-md shadow-orange-200/40',
+                            () => handleNavigateToDropoff(trip)
+                          );
+                        }
+
+                        // STEP 6: Arrive at Dropoff (orange-red)
+                        if (trip.status === 'Navigating Dropoff') {
+                          return renderPrimaryBtn(
+                            'Arrive at Dropoff',
+                            <MapPin size={13} />,
+                            'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600',
+                            'shadow-md shadow-orange-200/40',
+                            () => { impact('heavy'); handleArriveDropoff(trip); }
+                          );
+                        }
+
+                        // STEP 7: Complete Trip (red)
+                        if (trip.status === 'At Dropoff' || trip.status === 'Arrived') {
+                          return renderPrimaryBtn(
+                            'Complete Trip',
+                            <Check size={13} />,
+                            'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600',
+                            'shadow-md shadow-red-200/40',
+                            () => { impact('heavy'); openCompleteModal(trip); }
+                          );
+                        }
+
+                        return null;
+                      })()}
                     </div>
                   </div>
                 );
@@ -1019,17 +1224,20 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== ODOMETER PROMPT MODAL ===== */}
       {showOdometerPrompt && (
-        <div className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative z-10 border border-white/20">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/20">
-                <Gauge size={28} className="text-white" />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6" style={{ zIndex: 120 }}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
+            <div className="flex items-start justify-between mb-6">
+              <div className="text-center flex-1">
+                <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-200/50">
+                  <MapPin size={28} className="text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Arrived at Pickup</h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
+                {lastOdometer > 0 && (
+                  <p className="text-sm text-slate-400 mt-2">Current odometer: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
+                )}
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Odometer Reading</h3>
-              <p className="text-sm text-slate-500 mt-1 font-medium">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
-              {lastOdometer > 0 && (
-                <p className="text-sm text-slate-400 mt-2">Last reading: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
-              )}
+              <button type="button" onClick={() => setShowOdometerPrompt(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="space-y-4">
               <div>
@@ -1050,8 +1258,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 )}
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all">Cancel</button>
-                <button onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-blue-600 text-white rounded-2xl font-bold text-base disabled:opacity-40 active:scale-95 shadow-sm transition-all">Start Trip</button>
+                <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all cursor-pointer">Cancel</button>
+                <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base disabled:opacity-40 active:scale-95 shadow-sm transition-all cursor-pointer">Confirm Arrival</button>
               </div>
             </div>
           </div>
@@ -1060,14 +1268,17 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== ARRIVAL CONFIRM MODAL ===== */}
       {showArrivalConfirm && (
-        <div className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative z-10 border border-white/20">
-            <div className="text-center mb-5">
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
-                <MapPin size={28} className="text-white" />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
+            <div className="flex items-start justify-between mb-5">
+              <div className="text-center flex-1">
+                <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
+                  <MapPin size={28} className="text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Arrived at Pickup</h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium">{showArrivalConfirm.patient}</p>
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Arrived at Location</h3>
-              <p className="text-sm text-slate-500 mt-1 font-medium">{showArrivalConfirm.patient}</p>
+              <button type="button" onClick={() => setShowArrivalConfirm(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
             </div>
 
             <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
@@ -1087,14 +1298,18 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 <span className="text-xs text-slate-400 font-bold uppercase">Client</span>
                 <span className="text-sm font-bold text-slate-800">{showArrivalConfirm.patient}</span>
               </div>
-              {showArrivalConfirm.pickupPhone && (
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-400 font-bold uppercase">Phone</span>
-                  <button onClick={() => handleCall(showArrivalConfirm.pickupPhone, showArrivalConfirm.patient)} className="text-sm font-bold text-blue-600 flex items-center gap-1 hover:underline">
-                    <Phone size={14} /> {showArrivalConfirm.pickupPhone}
-                  </button>
-                </div>
-              )}
+              {showArrivalConfirm.pickupPhone && (() => {
+                const contact = getContactsForTrip(showArrivalConfirm).find(c => cleanPhone(c.phone) === cleanPhone(showArrivalConfirm.pickupPhone));
+                const label = contact ? contact.label : 'Contact';
+                return (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-slate-400 font-bold uppercase">{label}</span>
+                    <button type="button" onClick={() => handleCall(showArrivalConfirm.pickupPhone, `${label}: ${showArrivalConfirm.patient}`)} className="text-sm font-bold text-blue-600 flex items-center gap-1 hover:underline cursor-pointer">
+                      <Phone size={14} /> {formatPhoneDisplay(showArrivalConfirm.pickupPhone)}
+                    </button>
+                  </div>
+                );
+              })()}
               {showArrivalConfirm.notes && (
                 <div className="pt-3 border-t border-slate-200">
                   <p className="text-xs text-slate-400 font-bold uppercase mb-1.5">Notes</p>
@@ -1104,25 +1319,53 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <div className="pt-3 border-t border-slate-200 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 rounded-xl px-4 py-3">
                   <Info size={16} className="shrink-0" />
-                  <span className="font-medium">Obtain paper signature from client before proceeding.</span>
-                </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-                  <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1.5">Dispatcher Confirmation</p>
-                  <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={signatureConfirmed} onChange={e => setSignatureConfirmed(e.target.checked)} className="w-4 h-4 rounded" />
-                      <span className="text-sm text-slate-600 font-medium">Paper signature obtained from client</span>
-                    </label>
-                  </div>
+                  <span className="font-medium">Confirm arrival details before proceeding.</span>
                 </div>
               </div>
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all">Back</button>
-              <button onClick={confirmArrival} disabled={!signatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base active:scale-95 shadow-sm disabled:opacity-40 transition-all">
-                {showArrivalConfirm.status === 'In Transit' ? 'Confirm Arrival' : 'Confirm Complete'}
-              </button>
+              <button type="button" onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all cursor-pointer">Back</button>
+              <button type="button" onClick={confirmArrival} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base active:scale-95 shadow-sm transition-all cursor-pointer">Confirm Arrival</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== SIGNATURE CONFIRM MODAL (Before Heading to Dropoff) ===== */}
+      {showSignatureConfirm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
+            <div className="flex items-start justify-between mb-5">
+              <div className="text-center flex-1">
+                <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
+                  <Check size={28} className="text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Begin Transport</h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium">{showSignatureConfirm.patient}</p>
+              </div>
+              <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 rounded-xl px-4 py-3">
+                <Info size={16} className="shrink-0" />
+                <span className="font-medium">Obtain client signature before heading to dropoff.</span>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1.5">Signature Required</p>
+                <button type="button" onClick={() => setSignatureConfirmed(!signatureConfirmed)} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer ${signatureConfirmed ? 'border-green-200 bg-green-50' : 'border-blue-100 bg-white'}`}>
+                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${signatureConfirmed ? 'bg-green-500 border-green-500' : 'border-slate-300'}`}>
+                    {signatureConfirmed && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="text-sm text-slate-600 font-medium">Client signature obtained</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all cursor-pointer">Back</button>
+              <button type="button" onClick={confirmSignatureAndBegin} disabled={!signatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base active:scale-95 shadow-sm disabled:opacity-40 transition-all cursor-pointer">Confirm & Begin</button>
             </div>
           </div>
         </div>
@@ -1130,8 +1373,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== COMPLETE TRIP MODAL ===== */}
       {showCompleteModal && (
-        <div className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative z-10 border border-white/20">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
             <div className="text-center mb-5">
               <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
                 <Check size={28} className="text-white" />
@@ -1179,8 +1422,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setShowCompleteModal(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all">Cancel</button>
-              <button onClick={submitComplete} disabled={!completeOdometer} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base disabled:opacity-40 active:scale-95 shadow-sm transition-all">Complete Trip</button>
+              <button type="button" onClick={() => setShowCompleteModal(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all cursor-pointer">Cancel</button>
+              <button type="button" onClick={submitComplete} disabled={!completeOdometer} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base disabled:opacity-40 active:scale-95 shadow-sm transition-all cursor-pointer">Complete Trip</button>
             </div>
           </div>
         </div>
@@ -1188,13 +1431,13 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* ===== FULL-SCREEN TRIP DETAILS ===== */}
       {showTripDetails && (
-        <div className="fixed inset-0 z-[130] bg-white flex flex-col animate-slide-up">
-          <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3 shrink-0">
-            <button onClick={() => setShowTripDetails(null)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90"><ChevronLeft size={18} /></button>
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 130 }}>
+          <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
             <div className="flex-1">
               <h2 className="font-bold text-sm text-slate-900 leading-tight">{showTripDetails.patient}</h2>
               <p className="text-xs text-slate-400">{showTripDetails.bookingId || '—'}</p>
             </div>
+            <button type="button" onClick={() => setShowTripDetails(null)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90 cursor-pointer"><X size={18} /></button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 text-white">
@@ -1209,7 +1452,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <div>
                     <p className="text-xs text-white/60 uppercase font-bold">Pickup</p>
                     <p className="text-sm font-semibold">{showTripDetails.pickup}</p>
-                    {showTripDetails.pickupPhone && <button onClick={() => handleCall(showTripDetails.pickupPhone, showTripDetails.patient)} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5"><Phone size={10} /> {showTripDetails.pickupPhone}</button>}
+                    {showTripDetails.pickupPhone && (() => {
+                      const contactType = getContactsForTrip(showTripDetails).find(c => cleanPhone(c.phone) === cleanPhone(showTripDetails.pickupPhone));
+                      const label = contactType ? contactType.label : 'Pickup';
+                      return <button type="button" onClick={() => handleCall(showTripDetails.pickupPhone, `${label}: ${showTripDetails.patient}`)} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5 cursor-pointer"><Phone size={10} /> {label} · {formatPhoneDisplay(showTripDetails.pickupPhone)}</button>;
+                    })()}
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -1217,14 +1464,18 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <div>
                     <p className="text-xs text-white/60 uppercase font-bold">Dropoff</p>
                     <p className="text-sm font-semibold">{showTripDetails.dropoff}</p>
-                    {showTripDetails.dropoffPhone && <button onClick={() => handleCall(showTripDetails.dropoffPhone, showTripDetails.patient)} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5"><Phone size={10} /> {showTripDetails.dropoffPhone}</button>}
+                    {showTripDetails.dropoffPhone && (() => {
+                      const contactType = getContactsForTrip(showTripDetails).find(c => cleanPhone(c.phone) === cleanPhone(showTripDetails.dropoffPhone));
+                      const label = contactType ? contactType.label : 'Dropoff';
+                      return <button type="button" onClick={() => handleCall(showTripDetails.dropoffPhone, `${label}: ${showTripDetails.patient}`)} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5 cursor-pointer"><Phone size={10} /> {label} · {formatPhoneDisplay(showTripDetails.dropoffPhone)}</button>;
+                    })()}
                   </div>
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
-                <button onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="flex-1 h-9 bg-blue-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><Navigation size={12} /> Pickup</button>
-                <button onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="flex-1 h-9 bg-rose-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><Navigation size={12} /> Dropoff</button>
-                <button onClick={() => handleCall(getClientPhone(showTripDetails), showTripDetails.patient)} className="flex-1 h-9 bg-emerald-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><Phone size={12} /> Call</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="flex-1 h-9 bg-blue-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Pickup</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="flex-1 h-9 bg-rose-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Dropoff</button>
+                <button type="button" onClick={() => openContactSelector(showTripDetails)} className="flex-1 h-9 bg-emerald-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><PhoneForwarded size={12} /> Contacts</button>
               </div>
             </div>
 
@@ -1240,14 +1491,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.type || '—'}</p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-xs text-slate-400 uppercase font-bold">Patient Phone</p>
-                  <p className="text-sm font-bold text-slate-800">{showTripDetails.pickupPhone || '—'}</p>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-xs text-slate-400 uppercase font-bold">Dropoff Phone</p>
-                  <p className="text-sm font-bold text-slate-800">{showTripDetails.dropoffPhone || '—'}</p>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xs text-slate-400 uppercase font-bold">Distance</p>
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.distance ? `${showTripDetails.distance} mi` : '—'}</p>
                 </div>
@@ -1256,6 +1499,57 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.driverId || '—'}</p>
                 </div>
               </div>
+            </div>
+
+            {/* Smart Contacts Section */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><PhoneForwarded size={14} /> Contacts</h3>
+              {(() => {
+                const contacts = getContactsForTrip(showTripDetails);
+                const warning = getContactWarning(showTripDetails, trips);
+                const roleIcons = {
+                  patient: { icon: User, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+                  facility: { icon: Shield, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+                  escort: { icon: PhoneForwarded, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
+                  dispatcher: { icon: Headphones, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+                  routing: { icon: Route, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
+                };
+                return (
+                  <>
+                    {warning.show && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                        <AlertTriangle size={12} className="text-amber-600 shrink-0" />
+                        <p className="text-xs font-medium text-amber-700">{warning.message}</p>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      {contacts.map((contact, idx) => {
+                        const roleStyle = roleIcons[contact.role] || roleIcons.patient;
+                        const Icon = roleStyle.icon;
+                        return (
+                          <div key={idx} className={`flex items-center justify-between p-3 rounded-xl border ${roleStyle.border} ${roleStyle.bg}`}>
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${roleStyle.bg}`}>
+                                <Icon size={14} className={roleStyle.color} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-slate-900 truncate">{contact.name}</p>
+                                <p className="text-xs text-slate-500">{contact.label}{contact.isPrimary ? ' · Primary' : ''}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              <button type="button" onClick={() => handleCall(contact.phone, `${contact.label}: ${contact.name}`)} className="w-8 h-8 rounded-lg bg-white text-emerald-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer"><Phone size={14} /></button>
+                              {contact.role !== 'dispatcher' && contact.role !== 'routing' && (
+                                <button type="button" onClick={() => handleSMS(contact.phone, contact.name)} className="w-8 h-8 rounded-lg bg-white text-blue-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer"><MessageCircle size={14} /></button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
               {showTripDetails.notes && (
                 <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
                   <p className="text-xs text-amber-600 uppercase font-bold mb-1">Notes</p>
@@ -1309,9 +1603,9 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
               <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Actions</h3>
               <div className="flex gap-2">
-                <button onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95"><Map size={12} /> Google Maps</button>
-                <button onClick={() => openInNavApp(showTripDetails.pickup, 'waze')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95"><Navigation size={12} /> Waze</button>
-                <button onClick={() => openInNavApp(showTripDetails.pickup, 'apple')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95"><Map size={12} /> Apple</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={12} /> Google Maps</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'waze')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Waze</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'apple')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={12} /> Apple</button>
               </div>
             </div>
           </div>
@@ -1319,7 +1613,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       )}
 
       {/* ===== TOOLS PAGE ===== */}
-      {activeNav === 'tools' && (
+      {isClockedIn && activeNav === 'tools' && (
         <DriverToolsPage
           trips={trips}
           activeTrips={activeTrips}
@@ -1347,7 +1641,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       )}
 
       {/* ===== HISTORY PAGE ===== */}
-      {activeNav === 'history' && (
+      {isClockedIn && activeNav === 'history' && (
         <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
           <div className="px-1 pt-2 pb-3">
             <div className="flex items-center justify-between">
@@ -1442,8 +1736,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                       </div>
                     </div>
                     <div className="px-2 pb-2 flex gap-2">
-                      <button onClick={() => setShowTripDetails(trip)} className="flex-1 h-9 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><FileText size={12} /> Details</button>
-                      <button onClick={() => restoreHistoryTrip(trip)} className="flex-1 h-9 bg-blue-100 text-blue-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"><RotateCcw size={12} /> Restore</button>
+                      <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-9 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><FileText size={12} /> Details</button>
+                      <button type="button" onClick={() => restoreHistoryTrip(trip)} className={`flex-1 h-9 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${trip.status === 'No Show' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}><RotateCcw size={12} /> Restore</button>
                     </div>
                   </div>
                 );
@@ -1460,156 +1754,6 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
         </div>
       )}
 
-      {/* ===== PROFILE PAGE ===== */}
-      {activeNav === 'profile' && (
-        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/90 to-indigo-700/90 shadow-lg shadow-blue-600/10">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.1),transparent_60%)]" />
-            <div className="relative px-5 py-5">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl font-black text-white shadow-inner border border-white/10">
-                  {me?.name?.charAt(0)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-xl font-bold text-white truncate">{me?.name}</h2>
-                  <p className="text-sm text-white/70 truncate">{me?.email}</p>
-                  <p className="text-xs text-white/50 mt-0.5">{me?.vehicle || 'No vehicle'} • {me?.currentZone || '—'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-4">
-                <button onClick={handleStatusToggle} className={`px-4 h-9 rounded-xl font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-sm border ${isClockedIn ? 'bg-rose-500 text-white border-rose-500' : 'bg-emerald-500 text-white border-emerald-500'}`}>
-                  {isClockedIn ? 'Go Offline' : 'Go Online'}
-                </button>
-                <div className="flex items-center gap-1.5 px-3 h-9 bg-white/10 backdrop-blur-md rounded-xl border border-white/10">
-                  <Gauge size={12} className="text-white/70" />
-                  <span className="text-xs font-medium text-white">{me?.odometer?.toLocaleString() || 0} mi</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isOnline ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                  {isOnline ? <Wifi size={18} /> : <WifiOff size={18} />}
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-900">{isOnline ? 'Connected' : 'Offline'}</p>
-                  <p className="text-xs text-slate-400">Location sharing active</p>
-                </div>
-              </div>
-              <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'} ${isOnline ? 'animate-pulse' : ''}`} />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <button onClick={() => setShowAnalytics(!showAnalytics)} className="w-full p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                  <BarChart3 size={18} />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-900">Today's Analytics</p>
-                  <p className="text-xs text-slate-400">{analytics.tripsCompleted} trips completed</p>
-                </div>
-              </div>
-              <ChevronDown size={16} className={`text-slate-300 transition-transform ${showAnalytics ? 'rotate-180' : ''}`} />
-            </button>
-            {showAnalytics && (
-              <div className="px-4 pb-4 pt-0">
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  {[
-                    { label: 'Trips Done', value: analytics.tripsCompleted, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { label: 'Distance', value: `${analytics.totalDistance} mi`, icon: MapPin, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: 'Drive Time', value: formatDuration(analytics.totalDriveTime), icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                    { label: 'Efficiency', value: `${analytics.efficiency}/hr`, icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50' },
-                  ].map(stat => {
-                    const Icon = stat.icon;
-                    return (
-                      <div key={stat.label} className={`${stat.bg} rounded-xl p-3 text-center`}>
-                        <Icon size={16} className={`mx-auto mb-1 ${stat.color}`} />
-                        <p className="text-sm font-black text-slate-900">{stat.value}</p>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">Time Distribution</p>
-                  <div className="space-y-1.5">
-                    <div>
-                      <div className="flex justify-between text-xs text-slate-500 mb-0.5">
-                        <span>Driving</span>
-                        <span>{analytics.totalDriveTime > 0 ? `${Math.round((analytics.totalDriveTime / (analytics.totalDriveTime || 1)) * 100)}%` : '0%'}</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, analytics.totalDriveTime > 0 ? 70 : 0)}%` }} />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs text-slate-500 mb-0.5">
-                        <span>Idle/Waiting</span>
-                        <span>30%</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-amber-500 rounded-full" style={{ width: '30%' }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.12em]">Odometer</p>
-                <p className="text-2xl font-bold text-slate-900 mt-1">{me?.odometer?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-400">mi</span></p>
-                <p className="text-xs text-slate-400 mt-1">Next service at {me?.nextOilChange?.toLocaleString() || '5,000'} mi</p>
-              </div>
-              <Gauge size={32} className="text-slate-200" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.12em] mb-3">Vehicle Info</p>
-            <div className="space-y-2.5 text-sm">
-              {[
-                ['Vehicle', me?.vehicle || 'N/A'],
-                ['Zone', me?.currentZone || 'N/A'],
-                ['Status', isClockedIn ? 'Online' : 'Offline'],
-                ['GPS', 'Active'],
-                ['Background Tracking', backgroundLocation ? 'Enabled' : 'Not Available'],
-              ].map(([label, value]) => (
-                <div key={label} className="flex justify-between items-center">
-                  <span className="text-slate-400 text-xs">{label}</span>
-                  <span className={`font-semibold text-xs ${value === 'Online' || value === 'Active' || value === 'Enabled' ? 'text-emerald-600' : value === 'Offline' || value === 'Inactive' || value === 'Not Available' ? 'text-slate-400' : 'text-slate-800'}`}>{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <button onClick={() => setActiveNav('settings')} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-slate-50/50 transition border-b border-slate-100/50">
-              <div className="flex items-center gap-3">
-                <Settings size={17} className="text-slate-400" />
-                <span className="font-medium text-sm text-slate-800">Settings</span>
-              </div>
-              <ChevronRight size={15} className="text-slate-300" />
-            </button>
-            <button onClick={() => signOut(auth)} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-rose-50/50 transition">
-              <div className="flex items-center gap-3">
-                <LogOut size={17} className="text-rose-400" />
-                <span className="font-medium text-sm text-rose-600">Sign Out</span>
-              </div>
-              <ChevronRight size={15} className="text-slate-300" />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ===== SETTINGS PAGE ===== */}
       {activeNav === 'settings' && (
         <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
@@ -1619,13 +1763,135 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           </div>
           <div className="space-y-4 px-1">
             {/* Profile Card */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-lg">{me?.name?.charAt(0) || 'D'}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm text-slate-900 truncate">{me?.name || 'Driver'}</p>
-                  <p className="text-sm text-slate-500 truncate">{me?.vehicle || 'No vehicle'} &bull; {me?.status}</p>
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/90 to-indigo-700/90 shadow-lg shadow-blue-600/10">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.1),transparent_60%)]" />
+              <div className="relative px-5 py-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl font-black text-white shadow-inner border border-white/10">
+                    {me?.name?.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-xl font-bold text-white truncate">{me?.name}</h2>
+                    <p className="text-sm text-white/70 truncate">{me?.email}</p>
+                    <p className="text-xs text-white/50 mt-0.5">{me?.vehicle || 'No vehicle'} • {me?.currentZone || '—'}</p>
+                  </div>
                 </div>
+                <div className="flex items-center gap-2 mt-4">
+                  <button onClick={handleStatusToggle} className={`px-4 h-9 rounded-xl font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-sm border ${isClockedIn ? 'bg-rose-500 text-white border-rose-500' : 'bg-emerald-500 text-white border-emerald-500'}`}>
+                    {isClockedIn ? 'Go Offline' : 'Go Online'}
+                  </button>
+                  <div className="flex items-center gap-1.5 px-3 h-9 bg-white/10 backdrop-blur-md rounded-xl border border-white/10">
+                    <Gauge size={12} className="text-white/70" />
+                    <span className="text-xs font-medium text-white">{me?.odometer?.toLocaleString() || 0} mi</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Connection Status */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isOnline ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                    {isOnline ? <Wifi size={18} /> : <WifiOff size={18} />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{isOnline ? 'Connected' : 'Offline'}</p>
+                    <p className="text-xs text-slate-400">Location sharing active</p>
+                  </div>
+                </div>
+                <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'} ${isOnline ? 'animate-pulse' : ''}`} />
+              </div>
+            </div>
+
+            {/* Analytics */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <button onClick={() => setShowAnalytics(!showAnalytics)} className="w-full p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <BarChart3 size={18} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">Today's Analytics</p>
+                    <p className="text-xs text-slate-400">{analytics.tripsCompleted} trips completed</p>
+                  </div>
+                </div>
+                <ChevronDown size={16} className={`text-slate-300 transition-transform ${showAnalytics ? 'rotate-180' : ''}`} />
+              </button>
+              {showAnalytics && (
+                <div className="px-4 pb-4 pt-0">
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    {[
+                      { label: 'Trips Done', value: analytics.tripsCompleted, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50' },
+                      { label: 'Distance', value: `${analytics.totalDistance} mi`, icon: MapPin, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                      { label: 'Drive Time', value: formatDuration(analytics.totalDriveTime), icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                      { label: 'Efficiency', value: `${analytics.efficiency}/hr`, icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    ].map(stat => {
+                      const Icon = stat.icon;
+                      return (
+                        <div key={stat.label} className={`${stat.bg} rounded-xl p-3 text-center`}>
+                          <Icon size={16} className={`mx-auto mb-1 ${stat.color}`} />
+                          <p className="text-sm font-black text-slate-900">{stat.value}</p>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">Time Distribution</p>
+                    <div className="space-y-1.5">
+                      <div>
+                        <div className="flex justify-between text-xs text-slate-500 mb-0.5">
+                          <span>Driving</span>
+                          <span>{analytics.totalDriveTime > 0 ? `${Math.round((analytics.totalDriveTime / (analytics.totalDriveTime || 1)) * 100)}%` : '0%'}</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, analytics.totalDriveTime > 0 ? 70 : 0)}%` }} />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-xs text-slate-500 mb-0.5">
+                          <span>Idle/Waiting</span>
+                          <span>30%</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-amber-500 rounded-full" style={{ width: '30%' }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Odometer */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.12em]">Odometer</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{me?.odometer?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-400">mi</span></p>
+                  <p className="text-xs text-slate-400 mt-1">Next service at {me?.nextOilChange?.toLocaleString() || '5,000'} mi</p>
+                </div>
+                <Gauge size={32} className="text-slate-200" />
+              </div>
+            </div>
+
+            {/* Vehicle Info */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.12em] mb-3">Vehicle Info</p>
+              <div className="space-y-2.5 text-sm">
+                {[
+                  ['Vehicle', me?.vehicle || 'N/A'],
+                  ['Zone', me?.currentZone || 'N/A'],
+                  ['Status', isClockedIn ? 'Online' : 'Offline'],
+                  ['GPS', 'Active'],
+                  ['Background Tracking', backgroundLocation ? 'Enabled' : 'Not Available'],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between items-center">
+                    <span className="text-slate-400 text-xs">{label}</span>
+                    <span className={`font-semibold text-xs ${value === 'Online' || value === 'Active' || value === 'Enabled' ? 'text-emerald-600' : value === 'Offline' || value === 'Inactive' || value === 'Not Available' ? 'text-slate-400' : 'text-slate-800'}`}>{value}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1705,43 +1971,229 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
         </div>
       )}
 
-      {/* ===== UNDO TOAST ===== */}
-      {undoableAction && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[140] bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 backdrop-blur-sm text-xs font-semibold animate-slide-up">
-          <RotateCcw size={14} className="text-amber-300 shrink-0" />
-          <span>{undoableAction.trip.patient} marked as <strong>{undoableAction.newStatus}</strong></span>
-          <button onClick={handleUndo} className="ml-2 px-3 h-7 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-bold text-white active:scale-95 transition-all">Undo</button>
-        </div>
-      )}
+      {/* ===== LEG SELECTION MODAL ===== */}
+      {legActionPrompt && !passwordPrompt && (() => {
+        const patientKey = (legActionPrompt.trip.patient || '').trim().toLowerCase();
+        const allLegs = trips.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && (t.driverId === me?.id || (t.driverEmail || '').toLowerCase() === (me?.email || '').toLowerCase()));
+        const activeLegs = allLegs.filter(l => !['Completed','Cancelled','No Show'].includes(l.status));
+        const actionLabel = legActionPrompt.type === 'noshow' ? 'No Show' : 'Cancelled';
+        const allSelected = selectedLegsForAction.size === activeLegs.length;
+        const toggleLeg = (id) => {
+          setSelectedLegsForAction(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+          });
+        };
+        const toggleAll = () => {
+          setSelectedLegsForAction(prev => prev.size === activeLegs.length ? new Set() : new Set(activeLegs.map(l => l.id)));
+        };
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 150 }} onClick={() => { setLegActionPrompt(null); setSelectedLegsForAction(new Set()); }}>
+            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
+              {/* Header with step indicator */}
+              <div className="px-5 py-4 bg-gradient-to-r from-rose-600 to-rose-500 text-white">
+                <div className="flex items-center gap-0.5 mb-3">
+                  <div className="h-1 flex-1 rounded-full bg-white/90" />
+                  <div className="h-1 flex-1 rounded-full bg-white/30" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-white/60">Step 1 of 2</p>
+                    <h3 className="text-base font-bold">Select Legs to {actionLabel}</h3>
+                    <p className="text-xs text-white/70 mt-0.5">{legActionPrompt.trip.patient} — {activeLegs.length} active</p>
+                  </div>
+                  <button type="button" onClick={() => { setLegActionPrompt(null); setSelectedLegsForAction(new Set()); }} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
+                </div>
+              </div>
+              <div className="p-4 space-y-2 max-h-56 overflow-y-auto">
+                {/* Select All toggle */}
+                <button type="button" onClick={toggleAll} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition active:scale-95 cursor-pointer ${allSelected ? 'border-rose-200 bg-rose-50' : 'border-slate-100 hover:bg-slate-50'}`}>
+                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${allSelected ? 'bg-rose-500 border-rose-500' : 'border-slate-300'}`}>
+                    {allSelected && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="text-sm font-bold text-slate-900">Select All ({activeLegs.length})</span>
+                </button>
+                {allLegs.map((leg, idx) => {
+                  const isTerminal = ['Completed','Cancelled','No Show'].includes(leg.status);
+                  const isSelected = selectedLegsForAction.has(leg.id);
+                  return (
+                    <button
+                      type="button"
+                      key={leg.id}
+                      onClick={() => { if (!isTerminal) toggleLeg(leg.id); }}
+                      disabled={isTerminal}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl border transition ${isTerminal ? 'opacity-40 cursor-not-allowed border-slate-100 bg-slate-50' : `active:scale-95 cursor-pointer ${isSelected ? 'border-rose-200 bg-rose-50' : 'border-slate-100 hover:bg-slate-50'}`}`}>
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${isTerminal ? 'border-slate-200 bg-slate-100' : isSelected ? 'bg-rose-500 border-rose-500' : 'border-slate-300'}`}>
+                        {isTerminal ? <Check size={10} className="text-slate-400" /> : isSelected && <Check size={12} className="text-white" />}
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[9px] font-black">L{idx + 1}</span>
+                          <span className="text-sm font-bold text-slate-900 truncate">{leg.patient}</span>
+                          {leg.bookingId && <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded shrink-0">{leg.bookingId}</span>}
+                          {isTerminal && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+                          <span className="truncate">{leg.pickup}</span>
+                          <span className="shrink-0">→</span>
+                          <span className="truncate">{leg.dropoff}</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="px-4 pb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedLegsForAction.size === 0) return;
+                    setLegActionPrompt(null);
+                    setPasswordPrompt({ type: legActionPrompt.type, trip: legActionPrompt.trip, selectedLegIds: [...selectedLegsForAction] });
+                  }}
+                  disabled={selectedLegsForAction.size === 0}
+                  className="w-full py-3 bg-rose-600 text-white rounded-xl font-bold text-sm active:scale-95 transition disabled:opacity-40 cursor-pointer">
+                  {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `Continue with ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ===== RESTORE LEG SELECTION MODAL ===== */}
+      {restorePrompt && !passwordPrompt && (() => {
+        const allSelected = selectedLegsForAction.size === restorePrompt.legs.length;
+        const toggleLeg = (id) => {
+          setSelectedLegsForAction(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+          });
+        };
+        const toggleAll = () => {
+          setSelectedLegsForAction(prev => prev.size === restorePrompt.legs.length ? new Set() : new Set(restorePrompt.legs.map(l => l.id)));
+        };
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 140 }} onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }}>
+            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
+              <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold">Restore Trip Legs</h3>
+                  <p className="text-xs text-white/70 mt-0.5">{restorePrompt.trip.patient} — {restorePrompt.legs.length} leg{restorePrompt.legs.length !== 1 ? 's' : ''}</p>
+                </div>
+                <button type="button" onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
+              </div>
+              <div className="p-4 space-y-2 max-h-56 overflow-y-auto">
+                <button type="button" onClick={toggleAll} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition active:scale-95 cursor-pointer ${allSelected ? 'border-blue-200 bg-blue-50' : 'border-slate-100 hover:bg-slate-50'}`}>
+                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${allSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}>
+                    {allSelected && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="text-sm font-bold text-slate-900">Select All ({restorePrompt.legs.length})</span>
+                </button>
+                {restorePrompt.legs.map((leg, idx) => {
+                  const isSelected = selectedLegsForAction.has(leg.id);
+                  return (
+                    <button type="button" key={leg.id} onClick={() => toggleLeg(leg.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl border transition active:scale-95 cursor-pointer ${isSelected ? 'border-blue-200 bg-blue-50' : 'border-slate-100 hover:bg-slate-50'}`}>
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}>
+                        {isSelected && <Check size={12} className="text-white" />}
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[9px] font-black">L{idx + 1}</span>
+                          <span className="text-sm font-bold text-slate-900 truncate">{leg.patient}</span>
+                          {leg.bookingId && <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded shrink-0">{leg.bookingId}</span>}
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+                          <span className="truncate">{leg.pickup}</span>
+                          <span className="shrink-0">→</span>
+                          <span className="truncate">{leg.dropoff}</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="px-4 pb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedLegsForAction.size === 0) return;
+                    setRestorePrompt(null);
+                    setPasswordPrompt({ type: 'restore', trip: restorePrompt.trip, selectedLegIds: [...selectedLegsForAction] });
+                  }}
+                  disabled={selectedLegsForAction.size === 0}
+                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm active:scale-95 transition disabled:opacity-40 cursor-pointer">
+                  {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `Restore ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ===== PASSWORD CONFIRM MODAL ===== */}
       {passwordPrompt && (
-        <div className="fixed inset-0 z-[150] bg-black/40 flex items-center justify-center p-6">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative z-10">
-            <div className="text-center mb-5">
-              <div className="w-14 h-14 bg-gradient-to-br from-rose-600 to-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Lock size={24} className="text-white" />
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 180 }} onClick={(e) => { e.stopPropagation(); }}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative pointer-events-auto" style={{ zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+            {/* Header with step indicator */}
+            <div className="flex items-center gap-0.5 mb-4">
+              <div className="h-1 flex-1 rounded-full bg-emerald-400" />
+              <div className={`h-1 flex-1 rounded-full ${passwordPrompt.type === 'restore' ? 'bg-blue-400' : 'bg-rose-400'}`} />
+            </div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-4 text-center">Step 2 of 2</p>
+            <div className="flex items-start justify-between mb-5">
+              <div className="text-center flex-1">
+                <div className={`w-14 h-14 bg-gradient-to-br rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg ${passwordPrompt.type === 'restore' ? 'from-blue-600 to-blue-500' : 'from-rose-600 to-rose-500'}`}>
+                  <Lock size={24} className="text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Confirm {passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'restore' ? 'Restore' : 'Cancelled'}</h3>
+                <p className="text-xs text-slate-500 mt-1">{passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : `Enter your password to mark ${passwordPrompt.trip.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : 'Cancelled'}`}</p>
+                {passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 && (
+                  <p className="text-xs text-rose-500 font-semibold mt-1">{passwordPrompt.selectedLegIds.length} leg{passwordPrompt.selectedLegIds.length !== 1 ? 's' : ''} will be affected</p>
+                )}
               </div>
-              <h3 className="text-lg font-bold text-slate-900">Confirm {passwordPrompt.type === 'noshow' ? 'No Show' : 'Cancel'}</h3>
-              <p className="text-xs text-slate-500 mt-1">Enter your password to mark {passwordPrompt.trip.patient} as {passwordPrompt.type === 'noshow' ? 'No Show' : 'Cancelled'}</p>
+              <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="space-y-4">
+              {passwordPrompt.type !== 'restore' && (
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Reason</label>
+                  <select value={passwordPrompt.reason || ''} onChange={(e) => setPasswordPrompt(prev => ({ ...prev, reason: e.target.value }))}
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm focus:border-rose-500 outline-none">
+                    <option value="">Select reason (optional)</option>
+                    <option value="Client Cancelled">Client Cancelled</option>
+                    <option value="Facility Cancelled">Facility Cancelled</option>
+                    <option value="No Answer">No Answer</option>
+                    <option value="No Show">No Show</option>
+                    <option value="Transportation Issue">Transportation Issue</option>
+                    <option value="Weather">Weather</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              )}
               <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Password</label>
                 <input
                   type="password"
                   value={passwordValue}
                   onChange={(e) => setPasswordValue(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && verifyPasswordAndProceed()}
-                  placeholder="Your password"
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-center focus:border-rose-500 outline-none"
+                  placeholder="Enter password"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-center focus:border-rose-500 outline-none"
                   autoFocus
                 />
                 {passwordError && <p className="text-xs text-rose-600 font-semibold mt-1 text-center">{passwordError}</p>}
               </div>
               <div className="flex gap-2">
-                <button onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm active:scale-95">Cancel</button>
-                <button onClick={verifyPasswordAndProceed} disabled={!passwordValue || passwordVerifying} className="flex-1 py-3 bg-rose-600 text-white rounded-2xl font-bold text-sm disabled:opacity-40 active:scale-95 shadow-sm">
-                  {passwordVerifying ? 'Verifying...' : passwordPrompt.type === 'noshow' ? 'Mark No Show' : 'Cancel Trip'}
+                <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm active:scale-95 cursor-pointer">
+                  Back
+                </button>
+                <button type="button" onClick={verifyPasswordAndProceed} disabled={!passwordValue || passwordVerifying} className={`flex-1 py-3 text-white rounded-xl font-bold text-sm disabled:opacity-40 active:scale-95 shadow-sm cursor-pointer ${passwordPrompt.type === 'restore' ? 'bg-blue-600' : 'bg-rose-600'}`}>
+                  {passwordVerifying ? 'Verifying...' : passwordPrompt.type === 'noshow' ? 'Confirm No Show' : passwordPrompt.type === 'restore' ? 'Confirm Restore' : 'Confirm Cancelled'}
                 </button>
               </div>
             </div>
@@ -1749,23 +2201,126 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
         </div>
       )}
 
+      {/* ===== SMART CONTACT SELECTOR ===== */}
+      {showContactSelector && (() => {
+        const contacts = getContactsForTrip(showContactSelector);
+        const warning = getContactWarning(showContactSelector, trips);
+        const roleIcons = {
+          patient: { icon: User, color: 'text-emerald-600', bg: 'bg-emerald-50', ring: 'ring-emerald-200' },
+          facility: { icon: Shield, color: 'text-amber-600', bg: 'bg-amber-50', ring: 'ring-amber-200' },
+          escort: { icon: PhoneForwarded, color: 'text-purple-600', bg: 'bg-purple-50', ring: 'ring-purple-200' },
+          dispatcher: { icon: Headphones, color: 'text-blue-600', bg: 'bg-blue-50', ring: 'ring-blue-200' },
+          routing: { icon: Route, color: 'text-indigo-600', bg: 'bg-indigo-50', ring: 'ring-indigo-200' },
+        };
+        const roleActions = {
+          patient: { callLabel: 'Call Patient', smsLabel: 'Message Patient' },
+          facility: { callLabel: 'Call Facility', smsLabel: 'Message Facility' },
+          escort: { callLabel: 'Call Escort', smsLabel: 'Message Escort' },
+          dispatcher: { callLabel: 'Call Dispatch', smsLabel: null },
+          routing: { callLabel: 'Call Routing', smsLabel: null },
+        };
+        return (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end justify-center" style={{ zIndex: 170 }} onClick={() => setShowContactSelector(null)}>
+            <div className="bg-white w-full max-w-md rounded-t-3xl shadow-2xl relative overflow-hidden animate-slide-up pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold">Contact for Trip</h3>
+                    <p className="text-xs text-white/70 mt-0.5">{showContactSelector.patient} · {to12hr(showContactSelector.time)}</p>
+                  </div>
+                  <button type="button" onClick={() => setShowContactSelector(null)} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
+                </div>
+              </div>
+
+              {/* Warning */}
+              {warning.show && (
+                <div className="mx-4 mt-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <AlertTriangle size={12} className="text-amber-600 shrink-0" />
+                  <p className="text-xs font-medium text-amber-700">{warning.message}</p>
+                </div>
+              )}
+
+              {/* Contact List */}
+              <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
+                {contacts.map((contact, idx) => {
+                  const roleStyle = roleIcons[contact.role] || roleIcons.patient;
+                  const actions = roleActions[contact.role] || roleActions.patient;
+                  const Icon = roleStyle.icon;
+                  return (
+                    <div key={idx} className={`rounded-xl border-2 ${contact.isPrimary ? `${roleStyle.ring} bg-white` : 'border-slate-100 bg-slate-50'} p-3`}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${roleStyle.bg}`}>
+                          <Icon size={18} className={roleStyle.color} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-900 truncate">{contact.name}</span>
+                            {contact.isPrimary && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">PRIMARY</span>}
+                          </div>
+                          <p className="text-xs text-slate-500">{contact.label} · {formatPhoneDisplay(contact.phone)}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-13">
+                        <button
+                          type="button"
+                          onClick={() => { handleCall(contact.phone, `${contact.label}: ${contact.name}`); setShowContactSelector(null); }}
+                          className="flex-1 h-8 bg-emerald-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
+                          <Phone size={12} /> {actions.callLabel}
+                        </button>
+                        {actions.smsLabel && (
+                          <button
+                            type="button"
+                            onClick={() => { handleSMS(contact.phone, contact.name); setShowContactSelector(null); }}
+                            className="flex-1 h-8 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
+                            <MessageCircle size={12} /> {actions.smsLabel}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Quick Actions Footer */}
+              <div className="px-4 pb-4 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => { handleSmartCall(showContactSelector); setShowContactSelector(null); }}
+                  className="w-full h-10 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-95 shadow-sm cursor-pointer">
+                  <Phone size={14} /> Quick Call Primary Contact
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ===== BOTTOM NAVIGATION ===== */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{paddingBottom: 'env(safe-area-inset-bottom, 0px)'}}>
-        <div className="mx-3 mb-2 w-full max-w-md bg-white/50 backdrop-blur-3xl rounded-3xl shadow-[0_-2px_30px_rgba(0,0,0,0.06)] border border-white/40 px-2 py-0.5">
+      <nav className="fixed bottom-0 left-0 right-0 flex justify-center pointer-events-none" style={{ zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="mx-3 mb-3 w-full max-w-md bg-white/75 backdrop-blur-2xl rounded-2xl shadow-[0_4px_40px_rgba(0,0,0,0.08),0_1px_4px_rgba(0,0,0,0.04)] border border-white/60 px-1.5 py-1 pointer-events-auto">
           <div className="flex items-center justify-around">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActiveTab = activeNav === item.id;
               return (
                 <button key={item.id} onClick={() => setActiveNav(item.id)}
-                  className={`flex flex-col items-center gap-0 py-1 px-2 rounded-2xl transition-all relative min-w-[44px] ${isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all relative ${isActiveTab ? 'bg-blue-50' : ''}`}>
-                    <Icon size={15} strokeWidth={isActiveTab ? 2.5 : 1.5} className="transition-all" />
+                  className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all duration-300 relative min-w-[52px] group ${
+                    isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
+                  }`}>
+                  <div className={`relative flex items-center justify-center transition-all duration-300 ${
+                    isActiveTab
+                      ? 'w-9 h-7 rounded-lg bg-blue-600/10 scale-100'
+                      : 'w-7 h-7 rounded-lg scale-100 group-hover:scale-105'
+                  }`}>
+                    <Icon size={isActiveTab ? 17 : 15} strokeWidth={isActiveTab ? 2.5 : 1.5}
+                      className={`transition-all duration-300 ${isActiveTab ? 'text-blue-600 drop-shadow-[0_0_6px_rgba(37,99,235,0.3)]' : 'text-slate-400'}`}
+                    />
                     {item.id === 'chat' && chatUnread > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-white text-[9px] font-bold min-w-[14px] h-3.5 px-1 rounded-full flex items-center justify-center leading-none shadow-sm border border-white">{chatUnread > 99 ? '99+' : chatUnread}</span>
+                      <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-white text-[8px] font-bold min-w-[13px] h-3.5 px-1 rounded-full flex items-center justify-center leading-none shadow-sm border border-white/80">{chatUnread > 99 ? '99+' : chatUnread}</span>
                     )}
                   </div>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider transition-all leading-none ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>{item.label}</span>
+                  <span className={`text-[10px] font-semibold tracking-wide transition-all leading-none ${isActiveTab ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>{item.label}</span>
                 </button>
               );
             })}
@@ -1775,7 +2330,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
       {/* Offline Queue Indicator */}
       {offlineQueue.length > 0 && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-amber-600 text-white px-4 py-2 rounded-2xl shadow-lg text-xs font-bold flex items-center gap-2">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-amber-600 text-white px-4 py-2 rounded-2xl shadow-lg text-xs font-bold flex items-center gap-2" style={{ zIndex: 100 }}>
           <WifiOff size={12} />
           {offlineQueue.length} pending sync
         </div>
@@ -1786,14 +2341,14 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
         const patientName = legsDetailPatient;
         const legs = orderedTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientName.trim().toLowerCase());
         return (
-          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" onClick={() => setLegsDetailPatient(null)}>
+          <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 130 }} onClick={() => setLegsDetailPatient(null)}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className="bg-white w-full max-w-lg rounded-3xl p-5 relative z-10 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-white w-full max-w-lg rounded-3xl p-5 relative shadow-2xl max-h-[85vh] overflow-y-auto pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-slate-900">{patientName}</h3>
-                <button onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200"><X size={16} /></button>
+                <button type="button" onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200 cursor-pointer"><X size={16} /></button>
               </div>
-              <p className="text-xs text-slate-500 font-medium mb-4">{legs.length} legs</p>
+              <p className="text-xs text-slate-500 font-medium mb-4">{legs.length} leg{legs.length !== 1 ? 's' : ''}</p>
               <div className="space-y-2">
                 {legs.map((leg, idx) => (
                   <div key={leg.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
@@ -1820,7 +2375,18 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                       </div>
                     </div>
                     {leg.notes && <p className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{leg.notes}</p>}
-                    {leg.pickupPhone && <p className="mt-1.5 text-xs text-slate-400">Phone: {leg.pickupPhone}</p>}
+                    {leg.pickupPhone && (() => {
+                      const contact = getContactsForTrip(leg).find(c => cleanPhone(c.phone) === cleanPhone(leg.pickupPhone));
+                      const label = contact ? contact.label : 'Contact';
+                      return (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-400 uppercase">{label}</span>
+                          <button type="button" onClick={() => handleCall(leg.pickupPhone, `${label}: ${leg.patient}`)} className="text-xs text-blue-600 font-bold flex items-center gap-1 hover:underline cursor-pointer">
+                            <Phone size={10} /> {formatPhoneDisplay(leg.pickupPhone)}
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>

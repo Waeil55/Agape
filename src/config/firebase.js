@@ -1,6 +1,6 @@
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy } from 'firebase/firestore';
-import { getAuth, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
@@ -32,7 +32,7 @@ export { app, db, auth, analytics, messaging, deleteApp, initializeApp, firebase
   getFirestore, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp,
   writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
-  EmailAuthProvider, reauthenticateWithCredential, updatePassword, setPersistence,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail, setPersistence,
   browserLocalPersistence, getAuth, getMessaging, getToken, onMessage, logEvent };
 
 export const GOOGLE_MAPS_API_KEY = env.VITE_GOOGLE_MAPS_API_KEY || "";

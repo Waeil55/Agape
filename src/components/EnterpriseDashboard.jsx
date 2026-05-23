@@ -1,15 +1,15 @@
 import React, { useState, lazy, Suspense, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, FileText, Users, MapPin, Settings, BarChart2,
-  Archive, MessageCircle, Zap, ChevronLeft, ChevronRight, Bell,
+  Archive, MessageCircle, Zap, Bell,
   Phone, Building2, MessageSquare, Trash2, RefreshCcw, Clock,
   CheckCircle2, AlertCircle, BrainCircuit, Upload, Wand2, Search,
-  Timer, Repeat, AlertTriangle, X, Plus, LogOut, Truck, Activity,
-  Command, ChevronDown, Maximize2, Minimize2, PanelLeftClose, PanelRight,
+  Timer, Repeat, AlertTriangle, X, Plus, Truck,
+  Command, ChevronDown, Maximize2, Minimize2, PanelRight,
   TrendingUp, TrendingDown, Navigation, Wifi, WifiOff, Sun, Moon,
   MoreHorizontal, Filter, Download, Eye, EyeOff, Star, Hash, AtSign
 } from 'lucide-react';
-import { auth, signOut } from '../config/firebase';
+import { auth, signOut, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 import TripsPage from './TripsPage';
 import ChatPage from './ChatPage';
 import ArchivesPage from './ArchivesPage';
@@ -61,7 +61,7 @@ const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','trea
 
 const EnterpriseDashboard = ({
   role, currentUser, trips, setTrips, drivers, setDrivers, dispatchers, setDispatchers, vehicles, setVehicles,
-  trashedTrips, restoreTrip, logs, setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
+  trashedTrips, setTrashedTrips, restoreTrip, logs, setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
   selectedTasks, setSelectedTasks, searchQuery, setSearchQuery,
   smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
   smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing,
@@ -73,7 +73,6 @@ const EnterpriseDashboard = ({
   bulkAssignTrips, createSharedRide, createLegMission, requestDeleteTrip, updateTrip,
   chatUnreadCount, makeCall, sendSMS, handleUpdateDriverLocation
 }) => {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activePanel, setActivePanel] = useState('operations');
   const [operationsTab, setOperationsTab] = useState('manifest');
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -174,7 +173,6 @@ const EnterpriseDashboard = ({
     { id: 'settings', label: 'Go to Settings', icon: Settings, action: () => setActivePanel('settings') },
     { id: 'optimize', label: 'Run Fleet Optimization', icon: Wand2, action: () => setShowOptimizeModal(true) },
     { id: 'upload', label: 'Upload Trips', icon: Upload, action: () => setShowUploadModal(true) },
-    { id: 'toggle-sidebar', label: 'Toggle Sidebar', icon: PanelLeftClose, action: () => setSidebarCollapsed(!sidebarCollapsed) },
     { id: 'toggle-right', label: 'Toggle Right Panel', icon: PanelRight, action: () => setShowRightPanel(!showRightPanel) },
   ].filter(cmd => {
     if (cmd.id === 'admin' && role !== 'admin') return false;
@@ -194,7 +192,6 @@ const EnterpriseDashboard = ({
       return;
     }
     try {
-      const { EmailAuthProvider, reauthenticateWithCredential } = await import('../config/firebase');
       const credential = EmailAuthProvider.credential(user.email, authPassword);
       await reauthenticateWithCredential(user, credential);
       if (authActionPayload?.callback) {
@@ -209,77 +206,9 @@ const EnterpriseDashboard = ({
     }
   };
 
-  // ==================== SIDEBAR ====================
-  const renderSidebar = () => (
-    <aside className={`${sidebarCollapsed ? 'w-[52px]' : 'w-[220px]'} bg-[#0a0e1a] text-slate-400 flex flex-col transition-all duration-200 shrink-0 border-r border-white/5 relative z-20`}>
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 px-3 py-3 border-b border-white/5">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
-          <Truck size={16} className="text-white" />
-        </div>
-        {!sidebarCollapsed && (
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-white tracking-tight">Agape Care</p>
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Fleet OS</p>
-          </div>
-        )}
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="ml-auto p-1.5 rounded-md hover:bg-white/5 transition shrink-0"
-        >
-          {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 py-2 overflow-y-auto px-2">
-        <div className="mb-1">
-          {!sidebarCollapsed && <p className="text-[10px] uppercase tracking-wider text-slate-600 font-semibold px-2 py-1.5">Navigation</p>}
-          {sidebarItems.map(item => {
-            const Icon = item.icon;
-            const isActive = activePanel === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActivePanel(item.id)}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-sm rounded-lg transition-all mb-0.5 group relative ${
-                  isActive
-                    ? 'bg-blue-600/15 text-blue-400 font-medium'
-                    : 'hover:bg-white/5 hover:text-slate-200'
-                }`}
-                title={sidebarCollapsed ? item.label : undefined}
-              >
-                {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-blue-500 rounded-r" />}
-                <Icon size={16} className="shrink-0" />
-                {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                {item.id === 'chat' && chatUnreadCount > 0 && !sidebarCollapsed && (
-                  <span className="ml-auto bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 min-w-[18px] text-center font-bold">
-                    {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* Bottom section */}
-      <div className="border-t border-white/5 p-2">
-        <button
-          onClick={() => signOut(auth).catch(() => window.location.reload())}
-          className="w-full flex items-center gap-2.5 px-2.5 py-2 text-sm hover:bg-white/5 rounded-lg transition text-slate-500 hover:text-rose-400"
-          title={sidebarCollapsed ? 'Sign Out' : undefined}
-        >
-          <LogOut size={16} className="shrink-0" />
-          {!sidebarCollapsed && <span>Sign Out</span>}
-        </button>
-      </div>
-    </aside>
-  );
-
   // ==================== TOP BAR ====================
   const renderTopBar = () => (
-    <header className="bg-[#0d1117]/80 backdrop-blur-xl border-b border-white/5 px-4 py-2 flex items-center gap-3 shrink-0 h-[48px]">
+    <header className="bg-[var(--admin-surface)]/80 backdrop-blur-xl border-b border-white/5 px-4 py-2 flex items-center gap-3 shrink-0 h-[48px]">
       {/* Left: Breadcrumb + Panel title */}
       <div className="flex items-center gap-2">
         <h1 className="text-sm font-semibold text-white capitalize">{activePanel === 'liveMap' ? 'Live Map' : activePanel}</h1>
@@ -364,7 +293,7 @@ const EnterpriseDashboard = ({
             )}
           </button>
           {showNotifications && (
-            <div className="absolute right-0 top-full mt-2 w-72 bg-[#161b22] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
+            <div className="absolute right-0 top-full mt-2 w-72 admin-bg-elevated border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
               <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between">
                 <p className="text-xs font-semibold text-white">Notifications</p>
                 <button onClick={() => setShowNotifications(false)} className="p-1 hover:bg-white/5 rounded"><X size={12} className="text-slate-500" /></button>
@@ -408,7 +337,7 @@ const EnterpriseDashboard = ({
 
   // ==================== RIGHT PANEL ====================
   const renderRightPanel = () => (
-    <div className="w-[280px] bg-[#0d1117] border-l border-white/5 flex flex-col shrink-0 overflow-hidden">
+    <div className="w-[280px] admin-bg-surface border-l border-white/5 flex flex-col shrink-0 overflow-hidden">
       {/* Tabs */}
       <div className="flex border-b border-white/5">
         {[
@@ -565,7 +494,7 @@ const EnterpriseDashboard = ({
     return (
       <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[20vh]" onClick={() => setCommandPaletteOpen(false)}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-        <div className="w-full max-w-lg bg-[#161b22] border border-white/10 rounded-xl shadow-2xl overflow-hidden relative z-10" onClick={e => e.stopPropagation()}>
+        <div className="w-full max-w-lg admin-bg-elevated border border-white/10 rounded-xl shadow-2xl overflow-hidden relative z-10" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-2 px-3 py-3 border-b border-white/5">
             <Search size={16} className="text-slate-500" />
             <input
@@ -620,14 +549,6 @@ const EnterpriseDashboard = ({
       setSmartAssignResult={setSmartAssignResult}
       aiAnalyzing={aiAnalyzing}
       setAiAnalyzing={setAiAnalyzing}
-      showOptimizeModal={showOptimizeModal}
-      setShowOptimizeModal={setShowOptimizeModal}
-      showUploadModal={showUploadModal}
-      setShowUploadModal={setShowUploadModal}
-      uploadAssignDriver={uploadAssignDriver}
-      setUploadAssignDriver={setUploadAssignDriver}
-      bulkAssignModal={bulkAssignModal}
-      setBulkAssignModal={setBulkAssignModal}
       addToast={addToast}
       addAuditLog={addAuditLog}
       persistState={persistState}
@@ -684,19 +605,65 @@ const EnterpriseDashboard = ({
 
   // ==================== MAIN LAYOUT ====================
   return (
-    <div className="flex h-screen bg-[#0a0e1a] text-slate-300 overflow-hidden font-sans">
-      {/* Sidebar */}
-      {renderSidebar()}
-
+    <div className="flex h-screen admin-bg-main overflow-hidden font-sans">
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
         {renderTopBar()}
 
+        {/* Page tabs + AI tools (beside each other at top) */}
+        <div className="flex items-center gap-0.5 px-3 py-0 border-b border-white/5 bg-[var(--admin-surface)] shrink-0 overflow-x-auto">
+          {sidebarItems.map(item => {
+            const Icon = item.icon;
+            const isActive = activePanel === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActivePanel(item.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-t-md transition whitespace-nowrap ${
+                  isActive
+                    ? 'bg-blue-600/15 text-blue-400 border-b-2 border-blue-500'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                }`}
+              >
+                <Icon size={13} />
+                {item.label}
+              </button>
+            );
+          })}
+          {/* Spacer */}
+          <div className="flex-1" />
+          {/* AI Tools (only on operations panel) */}
+          {activePanel === 'operations' && (
+            <div className="flex items-center gap-1">
+              {selectedTasks.length > 0 && (
+                <button
+                  onClick={() => setBulkAssignModal(true)}
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-medium transition flex items-center gap-1"
+                >
+                  <Users size={12} /> Assign {selectedTasks.length}
+                </button>
+              )}
+              <button
+                onClick={() => setShowOptimizeModal(true)}
+                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-medium transition flex items-center gap-1"
+              >
+                <Wand2 size={12} /> Optimize
+              </button>
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-medium transition flex items-center gap-1"
+              >
+                <Upload size={12} /> Upload
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Content area */}
         <div className="flex-1 flex overflow-hidden">
           {/* Main content */}
-          <div className="flex-1 overflow-hidden bg-[#0a0e1a]">
+          <div className="flex-1 overflow-hidden admin-bg-main">
             {renderPanelContent()}
           </div>
 
@@ -712,7 +679,7 @@ const EnterpriseDashboard = ({
       {showUploadModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowUploadModal(false)} />
-          <div className="bg-[#161b22] w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
+          <div className="admin-bg-elevated w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-base font-bold text-white">Upload Trips</h2>
               <button onClick={() => setShowUploadModal(false)} className="p-1.5 rounded-lg hover:bg-white/5"><X size={18} className="text-slate-400" /></button>
@@ -742,7 +709,7 @@ const EnterpriseDashboard = ({
       {bulkAssignModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBulkAssignModal(false)} />
-          <div className="bg-[#161b22] w-full max-w-md max-h-[80vh] overflow-y-auto rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
+          <div className="admin-bg-elevated w-full max-w-md max-h-[80vh] overflow-y-auto rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-base font-bold text-white">Assign {selectedTasks.length} Trips</h2>
               <button onClick={() => setBulkAssignModal(false)} className="p-1.5 rounded-lg hover:bg-white/5"><X size={18} className="text-slate-400" /></button>
@@ -772,7 +739,7 @@ const EnterpriseDashboard = ({
       {manualAssignTrip && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setManualAssignTrip(null)} />
-          <div className="bg-[#161b22] w-full max-w-md max-h-[80vh] overflow-y-auto rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
+          <div className="admin-bg-elevated w-full max-w-md max-h-[80vh] overflow-y-auto rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-base font-bold text-white">Assign: {manualAssignTrip.patient}</h2>
               <button onClick={() => setManualAssignTrip(null)} className="p-1.5 rounded-lg hover:bg-white/5"><X size={18} className="text-slate-400" /></button>
@@ -818,7 +785,7 @@ const EnterpriseDashboard = ({
       {smartAssignTrip && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} />
-          <div className="bg-[#161b22] w-full max-w-lg rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
+          <div className="admin-bg-elevated w-full max-w-lg rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <BrainCircuit size={18} className="text-indigo-400" /> AI Assignment
@@ -867,7 +834,7 @@ const EnterpriseDashboard = ({
       {showOptimizeModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !aiAnalyzing && setShowOptimizeModal(false)} />
-          <div className="bg-[#161b22] w-full max-w-md rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
+          <div className="admin-bg-elevated w-full max-w-md rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <Wand2 size={18} className="text-indigo-400" /> Fleet Optimization
@@ -895,8 +862,8 @@ const EnterpriseDashboard = ({
       {tripDetails && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" onClick={() => setTripDetails(null)}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div className="bg-[#161b22] w-full max-w-lg rounded-xl shadow-2xl relative z-10 border border-white/10 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 bg-[#161b22] border-b border-white/5 px-5 py-3 flex items-center justify-between z-10">
+          <div className="admin-bg-elevated w-full max-w-lg rounded-xl shadow-2xl relative z-10 border border-white/10 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 admin-bg-elevated border-b border-white/5 px-5 py-3 flex items-center justify-between z-10">
               <h3 className="text-sm font-bold text-white">Trip Details</h3>
               <button onClick={() => setTripDetails(null)} className="p-1.5 rounded-lg hover:bg-white/5 transition"><X size={16} className="text-slate-400" /></button>
             </div>
@@ -973,7 +940,7 @@ const EnterpriseDashboard = ({
       {showAuthModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div className="bg-[#161b22] w-full max-w-sm rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
+          <div className="admin-bg-elevated w-full max-w-sm rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
             <h3 className="text-base font-bold text-white mb-4">Authenticate</h3>
             <form onSubmit={submitAuthAction}>
               <input
