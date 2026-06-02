@@ -1,4 +1,22 @@
 /**
+ * Convert time string to minutes since midnight (0-1440)
+ * Handles formats: "2:30 PM", "14:30", "Will Call", etc.
+ */
+export function timeToMinutes(t) {
+  if (!t) return 1440;
+  const cleanTime = String(t).toUpperCase().trim();
+  if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
+  const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+  if (!m) return 1440;
+  let h = parseInt(m[1], 10);
+  let min = parseInt(m[2] || '0', 10);
+  const p = m[3];
+  if (p === 'PM' && h < 12) h += 12;
+  if (p === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+/**
  * Normalize a trip service date to YYYY-MM-DD (local calendar) for comparison
  * with <input type="date"> values and manifest "today" strings.
  *
@@ -68,6 +86,18 @@ export function tripMatchesTodayOrTomorrow(tripDate) {
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const tomorrowKey = localYmd(tomorrow);
   return key === todayKey || key === tomorrowKey;
+}
+
+/**
+ * True if a trip time has passed (late for its scheduled slot).
+ */
+export function isTripLate(tripTime) {
+  if (!tripTime || tripTime === 'Will Call') return false;
+  const now = new Date();
+  const timeVal = timeToMinutes(tripTime);
+  const scheduled = new Date();
+  scheduled.setHours(Math.floor(timeVal / 60), timeVal % 60, 0, 0);
+  return now > scheduled;
 }
 
 /** If the trip has no usable date key, it matches any manifest day (legacy / incomplete rows). */
