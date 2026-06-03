@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import {
   MapPin, Navigation, Clock, User, PhoneCall,
@@ -72,6 +72,15 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const dropoffSiteName = (task.dropoff?.site || task.dropoffSite || '').trim();
   const pickupAddress = task.pickup?.address || task.pickup || '';
   const pickupSiteName = (task.pickup?.site || task.pickupSite || '').trim();
+
+  useEffect(() => {
+    if (isExpanded) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isExpanded]);
 
   const handleCopy = (text, id) => {
     navigator.clipboard?.writeText(text);
