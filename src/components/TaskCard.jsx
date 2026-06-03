@@ -397,18 +397,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                     <Ruler size={10} /> {task.details.distance}
                   </span>
                 )}
-                {actions?.onCall && (
-                  <button onClick={(e) => { e.stopPropagation(); actions.onCall(task); }}
-                    className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors text-[0.625em] font-bold flex items-center gap-1 border border-slate-200">
-                    <PhoneCall size={10} /> Call
-                  </button>
-                )}
-                {actions?.onSms && (
-                  <button onClick={(e) => { e.stopPropagation(); actions.onSms(task); }}
-                    className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors text-[0.625em] font-bold flex items-center gap-1 border border-slate-200">
-                    <MessageCircle size={10} /> SMS
-                  </button>
-                )}
                 {actions?.onContacts && (
                   <button onClick={(e) => { e.stopPropagation(); actions.onContacts(task); }}
                     className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors text-[0.625em] font-bold flex items-center gap-1 border border-slate-200">
