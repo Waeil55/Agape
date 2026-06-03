@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, onSnapshot, collection, getDocs } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
-import AIAssistantFloating from './components/AIAssistantFloating';
+
 import { hasPermission } from './constants/roles';
 import { timeToMinutes, tripMatchesTodayOrTomorrow, tripMatchesCalendarDay } from './utils/tripDate';
 import { cleanPhone } from './utils/smartContacts';
@@ -2597,7 +2597,6 @@ const App = () => {
         </>
       )}
     </div>
-      <AIAssistantFloating />
     </>
   );
 };
