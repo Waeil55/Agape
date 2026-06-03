@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Archive, Calendar, RefreshCcw, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Check, Edit2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Archive, Calendar, RefreshCcw, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Check, Edit2, ChevronDown, ChevronRight, Clock } from 'lucide-react';
 
 const today = new Date().toISOString().split('T')[0];
 
@@ -126,7 +126,12 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [activeRow, setActiveRow] = useState(null);
+  const [expandedTripId, setExpandedTripId] = useState(null);
   const inputRef = useRef(null);
+
+  const toggleTripExpand = (tripId) => {
+    setExpandedTripId(prev => prev === tripId ? null : tripId);
+  };
   const [expandedGroups, setExpandedGroups] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('agape_archiveExpandedGroups') || '{}');
@@ -441,8 +446,9 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
 
               {isExpanded && (
               <div className="w-full overflow-x-auto">
-                <table className="resizable-table text-xs" style={{ tableLayout: 'fixed', width: '100%', minWidth: Object.values(colWidths).reduce((a, b) => a + b, 0) + 100 }}>
+                <table className="resizable-table text-xs" style={{ tableLayout: 'fixed', width: '100%', minWidth: 40 + Object.values(colWidths).reduce((a, b) => a + b, 0) + 100 }}>
                   <colgroup>
+                    <col style={{ width: 40 }} />
                     {Columns.map(col => (
                       <col key={col.key} style={{ width: colWidths[col.key] || 100 }} />
                     ))}
@@ -450,6 +456,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                   </colgroup>
                   <thead className="bg-slate-800 text-slate-100 border-b border-slate-200">
                     <tr>
+                      <th className="p-0 w-10" />
                       {Columns.map(col => (
                         <th
                           key={col.key}
@@ -478,14 +485,22 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                     {dayTrips.map((trip) => {
                       const driverName = getDriverLabel(trip, drivers);
 
+                      const isExpanded = expandedTripId === trip.id;
                       return (
-                        <tr key={trip.id} className={`${activeRow === trip.id ? 'bg-blue-100' : ''} hover:bg-blue-50/50 transition-colors ${canEdit ? 'cursor-pointer' : ''}`}
+                        <React.Fragment key={trip.id}>
+                        <tr className={`${activeRow === trip.id ? 'bg-blue-100' : ''} hover:bg-blue-50/50 transition-colors ${canEdit ? 'cursor-pointer' : ''}`}
                           onClick={(e) => {
                             if (!canEdit) return;
                             const interactiveTags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'SVG', 'PATH'];
                             if (interactiveTags.includes(e.target.tagName)) return;
                             setActiveRow(trip.id);
                           }}>
+                          <td className="p-0 w-10 text-center">
+                            <button onClick={(e) => { e.stopPropagation(); toggleTripExpand(trip.id); }}
+                              className="p-1.5 hover:bg-slate-100 rounded transition-colors">
+                              {isExpanded ? <ChevronDown size={14} className="text-slate-500" /> : <ChevronRight size={14} className="text-slate-500" />}
+                            </button>
+                          </td>
                           {Columns.map(col => {
                             const cellKey = col.key;
                             const displayValue = renderCellValue(trip, col);
@@ -519,13 +534,126 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                           })}
                           <td className="p-2 whitespace-nowrap">
                             {restoreTrip && (
-                              <button onClick={() => restoreTrip(trip.id)}
+                              <button onClick={(e) => { e.stopPropagation(); restoreTrip(trip.id); }}
                                 className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-bold hover:bg-slate-200 transition-colors">
                                 <RefreshCcw size={12} /> Restore
                               </button>
                             )}
                           </td>
                         </tr>
+                        {isExpanded && (
+                        <tr key={`${trip.id}-detail`}>
+                          <td colSpan={Columns.length + 2} className="p-0 bg-slate-50">
+                            <div className="px-4 pb-4 pt-0">
+                              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50/50 border-b border-slate-200 flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Trip</span>
+                                    <span className="text-xs font-mono font-bold text-blue-600">{trip.bookingId || trip.id}</span>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-xs text-slate-500 font-medium">{driverName}</span>
+                                    {trip.completedVehicle && trip.completedVehicle !== 'Pending Assignment' && (
+                                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{trip.completedVehicle}</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="p-4 border-b border-slate-100">
+                                  <h3 className="text-sm font-bold text-slate-900 mb-3">{trip.patient || 'No Patient'}</h3>
+                                  <div className="flex items-stretch gap-3">
+                                    <div className="flex flex-col items-center pt-1.5 pb-1.5">
+                                      <div className="w-[7px] h-[7px] rounded-full bg-blue-500 ring-2 ring-blue-100" />
+                                      <div className="w-[1.5px] h-5 bg-slate-200 my-0.5 rounded-full" />
+                                      <div className="w-[7px] h-[7px] rounded-full bg-emerald-500 ring-2 ring-emerald-100" />
+                                    </div>
+                                    <div className="flex flex-col gap-2 flex-1 min-w-0">
+                                      <div>
+                                        <p className="text-[13px] font-medium text-slate-600 truncate">{trip.pickup || '—'}</p>
+                                        {trip.arrivalTime && <p className="text-[11px] text-emerald-600 font-medium">Arrived: {formatClock24(trip.arrivalTime)}</p>}
+                                      </div>
+                                      <div>
+                                        <p className="text-[13px] font-medium text-slate-600 truncate">{trip.dropoff || '—'}</p>
+                                        {trip.arrivalDropoffTime && <p className="text-[11px] text-rose-600 font-medium">Arrived: {formatClock24(trip.arrivalDropoffTime)}</p>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="p-4 border-b border-slate-100">
+                                  <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                                    <div>
+                                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Schedule</span>
+                                      <div className="mt-1.5 space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-1.5">
+                                            <Clock size={11} className="text-slate-400" />
+                                            <span className="text-[11px] text-slate-500">Scheduled</span>
+                                          </div>
+                                          <span className="text-[11px] font-semibold text-slate-800">{formatClock24(trip.time) || '—'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-1.5">
+                                            <Clock size={11} className="text-emerald-400" />
+                                            <span className="text-[11px] text-slate-500">Arrived Pickup</span>
+                                          </div>
+                                          <span className="text-[11px] font-semibold text-emerald-600">{formatClock24(trip.arrivalTime) || '—'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-1.5">
+                                            <Clock size={11} className="text-amber-400" />
+                                            <span className="text-[11px] text-slate-500">Departed Pickup</span>
+                                          </div>
+                                          <span className="text-[11px] font-semibold text-amber-600">{formatClock24(trip.departedPickupTime) || '—'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-1.5">
+                                            <Clock size={11} className="text-rose-400" />
+                                            <span className="text-[11px] text-slate-500">Arrived Dropoff</span>
+                                          </div>
+                                          <span className="text-[11px] font-semibold text-rose-600">{formatClock24(trip.arrivalDropoffTime || trip.completedAt) || '—'}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Vehicle</span>
+                                      <div className="mt-1.5 space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-[11px] text-slate-500">Start Odometer</span>
+                                          <span className="text-[11px] font-semibold text-emerald-600 font-mono">{trip.pickupOdometer || '—'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-[11px] text-slate-500">End Odometer</span>
+                                          <span className="text-[11px] font-semibold text-rose-600 font-mono">{trip.dropoffOdometer || '—'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-[11px] text-slate-500">Distance</span>
+                                          <span className="text-[11px] font-bold text-blue-600">{calcMiles(trip.pickupOdometer, trip.dropoffOdometer)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-[11px] text-slate-500">Travel Time</span>
+                                          <span className="text-[11px] font-semibold text-slate-800">{calcDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt)}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="px-4 py-2 bg-slate-50 flex items-center justify-between">
+                                  <span className="text-[10px] text-slate-400">{formatDateLabel(trip.date || '')}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-500">Signature:</span>
+                                    <span className={`text-[11px] font-bold ${trip.paperSignatureConfirmed ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                      {trip.paperSignatureConfirmed ? 'Yes' : 'No'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>
