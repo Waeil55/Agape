@@ -1,18 +1,9 @@
 import { useState } from 'react';
 
-function extractZipFromAddress(address) {
-  const s = String(address || '');
-  const stateZip = s.match(/\b([A-Z]{2})\s*,?\s*(\d{5})(?:-\d{4})?\b/i);
-  if (stateZip) return stateZip[2];
-  const endZip = s.match(/\b(\d{5})(?:-\d{4})?\b[^\d]*$/);
-  if (endZip) return endZip[1];
-  const anyZip = s.match(/\b(\d{5})(?:-\d{4})?\b/);
-  return anyZip ? anyZip[1] : '';
-}
 import {
   MapPin, Navigation, Clock, User, PhoneCall,
   ChevronDown, XCircle, AlertCircle,
-  Ruler, Users, Info, Activity, Building, Home, Accessibility,
+  Ruler, Users, Activity, Building, Home, Accessibility,
   Copy, Check, RotateCcw, PhoneForwarded, MessageCircle,
   Square, CheckSquare, RefreshCw, Forward,
   Edit2
@@ -77,8 +68,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
 
   const timeUrgency = getTimeUrgency(task.time, task.status);
   const isTerminal = ['Completed', 'Cancelled', 'No Show'].includes(task.status);
-  const zipPU = extractZipFromAddress(task.pickup?.address || task.pickup);
-  const zipDO = extractZipFromAddress(task.dropoff?.address || task.dropoff);
   const dropoffAddress = task.dropoff?.address || task.dropoff || '';
   const dropoffSiteName = (task.dropoff?.site || task.dropoffSite || '').trim();
   const pickupAddress = task.pickup?.address || task.pickup || '';
@@ -178,11 +167,9 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
               <div className="flex flex-col justify-between flex-1 gap-2 min-w-0">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <p className="text-[13px] font-medium text-slate-600 truncate">{pickupAddress}</p>
-                  {zipPU && <span className="text-[10px] font-mono font-bold text-blue-500 bg-blue-50 px-1 rounded shrink-0">{zipPU}</span>}
                 </div>
                 <div className="flex items-center gap-1.5 min-w-0">
                   <p className="text-[13px] font-medium text-slate-600 truncate">{dropoffAddress}</p>
-                  {zipDO && <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1 rounded shrink-0">{zipDO}</span>}
                 </div>
               </div>
             </div>
@@ -272,10 +259,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                             </h4>
                           )}
                           <p className="text-slate-600 text-[0.75em] leading-tight">{pickupAddress}</p>
-                          <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                            {zipPU && <span className="text-[0.625em] font-mono font-bold text-blue-500 bg-blue-50 px-1 rounded">{zipPU}</span>}
-                            {task.pickupPhone && <span className="text-[0.625em] font-mono font-bold text-slate-400 bg-white px-1 rounded border border-slate-100">{task.pickupPhone}</span>}
-                          </div>
                         </div>
                         <div className="flex shrink-0 gap-1 items-center">
                           <button onClick={(e) => { e.stopPropagation(); handleCopy(pickupAddress, 'pickup'); }}
@@ -328,10 +311,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                             </h4>
                           )}
                           <p className="text-slate-600 text-[0.75em] leading-tight">{dropoffAddress}</p>
-                          <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                            {zipDO && <span className="text-[0.625em] font-mono font-bold text-emerald-600 bg-emerald-50 px-1 rounded">{zipDO}</span>}
-                            {task.dropoffPhone && <span className="text-[0.625em] font-mono font-bold text-slate-400 bg-white px-1 rounded border border-slate-100">{task.dropoffPhone}</span>}
-                          </div>
                         </div>
                         <div className="flex shrink-0 gap-1 items-center">
                           <button onClick={(e) => { e.stopPropagation(); handleCopy(dropoffAddress, 'dropoff'); }}
