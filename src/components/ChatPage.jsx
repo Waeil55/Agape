@@ -62,42 +62,46 @@ const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [
     <div className="flex flex-1 bg-white overflow-hidden h-full">
       {isMobile ? (
         <div className="flex flex-col flex-1 min-h-0">
-          <div className="sticky top-0 z-10 bg-white shrink-0 border-b border-slate-100">
-            <div className="flex px-3 py-2 gap-1">
-              <button onClick={() => setActiveTab('team')}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                  activeTab === 'team'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                }`}>
-                Team Chat
-              </button>
-              <button onClick={() => setActiveTab('clients')}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                  activeTab === 'clients'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                }`}>
-                Clients
-              </button>
+          {role !== 'driver' && (
+            <div className="sticky top-0 z-10 bg-white shrink-0 border-b border-slate-100">
+              <div className="flex px-3 py-2 gap-1">
+                <button onClick={() => setActiveTab('team')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                    activeTab === 'team'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  }`}>
+                  Team Chat
+                </button>
+                <button onClick={() => setActiveTab('clients')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                    activeTab === 'clients'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  }`}>
+                  Clients
+                </button>
+              </div>
             </div>
-          </div>
+          )}
           <div className="flex-1 min-h-0">
-            {activeTab === 'team' ? (
+            {role === 'driver' || activeTab === 'team' ? (
               <TeamChatPanel currentUser={currentUser} role={role} />
             ) : (
-              <ClientChatPanel currentUser={currentUser} role={role} trips={trips} onSwitchToDispatch={switchToDispatch} />
+              <ClientChatPanel currentUser={currentUser} role={role} drivers={drivers} dispatchers={dispatchers} trips={trips} onSwitchToDispatch={switchToDispatch} />
             )}
           </div>
         </div>
       ) : (
         <div className="flex flex-1 min-w-0">
-          <div className="w-1/2 border-r border-slate-200 flex flex-col min-h-0">
+          <div className={`${role === 'driver' ? 'w-full' : 'w-1/2'} border-r border-slate-200 flex flex-col min-h-0`}>
             <TeamChatPanel currentUser={currentUser} role={role} />
           </div>
-          <div className="w-1/2 flex flex-col min-h-0">
-            <ClientChatPanel currentUser={currentUser} role={role} trips={trips} onSwitchToDispatch={switchToDispatch} />
-          </div>
+          {role !== 'driver' && (
+            <div className="w-1/2 flex flex-col min-h-0">
+              <ClientChatPanel currentUser={currentUser} role={role} drivers={drivers} dispatchers={dispatchers} trips={trips} onSwitchToDispatch={switchToDispatch} />
+            </div>
+          )}
         </div>
       )}
       
@@ -473,7 +477,7 @@ const TeamChatPanel = ({ currentUser, role }) => {
 };
 
 /* ===================== CLIENT CHAT PANEL ===================== */
-const ClientChatPanel = ({ currentUser, role, trips = [], onSwitchToDispatch }) => {
+const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], trips = [], onSwitchToDispatch }) => {
   const [conversations, setConversations] = useState([]);
   const [activeConv, setActiveConv] = useState(null);
   const [showSidebar, setShowSidebar] = useState(true);
@@ -496,6 +500,23 @@ const ClientChatPanel = ({ currentUser, role, trips = [], onSwitchToDispatch }) 
   const [newSmsText, setNewSmsText] = useState('');
   const [newSmsSending, setNewSmsSending] = useState(false);
   const messagesEndRef = useRef(null);
+
+  const scopeFilter = useCallback((convs) => {
+    if (role === 'driver') return [];
+    if (role !== 'dispatcher') return convs;
+    const disp = dispatchers.find(d => d.email?.toLowerCase() === (currentUser || '').toLowerCase());
+    if (!disp) return [];
+    const aDrivers = drivers.filter(d => d.assignedDispatcher === disp.id || d.assignedTo === disp.id);
+    const scopedIds = new Set(aDrivers.map(d => d.id));
+    const scopedEmails = new Set(aDrivers.map(d => d.email?.toLowerCase()).filter(Boolean));
+    const allowedPhones = new Set();
+    (trips || []).forEach(t => {
+      if (scopedIds.has(t.driverId) || scopedEmails.has(t.driverEmail?.toLowerCase())) {
+        [t.patientPhone, t.pickupPhone, t.dropoffPhone].filter(Boolean).forEach(p => allowedPhones.add(normalizePhone(p)));
+      }
+    });
+    return convs.filter(c => allowedPhones.has(c.phone));
+  }, [role, currentUser, dispatchers, drivers, trips]);
 
   const phoneToTrip = useMemo(() => {
     const map = {};
@@ -564,7 +585,7 @@ const ClientChatPanel = ({ currentUser, role, trips = [], onSwitchToDispatch }) 
           return { phone, clientName: resolved.name, tripId: resolved.tripId, trip: resolved.trip, lastMessage: last, messages: msgs };
         });
         convs.sort((a, b) => (b.lastMessage.timestamp?.toMillis?.() || 0) - (a.lastMessage.timestamp?.toMillis?.() || 0));
-        setConversations(convs);
+        setConversations(scopeFilter(convs));
       } catch (e) { console.error('Failed to load client conversations:', e); }
       setLoading(false);
     };
@@ -848,9 +869,10 @@ const ClientChatPanel = ({ currentUser, role, trips = [], onSwitchToDispatch }) 
         return { phone: ph, clientName: resolved.name, tripId: resolved.tripId, trip: resolved.trip, lastMessage: last, messages: msgs };
       });
       convs.sort((a, b) => (b.lastMessage.timestamp?.toMillis?.() || 0) - (a.lastMessage.timestamp?.toMillis?.() || 0));
-      setConversations(convs);
+      const filteredConvs = scopeFilter(convs);
+      setConversations(filteredConvs);
       const norm = normalizePhone(phone);
-      const conv = convs.find(c => c.phone === norm);
+      const conv = filteredConvs.find(c => c.phone === norm);
       if (conv) { openConversation(conv); if (isMobile) setShowSidebar(false); }
     } catch (err) { console.error('New SMS failed:', err); }
     setNewSmsSending(false);
