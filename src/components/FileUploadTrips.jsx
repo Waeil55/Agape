@@ -18,17 +18,36 @@ const timeToMinutes = (t) => {
 };
 
 const COLUMN_ALIASES = {
-  bookingId: ['booking id', 'bookingid', 'reservation id', 'trip id', 'booking number', 'confirmation id'],
-  patient: ['client', 'client name', 'passenger', 'passenger name', 'rider', 'customer', 'patient name', 'name', 'rider name', 'guest', 'user', 'person'],
-  pickup: ['pickup', 'pickup address', 'pickup_address', 'pick up', 'origin', 'from', 'from address', 'from_address', 'pu', 'pickup location', 'start address', 'start'],
-  dropoff: ['dropoff', 'dropoff address', 'dropoff_address', 'drop off', 'destination', 'to', 'to address', 'to_address', 'do', 'dest', 'dropoff location', 'end address', 'end'],
-  pickupPhone: ['pickup phone', 'pickup phone number', 'pickup_phone', 'phone', 'client phone', 'passenger phone', 'primary phone', 'phone number', 'tel', 'telephone', 'contact'],
-  dropoffPhone: ['dropoff phone', 'dropoff phone number', 'dropoff_phone', 'facility phone', 'destination phone', 'location phone', 'secondary phone'],
-  time: ['time', 'pickup time', 'pickup_time', 'schedule time', 'scheduled time', 'appt time', 'appt', 'appointment time', 'timestamp', 'slot', 'scheduled'],
-  dropoffTime: ['requested late dropoff', 'requested time dropoff', 'dropoff time', 'late dropoff', 'return time'],
-  date: ['date', 'trip date', 'service date', 'requested date'],
-  type: ['type', 'trip type', 'am/pm', 'run', 'shift', 'route type', 'service type', 'schedule type', 'trip_type'],
-  notes: ['notes', 'special instructions', 'instructions', 'comment', 'comments', 'note', 'memo', 'remarks', 'additional info', 'info', 'pickup comments', 'dropoff comments', 'message', 'purpose'],
+  bookingId: ['booking id', 'bookingid', 'reservation id', 'trip id', 'booking number', 'confirmation id', 'tripid', 'trip_id', 'trip number', 'order id', 'order number', 'booking', 'confirmation #', 'confirmation', 'reservation'],
+  patient: ['client', 'client name', 'passenger', 'passenger name', 'rider', 'customer', 'patient name', 'name', 'rider name', 'guest', 'user', 'person', 'member', 'member name', 'full name', 'contact name'],
+  pickup: ['pickup', 'pickup address', 'pickup_address', 'pick up', 'origin', 'from', 'from address', 'from_address', 'pu', 'pickup location', 'start address', 'start', 'pick-up address', 'pick up address', 'pu address', 'address short', 'address'],
+  dropoff: ['dropoff', 'dropoff address', 'dropoff_address', 'drop off', 'destination', 'to', 'to address', 'to_address', 'do', 'dest', 'dropoff location', 'end address', 'end', 'drop-off address', 'drop off address', 'do address'],
+  pickupPhone: ['pickup phone', 'pickup phone number', 'pickup_phone', 'phone', 'client phone', 'passenger phone', 'primary phone', 'phone number', 'tel', 'telephone', 'contact', 'member phone', 'mobile', 'cell phone', 'cell', 'primary contact'],
+  dropoffPhone: ['dropoff phone', 'dropoff phone number', 'dropoff_phone', 'facility phone', 'destination phone', 'location phone', 'secondary phone', 'dest phone', 'facility contact', 'location contact'],
+  time: ['time', 'pickup time', 'pickup_time', 'schedule time', 'scheduled time', 'appt time', 'appt', 'appointment time', 'timestamp', 'slot', 'scheduled', 'pick up time', 'pu time', 'pickup', 'scheduled pickup'],
+  dropoffTime: ['requested late dropoff', 'requested time dropoff', 'dropoff time', 'late dropoff', 'return time', 'do time', 'drop-off time', 'drop off time', 'appt end time', 'end time', 'dropoff', 'scheduled dropoff', 'return'],
+  date: ['date', 'trip date', 'service date', 'requested date', 'scheduled date', 'appt date', 'appointment date', 'day', 'calendar date', 'schedule date'],
+  type: ['type', 'trip type', 'am/pm', 'run', 'shift', 'route type', 'service type', 'schedule type', 'trip_type', 'mode', 'vehicle type', 'req', 'service', 'transport type', 'transportation type'],
+  notes: ['notes', 'special instructions', 'instructions', 'comment', 'comments', 'note', 'memo', 'remarks', 'additional info', 'info', 'pickup comments', 'dropoff comments', 'message', 'purpose', 'driver notes', 'trip notes', 'special', 'special needs', 'alert'],
+  driver: ['driver', 'driver name', 'assigned to', 'chauffeur', 'provider', 'assigned driver', 'driver id', 'driverid'],
+  driverEmail: ['driver email', 'driver_email', 'driver email address', 'email'],
+  vehicle: ['vehicle', 'vehicle id', 'car', 'van', 'fleet', 'assigned vehicle', 'truck', 'vehicle number', 'unit #', 'unit number'],
+  pickupOdometer: ['pickup odometer', 'pu odometer', 'start odometer', 'start mileage', 'pickup mileage', 'odometer start', 'pu odo', 'start odo', 'begin odo', 'begin odometer', 'start odo reading'],
+  dropoffOdometer: ['dropoff odometer', 'do odometer', 'end odometer', 'end mileage', 'dropoff mileage', 'odometer end', 'do odo', 'end odo', 'final odo', 'end odo reading'],
+  odometer: ['odometer', 'odo', 'mileage'],
+  distance: ['distance', 'dist', 'trip distance', 'miles', 'total miles', 'est miles', 'estimated miles', 'est distance', 'total distance', 'mileage'],
+  pickupArrival: ['pickup arrival', 'pu arrival', 'arrive pickup', 'arrived at pickup', 'time arrived at pickup', 'pu arrival time', 'pickup arrival time', 'arrival time', 'arrive time', 'arrived time', 'actual pickup time', 'pickup arrived', 'arrival'],
+  dropoffArrival: ['dropoff arrival', 'do arrival', 'arrive dropoff', 'arrived at dropoff', 'time arrived at dropoff', 'do arrival time', 'dropoff arrival time', 'actual dropoff time', 'dropoff arrived'],
+  completedAt: ['completed at', 'completedat', 'completed timestamp', 'completion time', 'date completed', 'completion date', 'timestamp', 'date/time completed', 'finish time', 'end time', 'trip end'],
+  startTime: ['start time', 'started at', 'startedat', 'start timestamp', 'trip start', 'begin time', 'departure time', 'begin trip', 'dispatch time'],
+  departedPickupTime: ['departed pickup', 'departed pickup time', 'departed pu', 'left pickup', 'pickup departure', 'departure from pickup', 'departed at'],
+  cancelledAt: ['cancelled at', 'cancelledat', 'cancelled timestamp', 'cancellation time', 'date cancelled', 'cancellation date', 'cancelled date'],
+  cancellationReason: ['cancellation reason', 'cancel reason', 'reason', 'cancelled reason', 'cancel_reason'],
+  completedVehicle: ['completed vehicle', 'vehicle', 'trip vehicle', 'assigned vehicle', 'completion vehicle', 'vehicle used'],
+  paperSignatureConfirmed: ['signature', 'signature captured', 'signature captured?', 'signature confirmed', 'signed', 'paper signature', 'rider signature', 'sign'],
+  patientPhone: ['patient phone', 'client phone', 'rider phone', 'passenger phone', 'home phone', 'primary contact phone'],
+  pickupSiteName: ['pickup site', 'pickup site name', 'site name origin', 'origin site', 'pickup location name', 'site', 'facility name (pickup)', 'building (pickup)'],
+  dropoffSiteName: ['dropoff site', 'dropoff site name', 'site name destination', 'destination site', 'dropoff location name', 'facility name (dropoff)', 'building (dropoff)'],
 };
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
@@ -115,12 +134,111 @@ function parseCSV(text) {
 function parseExcel(buffer) {
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
-  return rows.map(row => {
-    const normalized = {};
-    Object.keys(row).forEach(k => { normalized[k.trim()] = String(row[k] ?? '').trim(); });
-    return normalized;
-  });
+  const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+  return processRawRows(rawRows);
+}
+
+function processRawRows(rawRows) {
+  if (!rawRows || rawRows.length === 0) return [];
+  
+  // Detect Agape 2-row report format (check data rows, NOT the header row)
+  let isAgapeReport = false;
+  for (let ri = 1; ri < rawRows.length; ri++) {
+    const r = rawRows[ri];
+    if (!r || r.length < 8) continue;
+    const hasActivity = String(r[4]).toUpperCase() === 'PICKUP' || String(r[4]).toUpperCase() === 'DROPOFF';
+    const hasSig = r.some(v => String(v).toUpperCase() === 'YES' || String(v).toUpperCase() === 'NO');
+    if (hasActivity && hasSig) { isAgapeReport = true; break; }
+  }
+  
+  if (isAgapeReport) {
+    const dataRows = rawRows.filter(r => r && (String(r[4]).toUpperCase() === 'PICKUP' || String(r[4]).toUpperCase() === 'DROPOFF' || String(r.join(' ')).toUpperCase().includes('PICKUP')));
+    const grouped = [];
+    // Detect format: new (Arrival + Odometer separate) vs old (combined "time odo" in one column)
+    // New format: p[6]=arrival, p[7]=odometer, p[8]=travel time, p[9]=address, p[10]=signature
+    // Old format: p[6]="time odo", p[7]=travel time, p[8]=address, p[9]=distance, p[10]=signature
+    const firstRow = dataRows[0];
+    const isNewFormat = firstRow && firstRow.length >= 10 && 
+      /^\d{1,2}:\d{2}$/.test(String(firstRow[6] || '').trim()) && 
+      /^\d+$/.test(String(firstRow[7] || '').trim().replace(/,/g, ''));
+    
+    for (let i = 0; i < dataRows.length; i += 2) {
+      const p = dataRows[i];
+      const d = dataRows[i + 1] || p;
+      
+      let pArr, pOdo, dArr, dOdo, travelTime;
+      
+      if (isNewFormat) {
+        // New: separate columns
+        pArr = String(p[6] || '').trim();
+        pOdo = String(p[7] || '').trim().replace(/,/g, '');
+        dArr = String(d[6] || '').trim();
+        dOdo = String(d[7] || '').trim().replace(/,/g, '');
+        travelTime = String(p[8] || d[8] || '');
+      } else {
+        // Old: combined "time odo" in p[6]
+        const pSplit = String(p[6] || '').split(' ');
+        const dSplit = String(d[6] || '').split(' ');
+        pArr = pSplit[0] || '';
+        pOdo = pSplit[1] || pSplit[0] || '';
+        dArr = dSplit[0] || '';
+        dOdo = dSplit[1] || dSplit[0] || '';
+        travelTime = String(p[7] || d[7] || '');
+      }
+      
+      const driverStr = String(p[5] || '');
+      const dName = driverStr.split(' ')[0] || '';
+      const veh = driverStr.split(' ').slice(1).join(' ') || '';
+      
+      // Booking ID from column 0
+      const bookingId = String(p[0] || '').trim();
+      
+      // Address column index varies by format
+      const addrIdx = isNewFormat ? 9 : 8;
+      const shortAddrIdx = 1;
+      
+      let pickupAddr = String(p[addrIdx] || p[shortAddrIdx] || '').trim();
+      let dropoffAddr = String(d[addrIdx] || d[shortAddrIdx] || '').trim();
+      
+      if (!pickupAddr && String(p[shortAddrIdx] || '').trim()) pickupAddr = String(p[shortAddrIdx] || '').trim();
+      if (!dropoffAddr && String(d[shortAddrIdx] || '').trim()) dropoffAddr = String(d[shortAddrIdx] || '').trim();
+      
+      // Signature column index varies
+      const sigIdx = isNewFormat ? 10 : 10;
+      
+      grouped.push({
+        'Trip ID': bookingId,
+        'Client Name': String(p[3] || d[3] || ''),
+        'Pickup Time': String(p[2] || ''),
+        'Dropoff Time': String(d[2] || ''),
+        'Pickup Address': pickupAddr,
+        'Dropoff Address': dropoffAddr,
+        'Status': 'Completed',
+        '_agape_driverName': dName,
+        '_agape_vehicle': veh,
+        '_agape_pickupArrival': pArr,
+        '_agape_pickupOdo': pOdo,
+        '_agape_dropoffArrival': dArr,
+        '_agape_dropoffOdo': dOdo,
+        '_agape_signature': String(p[sigIdx]).toUpperCase() === 'YES',
+        '_agape_travelTime': travelTime,
+        '_agape_phone': String(p[addrIdx] || '').replace(/.*\((\d{3,})\)/, '$1') || '',
+      });
+    }
+    return grouped;
+  }
+  
+  // Standard format with headers
+  const headers = rawRows[0].map(h => String(h || '').trim());
+  const objects = [];
+  for (let i = 1; i < rawRows.length; i++) {
+    const row = rawRows[i];
+    if (!row || row.length === 0 || row.every(c => !c)) continue;
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = String(row[idx] ?? '').trim(); });
+    objects.push(obj);
+  }
+  return objects;
 }
 
 function mapColumns(row) {
@@ -141,6 +259,25 @@ function mapColumns(row) {
     date: find(COLUMN_ALIASES.date),
     type: find(COLUMN_ALIASES.type),
     notes: find(COLUMN_ALIASES.notes),
+    driver: find(COLUMN_ALIASES.driver),
+    driverEmail: find(COLUMN_ALIASES.driverEmail),
+    vehicle: find(COLUMN_ALIASES.vehicle),
+    pickupOdometer: find(COLUMN_ALIASES.pickupOdometer),
+    dropoffOdometer: find(COLUMN_ALIASES.dropoffOdometer),
+    odometer: find(COLUMN_ALIASES.odometer),
+    distance: find(COLUMN_ALIASES.distance),
+    pickupArrival: find(COLUMN_ALIASES.pickupArrival),
+    dropoffArrival: find(COLUMN_ALIASES.dropoffArrival),
+    completedAt: find(COLUMN_ALIASES.completedAt),
+    startTime: find(COLUMN_ALIASES.startTime),
+    departedPickupTime: find(COLUMN_ALIASES.departedPickupTime),
+    cancelledAt: find(COLUMN_ALIASES.cancelledAt),
+    cancellationReason: find(COLUMN_ALIASES.cancellationReason),
+    completedVehicle: find(COLUMN_ALIASES.completedVehicle),
+    paperSignatureConfirmed: find(COLUMN_ALIASES.paperSignatureConfirmed),
+    patientPhone: find(COLUMN_ALIASES.patientPhone),
+    pickupSiteName: find(COLUMN_ALIASES.pickupSiteName),
+    dropoffSiteName: find(COLUMN_ALIASES.dropoffSiteName),
   };
 }
 
@@ -202,7 +339,7 @@ const Badge = ({ children, variant = 'info' }) => {
   return <span className={`px-2 py-0.5 rounded-full text-xs font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
 };
 
-const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' }) => {
+const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', uploadContext = 'operations' }) => {
   const [file, setFile] = useState(null);
   const [step, setStep] = useState('upload');
   const [parsedRows, setParsedRows] = useState([]);
@@ -217,6 +354,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
   const [selectedCount, setSelectedCount] = useState(0);
   const [assignToDriver, setAssignToDriver] = useState(preSelectDriver || '');
   const [showAssignPrompt, setShowAssignPrompt] = useState(true);
+  const forceCompleted = uploadContext === 'reports';
   const dropRef = useRef(null);
 
   const handleFileSelect = (selectedFile) => {
@@ -348,6 +486,14 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
         if (patients.size > 1) facilityPhones.add(phone);
       });
 
+      // Parse a distance string like "5.2mi" or "5.2 mi" or "5.2" into a number
+      const parseDistance = (val) => {
+        if (!val) return '';
+        const cleaned = String(val).replace(/[^0-9.]/g, '');
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? String(val) : String(num);
+      };
+
       const mapped = rows.map((row, idx) => {
         const m = mapColumns(row);
         const pKey = (m.patient || '').trim().toLowerCase();
@@ -355,27 +501,18 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
         
         let patientPhone = '';
         if (pInfo) {
-          // Priority 1: A phone number associated with a "home" address that IS NOT a shared facility number
           const homePhonesList = Array.from(pInfo.homePhones);
           const nonFacHome = homePhonesList.find(ph => !facilityPhones.has(cleanPhone(ph)));
-          
           if (nonFacHome) {
             patientPhone = nonFacHome;
           } else if (pInfo.earliestPhone && !facilityPhones.has(cleanPhone(pInfo.earliestPhone))) {
-            // Priority 2: Use the phone from the EARLIEST trip (if not a facility)
             patientPhone = pInfo.earliestPhone;
           } else if (homePhonesList.length > 0) {
             patientPhone = homePhonesList[0];
           } else {
-            // Priority 3: Any phone number for this patient that IS NOT a shared facility number
             const allPhonesList = Array.from(pInfo.allPhones);
             const nonFacAny = allPhonesList.find(ph => !facilityPhones.has(cleanPhone(ph)));
-            if (nonFacAny) {
-              patientPhone = nonFacAny;
-            } else {
-              // Fallback
-              patientPhone = m.pickupPhone || m.dropoffPhone || '';
-            }
+            patientPhone = nonFacAny || m.pickupPhone || m.dropoffPhone || '';
           }
         }
 
@@ -383,27 +520,160 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
           .filter(Boolean)
           .join(' | ');
 
+        // Extract from ANY possible source: column-mapped, _agape_* fields, common raw keys
+        const extract = (...sources) => {
+          for (const src of sources) {
+            if (src !== undefined && src !== null && src !== '') return String(src).trim();
+          }
+          return '';
+        };
+
+        // Parse signature from YES/NO text or boolean
+        const parseSig = (val) => {
+          if (typeof val === 'boolean') return val;
+          if (!val) return false;
+          return String(val).toUpperCase() === 'YES' || String(val).toUpperCase() === 'Y' || String(val).toUpperCase() === 'TRUE' || String(val) === '1';
+        };
+
+        // Extract distance from multiple possible sources
+        const distance = parseDistance(
+          extract(
+            m.distance,
+            row['_agape_distance'],
+            row['Distance'],
+            row['Miles'],
+            row['Mileage'],
+            row['distance'],
+            row['miles'],
+            row['Trip Distance'],
+            row['Estimated Miles'],
+            row['Est Miles'],
+          )
+        );
+
+        // Extract odometer values, parsing as integers
+        const pickupOdo = extract(
+          row['_agape_pickupOdo'],
+          m.pickupOdometer,
+          m.odometer,
+          row['Pickup Odometer'],
+          row['pickupOdometer'],
+          row['Start Odometer'],
+          row['PU Odo'],
+        );
+        const dropoffOdo = extract(
+          row['_agape_dropoffOdo'],
+          m.dropoffOdometer,
+          row['Dropoff Odometer'],
+          row['dropoffOdometer'],
+          row['End Odometer'],
+          row['DO Odo'],
+        );
+
+        // Extract arrival times
+        const arrivalTime = extract(
+          row['_agape_pickupArrival'],
+          m.pickupArrival,
+          row['Pickup Arrival'],
+          row['arrivalTime'],
+          row['Arrival Time'],
+          row['PU Arrival'],
+        );
+        const arrivalDropoffTime = extract(
+          row['_agape_dropoffArrival'],
+          m.dropoffArrival,
+          row['Dropoff Arrival'],
+          row['arrivalDropoffTime'],
+          row['Dropoff Time'],
+          row['DO Arrival'],
+        );
+
+        // Extract driver info
+        const driverName = extract(row['_agape_driverName'], m.driver, row['Driver'], row['Driver Name'], row['driver']);
+        const completedVehicle = extract(row['_agape_vehicle'], m.completedVehicle, m.vehicle, row['Vehicle'], row['vehicle']);
+        const driverEmail = extract(m.driverEmail, row['Driver Email'], row['driverEmail'], row['driver_email']);
+
+        // Extract timestamps
+        const completedAt = extract(m.completedAt, row['Completed At'], row['completedAt'], row['Completion Time']);
+        const startTime = extract(m.startTime, row['Start Time'], row['startTime'], row['Started At']);
+        const departedPickupTime = extract(m.departedPickupTime, row['Departed Pickup'], row['departedPickupTime']);
+
+        // Date: use mapped value, or try raw keys
+        let date = normalizeDateValue(m.date);
+        if (!date) date = normalizeDateValue(row['Date'] || row['date'] || row['Trip Date'] || row['Service Date'] || '');
+        if (!date) date = today;
+
+        const pickupAddr = extract(m.pickup, row['Pickup Address'], row['pickup'], row['Pickup']);
+        const dropoffAddr = extract(m.dropoff, row['Dropoff Address'], row['dropoff'], row['Dropoff']);
+
         return {
-          id: `TRIP-${Date.now()}-${idx}`,
-          bookingId: m.bookingId || '',
-          patient: m.patient || '',
-          patientPhone: patientPhone,
-          date: normalizeDateValue(m.date) || today,
-          time: m.time || '',
-          dropoffTime: m.dropoffTime || '',
-          type: m.type || row['Space Types'] || '',
-          purpose: row['Purpose'] || '',
-          providerName: row['Provider Name'] || '',
-          directDistance: row['Direct Distance'] || '',
-          driverId: null,
-          pickup: m.pickup || '',
-          dropoff: m.dropoff || '',
-          pickupSiteName: colMap.pickupSite ? row[colMap.pickupSite] : '',
-          dropoffSiteName: colMap.dropoffSite ? row[colMap.dropoffSite] : '',
-          pickupPhone: m.pickupPhone || '',
-          dropoffPhone: m.dropoffPhone || '',
-          status: 'Unassigned',
+          // --- IDENTIFIERS ---
+          id: row['Trip ID'] || row['TripID'] || row['tripid'] || row['ID'] || row['id'] || `TRIP-${Date.now()}-${idx}`,
+          bookingId: extract(m.bookingId, row['Booking Id'], row['Booking ID'], row['bookingId'], row['Booking'], row['Confirmation #']),
+          patient: extract(m.patient, row['Client Name'], row['Client'], row['Patient'], row['patient'], 'Unknown'),
+          patientPhone: patientPhone || extract(m.patientPhone, row['Patient Phone'], row['patientPhone']),
+
+          // --- DATES & TIMES ---
+          date,
+          time: extract(m.time, row['Pickup Time'], row['Schedule Time'], row['scheduled'], row['time'], row['Time']),
+          dropoffTime: extract(m.dropoffTime, row['Dropoff Time'], row['Dropoff Time (Return)'], row['return']),
+
+          // --- ADDRESSES ---
+          pickup: pickupAddr,
+          dropoff: dropoffAddr,
+          pickupSiteName: extract(colMap.pickupSite ? row[colMap.pickupSite] : '', m.pickupSiteName, row['Pickup Site'], row['pickupSiteName'], row['Origin Site'], row['Pickup Location Name']),
+          dropoffSiteName: extract(colMap.dropoffSite ? row[colMap.dropoffSite] : '', m.dropoffSiteName, row['Dropoff Site'], row['dropoffSiteName'], row['Destination Site']),
+          pickupPhone: extract(m.pickupPhone, row['Pickup Phone'], row['pickupPhone']),
+          dropoffPhone: extract(m.dropoffPhone, row['Dropoff Phone'], row['dropoffPhone']),
+
+          // --- TYPE & NOTES ---
+          type: extract(m.type, row['Space Types'], row['Type'], row['Service Type'], row['Req'], row['req']),
+          purpose: extract(row['Purpose'], row['purpose']),
+          providerName: extract(row['Provider Name'], row['providerName']),
+          directDistance: extract(row['Direct Distance'], row['directDistance']),
           notes,
+
+          // --- STATUS ---
+          status: extract(row['Status'], row['status'], forceCompleted ? 'Completed' : 'Unassigned'),
+          driverId: null,
+          driverName,
+          driverEmail,
+          completedVehicle,
+
+          // --- ODOMETER ---
+          pickupOdometer: pickupOdo,
+          dropoffOdometer: dropoffOdo,
+
+          // --- TIMES (arrival/departure/completion) ---
+          arrivalTime,
+          arrivalDropoffTime,
+          departedPickupTime,
+          completedAt,
+          startTime,
+
+          // --- MILEAGE ---
+          distance,
+
+          // --- SIGNATURE ---
+          paperSignatureConfirmed: parseSig(
+            row['_agape_signature'] ?? 
+            m.paperSignatureConfirmed ?? 
+            row['Signature Captured?'] ?? 
+            row['Signature'] ?? 
+            row['signature'] ?? 
+            row['Signed'] ?? 
+            row['Rider Signature Received']
+          ),
+
+          // --- CANCELLATION ---
+          cancelledAt: extract(m.cancelledAt, row['Cancelled At'], row['cancelledAt']),
+          cancellationReason: extract(m.cancellationReason, row['Cancellation Reason'], row['cancellationReason'], row['Reason'], row['reason']),
+          cancelledBy: extract(row['Cancelled By'], row['cancelledBy']),
+
+          // --- ACTIVITY / TRAVEL TIME (Agape report extras) ---
+          _travelTime: extract(row['_agape_travelTime'], row['Travel Time'], row['travelTime']),
+
+          // --- RAW DATA (always preserved) ---
           _originalRow: row,
           _hasIssues: false,
           _issues: [],
@@ -446,14 +716,23 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
   };
 
   const confirmImport = () => {
-    const cleanTrips = mappedTrips.map(({ _originalRow, _hasIssues, _issues, _confidence, ...trip }) => {
-      // Per-trip driver assignment takes precedence, otherwise use global selector
-      const finalDriverId = trip.driverId || assignToDriver;
-      if (finalDriverId) {
+    const cleanTrips = mappedTrips.map(({ _originalRow, _hasIssues, _issues, _confidence, _travelTime, ...trip }) => {
+      const finalDriverId = trip.driverId || assignToDriver || _originalRow['Driver ID'] || null;
+      let newStatus = trip.status;
+      
+      if (forceCompleted) {
+        newStatus = 'Completed';
+      } else if (finalDriverId) {
         const driver = drivers.find(d => d.id === finalDriverId);
-        return { ...trip, driverId: finalDriverId, status: driver ? 'Assigned' : trip.status };
+        if (newStatus === 'Unassigned' && driver) {
+          newStatus = 'Assigned';
+        }
       }
-      return trip;
+      
+      if (finalDriverId) {
+        return { ...trip, driverId: finalDriverId, status: newStatus };
+      }
+      return { ...trip, status: newStatus };
     });
     onTripsCreated(cleanTrips);
   };
@@ -682,7 +961,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                   <p className="text-xs text-blue-600 font-bold uppercase tracking-widest opacity-70">Bulk Assign All Uploaded Trips:</p>
                   <div className="flex gap-2">
                     <select value={assignToDriver} onChange={(e) => setAssignToDriver(e.target.value)} className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-white font-bold shadow-sm">
-                      <option value="">Leave Most as Unassigned (Or use per-trip selector below)</option>
+                      <option value="">Leave Most as {forceCompleted ? 'Unassigned (Driver Unknown)' : 'Unassigned'} (Or use per-trip selector below)</option>
                       {drivers.map(d => (
                         <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
                       ))}
@@ -693,12 +972,17 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
                       </button>
                     )}
                   </div>
+                  
                   {assignToDriver && (
                     <p className="text-xs text-emerald-700 font-black flex items-center gap-1.5 uppercase tracking-wider">
                       <CheckCircle2 size={12} /> All {mappedTrips.length} trips will default to {drivers.find(d => d.id === assignToDriver)?.name}
                     </p>
                   )}
                   <p className="text-xs text-slate-500 font-bold italic">Tip: You can still override individual trips in the table below.</p>
+                </div>
+              ) : forceCompleted ? (
+                <div className="p-4 border-2 border-dashed border-emerald-200 bg-emerald-50 rounded-xl text-center">
+                  <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-2"><CheckCircle2 size={14}/> Trips will be imported as Completed.</p>
                 </div>
               ) : (
                 <div className="p-4 border-2 border-dashed border-blue-100 rounded-xl text-center">
@@ -713,7 +997,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '' })
               </button>
               <button onClick={confirmImport} className="w-full sm:flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm text-sm">
                 <CheckCircle2 size={18} />
-                Import {totalSelected} Trips
+                Import {totalSelected} {forceCompleted ? 'Completed ' : ''}Trips
               </button>
             </div>
           </div>

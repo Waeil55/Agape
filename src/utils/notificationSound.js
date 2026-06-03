@@ -62,8 +62,30 @@ export function playMessageSound() {
     const ctx = getAudioContext();
     if (!ctx) return;
     const now = ctx.currentTime;
-    playTone(ctx, 440, now, 0.1, 0.2);
-    playTone(ctx, 587.33, now + 0.08, 0.15, 0.25);
+    
+    // Premium iOS-style subtle "ping" (like a soft bell/marimba)
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    osc1.type = 'sine';
+    osc2.type = 'triangle';
+    
+    osc1.frequency.value = 1200;
+    osc2.frequency.value = 2400;
+    
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    
+    osc1.connect(gainNode);
+    osc2.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + 0.3);
+    osc2.stop(now + 0.3);
   } catch {}
 }
 

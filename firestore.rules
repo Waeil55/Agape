@@ -1,53 +1,83 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper: check if user is admin via users/{uid} doc
     function isAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
-    // Helper: check if user is participant in a given conversation
-    function isParticipant(conversationId) {
-      let convData = get(/databases/$(database)/documents/chatData/conversations).data;
-      return convData.conversations != null
-          && convData.conversations[conversationId] != null
-          && convData.conversations[conversationId].participants.hasAny([request.auth.token.email]);
+    function isDispatcher() {
+      let role = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return role == 'admin' || role == 'dispatcher';
+    }
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
 
     match /users/{userId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && (isAdmin() || request.resource.data.role == 'driver');
+      allow update: if request.auth != null && (isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role));
+      allow delete: if request.auth != null && isAdmin();
+    }
+    match /routeData/{document} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isDispatcher();
     }
     match /appData/agape {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isDispatcher();
     }
     match /logs/{logId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && isAdmin();
     }
     match /trips/{tripId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isDispatcher();
     }
-    // Driver location documents for real-time GPS tracking
+    match /tripLedger/{tripId} {
+      allow read: if request.auth != null && isDispatcher();
+      allow write: if request.auth != null && isDispatcher();
+    }
+    match /driverProfiles/{driverId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isOwner(driverId) || isDispatcher());
+    }
+    match /dispatcherProfiles/{dispatcherId} {
+      allow read: if request.auth != null && isDispatcher();
+      allow write: if request.auth != null && isAdmin();
+    }
+    match /fleetVehicles/{vehicleId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isDispatcher();
+    }
+    match /systemConfig/{document} {
+      allow read: if request.auth != null && isDispatcher();
+      allow write: if request.auth != null && isAdmin();
+    }
     match /drivers/{driverId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == driverId;
+      allow write: if request.auth != null && isOwner(driverId);
     }
     match /global_chat/{msgId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && isDispatcher();
     }
-    // Single-doc map — client-side filtering enforces participant privacy
     match /chatData/{document} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null && isDispatcher();
+      allow write: if request.auth != null && isDispatcher();
     }
-    // Messages: participants-only read, sender-only create, admin-only update/delete
     match /chat_messages/{msgId} {
-      allow read: if request.auth != null && (isAdmin() || (resource.data.conversationId != null && isParticipant(resource.data.conversationId)));
+      allow read: if request.auth != null && (isAdmin() || (resource.data.conversationId != null && resource.data.participants.hasAny([request.auth.token.email])));
       allow create: if request.auth != null && request.resource.data.sender == request.auth.token.email;
       allow update, delete: if request.auth != null && isAdmin();
     }
     match /presence/{email} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.email == email;
     }
     match /chat_typing/{docId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.resource.data.email == request.auth.token.email;
     }
   }
 }

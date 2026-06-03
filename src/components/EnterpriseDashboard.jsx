@@ -1,23 +1,26 @@
-import React, { useState, lazy, Suspense, useEffect, useRef } from 'react';
+import React, { useState, lazy, Suspense, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  LayoutDashboard, FileText, Users, MapPin, Settings, BarChart2,
-  Archive, MessageCircle, Zap, Bell,
-  Phone, Building2, MessageSquare, Trash2, RefreshCcw, Clock,
-  CheckCircle2, AlertCircle, BrainCircuit, Upload, Wand2, Search,
-  Timer, Repeat, AlertTriangle, X, Plus, Truck,
-  Command, ChevronDown, Maximize2, Minimize2, PanelRight,
-  TrendingUp, TrendingDown, Navigation, Wifi, WifiOff, Sun, Moon,
-  MoreHorizontal, Filter, Download, Eye, EyeOff, Star, Hash, AtSign
+  LayoutDashboard, Users, MapPin, Settings, BarChart2,
+  Archive, MessageCircle, Bell,
+  CheckCircle2, BrainCircuit, Upload, Wand2, Search,
+  AlertTriangle, X, Truck, Zap,
+  PanelRight,
+  Wifi, WifiOff,
+  Eye, Hash, Route, Activity,
+  CalendarDays, ClipboardList, ShieldCheck, Receipt, Siren, CarFront, Plus,
 } from 'lucide-react';
-import { auth, signOut, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
-import TripsPage from './TripsPage';
+import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
+import { timeToMinutes, isTripLate } from '../utils/tripDate';
 import ChatPage from './ChatPage';
 import ArchivesPage from './ArchivesPage';
 import DriversVehiclesPage from './DriversVehiclesPage';
 import SettingsPage from './SettingsPage';
 import UsersPage from './UsersPage';
 import OperationsCommandCenter from './OperationsCommandCenter';
-
+import AdminPage from './AdminPage';
+import DriverPage from './DriverPage';
+import RoutePlannerPage from './RoutePlannerPage';
+const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LiveMapPage = lazy(() => import('./LiveMapPage'));
 const DispatchAssistant = lazy(() => import('./DispatchAssistant'));
 const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
@@ -27,37 +30,66 @@ const LazyFallback = () => (
   <div className="flex items-center justify-center h-full">
     <div className="flex flex-col items-center gap-3">
       <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-      <p className="text-xs text-slate-500 font-medium">Loading module...</p>
+      <p className="text-xs text-slate-400 font-medium">Loading module...</p>
     </div>
   </div>
 );
 
-const timeToMinutes = (t) => {
-  if (!t) return 1440;
-  const cleanTime = String(t).toUpperCase().trim();
-  if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
-  const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
-  if (!m) return 1440;
-  let h = parseInt(m[1], 10);
-  let min = parseInt(m[2] || '0', 10);
-  const p = m[3];
-  if (p === 'PM' && h < 12) h += 12;
-  if (p === 'AM' && h === 12) h = 0;
-  return h * 60 + min;
-};
-
-const isTripLate = (tripTime) => {
-  if (!tripTime || tripTime === 'Will Call') return false;
-  const now = new Date();
-  const timeVal = timeToMinutes(tripTime);
-  const scheduled = new Date();
-  scheduled.setHours(Math.floor(timeVal / 60), timeVal % 60, 0, 0);
-  return now > scheduled;
-};
-
-const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
-
 const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute', 'skills', 'senior', 'living', 'manor', 'village'];
+const SYNTHETIC_REFERENCE_PATTERNS = [/^BK-\d+-\d+$/i, /^TRP-\d+$/i, /^TRIP-\d{10,}-\d+$/i];
+
+const isSyntheticReference = (value) => {
+  const cleanValue = String(value || '').trim();
+  if (!cleanValue) return false;
+  return SYNTHETIC_REFERENCE_PATTERNS.some((pattern) => pattern.test(cleanValue));
+};
+
+const getBookingReference = (trip) => {
+  const bookingId = String(trip?.bookingId || '').trim();
+  return bookingId && !isSyntheticReference(bookingId) ? bookingId : '';
+};
+
+const getClientIdentifier = (trip) => {
+  const found = [
+    trip?.clientId,
+    trip?.memberId,
+    trip?.patientId,
+    trip?.passengerId,
+    trip?.customerId,
+    trip?.medicaidId,
+    trip?.riderId,
+  ].find((value) => String(value || '').trim());
+  return String(found || '').trim();
+};
+
+const formatPhoneDisplay = (phone) => {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+1 ${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return '';
+};
+
+const openAddressInMaps = (address = '') => {
+  if (!address) return;
+  const query = encodeURIComponent(address);
+  window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank', 'noopener,noreferrer');
+};
+
+const findTripLocations = (trip, trips, trashedTrips, logs) => {
+  const id = trip?.id || '';
+  const bk = trip?.bookingId || '';
+  const matchKey = (val) => val === id || val === bk || (bk && val?.includes?.(bk));
+  const locations = [];
+  if (trips?.some(t => matchKey(t.id) || matchKey(t.bookingId))) locations.push({ panel: 'operations', label: 'Dispatch Board', icon: 'Zap' });
+  if (trashedTrips?.some(t => matchKey(t.id) || matchKey(t.bookingId))) locations.push({ panel: 'archives', label: 'Archives', icon: 'Archive' });
+  if (logs?.some(l => matchKey(l.meta?.id) || matchKey(l.meta?.bookingId) || String(l.d || '').includes(id) || String(l.d || '').includes(bk))) locations.push({ panel: 'reports', label: 'Activity Logs', icon: 'BarChart2' });
+  if (trip?.routeAssignments?.length > 0) locations.push({ panel: 'operations', label: 'Route Plans', icon: 'Route' });
+  return locations;
+};
 
 const EnterpriseDashboard = ({
   role, currentUser, trips, setTrips, drivers, setDrivers, dispatchers, setDispatchers, vehicles, setVehicles,
@@ -70,29 +102,55 @@ const EnterpriseDashboard = ({
   showDispatcherArchive, setShowDispatcherArchive,
   addToast, addAuditLog, persistState, hasPermission, requestAuthAction,
   triggerSmartAssign, triggerFleetOptimization, assignTripToDriver,
-  bulkAssignTrips, createSharedRide, createLegMission, requestDeleteTrip, updateTrip,
-  chatUnreadCount, makeCall, sendSMS, handleUpdateDriverLocation
+  bulkAssignTrips, createSharedRide, createLegMission, requestDeleteTrip, requestBulkDelete, updateTrip, updateTrashedTrip,
+  chatUnreadCount, makeCall, sendSMS, handleUpdateDriverLocation, addTrip, showAddTripModal, setShowAddTripModal,
+  driverTelemetry = [],
+  onDispatcherStatusUpdate, driverWorkDrivers = [], driverWorkTrips = [], allDrivers = [],
+  onUpdateMission, onUpdateDriverTrip, onDriverStatusUpdate, onCompleteTrip, onLogout
 }) => {
-  const [activePanel, setActivePanel] = useState('operations');
-  const [operationsTab, setOperationsTab] = useState('manifest');
+  const displayLoginId = String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '');
+  const [activePanel, setActivePanel] = useState(() => localStorage.getItem('agape_activePanel') || 'operations');
+  const [operationsTab, setOperationsTab] = useState(() => localStorage.getItem('agape_operationsTab') || 'manifest');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authActionPayload, setAuthActionPayload] = useState(null);
   const [authPassword, setAuthPassword] = useState('');
   const [reAuthError, setReAuthError] = useState('');
   const [tripDetails, setTripDetails] = useState(null);
-  const [showRightPanel, setShowRightPanel] = useState(true);
+  const [showTripLocations, setShowTripLocations] = useState(false);
+  const [showRightPanel, setShowRightPanel] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [fallbackAdminOnline, setFallbackAdminOnline] = useState(() => localStorage.getItem('agape_adminOnline') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('agape_adminOnline', fallbackAdminOnline);
+  }, [fallbackAdminOnline]);
   const [commandQuery, setCommandQuery] = useState('');
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [rightPanelTab, setRightPanelTab] = useState('alerts');
+  const [rightPanelTab, setRightPanelTab] = useState(() => {
+    const t = localStorage.getItem('agape_rightPanelTab');
+    return t === 'alerts' || t === 'details' || t === 'ai' ? t : 'alerts';
+  });
+  const [showSequencerModal, setShowSequencerModal] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Live clock
+  // Persist navigation state to localStorage (survives refresh)
+  useEffect(() => { localStorage.setItem('agape_activePanel', activePanel); }, [activePanel]);
+  useEffect(() => { localStorage.setItem('agape_operationsTab', operationsTab); }, [operationsTab]);
+  useEffect(() => { if (rightPanelTab) localStorage.setItem('agape_rightPanelTab', rightPanelTab); else localStorage.removeItem('agape_rightPanelTab'); }, [rightPanelTab]);
   useEffect(() => {
-    const interval = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, []);
+    if (showRightPanel && !rightPanelTab) {
+      setRightPanelTab('alerts');
+    }
+  }, [showRightPanel, rightPanelTab]);
+  useEffect(() => {
+    if (tripDetails && showRightPanel) {
+      setRightPanelTab('details');
+    }
+  }, [tripDetails, showRightPanel]);
+  useEffect(() => {
+    if (activePanel === 'drive' && driverWorkDrivers.length === 0) {
+      setActivePanel('operations');
+    }
+  }, [activePanel, driverWorkDrivers.length]);
 
   // Online/offline listener
   useEffect(() => {
@@ -106,6 +164,28 @@ const EnterpriseDashboard = ({
     };
   }, []);
 
+  const handleSmartNavigate = useCallback((query) => {
+    setActivePanel('operations');
+    setOperationsTab('manifest');
+    setSearchQuery(query);
+    if (addToast) {
+      addToast('Smart Navigation', `Searching operations for "${query}"`, 'success');
+    }
+  }, [addToast, setSearchQuery]);
+
+  const openRightPanel = useCallback((preferredTab = null) => {
+    setRightPanelTab(preferredTab || (tripDetails ? 'details' : 'alerts'));
+    setShowRightPanel(true);
+  }, [tripDetails]);
+
+  const toggleRightPanel = useCallback(() => {
+    if (showRightPanel) {
+      setShowRightPanel(false);
+      return;
+    }
+    openRightPanel();
+  }, [openRightPanel, showRightPanel]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -115,7 +195,6 @@ const EnterpriseDashboard = ({
       }
       if (e.key === 'Escape') {
         setCommandPaletteOpen(false);
-        setShowNotifications(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -126,22 +205,28 @@ const EnterpriseDashboard = ({
 
   const sidebarItems = [
     { id: 'operations', label: 'Operations', icon: LayoutDashboard, roles: ['admin', 'dispatcher'] },
+    { id: 'drive', label: 'Drive', icon: Truck, roles: ['admin', 'dispatcher'] },
     { id: 'liveMap', label: 'Live Map', icon: MapPin, roles: ['admin', 'dispatcher', 'fleet_manager', 'qa_auditor', 'supervisor'] },
     { id: 'chat', label: 'Chat', icon: MessageCircle, roles: ['admin', 'dispatcher'] },
-    { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['admin', 'billing', 'qa_auditor', 'fleet_manager', 'supervisor'] },
+    { id: 'routePlanner', label: 'Routes', icon: Route, roles: ['admin', 'dispatcher'] },
+    { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['admin', 'dispatcher', 'billing', 'qa_auditor', 'fleet_manager', 'supervisor'] },
     { id: 'archives', label: 'Archives', icon: Archive, roles: ['admin', 'dispatcher'] },
-    { id: 'admin', label: 'Admin', icon: Settings, roles: ['admin'] },
+    { id: 'admin', label: 'Admin', icon: Users, roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin', 'dispatcher'] },
-  ].filter(item => item.roles.includes(role));
+  ].filter(item => item.roles.includes(role))
+    .filter(item => item.id !== 'drive' || driverWorkDrivers.length > 0);
 
   const todayTrips = trips.filter(t => t.date === todayStr || !t.date);
   const activeTrips = todayTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
   const unassignedTrips = activeTrips.filter(t => t.status === 'Unassigned');
   const assignedTrips = activeTrips.filter(t => t.status === 'Assigned');
-  const inProgressTrips = activeTrips.filter(t => ['In Mission', 'En Route', 'At Pickup', 'At Dropoff'].includes(t.status));
+  const inProgressTrips = activeTrips.filter(t => ['In Mission', 'En Route', 'At Pickup', 'At Dropoff', 'Assigned', 'In Progress', 'Navigating Pickup', 'Navigating Dropoff', 'In Transit', 'Arrived'].includes(t.status));
   const completedToday = todayTrips.filter(t => t.status === 'Completed').length;
   const availableDrivers = drivers.filter(d => d.status === 'Available').length;
   const lateTrips = activeTrips.filter(t => isTripLate(t.time));
+  const dispatcherOnlineCount = dispatchers.filter((dispatcher) => dispatcher.clockedIn).length;
+  const activeDriverCount = drivers.filter((driver) => driver.status && !['Offline', 'Unavailable'].includes(driver.status)).length;
+  const aiAlertCount = lateTrips.length + unassignedTrips.length;
 
   const sortedScheduled = [...activeTrips]
     .filter(t => t.time !== 'Will Call')
@@ -162,18 +247,127 @@ const EnterpriseDashboard = ({
       )
     : sortedScheduled;
 
+  const workspaceMeta = {
+    operations: {
+      eyebrow: '',
+      title: 'Dispatch Board',
+      description: 'Manage trips, drivers, routes, and live dispatch from one place.',
+    },
+    drive: {
+      eyebrow: '',
+      title: 'Driver Workstation',
+      description: 'Mission execution, guided trips, navigation, and mobile-first operational controls.',
+    },
+    liveMap: {
+      eyebrow: '',
+      title: 'Live Map Intelligence',
+      description: 'Realtime fleet movement, dwell time, driver status, next destinations, and geographic risk visibility.',
+    },
+    chat: {
+      eyebrow: '',
+      title: 'Operational Messaging',
+      description: 'Role-aware communications across dispatch, drivers, routing, and supervisors.',
+    },
+    routePlanner: {
+      eyebrow: '',
+      title: 'Smart Route Planner',
+      description: 'Intelligent multi-stop route optimization, drag-and-drop planning, and live navigation.',
+    },
+    reports: {
+      eyebrow: '',
+      title: 'Enterprise Reports',
+      description: 'Trip performance, utilization, compliance, and daily financial-operational visibility.',
+    },
+    archives: {
+      eyebrow: '',
+      title: 'Archives & Recovery',
+      description: 'Recovered trips, historical records, and audit-backed operational history.',
+    },
+    admin: {
+      eyebrow: '',
+      title: 'People, Fleet, and Access Control',
+      description: 'Manage dispatchers, drivers, vehicles, permissions, and cross-functional operational structure.',
+    },
+    settings: {
+      eyebrow: '',
+      title: 'Platform Settings',
+      description: 'Communication channels, workflow preferences, security controls, and application behavior.',
+    },
+  };
+
+  const activeWorkspaceMeta = workspaceMeta[activePanel] || workspaceMeta.operations;
+
+  const openOperationsWorkspace = useCallback((tab = 'manifest') => {
+    setActivePanel('operations');
+    setOperationsTab(tab);
+  }, []);
+
+  const topNavItems = useMemo(() => {
+    const items = [
+      { id: 'dispatch', label: 'Dispatch Board', icon: Zap, active: activePanel === 'operations', action: () => openOperationsWorkspace('manifest') },
+      { id: 'schedule', label: 'Schedule', icon: CalendarDays, active: showSequencerModal, action: () => setShowSequencerModal(true) },
+      ...(driverWorkDrivers.length > 0 ? [{ id: 'drive', label: 'Drive', icon: Truck, active: activePanel === 'drive', action: () => setActivePanel('drive') }] : []),
+      ...(role === 'admin' ? [{ id: 'admin', label: 'Admin', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
+      { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => setActivePanel('reports') },
+      { id: 'map', label: 'Live Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
+      { id: 'messages', label: 'Messages', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat') },
+      { id: 'routes', label: 'Routes', icon: Route, active: activePanel === 'routePlanner', action: () => setActivePanel('routePlanner') },
+      { id: 'archives', label: 'Archives', icon: Archive, active: activePanel === 'archives', action: () => setActivePanel('archives') },
+      { id: 'settings', label: 'Settings', icon: Settings, active: activePanel === 'settings', action: () => setActivePanel('settings') },
+    ];
+    return items;
+  }, [activePanel, driverWorkDrivers.length, openOperationsWorkspace, role, setActivePanel, showSequencerModal]);
+
+  const topActionItems = useMemo(() => {
+    switch (activePanel) {
+      case 'operations':
+        return [];
+      case 'reports':
+        return [
+          { id: 'upload', label: 'Upload', icon: Upload, action: () => setShowUploadModal(true) },
+          { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
+        ];
+      case 'liveMap':
+        return [
+          { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
+          { id: 'routes', label: 'Routes', icon: Route, action: () => setShowSequencerModal(true) },
+        ];
+      case 'chat':
+        return [
+          { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
+        ];
+      case 'archives':
+        return [
+          { id: 'reports', label: 'Reports', icon: BarChart2, action: () => setActivePanel('reports') },
+        ];
+      case 'admin':
+        return [
+          { id: 'upload', label: 'Upload', icon: Upload, action: () => setShowUploadModal(true) },
+          { id: 'reports', label: 'Reports', icon: BarChart2, action: () => setActivePanel('reports') },
+        ];
+      case 'settings':
+        return [
+          { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
+        ];
+      default:
+        return [];
+    }
+  }, [activePanel, openOperationsWorkspace, setShowAddTripModal, setShowUploadModal]);
+
   // Command palette commands
   const commands = [
     { id: 'ops', label: 'Go to Operations', icon: LayoutDashboard, action: () => setActivePanel('operations') },
     { id: 'map', label: 'Go to Live Map', icon: MapPin, action: () => setActivePanel('liveMap') },
+    { id: 'sequencer', label: 'Open Route Sequencer', icon: Route, action: () => setShowSequencerModal(true) },
     { id: 'chat', label: 'Go to Chat', icon: MessageCircle, action: () => setActivePanel('chat') },
+    { id: 'routes', label: 'Go to Route Planner', icon: Route, action: () => setActivePanel('routePlanner') },
     { id: 'reports', label: 'Go to Reports', icon: BarChart2, action: () => setActivePanel('reports') },
     { id: 'archives', label: 'Go to Archives', icon: Archive, action: () => setActivePanel('archives') },
-    { id: 'admin', label: 'Go to Admin', icon: Settings, action: () => setActivePanel('admin') },
+    { id: 'admin', label: 'Go to Admin', icon: Users, action: () => setActivePanel('admin') },
     { id: 'settings', label: 'Go to Settings', icon: Settings, action: () => setActivePanel('settings') },
     { id: 'optimize', label: 'Run Fleet Optimization', icon: Wand2, action: () => setShowOptimizeModal(true) },
     { id: 'upload', label: 'Upload Trips', icon: Upload, action: () => setShowUploadModal(true) },
-    { id: 'toggle-right', label: 'Toggle Right Panel', icon: PanelRight, action: () => setShowRightPanel(!showRightPanel) },
+    { id: 'toggle-right', label: 'Toggle Right Panel', icon: PanelRight, action: toggleRightPanel },
   ].filter(cmd => {
     if (cmd.id === 'admin' && role !== 'admin') return false;
     return true;
@@ -206,140 +400,251 @@ const EnterpriseDashboard = ({
     }
   };
 
-  // ==================== TOP BAR ====================
+  // ==================== TOP NAVIGATION ====================
   const renderTopBar = () => (
-    <header className="bg-[var(--admin-surface)]/80 backdrop-blur-xl border-b border-white/5 px-4 py-2 flex items-center gap-3 shrink-0 h-[48px]">
-      {/* Left: Breadcrumb + Panel title */}
-      <div className="flex items-center gap-2">
-        <h1 className="text-sm font-semibold text-white capitalize">{activePanel === 'liveMap' ? 'Live Map' : activePanel}</h1>
-        {activePanel === 'operations' && (
-          <div className="flex items-center gap-1 ml-2">
-            {['manifest', 'willcall', 'fleet'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setOperationsTab(tab)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
-                  operationsTab === tab
-                    ? 'bg-blue-600/20 text-blue-400'
-                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                }`}
-              >
-                {tab === 'manifest' ? 'Manifest' : tab === 'willcall' ? 'Will Call' : 'Fleet'}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Center: Search */}
-      <div className="flex-1 max-w-md mx-auto">
-        <button
-          onClick={() => setCommandPaletteOpen(true)}
-          className="w-full flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-slate-500 hover:bg-white/8 hover:border-white/15 transition"
-        >
-          <Search size={13} />
-          <span>Search trips, drivers, commands...</span>
-          <kbd className="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono">⌘K</kbd>
-        </button>
-      </div>
-
-      {/* Right: Live metrics + actions */}
+    <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-white/50 px-3 hidden md:flex items-center gap-2 shrink-0 h-[40px]" style={{boxShadow: '0 1px 16px rgba(0,0,0,0.06)'}}>
+      {/* Brand */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* Connection status */}
-        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${isOnline ? 'text-emerald-400 bg-emerald-500/10' : 'text-rose-400 bg-rose-500/10'}`}>
-          {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
-          <span className="hidden lg:inline">{isOnline ? 'Online' : 'Offline'}</span>
-        </div>
-
-        {/* Live metrics pills */}
-        <div className="hidden xl:flex items-center gap-1.5">
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 text-blue-400 rounded-md text-xs font-medium">
-            <FileText size={12} />
-            <span>{activeTrips.length} active</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 text-emerald-400 rounded-md text-xs font-medium">
-            <Users size={12} />
-            <span>{availableDrivers} ready</span>
-          </div>
-          {unassignedTrips.length > 0 && (
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-rose-500/10 text-rose-400 rounded-md text-xs font-medium">
-              <AlertCircle size={12} />
-              <span>{unassignedTrips.length} unassigned</span>
-            </div>
-          )}
-          {lateTrips.length > 0 && (
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-500/10 text-amber-400 rounded-md text-xs font-medium">
-              <Clock size={12} />
-              <span>{lateTrips.length} late</span>
-            </div>
-          )}
-        </div>
-
-        {/* Clock */}
-        <div className="hidden md:flex items-center gap-1.5 px-2 py-1 text-slate-400 text-xs font-mono">
-          <Clock size={12} />
-          <span>{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-        </div>
-
-        {/* Notifications */}
-        <div className="relative">
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="p-1.5 rounded-md hover:bg-white/5 text-slate-400 hover:text-slate-200 transition relative"
-          >
-            <Bell size={16} />
-            {chatUnreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            )}
-          </button>
-          {showNotifications && (
-            <div className="absolute right-0 top-full mt-2 w-72 admin-bg-elevated border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
-              <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between">
-                <p className="text-xs font-semibold text-white">Notifications</p>
-                <button onClick={() => setShowNotifications(false)} className="p-1 hover:bg-white/5 rounded"><X size={12} className="text-slate-500" /></button>
-              </div>
-              <div className="max-h-64 overflow-y-auto">
-                {logs.slice(0, 5).map((log, i) => (
-                  <div key={i} className="px-3 py-2 border-b border-white/5 hover:bg-white/5">
-                    <p className="text-xs font-medium text-slate-300">{log.t}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5 truncate">{log.d}</p>
-                  </div>
-                ))}
-                {logs.length === 0 && (
-                  <div className="px-3 py-4 text-center text-xs text-slate-600">No notifications</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Toggle right panel */}
-        <button
-          onClick={() => setShowRightPanel(!showRightPanel)}
-          className={`p-1.5 rounded-md transition ${showRightPanel ? 'bg-blue-600/20 text-blue-400' : 'hover:bg-white/5 text-slate-400'}`}
-        >
-          <PanelRight size={16} />
-        </button>
-
-        {/* User avatar */}
-        <div className="flex items-center gap-2 pl-2 border-l border-white/10 ml-1">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-            {(currentUser || 'U').charAt(0).toUpperCase()}
-          </div>
+        <img src="/agape.png" alt="Agape Care" className="w-6 h-6 rounded-md object-contain" />
+        <div className="flex items-center gap-1.5">
           <div className="hidden lg:block">
-            <p className="text-xs font-medium text-white truncate max-w-[120px]">{currentUser?.split('@')[0]}</p>
-            <p className="text-[10px] text-slate-500 capitalize">{role}</p>
+            <h1 className="text-caption font-black text-slate-900 tracking-tight leading-none">Agape Care</h1>
+            <p className="text-[8px] font-bold text-blue-600 uppercase tracking-widest">Enterprise</p>
           </div>
+          <span title={isOnline ? 'Realtime connected' : 'Offline / not realtime'} className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'} shrink-0 hidden lg:inline-block`} />
         </div>
+      </div>
+
+      <div className="w-px h-4 bg-slate-200 shrink-0" />
+
+      {/* Main Navigation — icon + label, no overflow */}
+      <nav className="flex items-center gap-0.5">
+        {sidebarItems.map(item => {
+          const Icon = item.icon;
+          const isActive = activePanel === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActivePanel(item.id)}
+              title={item.label}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-bold transition-all duration-150 whitespace-nowrap ${
+                isActive
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+              }`}
+            >
+              <Icon size={12} className={isActive ? 'text-white' : 'text-slate-400'} />
+              <span className="hidden sm:inline">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="flex-1" />
+
+      {/* Action Tools (Operations only) */}
+      {activePanel === 'operations' && (
+        <div className="flex items-center gap-1 shrink-0">
+          {selectedTasks.length > 0 && (
+            <button
+              onClick={() => setBulkAssignModal(true)}
+              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-micro font-bold transition flex items-center gap-1 shadow-sm"
+            >
+              <Users size={11} /> Assign {selectedTasks.length}
+            </button>
+          )}
+          <button
+            onClick={toggleRightPanel}
+            title={showRightPanel ? 'Close command panel' : 'Open command panel'}
+            className={`p-1 rounded-md transition flex items-center gap-1 text-micro font-bold shadow-sm ${
+              showRightPanel
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+            }`}
+          >
+            <PanelRight size={12} />
+          </button>
+        </div>
+      )}
+
+      {/* Online/Offline Status Toggle */}
+      {(() => {
+        const myDispatcher = dispatchers?.find(d => d.email === currentUser);
+        const amIOnline = myDispatcher ? myDispatcher.clockedIn : fallbackAdminOnline;
+        
+        return (
+          <button 
+            onClick={() => {
+              if (myDispatcher && onDispatcherStatusUpdate) {
+                onDispatcherStatusUpdate(myDispatcher.id, !amIOnline);
+              } else {
+                setFallbackAdminOnline(!fallbackAdminOnline);
+              }
+            }}
+            className={`hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold uppercase tracking-wider border shadow-sm transition-all hover:scale-105 active:scale-95 ${
+              amIOnline ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+            }`}
+            title={amIOnline ? "Click to go Offline" : "Click to go Online"}
+          >
+            {amIOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+            {amIOnline ? 'Online' : 'Offline'}
+          </button>
+        );
+      })()}
+
+      {/* User Avatar */}
+      <button
+        onClick={() => setActivePanel('settings')}
+        title={displayLoginId}
+        className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-black hover:bg-slate-300 transition shrink-0 uppercase"
+      >
+        {(displayLoginId || 'U')[0]}
+      </button>
+    </header>
+  );
+
+  const renderEnterpriseTopBar = () => (
+    <header className="sticky top-0 z-30 hidden h-[72px] items-center gap-4 border-b border-slate-200/80 bg-[#F3F4F6]/95 px-6 backdrop-blur-[12px] md:flex">
+      <div className="flex min-w-[220px] items-center gap-3 shrink-0">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-300 bg-white">
+          <img src="/agape.png" alt="Agape Care" className="h-8 w-8 object-contain" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-[14px] font-semibold text-slate-900">Agape Care</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Enterprise Transport OS</p>
+        </div>
+      </div>
+
+      <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar">
+        <div className="flex min-w-max items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+          {topNavItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={item.action}
+                className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-semibold transition ${
+                  item.active
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-white hover:text-slate-900'
+                }`}
+                title={item.label}
+              >
+                <Icon size={15} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (showRightPanel && rightPanelTab === 'alerts') {
+              setShowRightPanel(false);
+            } else {
+              setActivePanel('operations');
+              openRightPanel('alerts');
+            }
+          }}
+          className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+          title="Notifications"
+        >
+          <Bell size={16} />
+          {aiAlertCount > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-rose-500" />}
+        </button>
+        <button
+          onClick={() => setActivePanel('settings')}
+          title={displayLoginId}
+          className="flex h-9 min-w-[108px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 text-left shadow-sm transition hover:bg-slate-50"
+        >
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold uppercase text-white">
+            {(currentUser || 'U')[0]}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[12px] font-semibold text-slate-900">{displayLoginId || 'Account'}</p>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{role}</p>
+          </div>
+        </button>
       </div>
     </header>
   );
 
+  // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
+  const renderMobileTopBar = () => (
+    <header className="bg-[#F3F4F6]/95 backdrop-blur-xl border-b border-slate-200/80 px-3 flex md:hidden items-center gap-2 shrink-0 h-[56px] z-20 relative">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300 bg-white">
+        <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain" />
+      </div>
+      <div>
+        <h1 className="text-[13px] font-bold text-slate-900 tracking-tight leading-none">Agape Care</h1>
+        <p className="text-[10px] font-medium text-slate-500 capitalize">{activeWorkspaceMeta.title}</p>
+      </div>
+      <div className="flex-1" />
+      {/* Online status dot */}
+      <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} title={isOnline ? 'Online' : 'Offline'} />
+      {activePanel === 'operations' && (
+        <button
+          onClick={toggleRightPanel}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-bold shadow-sm ${
+            showRightPanel ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+          }`}
+        >
+          <PanelRight size={11} /> Panel
+        </button>
+      )}
+      {/* User avatar -> settings */}
+      <button
+        onClick={() => setActivePanel('settings')}
+        className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-black hover:bg-slate-300 transition uppercase"
+      >
+        {(currentUser || 'U')[0]}
+      </button>
+    </header>
+  );
+
+  // ==================== BOTTOM NAVIGATION (Mobile only for dispatcher/admin) ====================
+  const renderBottomNav = () => (
+    <nav className="bottom-nav md:hidden flex items-stretch">
+      {sidebarItems.map(item => {
+        const Icon = item.icon;
+        const isActive = activePanel === item.id;
+        const hasBadge = item.id === 'chat' && chatUnreadCount > 0;
+        return (
+          <button
+            key={item.id}
+            onClick={() => setActivePanel(item.id)}
+            className={`flex-1 flex flex-col items-center justify-center py-1 gap-0.5 transition-all relative min-h-[52px] ${
+              isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
+            }`}
+          >
+            <div className="relative">
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
+              {hasBadge && (
+                <span className="absolute -top-1 -right-2 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                  {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                </span>
+              )}
+            </div>
+            <span className={`text-[10px] tracking-wide transition-all leading-none ${isActive ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>
+              {item.label}
+            </span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+
+
+
   // ==================== RIGHT PANEL ====================
   const renderRightPanel = () => (
-    <div className="w-[280px] admin-bg-surface border-l border-white/5 flex flex-col shrink-0 overflow-hidden">
+    <div className="w-[320px] lg:w-[340px] min-w-[280px] bg-white border-l border-slate-200 flex flex-col shrink-0 overflow-hidden">
       {/* Tabs */}
-      <div className="flex border-b border-white/5">
+      <div className="flex border-b border-slate-100">
         {[
           { id: 'alerts', label: 'Alerts', icon: AlertTriangle },
           { id: 'details', label: 'Details', icon: Eye },
@@ -348,44 +653,50 @@ const EnterpriseDashboard = ({
           <button
             key={tab.id}
             onClick={() => setRightPanelTab(tab.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium transition ${
+            className={`relative flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-all duration-200 ${
               rightPanelTab === tab.id
-                ? 'text-blue-400 border-b border-blue-500 bg-blue-500/5'
-                : 'text-slate-500 hover:text-slate-300'
+                ? 'text-blue-700'
+                : 'text-slate-400 hover:text-slate-700'
             }`}
           >
             <tab.icon size={12} />
             {tab.label}
+            {rightPanelTab === tab.id && (
+              <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-blue-500 rounded-full" />
+            )}
           </button>
         ))}
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-3 py-3">
         {rightPanelTab === 'alerts' && (
-          <div className="p-2">
+          <div className="space-y-3">
             {logs.slice(0, 20).map((log, i) => (
-              <div key={i} className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5 mb-1.5 hover:bg-white/[0.04] transition">
-                <div className="flex items-start gap-2">
-                  <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${
-                    log.c === 'rose' ? 'bg-rose-500' :
-                    log.c === 'amber' ? 'bg-amber-500' :
-                    log.c === 'emerald' ? 'bg-emerald-500' :
-                    log.c === 'blue' ? 'bg-blue-500' :
-                    'bg-slate-500'
+              <div key={i} className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-sm mb-1.5 hover:shadow-md transition-all duration-200 group">
+                <div className="flex items-start gap-2.5">
+                  <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ring-1 ring-slate-200 ${
+                    log.c === 'rose' ? 'bg-rose-500 ring-rose-500/20' :
+                    log.c === 'amber' ? 'bg-amber-500 ring-amber-500/20' :
+                    log.c === 'emerald' ? 'bg-emerald-500 ring-emerald-500/20' :
+                    log.c === 'blue' ? 'bg-blue-500 ring-blue-500/20' :
+                    'bg-slate-500 ring-slate-500/20'
                   }`} />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-slate-300">{log.t}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{log.d}</p>
-                    {log.timestamp && <p className="text-[10px] text-slate-600 mt-1">{log.timestamp}</p>}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-slate-700">{log.t}</p>
+                    <p className="text-micro text-slate-400 mt-0.5 leading-relaxed">{log.d}</p>
+                    {log.timestamp && <p className="text-micro text-slate-500 mt-1">{log.timestamp}</p>}
                   </div>
                 </div>
               </div>
             ))}
             {logs.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 text-slate-600">
-                <Bell size={20} className="mb-2 opacity-50" />
-                <p className="text-xs">No alerts</p>
+              <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+                <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+                  <Bell size={18} className="opacity-40" />
+                </div>
+                <p className="text-xs font-medium">No alerts</p>
+                <p className="text-micro text-slate-500 mt-1">All clear — no issues detected</p>
               </div>
             )}
           </div>
@@ -395,48 +706,144 @@ const EnterpriseDashboard = ({
           <div className="p-2">
             {tripDetails ? (
               <div className="space-y-2">
-                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Patient</p>
-                  <p className="text-sm font-bold text-white">{tripDetails.patient}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{tripDetails.bookingId || 'No booking ID'}</p>
+                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Patient</p>
+                  <p className="text-sm font-bold text-slate-900">{tripDetails.patient}</p>
+                  {getBookingReference(tripDetails) && <p className="text-xs text-slate-400 mt-0.5">Booking ID: {getBookingReference(tripDetails)}</p>}
+                  {getClientIdentifier(tripDetails) && <p className="text-xs text-slate-400 mt-0.5">Client ID: {getClientIdentifier(tripDetails)}</p>}
+                  {(tripDetails.type || tripDetails.serviceType) && <p className="text-xs text-slate-400 mt-0.5">Service: {tripDetails.type || tripDetails.serviceType}</p>}
+                  {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone)}</p>}
+                  {formatPhoneDisplay(tripDetails.pickupPhone) && formatPhoneDisplay(tripDetails.pickupPhone) !== formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700">Pickup phone: {formatPhoneDisplay(tripDetails.pickupPhone)}</p>}
+                  {formatPhoneDisplay(tripDetails.dropoffPhone) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.dropoffPhone)}</p>}
                 </div>
-                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Status</p>
-                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                    tripDetails.status === 'Unassigned' ? 'bg-rose-500/15 text-rose-400' :
-                    tripDetails.status === 'Assigned' ? 'bg-blue-500/15 text-blue-400' :
-                    tripDetails.status === 'Completed' ? 'bg-emerald-500/15 text-emerald-400' :
-                    'bg-slate-500/15 text-slate-400'
+                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Status</p>
+                  <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-bold ${
+                    tripDetails.status === 'Unassigned' ? 'bg-rose-100 text-rose-700' :
+                    tripDetails.status === 'Assigned' ? 'bg-blue-100 text-blue-700' :
+                    tripDetails.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
+                    'bg-slate-100 text-slate-700'
                   }`}>{tripDetails.status}</span>
                 </div>
-                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Time</p>
-                  <p className="text-sm font-bold text-white">{tripDetails.time || '—'}</p>
+                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Time</p>
+                  <p className="text-sm font-bold text-slate-900">{tripDetails.time || '—'}</p>
                 </div>
-                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Route</p>
+                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Route</p>
                   <div className="space-y-1.5">
-                    <div className="flex items-start gap-2">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                      <p className="text-xs text-slate-300">{tripDetails.pickup || '—'}</p>
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0 ring-1 ring-emerald-500/20" />
+                      <div>
+                        <p className="text-xs text-slate-700">{tripDetails.pickup || '—'}</p>
+                        {tripDetails.pickupSiteName && <p className="text-[11px] text-emerald-700 mt-0.5">{tripDetails.pickupSiteName}</p>}
+                      </div>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <div className="w-2 h-2 rounded-full bg-rose-500 mt-1.5 shrink-0" />
-                      <p className="text-xs text-slate-300">{tripDetails.dropoff || '—'}</p>
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-2 h-2 rounded-full bg-rose-500 mt-1.5 shrink-0 ring-1 ring-rose-500/20" />
+                      <div>
+                        <p className="text-xs text-slate-700">{tripDetails.dropoff || '—'}</p>
+                        {tripDetails.dropoffSiteName && <p className="text-[11px] text-rose-700 mt-0.5">{tripDetails.dropoffSiteName}</p>}
+                      </div>
                     </div>
                   </div>
                 </div>
-                {tripDetails.driverName && (
-                  <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Driver</p>
-                    <p className="text-sm font-medium text-white">{tripDetails.driverName}</p>
+                {tripDetails.routeAssignments?.length > 0 && (
+                  <div className="bg-white rounded-xl border border-indigo-100 p-2.5 shadow-sm">
+                    <p className="text-micro font-bold uppercase tracking-wider text-indigo-500 mb-1">Route Plans</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tripDetails.routeAssignments.map((route, index) => (
+                        <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 border border-indigo-100">
+                          {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` • ${route.statusLabel}` : ''}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
+                {(tripDetails.driverName || tripDetails.driverId) && (
+                  <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                    <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Driver</p>
+                    <p className="text-sm font-medium text-slate-900">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || '—'}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
+                  </div>
+                )}
+                {tripDetails.notes && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5">
+                    <p className="text-micro font-bold uppercase tracking-wider text-amber-700">Notes</p>
+                    <p className="text-xs text-amber-800 mt-0.5">{tripDetails.notes}</p>
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowTripLocations(prev => !prev)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-[10px] font-bold text-slate-600 transition-colors"
+                >
+                  <Search size={11} /> Find This Trip
+                </button>
+                {showTripLocations && (() => {
+                  const locs = findTripLocations(tripDetails, trips, trashedTrips, logs);
+                  return locs.length > 0 ? (
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Found in</p>
+                      {locs.map((loc, i) => (
+                        <button
+                          key={i}
+                          onClick={() => { setActivePanel(loc.panel); setTripDetails(null); setShowRightPanel(false); setShowTripLocations(false); }}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-colors text-left"
+                        >
+                          {loc.icon === 'Zap' && <Zap size={12} className="text-indigo-600" />}
+                          {loc.icon === 'Archive' && <Archive size={12} className="text-indigo-600" />}
+                          {loc.icon === 'BarChart2' && <BarChart2 size={12} className="text-indigo-600" />}
+                          {loc.icon === 'Route' && <Route size={12} className="text-indigo-600" />}
+                          <span className="text-[10px] font-semibold text-indigo-700">{loc.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 text-center py-1.5">No other references found.</p>
+                  );
+                })()}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-slate-600">
-                <Eye size={20} className="mb-2 opacity-50" />
-                <p className="text-xs">Select a trip to view details</p>
+              <div className="space-y-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                      <Eye size={15} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Select a Trip</p>
+                      <p className="text-micro text-slate-500">Click any trip card to load the full client details here.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-2">Live Summary</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-slate-50 px-2.5 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Today</p>
+                      <p className="mt-1 text-sm font-black text-slate-900">{todayTrips.length}</p>
+                    </div>
+                    <div className="rounded-lg bg-rose-50 px-2.5 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-rose-600">Unassigned</p>
+                      <p className="mt-1 text-sm font-black text-rose-700">{unassignedTrips.length}</p>
+                    </div>
+                    <div className="rounded-lg bg-amber-50 px-2.5 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Late</p>
+                      <p className="mt-1 text-sm font-black text-amber-700">{lateTrips.length}</p>
+                    </div>
+                    <div className="rounded-lg bg-blue-50 px-2.5 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Will Call</p>
+                      <p className="mt-1 text-sm font-black text-blue-700">{willCallTrips.length}</p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRightPanelTab('ai')}
+                  className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors"
+                >
+                  Open AI Dispatch Guidance
+                </button>
               </div>
             )}
           </div>
@@ -444,12 +851,17 @@ const EnterpriseDashboard = ({
 
         {rightPanelTab === 'ai' && (
           <div className="p-2">
-            <div className="p-3 rounded-lg bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 mb-2">
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl mb-2">
               <div className="flex items-center gap-2 mb-2">
-                <BrainCircuit size={14} className="text-indigo-400" />
-                <p className="text-xs font-semibold text-indigo-300">AI Dispatch Assistant</p>
+                <div className="w-6 h-6 rounded-md bg-indigo-100 flex items-center justify-center">
+                  <BrainCircuit size={13} className="text-indigo-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-indigo-700">AI Dispatch</p>
+                  <p className="text-micro text-indigo-500/60">Powered by smart routing</p>
+                </div>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <p className="text-micro text-slate-500 leading-relaxed">
                 {unassignedTrips.length > 0
                   ? `${unassignedTrips.length} trip${unassignedTrips.length > 1 ? 's' : ''} waiting for assignment. Run optimization to auto-assign.`
                   : 'All trips are assigned. System running optimally.'}
@@ -457,7 +869,7 @@ const EnterpriseDashboard = ({
               {unassignedTrips.length > 0 && (
                 <button
                   onClick={() => setShowOptimizeModal(true)}
-                  className="mt-2 w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-medium transition flex items-center justify-center gap-1.5"
+                  className="mt-2.5 w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-1.5"
                 >
                   <Wand2 size={12} /> Run Optimization
                 </button>
@@ -465,20 +877,29 @@ const EnterpriseDashboard = ({
             </div>
 
             {/* Quick stats */}
-            <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">Fleet Insights</p>
-              <div className="space-y-1.5">
+            <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+              <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-2.5">Fleet Insights</p>
+              <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Completion rate</span>
-                  <span className="text-emerald-400 font-medium">{todayTrips.length > 0 ? Math.round((completedToday / todayTrips.length) * 100) : 0}%</span>
+                  <span className="text-slate-500">Completion</span>
+                  <span className="text-emerald-700 font-medium tabular-nums">{todayTrips.length > 0 ? Math.round((completedToday / todayTrips.length) * 100) : 0}%</span>
+                </div>
+                <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${todayTrips.length > 0 ? Math.round((completedToday / todayTrips.length) * 100) : 0}%` }} />
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">On-time rate</span>
-                  <span className="text-blue-400 font-medium">{activeTrips.length > 0 ? Math.round(((activeTrips.length - lateTrips.length) / activeTrips.length) * 100) : 100}%</span>
+                  <span className="text-slate-500">On-time rate</span>
+                  <span className="text-blue-700 font-medium tabular-nums">{activeTrips.length > 0 ? Math.round(((activeTrips.length - lateTrips.length) / activeTrips.length) * 100) : 100}%</span>
+                </div>
+                <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${activeTrips.length > 0 ? Math.round(((activeTrips.length - lateTrips.length) / activeTrips.length) * 100) : 100}%` }} />
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Driver utilization</span>
-                  <span className="text-amber-400 font-medium">{drivers.length > 0 ? Math.round(((drivers.length - availableDrivers) / drivers.length) * 100) : 0}%</span>
+                  <span className="text-slate-500">Utilization</span>
+                  <span className="text-amber-700 font-medium tabular-nums">{drivers.length > 0 ? Math.round(((drivers.length - availableDrivers) / drivers.length) * 100) : 0}%</span>
+                </div>
+                <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${drivers.length > 0 ? Math.round(((drivers.length - availableDrivers) / drivers.length) * 100) : 0}%` }} />
                 </div>
               </div>
             </div>
@@ -493,33 +914,44 @@ const EnterpriseDashboard = ({
     if (!commandPaletteOpen) return null;
     return (
       <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[20vh]" onClick={() => setCommandPaletteOpen(false)}>
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-        <div className="w-full max-w-lg admin-bg-elevated border border-white/10 rounded-xl shadow-2xl overflow-hidden relative z-10" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center gap-2 px-3 py-3 border-b border-white/5">
-            <Search size={16} className="text-slate-500" />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
+        <div className="w-full max-w-lg bg-white backdrop-blur-xl border border-slate-200 rounded-3xl shadow-sm overflow-hidden relative z-10 animate-in fade-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100">
+            <Search size={16} className="text-slate-400" />
             <input
               type="text"
               placeholder="Type a command or search..."
               value={commandQuery}
               onChange={e => setCommandQuery(e.target.value)}
-              className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
+              className="flex-1 bg-transparent text-sm text-slate-900 placeholder-slate-400 outline-none"
               autoFocus
             />
-            <kbd className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono text-slate-500">ESC</kbd>
+            <div className="flex items-center gap-1.5">
+              <kbd className="text-micro bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-400">⌘K</kbd>
+              <kbd className="text-micro bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-400">ESC</kbd>
+            </div>
           </div>
           <div className="max-h-72 overflow-y-auto p-1.5">
-            {filteredCommands.map(cmd => (
+            {filteredCommands.map((cmd, idx) => (
               <button
                 key={cmd.id}
                 onClick={() => { cmd.action(); setCommandPaletteOpen(false); setCommandQuery(''); }}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/5 text-left transition"
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition-all duration-150 group"
               >
-                <cmd.icon size={14} className="text-slate-400" />
-                <span className="text-sm text-slate-300">{cmd.label}</span>
+                <div className="w-7 h-7 rounded-md bg-slate-50 flex items-center justify-center group-hover:bg-slate-100 transition-colors">
+                  <cmd.icon size={13} className="text-slate-500" />
+                </div>
+                <span className="text-sm text-slate-700 flex-1">{cmd.label}</span>
+                <span className="text-micro text-slate-500 font-mono">⌘{idx + 1}</span>
               </button>
             ))}
             {filteredCommands.length === 0 && (
-              <div className="px-3 py-4 text-center text-xs text-slate-600">No commands found</div>
+              <div className="px-4 py-6 text-center">
+                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-2">
+                  <Search size={14} className="text-slate-500" />
+                </div>
+                <p className="text-xs text-slate-500">No commands found</p>
+              </div>
             )}
           </div>
         </div>
@@ -558,11 +990,20 @@ const EnterpriseDashboard = ({
       triggerFleetOptimization={triggerFleetOptimization}
       assignTripToDriver={assignTripToDriver}
       bulkAssignTrips={bulkAssignTrips}
+      setBulkAssignModal={setBulkAssignModal}
       requestDeleteTrip={requestDeleteTrip}
       updateTrip={updateTrip}
       makeCall={makeCall}
       sendSMS={sendSMS}
       setTripDetails={setTripDetails}
+      setShowAddTripModal={setShowAddTripModal}
+      setShowUploadModal={setShowUploadModal}
+      onOpenSequencer={() => setShowSequencerModal(true)}
+      onOpenLiveMap={() => setActivePanel('liveMap')}
+      showRightPanel={showRightPanel}
+      onTogglePanel={toggleRightPanel}
+      isOnline={isOnline}
+      phoneNumbers={phoneNumbers}
     />
   );
 
@@ -572,105 +1013,93 @@ const EnterpriseDashboard = ({
       case 'operations': return renderOperationsPage();
       case 'liveMap': return (
         <Suspense fallback={<LazyFallback />}>
-          <LiveMapPage drivers={drivers} onUpdateDriverLocation={handleUpdateDriverLocation} />
+          <LiveMapPage role={role} currentUser={currentUser} drivers={drivers} trips={trips} driverTelemetry={driverTelemetry} onUpdateDriverLocation={handleUpdateDriverLocation} assignTripToDriver={assignTripToDriver} triggerSmartAssign={triggerSmartAssign} setManualAssignTrip={setManualAssignTrip} makeCall={makeCall} sendSMS={sendSMS} />
         </Suspense>
       );
-      case 'chat': return <ChatPage currentUser={currentUser} role={role} />;
+      case 'dispatch': return (
+        <Suspense fallback={<LazyFallback />}>
+          <DispatchAssistant drivers={drivers} trips={trips} onAssignTrip={assignTripToDriver} addAuditLog={addAuditLog} currentUser={currentUser} />
+        </Suspense>
+      );
+      case 'chat': return <ChatPage currentUser={currentUser} role={role} drivers={drivers} dispatchers={dispatchers} trips={trips} onSwitchToDispatch={(tripId) => setActivePanel('operations')} />;
+      case 'routePlanner': return <RoutePlannerPage trips={trips} drivers={drivers} role={role} currentUser={currentUser} />;
       case 'reports': return (
         <Suspense fallback={<LazyFallback />}>
-          <ReportsPage trips={trips} drivers={drivers} onUpdateTrip={updateTrip} role={role} />
+          <ReportsPage trips={trips} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} />
         </Suspense>
       );
-      case 'archives': return <ArchivesPage trashedTrips={trashedTrips} restoreTrip={restoreTrip} />;
+      case 'archives': return <ArchivesPage trashedTrips={trashedTrips} restoreTrip={restoreTrip} drivers={drivers} role={role} updateTrashedTrip={updateTrashedTrip} />;
       case 'admin': return (
-        <div className="flex h-full overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <div>
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2"><Users size={14} /> User Management</h3>
-              <UsersPage drivers={drivers} setDrivers={setDrivers} dispatchers={dispatchers} setDispatchers={setDispatchers} addAuditLog={addAuditLog} currentUser={currentUser} role={role} requestAuthAction={requestAuthAction} />
-            </div>
-            <div>
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2"><Truck size={14} /> Fleet Management</h3>
-              <DriversVehiclesPage role={role} drivers={drivers} setDrivers={setDrivers} dispatchers={dispatchers} addAuditLog={addAuditLog} currentUser={currentUser} trips={trips} requestAuthAction={requestAuthAction} vehicles={vehicles} setVehicles={setVehicles} onAssignTrip={(tripId, driverId) => { const driver = drivers.find(d => d.id === driverId); setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'Assigned', driverId, driverEmail: driver?.email || null, driverName: driver?.name || null } : t)); const trip = trips.find(t => t.id === tripId); addAuditLog('Assignment', `${currentUser} (${role}) assigned ${trip?.patient || 'Trip '+tripId} to ${driver?.name || 'Unknown'}`, 'emerald'); }} onUploadForDriver={(driverId) => { setUploadAssignDriver(driverId); setShowUploadModal(true); }} />
-            </div>
-          </div>
-        </div>
+        <AdminPage
+          role={role} currentUser={currentUser}
+          drivers={drivers} setDrivers={setDrivers}
+          dispatchers={dispatchers} setDispatchers={setDispatchers}
+          vehicles={vehicles} setVehicles={setVehicles}
+          addAuditLog={addAuditLog}
+          logs={logs}
+          trips={trips}
+          assignTripToDriver={assignTripToDriver}
+          requestAuthAction={requestAuthAction}
+          onViewTrip={(ref) => {
+            const trip = trips.find(t => t.id === ref || t.bookingId === ref);
+            if (trip) setTripDetails(trip);
+          }}
+        />
       );
       case 'settings': return (
-        <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} />
+        <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} />
       );
+      case 'drive': return driverWorkDrivers.length > 0 ? (
+        <DriverPage currentUser={currentUser} role={role} drivers={driverWorkDrivers} trips={driverWorkTrips} allDrivers={allDrivers} dispatchers={dispatchers} phoneNumbers={phoneNumbers} onUpdateTrip={onUpdateDriverTrip} onCompleteTrip={onCompleteTrip} onDriverStatusUpdate={onDriverStatusUpdate} onAddAuditLog={addAuditLog} onLogout={() => {}} requestAuthAction={requestAuthAction} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} onUpdateDriverLocation={handleUpdateDriverLocation} onOpenSettings={() => setActivePanel('settings')} onAddTrip={addTrip} showAddTripModal={showAddTripModal} setShowAddTripModal={setShowAddTripModal} />
+      ) : renderOperationsPage();
       default: return renderOperationsPage();
     }
   };
 
   // ==================== MAIN LAYOUT ====================
   return (
-    <div className="flex h-screen admin-bg-main overflow-hidden font-sans">
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
-        {renderTopBar()}
+    <div className="h-screen w-full overflow-hidden bg-[#F3F4F6] font-sans text-slate-900">
+      <div className="flex h-full min-w-0 flex-col">
+        {renderEnterpriseTopBar()}
+        {renderMobileTopBar()}
 
-        {/* Page tabs + AI tools (beside each other at top) */}
-        <div className="flex items-center gap-0.5 px-3 py-0 border-b border-white/5 bg-[var(--admin-surface)] shrink-0 overflow-x-auto">
-          {sidebarItems.map(item => {
-            const Icon = item.icon;
-            const isActive = activePanel === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActivePanel(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-t-md transition whitespace-nowrap ${
-                  isActive
-                    ? 'bg-blue-600/15 text-blue-400 border-b-2 border-blue-500'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                }`}
-              >
-                <Icon size={13} />
-                {item.label}
-              </button>
-            );
-          })}
-          {/* Spacer */}
-          <div className="flex-1" />
-          {/* AI Tools (only on operations panel) */}
-          {activePanel === 'operations' && (
-            <div className="flex items-center gap-1">
-              {selectedTasks.length > 0 && (
-                <button
-                  onClick={() => setBulkAssignModal(true)}
-                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-medium transition flex items-center gap-1"
-                >
-                  <Users size={12} /> Assign {selectedTasks.length}
-                </button>
-              )}
-              <button
-                onClick={() => setShowOptimizeModal(true)}
-                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-medium transition flex items-center gap-1"
-              >
-                <Wand2 size={12} /> Optimize
-              </button>
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-medium transition flex items-center gap-1"
-              >
-                <Upload size={12} /> Upload
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Content area */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Main content */}
-          <div className="flex-1 overflow-hidden admin-bg-main">
-            {renderPanelContent()}
+        <div className="flex min-h-0 flex-1">
+          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'} bg-[#F3F4F6] ${['operations', 'chat'].includes(activePanel) ? '' : 'px-3 py-3 pb-20 sm:px-5 sm:py-4 md:px-6 md:py-5 md:pb-5'}`}>
+            {activePanel === 'operations' ? (
+              renderPanelContent()
+            ) : (
+              <div className={
+                activePanel === 'drive'
+                  ? 'rounded-3xl border border-slate-100/50 bg-white shadow-sm flex flex-col flex-1 min-h-0'
+                  : activePanel === 'chat'
+                  ? 'rounded-3xl border border-slate-100/50 bg-white shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
+                  : 'rounded-3xl border border-slate-100/50 bg-white shadow-sm'
+              }>
+                {renderPanelContent()}
+              </div>
+            )}
           </div>
 
-          {/* Right panel */}
-          {showRightPanel && renderRightPanel()}
+          <div className="hidden md:flex flex-shrink-0">
+            {showRightPanel && renderRightPanel()}
+          </div>
         </div>
       </div>
+
+      {/* Right panel as mobile drawer */}
+      <div className="block md:hidden">
+        {showRightPanel && (
+          <div className="fixed inset-0 z-[100] flex items-start justify-end">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setShowRightPanel(false)} />
+            <div className="w-[320px] max-w-full bg-white border-l border-slate-200 flex flex-col h-full shadow-xl z-10 relative">
+              {renderRightPanel()}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Navigation — mobile only */}
+      {renderBottomNav()}
 
       {/* Command Palette */}
       {renderCommandPalette()}
@@ -679,29 +1108,62 @@ const EnterpriseDashboard = ({
       {showUploadModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowUploadModal(false)} />
-          <div className="admin-bg-elevated w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-base font-bold text-white">Upload Trips</h2>
-              <button onClick={() => setShowUploadModal(false)} className="p-1.5 rounded-lg hover:bg-white/5"><X size={18} className="text-slate-400" /></button>
+          <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between z-10">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Upload size={16} className="text-blue-700" /> Upload Trips
+              </h2>
+              <button onClick={() => setShowUploadModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
-            <Suspense fallback={<LazyFallback />}>
-              <FileUploadTrips
-                drivers={drivers}
-                preSelectDriver={uploadAssignDriver}
-                onTripsCreated={(newTrips) => {
-                  setTrips(prev => {
-                    const combined = [...prev, ...newTrips];
-                    const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-                    persistState({ trips: unique });
-                    return unique;
-                  });
-                  setShowUploadModal(false);
-                  setUploadAssignDriver('');
-                  addAuditLog('Trips Uploaded', `${currentUser} (${role}) imported ${newTrips.length} trips via file upload.`, 'blue');
-                  addToast('Trips Uploaded', `${newTrips.length} trips added successfully.`, 'success');
-                }}
-              />
-            </Suspense>
+            <div className="p-6">
+              <Suspense fallback={<LazyFallback />}>
+                <FileUploadTrips
+                  uploadContext={activePanel}
+                  drivers={drivers}
+                  preSelectDriver={uploadAssignDriver}
+                  onTripsCreated={(newTrips) => {
+                    setTrips(prev => {
+                      // Build a normalized key lookup for existing trips
+                      const makeKey = (t) => {
+                        const bk = t?.bookingId;
+                        if (bk && !/^(BK-\d+-\d+|TRP-\d+|TRIP-\d{10,}-\d+)$/i.test(bk)) return `bk::${bk}`;
+                        const parts = [
+                          (t?.patient || '').trim().toLowerCase(),
+                          (t?.date || '').trim(),
+                          (t?.time || '').trim(),
+                          (t?.pickup || '').trim().toLowerCase().replace(/\s+/g, ' '),
+                          (t?.dropoff || '').trim().toLowerCase().replace(/\s+/g, ' '),
+                        ];
+                        return `cmp::${parts.join('|')}`;
+                      };
+                      const existingKeys = new Map();
+                      prev.forEach((et, idx) => { existingKeys.set(makeKey(et), idx); });
+                      
+                      const updatedTrips = [...prev];
+                      let newCount = 0;
+                      let updatedCount = 0;
+                      
+                      newTrips.forEach(nt => {
+                        const key = makeKey(nt);
+                        if (existingKeys.has(key)) {
+                          const idx = existingKeys.get(key);
+                          updatedTrips[idx] = { ...updatedTrips[idx], ...nt, id: updatedTrips[idx].id };
+                          updatedCount++;
+                        } else {
+                          updatedTrips.push(nt);
+                          existingKeys.set(key, updatedTrips.length - 1);
+                          newCount++;
+                        }
+                      });
+                      
+                      return updatedTrips;
+                    });
+                    setShowUploadModal(false);
+                    addToast('Trips Imported', `${newTrips.length} trip(s) imported successfully.`, 'success');
+                  }}
+                />
+              </Suspense>
+            </div>
           </div>
         </div>
       )}
@@ -709,26 +1171,28 @@ const EnterpriseDashboard = ({
       {bulkAssignModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBulkAssignModal(false)} />
-          <div className="admin-bg-elevated w-full max-w-md max-h-[80vh] overflow-y-auto rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-base font-bold text-white">Assign {selectedTasks.length} Trips</h2>
-              <button onClick={() => setBulkAssignModal(false)} className="p-1.5 rounded-lg hover:bg-white/5"><X size={18} className="text-slate-400" /></button>
+          <div className="bg-white w-full max-w-md max-h-[80vh] overflow-y-auto rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Users size={16} className="text-emerald-700" /> Assign {selectedTasks.length} Trips
+              </h2>
+              <button onClick={() => setBulkAssignModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
-            <div className="space-y-1.5">
+            <div className="p-4 space-y-1.5">
               {drivers.map(d => (
                 <button
                   key={d.id}
                   onClick={() => { bulkAssignTrips(d.id); setBulkAssignModal(false); }}
-                  className="w-full flex items-center justify-between p-3 rounded-lg border border-white/10 hover:bg-white/5 text-sm transition"
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-sm transition-all duration-200 group"
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs">{d.name.charAt(0)}</div>
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs ring-1 ring-blue-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
-                      <p className="font-medium text-white">{d.name}</p>
-                      <p className="text-xs text-slate-500">{d.vehicle} • {d.status}</p>
+                      <p className="font-medium text-slate-900">{d.name}</p>
+                      <p className="text-xs text-slate-400">{d.vehicle} • {d.status}</p>
                     </div>
                   </div>
-                  <span className="text-blue-400 text-xs font-medium">Assign →</span>
+                  <span className="text-blue-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
                 </button>
               ))}
             </div>
@@ -739,42 +1203,51 @@ const EnterpriseDashboard = ({
       {manualAssignTrip && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setManualAssignTrip(null)} />
-          <div className="admin-bg-elevated w-full max-w-md max-h-[80vh] overflow-y-auto rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-base font-bold text-white">Assign: {manualAssignTrip.patient}</h2>
-              <button onClick={() => setManualAssignTrip(null)} className="p-1.5 rounded-lg hover:bg-white/5"><X size={18} className="text-slate-400" /></button>
+          <div className="bg-white w-full max-w-md max-h-[80vh] overflow-y-auto rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Users size={16} className="text-emerald-700" /> Assign: {manualAssignTrip.patient}
+              </h2>
+              <button onClick={() => setManualAssignTrip(null)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
-            <div className="space-y-1.5">
+            <div className="p-4 space-y-1.5">
+              <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">Available Drivers</p>
               {drivers.filter(d => d.status === 'Available').map(d => (
                 <button
                   key={d.id}
                   onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
-                  className="w-full flex items-center justify-between p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 text-sm transition"
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-sm transition-all duration-200 group"
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">{d.name.charAt(0)}</div>
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs ring-1 ring-emerald-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
-                      <p className="font-medium text-white">{d.name}</p>
-                      <p className="text-xs text-slate-500">{d.vehicle} • Available</p>
+                      <p className="font-medium text-slate-900">{d.name}</p>
+                      <p className="text-xs text-slate-400">{d.vehicle} • Available</p>
                     </div>
                   </div>
-                  <span className="text-emerald-400 text-xs font-medium">Assign →</span>
+                  <span className="text-emerald-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
                 </button>
               ))}
+              {drivers.filter(d => d.status !== 'Available').length > 0 && (
+                <>
+                  <div className="border-t border-slate-200 my-2" />
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">Other Drivers</p>
+                </>
+              )}
               {drivers.filter(d => d.status !== 'Available').map(d => (
                 <button
                   key={d.id}
                   onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
-                  className="w-full flex items-center justify-between p-3 rounded-lg border border-white/10 hover:bg-white/5 text-sm opacity-60 transition"
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm opacity-70 hover:opacity-100 transition-all duration-200 group"
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-slate-500/20 text-slate-400 flex items-center justify-center font-bold text-xs">{d.name.charAt(0)}</div>
+                    <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs ring-1 ring-slate-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
-                      <p className="font-medium text-white">{d.name}</p>
-                      <p className="text-xs text-slate-500">{d.status} • {d.vehicle}</p>
+                      <p className="font-medium text-slate-900">{d.name}</p>
+                      <p className="text-xs text-slate-400">{d.status} • {d.vehicle}</p>
                     </div>
                   </div>
-                  <span className="text-slate-500 text-xs font-medium">Assign →</span>
+                  <span className="text-slate-400 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
                 </button>
               ))}
             </div>
@@ -785,48 +1258,61 @@ const EnterpriseDashboard = ({
       {smartAssignTrip && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} />
-          <div className="admin-bg-elevated w-full max-w-lg rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <BrainCircuit size={18} className="text-indigo-400" /> AI Assignment
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <BrainCircuit size={16} className="text-indigo-700" /> AI Assignment
               </h2>
-              <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-1.5 rounded-lg hover:bg-white/5"><X size={18} className="text-slate-400" /></button>
+              <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
-            {aiAnalyzing ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <div className="w-10 h-10 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3" />
-                <p className="text-sm font-medium text-slate-400">Analyzing routes...</p>
-              </div>
-            ) : smartAssignResult?.driverId ? (
-              (() => {
-                const d = drivers.find(drv => drv.id === smartAssignResult.driverId);
-                if (!d) return null;
-                return (
-                  <div className="p-3 rounded-lg border border-white/10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">{d.name.charAt(0)}</div>
-                        <div>
-                          <p className="font-medium text-white">{d.name}</p>
-                          <p className="text-xs text-slate-500">{d.vehicle} • {smartAssignResult.score}% match</p>
+            <div className="p-5">
+              {aiAnalyzing ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <div className="w-10 h-10 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3" />
+                  <p className="text-sm font-medium text-slate-500">Analyzing routes...</p>
+                </div>
+              ) : smartAssignResult?.driverId ? (
+                (() => {
+                  const d = drivers.find(drv => drv.id === smartAssignResult.driverId);
+                  if (!d) return null;
+                  return (
+                    <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold ring-1 ring-indigo-200">{String(d?.name || '?').charAt(0)}</div>
+                          <div>
+                            <p className="font-medium text-slate-900">{d.name}</p>
+                            <p className="text-xs text-slate-400">{d.vehicle}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-indigo-700 tabular-nums">{smartAssignResult.score}%</div>
+                          <p className="text-micro text-slate-400">match</p>
                         </div>
                       </div>
+                      {smartAssignResult.reason && (
+                        <div className="mt-3 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                          <p className="text-micro text-slate-500 leading-relaxed">{smartAssignResult.reason}</p>
+                        </div>
+                      )}
                       <button
                         onClick={() => assignTripToDriver(smartAssignTrip.id, d.id)}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition"
+                        className="mt-3 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2"
                       >
-                        Assign
+                        <CheckCircle2 size={14} /> Confirm Assignment
                       </button>
                     </div>
-                    {smartAssignResult.reason && (
-                      <p className="mt-3 text-xs text-slate-400">{smartAssignResult.reason}</p>
-                    )}
+                  );
+                })()
+              ) : (
+                <div className="py-6 text-center">
+                  <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-3">
+                    <BrainCircuit size={18} className="text-slate-500" />
                   </div>
-                );
-              })()
-            ) : (
-              <p className="text-sm text-slate-500 text-center py-4">{smartAssignResult?.reason || 'No suitable driver found'}</p>
-            )}
+                  <p className="text-sm text-slate-400">{smartAssignResult?.reason || 'No suitable driver found'}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -834,26 +1320,33 @@ const EnterpriseDashboard = ({
       {showOptimizeModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !aiAnalyzing && setShowOptimizeModal(false)} />
-          <div className="admin-bg-elevated w-full max-w-md rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Wand2 size={18} className="text-indigo-400" /> Fleet Optimization
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Wand2 size={16} className="text-indigo-700" /> Fleet Optimization
               </h2>
-              {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="p-1.5 rounded-lg hover:bg-white/5"><X size={18} className="text-slate-400" /></button>}
+              {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>}
             </div>
-            {aiAnalyzing ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <div className="w-10 h-10 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3" />
-                <p className="text-sm font-medium text-slate-400">Optimizing fleet...</p>
-              </div>
-            ) : (
-              <button
-                onClick={() => { triggerFleetOptimization(); setTimeout(() => setShowOptimizeModal(false), 3000); }}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition flex items-center justify-center gap-2"
-              >
-                <Zap size={16} /> Run Optimization
-              </button>
-            )}
+            <div className="p-5">
+              {aiAnalyzing ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <div className="w-10 h-10 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3" />
+                  <p className="text-sm font-medium text-slate-500">Optimizing fleet...</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <p className="text-xs text-slate-500">Optimize driver routes and assignments for maximum efficiency.</p>
+                  </div>
+                  <button
+                    onClick={() => { triggerFleetOptimization(); setTimeout(() => setShowOptimizeModal(false), 3000); }}
+                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2"
+                  >
+                    <Zap size={16} /> Run Optimization
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -862,75 +1355,125 @@ const EnterpriseDashboard = ({
       {tripDetails && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" onClick={() => setTripDetails(null)}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div className="admin-bg-elevated w-full max-w-lg rounded-xl shadow-2xl relative z-10 border border-white/10 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 admin-bg-elevated border-b border-white/5 px-5 py-3 flex items-center justify-between z-10">
-              <h3 className="text-sm font-bold text-white">Trip Details</h3>
-              <button onClick={() => setTripDetails(null)} className="p-1.5 rounded-lg hover:bg-white/5 transition"><X size={16} className="text-slate-400" /></button>
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-sm relative z-10 border border-slate-200 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white backdrop-blur-md border-b border-slate-100 px-5 py-3.5 flex items-center justify-between z-10">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                <h3 className="text-sm font-bold text-slate-900">Trip Details</h3>
+              </div>
+              <button onClick={() => setTripDetails(null)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="p-5 space-y-3">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-base font-bold text-white">{tripDetails.patient}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{tripDetails.bookingId || 'No booking ID'}</p>
+                  <p className="text-base font-bold text-slate-900">{tripDetails.patient}</p>
+                  {getBookingReference(tripDetails) && <p className="text-xs text-slate-400 mt-0.5">Booking ID: {getBookingReference(tripDetails)}</p>}
+                  {getClientIdentifier(tripDetails) && <p className="text-xs text-slate-400 mt-0.5">Client ID: {getClientIdentifier(tripDetails)}</p>}
+                  {(tripDetails.type || tripDetails.serviceType) && <p className="text-xs text-slate-400 mt-0.5">Service: {tripDetails.type || tripDetails.serviceType}</p>}
                 </div>
-                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                  tripDetails.status === 'Unassigned' ? 'bg-rose-500/15 text-rose-400' :
-                  tripDetails.status === 'Assigned' ? 'bg-blue-500/15 text-blue-400' :
-                  tripDetails.status === 'Completed' ? 'bg-emerald-500/15 text-emerald-400' :
-                  'bg-slate-500/15 text-slate-400'
+                <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
+                  tripDetails.status === 'Unassigned' ? 'bg-rose-100 text-rose-700' :
+                  tripDetails.status === 'Assigned' ? 'bg-blue-100 text-blue-700' :
+                  tripDetails.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
+                  'bg-slate-100 text-slate-700'
                 }`}>{tripDetails.status}</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-white/[0.02] rounded-lg p-2.5 border border-white/5">
-                  <p className="text-[10px] text-slate-500 font-medium uppercase">Time</p>
-                  <p className="text-sm font-bold text-white mt-0.5">{tripDetails.time || '—'}</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Time</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.time || '—'}</p>
                 </div>
-                <div className="bg-white/[0.02] rounded-lg p-2.5 border border-white/5">
-                  <p className="text-[10px] text-slate-500 font-medium uppercase">Date</p>
-                  <p className="text-sm font-bold text-white mt-0.5">{tripDetails.date || '—'}</p>
+                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Date</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.date || '—'}</p>
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5">
+              <div className="space-y-2">
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-emerald-500/20">
                     <span className="text-[8px] font-black text-white">P</span>
                   </div>
                   <div className="flex-1">
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase">Pickup</p>
-                    <p className="text-xs font-medium text-slate-300 mt-0.5">{tripDetails.pickup || '—'}</p>
+                    <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Pickup</p>
+                    <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.pickup || '—'}</p>
+                    {tripDetails.pickupSiteName && <p className="text-xs text-emerald-700 mt-1">{tripDetails.pickupSiteName}</p>}
+                    {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone)}</p>}
+                    {formatPhoneDisplay(tripDetails.pickupPhone) && formatPhoneDisplay(tripDetails.pickupPhone) !== formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700">Pickup phone: {formatPhoneDisplay(tripDetails.pickupPhone)}</p>}
                   </div>
                 </div>
-                <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-rose-500/20">
                     <span className="text-[8px] font-black text-white">D</span>
                   </div>
                   <div className="flex-1">
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase">Dropoff</p>
-                    <p className="text-xs font-medium text-slate-300 mt-0.5">{tripDetails.dropoff || '—'}</p>
+                    <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Dropoff</p>
+                    <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.dropoff || '—'}</p>
+                    {tripDetails.dropoffSiteName && <p className="text-xs text-rose-700 mt-1">{tripDetails.dropoffSiteName}</p>}
+                    {formatPhoneDisplay(tripDetails.dropoffPhone) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.dropoffPhone)}</p>}
                   </div>
                 </div>
               </div>
 
+              {tripDetails.routeAssignments?.length > 0 && (
+                <div className="bg-white rounded-xl border border-indigo-100 p-3 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-indigo-500">Route Plans</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {tripDetails.routeAssignments.map((route, index) => (
+                      <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700">
+                        {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` • ${route.statusLabel}` : ''}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {(tripDetails.driverName || tripDetails.driverId) && (
-                <div className="bg-white/[0.02] rounded-lg p-2.5 border border-white/5">
-                  <p className="text-[10px] text-slate-500 font-medium uppercase">Driver</p>
-                  <p className="text-sm font-bold text-white mt-0.5">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || '—'}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
+                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Driver</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || '—'}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
                 </div>
               )}
 
               {tripDetails.notes && (
-                <div className="bg-amber-500/10 rounded-lg p-2.5 border border-amber-500/20">
-                  <p className="text-[10px] text-amber-400 font-medium uppercase">Notes</p>
-                  <p className="text-xs text-amber-300 mt-0.5">{tripDetails.notes}</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <p className="text-micro font-bold uppercase tracking-wider text-amber-700">Notes</p>
+                  <p className="text-xs text-amber-700 mt-0.5">{tripDetails.notes}</p>
                 </div>
               )}
 
-              <div className="pt-2 border-t border-white/5">
-                <p className="text-[10px] text-slate-600 font-mono">Trip ID: {tripDetails.id}</p>
-              </div>
+              <button
+                onClick={() => setShowTripLocations(prev => !prev)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-600 transition-colors"
+              >
+                <Search size={13} /> {showTripLocations ? 'Hide' : 'Find This Trip'}
+              </button>
+
+              {showTripLocations && (() => {
+                const locs = findTripLocations(tripDetails, trips, trashedTrips, logs);
+                return locs.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Found in</p>
+                    {locs.map((loc, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { setActivePanel(loc.panel); setTripDetails(null); setShowTripLocations(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-colors text-left"
+                      >
+                        {loc.icon === 'Zap' && <Zap size={14} className="text-indigo-600" />}
+                        {loc.icon === 'Archive' && <Archive size={14} className="text-indigo-600" />}
+                        {loc.icon === 'BarChart2' && <BarChart2 size={14} className="text-indigo-600" />}
+                        {loc.icon === 'Route' && <Route size={14} className="text-indigo-600" />}
+                        <span className="text-xs font-semibold text-indigo-700">{loc.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 text-center py-2">No other references found.</p>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -940,23 +1483,80 @@ const EnterpriseDashboard = ({
       {showAuthModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div className="admin-bg-elevated w-full max-w-sm rounded-xl p-6 shadow-2xl relative z-10 border border-white/10">
-            <h3 className="text-base font-bold text-white mb-4">Authenticate</h3>
-            <form onSubmit={submitAuthAction}>
+          <div className="bg-white w-full max-w-sm rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-5 py-3.5 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Hash size={16} className="text-blue-700" /> Authenticate
+              </h3>
+            </div>
+            <form onSubmit={submitAuthAction} className="p-5">
+              <div className="space-y-1 mb-2">
+                <p className="text-xs text-slate-400">Enter your password to confirm this action.</p>
+              </div>
               <input
                 type="password"
                 value={authPassword}
                 onChange={(e) => setAuthPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 mb-3"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 mb-3 transition-all"
                 autoFocus
               />
-              {reAuthError && <p className="text-xs text-rose-400 mb-3">{reAuthError}</p>}
+              {reAuthError && <p className="text-xs text-rose-700 mb-3">{reAuthError}</p>}
               <div className="flex gap-2">
-                <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-sm font-medium transition">Cancel</button>
-                <button type="submit" className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition">Confirm</button>
+                <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all duration-200">Cancel</button>
+                <button type="submit" className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200">Confirm</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Route Sequencer Modal */}
+      {showSequencerModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowSequencerModal(false)} />
+          <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
+            <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Route size={16} className="text-indigo-700" /> Route Sequencer
+              </h2>
+              <button onClick={() => setShowSequencerModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <Suspense fallback={<LazyFallback />}>
+                <RouteSequencerApp 
+                  trips={trips} 
+                  drivers={drivers}
+                  currentUser={currentUser} 
+                  role={role}
+                  onRouteSaved={({ route, saveMode, driverId, validTripIds }) => {
+                    if (saveMode === 'recurring') {
+                      addAuditLog('Route Created', `${currentUser} saved recurring route "${route.name}" with ${route.sequence?.length || 0} stops.`, 'indigo');
+                      return;
+                    }
+                    const driver = drivers.find((item) => item.id === driverId);
+                    addAuditLog(
+                      driver ? 'Route Assigned' : 'Route Saved',
+                      driver
+                        ? `${currentUser} assigned today's route "${route.name}" to ${driver.name} (${validTripIds.length} synced trips).`
+                        : `${currentUser} saved today's route "${route.name}" without assigning a driver.`,
+                      driver ? 'amber' : 'slate'
+                    );
+                  }}
+                  onApplyRoute={({ route, driverId, tripIds, driver }) => {
+                    const routeTripIds = new Set(tripIds || []);
+                    if (!driverId || routeTripIds.size === 0) return;
+                    setTrips(prev => prev.map(t => {
+                      if (routeTripIds.has(t.id)) {
+                        return { ...t, status: 'Assigned', driverId, driverEmail: driver?.email || null, driverName: driver?.name || null };
+                      }
+                      return t;
+                    }));
+                    addAuditLog('Route Applied', `${currentUser} synced ${routeTripIds.size} trip assignments from route "${route.name}".`, 'emerald');
+                  }}
+                />
+              </Suspense>
+            </div>
           </div>
         </div>
       )}

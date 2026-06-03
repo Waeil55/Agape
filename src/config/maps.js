@@ -1,7 +1,7 @@
 import { GOOGLE_MAPS_API_KEY } from './firebase';
 
 export function hasGoogleMapsConfigured() {
-  return Boolean(GOOGLE_MAPS_API_KEY);
+  return Boolean(GOOGLE_MAPS_API_KEY());
 }
 
 export function extractZipFromAddress(address) {
@@ -35,7 +35,7 @@ export async function geocodeAddress(address) {
 
   try {
     const resp = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY()}`
     );
     const data = await resp.json();
     const result = data?.results?.[0];
@@ -54,7 +54,8 @@ export async function geocodeAddress(address) {
       city,
       state,
     };
-  } catch {
+  } catch (err) {
+    console.error('[Google Maps] geocodeAddress failed:', err);
     return null;
   }
 }
@@ -69,13 +70,17 @@ export async function getDistanceMatrix(origins, destinations) {
       origins: originQueries.join('|'),
       destinations: destinationQueries.join('|'),
       units: 'imperial',
-      key: GOOGLE_MAPS_API_KEY,
+      key: GOOGLE_MAPS_API_KEY(),
     });
     const resp = await fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?${params.toString()}`);
     const data = await resp.json();
-    if (data?.status !== 'OK') return null;
+    if (data?.status !== 'OK') {
+      console.warn('[Google Maps] Distance Matrix API error:', data?.status, data?.error_message);
+      return null;
+    }
     return data.rows || null;
-  } catch {
+  } catch (err) {
+    console.error('[Google Maps] getDistanceMatrix failed:', err);
     return null;
   }
 }
@@ -102,5 +107,5 @@ export function buildStaticMapUrl(markers = []) {
     .join('&');
 
   if (!serializedMarkers) return null;
-  return `https://maps.googleapis.com/maps/api/staticmap?size=1200x700&maptype=roadmap&${serializedMarkers}&key=${GOOGLE_MAPS_API_KEY}`;
+    return `https://maps.googleapis.com/maps/api/staticmap?size=1200x700&maptype=roadmap&${serializedMarkers}&key=${GOOGLE_MAPS_API_KEY()}`;
 }

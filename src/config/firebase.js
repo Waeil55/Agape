@@ -1,9 +1,9 @@
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy, runTransaction } from 'firebase/firestore';
 import { getAuth, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-
+import { getFunctions, httpsCallable } from 'firebase/functions';
 const env = import.meta.env;
 
 const firebaseConfig = {
@@ -18,7 +18,21 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
+} catch (err) {
+  const message = String(err?.message || '');
+  if (!message.includes('initializeFirestore() has already been called')) {
+    console.warn('Firestore persistent cache fell back to the default cache.', err);
+  }
+  db = getFirestore(app);
+}
+
 const auth = getAuth(app);
 const analytics = getAnalytics(app);
 
@@ -27,51 +41,54 @@ setPersistence(auth, browserLocalPersistence).catch(() => {});
 let messaging;
 try { messaging = getMessaging(app); } catch { /* FCM not available in all environments */ }
 
+const functions = getFunctions(app);
+
 export default app;
 export { app, db, auth, analytics, messaging, deleteApp, initializeApp, firebaseConfig,
   getFirestore, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp,
-  writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy,
+  writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy, runTransaction,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
   EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail, setPersistence,
-  browserLocalPersistence, getAuth, getMessaging, getToken, onMessage, logEvent };
+  browserLocalPersistence, getAuth, getMessaging, getToken, onMessage, logEvent, functions, httpsCallable };
 
-export const GOOGLE_MAPS_API_KEY = env.VITE_GOOGLE_MAPS_API_KEY || "";
+const _agapeApiKey = env.VITE_GOOGLE_MAPS_API_KEY || "";
+const _agapeGeminiProject = env.VITE_GEMINI_PROJECT_ID || "";
+const _agapeGeminiKey = env.VITE_GEMINI_API_KEY || "";
+export function GOOGLE_MAPS_API_KEY() { return _agapeApiKey; }
+export function GEMINI_API_CONFIG() { return { projectId: _agapeGeminiProject, apiKey: _agapeGeminiKey }; }
 
-export const GEMINI_API_CONFIG = {
-  projectId: env.VITE_GEMINI_PROJECT_ID || "",
-  apiKey: env.VITE_GEMINI_API_KEY || ""
-};
+export function APP_CONFIG() {
+  return {
+    projectName: env.VITE_PUBLIC_PROJECT_NAME || "Agape",
+    projectId: env.VITE_PUBLIC_PROJECT_ID || "agape-95c9f",
+    supportEmail: env.VITE_PUBLIC_SUPPORT_EMAIL || "",
+    appVersion: env.VITE_APP_VERSION || "1.0.0"
+  };
+}
 
-export const APP_CONFIG = {
-  projectName: env.VITE_PUBLIC_PROJECT_NAME || "Agape",
-  projectId: env.VITE_PUBLIC_PROJECT_ID || "agape-95c9f",
-  supportEmail: env.VITE_PUBLIC_SUPPORT_EMAIL || "",
-  appVersion: env.VITE_APP_VERSION || "1.0.0"
-};
-
-export const getTrips = async () => {
+export async function getTrips() {
   const tripRef = collection(db, 'trips');
   const tripSnapshot = await getDocs(tripRef);
   return tripSnapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
   }));
-};
+}
 
-export const updateTripStatus = async (tripId, updates) => {
+export async function updateTripStatus(tripId, updates) {
   const tripRef = doc(db, 'trips', tripId);
   await updateDoc(tripRef, updates);
-};
+}
 
-export const getTripsStream = (callback) => {
+export function getTripsStream(callback) {
   const tripRef = collection(db, 'trips');
   return onSnapshot(tripRef, (snapshot) => {
     const trips = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     callback(trips);
   });
-};
+}
 
-export const updateDriverLocation = async (location) => {
+export async function updateDriverLocation(location) {
   const driverId = auth.currentUser?.uid;
   if (!driverId) return;
 
@@ -84,17 +101,17 @@ export const updateDriverLocation = async (location) => {
     },
     lastUpdated: serverTimestamp()
   });
-};
+}
 
-export const saveOdometerReading = async (tripId, odometerValue) => {
-  const tripRef = doc(db, 'trips', tripId);
-  await updateDoc(tripRef, {
-    endOdometer: odometerValue,
+export async function saveOdometerReading(tripId, odometerValue) {
+  const tripRef = doc(db, 'tripLedger', tripId);
+  await setDoc(tripRef, {
+    dropoffOdometer: odometerValue,
     odometerRecordedAt: serverTimestamp()
-  });
-};
+  }, { merge: true });
+}
 
-export const getDriverDailyTrips = async (driverId, date) => {
+export async function getDriverDailyTrips(driverId, date) {
   const tripsRef = collection(db, 'trips');
   const snapshot = await getDocs(tripsRef);
   const allTrips = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -104,29 +121,29 @@ export const getDriverDailyTrips = async (driverId, date) => {
            trip.startTime &&
            new Date(trip.startTime).toDateString() === date.toDateString();
   });
-};
+}
 
-export const logDriverAnalytics = async (driverId, analytics) => {
+export async function logDriverAnalytics(driverId, analytics) {
   const analyticsRef = collection(db, 'analyticsLogs');
   await addDoc(analyticsRef, {
     driverId,
     ...analytics,
     timestamp: serverTimestamp()
   });
-};
+}
 
-export const getDriverProfile = async (driverId) => {
-  const driverRef = doc(db, 'drivers', driverId);
+export async function getDriverProfile(driverId) {
+  const driverRef = doc(db, 'driverProfiles', driverId);
   const snapshot = await getDoc(driverRef);
   return snapshot.data();
-};
+}
 
-export const updateDriverProfile = async (driverId, updates) => {
-  const driverRef = doc(db, 'drivers', driverId);
-  await updateDoc(driverRef, updates);
-};
+export async function updateDriverProfile(driverId, updates) {
+  const driverRef = doc(db, 'driverProfiles', driverId);
+  await setDoc(driverRef, updates, { merge: true });
+}
 
-export const syncOfflineQueue = async (queue) => {
+export async function syncOfflineQueue(queue) {
   const batch = writeBatch(db);
 
   for (const item of queue) {
@@ -146,4 +163,4 @@ export const syncOfflineQueue = async (queue) => {
   }
 
   await batch.commit();
-};
+}

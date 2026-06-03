@@ -85,13 +85,13 @@
   --text-secondary: #475569;
   --text-tertiary: #94a3b8;
   --text-inverse: #ffffff;
-  --text-link: #121A66;
+  --text-link: #1B5DB3;
 
   /* Brand */
-  --brand-primary: #121A66;
-  --brand-primary-hover: #1D2F86;
-  --brand-primary-light: #e3e8ff;
-  --brand-primary-subtle: #f0f3ff;
+  --brand-primary: #1B5DB3;
+  --brand-primary-hover: #154A8F;
+  --brand-primary-light: #e3edf7;
+  --brand-primary-subtle: #f0f5fb;
   --brand-accent: #8b5cf6;
 
   /* Status */
@@ -104,7 +104,7 @@
   --danger: #dc2626;
   --danger-bg: #fef2f2;
   --danger-border: #fecaca;
-  --info: #121A66;
+  --info: #1B5DB3;
   --info-bg: #eff6ff;
   --info-border: #bfdbfe;
 
@@ -128,7 +128,7 @@
   --glass-blur: 12px;
 
   /* Gradient accents */
-  --gradient-brand: linear-gradient(135deg, #121A66, #2A6FB0);
+  --gradient-brand: linear-gradient(135deg, #1B5DB3, #2A6FB0);
   --gradient-success: linear-gradient(135deg, #059669, #10b981);
   --gradient-warning: linear-gradient(135deg, #d97706, #f59e0b);
   --gradient-danger: linear-gradient(135deg, #dc2626, #ef4444);
@@ -661,21 +661,7 @@ table .font-black { font-weight: 750; }
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
 }
 
-/* ===== ENTERPRISE UI HARDENING ===== */
-.driver-trip-focus-panel {
-  top: calc(env(safe-area-inset-top, 0px) + 76px);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
-  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 164px);
-  background: #ffffff;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06);
-}
 
-@media (min-width: 640px) {
-  .driver-trip-focus-panel {
-    top: calc(env(safe-area-inset-top, 0px) + 84px);
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
-  }
-}
 
 button,
 [role="button"],
@@ -705,8 +691,8 @@ button[class*="bg-slate-900"][class*="text-white"],
 a[class*="bg-blue-600"][class*="text-white"],
 a[class*="bg-indigo-600"][class*="text-white"],
 a[class*="bg-slate-900"][class*="text-white"] {
-  background-color: #121A66 !important;
-  border-color: #121A66 !important;
+  background-color: #1B5DB3 !important;
+  border-color: #1B5DB3 !important;
 }
 
 button[class*="bg-blue-600"][class*="text-white"]:hover,
@@ -731,7 +717,7 @@ input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: #121A66 !important;
+  border-color: #1B5DB3 !important;
   box-shadow: 0 0 0 3px rgba(18, 26, 102, 0.16);
 }
 
@@ -744,7 +730,7 @@ table thead,
 table thead[class],
 table thead tr,
 table thead tr[class] {
-  background: linear-gradient(135deg, #121A66 0%, #2A6FB0 100%) !important;
+  background: linear-gradient(135deg, #1B5DB3 0%, #2A6FB0 100%) !important;
 }
 
 table thead th,

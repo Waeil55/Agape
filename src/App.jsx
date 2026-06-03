@@ -1,14 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback, lazy, Suspense, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import {
-  Truck, Users, MapPin, Phone, Clock, Search, ShieldCheck,
-  ArrowRight, CheckCircle2, Trash2, Map as MapIcon, LogOut,
-  Settings, Repeat, BrainCircuit, Zap, BarChart3,
-  MessageCircle, MessageSquare, Target, Upload, AlertCircle, Building2,
-  Activity, Wand2, Wrench, Lock, Briefcase, User,
-  ArchiveRestore, RefreshCcw, FileText, BarChart2, Archive, X, Plus, ChevronLeft, Wifi, WifiOff
+  Truck, Users, MapPin, Clock, Search, ShieldCheck,
+  ArrowRight, CheckCircle2, Archive, Map as MapIcon, LogOut,
+  Settings, BrainCircuit, Zap,
+  Target, Upload, AlertCircle,
+  Activity, Wand2, Lock, Briefcase, User,
+  RefreshCcw, X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp } from './config/firebase';
-import TripsPage from './components/TripsPage';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, onSnapshot, collection, getDocs } from './config/firebase';
+import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
+import AIAssistantFloating from './components/AIAssistantFloating';
+import { hasPermission } from './constants/roles';
+import { timeToMinutes, tripMatchesTodayOrTomorrow, tripMatchesCalendarDay } from './utils/tripDate';
+import { cleanPhone } from './utils/smartContacts';
+import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, isDriverAssignedToDispatcher, isTripInDispatcherScope, normalizeEmail } from './utils/accessControl';
 import ChatPage from './components/ChatPage';
 import ArchivesPage from './components/ArchivesPage';
 import DriversVehiclesPage from './components/DriversVehiclesPage';
@@ -16,22 +21,48 @@ import SettingsPage from './components/SettingsPage';
 import DriverPage from './components/DriverPage';
 import UsersPage from './components/UsersPage';
 import EnterpriseDashboard from './components/EnterpriseDashboard';
+import AddTripModal from './components/AddTripModal';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
-import { playMessageSound, initAudioContext } from './utils/notificationSound';
-import { makeCall, sendSMS, showCallActionSheet } from './utils/nativeActions';
+import { playMessageSound, playNotificationSound, initAudioContext } from './utils/notificationSound';
+import { makeCall, sendSMS } from './utils/nativeActions';
 import { initPlatform } from './utils/platform';
-
-const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
-import { suggestBatchAssignment, suggestOptimalDriver } from './config/ai';
-import { tripMatchesCalendarDay, tripMatchesTodayOrTomorrow } from './utils/tripDate';
+import {
+  buildTelemetryDocId,
+  deriveMovementState,
+  getDriverTelemetryForDate,
+  shouldAppendBreadcrumb,
+  todayLocal,
+  trimTelemetryCollections,
+} from './utils/driverTelemetry';
+import './utils/clientExport';
+import { registerServiceWorker, requestPeriodicSync, setupSWMessageHandler, triggerSync, skipWaiting } from './utils/swManager';
+import { useFirestoreAppData } from './hooks/useFirestoreAppData';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 // Lazy-loaded heavy components
-const LiveMapPage = lazy(() => import('./components/LiveMapPage'));
-const DispatchAssistant = lazy(() => import('./components/DispatchAssistant'));
-const FileUploadTrips = lazy(() => import('./components/FileUploadTrips'));
-const ReportsPage = lazy(() => import('./components/ReportsPage'));
+const lazyWithRetry = (componentImport) =>
+  lazy(async () => {
+    const pageHasAlreadyBeenForceRefreshed = JSON.parse(
+      window.sessionStorage.getItem('page-has-been-force-refreshed') || 'false'
+    );
+    try {
+      const component = await componentImport();
+      window.sessionStorage.setItem('page-has-been-force-refreshed', 'false');
+      return component;
+    } catch (error) {
+      if (!pageHasAlreadyBeenForceRefreshed) {
+        window.sessionStorage.setItem('page-has-been-force-refreshed', 'true');
+        return window.location.reload();
+      }
+      throw error;
+    }
+  });
+
+const LiveMapPage = lazyWithRetry(() => import('./components/LiveMapPage'));
+const DispatchAssistant = lazyWithRetry(() => import('./components/DispatchAssistant'));
+const FileUploadTrips = lazyWithRetry(() => import('./components/FileUploadTrips'));
+const ReportsPage = lazyWithRetry(() => import('./components/ReportsPage'));
 
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
@@ -51,98 +82,7 @@ const getLogTextColor = (color) => {
   return colors[color] || 'text-slate-600';
 };
 
-const PERMISSIONS = {
-  admin: {
-    canDeleteTrip: true,
-    canAssignTrip: true,
-    canManageUsers: true,
-    canViewReports: true,
-    canEditFleet: true,
-    canViewLiveMap: true,
-    canOptimizeFleet: true,
-    canResetSystem: true
-  },
-  dispatcher: {
-    canDeleteTrip: true,
-    canAssignTrip: true,
-    canManageUsers: false,
-    canViewReports: false,
-    canEditFleet: false,
-    canViewLiveMap: true,
-    canOptimizeFleet: true,
-    canResetSystem: false
-  },
-  driver: {
-    canDeleteTrip: false,
-    canAssignTrip: false,
-    canManageUsers: false,
-    canViewReports: false,
-    canEditFleet: false,
-    canViewLiveMap: false,
-    canOptimizeFleet: false,
-    canResetSystem: false
-  },
-  billing: {
-    canDeleteTrip: false,
-    canAssignTrip: false,
-    canManageUsers: false,
-    canViewReports: true,
-    canEditFleet: false,
-    canViewLiveMap: false,
-    canOptimizeFleet: false,
-    canResetSystem: false
-  },
-  qa_auditor: {
-    canDeleteTrip: false,
-    canAssignTrip: false,
-    canManageUsers: false,
-    canViewReports: true,
-    canEditFleet: false,
-    canViewLiveMap: true,
-    canOptimizeFleet: false,
-    canResetSystem: false
-  },
-  fleet_manager: {
-    canDeleteTrip: false,
-    canAssignTrip: true,
-    canManageUsers: false,
-    canViewReports: true,
-    canEditFleet: true,
-    canViewLiveMap: true,
-    canOptimizeFleet: true,
-    canResetSystem: false
-  },
-  supervisor: {
-    canDeleteTrip: false,
-    canAssignTrip: false,
-    canManageUsers: false,
-    canViewReports: true,
-    canEditFleet: false,
-    canViewLiveMap: true,
-    canOptimizeFleet: false,
-    canResetSystem: false
-  }
-};
-
-const hasPermission = (role, action) => {
-  return PERMISSIONS[role]?.[action] || false;
-};
-
 const todayStr = new Date().toISOString().split('T')[0];
-
-function timeToMinutes(t) {
-  if (!t) return 1440;
-  const cleanTime = String(t).toUpperCase().trim();
-  if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
-  const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
-  if (!m) return 1440;
-  let h = parseInt(m[1], 10);
-  let min = parseInt(m[2] || '0', 10);
-  const p = m[3];
-  if (p === 'PM' && h < 12) h += 12;
-  if (p === 'AM' && h === 12) h = 0;
-  return h * 60 + min;
-}
 
 function isTripLate(tripTime) {
   if (!tripTime || tripTime === 'Will Call') return false;
@@ -153,18 +93,6 @@ function isTripLate(tripTime) {
   return now > scheduled;
 }
 
-const DEFAULT_DATA = {
-  trips: [],
-  drivers: [],
-  dispatchers: [],
-  vehicles: [],
-  logs: [
-    { t: 'System Initialized', d: 'Agape Care Cloud OS is now online.', c: 'emerald', type: 'system' }
-  ],
-  trashedTrips: [],
-  phoneNumbers: { routing: '8669823983', dispatcher: '3177777707' }
-};
-
 const DEFAULT_APP_SETTINGS = {
   theme: 'light',
   fontScale: 'md',
@@ -172,10 +100,50 @@ const DEFAULT_APP_SETTINGS = {
   navigationApp: 'google',
 };
 
+const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
+
+function normalizeUsername(value = '') {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '');
+}
+
+function isEmailLike(value = '') {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function isInternalAuthEmail(value = '') {
+  return String(value || '').trim().toLowerCase().endsWith(`@${INTERNAL_AUTH_DOMAIN}`);
+}
+
+function usernameToAuthEmail(username = '') {
+  const normalized = normalizeUsername(username);
+  return normalized ? `${normalized}@${INTERNAL_AUTH_DOMAIN}` : '';
+}
+
+function authEmailToUsername(value = '') {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized.endsWith(`@${INTERNAL_AUTH_DOMAIN}`)) {
+    return normalized.split('@')[0];
+  }
+  return normalized.split('@')[0] || normalized;
+}
+
+function resolveAuthIdentifier(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return { authEmail: '', username: '' };
+  if (isEmailLike(raw) && !isInternalAuthEmail(raw)) {
+    return { authEmail: raw.toLowerCase(), username: authEmailToUsername(raw) };
+  }
+  const username = normalizeUsername(raw);
+  return { authEmail: usernameToAuthEmail(username), username };
+}
+
 function buildDriverProfileFromEmail(email, uid = '') {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   const seed = (uid || normalizedEmail.replace(/[^a-z0-9]/gi, '')).slice(0, 4).toUpperCase() || 'USER';
-  const name = normalizedEmail.split('@')[0] || 'Driver';
+  const name = authEmailToUsername(normalizedEmail) || 'Driver';
   return {
     id: `DRV-${seed}`,
     name,
@@ -193,28 +161,137 @@ function buildDriverProfileFromEmail(email, uid = '') {
   };
 }
 
-// Returns null for system-generated booking ID patterns (avoids duplicates in Firestore),
-// keeps the original value for custom/user-entered booking IDs.
-function extractCustomBookingId(value) {
-  const cleanValue = String(value || '').trim();
-  if (!cleanValue) return null;
-  if (/^BK-\d+-\d+$/i.test(cleanValue)) return null;
-  if (/^TRP-\d+$/i.test(cleanValue)) return null;
-  if (/^TRIP-\d{10,}-\d+$/i.test(cleanValue)) return null;
-  return cleanValue;
+function buildStableProfileId(role, uid = '') {
+  const seed = String(uid || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'USER';
+  if (role === 'dispatcher') return `DSP-${seed}`;
+  if (role === 'driver') return `DRV-${seed}`;
+  return null;
 }
 
-function normalizeTrip(trip) {
-  if (!trip) return trip;
-  return {
-    ...trip,
-    bookingId: extractCustomBookingId(trip.bookingId),
-  };
+function getDriverProfileHealthScore(driver) {
+  if (!driver) return Number.NEGATIVE_INFINITY;
+  let score = 0;
+  if (driver.clockedIn) score += 8;
+  if (driver.activeMission) score += 6;
+  if (driver.vehicle && driver.vehicle !== 'Pending Assignment') score += 5;
+  if (driver.currentZone && !['TBD', '--'].includes(driver.currentZone)) score += 3;
+  if (driver.phone) score += 2;
+  if (Array.isArray(driver.schedule) && driver.schedule.length > 0) score += 2;
+  if (driver.assignedTo) score += 2;
+  if (Number(driver.odometer) > 0) score += 1;
+  if (driver.status && !['Offline', ''].includes(driver.status)) score += 1;
+  if (driver.vehicle === 'Pending Assignment') score -= 2;
+  if (!driver.phone) score -= 1;
+  if (driver.currentZone === 'TBD') score -= 1;
+  return score;
 }
 
-const DATA_DOC = 'appData/agape';
+function getDriverProfilesForEmail(drivers = [], email = '') {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return [];
+  return (drivers || []).filter(driver => normalizeEmail(driver.email) === normalizedEmail);
+}
+
+function getBestDriverProfileForEmail(drivers = [], email = '', trips = []) {
+  const matches = getDriverProfilesForEmail(drivers, email);
+  if (matches.length === 0) return null;
+  return [...matches].sort((a, b) => {
+    const aExactTripCount = (trips || []).filter(trip => trip.driverId === a.id).length;
+    const bExactTripCount = (trips || []).filter(trip => trip.driverId === b.id).length;
+    if (bExactTripCount !== aExactTripCount) return bExactTripCount - aExactTripCount;
+    const scoreDiff = getDriverProfileHealthScore(b) - getDriverProfileHealthScore(a);
+    if (scoreDiff !== 0) return scoreDiff;
+    const aEmailTripCount = (trips || []).filter(trip => {
+      const tripEmail = normalizeEmail(trip.driverEmail || drivers.find(driver => driver.id === trip.driverId)?.email);
+      return tripEmail === normalizeEmail(a.email);
+    }).length;
+    const bEmailTripCount = (trips || []).filter(trip => {
+      const tripEmail = normalizeEmail(trip.driverEmail || drivers.find(driver => driver.id === trip.driverId)?.email);
+      return tripEmail === normalizeEmail(b.email);
+    }).length;
+    if (bEmailTripCount !== aEmailTripCount) return bEmailTripCount - aEmailTripCount;
+    const aUpdated = Date.parse(a?.updatedAt || a?.updatedAtLocal || 0) || 0;
+    const bUpdated = Date.parse(b?.updatedAt || b?.updatedAtLocal || 0) || 0;
+    return bUpdated - aUpdated;
+  })[0];
+}
+
 const FIRESTORE_BOOT_TIMEOUT_MS = 12000;
 const AUTH_WATCHDOG_TIMEOUT_MS = 18000;
+
+const buildTravelDuration = (startTime, endTime) => {
+  if (!startTime || !endTime) return '';
+  const parseMinutes = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    if (raw.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) {
+        return d.getHours() * 60 + d.getMinutes();
+      }
+      return null;
+    }
+    const mins = timeToMinutes(raw);
+    return Number.isFinite(mins) ? mins : null;
+  };
+  const s = new Date(startTime);
+  const e = new Date(endTime);
+  if (!isNaN(s.getTime()) && !isNaN(e.getTime())) {
+    const diff = Math.round((e - s) / 60000);
+    if (diff < 0) return '';
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+    return h > 0 ? `${h}h${m > 0 ? m : ''}` : `${m}m`;
+  }
+  const start = parseMinutes(startTime);
+  const end = parseMinutes(endTime);
+  if (start === null || end === null || end < start) return '';
+  const diff = end - start;
+  const hours = Math.floor(diff / 60);
+  const mins = diff % 60;
+  return hours > 0 ? `${hours}h${mins > 0 ? mins : ''}` : `${mins}m`;
+};
+
+const buildOdometerDistance = (startOdo, endOdo) => {
+  const start = Number(startOdo);
+  const end = Number(endOdo);
+  if (Number.isNaN(start) || Number.isNaN(end)) return '';
+  const diff = end - start;
+  return diff >= 0 ? Number(diff.toFixed(1)) : '';
+};
+
+const TRACKING_ACTIVE_STATUSES = new Set([
+  'Assigned',
+  'In Mission',
+  'In Progress',
+  'Navigating Pickup',
+  'En Route',
+  'At Pickup',
+  'In Transit',
+  'Navigating Dropoff',
+  'At Dropoff',
+  'Arrived',
+]);
+
+function buildTripTrackingPhase(trip) {
+  if (!trip) return { phase: 'idle', destination: '', destinationType: '' };
+  if (['Assigned', 'In Mission', 'In Progress', 'Navigating Pickup', 'En Route'].includes(trip.status)) {
+    return { phase: 'pickup', destination: trip.pickup || '', destinationType: 'pickup' };
+  }
+  if (['At Pickup', 'In Transit', 'Navigating Dropoff', 'At Dropoff', 'Arrived'].includes(trip.status)) {
+    return { phase: 'dropoff', destination: trip.dropoff || '', destinationType: 'dropoff' };
+  }
+  return { phase: 'active', destination: trip.pickup || trip.dropoff || '', destinationType: 'unknown' };
+}
+
+function getRoleGateMessage(requestedRole, actualRole = '') {
+  const portalMessage = requestedRole === 'admin'
+    ? 'Access denied. Only CEO / Owner admin accounts can use Admin Login.'
+    : requestedRole === 'dispatcher'
+      ? 'Access denied. Only dispatcher accounts can use Dispatcher Login.'
+      : 'Access denied. Only driver accounts can use Driver Login.';
+  return `${portalMessage} Your account is registered as ${actualRole || 'unknown'}.`;
+}
 
 function withTimeout(promise, timeoutMs, label) {
   let timeoutId;
@@ -226,82 +303,6 @@ function withTimeout(promise, timeoutMs, label) {
   ]).catch(error => ({ ok: false, error, label })).finally(() => clearTimeout(timeoutId));
 }
 
-function readLocalJson(key) {
-  try {
-    const value = localStorage.getItem(key);
-    return value ? JSON.parse(value) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeLocalJson(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Local storage may be unavailable in private or restricted browser contexts.
-  }
-}
-
-function readCachedProfile(email) {
-  const cached = readLocalJson('agape_cached_profile');
-  if (!cached?.email || !email) return null;
-  return cached.email.toLowerCase() === email.toLowerCase() ? cached : null;
-}
-
-async function loadAppData() {
-  try {
-    const snap = await getDoc(doc(db, DATA_DOC));
-    if (snap.exists()) return snap.data();
-  } catch {}
-  return null;
-}
-
-function sanitizeForFirestore(obj) {
-  return JSON.parse(JSON.stringify(obj, (key, value) => value === undefined ? null : value));
-}
-
-async function saveAppData(data, retries = 3) {
-  const getTodayStr = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
-  // Keep all trips for now to prevent any accidental data loss. 
-  // We'll implement a manual archive process instead of auto-pruning unassigned trips.
-  const prunedTrips = (data.trips || []).map(normalizeTrip);
-
-  const sanitized = sanitizeForFirestore({
-    drivers: data.drivers || [],
-    dispatchers: data.dispatchers || [],
-    trips: prunedTrips,
-    trashedTrips: data.trashedTrips || [],
-    vehicles: data.vehicles || [],
-    phoneNumbers: data.phoneNumbers || {}
-  });
-
-  let lastErr = null;
-  for (let i = 0; i < retries; i++) {
-    try {
-      const ref = doc(db, DATA_DOC);
-      await setDoc(ref, sanitized, { merge: true });
-      return;
-    } catch (err) {
-      lastErr = err;
-      console.error("Save attempt failed:", err);
-      if (i < retries - 1) await new Promise(r => setTimeout(r, 500 * (i + 1)));
-    }
-  }
-}
-
-async function logToCloud(log) {
-  try {
-    const logRef = collection(db, 'logs');
-    await addDoc(logRef, { ...log, timestamp: serverTimestamp() });
-  } catch (err) {
-    console.error("Log to cloud failed:", err);
-  }
-}
-
 const App = () => {
   const [isOffline, setIsOffline] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -309,13 +310,23 @@ const App = () => {
   const [startupIssue, setStartupIssue] = useState('');
   const [showLoadingRecovery, setShowLoadingRecovery] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
-  const dataLoadedRef = useRef(false);
   const authBootResolvedRef = useRef(false);
   const prevChatConvsRef = useRef(null);
+  const loginPortalRoleRef = useRef(null);
+  const skipNextSignedOutResetRef = useRef(false);
   
   const [refreshTick, setRefreshTick] = useState(0);
+  const [role, setRole] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const roleRef = useRef(null);
+  const currentUserRef = useRef(null);
+  const driversRef = useRef([]);
+  const tripsRef = useRef([]);
+  const driverProfileBootstrapRef = useRef('');
+  const [driverTelemetry, setDriverTelemetry] = useState([]);
+  const driverTelemetryRef = useRef([]);
 
-  // Online/offline listener + PWA auto-refresh
+  // Online/offline listener + Real-time auto-refresh (1 second)
   useEffect(() => {
     const goOnline = () => setIsOffline(false);
     const goOffline = () => setIsOffline(true);
@@ -323,91 +334,250 @@ const App = () => {
     window.addEventListener('offline', goOffline);
     initPlatform();
 
-    // PWA auto-refresh: soft re-render every 30s to keep data fresh
-    const refreshInterval = setInterval(() => {
-      setRefreshTick(t => t + 1);
-    }, 30000);
+    // REMOVED: The 1-second refresh interval was causing constant re-renders and data flickering.
+    // Real-time sync now comes from Firebase document listener on appData/agape.
 
     // Force re-render when app comes back to foreground (iOS PWA fix)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         setRefreshTick(t => t + 1);
+        triggerSync();
+        localStorage.setItem('agape-sync-trigger', String(Date.now()));
       }
     };
+
+    // Listen for periodic sync from Service Worker
+    const handlePeriodicSync = (event) => {
+      setRefreshTick(t => t + 1);
+    };
+
+    // Listen for sync requests from other tabs
+    const handleStorageChange = (event) => {
+      if (event.key === 'agape-sync-trigger') {
+        setRefreshTick(t => t + 1);
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('periodicSync', handlePeriodicSync);
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
       window.removeEventListener('online', goOnline);
       window.removeEventListener('offline', goOffline);
       document.removeEventListener('visibilitychange', handleVisibility);
-      clearInterval(refreshInterval);
+      window.removeEventListener('periodicSync', handlePeriodicSync);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
-  // State variables (declare before refs to avoid temporal dead zone)
-  const [logs, setLogs] = useState(DEFAULT_DATA.logs);
-  const [dispatchers, setDispatchers] = useState(DEFAULT_DATA.dispatchers);
-  const [drivers, setDrivers] = useState(DEFAULT_DATA.drivers);
-  const [trips, setTrips] = useState(DEFAULT_DATA.trips);
-  const [trashedTrips, setTrashedTrips] = useState([]);
-  const [phoneNumbers, setPhoneNumbers] = useState(DEFAULT_DATA.phoneNumbers);
-  const [vehicles, setVehicles] = useState(DEFAULT_DATA.vehicles);
+
+  // Handle dynamic import failures (stale chunk hashes after deploy) by reloading
+  useEffect(() => {
+    const onError = (event) => {
+      if (event.target?.tagName === 'LINK' && event.target?.rel === 'modulepreload') {
+        event.preventDefault();
+        window.location.reload();
+        return;
+      }
+      if (event.target?.tagName === 'SCRIPT' && event.target?.type === 'module' && event.target?.src) {
+        if (!event.target.src.includes(location.origin)) return;
+        event.preventDefault();
+        window.location.reload();
+      }
+    };
+    const onRejection = (event) => {
+      if (event.reason && typeof event.reason === 'object' && event.reason?.message?.includes('dynamically imported module')) {
+        event.preventDefault();
+        window.location.reload();
+      }
+    };
+    window.addEventListener('error', onError, true);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('error', onError, true);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
+
+  // Initialize Service Worker for PWA auto-update across all platforms
+  useEffect(() => {
+    let cleanupSWMessages = () => {};
+
+    const onSWUpdate = () => { skipWaiting(); };
+    window.addEventListener('swUpdateAvailable', onSWUpdate);
+
+    (async () => {
+      try {
+        // Register service worker
+        await registerServiceWorker();
+        
+        // Request periodic background sync
+        await requestPeriodicSync();
+
+        // Setup message handler for sync requests from SW
+        cleanupSWMessages = setupSWMessageHandler((data) => {
+          setRefreshTick(t => t + 1);
+        });
+
+        console.log('PWA auto-update enabled');
+      } catch (error) {
+        console.error('PWA setup error:', error);
+      }
+    })();
+    return () => {
+      cleanupSWMessages();
+      window.removeEventListener('swUpdateAvailable', onSWUpdate);
+    };
+  }, []);
+
+  // ALL DATA COMES FROM FIRESTORE VIA onSnapshot — single source of truth
+  const {
+    trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
+    loading: dataLoading, saving: dataSaving, error: dataError, lastSavedAt,
+    setTrips, setDrivers, upsertDriverProfile, setDispatchers, setVehicles,
+    setTrashedTrips, setLogs, setPhoneNumbers,
+    addLog, initializeAppData,
+  } = useFirestoreAppData();
+
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
-  const hydrateAppData = useCallback((rawData) => {
-    const d = { ...DEFAULT_DATA, ...(rawData || {}) };
-    setTrips((d.trips || DEFAULT_DATA.trips).map(normalizeTrip));
-    setTrashedTrips(d.trashedTrips || []);
-    setDrivers(d.drivers || DEFAULT_DATA.drivers);
-    setLogs(d.logs || DEFAULT_DATA.logs);
-    setDispatchers(d.dispatchers || DEFAULT_DATA.dispatchers);
-    setPhoneNumbers(d.phoneNumbers || DEFAULT_DATA.phoneNumbers);
-    setVehicles(d.vehicles || DEFAULT_DATA.vehicles);
-  }, []);
-  // Refs for latest state — always up to date, no closure issues
-  const sTrips = useRef(trips);
-  const sDrivers = useRef(drivers);
-  const sLogs = useRef(logs);
-  const sTrashed = useRef(trashedTrips);
-  const sDisp = useRef(dispatchers);
-  const sPhone = useRef(phoneNumbers);
-  const sVehicles = useRef(vehicles);
-  sTrips.current = trips;
-  sDrivers.current = drivers;
-  sLogs.current = logs;
-  sTrashed.current = trashedTrips;
-  sDisp.current = dispatchers;
-  sPhone.current = phoneNumbers;
-  sVehicles.current = vehicles;
-
-  const fromSnapshot = useRef(false);
-
-  const persistState = useCallback((overrides = {}) => {
-    // CRITICAL GUARDS: Don't save if we are still loading, or if we just got a cloud update.
-    // dataLoaded via ref — useCallback([]) would otherwise freeze dataLoaded as false forever.
-    if (!dataLoadedRef.current) return;
-    if (fromSnapshot.current) return;
-
-    const data = {
-      trips: overrides.trips || sTrips.current,
-      trashedTrips: overrides.trashedTrips || sTrashed.current,
-      drivers: overrides.drivers || sDrivers.current,
-      logs: overrides.logs || sLogs.current,
-      dispatchers: overrides.dispatchers || sDisp.current,
-      phoneNumbers: overrides.phoneNumbers || sPhone.current,
-      vehicles: overrides.vehicles || sVehicles.current,
-    };
-    // Also save to local storage for instant recovery on refresh before Firestore syncs
-    localStorage.setItem('agape_cached_data', JSON.stringify(data));
-    saveAppData(data).catch(err => {
-      console.error("Persistence failed:", err);
+  const scopedDrivers = useMemo(
+    () => filterDriversForRole(role, currentUser, drivers, dispatchers),
+    [role, currentUser, drivers, dispatchers]
+  );
+  const scopedTrips = useMemo(
+    () => filterTripsForRole(role, currentUser, trips, drivers, dispatchers),
+    [role, currentUser, trips, drivers, dispatchers]
+  );
+  const currentUserEmailTripMatches = useMemo(() => {
+    const email = normalizeEmail(currentUser);
+    if (!email) return [];
+    return trips.filter(trip => {
+      const tripEmail = normalizeEmail(trip.driverEmail || drivers.find(driver => driver.id === trip.driverId)?.email);
+      return tripEmail === email;
     });
+  }, [trips, drivers, currentUser]);
+  const currentUserDriverProfile = useMemo(() => {
+    if (role !== 'driver') return null;
+    const email = normalizeEmail(currentUser);
+    if (!email) return null;
+    const matchedProfile = getBestDriverProfileForEmail(drivers, email, trips);
+    if (matchedProfile) return matchedProfile;
+    if (dataLoading) return null;
+    if (currentUserEmailTripMatches.length > 0) {
+      const seedTrip = currentUserEmailTripMatches[0];
+      return {
+        ...buildDriverProfileFromEmail(email, auth.currentUser?.uid || ''),
+        id: seedTrip.driverId || buildDriverProfileFromEmail(email, auth.currentUser?.uid || '').id,
+        name: seedTrip.driverName || buildDriverProfileFromEmail(email, auth.currentUser?.uid || '').name,
+        status: 'Available',
+        clockedIn: true,
+        vehicle: 'Assigned Route',
+        currentZone: seedTrip.pickup || 'Assigned Work',
+        isVirtualProfile: true,
+      };
+    }
+    return {
+      ...buildDriverProfileFromEmail(email, auth.currentUser?.uid || ''),
+      id: buildStableProfileId('driver', auth.currentUser?.uid || '') || buildDriverProfileFromEmail(email, auth.currentUser?.uid || '').id,
+      isProvisioningProfile: true,
+    };
+  }, [drivers, currentUser, role, dataLoading, trips, currentUserEmailTripMatches]);
+  const currentUserDriverTrips = useMemo(() => {
+    if (role !== 'driver') return [];
+    const email = normalizeEmail(currentUserDriverProfile?.email || currentUser);
+    if (!email) return [];
+    const driverIds = new Set([
+      ...getDriverProfilesForEmail(drivers, email).map(driver => driver.id),
+      currentUserDriverProfile?.id,
+    ].filter(Boolean));
+    return trips.filter(trip => {
+      const tripEmail = normalizeEmail(trip.driverEmail || drivers.find(driver => driver.id === trip.driverId)?.email);
+      const assignedToCurrentDriver = driverIds.has(trip.driverId) || tripEmail === email;
+      const activeStatus = !['Completed', 'Cancelled', 'No Show'].includes(trip.status);
+      return assignedToCurrentDriver && (tripMatchesTodayOrTomorrow(trip.date) || activeStatus);
+    });
+  }, [trips, drivers, currentUserDriverProfile, currentUser, role]);
+  useEffect(() => {
+    if (role !== 'driver' || dataLoading || !auth.currentUser || !currentUserDriverProfile) return;
+    const normalizedEmail = normalizeEmail(currentUser);
+    if (!normalizedEmail) return;
+
+    const driverId = currentUserDriverProfile.id || buildStableProfileId('driver', auth.currentUser.uid);
+    if (!driverId) return;
+
+    const existingProfile = drivers.find((driver) => (
+      driver.id === driverId || normalizeEmail(driver.email) === normalizedEmail
+    ));
+    const bootstrapKey = `${auth.currentUser.uid}:${driverId}:${normalizedEmail}`;
+    const needsProfileProvision = !existingProfile || !normalizeEmail(existingProfile.email) || existingProfile.id !== driverId;
+
+    if (!needsProfileProvision && driverProfileBootstrapRef.current === bootstrapKey) return;
+
+    driverProfileBootstrapRef.current = bootstrapKey;
+    const baseProfile = buildDriverProfileFromEmail(normalizedEmail, auth.currentUser.uid);
+    const nextProfile = {
+      ...baseProfile,
+      ...existingProfile,
+      ...currentUserDriverProfile,
+      id: driverId,
+      email: normalizedEmail,
+      name: existingProfile?.name || currentUserDriverProfile.name || baseProfile.name,
+      phone: existingProfile?.phone || auth.currentUser.phoneNumber || '',
+      updatedAtLocal: new Date().toISOString(),
+    };
+
+    upsertDriverProfile(driverId, nextProfile).catch((err) => {
+      console.error('Driver profile bootstrap failed:', err);
+    });
+    setDoc(doc(db, 'users', auth.currentUser.uid), { profileId: driverId, email: normalizedEmail }, { merge: true }).catch((err) => {
+      console.error('User profileId sync failed:', err);
+    });
+  }, [role, dataLoading, currentUser, currentUserDriverProfile, drivers, upsertDriverProfile]);
+  const currentDispatcherRecord = useMemo(
+    () => getDispatcherForUser(dispatchers, currentUser),
+    [dispatchers, currentUser]
+  );
+  const canControlDriver = useCallback((driver) => {
+    if (role === 'admin') return true;
+    if (role === 'dispatcher') return isDriverAssignedToDispatcher(driver, currentDispatcherRecord);
+    return normalizeEmail(driver?.email) === normalizeEmail(currentUser);
+  }, [role, currentDispatcherRecord, currentUser]);
+  const canControlTrip = useCallback((trip) => {
+    if (role === 'admin') return true;
+    if (role === 'dispatcher') return isTripInDispatcherScope(trip, scopedDrivers);
+    return normalizeEmail(trip?.driverEmail) === normalizeEmail(currentUser);
+  }, [role, scopedDrivers, currentUser]);
+
+  // Generate a deterministic dedup key for any trip
+  const getTripKey = useCallback((trip) => {
+    if (!trip) return '';
+    const bk = trip.bookingId;
+    if (bk && !/^(BK-\d+-\d+|TRP-\d+|TRIP-\d{10,}-\d+)$/i.test(bk)) return `bk::${bk}`;
+    if (trip.id && !trip.id.startsWith('TRIP-')) return `id::${trip.id}`;
+    const parts = [
+      (trip.patient || '').trim().toLowerCase(),
+      (trip.date || '').trim(),
+      (trip.time || '').trim(),
+      (trip.pickup || '').trim().toLowerCase().replace(/\s+/g, ' '),
+      (trip.dropoff || '').trim().toLowerCase().replace(/\s+/g, ' '),
+    ];
+    return `cmp::${parts.join('|')}`;
   }, []);
-  const [role, setRole] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-  const roleRef = useRef(null);
-  const currentUserRef = useRef(null);
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('agape_activeTab') || 'dashboard');
+
+  // Dedup an array of trips using getTripKey
+  const dedupTrips = useCallback((tripArray) => {
+    const seen = new Set();
+    return tripArray.filter(t => {
+      const key = getTripKey(t);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [getTripKey]);
+
+  const [activeTab, setActiveTab] = useState(() => 'dashboard');
   const [toasts, setToasts] = useState([]);
   const [selectedTasks, setSelectedTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -427,14 +597,9 @@ const App = () => {
   const [reAuthError, setReAuthError] = useState('');
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
   const [showDispatcherArchive, setShowDispatcherArchive] = useState(false);
-  const [appSettings, setAppSettings] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('agape_app_settings') || '{}');
-      return { ...DEFAULT_APP_SETTINGS, ...saved };
-    } catch {
-      return DEFAULT_APP_SETTINGS;
-    }
-  });
+  const [showAddTripModal, setShowAddTripModal] = useState(false);
+  const [appSettings, setAppSettings] = useState(() => ({ ...DEFAULT_APP_SETTINGS }));
+  const [, setUserSettingsLoaded] = useState(false);
 
   const addToast = (title, message, type = 'info') => {
     const id = Date.now();
@@ -444,21 +609,16 @@ const App = () => {
 
   const updateAppSettings = useCallback((updates, isProfileUpdate = false) => {
     if (isProfileUpdate && role === 'driver' && updates.odometer !== undefined) {
-      setDrivers(prev => {
-        const updated = prev.map(d => d.email === currentUser ? { ...d, odometer: updates.odometer } : d);
-        persistState({ drivers: updated });
-        return updated;
-      });
+      setDrivers(prev => prev.map(d => d.email === currentUser ? { ...d, odometer: updates.odometer } : d));
       addToast('Profile Updated', 'Your vehicle odometer has been synchronized.', 'success');
     } else {
       setAppSettings((prev) => ({ ...prev, ...updates }));
     }
-  }, [role, currentUser, persistState]);
+  }, [role, currentUser, setDrivers]);
 
   const handleUpdatePhoneNumbers = useCallback((updates) => {
     setPhoneNumbers(prev => ({ ...prev, ...updates }));
-    setTimeout(persistState, 0);
-  }, [persistState]);
+  }, [setPhoneNumbers]);
 
   const requestAuthAction = (label, callback) => {
     setReAuthError('');
@@ -478,9 +638,92 @@ const App = () => {
   const [pendingRole, setPendingRole] = useState(null);
   const [loginError, setLoginError] = useState('');
 
-  useEffect(() => { dataLoadedRef.current = dataLoaded; }, [dataLoaded]);
+  const resetSessionState = useCallback((options = {}) => {
+    const {
+      loginErrorMessage = '',
+      preserveEmail = false,
+      emailValue = '',
+      pendingRoleValue = null,
+      nextLoginStep = 'role_selection',
+      clearStartupIssue = true,
+      clearLoading = true,
+    } = options;
+
+    loginPortalRoleRef.current = pendingRoleValue;
+    roleRef.current = null;
+    currentUserRef.current = null;
+    authBootResolvedRef.current = true;
+    prevChatConvsRef.current = null;
+
+    setIsAuthenticated(false);
+    setRole(null);
+    setCurrentUser(null);
+    setDataLoaded(false);
+    setActiveTab('dashboard');
+    setActiveManifest(null);
+    setIsInspected(false);
+    setSelectedTasks([]);
+    setSearchQuery('');
+    setSmartAssignTrip(null);
+    setManualAssignTrip(null);
+    setSmartAssignResult(null);
+    setAiAnalyzing(false);
+    setShowOptimizeModal(false);
+    setShowUploadModal(false);
+    setUploadAssignDriver('');
+    setShowAuthModal(false);
+    setAuthActionPayload(null);
+    setAuthPassword('');
+    setReAuthError('');
+    setBulkAssignModal(false);
+    setShowDispatcherArchive(false);
+    setShowAddTripModal(false);
+    setChatUnreadCount(0);
+    setDriverTelemetry([]);
+    setPassword('');
+    setEmail(preserveEmail ? emailValue : '');
+    setPendingRole(pendingRoleValue);
+    setLoginStep(nextLoginStep);
+    setLoginError(loginErrorMessage);
+    setShowLoadingRecovery(false);
+    if (clearStartupIssue) setStartupIssue('');
+    if (clearLoading) setIsLoading(false);
+  }, []);
+
   useEffect(() => { roleRef.current = role; }, [role]);
   useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+  useEffect(() => { driversRef.current = drivers; }, [drivers]);
+  useEffect(() => { tripsRef.current = trips; }, [trips]);
+  useEffect(() => {
+    driverTelemetryRef.current = driverTelemetry;
+  }, [driverTelemetry]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setDriverTelemetry([]);
+      return undefined;
+    }
+    const unsub = onSnapshot(
+      collection(db, 'driverTelemetry'),
+      (snap) => {
+        const recentDocs = [];
+        snap.forEach((itemDoc) => {
+          recentDocs.push({ id: itemDoc.id, ...itemDoc.data() });
+        });
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 10);
+        const cutoffKey = todayLocal(cutoff);
+        const filtered = recentDocs
+          .filter((item) => !item.date || item.date >= cutoffKey)
+          .sort((a, b) => Date.parse(b?.lastPingAt || b?.updatedAtLocal || 0) - Date.parse(a?.lastPingAt || a?.updatedAtLocal || 0));
+        setDriverTelemetry(filtered);
+      },
+      (err) => {
+        console.error('Realtime driver telemetry sync failed:', err);
+      }
+    );
+    return () => unsub();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -491,11 +734,32 @@ const App = () => {
     return () => clearTimeout(timer);
   }, [isLoading]);
 
-  // Save activeTab to localStorage on change (survives refresh)
-  useEffect(() => { if (activeTab) localStorage.setItem('agape_activeTab', activeTab); }, [activeTab]);
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setDataLoaded(false);
+      return;
+    }
+    if (!dataLoading) {
+      setDataLoaded(true);
+    }
+  }, [isAuthenticated, dataLoading]);
+
+  // Persist activeTab and appSettings to Firestore user document for authenticated users
+  const persistUserSettings = async (overrides = {}) => {
+    try {
+      if (!auth.currentUser) return;
+      const uid = auth.currentUser.uid;
+      await setDoc(
+        doc(db, 'users', uid),
+        { settings: { ...DEFAULT_APP_SETTINGS, ...appSettings, ...overrides } },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error('Persisting user settings failed:', err);
+    }
+  };
 
   useEffect(() => {
-    localStorage.setItem('agape_app_settings', JSON.stringify(appSettings));
     const theme = appSettings.theme === 'system'
       ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
       : appSettings.theme || 'light';
@@ -512,7 +776,29 @@ const App = () => {
       document.head.appendChild(themeMeta);
     }
     themeMeta.setAttribute('content', themeColor);
+    // Persist settings to Firestore for logged in user
+    if (isAuthenticated && auth.currentUser) {
+      persistUserSettings();
+    }
   }, [appSettings]);
+
+  // Force fail-safe: if loading takes >15s, show login (allow time for offline cache)
+  useEffect(() => {
+    const force = setTimeout(() => {
+      if (!isLoading) return;
+      if (navigator.onLine === false) {
+        setStartupIssue('You are offline — showing cached data.');
+        setIsLoading(false);
+      } else {
+        setStartupIssue('Connection timed out. Retry or sign in again.');
+        setLoginError('Could not reach the cloud. Please check your connection and sign in.');
+        setIsLoading(false);
+      }
+    }, 15000);
+    return () => clearTimeout(force);
+  }, [isLoading]);
+  // Ultimate fallback — never stay on loading >18s
+  useEffect(() => { const t = setTimeout(() => { if (isLoading) setIsLoading(false); }, 18000); return () => clearTimeout(t); }, [isLoading]);
 
   useEffect(() => {
     let unsubData = null;
@@ -521,228 +807,221 @@ const App = () => {
     authBootResolvedRef.current = false;
     const bootWatchdog = setTimeout(() => {
       if (cancelled || authBootResolvedRef.current) return;
+      if (navigator.onLine === false) {
+        authBootResolvedRef.current = true;
+        setIsLoading(false);
+        setStartupIssue('');
+        return;
+      }
       setStartupIssue('Startup took too long. Use Retry or Return to Access Portal.');
-      setLoginError('Could not verify your session quickly enough. Please sign in again.');
-      setIsAuthenticated(false);
-      setRole(null);
-      setCurrentUser(null);
-      setDataLoaded(false);
-      setIsLoading(false);
+      skipNextSignedOutResetRef.current = true;
       signOut(auth).catch(() => {});
+      resetSessionState({ loginErrorMessage: 'Could not verify your session quickly enough. Please sign in again.' });
     }, AUTH_WATCHDOG_TIMEOUT_MS);
 
     const unsub = onAuthStateChanged(auth, async (user) => {
+      try {
       if (user) {
         // Load user role — ensure doc exists for Firestore security rules
         const [userDocResult, dataSnapResult] = await Promise.all([
           withTimeout(getDoc(doc(db, 'users', user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'user profile'),
-          withTimeout(getDoc(doc(db, DATA_DOC)), FIRESTORE_BOOT_TIMEOUT_MS, 'operations data'),
+          withTimeout(getDoc(doc(db, 'appData/agape')), FIRESTORE_BOOT_TIMEOUT_MS, 'operations data'),
         ]);
         if (cancelled) return;
 
-        const userDoc = userDocResult.ok ? userDocResult.value : null;
+        const requestedPortalRole = loginPortalRoleRef.current;
+        let userDoc = userDocResult.ok ? userDocResult.value : null;
         const dataSnap = dataSnapResult.ok ? dataSnapResult.value : null;
-        const cachedProfile = readCachedProfile(user.email || '');
         let userRole = '';
         if (userDoc?.exists()) {
           userRole = String(userDoc.data()?.role || '').toLowerCase();
-          writeLocalJson('agape_cached_profile', {
-            uid: user.uid,
-            email: user.email || '',
-            role: userRole,
-            cachedAt: new Date().toISOString(),
-          });
-        } else if (cachedProfile?.role && (userDocResult.timeout || userDocResult.error)) {
-          userRole = String(cachedProfile.role).toLowerCase();
-          setStartupIssue('Cloud profile verification is slow. Running from trusted local session while sync reconnects.');
         } else {
+          const usersSnap = await withTimeout(getDocs(collection(db, 'users')), FIRESTORE_BOOT_TIMEOUT_MS, 'user directory');
+          const hasExistingUsers = usersSnap.ok ? !usersSnap.value.empty : true;
+          const canBootstrapFirstAdmin = !hasExistingUsers && requestedPortalRole === 'admin';
+
+          if (canBootstrapFirstAdmin) {
+            const normalizedAuthEmail = String(user.email || '').trim().toLowerCase();
+            const username = normalizeUsername(
+              authEmailToUsername(normalizedAuthEmail) || user.displayName || 'admin'
+            ) || 'admin';
+            await setDoc(
+              doc(db, 'users', user.uid),
+              {
+                role: 'admin',
+                email: normalizedAuthEmail,
+                username,
+                name: user.displayName || username,
+                loginType: isInternalAuthEmail(normalizedAuthEmail) ? 'username' : 'email',
+                profileId: null,
+                bootstrappedAt: new Date().toISOString(),
+              },
+              { merge: true }
+            );
+            userRole = 'admin';
+            userDoc = await getDoc(doc(db, 'users', user.uid));
+          } else {
+            skipNextSignedOutResetRef.current = true;
+            await signOut(auth).catch(() => {});
+            resetSessionState({
+              loginErrorMessage: hasExistingUsers
+                ? 'Account not found in Agape system. Please contact your administrator.'
+                : 'No Agape admin profile exists yet. Sign in through Admin Login with the first Firebase Auth account to initialize the system.',
+            });
+            return;
+          }
+        }
+
+        if (requestedPortalRole && requestedPortalRole !== userRole) {
+          const preferredLoginId = String(userDoc?.data()?.username || authEmailToUsername(user.email || '') || user.email || '').trim();
+          skipNextSignedOutResetRef.current = true;
           await signOut(auth).catch(() => {});
-          roleRef.current = null;
-          currentUserRef.current = null;
-          setRole(null);
-          setCurrentUser(null);
-          setIsAuthenticated(false);
-          setActiveTab('dashboard');
-          setLoginError('Account not found in Agape system. Please contact your administrator.');
-          authBootResolvedRef.current = true;
-          setIsLoading(false);
+          resetSessionState({
+            loginErrorMessage: getRoleGateMessage(requestedPortalRole, userRole),
+            preserveEmail: true,
+            emailValue: preferredLoginId,
+            pendingRoleValue: requestedPortalRole,
+            nextLoginStep: 'credentials',
+          });
           return;
         }
 
         const userEmail = user.email;
         // Capture in local variables for onSnapshot closure (useEffect has [])
         const capturedRole = userRole;
+        loginPortalRoleRef.current = null;
         roleRef.current = userRole;
         currentUserRef.current = userEmail || '';
         setRole(userRole);
         setCurrentUser(userEmail);
         setIsAuthenticated(true);
-        const savedTab = localStorage.getItem('agape_activeTab');
+        setLoginStep('role_selection');
+        setPendingRole(null);
+        setPassword('');
+        setLoginError('');
         const driverTabs = ['driverHome', 'chat', 'completed', 'cancelled', 'noshow', 'settings'];
+        // Load per-user UI settings from users/{uid}.settings if available
+        const userSettings = userDoc && userDoc.exists() ? (userDoc.data().settings || {}) : {};
+        const preferredTab = userSettings.activeTab || null;
         const validTab = capturedRole === 'driver'
-          ? (driverTabs.includes(savedTab) ? savedTab : 'driverHome')
-          : (savedTab && savedTab !== 'login' ? savedTab : 'dashboard');
+          ? (driverTabs.includes(preferredTab) ? preferredTab : 'driverHome')
+          : (preferredTab && preferredTab !== 'login' ? preferredTab : 'dashboard');
         setActiveTab(validTab);
 
-        // Request notification permission (non-drivers)
-        if (userRole !== 'driver') {
-          requestNotificationPermission().then(token => {
-            if (token) { setNotificationsEnabled(true); }
-          });
+        // Apply saved app settings if any
+        if (userSettings && Object.keys(userSettings).length > 0) {
+          setAppSettings(prev => ({ ...prev, ...userSettings }));
+          setUserSettingsLoaded(true);
         }
+
+        // Request notification permission for every role so chat/trip alerts can sound everywhere.
+        requestNotificationPermission().then(token => {
+          if (token) { setNotificationsEnabled(true); }
+        });
         
         // Listen for foreground push messages
         unsubFcm = onForegroundMessage((payload) => {
           const title = payload.notification?.title || payload.data?.title || 'Agape Care';
           const body = payload.notification?.body || payload.data?.body || '';
           const type = payload.data?.type === 'chat' || title.toLowerCase().includes('message') ? 'message' : 'notification';
-          if (title && body) showLocalNotification(title, body, type);
+          if (title && body) {
+            if (type === 'message') playMessageSound(); else playNotificationSound();
+            showLocalNotification(title, body, type);
+          }
         });
 
-        // Initialize data from Firestore, then fall back to the last known good local cache.
-        const cachedData = readLocalJson('agape_cached_data');
-        if (dataSnap?.exists()) {
-          hydrateAppData(dataSnap.data());
-        } else if (cachedData) {
-          hydrateAppData(cachedData);
-          setStartupIssue('Using local cached workspace data while cloud sync reconnects.');
-        } else {
-          hydrateAppData(DEFAULT_DATA);
-          setStartupIssue('Cloud data is still connecting. Workspace opened with a clean operational shell.');
-        }
-        setDataLoaded(true);
-        authBootResolvedRef.current = true;
-        setIsLoading(false);
-
-        // Real-time listener for cross-tab / multi-user sync
-        unsubData = onSnapshot(doc(db, DATA_DOC), {
-          next: async (snap) => {
-            if (snap.exists()) {
-              fromSnapshot.current = true;
-              const d = snap.data();
-              setTrips((d.trips || []).map(normalizeTrip));
-              setTrashedTrips(d.trashedTrips || []);
-              setLogs(d.logs || []);
-              setDispatchers(d.dispatchers || []);
-              setPhoneNumbers(d.phoneNumbers || DEFAULT_DATA.phoneNumbers);
-              setVehicles(d.vehicles || DEFAULT_DATA.vehicles);
-              writeLocalJson('agape_cached_data', {
-                trips: d.trips || [],
-                trashedTrips: d.trashedTrips || [],
-                drivers: d.drivers || [],
-                logs: d.logs || [],
-                dispatchers: d.dispatchers || [],
-                phoneNumbers: d.phoneNumbers || DEFAULT_DATA.phoneNumbers,
-                vehicles: d.vehicles || DEFAULT_DATA.vehicles,
-              });
-              
-              try {
-                // ONLY admins/dispatchers can sync the driver list from the users collection
-                // ONLY admins/dispatchers can sync the driver/dispatcher lists from the users collection
-                const r = roleRef.current;
-                if (r === 'admin' || r === 'dispatcher') {
-                  const usersResult = await withTimeout(getDocs(collection(db, 'users')), FIRESTORE_BOOT_TIMEOUT_MS, 'user sync');
-                  if (!usersResult.ok) throw usersResult.error || new Error('User sync timed out');
-                  const allUsers = usersResult.value.docs.map(u => ({ id: u.id, ...u.data() }));
-                  
-                  // SYNC DRIVERS
-                  const activeDriverUsers = allUsers
-                    .filter(u => u.role && u.role.toLowerCase() === 'driver')
-                    .map(u => ({ email: u.email, id: u.id, name: (u.email || '').split('@')[0], phone: u.phone || '' }));
-                  
-                  const currentDrivers = d.drivers || [];
-                  const legacyNames = ['Alex Johnson', 'Sarah Miller', 'Michael Chen'];
-                  let cleanedDrivers = currentDrivers.filter(p => !legacyNames.includes(p.name) && activeDriverUsers.find(au => au.email === p.email));
-                  
-                  let driversChanged = false;
-                  activeDriverUsers.forEach(au => {
-                    const existing = cleanedDrivers.find(d => d.email === au.email);
-                    if (!existing) {
-                      cleanedDrivers.push({
-                        id: `DRV-${au.id.slice(0, 4)}`,
-                        name: au.name, email: au.email, phone: au.phone || '',
-                        status: 'Available', vehicle: 'Pending Assignment', dist: '--',
-                        currentZone: 'TBD', odometer: 0, nextOilChange: 5000,
-                        assignedTo: '', schedule: [], clockedIn: false
-                      });
-                      driversChanged = true;
-                    } else if (au.phone && existing.phone !== au.phone) {
-                      existing.phone = au.phone;
-                      driversChanged = true;
-                    }
-                  });
-
-                  // SYNC DISPATCHERS
-                  const activeDispatcherUsers = allUsers
-                    .filter(u => u.role && u.role.toLowerCase() === 'dispatcher')
-                    .map(u => ({ email: u.email, id: u.id, name: (u.email || '').split('@')[0] }));
-                  
-                  let cleanedDispatchers = (d.dispatchers || []).filter(p => activeDispatcherUsers.find(au => au.email === p.email));
-                  let dispatchersChanged = false;
-                  
-                  activeDispatcherUsers.forEach(au => {
-                    const existing = cleanedDispatchers.find(ds => ds.email === au.email);
-                    if (!existing) {
-                      cleanedDispatchers.push({ id: `DSP-${String(cleanedDispatchers.length + 1).padStart(2, '0')}`, name: au.name, email: au.email });
-                      dispatchersChanged = true;
-                    }
-                  });
-
-                  if (driversChanged || dispatchersChanged || cleanedDrivers.length !== currentDrivers.length || cleanedDispatchers.length !== (d.dispatchers || []).length) {
-                    setDrivers(cleanedDrivers);
-                    setDispatchers(cleanedDispatchers);
-                    updateDoc(doc(db, DATA_DOC), { drivers: cleanedDrivers, dispatchers: cleanedDispatchers }).catch(() => {});
-                  } else {
-                    setDrivers(cleanedDrivers);
-                    setDispatchers(cleanedDispatchers);
-                  }
-                } else {
-                  // Self-sync: ensure the current driver exists in the drivers array
-                  let currentDrivers = d.drivers || [];
-                  const cu = currentUserRef.current || '';
-                  const normalizedCurrentEmail = cu.trim().toLowerCase();
-                  const exists = currentDrivers.some(drv => (drv.email || '').trim().toLowerCase() === normalizedCurrentEmail);
-                  if (!exists && r === 'driver') {
-                    const driverUsersResult = await withTimeout(getDocs(collection(db, 'users')), FIRESTORE_BOOT_TIMEOUT_MS, 'driver self-sync');
-                    const myUserDoc = driverUsersResult.ok
-                      ? driverUsersResult.value.docs.find(u => (u.data().email || '').trim().toLowerCase() === normalizedCurrentEmail)
-                      : null;
-                    if (myUserDoc) {
-                      const uid = myUserDoc.id;
-                      const newDriver = {
-                        id: `DRV-${uid.slice(0, 4)}`,
-                        name: cu.split('@')[0] || 'Driver', email: cu, phone: '',
-                        status: 'Available', vehicle: 'Pending Assignment', dist: '--',
-                        currentZone: 'TBD', odometer: 0, nextOilChange: 5000,
-                        assignedTo: '', schedule: [], clockedIn: false
-                      };
-                      currentDrivers = [...currentDrivers, newDriver];
-                      updateDoc(doc(db, DATA_DOC), { drivers: currentDrivers }).catch(() => {});
-                    }
-                  }
-                  setDrivers(currentDrivers);
-                  setDispatchers(d.dispatchers || []);
-                }
-              } catch (err) {
-                console.error("User list sync failed:", err);
-                setStartupIssue('Realtime data is open, but user list sync is delayed.');
-              } finally {
-                setTimeout(() => { fromSnapshot.current = false; }, 500);
-              }
-            }
-          },
-          error: (err) => {
-            console.error("Snapshot error:", err);
-            setStartupIssue('Realtime cloud sync is disconnected. Local changes are still cached.');
-          },
-        });
-      } else {
-        roleRef.current = null;
-        currentUserRef.current = null;
+        // Data is automatically synced from Firestore via useFirestoreAppData hook.
+        // No manual hydration needed — the onSnapshot listener provides real-time data.
         setDataLoaded(false);
-        setStartupIssue('');
         authBootResolvedRef.current = true;
         setIsLoading(false);
+        
+        try {
+          const r = roleRef.current;
+          if (r === 'admin' || r === 'dispatcher') {
+            const usersResult = await getDocs(collection(db, 'users'));
+            const allUsers = usersResult.docs.map(u => ({ id: u.id, ...u.data() }));
+            
+            // Sync new drivers from users collection — batch into single write
+            const activeDriverUsers = allUsers.filter(u => u.role && u.role.toLowerCase() === 'driver');
+            const nonDriverEmails = new Set(
+              allUsers
+                .filter(u => u.role && u.role.toLowerCase() !== 'driver')
+                .map(u => normalizeEmail(u.email))
+                .filter(Boolean)
+            );
+            setDrivers(prev => {
+              const normalizedPrev = prev.filter((driver) => {
+                const email = normalizeEmail(driver.email);
+                if (!email) return true;
+                return !nonDriverEmails.has(email);
+              });
+              const toAdd = [];
+              for (const au of activeDriverUsers) {
+                if (!normalizedPrev.find(d => normalizeEmail(d.email) === normalizeEmail(au.email))) {
+                  const stableId = au.profileId || buildStableProfileId('driver', au.id);
+                  toAdd.push({
+                    id: stableId,
+                    name: au.name || au.username || authEmailToUsername(au.email || '') || 'driver',
+                    email: au.email,
+                    phone: au.phone || '',
+                    status: 'Available', vehicle: 'Pending Assignment', dist: '--',
+                    currentZone: 'TBD', odometer: 0, nextOilChange: 5000,
+                    assignedTo: '', schedule: [], clockedIn: false
+                  });
+                }
+              }
+              return toAdd.length > 0 || normalizedPrev.length !== prev.length ? [...normalizedPrev, ...toAdd] : prev;
+            });
+            
+            // Sync new dispatchers — batch into single write
+            const activeDispatcherUsers = allUsers.filter(u => u.role && u.role.toLowerCase() === 'dispatcher');
+            const nonDispatcherEmails = new Set(
+              allUsers
+                .filter(u => u.role && u.role.toLowerCase() !== 'dispatcher')
+                .map(u => normalizeEmail(u.email))
+                .filter(Boolean)
+            );
+            setDispatchers(prev => {
+              const normalizedPrev = prev.filter((dispatcher) => {
+                const email = normalizeEmail(dispatcher.email);
+                if (!email) return true;
+                return !nonDispatcherEmails.has(email);
+              });
+              const toAdd = [];
+              for (const au of activeDispatcherUsers) {
+                if (!normalizedPrev.find(ds => normalizeEmail(ds.email) === normalizeEmail(au.email))) {
+                  toAdd.push({
+                    id: au.profileId || buildStableProfileId('dispatcher', au.id),
+                    name: au.name || au.username || authEmailToUsername(au.email || '') || 'dispatcher',
+                    email: au.email,
+                  });
+                }
+              }
+              return toAdd.length > 0 || normalizedPrev.length !== prev.length ? [...normalizedPrev, ...toAdd] : prev;
+            });
+          }
+        } catch (err) {
+          console.error("User list sync failed:", err);
+          setStartupIssue('Realtime data is open, but user list sync is delayed.');
+        } finally {
+          // User sync complete
+        }
+      } else {
+        if (skipNextSignedOutResetRef.current) {
+          skipNextSignedOutResetRef.current = false;
+          authBootResolvedRef.current = true;
+          setIsLoading(false);
+          return;
+        }
+        resetSessionState();
+      }
+      } catch (bootErr) {
+        console.error("Auth boot error:", bootErr);
+        setStartupIssue('Startup encountered an error. Please retry.');
+        skipNextSignedOutResetRef.current = true;
+        signOut(auth).catch(() => {});
+        resetSessionState({ loginErrorMessage: 'Could not initialize your session. Please sign in again.' });
       }
     });
     return () => {
@@ -752,28 +1031,13 @@ const App = () => {
       if (unsubData) unsubData();
       if (typeof unsubFcm === 'function') unsubFcm();
     };
-  }, [hydrateAppData]);
+  }, [resetSessionState]);
 
   useEffect(() => {
-    if (isAuthenticated && dataLoaded && !fromSnapshot.current) {
-      persistState();
+    if (startupIssue === 'Worker driver profile was missing and has been provisioned while cloud records sync.') {
+      setStartupIssue('');
     }
-  }, [trips, trashedTrips, drivers, logs, dispatchers, vehicles, phoneNumbers, dataLoaded, isAuthenticated, persistState]);
-
-  useEffect(() => {
-    if (role !== 'driver' || !currentUser || !dataLoaded) return;
-    const normalizedEmail = currentUser.trim().toLowerCase();
-    const exists = drivers.some(d => (d.email || '').trim().toLowerCase() === normalizedEmail);
-    if (exists) return;
-
-    setDrivers(prev => {
-      if (prev.some(d => (d.email || '').trim().toLowerCase() === normalizedEmail)) return prev;
-      const updated = [...prev, buildDriverProfileFromEmail(normalizedEmail, auth.currentUser?.uid || '')];
-      persistState({ drivers: updated });
-      return updated;
-    });
-    setStartupIssue('Driver profile was missing and has been provisioned locally while cloud records sync.');
-  }, [role, currentUser, dataLoaded, drivers, persistState]);
+  }, [startupIssue]);
 
   useEffect(() => {
     const metaTags = [
@@ -811,10 +1075,15 @@ const App = () => {
       const curr = snap.data().conversations || {};
       // Calculate unread count for nav badge
       let totalUnread = 0;
+      const normalizedCurrentUser = String(currentUser || '').trim().toLowerCase();
       for (const c of Object.values(curr)) {
-        if (c?.lastMessage?.sender && c.lastMessage.sender !== currentUser &&
-            !(c.lastMessage?.readBy || []).includes(currentUser)) {
-          totalUnread++;
+        if (Array.isArray(c?.participants) && !c.participants.includes(normalizedCurrentUser)) continue;
+        const explicitUnread = (c?.unread || {})[normalizedCurrentUser] || 0;
+        if (explicitUnread > 0) {
+          totalUnread += explicitUnread;
+        } else if (c?.lastMessage?.sender && c.lastMessage.sender !== normalizedCurrentUser &&
+            !(c.lastMessage?.readBy || []).includes(normalizedCurrentUser)) {
+          totalUnread += 1;
         }
       }
       setChatUnreadCount(totalUnread);
@@ -823,7 +1092,8 @@ const App = () => {
       for (const [id, c] of Object.entries(curr)) {
         const prevLast = prev[id]?.lastMessage;
         const currLast = c?.lastMessage;
-        if (currLast && currLast.sender && currLast.sender !== currentUser &&
+        if (currLast && currLast.sender && currLast.sender !== normalizedCurrentUser &&
+            (!c?.participants || c.participants.includes(normalizedCurrentUser)) &&
             (!prevLast || prevLast.text !== currLast.text || prevLast.timestamp !== currLast.timestamp)) {
           if (activeTab !== 'chat') {
             playMessageSound();
@@ -832,6 +1102,8 @@ const App = () => {
               currLast.text,
               'message'
             );
+          } else {
+            playMessageSound();
           }
           break;
         }
@@ -841,10 +1113,20 @@ const App = () => {
     return () => { unsub(); };
   }, [isAuthenticated, currentUser, role, activeTab]);
 
-  const addAuditLog = (title, desc, color) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setLogs(prev => [{ t: title, d: desc, c: color, type: 'audit', timestamp: timeStr }, ...prev].slice(0, 100));
-    setTimeout(persistState, 0);
+  const addAuditLog = (title, desc, color, meta = null) => {
+    const now = Date.now();
+    const timeStr = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Attach actor metadata so UIs can filter sensitive admin activity
+    const actorEmail = currentUser || 'system';
+    let actorRole = 'admin';
+    try {
+      const norm = (s) => String(s || '').trim().toLowerCase();
+      if (drivers && drivers.some(d => norm(d.email) === norm(actorEmail))) actorRole = 'driver';
+      else if (dispatchers && dispatchers.some(d => norm(d.email) === norm(actorEmail))) actorRole = 'dispatcher';
+      else if (!currentUser) actorRole = 'system';
+    } catch (e) { /* ignore */ }
+    setLogs(prev => [{ t: title, d: desc, c: color, type: 'audit', timestamp: timeStr, time: now, actor: actorEmail, actorRole, meta }, ...prev].slice(0, 100));
+    addLog({ t: title, d: desc, c: color, type: 'audit', time: now, actor: actorEmail, actorRole, meta });
   };
 
 
@@ -853,20 +1135,31 @@ const App = () => {
       setLoginError('Self-provisioning is disabled for this enterprise deployment. Ask an administrator to create the account from User Management.');
       return;
     }
-    if (!email || !password) { setLoginError('Enter email and password first.'); return; }
+    if (!email || !password) { setLoginError('Enter username and password first.'); return; }
     if (password.length < 6) { setLoginError('Password must be at least 6 characters.'); return; }
+    if (!pendingRole) {
+      setLoginError('Select a role before creating an account.');
+      return;
+    }
+    if (pendingRole !== 'driver') {
+      setLoginError('Only driver accounts can be self-provisioned. Contact an administrator for other roles.');
+      return;
+    }
     try {
-      const userCred = await createUserWithEmailAndPassword(auth, email, password);
-      await setDoc(doc(db, 'users', userCred.user.uid), { role: pendingRole || 'admin', email });
-      await setDoc(doc(db, DATA_DOC), {
-        trips: DEFAULT_DATA.trips,
-        trashedTrips: [],
-        drivers: DEFAULT_DATA.drivers,
-        logs: DEFAULT_DATA.logs,
-        dispatchers: DEFAULT_DATA.dispatchers,
-      });
-      setRole(pendingRole || 'admin');
-      setCurrentUser(email);
+      const { authEmail, username } = resolveAuthIdentifier(email);
+      if (!authEmail || !username) {
+        setLoginError('Enter a valid username using letters, numbers, dot, dash, or underscore.');
+        return;
+      }
+      const userCred = await createUserWithEmailAndPassword(auth, authEmail, password);
+      await setDoc(
+        doc(db, 'users', userCred.user.uid),
+        { role: pendingRole, email: authEmail, username, name: username, profileId: buildStableProfileId(pendingRole, userCred.user.uid), loginType: 'username' },
+        { merge: true }
+      );
+      await initializeAppData();
+      setRole(pendingRole);
+      setCurrentUser(authEmail);
       setIsAuthenticated(true);
       setActiveTab('dashboard');
       setLoginError('');
@@ -879,77 +1172,55 @@ const App = () => {
   const handlePasswordReset = async () => {
     setLoginError('');
     if (!email) {
-      setLoginError('Enter your email first, then use Secure Reset.');
+      setLoginError('Enter your username first.');
       return;
     }
     try {
-      await sendPasswordResetEmail(auth, email);
+      const { authEmail } = resolveAuthIdentifier(email);
+      if (!authEmail) {
+        setLoginError('Enter a valid username first.');
+        return;
+      }
+      if (isInternalAuthEmail(authEmail)) {
+        setLoginError('Password resets for username accounts are handled by your admin inside Agape Care.');
+        return;
+      }
+      await sendPasswordResetEmail(auth, authEmail);
       setLoginError('Password reset email sent. Check your inbox.');
     } catch (err) {
       setLoginError(err.message.replace('Firebase: ', ''));
     }
   };
 
-  const executeLogin = async (selectedRole, userEmail) => {
+  const executeLogin = async (selectedRole) => {
+    const requestedRole = String(selectedRole || '').toLowerCase();
+    loginPortalRoleRef.current = requestedRole;
+    setLoginError('');
+    setIsLoading(true);
     try {
-      const userCred = await signInWithEmailAndPassword(auth, email, password);
-      
-      // SECURITY: Fetch the actual role from Firestore instead of trusting the user's selection
-      const userSnapResult = await withTimeout(getDoc(doc(db, 'users', userCred.user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'login role verification');
-      if (!userSnapResult.ok) {
-        await signOut(auth);
-        setLoginError('Could not verify this account quickly enough. Please check connection and retry.');
+      const { authEmail, username } = resolveAuthIdentifier(email);
+      if (!authEmail || !username) {
+        setIsLoading(false);
+        setLoginError('Enter a valid username.');
         return;
       }
-      const userSnap = userSnapResult.value;
-      if (!userSnap.exists()) {
-        await signOut(auth);
-        setLoginError("Account not found in Agape system. Please contact your administrator.");
-        return;
-      }
-      
-      const dbRole = String(userSnap.data().role || '').toLowerCase();
-      const requestedRole = String(selectedRole || '').toLowerCase();
-      if (dbRole !== requestedRole) {
-        await signOut(auth);
-        setLoginError(`Access Denied: Your account is registered as ${dbRole}, not ${selectedRole}.`);
-        return;
-      }
-      
-      setRole(dbRole);
-      setCurrentUser(userCred.user.email || userEmail);
-      writeLocalJson('agape_cached_profile', {
-        uid: userCred.user.uid,
-        email: userCred.user.email || userEmail,
-        role: dbRole,
-        cachedAt: new Date().toISOString(),
-      });
-      setIsAuthenticated(true);
-      setActiveTab(dbRole === 'driver' ? 'driverHome' : 'dashboard');
-      setLoginError('');
-      requestNotificationPermission().then(token => { if (token) { setNotificationsEnabled(true); } });
-      if (requestedRole === 'dispatcher') {
-        addAuditLog('Dispatcher Logged In', `Dispatcher ${userEmail} accessed the system.`, 'blue');
-      }
+      await signInWithEmailAndPassword(auth, authEmail, password);
     } catch (err) {
+      loginPortalRoleRef.current = requestedRole;
+      setIsLoading(false);
+      setPassword('');
       setLoginError(err.message.replace('Firebase: ', ''));
     }
   };
 
   const handleLogout = async () => {
-    if (role === 'dispatcher') addAuditLog('Dispatcher Logged Out', `Dispatcher ${currentUser} left the system.`, 'slate');
-    await signOut(auth);
-    roleRef.current = null;
-    currentUserRef.current = null;
-    setIsAuthenticated(false);
-    setRole(null);
-    setCurrentUser(null);
-    setActiveManifest(null);
-    setIsInspected(false);
-    setLoginStep('role_selection');
-    setEmail('');
-    setPassword('');
-    setLoginError('');
+    try {
+      if (role === 'dispatcher') addAuditLog('Dispatcher Logged Out', `Dispatcher ${currentUser} left the system.`, 'slate');
+      skipNextSignedOutResetRef.current = true;
+      await signOut(auth);
+    } finally {
+      resetSessionState();
+    }
   };
 
   const toggleTaskSelection = (id) => {
@@ -957,20 +1228,24 @@ const App = () => {
   };
 
   const createSharedRide = () => {
-    const selectedTrips = trips.filter(t => selectedTasks.includes(t.id));
+    const selectedTrips = trips.filter(t => selectedTasks.includes(t.id) && canControlTrip(t));
     if (selectedTrips.length < 2) return;
     const sharedGroupId = `SR-${Date.now().toString().slice(-6)}`;
-    setTrips(prev => prev.map(t => selectedTasks.includes(t.id) ? { ...t, sharedRideGroup: sharedGroupId, status: t.status === 'Unassigned' ? 'Unassigned' : t.status } : t));
+    setTrips(prev => prev.map(t => selectedTasks.includes(t.id) && canControlTrip(t) ? { ...t, sharedRideGroup: sharedGroupId, status: t.status === 'Unassigned' ? 'Unassigned' : t.status } : t));
     addAuditLog('Shared Ride Created', `${currentUser} grouped ${selectedTrips.length} trips as shared ride ${sharedGroupId}.`, 'blue');
     setSelectedTasks([]);
     setBulkAssignModal(false);
-    setTimeout(persistState, 0);
+    // Firestore auto-syncs via useFirestoreAppData
   };
 
   const createLegMission = (driverId) => {
-    const selectedTrips = trips.filter(t => selectedTasks.includes(t.id));
-    if (selectedTrips.length === 0) return;
     const driver = drivers.find(d => d.id === driverId);
+    if (!driver || !canControlDriver(driver)) {
+      addAuditLog('Scope Blocked', `${currentUser} attempted to create a mission for an out-of-scope driver.`, 'rose');
+      return;
+    }
+    const selectedTrips = trips.filter(t => selectedTasks.includes(t.id) && canControlTrip(t));
+    if (selectedTrips.length === 0) return;
     
     // Build map of patient → best client phone (detect home address as one that appears in both pickup and dropoff)
     const patientPhoneMap = {};
@@ -1049,7 +1324,7 @@ const App = () => {
     });
     
     // Update trips status and assign to driver
-    const updatedTrips = trips.map(t => selectedTasks.includes(t.id) ? {
+    const updatedTrips = trips.map(t => selectedTasks.includes(t.id) && canControlTrip(t) ? {
       ...t,
       status: 'In Mission',
       driverId,
@@ -1062,33 +1337,41 @@ const App = () => {
     if (driver) {
       const updatedDrivers = drivers.map(d => d.id === driverId ? { ...d, activeMission: { id: `M-${Date.now()}`, legs, currentLegIndex: 0 } } : d);
       setDrivers(updatedDrivers);
-      addAuditLog('Mission Created', `Created ${legs.length}-leg mission for ${driver.name} with ${selectedTrips.length} patients.`, 'indigo');
+      addAuditLog('Mission Created', `${currentUser} created a ${legs.length}-leg mission for ${driver.name} with ${selectedTrips.length} patients.`, 'indigo');
     }
     
     setSelectedTasks([]);
     setBulkAssignModal(false);
-    setTimeout(persistState, 0);
+    // Firestore auto-syncs via useFirestoreAppData
   };
 
   const assignTripToDriver = (tripId, driverId) => {
     const driver = drivers.find(d => d.id === driverId);
     const tripToAssign = trips.find(t => t.id === tripId);
-    const updatedTrips = trips.map(t => t.id === tripId ? {
+    if (!driver || !tripToAssign) return;
+    if (!canControlDriver(driver) || !canControlTrip(tripToAssign)) {
+      addAuditLog('Scope Blocked', `${currentUser} attempted to assign a trip outside their dispatcher scope.`, 'rose');
+      return;
+    }
+    const prevTrip = { ...tripToAssign };
+    setTrips(prev => prev.map(t => t.id === tripId ? {
       ...t,
       status: 'Assigned',
       driverId,
       driverEmail: driver?.email || null,
       driverName: driver?.name || null,
-    } : t);
-    setTrips(updatedTrips);
+    } : t));
     setSmartAssignTrip(null);
     setSmartAssignResult(null);
-    if (role === 'dispatcher') {
-      addAuditLog('AI Route Action', `${currentUser} assigned ${tripToAssign.patient}'s trip to ${driver.name} via AI Suggestion.`, 'emerald');
-    } else {
-      setTimeout(persistState, 0);
-    }
+    const changed = [
+      { field: 'status', before: prevTrip.status, after: 'Assigned' },
+      { field: 'driverId', before: prevTrip.driverId || null, after: driverId },
+      { field: 'driverName', before: prevTrip.driverName || null, after: driver.name },
+    ];
+    addAuditLog('Trip Assigned', `${currentUser} assigned ${tripToAssign.patient}'s trip to ${driver.name}.`, 'emerald', { entity: 'trip', id: tripId, diffs: changed });
+    // Firestore auto-syncs via useFirestoreAppData
     if (notificationsEnabled && tripToAssign) {
+      playNotificationSound();
       showLocalNotification(
         '🚗 New Trip Assigned',
         `${tripToAssign.patient} — ${tripToAssign.pickup} → ${tripToAssign.dropoff}`
@@ -1104,23 +1387,35 @@ const App = () => {
   const bulkAssignTrips = (driverId) => {
     if (selectedTasks.length === 0) return;
     const driver = drivers.find(d => d.id === driverId);
-    setTrips(prev => prev.map(t => selectedTasks.includes(t.id) ? {
+    if (!driver || !canControlDriver(driver)) {
+      addAuditLog('Scope Blocked', `${currentUser} attempted bulk assignment to an out-of-scope driver.`, 'rose');
+      return;
+    }
+    const allowedSelection = selectedTasks.filter(id => {
+      const trip = trips.find(t => t.id === id);
+      return trip && canControlTrip(trip);
+    });
+    setTrips(prev => prev.map(t => allowedSelection.includes(t.id) ? {
       ...t,
       status: 'Assigned',
       driverId,
       driverEmail: driver?.email || null,
       driverName: driver?.name || null,
     } : t));
-    addAuditLog('Bulk Assignment', `${currentUser} assigned ${selectedTasks.length} trips to ${driver?.name || 'Unknown'}`, 'emerald');
+    addAuditLog('Bulk Assignment', `${currentUser} assigned ${allowedSelection.length} trips to ${driver?.name || 'Unknown'}`, 'emerald');
     setSelectedTasks([]);
     setBulkAssignModal(false);
   };
 
   const triggerSmartAssign = async (trip) => {
+    if (!canControlTrip(trip)) {
+      addAuditLog('AI Scope Blocked', `${currentUser} requested AI assignment for an out-of-scope trip.`, 'rose');
+      return;
+    }
     setSmartAssignTrip(trip);
     setSmartAssignResult(null);
     setAiAnalyzing(true);
-    const result = await suggestOptimalDriver(trip, drivers, trips);
+    const result = await suggestOptimalDriver(trip, scopedDrivers, scopedTrips);
     setSmartAssignResult(result);
     setAiAnalyzing(false);
   };
@@ -1128,15 +1423,16 @@ const App = () => {
   const triggerFleetOptimization = async () => {
     setAiAnalyzing(true);
     try {
-      const unassigned = trips.filter(t => t.status === 'Unassigned');
-      const available = drivers.filter(d => d.status === 'Available' || d.status === 'On Trip');
+      const unassigned = scopedTrips.filter(t => t.status === 'Unassigned');
+      const available = scopedDrivers.filter(d => d.status === 'Available' || d.status === 'On Trip');
       if (unassigned.length > 0 && available.length > 0) {
-        const assignments = await suggestBatchAssignment(unassigned, available);
+        const assignments = await suggestBatchAssignment(unassigned, available, scopedTrips);
         if (assignments && Object.keys(assignments).length > 0) {
           setTrips(prev => prev.map(t => {
             const assignedDriverId = assignments[t.id];
             if (!assignedDriverId) return t;
             const assignedDriver = available.find(driver => driver.id === assignedDriverId);
+            if (!assignedDriver) return t;
             return {
               ...t,
               status: 'Assigned',
@@ -1150,6 +1446,7 @@ const App = () => {
           Object.entries(assignments).forEach(([tripId]) => {
             const trip = trips.find(t => t.id === tripId);
             if (trip && notificationsEnabled) {
+              playNotificationSound();
               showLocalNotification('🚗 Trip Assigned', `${trip.patient} — ${trip.pickup} → ${trip.dropoff}`);
             }
           });
@@ -1168,15 +1465,95 @@ const App = () => {
       addAuditLog('Permission Denied', `${currentUser} attempted to delete a trip without authorization.`, 'rose');
       return;
     }
-    if (window.confirm('Move this trip to Archive?')) {
-      executeDeleteTrip(tripId);
+    const trip = trips.find(t => t.id === tripId);
+    if (trip && !canControlTrip(trip)) {
+      addAuditLog('Scope Blocked', `${currentUser} attempted to archive an out-of-scope trip.`, 'rose');
+      return;
     }
+    requestAuthAction('archive_trip', () => {
+      executeDeleteTrip(tripId);
+    });
+  };
+
+  const enrichTripMetrics = (trip) => {
+    const travelTime = buildTravelDuration(trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
+    const distance = buildOdometerDistance(trip.pickupOdometer, trip.dropoffOdometer);
+    return {
+      ...trip,
+      travelTime: travelTime || trip.travelTime || '',
+      distance: distance !== '' ? distance : trip.distance || '',
+    };
   };
 
   const updateTrip = (updatedTrip) => {
-    setTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
-    addAuditLog('Trip Updated', `${currentUser} modified trip ${updatedTrip.id} (${updatedTrip.patient})`, 'blue');
+    if (!canControlTrip(updatedTrip)) {
+      addAuditLog('Scope Blocked', `${currentUser} attempted to edit an out-of-scope trip.`, 'rose');
+      return;
+    }
+    const prevTrip = trips.find(t => t.id === updatedTrip.id) || null;
+    const enrichedTrip = enrichTripMetrics(updatedTrip);
+    setTrips(prev => prev.map(t => t.id === enrichedTrip.id ? enrichedTrip : t));
+    // Log detailed before/after changes
+    if (prevTrip) {
+      const changed = [];
+      Object.keys(enrichedTrip).forEach((k) => {
+        const a = prevTrip[k];
+        const b = enrichedTrip[k];
+        if (String(a) !== String(b)) changed.push({ field: k, before: a, after: b });
+      });
+      if (changed.length > 0) {
+        const details = changed.map(c => `${c.field}: ${c.before ?? '—'} → ${c.after ?? '—'}`).join('; ');
+        addAuditLog(
+          'Trip Updated',
+          `${currentUser} modified trip ${enrichedTrip.id} (${enrichedTrip.patient}): ${details}`,
+          'blue',
+          { entity: 'trip', id: enrichedTrip.id, diffs: changed, summary: details }
+        );
+      } else {
+        addAuditLog('Trip Updated', `${currentUser} modified trip ${enrichedTrip.id} (${enrichedTrip.patient})`, 'blue');
+      }
+    } else {
+      addAuditLog('Trip Updated', `${currentUser} modified trip ${enrichedTrip.id} (${enrichedTrip.patient})`, 'blue');
+    }
   };
+
+  const updateTrashedTrip = (updatedTrip) => {
+    const prevTrip = trashedTrips.find(t => t.id === updatedTrip.id) || null;
+    setTrashedTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
+    if (prevTrip) {
+      const diffs = [];
+      Object.keys(updatedTrip).forEach((key) => {
+        if (String(prevTrip[key]) !== String(updatedTrip[key])) {
+          diffs.push({ field: key, before: prevTrip[key], after: updatedTrip[key] });
+        }
+      });
+      addAuditLog(
+        'Archived Trip Updated',
+        `${currentUser} modified archived trip ${updatedTrip.id} (${updatedTrip.patient})`,
+        'blue',
+        { entity: 'trip', id: updatedTrip.id, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; ') }
+      );
+      return;
+    }
+    addAuditLog('Archived Trip Updated', `${currentUser} modified archived trip ${updatedTrip.id} (${updatedTrip.patient})`, 'blue');
+  };
+
+  const addTrip = useCallback((newTrip) => {
+    if (newTrip.driverId) {
+      const selectedDriver = drivers.find(driver => driver.id === newTrip.driverId);
+      if (!canControlDriver(selectedDriver)) {
+        addAuditLog('Scope Blocked', `${currentUser} attempted to add a trip for an out-of-scope driver.`, 'rose');
+        addToast('Trip Blocked', 'Dispatchers can only assign trips to their assigned drivers.', 'danger');
+        return;
+      }
+    }
+    setTrips(prev => {
+      const all = dedupTrips([newTrip, ...prev]);
+      return all;
+    });
+    addAuditLog('Trip Added', `${currentUser} manually added trip for ${newTrip.patient} (${newTrip.bookingId}).`, 'emerald');
+    addToast('Trip Added', `${newTrip.patient}'s trip has been added successfully.`, 'success');
+  }, [currentUser, dedupTrips, drivers, canControlDriver]);
 
   const resetSystemData = () => {
     if (role !== 'admin') return;
@@ -1185,66 +1562,165 @@ const App = () => {
     setDrivers([]);
     setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]);
     addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose');
-    setTimeout(() => persistState({ trips: [], trashedTrips: [], drivers: [] }), 0);
+    // Firestore auto-syncs via useFirestoreAppData
   };
 
   const executeDeleteTrip = (tripId) => {
-    const tripToDelete = trips.find(t => t.id === tripId);
+    // CRITICAL FIX: Use refs instead of closures to avoid stale data from Firestore sync
+    const currentTrips = trips || [];
+    const currentTrashed = trashedTrips || [];
+    
+    const tripToDelete = currentTrips.find(t => t.id === tripId);
     if (tripToDelete) {
-      setTrashedTrips([tripToDelete, ...trashedTrips]);
-      setTrips(trips.filter(t => t.id !== tripId));
+      const newTrashedTrips = [tripToDelete, ...currentTrashed];
+      const newTrips = currentTrips.filter(t => t.id !== tripId);
+      
+      setTrashedTrips(newTrashedTrips);
+      setTrips(newTrips);
       setSelectedTasks(selectedTasks.filter(id => id !== tripId));
-      if (role === 'dispatcher') {
-        addAuditLog('Trip Deleted', `${currentUser} deleted trip ${tripId} (${tripToDelete.patient}). Sent to Archive.`, 'rose');
-      } else {
-        setTimeout(persistState, 0);
-      }
+      
+      // Writes directly to Firestore via setTrips/setTrashedTrips
+      const changed = Object.keys(tripToDelete).map(k => ({ field: k, before: tripToDelete[k], after: undefined }));
+      addAuditLog('Trip Archived', `${currentUser} archived trip ${tripId} (${tripToDelete.patient}).`, 'rose', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'active', after: 'archived' }] });
     }
+  };
+
+  const requestBulkDelete = (tripIds, onSuccess) => {
+    if (!hasPermission(role, 'canDeleteTrip')) {
+      addAuditLog('Permission Denied', `${currentUser} attempted bulk archive without authorization.`, 'rose');
+      return;
+    }
+    requestAuthAction('archive_trips', () => {
+      // CRITICAL FIX: Use refs instead of closures to get CURRENT state, not stale captured values
+      // This prevents Firestore sync from making the captured values outdated
+      const currentTrips = trips || [];
+      const currentTrashed = trashedTrips || [];
+      
+      const tripsToDelete = currentTrips.filter(t => tripIds.includes(t.id));
+      if (tripsToDelete.length > 0) {
+        const newTrashedTrips = [...tripsToDelete, ...currentTrashed];
+        const newTrips = currentTrips.filter(t => !tripIds.includes(t.id));
+        
+        // Update state immediately with correct data
+        setTrashedTrips(newTrashedTrips);
+        setTrips(newTrips);
+        setSelectedTasks([]);
+        
+        // Writes directly to Firestore via setTrips/setTrashedTrips
+        
+        if (onSuccess) onSuccess();
+        addAuditLog('Bulk Trip Archived', `${currentUser} archived ${tripsToDelete.length} trips.`, 'rose');
+      }
+    });
   };
 
   const restoreTrip = (tripId) => {
-    const tripToRestore = trashedTrips.find(t => t.id === tripId);
-    if (tripToRestore) {
-      const newTrips = [...trips, tripToRestore];
-      const newTrashed = trashedTrips.filter(t => t.id !== tripId);
-      setTrips(newTrips);
-      setTrashedTrips(newTrashed);
-      addAuditLog('Trip Restored', `${currentUser || 'Admin'} restored trip ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald');
-      persistState({ trips: newTrips, trashedTrips: newTrashed });
-    }
+    requestAuthAction('restore_trip', () => {
+      // CRITICAL FIX: Use refs instead of closures to avoid stale data from Firestore sync
+      const currentTrips = trips || [];
+      const currentTrashed = trashedTrips || [];
+      
+      const tripToRestore = currentTrashed.find(t => t.id === tripId);
+      if (tripToRestore) {
+        // Check if an equivalent trip already exists in active trips — skip restore if so
+        const restoreKey = getTripKey(tripToRestore);
+        const alreadyExists = currentTrips.some(et => getTripKey(et) === restoreKey);
+        if (alreadyExists) {
+          const newTrashed = currentTrashed.filter(t => t.id !== tripId);
+          setTrashedTrips(newTrashed);
+          // Firestore auto-syncs
+          addAuditLog('Trip Removed from Archive', `Duplicate of ${tripToRestore.patient} — removed from Archive.`, 'amber');
+          return;
+        }
+        
+        const newTrips = dedupTrips([...currentTrips, tripToRestore]);
+        const newTrashed = currentTrashed.filter(t => t.id !== tripId);
+        
+        setTrips(newTrips);
+        setTrashedTrips(newTrashed);
+        
+        // Writes directly to Firestore via setTrips/setTrashedTrips
+        
+        addAuditLog('Trip Restored', `${currentUser || 'Admin'} restored trip ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'archived', after: 'active' }] });
+      }
+    });
   };
 
   const handleDriverStatusUpdate = (driverId, clockedIn) => {
+    const prevDriverState = drivers.find(d => d.id === driverId) || {};
     setDrivers(prevDrivers => {
-      const workingDrivers = prevDrivers.some(d => d.id === driverId)
+      const driverExists = prevDrivers.some(d => d.id === driverId);
+      const workingDrivers = driverExists
         ? prevDrivers
-        : [...prevDrivers, buildDriverProfileFromEmail(currentUser || '', auth.currentUser?.uid || '')];
+        : [...prevDrivers, { ...buildDriverProfileFromEmail(currentUser || '', auth.currentUser?.uid || ''), id: driverId }];
       const updated = workingDrivers.map(d => d.id === driverId ? {
         ...d,
         clockedIn,
         lastUpdate: new Date().toISOString(),
         status: clockedIn ? 'Available' : 'Offline',
       } : d);
-      persistState({ drivers: updated });
       return updated;
     });
+    const driverName = prevDriverState?.name || driverId;
+    const changed = [];
+    if (Boolean(prevDriverState.clockedIn) !== clockedIn) changed.push({ field: 'clockedIn', before: prevDriverState.clockedIn, after: clockedIn });
+    if (prevDriverState.status !== (clockedIn ? 'Available' : 'Offline')) changed.push({ field: 'status', before: prevDriverState.status, after: clockedIn ? 'Available' : 'Offline' });
     addAuditLog(
       clockedIn ? 'Driver Clocked In' : 'Driver Clocked Out',
-      `${drivers.find(d => d.id === driverId)?.name || driverId} ${clockedIn ? 'clocked in' : 'clocked out'}.`,
-      clockedIn ? 'emerald' : 'blue'
+      `${driverName} ${clockedIn ? 'clocked in' : 'clocked out'}.`,
+      clockedIn ? 'emerald' : 'blue',
+      { entity: 'driver', id: driverId, diffs: changed }
+    );
+  };
+
+  const handleDispatcherStatusUpdate = (dispatcherId, clockedIn) => {
+    const prevState = dispatchers.find(d => d.id === dispatcherId) || {};
+    setDispatchers(prevDispatchers => {
+      const updated = prevDispatchers.map(d => d.id === dispatcherId ? {
+        ...d,
+        clockedIn,
+        lastUpdate: new Date().toISOString(),
+      } : d);
+      return updated;
+    });
+    const changed = [];
+    if (Boolean(prevState.clockedIn) !== clockedIn) changed.push({ field: 'clockedIn', before: prevState.clockedIn, after: clockedIn });
+    addAuditLog(
+      clockedIn ? 'Dispatcher Clocked In' : 'Dispatcher Clocked Out',
+      `${prevState?.name || dispatcherId} ${clockedIn ? 'clocked in' : 'clocked out'}.`,
+      clockedIn ? 'emerald' : 'blue',
+      { entity: 'dispatcher', id: dispatcherId, diffs: changed }
     );
   };
 
   const handleCompleteTrip = (tripId, driverId, odometer) => {
-    const trip = sTrips.current.find(t => t.id === tripId);
+    const trip = trips.find(t => t.id === tripId);
     if (!trip?.pickupOdometer || !trip?.arrivalTime || !trip?.departedPickupTime || !trip?.arrivalDropoffTime || (!trip?.paperSignatureConfirmed && !trip?.unableToSign)) {
       addAuditLog('Trip Completion Blocked', `${currentUser || 'Driver'} attempted to complete ${trip?.patient || tripId} before all required steps were finished.`, 'rose');
       return;
     }
-    setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'Completed', dropoffOdometer: odometer, completedAt: new Date().toISOString() } : t));
+    const completedAt = new Date().toISOString();
+    const nextTrip = enrichTripMetrics({
+      ...trip,
+      status: 'Completed',
+      dropoffOdometer: odometer,
+      completedAt,
+    });
+    setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
     setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer } : d));
+    const diffs = [];
+    Object.keys(nextTrip || {}).forEach((key) => {
+      if (String(trip?.[key]) !== String(nextTrip?.[key])) {
+        diffs.push({ field: key, before: trip?.[key], after: nextTrip?.[key] });
+      }
+    });
     const driver = drivers.find(d => d.id === driverId);
-    addAuditLog('Trip Completed', `${driver?.name || 'Driver'} completed trip ${tripId} (${trip?.patient}). Odometer: ${odometer?.toLocaleString()} mi.`, 'emerald');
+    addAuditLog(
+      'Trip Completed',
+      `${driver?.name || 'Driver'} completed trip ${tripId} (${trip?.patient}). Odometer: ${odometer?.toLocaleString()} mi.`,
+      'emerald',
+      { entity: 'trip', id: tripId, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; ') }
+    );
     // Maintenance check
     if (driver) {
       const dueIn = (driver.nextOilChange || 50000) - odometer;
@@ -1253,25 +1729,198 @@ const App = () => {
       }
     }
     if (notificationsEnabled) {
+      playNotificationSound();
       showLocalNotification('✅ Trip Completed', `${trip?.patient || 'Trip'} marked as completed. Odometer: ${odometer?.toLocaleString()} mi.`);
     }
   };
 
-  const handleUpdateDriverLocation = useCallback((driverId, latitude, longitude) => {
-    setDrivers(prev => {
-      const workingDrivers = prev.some(d => d.id === driverId)
-        ? prev
-        : [...prev, buildDriverProfileFromEmail(currentUserRef.current || '', auth.currentUser?.uid || '')];
-      const updated = workingDrivers.map(d => d.id === driverId ? {
-        ...d,
-        latitude,
-        longitude,
-        lastLocationUpdate: new Date().toISOString(),
-      } : d);
-      persistState({ drivers: updated });
-      return updated;
+  const handleUpdateDriverLocation = useCallback(async (driverId, latitude, longitude, telemetry = {}) => {
+    if (!driverId) return;
+
+    const updatedAt = telemetry.recordedAt ? new Date(telemetry.recordedAt) : new Date();
+    const updatedAtIso = updatedAt.toISOString();
+    const currentDrivers = driversRef.current || [];
+    const currentTrips = tripsRef.current || [];
+    const existingDriver = currentDrivers.find((driver) => driver.id === driverId) || {
+      ...buildDriverProfileFromEmail(currentUserRef.current || '', auth.currentUser?.uid || ''),
+      id: driverId,
+    };
+    const driverEmail = normalizeEmail(existingDriver.email);
+    const activeTrip = [...currentTrips]
+      .filter((trip) => (
+        trip.driverId === driverId ||
+        (driverEmail && normalizeEmail(trip.driverEmail) === driverEmail)
+      ))
+      .filter((trip) => TRACKING_ACTIVE_STATUSES.has(trip.status))
+      .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time))[0] || null;
+    const phase = buildTripTrackingPhase(activeTrip);
+    const movement = deriveMovementState(existingDriver, latitude, longitude, telemetry, updatedAt);
+    const speedMph = Number.isFinite(Number(telemetry.speedMph))
+      ? Number(telemetry.speedMph)
+      : movement.inferredSpeedMph || existingDriver.speedMph || 0;
+    const mergedTelemetry = {
+      ...(existingDriver.telemetry || {}),
+      ...telemetry,
+      movementState: movement.movementState,
+      stoppedSince: movement.stoppedSince,
+      movingSince: movement.movingSince,
+      dwellMinutes: movement.dwellMinutes,
+      movingMinutes: movement.movingMinutes,
+      inferredSpeedMph: movement.inferredSpeedMph,
+      distanceDeltaMiles: movement.distanceMiles,
+      updatedAt: updatedAtIso,
+      activeTripId: activeTrip?.id || null,
+      activeTripStatus: activeTrip?.status || null,
+      activeDestination: phase.destination || '',
+      activePhase: phase.phase,
+      actorRole: telemetry.actorRole || roleRef.current || existingDriver.role || 'driver',
+      source: telemetry.source || 'driver-pwa',
+    };
+
+    const profileUpdates = {
+      latitude,
+      longitude,
+      lastLocationUpdate: updatedAtIso,
+      lastUpdate: updatedAtIso,
+      locationAccuracy: telemetry.accuracy ?? existingDriver.locationAccuracy ?? null,
+      speedMph,
+      heading: telemetry.heading ?? existingDriver.heading ?? null,
+      movementState: movement.movementState,
+      stoppedSince: movement.stoppedSince,
+      movingSince: movement.movingSince,
+      currentDwellMinutes: movement.dwellMinutes,
+      currentMovingMinutes: movement.movingMinutes,
+      lastMotionChangeAt: movement.stateChanged ? updatedAtIso : (existingDriver.lastMotionChangeAt || updatedAtIso),
+      telemetry: mergedTelemetry,
+    };
+
+    if (upsertDriverProfile) {
+      await upsertDriverProfile(driverId, profileUpdates);
+    }
+
+    const telemetryDate = todayLocal(updatedAt);
+    const docId = buildTelemetryDocId(driverId, telemetryDate);
+    const previousDoc = getDriverTelemetryForDate(driverTelemetryRef.current, driverId, telemetryDate) || null;
+    const previousSample = previousDoc?.breadcrumbs?.[previousDoc.breadcrumbs.length - 1] || null;
+    const distanceContribution = movement.elapsedSeconds > 0 && movement.elapsedSeconds <= 15 * 60
+      ? movement.distanceMiles
+      : 0;
+    const totalMovingMinutes = Number(previousDoc?.totalMovingMinutes || 0) + (movement.previousState === 'moving' ? movement.elapsedMinutes : 0);
+    const totalStoppedMinutes = Number(previousDoc?.totalStoppedMinutes || 0) + (movement.previousState === 'stopped' ? movement.elapsedMinutes : 0);
+    const totalTrackedMiles = Number(previousDoc?.totalTrackedMiles || 0) + distanceContribution;
+
+    const sample = {
+      at: updatedAtIso,
+      lat: Number(Number(latitude).toFixed(6)),
+      lng: Number(Number(longitude).toFixed(6)),
+      accuracy: telemetry.accuracy ?? null,
+      speedMph: Number(Number(speedMph || 0).toFixed(1)),
+      heading: telemetry.heading ?? null,
+      state: movement.movementState,
+      dwellMinutes: movement.dwellMinutes,
+      movingMinutes: movement.movingMinutes,
+      tripId: activeTrip?.id || null,
+      tripStatus: activeTrip?.status || null,
+      patient: activeTrip?.patient || null,
+      destination: phase.destination || '',
+      destinationType: phase.destinationType,
+      distanceDeltaMiles: movement.distanceMiles,
+    };
+
+    let breadcrumbs = Array.isArray(previousDoc?.breadcrumbs) ? [...previousDoc.breadcrumbs] : [];
+    if (shouldAppendBreadcrumb(previousSample, sample)) {
+      breadcrumbs.push(sample);
+    } else if (breadcrumbs.length > 0) {
+      breadcrumbs[breadcrumbs.length - 1] = sample;
+    } else {
+      breadcrumbs = [sample];
+    }
+
+    let stopEvents = Array.isArray(previousDoc?.stopEvents) ? [...previousDoc.stopEvents] : [];
+    const latestStop = stopEvents[stopEvents.length - 1];
+    if (movement.movementState === 'stopped') {
+      if (movement.stateChanged || !latestStop || latestStop.endedAt) {
+        stopEvents.push({
+          startedAt: movement.stoppedSince || updatedAtIso,
+          endedAt: null,
+          minutes: movement.dwellMinutes,
+          lat: sample.lat,
+          lng: sample.lng,
+          tripId: activeTrip?.id || null,
+          tripStatus: activeTrip?.status || null,
+          patient: activeTrip?.patient || null,
+          destination: phase.destination || '',
+          destinationType: phase.destinationType,
+          lastUpdatedAt: updatedAtIso,
+        });
+      } else {
+        stopEvents[stopEvents.length - 1] = {
+          ...latestStop,
+          minutes: movement.dwellMinutes,
+          lastUpdatedAt: updatedAtIso,
+          tripStatus: activeTrip?.status || latestStop.tripStatus || null,
+          patient: activeTrip?.patient || latestStop.patient || null,
+          destination: phase.destination || latestStop.destination || '',
+        };
+      }
+    } else if (movement.previousState === 'stopped' && latestStop && !latestStop.endedAt) {
+      stopEvents[stopEvents.length - 1] = {
+        ...latestStop,
+        endedAt: updatedAtIso,
+        minutes: Math.max(Number(latestStop.minutes || 0), Number(movement.elapsedMinutes || 0)),
+        lastUpdatedAt: updatedAtIso,
+      };
+    }
+
+    const longestStopMinutes = stopEvents.reduce((max, stop) => Math.max(max, Number(stop?.minutes || 0)), Number(previousDoc?.longestStopMinutes || 0));
+    const nextTelemetryDoc = trimTelemetryCollections({
+      ...(previousDoc || {}),
+      id: docId,
+      driverId,
+      date: telemetryDate,
+      driverName: existingDriver.name || 'Driver',
+      driverEmail: existingDriver.email || '',
+      vehicle: existingDriver.vehicle || '',
+      assignedTo: existingDriver.assignedTo || '',
+      actorRole: telemetry.actorRole || roleRef.current || existingDriver.role || 'driver',
+      liveSample: sample,
+      movementState: movement.movementState,
+      firstPingAt: previousDoc?.firstPingAt || updatedAtIso,
+      lastPingAt: updatedAtIso,
+      movingSince: movement.movingSince,
+      stoppedSince: movement.stoppedSince,
+      currentDwellMinutes: movement.dwellMinutes,
+      currentMovingMinutes: movement.movingMinutes,
+      totalMovingMinutes: Number(totalMovingMinutes.toFixed(1)),
+      totalStoppedMinutes: Number(totalStoppedMinutes.toFixed(1)),
+      totalOnlineMinutes: Number((totalMovingMinutes + totalStoppedMinutes).toFixed(1)),
+      totalTrackedMiles: Number(totalTrackedMiles.toFixed(2)),
+      totalPings: Number(previousDoc?.totalPings || 0) + 1,
+      stopCount: stopEvents.filter((stop) => stop?.startedAt).length,
+      longestStopMinutes: Number(longestStopMinutes.toFixed(1)),
+      maxSpeedMph: Math.max(Number(previousDoc?.maxSpeedMph || 0), Number(speedMph || 0)),
+      activeTripId: activeTrip?.id || null,
+      activeTripStatus: activeTrip?.status || null,
+      activePatient: activeTrip?.patient || null,
+      activeDestination: phase.destination || '',
+      activePhase: phase.phase,
+      breadcrumbs,
+      stopEvents,
+      updatedAtLocal: updatedAtIso,
     });
-  }, [persistState]);
+
+    setDriverTelemetry((prev) => {
+      const others = prev.filter((item) => item.id !== docId);
+      return [nextTelemetryDoc, ...others]
+        .sort((a, b) => Date.parse(b?.lastPingAt || b?.updatedAtLocal || 0) - Date.parse(a?.lastPingAt || a?.updatedAtLocal || 0));
+    });
+
+    try {
+      await setDoc(doc(db, 'driverTelemetry', docId), nextTelemetryDoc, { merge: true });
+    } catch (err) {
+      console.error('Driver telemetry write failed:', err);
+    }
+  }, [upsertDriverProfile]);
 
   const submitAuthAction = async (e) => {
     e.preventDefault();
@@ -1298,26 +1947,24 @@ const App = () => {
 
   const renderLoginScreen = () => {
     const handleRoleSelect = (roleKey) => {
+      loginPortalRoleRef.current = roleKey;
       setPendingRole(roleKey);
+      setPassword('');
+      setLoginError('');
       setLoginStep('credentials');
     };
 
     const submitLogin = async (e) => {
       e.preventDefault();
       setLoginError('');
-      let identifiedUser = null;
-      if (pendingRole === 'dispatcher') {
-        const foundDispatcher = dispatchers.find(d => d.email === email);
-        identifiedUser = foundDispatcher ? foundDispatcher.name : email;
-      }
-      await executeLogin(pendingRole, identifiedUser || email);
+      await executeLogin(pendingRole);
     };
 
     return (
-      <div className="flex-1 bg-slate-50 flex flex-col justify-start lg:justify-center items-center px-4 py-6 relative overflow-y-auto font-outfit" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
+      <div className="flex-1 bg-slate-100 flex flex-col justify-start lg:justify-center items-center px-4 py-6 relative overflow-y-auto font-outfit" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(241,245,249,0.72)),linear-gradient(90deg,rgba(37,99,235,0.06)_1px,transparent_1px),linear-gradient(180deg,rgba(37,99,235,0.05)_1px,transparent_1px)] bg-[length:auto,48px_48px,48px_48px]" />
         
-        <div className="w-full max-w-lg bg-white/90 backdrop-blur-xl rounded-[1.75rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.22)] p-6 sm:p-8 border border-white relative z-10">
+        <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-6 sm:p-8 relative z-10">
           <div className="flex flex-col items-center mb-6 text-center">
             <div className="w-20 h-20 sm:w-24 sm:h-24 mb-4 relative">
               <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain relative z-10" />
@@ -1325,7 +1972,7 @@ const App = () => {
             <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 mb-2 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
               <ShieldCheck size={14} className="text-blue-600" />
-              <p className="text-[11px] font-black text-blue-800 uppercase tracking-[0.18em]">Enterprise Fleet OS</p>
+              <p className="text-micro font-black text-blue-800 uppercase tracking-[0.18em]">Enterprise Fleet OS</p>
             </div>
           </div>
 
@@ -1334,9 +1981,9 @@ const App = () => {
               <h2 className="text-center text-sm font-bold text-slate-500 tracking-wide">Secure Access Portal</h2>
               <div className="grid grid-cols-1 gap-3">
                 {[
-                  { key: 'admin', Icon: ShieldCheck, label: 'Administrator', sub: 'Master Control & Intelligence', color: 'indigo' },
-                  { key: 'dispatcher', Icon: Briefcase, label: 'Dispatcher', sub: 'Fleet Logistics & Command', color: 'blue' },
-                  { key: 'driver', Icon: Truck, label: 'Driver Console', sub: 'Field Operations & Service', color: 'emerald' }
+                  { key: 'admin', Icon: ShieldCheck, label: 'Admin Login', sub: 'CEO / Owner only', color: 'indigo' },
+                  { key: 'dispatcher', Icon: Briefcase, label: 'Dispatcher Login', sub: 'Fleet Logistics & Command', color: 'blue' },
+                  { key: 'driver', Icon: Truck, label: 'Driver Login', sub: 'Field Operations & Service', color: 'emerald' }
                 ].map(r => {
                   const Icon = r.Icon;
                   const colorMap = {
@@ -1363,7 +2010,13 @@ const App = () => {
           ) : (
             <form onSubmit={submitLogin} className="space-y-4">
               <div className="flex items-center gap-4 mb-5 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                <button type="button" onClick={() => setLoginStep('role_selection')} className="p-2.5 bg-white rounded-xl text-slate-400 hover:text-slate-900 shadow-sm active:scale-95 transition-all"><ArrowRight className="rotate-180" size={18} /></button>
+                <button type="button" onClick={() => {
+                  loginPortalRoleRef.current = null;
+                  setPendingRole(null);
+                  setPassword('');
+                  setLoginError('');
+                  setLoginStep('role_selection');
+                }} className="p-2.5 bg-white rounded-xl text-slate-400 hover:text-slate-900 shadow-sm active:scale-95 transition-all"><ArrowRight className="rotate-180" size={18} /></button>
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Authenticating as</p>
                   <p className="text-base font-black text-slate-900 capitalize">{pendingRole}</p>
@@ -1371,9 +2024,9 @@ const App = () => {
               </div>
               
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Enterprise Email</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Username</label>
                 <div className="relative">
-                  <input type="email" required placeholder="name@agapecare.com" value={email} onChange={(e) => setEmail(e.target.value)} 
+                  <input type="text" required autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="waeil.admin" value={email} onChange={(e) => setEmail(e.target.value)} 
                     className="w-full p-3.5 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
@@ -1388,12 +2041,11 @@ const App = () => {
 
               {loginError && <p className={`text-sm font-semibold text-center mt-2 p-3 rounded-lg border ${loginError.toLowerCase().includes('sent') ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100'}`}>{loginError}</p>}
               
-              <button type="submit" className="w-full py-4 mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-500/25 active:scale-[0.98] hover:shadow-blue-500/40 transition-all duration-300">Authorize Access</button>
+              <button type="submit" className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg transition-all">Authorize Access</button>
               
               <div className="pt-2 flex items-center justify-between text-sm font-bold">
-                <button type="button" onClick={handleCreateAccount} className="text-slate-400 hover:text-slate-900 transition">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>
-                <span className="text-slate-200">|</span>
-                <button type="button" onClick={handlePasswordReset} className="text-slate-400 hover:text-slate-900 transition">Secure Reset</button>
+                <button type="button" onClick={handleCreateAccount} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition text-sm">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>
+                <button type="button" onClick={handlePasswordReset} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition text-sm">Reset Help</button>
               </div>
             </form>
           )}
@@ -1414,7 +2066,7 @@ const App = () => {
     return (
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setShowAuthModal(false)} />
-        <div className="bg-white/90 backdrop-blur-xl w-full max-w-sm rounded-[2rem] p-8 shadow-2xl relative z-10 border border-white/50">
+        <div className="bg-white w-full max-w-sm rounded-3xl p-8 shadow-sm relative z-10 border border-slate-200">
           <div className="w-16 h-16 bg-gradient-to-tr from-rose-600 to-rose-400 text-white rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-rose-500/30">
             <Lock size={32} />
           </div>
@@ -1424,8 +2076,8 @@ const App = () => {
           <form onSubmit={submitAuthAction}>
             <input type="password" required placeholder="Enter your password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full p-4 bg-slate-100/50 rounded-[1rem] font-semibold border border-slate-200/50 focus:border-rose-500 focus:bg-white mb-4" />
             <div className="flex gap-2">
-              <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-[1rem] font-bold active:scale-95 transition-all">Cancel</button>
-              <button type="submit" className="flex-1 py-3.5 bg-rose-600 text-white rounded-[1rem] font-bold active:scale-95 transition-all shadow-md shadow-rose-500/20">Authorize</button>
+              <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold active:scale-95 transition-all">Cancel</button>
+              <button type="submit" className="flex-1 py-3.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold active:scale-95 transition-all shadow-md shadow-rose-500/20">Authorize</button>
             </div>
           </form>
         </div>
@@ -1454,7 +2106,7 @@ const App = () => {
           <div className="space-y-3">
             <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Available Fleet</h4>
             <div className="grid grid-cols-1 gap-2">
-              {drivers.map(d => (
+              {scopedDrivers.map(d => (
                 <button key={d.id} onClick={() => bulkAssignTrips(d.id)} className="w-full flex items-center justify-between p-4 bg-white/50 border border-slate-200 rounded-2xl hover:bg-white hover:border-blue-300 hover:shadow-md transition-all group text-left">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
@@ -1521,7 +2173,7 @@ const App = () => {
               <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Target size={14} /> AI Assignment Result</h4>
               {smartAssignResult && smartAssignResult.driverId ? (
                 (() => {
-                  const d = drivers.find(drv => drv.id === smartAssignResult.driverId);
+                  const d = scopedDrivers.find(drv => drv.id === smartAssignResult.driverId);
                   if (!d) return <p className="text-sm text-slate-500">Suggested driver not found in fleet.</p>;
                   const isHighScore = smartAssignResult.score >= 80;
                   const isMidScore = smartAssignResult.score >= 50;
@@ -1567,8 +2219,8 @@ const App = () => {
 
   const renderManualAssignModal = () => {
     if (!manualAssignTrip) return null;
-    const availableDrivers = drivers.filter(d => d.status === 'Available');
-    const otherDrivers = drivers.filter(d => d.status !== 'Available');
+    const availableDrivers = scopedDrivers.filter(d => d.status === 'Available');
+    const otherDrivers = scopedDrivers.filter(d => d.status !== 'Available');
     
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-12">
@@ -1596,7 +2248,7 @@ const App = () => {
                     <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
                       className="flex items-center justify-between p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl hover:bg-emerald-50 active:scale-[0.98] transition-all group">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">{d.name.charAt(0)}</div>
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">{String(d?.name || '?').charAt(0)}</div>
                         <div className="text-left">
                           <p className="text-sm font-bold text-slate-900">{d.name}</p>
                           <p className="text-xs font-medium text-slate-500">{d.vehicle} • {d.currentZone}</p>
@@ -1617,7 +2269,7 @@ const App = () => {
                     <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
                       className="flex items-center justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:bg-slate-50 active:scale-[0.98] transition-all group opacity-80 hover:opacity-100">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold">{d.name.charAt(0)}</div>
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold">{String(d?.name || '?').charAt(0)}</div>
                         <div className="text-left">
                           <p className="text-sm font-bold text-slate-900">{d.name}</p>
                           <p className="text-xs font-medium text-slate-500">{d.status} • {d.vehicle}</p>
@@ -1676,324 +2328,6 @@ const App = () => {
     );
   };
 
-  const renderDispatcherCommandCenter = () => {
-    const getTodayStr = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-const today = getTodayStr();
-    const dateFiltered = trips.filter(t => tripMatchesCalendarDay(t.date, today));
-    const searchedTrips = dateFiltered.filter(t => t.patient.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    // SORTING LOGIC: Closest time first, Unassigned at bottom
-    const sortedScheduled = searchedTrips
-      .filter(t => t.time !== 'Will Call')
-      .sort((a, b) => {
-        if (a.status === 'Unassigned' && b.status !== 'Unassigned') return 1;
-        if (a.status !== 'Unassigned' && b.status === 'Unassigned') return -1;
-        return timeToMinutes(a.time) - timeToMinutes(b.time);
-      });
-      
-    const willCallTrips = searchedTrips.filter(t => t.time === 'Will Call');
-
-    return (
-      <div className="space-y-6 md:space-y-8 w-full max-w-full overflow-hidden pb-32">
-        {renderSmartAssignModal()}
-        {renderBulkAssignModal()}
-        {renderManualAssignModal()}
-        {renderOptimizeAllModal()}
-        {renderSecurityAuthModal()}
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
-          <div className="lg:col-span-8 space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/80 backdrop-blur-xl p-3 md:p-4 rounded-[1.5rem] md:rounded-[2rem] border border-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
-              <div className="relative flex-1 w-full md:w-auto flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="text" placeholder="Search Agape Care manifests..." className="w-full pl-12 pr-4 py-3 bg-slate-100/50 border border-slate-200/50 rounded-[1rem] focus:bg-white focus:border-blue-500 font-semibold text-sm transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-                </div>
-                <div className="bg-slate-100/50 p-1 rounded-[1.2rem] flex shrink-0">
-                  <button onClick={() => setShowDispatcherArchive(false)} className={`px-4 py-2 rounded-[0.8rem] text-sm font-bold transition-all ${!showDispatcherArchive ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>Live</button>
-                  <button onClick={() => setShowDispatcherArchive(true)} className={`px-4 py-2 rounded-[0.8rem] text-sm font-bold transition-all flex items-center gap-1 ${showDispatcherArchive ? 'bg-white shadow-sm text-rose-600' : 'text-slate-500'}`}>
-                    <ArchiveRestore size={12} /> ({trashedTrips.length})
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                <button onClick={() => setShowOptimizeModal(true)} className="flex-1 md:flex-none bg-indigo-600 text-white px-5 py-3 rounded-[1rem] font-bold text-xs active:scale-95 shadow-sm shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all">
-                  <Wand2 size={16} /> Optimize
-                </button>
-                <button onClick={() => setShowUploadModal(true)} className="flex-1 md:flex-none bg-slate-900 text-white px-5 py-3 rounded-[1rem] font-bold text-xs active:scale-95 shadow-sm flex items-center justify-center gap-2 transition-all">
-                  <Upload size={16} /> Upload
-                </button>
-              </div>
-            </div>
-
-            {showDispatcherArchive ? (
-              <div className="bg-rose-50/50 rounded-[1.5rem] border border-rose-100/50 shadow-sm overflow-hidden w-full">
-                <div className="p-4 border-b border-rose-100/50 flex justify-between items-center bg-rose-100/30">
-                  <h3 className="text-sm font-black flex items-center gap-2 text-rose-900">
-                    <Trash2 size={16} className="text-rose-600" /> Deleted Trips Archive
-                  </h3>
-                </div>
-                <div className="divide-y divide-rose-100/50">
-                  {trashedTrips.length === 0 ? (
-                    <div className="p-8 text-center text-rose-400 font-bold text-sm">The archive is currently empty.</div>
-                  ) : (
-                    trashedTrips.map(t => (
-                      <div key={t.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/50">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="min-w-0">
-                            <p className="font-black text-rose-900 text-sm break-words line-through">{t.patient}</p>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <Badge variant="danger">Deleted</Badge>
-                              <span className="text-xs font-bold text-rose-400 uppercase tracking-widest">{t.bookingId || '—'} &bull; {t.time}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4 shrink-0">
-                          <button onClick={() => restoreTrip(t.id)} className="bg-emerald-100 text-emerald-800 px-3 py-2 rounded-[0.8rem] text-sm font-bold active:scale-95 flex items-center gap-1.5 transition-all">
-                            <RefreshCcw size={14} /> Restore
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            ) : (
-              <>
-                {willCallTrips.length > 0 && (
-                  <div className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] md:rounded-[2.5rem] border border-amber-200/50 shadow-sm overflow-hidden w-full">
-                    <div className="p-4 md:p-6 border-b border-amber-100 flex justify-between items-center bg-amber-50/50">
-                      <div className="flex items-center gap-4">
-                        <input 
-                          type="checkbox" 
-                          checked={willCallTrips.length > 0 && willCallTrips.every(t => selectedTasks.includes(t.id))}
-                          onChange={(e) => {
-                            const ids = willCallTrips.map(t => t.id);
-                            if (e.target.checked) {
-                              setSelectedTasks(prev => [...new Set([...prev, ...ids])]);
-                            } else {
-                              setSelectedTasks(prev => prev.filter(id => !ids.includes(id)));
-                            }
-                          }}
-                          className="w-5 h-5 rounded-[0.4rem] border-amber-300 text-amber-600 cursor-pointer"
-                        />
-                        <h3 className="text-base md:text-lg font-black text-amber-900 flex items-center gap-2">
-                          <Phone size={18} className="text-amber-600" /> Will Call Queue
-                        </h3>
-                      </div>
-                      <Badge variant="warning">{willCallTrips.length} Pending</Badge>
-                    </div>
-                    <div className="divide-y divide-slate-100/50">
-                      {willCallTrips.map(t => (
-                        <div key={t.id} className={`p-4 md:px-6 md:py-4 flex flex-col transition-colors ${selectedTasks.includes(t.id) ? 'bg-amber-50/50' : 'hover:bg-slate-50/50'}`}>
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="flex items-center gap-4 min-w-0">
-                              <input type="checkbox" checked={selectedTasks.includes(t.id)} onChange={() => toggleTaskSelection(t.id)} className="w-5 h-5 rounded-[0.4rem] border-slate-300 text-amber-600 shrink-0" />
-                              <div className="min-w-0">
-                                <p className="font-bold text-amber-900 text-sm md:text-base break-words">{t.patient}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <Badge variant={t.status === 'Assigned' ? 'success' : 'warning'}>{t.status === 'Assigned' ? 'Assigned' : 'Awaiting Call'}</Badge>
-                                  <span className="text-xs font-medium text-amber-700/70">{t.bookingId || '—'} &bull; {t.type}</span>
-                                  {isTripLate(t.time) && t.status !== 'Completed' && <Badge variant="danger">Late</Badge>}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between md:justify-end gap-2 md:gap-4 shrink-0">
-                            {t.status === 'Unassigned' ? (
-                                <div className="flex gap-2 w-full md:w-auto">
-                                  <button onClick={() => triggerSmartAssign(t)} className="flex-1 md:flex-none bg-indigo-600 text-white px-3 py-2.5 rounded-[1rem] text-xs sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-500/10"><BrainCircuit size={14} /> AI</button>
-                                  <button onClick={() => setManualAssignTrip(t)} className="flex-1 md:flex-none bg-blue-600 text-white px-3 py-2.5 rounded-[1rem] text-xs sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/10"><Users size={14} /> Assign</button>
-                                </div>
-                              ) : (
-                                <div className="bg-emerald-50 text-emerald-800 px-3 py-2 rounded-[1rem] border border-emerald-100 text-xs sm:text-xs font-bold flex items-center gap-1.5"><CheckCircle2 size={12} /> {drivers.find(d => d.id === t.driverId)?.name}</div>
-                              )}
-                              <button onClick={() => requestDeleteTrip(t.id)} className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-[1rem] active:scale-95 transition-all" title="Delete Trip"><Trash2 size={18} /></button>
-                            </div>
-                          </div>
-                          {t.status === 'Assigned' && (
-                            <div className="mt-2 pl-9">
-                               <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                                 <div className="h-full bg-blue-500 w-1/3 animate-pulse" />
-                               </div>
-                            </div>
-                          )}
-                           <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100 pl-9">
-                             {t.pickupPhone && (
-                               <>
-                                 <button onClick={() => makeCall(t.pickupPhone, t.patient)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-bold active:bg-emerald-200 transition-colors"><Phone size={12} /> {t.pickupPhone} <span className="text-xs font-medium opacity-70">Client</span></button>
-                                 <button onClick={() => sendSMS(t.pickupPhone, t.patient)} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm font-bold active:bg-blue-200 transition-colors"><MessageSquare size={12} /> SMS Client</button>
-                               </>
-                             )}
-                             {t.dropoffPhone && (
-                               <>
-                                 <button onClick={() => makeCall(t.dropoffPhone, t.patient)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold active:bg-slate-200 transition-colors"><Building2 size={12} /> {t.dropoffPhone} <span className="text-xs font-medium opacity-70">Hospital</span></button>
-                                 <button onClick={() => sendSMS(t.dropoffPhone, t.patient)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold active:bg-slate-200 transition-colors"><MessageSquare size={12} /> SMS Hosp</button>
-                               </>
-                             )}
-                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] md:rounded-[2.5rem] border border-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)] overflow-hidden w-full">
-                  <div className="p-5 md:p-6 border-b border-slate-100/50 flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                      <input 
-                        type="checkbox" 
-                        checked={sortedScheduled.length > 0 && sortedScheduled.every(t => selectedTasks.includes(t.id))}
-                        onChange={(e) => {
-                          const ids = sortedScheduled.map(t => t.id);
-                          if (e.target.checked) {
-                            setSelectedTasks(prev => [...new Set([...prev, ...ids])]);
-                          } else {
-                            setSelectedTasks(prev => prev.filter(id => !ids.includes(id)));
-                          }
-                        }}
-                        className="w-5 h-5 rounded-[0.4rem] border-slate-300 text-blue-600 cursor-pointer"
-                      />
-                      <h3 className="text-base md:text-lg font-black flex items-center gap-2">
-                        <Clock size={18} className="text-blue-600" /> Scheduled Board
-                      </h3>
-                    </div>
-                    <div className="flex gap-2">
-                      {selectedTasks.length > 0 && (
-                        <button onClick={() => setBulkAssignModal(true)} className="bg-emerald-600 text-white px-4 py-2.5 rounded-[1rem] text-xs font-bold active:scale-95 flex items-center gap-2 transition-all"><Users size={14} /> Assign {selectedTasks.length} Trips</button>
-                      )}
-                      {selectedTasks.length > 1 && (
-                        <button onClick={createSharedRide} className="bg-blue-600 text-white px-4 py-2.5 rounded-[1rem] text-xs font-bold active:scale-95 flex items-center gap-2 transition-all"><Repeat size={14} /> Group Trips</button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="divide-y divide-slate-100/50">
-                    {sortedScheduled.map(t => (
-                      <div key={t.id} className={`p-4 md:px-8 md:py-6 flex flex-col transition-colors ${selectedTasks.includes(t.id) ? 'bg-blue-50/50' : 'hover:bg-slate-50/50'}`}>
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                          <div className="flex items-center gap-4 min-w-0">
-                            <input type="checkbox" checked={selectedTasks.includes(t.id)} onChange={() => toggleTaskSelection(t.id)} className="w-5 h-5 rounded-[0.4rem] border-slate-300 text-blue-600 shrink-0" />
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-900 text-sm md:text-base break-words">{t.patient}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge variant={t.status === 'Unassigned' ? 'danger' : 'success'}>{t.status}</Badge>
-                                <span className="text-xs font-medium text-slate-500">{t.time}</span>
-                                {isTripLate(t.time) && t.status !== 'Completed' && <Badge variant="danger">Late</Badge>}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between md:justify-end gap-2 md:gap-4 shrink-0">
-                            {t.status === 'Unassigned' ? (
-                                <div className="flex gap-2 w-full md:w-auto">
-                                  <button onClick={() => triggerSmartAssign(t)} className="flex-1 md:flex-none bg-indigo-600 text-white px-3 py-2.5 rounded-[1rem] text-xs sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-500/10"><BrainCircuit size={14} /> AI</button>
-                                  <button onClick={() => setManualAssignTrip(t)} className="flex-1 md:flex-none bg-blue-600 text-white px-3 py-2.5 rounded-[1rem] text-xs sm:text-xs font-bold active:scale-95 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/10"><Users size={14} /> Assign</button>
-                                </div>
-                              ) : (
-                                <div className="bg-emerald-50 text-emerald-800 px-3 py-2 rounded-[1rem] border border-emerald-100 text-xs sm:text-xs font-bold flex items-center gap-1.5"><CheckCircle2 size={12} /> {drivers.find(d => d.id === t.driverId)?.name || 'Assigned'}</div>
-                              )}
-                            <button onClick={() => requestDeleteTrip(t.id)} className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-[1rem] active:scale-95 transition-all" title="Delete Trip"><Trash2 size={18} /></button>
-                          </div>
-                        </div>
-                        {t.status === 'Assigned' && (
-                          <div className="mt-2 pl-9">
-                             <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                               <div className="h-full bg-blue-500 w-1/3 animate-pulse" />
-                             </div>
-                          </div>
-                        )}
-                        <div className="mt-3 pl-9 text-sm font-medium text-slate-500 flex flex-col gap-1">
-                          <p className="flex items-center gap-2 break-words"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span> {t.pickup}</p>
-                          <p className="flex items-center gap-2 break-words"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span> {t.dropoff}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-2 pl-9">
-                          {t.pickupPhone && (
-                            <>
-                              <button onClick={() => makeCall(t.pickupPhone, t.patient)} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold active:bg-emerald-200 transition-colors"><Phone size={11} /> Client</button>
-                              <button onClick={() => sendSMS(t.pickupPhone, t.patient)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold active:bg-blue-200 transition-colors"><MessageSquare size={11} /> SMS</button>
-                            </>
-                          )}
-                          {t.dropoffPhone && (
-                            <>
-                              <button onClick={() => makeCall(t.dropoffPhone, t.patient)} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold active:bg-slate-200 transition-colors"><Building2 size={11} /> Hospital</button>
-                              <button onClick={() => sendSMS(t.dropoffPhone, t.patient)} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold active:bg-slate-200 transition-colors"><MessageSquare size={11} /> SMS</button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="lg:col-span-4 space-y-4 sm:space-y-6">
-            <div className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] p-4 sm:p-6 border border-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
-              <div className="flex justify-between items-center mb-4 sm:mb-6">
-                <h3 className="text-sm sm:text-base font-black text-slate-900">Live Fleet</h3>
-                <div className="flex items-center gap-3">
-                  {role === 'admin' && <button className="p-1.5 sm:p-2 bg-slate-100 hover:bg-slate-200 rounded-lg sm:rounded-[1rem] text-slate-600 active:scale-95 transition-all" title="Add Driver/Vehicle"><Plus size={14} /></button>}
-                  <span className="relative flex h-2 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2.5 bg-emerald-500"></span>
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2 sm:space-y-3">
-                {drivers.map(d => {
-                  const isMaintenanceDue = d.nextOilChange - d.odometer < 200;
-                  return (
-                    <div key={d.id} className={`p-3 sm:p-4 rounded-xl sm:rounded-[1.5rem] active:scale-[0.98] transition-all cursor-pointer ${isMaintenanceDue ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100/50'}`}>
-                      <div className="flex items-center justify-between mb-2 sm:mb-3">
-                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                          <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-lg sm:rounded-[1rem] bg-blue-100 text-blue-600 flex items-center justify-center font-bold shrink-0 text-xs sm:text-sm">{d.name.charAt(0)}</div>
-                          <div className="min-w-0">
-                            <p className="font-bold text-xs sm:text-sm break-words text-slate-900">{d.name}</p>
-                            <p className="text-xs sm:text-xs font-medium text-slate-500 flex items-center gap-1 break-words"><MapPin size={8} className="text-blue-500 shrink-0" /> {d.currentZone}</p>
-                          </div>
-                        </div>
-                        <div className={`w-2 h-2.5 rounded-full ${d.status === 'Available' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs sm:text-xs font-bold text-slate-500">
-                        <div className="flex items-center gap-2">
-                          <span>{d.vehicle}</span>
-                          {d.phone && (
-                            <div className="flex gap-1 ml-1">
-                              <button onClick={() => makeCall(d.phone, d.name)} className="p-1 bg-emerald-50 text-emerald-600 rounded hover:bg-emerald-100"><Phone size={8} /></button>
-                              <button onClick={() => sendSMS(d.phone, d.name)} className="p-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><MessageSquare size={8} /></button>
-                            </div>
-                          )}
-                        </div>
-                        <span>{d.dist}</span>
-                        {isMaintenanceDue && <span className="text-rose-600"><Wrench size={10} className="inline mr-1" />Service Due</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] p-4 sm:p-6 border border-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
-              <h3 className="text-sm sm:text-base font-black text-slate-900 mb-3 sm:mb-4 flex items-center gap-2"><Activity size={16} className="text-indigo-600" /> System Pulse</h3>
-              <div className="space-y-1 sm:space-y-2 max-h-48 sm:max-h-60 overflow-y-auto">
-                {logs.slice(0, 5).map((log, idx) => (
-                  <div key={idx} className="flex items-start gap-2 p-1.5 sm:p-2 rounded-lg hover:bg-slate-50">
-                    <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${log.c === 'amber' ? 'bg-amber-500' : log.c === 'blue' ? 'bg-blue-500' : log.c === 'rose' ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
-                    <div className="min-w-0">
-                      <p className="text-sm sm:text-xs font-bold text-slate-900 break-words">{log.t}</p>
-                      <p className={`text-xs sm:text-xs ${getLogTextColor(log.c)} break-words`}>{log.d}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <>
@@ -2001,72 +2335,24 @@ const today = getTodayStr();
       <div className={`offline-banner${isOffline ? ' visible' : ''}`}>
         You are offline — changes will sync when connection returns
       </div>
-      <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
-      {/* HEADER */}
-      <header className="bg-white shadow-sm border-b border-slate-200" style={{paddingTop: 'var(--sat)'}}>
-        <div className="max-w-full px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <img src="/agape.png" alt="Agape Care" className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl shrink-0 shadow-sm" />
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 truncate leading-tight tracking-tight">Agape Care</h1>
-              <p className="hidden sm:block text-sm text-slate-500 font-medium">Fleet Management System</p>
-            </div>
-          </div>
-          {isAuthenticated && (
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              {role === 'driver' && (() => {
-                const myDriver = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase());
-                const isOnline = myDriver?.clockedIn || false;
-                return (
-                  <button onClick={() => handleDriverStatusUpdate(myDriver?.id, !isOnline)}
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
-                      isOnline
-                        ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200'
-                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                    }`}
-                    title={isOnline ? 'Go Offline' : 'Go Online'}>
-                    {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
-                  </button>
-                );
-              })()}
-              {role === 'driver' && phoneNumbers?.routing && (
-                <button onClick={() => makeCall(phoneNumbers.routing, 'Routing')} className="h-8 px-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center gap-1 shadow-sm" title="Call Routing">
-                  <Phone size={12} />
-                  <span className="text-[9px] font-bold">Rout</span>
-                </button>
-              )}
-              {role === 'driver' && phoneNumbers?.dispatcher && (
-                <button onClick={() => makeCall(phoneNumbers.dispatcher, 'Dispatch')} className="h-8 px-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition flex items-center gap-1 shadow-sm" title="Call Dispatch">
-                  <Phone size={12} />
-                  <span className="text-[9px] font-bold">Disp</span>
-                </button>
-              )}
-              <span className="hidden sm:inline-flex items-center px-4 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold capitalize border border-blue-100">{role}</span>
-              <button onClick={handleLogout} className="h-10 px-3 hover:bg-slate-100 rounded-xl text-slate-600 hover:text-slate-900 transition font-semibold text-sm flex items-center gap-1.5">
-                <LogOut size={18} /> <span className="hidden sm:inline">Sign Out</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-
+      <div className="min-h-screen flex-1 flex flex-col bg-slate-100 overflow-visible w-full">
+      {/* Header removed: DriverPage handles its own UI */}
       {startupIssue && !isLoading && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-2 text-xs sm:text-sm font-semibold text-amber-800 flex items-center justify-between gap-3">
           <span className="flex items-center gap-2 min-w-0"><AlertCircle size={16} className="shrink-0" /> <span className="truncate">{startupIssue}</span></span>
           <button onClick={() => setStartupIssue('')} className="text-amber-700 hover:text-amber-900 font-bold shrink-0">Dismiss</button>
         </div>
       )}
+      {isAuthenticated && (
+        // Status bar removed per UX request — connection indicator now next to company name in page headers
+        <></>
+      )}
 
       {/* LOADING SCREEN */}
       {isLoading ? (
-        <div className="flex-1 bg-slate-50 flex items-center justify-center px-4">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.45)] flex flex-col items-center gap-6 text-center">
-            <div className="relative">
-              <div className="w-20 h-20 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin shadow-lg shadow-blue-100"></div>
-              <div className="absolute inset-3 rounded-full bg-blue-50 flex items-center justify-center">
-                <ShieldCheck size={24} className="text-blue-600" />
-              </div>
-            </div>
+        <div className="flex-1 bg-slate-100 flex items-center justify-center px-4">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-8 flex flex-col items-center gap-6 text-center">
+            <img src="/agape.png" alt="Agape Care" className="w-20 h-20 object-contain" />
             <div className="text-center">
               <p className="text-lg font-bold text-slate-700">Loading Agape Care</p>
               <p className="text-sm font-medium text-slate-400 mt-1">Preparing your workspace...</p>
@@ -2080,15 +2366,9 @@ const today = getTodayStr();
                     <RefreshCcw size={15} /> Retry
                   </button>
                   <button onClick={async () => {
+                    skipNextSignedOutResetRef.current = true;
                     await signOut(auth).catch(() => {});
-                    roleRef.current = null;
-                    currentUserRef.current = null;
-                    setRole(null);
-                    setCurrentUser(null);
-                    setIsAuthenticated(false);
-                    setDataLoaded(false);
-                    setLoginError('Session reset. Please sign in again.');
-                    setIsLoading(false);
+                    resetSessionState({ loginErrorMessage: 'Session reset. Please sign in again.' });
                   }} className="h-11 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm active:scale-95 transition">
                     Access Portal
                   </button>
@@ -2099,56 +2379,110 @@ const today = getTodayStr();
         </div>
       ) : !isAuthenticated ? (
         renderLoginScreen()
+      ) : dataLoading ? (
+        <div className="flex-1 bg-slate-100 flex items-center justify-center px-4">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-8 flex flex-col items-center gap-5 text-center">
+            <img src="/agape.png" alt="Agape Care" className="w-16 h-16 object-contain" />
+            <div>
+              <p className="text-lg font-bold text-slate-800">Syncing live operations</p>
+              <p className="text-sm font-medium text-slate-500 mt-1">Pulling trips, drivers, assignments, and route data from Firestore.</p>
+            </div>
+            <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+          </div>
+        </div>
       ) : (
         <>
           {role === 'driver' ? (() => {
-            const normalizedCurrentUserEmail = (currentUser || '').trim().toLowerCase();
-            const matchedDriver = drivers.find(d => ((d.email || '').trim().toLowerCase()) === normalizedCurrentUserEmail);
-            const myDriver = matchedDriver || (normalizedCurrentUserEmail ? buildDriverProfileFromEmail(normalizedCurrentUserEmail, auth.currentUser?.uid || '') : null);
-            const driverId = myDriver?.id;
-            const isTripForCurrentDriver = (trip) => {
-              const resolvedDriverEmail = (
-                trip.driverEmail || drivers.find(d => d.id === trip.driverId)?.email || ''
-              ).trim().toLowerCase();
-              return trip.driverId === driverId || resolvedDriverEmail === normalizedCurrentUserEmail;
-            };
-            const myTrips = trips.filter(t => isTripForCurrentDriver(t) && tripMatchesTodayOrTomorrow(t.date));
+            const myDriver = currentUserDriverProfile;
+            if (!myDriver) {
+              return (
+                <div className="flex-1 bg-slate-100 flex items-center justify-center px-4">
+                  <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl shadow-sm p-6 text-center">
+                    <img src="/agape.png" alt="Agape Care" className="w-16 h-16 object-contain mx-auto mb-4" />
+                    <h2 className="text-lg font-black text-slate-900">
+                      {dataLoading ? 'Syncing your driver profile...' : 'Driver profile not ready'}
+                    </h2>
+                    <p className="text-sm font-medium text-slate-500 mt-2 leading-relaxed">
+                      {dataLoading
+                        ? 'We are reconnecting your cloud driver record and live trips.'
+                        : 'We are reconnecting your cloud driver record and assigned trips. Dispatch can help if the trip board still looks empty after sync.'}
+                    </p>
+                    <div className="mt-5 grid grid-cols-1 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => makeCall(phoneNumbers?.dispatcher || '', 'Dispatcher')}
+                        disabled={!phoneNumbers?.dispatcher}
+                        className="h-11 rounded-xl bg-blue-50 text-blue-700 font-bold text-sm border border-blue-200 disabled:opacity-50"
+                      >
+                        Call Dispatcher
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            const driverId = myDriver.id;
+            const myTrips = currentUserDriverTrips;
             const myDrivers = myDriver ? [myDriver] : [];
             return <DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
+              allDrivers={drivers}
+              dispatchers={dispatchers}
+              chatUnreadCount={chatUnreadCount}
               appSettings={appSettings}
               activeMission={myDriver?.activeMission}
               phoneNumbers={phoneNumbers}
               onOpenSettings={() => setActiveTab('settings')}
+              onLogout={handleLogout}
               onUpdateAppSettings={updateAppSettings}
               onUpdateMission={(updatedMission) => {
                 setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, activeMission: updatedMission } : d));
-                setTimeout(persistState, 0);
+                // Firestore auto-syncs via useFirestoreAppData
               }}
               onUpdateDriverLocation={handleUpdateDriverLocation}
               onUpdateTrip={(tripId, status, extraData = {}) => {
-                setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
-                const trip = sTrips.current.find(t => t.id === tripId);
-                addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${tripId} (${trip?.patient || 'Unknown'}) to ${status}`, 'blue');
+                const prevTrip = trips.find(t => t.id === tripId);
+                const newTrip = prevTrip ? { ...prevTrip, status, ...extraData } : null;
+                if (newTrip) {
+                  // Apply update
+                  setTrips(prev => prev.map(t => t.id === tripId ? newTrip : t));
+                  // Compute field-level diffs for audit
+                  const changed = [];
+                  Object.keys(newTrip).forEach((k) => {
+                    const a = prevTrip[k];
+                    const b = newTrip[k];
+                    if (String(a) !== String(b)) changed.push({ field: k, before: a, after: b });
+                  });
+                  if (changed.length > 0) {
+                    const details = changed.map(c => `${c.field}: ${c.before ?? '—'} → ${c.after ?? '—'}`).join('; ');
+                    addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${tripId} (${prevTrip?.patient || 'Unknown'})`, 'blue', { entity: 'trip', id: tripId, diffs: changed, summary: details });
+                  }
+                }
               }}
               onDriverStatusUpdate={handleDriverStatusUpdate}
               onCompleteTrip={(tripId, driverId, odometer) => {
                 handleCompleteTrip(tripId, driverId, odometer);
-                const trip = sTrips.current.find(t => t.id === tripId);
+                const trip = trips.find(t => t.id === tripId);
                 addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'Unknown'}). Odo: ${odometer}`, 'emerald');
               }}
+              onAddAuditLog={addAuditLog}
+              onAddTrip={addTrip}
+              requestAuthAction={requestAuthAction}
+              showAddTripModal={showAddTripModal}
+              setShowAddTripModal={setShowAddTripModal}
             />;
           })() : (
             <EnterpriseDashboard
               role={role}
               currentUser={currentUser}
-              trips={trips}
+              trips={scopedTrips}
               setTrips={setTrips}
-              drivers={drivers}
+              drivers={scopedDrivers}
               setDrivers={setDrivers}
               dispatchers={dispatchers}
               setDispatchers={setDispatchers}
               vehicles={vehicles}
               setVehicles={setVehicles}
+              onDispatcherStatusUpdate={handleDispatcherStatusUpdate}
               trashedTrips={trashedTrips}
               restoreTrip={restoreTrip}
               logs={logs}
@@ -2182,7 +2516,8 @@ const today = getTodayStr();
               setShowDispatcherArchive={setShowDispatcherArchive}
               addToast={addToast}
               addAuditLog={addAuditLog}
-              persistState={persistState}
+              persistState={() => {}} // No-op: Firestore is the single source of truth
+              driverTelemetry={driverTelemetry}
               hasPermission={hasPermission}
               requestAuthAction={requestAuthAction}
               triggerSmartAssign={triggerSmartAssign}
@@ -2192,13 +2527,58 @@ const today = getTodayStr();
               createSharedRide={createSharedRide}
               createLegMission={createLegMission}
               requestDeleteTrip={requestDeleteTrip}
+              requestBulkDelete={requestBulkDelete}
               updateTrip={updateTrip}
+              updateTrashedTrip={updateTrashedTrip}
               chatUnreadCount={chatUnreadCount}
               makeCall={makeCall}
               sendSMS={sendSMS}
               handleUpdateDriverLocation={handleUpdateDriverLocation}
+              addTrip={addTrip}
+              showAddTripModal={showAddTripModal}
+              setShowAddTripModal={setShowAddTripModal}
+              driverWorkDrivers={currentUserDriverProfile ? [currentUserDriverProfile] : []}
+              driverWorkTrips={currentUserDriverTrips}
+              allDrivers={drivers}
+              onUpdateMission={(updatedMission) => {
+                setDrivers(prev => prev.map(d => normalizeEmail(d.email) === normalizeEmail(currentUser) ? { ...d, activeMission: updatedMission } : d));
+              }}
+              onUpdateDriverTrip={(tripId, status, extraData = {}) => {
+                const prevTrip = trips.find(t => t.id === tripId);
+                const nextTrip = prevTrip ? { ...prevTrip, status, ...extraData } : null;
+                if (!nextTrip) return;
+                setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
+                const diffs = [];
+                Object.keys(nextTrip).forEach((key) => {
+                  if (String(prevTrip?.[key]) !== String(nextTrip?.[key])) {
+                    diffs.push({ field: key, before: prevTrip?.[key], after: nextTrip?.[key] });
+                  }
+                });
+                addAuditLog(
+                  'Worker Driver Update',
+                  `${currentUser} updated trip ${tripId} (${prevTrip?.patient || 'Unknown'}) to ${status}`,
+                  'blue',
+                  { entity: 'trip', id: tripId, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; ') }
+                );
+              }}
+              onDriverStatusUpdate={handleDriverStatusUpdate}
+              onCompleteTrip={handleCompleteTrip}
+              onLogout={handleLogout}
             />
           )}
+
+          {/* Global Modals */}
+          {showAddTripModal && (
+            <AddTripModal
+              onClose={() => setShowAddTripModal(false)}
+              onAddTrip={addTrip}
+              role={role}
+              currentUser={currentUser}
+              drivers={role === 'dispatcher' ? scopedDrivers : drivers}
+              dispatchers={dispatchers}
+            />
+          )}
+          {renderSecurityAuthModal()}
 
           {/* Toast Notifications - Global */}
           <div className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-[200] flex flex-col gap-3 pointer-events-none">
@@ -2217,6 +2597,7 @@ const today = getTodayStr();
         </>
       )}
     </div>
+      <AIAssistantFloating />
     </>
   );
 };

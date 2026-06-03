@@ -1,4 +1,3 @@
-import { playNotificationSound, playMessageSound } from '../utils/notificationSound';
 import app, { getMessaging, getToken, onMessage } from './firebase';
 
 const VAPID_KEY = 'BMA5e1UV1qoZ1TDxp4FQ5Q4qCAKVdsGD8yFGvqYpZ9DgF-1FMPQeHNdH7FsqTGEcHl-zUDRWZ0j3EL0tQ8PvBzM';
@@ -75,12 +74,6 @@ export function showLocalNotification(title, body, type = 'notification') {
       });
     } catch { /* Notification may fail in some environments */ }
   };
-
-  if (type === 'message') {
-    playMessageSound();
-  } else {
-    playNotificationSound();
-  }
 
   if (Notification.permission === 'granted') {
     doNotify();

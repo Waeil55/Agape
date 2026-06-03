@@ -1,27 +1,41 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { tripMatchesTodayOrTomorrow } from '../utils/tripDate';
-import { auth, db, doc, onSnapshot, getDoc, setDoc, signOut, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading } from '../config/firebase';
+import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate } from '../utils/tripDate';
+import { auth, db, doc, onSnapshot, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles } from '../config/maps';
 import LiveRouteMap from './LiveRouteMap';
 import { showLocalNotification } from '../config/notifications';
+import { playNotificationSound } from '../utils/notificationSound';
 import ChatPage from './ChatPage';
 import DriverToolsPage from './DriverToolsPage';
+import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
+import TaskCard from './TaskCard';
+import EditTripModal from './EditTripModal';
 import {
   Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle,
   AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check,
-  ChevronUp, ChevronDown, Edit2, ListChecks, Sparkles, Target, RotateCcw, Lock,
-  Home, History, MessageSquare, Settings, LogOut, ChevronLeft, Calendar,
-  Wifi, WifiOff, Filter, ArrowRight, Send, Smile, Bell, Circle, Search,
-  Star, Activity, Repeat, Zap, X, Route, PhoneCall, Radio, CircleDot,
-  CheckSquare, Square, BrainCircuit, Map, BarChart3, Sun, Moon,
+  ChevronUp, ChevronDown, RotateCcw, Lock, RefreshCw, Forward,
+  Home, Settings, LogOut,
+  Wifi, WifiOff, ArrowRight, Search,
+  Repeat, Zap, X, Route,
+  CheckSquare, Square, Map, BarChart3, Sun, Moon,
   Download, Trash2, FileText, AlertTriangle, Info,
-  Timer, Copy, PhoneForwarded, Shield, Headphones
+  Copy, PhoneForwarded, Shield, Headphones, Building, Edit2
 } from 'lucide-react';
 import { openNavigation, showNavActionSheet, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
-import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone } from '../utils/smartContacts';
+import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
+
+const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
+const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
+
+const isWillCall = (trip) => {
+  const t = (trip && typeof trip === 'object') ? trip.time : trip;
+  if (t === undefined || t === null) return true;
+  const s = String(t).toUpperCase().trim();
+  return s === '' || s === 'WILL CALL' || s === 'WC';
+};
 
 const to12hr = (time) => {
   if (!time || time === 'Will Call' || time === 'WC') return time || 'Will Call';
@@ -48,20 +62,6 @@ const formatTimeInput = (v) => {
   return m ? `${m[1].padStart(2, '0')}:${m[2]}` : v;
 };
 
-const timeToMinutes = (t) => {
-  if (!t || t === 'Will Call' || t === 'WC') return 1440;
-  const m = String(t).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-  if (!m) return 1440;
-  let h = parseInt(m[1], 10);
-  let min = parseInt(m[2] || '0', 10);
-  const p = m[3];
-  if (p) {
-    if (p.toUpperCase() === 'PM' && h < 12) h += 12;
-    if (p.toUpperCase() === 'AM' && h === 12) h = 0;
-  }
-  return h * 60 + min;
-};
-
 const formatDuration = (minutes) => {
   if (!minutes || minutes < 0) return '--';
   if (minutes < 60) return `${Math.round(minutes)} min`;
@@ -70,18 +70,76 @@ const formatDuration = (minutes) => {
   return `${h}h ${m}m`;
 };
 
-const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, appSettings = {}, phoneNumbers = {}, onUpdateDriverLocation, onUpdateAppSettings }) => {
-  const me = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase());
-  const [activeNav, setActiveNav] = useState('trips');
-  const [historyFilter, setHistoryFilter] = useState('all');
-  const [historySearch, setHistorySearch] = useState('');
-  const [chatUnread, setChatUnread] = useState(0);
+const buildFallbackDriverProfile = (email = '') => ({
+  id: '',
+  email,
+  name: String(email || 'Driver').replace(/@auth\.agapecare\.local$/i, '').split('@')[0] || 'Driver',
+  phone: '',
+  status: 'Offline',
+  vehicle: '',
+  currentZone: '',
+  odometer: 0,
+  nextOilChange: 5000,
+  clockedIn: false,
+});
+
+const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers, dispatchers, chatUnreadCount = 0, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction }) => {
+  const me = useMemo(
+    () =>
+      drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase()) ||
+      (allDrivers || []).find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase()) ||
+      buildFallbackDriverProfile(currentUser || ''),
+    [drivers, allDrivers, currentUser]
+  );
+  const normalizedCurrentUserEmail = useMemo(
+    () => (currentUser || me?.email || '').trim().toLowerCase(),
+    [currentUser, me?.email]
+  );
+  const driverIdentityIds = useMemo(() => {
+    const knownProfiles = [...(drivers || []), ...(allDrivers || [])];
+    return new Set(
+      knownProfiles
+        .filter((driver) => (driver?.email || '').trim().toLowerCase() === normalizedCurrentUserEmail)
+        .map((driver) => driver.id)
+        .concat(me?.id ? [me.id] : [])
+        .filter(Boolean)
+    );
+  }, [drivers, allDrivers, me?.id, normalizedCurrentUserEmail]);
+  const tripBelongsToCurrentDriver = useCallback((trip) => {
+    if (!trip) return false;
+    if (trip.driverId && driverIdentityIds.has(trip.driverId)) return true;
+    const resolvedDriverEmail = (
+      trip.driverEmail ||
+      drivers.find((driver) => driver.id === trip.driverId)?.email ||
+      (allDrivers || []).find((driver) => driver.id === trip.driverId)?.email ||
+      ''
+    ).trim().toLowerCase();
+    return !!normalizedCurrentUserEmail && resolvedDriverEmail === normalizedCurrentUserEmail;
+  }, [driverIdentityIds, normalizedCurrentUserEmail, drivers, allDrivers]);
+  const driverScopedTrips = useMemo(
+    () => (Array.isArray(trips) ? trips.filter(tripBelongsToCurrentDriver) : []),
+    [trips, tripBelongsToCurrentDriver]
+  );
+  const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
+  const [activeNav, setActiveNav] = useState(() => {
+    const savedNav = localStorage.getItem(`agape_drvNav_${userKey}`) || 'trips';
+    return ['trips', 'tools', 'history', 'chat', 'settings'].includes(savedNav) ? savedNav : 'trips';
+  });
+  const [historyFilter, setHistoryFilter] = useState(() => localStorage.getItem(`agape_drvHistFilter_${userKey}`) || 'all');
+  const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
+
+  useEffect(() => {
+    localStorage.setItem(`agape_drvNav_${userKey}`, activeNav);
+    localStorage.setItem(`agape_drvHistFilter_${userKey}`, historyFilter);
+    localStorage.setItem(`agape_drvHistSearch_${userKey}`, historySearch);
+  }, [activeNav, historyFilter, historySearch, userKey]);
   const [selectedTrips, setSelectedTrips] = useState([]);
   const [aiOptimizing, setAiOptimizing] = useState(false);
   const [aiSequence, setAiSequence] = useState(null);
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [guidedMode, setGuidedMode] = useState(false);
   const [guidedStepIndex, setGuidedStepIndex] = useState(0);
+  const [guidedSteps, setGuidedSteps] = useState([]);
   const guidedLastAdvance = useRef(-1);
   const [aiRideShare, setAiRideShare] = useState([]);
   const [showOdometerPrompt, setShowOdometerPrompt] = useState(null);
@@ -93,14 +151,26 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const [showSignatureConfirm, setShowSignatureConfirm] = useState(null);
   const [showCompleteModal, setShowCompleteModal] = useState(null);
   const [completeOdometer, setCompleteOdometer] = useState('');
+  const [completeError, setCompleteError] = useState('');
   const [departedTime, setDepartedTime] = useState('');
   const [arrivalDropoffTime, setArrivalDropoffTime] = useState('');
   const [showTripDetails, setShowTripDetails] = useState(null);
-  const [legActionPrompt, setLegActionPrompt] = useState(null);
+  const [showToast, setShowToast] = useState(null);
+  const [expandedTripId, setExpandedTripIdRaw] = useState(() => {
+    try { const v = localStorage.getItem('expandedTripId'); return v && v !== 'null' ? v : null; } catch { return null; }
+  });
+  const setExpandedTripId = useCallback((val) => {
+    setExpandedTripIdRaw(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      try { if (next) localStorage.setItem('expandedTripId', next); else localStorage.removeItem('expandedTripId'); } catch {}
+      return next;
+    });
+  }, []);
   const [selectedLegsForAction, setSelectedLegsForAction] = useState(new Set());
   const [isGpsTracking, setIsGpsTracking] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlineQueue, setOfflineQueue] = useState([]);
+  const [showSequencerModal, setShowSequencerModal] = useState(false);
   const [driverPosition, setDriverPosition] = useState(null);
   const [analytics, setAnalytics] = useState({ tripsCompleted: 0, totalDistance: 0, timeSaved: 0, totalDriveTime: 0, efficiency: 0 });
   const [legsDetailPatient, setLegsDetailPatient] = useState(null);
@@ -118,23 +188,115 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const [passwordVerifying, setPasswordVerifying] = useState(false);
   const [showContactSelector, setShowContactSelector] = useState(null);
   const [restorePrompt, setRestorePrompt] = useState(null);
+  const [cancelPrompt, setCancelPrompt] = useState(null);
+  const [showLegsModal, setShowLegsModal] = useState(null);
+  const [editTripModal, setEditTripModal] = useState(null);
+  const [skipConfirmTripId, setSkipConfirmTripId] = useState(null);
+  const [routeTemplates, setRouteTemplates] = useState([]);
+  const [assignedSequence, setAssignedSequence] = useState(null);
+  const [showAssignedRouteDetails, setShowAssignedRouteDetails] = useState(false);
+  const displayLoginId = useMemo(
+    () => String(me?.email || currentUser || '').replace(/@auth\.agapecare\.local$/i, ''),
+    [me?.email, currentUser]
+  );
+  const tripsScrollRef = useRef(null);
+  const workflowScrollLockRef = useRef({ tripId: null, locked: false });
+
+  const scrollTripsToTop = useCallback((behavior = 'smooth') => {
+    const node = tripsScrollRef.current;
+    if (node && typeof node.scrollTo === 'function') {
+      node.scrollTo({ top: 0, behavior });
+      return;
+    }
+    window.scrollTo({ top: 0, behavior });
+  }, []);
+
+  const engageWorkflowScrollLock = useCallback((tripId, behavior = 'smooth') => {
+    workflowScrollLockRef.current = { tripId, locked: true };
+    requestAnimationFrame(() => {
+      scrollTripsToTop(behavior);
+      setTimeout(() => scrollTripsToTop('auto'), behavior === 'smooth' ? 380 : 0);
+    });
+  }, [scrollTripsToTop]);
+
+  const releaseWorkflowScrollLock = useCallback(() => {
+    workflowScrollLockRef.current = { tripId: null, locked: false };
+  }, []);
+
+  useEffect(() => {
+    if (!me?.id) return;
+    const unsub = onSnapshot(doc(db, 'routeData', 'sequences'), (snap) => {
+      if (snap.exists()) {
+        const templates = snap.data().templates || [];
+        setRouteTemplates(templates);
+      } else {
+        setRouteTemplates([]);
+      }
+    });
+    return () => unsub();
+  }, [me, trips]);
+
+  // Re-compute assignedSequence whenever templates, me, or trips change
+  useEffect(() => {
+    setAssignedSequence(getDriverActiveRoutePlan(routeTemplates, me, trips));
+  }, [routeTemplates, me, trips]);
+
+  useEffect(() => {
+    if (!assignedSequence) {
+      setShowAssignedRouteDetails(false);
+    }
+  }, [assignedSequence?.id]);
+
+  // Clear expandedTripId if the trip no longer exists
+  useEffect(() => {
+    if (expandedTripId && !trips.some(t => t.id === expandedTripId)) {
+      setExpandedTripId(null);
+    }
+  }, [trips, expandedTripId, setExpandedTripId]);
+
   const gpsWatchId = useRef(null);
   const meRef = useRef(me);
   const lastUpdateRef = useRef(0);
   const queueRef = useRef([]);
   const etasRef = useRef({});
   const positionRef = useRef(null);
+  const addressCoordsCache = useRef({});
+  const geofenceAlerted = useRef(new Set());
   meRef.current = me;
   positionRef.current = driverPosition;
+
+  const geofenceProximityNotified = useRef(new Set());
+
+  // Geocode addresses for active trips and cache results
+  const preloadAddressCoords = useCallback(async (trip) => {
+    const addressesToGeocode = [];
+    if (trip.pickup && !addressCoordsCache.current[trip.pickup]) addressesToGeocode.push({ addr: trip.pickup, type: 'pickup' });
+    if (trip.dropoff && !addressCoordsCache.current[trip.dropoff]) addressesToGeocode.push({ addr: trip.dropoff, type: 'dropoff' });
+    for (const { addr, type } of addressesToGeocode) {
+      try {
+        const { geocodeAddress } = await import('../config/maps');
+        const coords = await geocodeAddress(addr);
+        if (coords?.lat && coords?.lng) {
+          addressCoordsCache.current[addr] = { lat: coords.lat, lng: coords.lng, type };
+        }
+      } catch {}
+    }
+  }, []);
+
+  // Preload address coords when entering navigation
+  const preloadGeofence = useCallback((trip) => {
+    if (!trip) return;
+    preloadAddressCoords(trip);
+  }, [preloadAddressCoords]);
 
   // Smart contact system: build contact list per trip with type detection
   const tripContacts = useMemo(() => {
     const map = {};
-    trips.forEach(t => {
+    driverScopedTrips.forEach(t => {
       map[t.id] = buildContactList(t, trips, phoneNumbers);
     });
     return map;
-  }, [trips, phoneNumbers]);
+  }, [driverScopedTrips, trips, phoneNumbers]);
 
   const getPrimaryContactForTrip = (trip) => getPrimaryContact(trip, trips, phoneNumbers);
 
@@ -143,29 +305,54 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   // Count legs per patient for today
   const patientLegs = useMemo(() => {
     const counts = {};
-    trips.forEach(t => {
-      const isAssignedToMe = (t.driverId === me?.id || ((t.driverEmail || '').toLowerCase() === (me?.email || '').toLowerCase()));
-      if (!isAssignedToMe) return;
+    driverScopedTrips.forEach(t => {
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
       counts[key] = (counts[key] || 0) + 1;
     });
     return counts;
-  }, [trips, me?.id, me?.email]);
+  }, [driverScopedTrips]);
 
   // Count ACTIVE legs per patient (for no-show/cancel decision)
   const patientActiveLegs = useMemo(() => {
     const counts = {};
-    trips.forEach(t => {
-      const isAssignedToMe = (t.driverId === me?.id || ((t.driverEmail || '').toLowerCase() === (me?.email || '').toLowerCase()));
-      if (!isAssignedToMe) return;
+    driverScopedTrips.forEach(t => {
       if (['Completed','Cancelled','No Show'].includes(t.status)) return;
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
       counts[key] = (counts[key] || 0) + 1;
     });
     return counts;
-  }, [trips, me?.id, me?.email]);
+  }, [driverScopedTrips]);
+
+  const updateAssignedRouteRecord = useCallback(async (updates, auditTitle, auditMessage) => {
+    if (!assignedSequence?.id || routeTemplates.length === 0) return;
+    const nextTemplates = routeTemplates.map((template) => (
+      template.id === assignedSequence.id ? { ...template, ...updates } : template
+    ));
+    await setDoc(doc(db, 'routeData', 'sequences'), { templates: nextTemplates }, { merge: true });
+    if (auditTitle && auditMessage && onAddAuditLog) {
+      onAddAuditLog(auditTitle, auditMessage, 'indigo');
+    }
+  }, [assignedSequence?.id, routeTemplates, currentUser, onAddAuditLog]);
+
+  const startAssignedRoute = useCallback(async () => {
+    if (!assignedSequence) return;
+    const orderedTripIds = [...new Set((assignedSequence.sequence || []).map((step) => step.clientId))];
+    const steps = (assignedSequence.sequence || []).map((step) => ({ tripId: step.clientId, type: step.type }));
+    setAiSequence(orderedTripIds);
+    setGuidedSteps(steps);
+    setGuidedStepIndex(0);
+    guidedLastAdvance.current = -1;
+    setGuidedMode(true);
+    setShowAssignedRouteDetails(true);
+    if (steps[0]?.tripId) engageWorkflowScrollLock(steps[0].tripId);
+    await updateAssignedRouteRecord({
+      assignmentStatus: ROUTE_ASSIGNMENT_STATUS.IN_PROGRESS,
+      driverAcknowledgedAt: assignedSequence.driverAcknowledgedAt || new Date().toISOString(),
+      startedAt: new Date().toISOString(),
+    }, 'Route Started', `${currentUser} started route "${assignedSequence.name || 'Assigned Route'}".`);
+  }, [assignedSequence, currentUser, updateAssignedRouteRecord, engageWorkflowScrollLock]);
 
   const getUrgency = (trip) => {
     if (!trip || !trip.time || ['Completed','Cancelled','No Show'].includes(trip.status)) return 0;
@@ -188,6 +375,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     urgent.forEach(t => {
       notifiedTripsRef.current.add(t.id);
       const level = getUrgency(t) === 2 ? 'Overdue' : 'Due Soon';
+      playNotificationSound();
       showLocalNotification(`🚨 ${level}: ${t.patient}`, `${t.time} — ${t.pickup} → ${t.dropoff}`);
     });
   }, [trips]);
@@ -209,12 +397,17 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const revertTripStatus = (trip) => {
     const prevStatus = trip.status === 'Navigating Dropoff' ? 'In Transit' : trip.status === 'At Dropoff' ? 'In Transit' : trip.status === 'In Transit' ? 'At Pickup' : trip.status === 'At Pickup' ? 'In Progress' : trip.status === 'Navigating Pickup' ? 'In Progress' : trip.status === 'In Progress' ? 'Assigned' : trip.status === 'Arrived' ? 'In Transit' : null;
     if (!prevStatus) return;
+    if (prevStatus === 'Assigned' || prevStatus === 'Unassigned') {
+      releaseWorkflowScrollLock();
+    } else {
+      engageWorkflowScrollLock(trip.id, 'auto');
+    }
     onUpdateTrip(trip.id, prevStatus, {});
   };
 
   const restoreHistoryTrip = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
-    const relatedLegs = trips.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && (t.driverId === me?.id || (t.driverEmail || '').toLowerCase() === (me?.email || '').toLowerCase()) && ['Completed','Cancelled','No Show'].includes(t.status));
+    const relatedLegs = driverScopedTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && ['Completed','Cancelled','No Show'].includes(t.status));
     if (relatedLegs.length > 1) {
       setRestorePrompt({ trip, legs: relatedLegs });
     } else {
@@ -222,14 +415,28 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     }
   };
 
-  // Online/offline detection
+  // Online/offline detection — debounced to prevent rapid flickering on mobile
   useEffect(() => {
-    const goOnline = () => { setIsOnline(true); syncOfflineQueue(); };
-    const goOffline = () => setIsOnline(false);
+    let onlineTimer = null;
+    let offlineTimer = null;
+    const goOnline = () => {
+      clearTimeout(offlineTimer);
+      onlineTimer = setTimeout(() => { setIsOnline(true); syncOfflineQueue(); }, 1500);
+    };
+    const goOffline = () => {
+      clearTimeout(onlineTimer);
+      offlineTimer = setTimeout(() => setIsOnline(false), 1500);
+    };
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
-    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+    return () => {
+      clearTimeout(onlineTimer);
+      clearTimeout(offlineTimer);
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
   }, []);
+
 
   const addToQueue = useCallback((action, data) => {
     queueRef.current = [...queueRef.current, { action, data, timestamp: Date.now() }];
@@ -244,34 +451,21 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     setOfflineQueue([]);
     for (const item of queue) {
       if (item.action === 'updateLocation' && meRef.current?.id) {
-        try { onUpdateDriverLocation && onUpdateDriverLocation(meRef.current.id, item.data.lat, item.data.lng); } catch {}
+        try { onUpdateDriverLocation && onUpdateDriverLocation(meRef.current.id, item.data.lat, item.data.lng, item.data.telemetry || {}); } catch {}
       } else if (item.action === 'completeTrip' && meRef.current?.id) {
         try { onCompleteTrip && onCompleteTrip(item.data.tripId, meRef.current.id, item.data.odometer); } catch {}
       }
     }
   }, []);
 
-  // Real-time unread count for chat
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'chatData/conversations'), snap => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const total = Object.entries(data.conversations || {})
-        .filter(([, c]) => c.participants?.includes(currentUser))
-        .reduce((sum, [, c]) => sum + ((c.unread || {})[currentUser] || 0), 0);
-      setChatUnread(total);
-    });
-    return () => unsub();
-  }, [currentUser]);
-
   // Load last odometer from completed trips
   useEffect(() => {
     if (!me?.id) return;
-    const completed = trips
-      .filter(t => (t.driverId === me.id || (t.driverEmail || '').toLowerCase() === (me.email || '').toLowerCase()) && t.status === 'Completed' && t.dropoffOdometer)
+    const completed = driverScopedTrips
+      .filter(t => t.status === 'Completed' && t.dropoffOdometer)
       .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
     if (completed.length > 0) setLastOdometer(completed[0].dropoffOdometer);
-  }, [trips, me?.id, me?.email]);
+  }, [driverScopedTrips, me?.id]);
 
   // GPS is mandatory — always active on mount
   useEffect(() => {
@@ -287,9 +481,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   // Analytics calculation
   useEffect(() => {
     if (me?.clockedIn) {
-      const myTripsFilter = t => (t.driverId === me.id || (t.driverEmail || '').toLowerCase() === (me.email || '').toLowerCase());
-      const completed = trips.filter(t => myTripsFilter(t) && t.status === 'Completed');
-      const allMine = trips.filter(t => myTripsFilter(t));
+      const completed = driverScopedTrips.filter(t => t.status === 'Completed');
+      const allMine = driverScopedTrips;
       const totalDist = allMine.reduce((sum, t) => sum + (t.distance || 0), 0);
       const totalTime = completed.reduce((sum, t) => {
         if (t.startTime && t.completedAt) {
@@ -305,17 +498,26 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
         efficiency: completed.length > 0 ? Math.round((completed.length / (totalTime || 1)) * 60) : 0,
       });
     }
-  }, [trips, me?.id, me?.email]);
+  }, [driverScopedTrips, me?.clockedIn]);
+
+  const getWorkflowSteps = (trip) => {
+    const s = trip.status || '';
+    return [
+      { key: 'start', label: 'Start Trip', phase: 'pickup', done: ['In Progress','Navigating Pickup','At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
+      { key: 'nav-pickup', label: 'Navigate to Pickup', phase: 'pickup', done: ['Navigating Pickup','At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
+      { key: 'arrive-pickup', label: 'Arrive at Pickup', phase: 'pickup', done: ['At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
+      { key: 'begin-transport', label: 'Begin Transport', phase: 'pickup', done: ['In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
+      { key: 'nav-dropoff', label: 'Navigate to Dropoff', phase: 'dropoff', done: ['Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
+      { key: 'arrive-dropoff', label: 'Arrive at Dropoff', phase: 'dropoff', done: ['At Dropoff','Arrived','Completed'].includes(s) },
+      { key: 'complete', label: 'Complete Trip', phase: 'dropoff', done: ['Completed'].includes(s) },
+    ];
+  };
+  const getCurrentWorkflowStep = (trip) => getWorkflowSteps(trip).findIndex(s => !s.done);
 
   const getTodayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
-  const myTrips = trips
-    .filter(t => {
-      const isAssignedToMe = (t.driverId === me?.id || ((t.driverEmail || '').toLowerCase() === (me?.email || '').toLowerCase()));
-      const inWindow = tripMatchesTodayOrTomorrow(t.date);
-      const isActiveStatus = !['Completed', 'Cancelled', 'No Show'].includes(t.status);
-      return (isAssignedToMe && inWindow) || (isAssignedToMe && isActiveStatus);
-    })
+  const myTrips = driverScopedTrips
+    .filter(t => tripMatchesTodayOrTomorrow(t.date))
     .sort((a, b) => {
       const today = getTodayStr();
       const aToday = a.date === today ? 0 : 1;
@@ -324,16 +526,74 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
 
-  const completedTrips = trips.filter(t => (t.driverId === me?.id || (t.driverEmail||'').toLowerCase() === (me?.email||'').toLowerCase()) && t.status === 'Completed');
-  const noShowTrips = trips.filter(t => (t.driverId === me?.id || (t.driverEmail||'').toLowerCase() === (me?.email||'').toLowerCase()) && t.status === 'No Show');
-  const cancelledTrips = trips.filter(t => (t.driverId === me?.id || (t.driverEmail||'').toLowerCase() === (me?.email||'').toLowerCase()) && t.status === 'Cancelled');
+  const completedTrips = driverScopedTrips.filter(t => t.status === 'Completed');
+  const noShowTrips = driverScopedTrips.filter(t => t.status === 'No Show');
+  const cancelledTrips = driverScopedTrips.filter(t => t.status === 'Cancelled');
   const allHistory = [...completedTrips, ...noShowTrips, ...cancelledTrips].sort((a,b) => { const da = a.completedAt || a.date || ''; const db = b.completedAt || b.date || ''; return db.localeCompare(da); });
 
   const activeTrips = myTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
 
-  const orderedTrips = aiSequence && aiSequence.length > 0
-    ? [...activeTrips].sort((a, b) => aiSequence.indexOf(a.id) - aiSequence.indexOf(b.id))
-    : activeTrips;
+  const orderedTrips = [...activeTrips].sort((a, b) => {
+    // 1. If guided mode is active, the absolute top priority is the current step's trip
+    if (guidedMode && guidedSteps && guidedSteps[guidedStepIndex]) {
+      if (a.id === guidedSteps[guidedStepIndex].tripId && b.id !== guidedSteps[guidedStepIndex].tripId) return -1;
+      if (b.id === guidedSteps[guidedStepIndex].tripId && a.id !== guidedSteps[guidedStepIndex].tripId) return 1;
+    }
+
+    // 2. Trips that are currently in progress should be pushed to the top
+    const inProgressStatuses = [
+      'In Mission',
+      'En Route',
+      'In Progress',
+      'Navigating Pickup',
+      'At Pickup',
+      'In Transit',
+      'Navigating Dropoff',
+      'At Dropoff',
+      'Arrived',
+      'Arrived PU',
+      'Arrived DO',
+    ];
+    const aInProgress = inProgressStatuses.includes(a.status);
+    const bInProgress = inProgressStatuses.includes(b.status);
+    if (aInProgress && !bInProgress) return -1;
+    if (bInProgress && !aInProgress) return 1;
+
+    // 3. Fall back to AI sequence if it exists
+    if (aiSequence && aiSequence.length > 0) {
+      const aiA = aiSequence.indexOf(a.id);
+      const aiB = aiSequence.indexOf(b.id);
+      if (aiA !== -1 || aiB !== -1) {
+        if (aiA === -1) return 1;
+        if (aiB === -1) return -1;
+        return aiA - aiB;
+      }
+    }
+
+    // 4. Will Call / no-time trips always go to the bottom
+    const aWC = isWillCall(a);
+    const bWC = isWillCall(b);
+    if (aWC !== bWC) return aWC ? 1 : -1;
+
+    // 5. Otherwise fall back to urgency and then time.
+    const urgencyDiff = getUrgency(b) - getUrgency(a);
+    if (urgencyDiff !== 0) return urgencyDiff;
+    return timeToMinutes(a.time) - timeToMinutes(b.time);
+  });
+
+  const timedTrips = orderedTrips.filter(t => !isWillCall(t));
+  const willCallTrips = orderedTrips.filter(t => isWillCall(t));
+
+  useEffect(() => {
+    const { tripId, locked } = workflowScrollLockRef.current;
+    if (!locked || !tripId) return;
+    const stillActive = orderedTrips.some((trip) => trip.id === tripId);
+    if (!stillActive) {
+      releaseWorkflowScrollLock();
+      return;
+    }
+    requestAnimationFrame(() => scrollTripsToTop('auto'));
+  }, [orderedTrips, guidedMode, guidedStepIndex, releaseWorkflowScrollLock, scrollTripsToTop]);
 
   const isClockedIn = me?.clockedIn || false;
 
@@ -426,11 +686,48 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     return () => clearInterval(timer);
   }, [driverPosition, activeTrips.length]);
 
+  // Geofence proximity detection — check every 15s if near pickup/dropoff
+  useEffect(() => {
+    if (!driverPosition || activeTrips.length === 0) return;
+    const timer = setInterval(() => {
+      const pos = driverPosition;
+      if (!pos?.lat || !pos?.lng) return;
+      activeTrips.forEach(trip => {
+        const tripKey = trip.id;
+        const alreadyNotified = geofenceAlerted.current.has(tripKey);
+        const pickupCoords = trip.pickup ? addressCoordsCache.current[trip.pickup] : null;
+        const dropoffCoords = trip.dropoff ? addressCoordsCache.current[trip.dropoff] : null;
+
+        if (pickupCoords && !alreadyNotified && (trip.status === 'Navigating Pickup' || trip.status === 'In Progress')) {
+          const dist = Math.sqrt(Math.pow(pos.lat - pickupCoords.lat, 2) + Math.pow(pos.lng - pickupCoords.lng, 2)) * 69;
+          if (dist <= 0.1 && !geofenceProximityNotified.current.has(`${tripKey}_pu`)) {
+            geofenceProximityNotified.current.add(`${tripKey}_pu`);
+            setTimeout(() => geofenceProximityNotified.current.delete(`${tripKey}_pu`), 30000);
+            setShowToast({ message: `Near pickup: ${trip.patient}. Tap to arrive.`, action: 'arrive-pickup', trip });
+            setTimeout(() => setShowToast(null), 8000);
+          }
+        }
+
+        if (dropoffCoords && !alreadyNotified && (trip.status === 'Navigating Dropoff' || trip.status === 'In Transit')) {
+          const dist = Math.sqrt(Math.pow(pos.lat - dropoffCoords.lat, 2) + Math.pow(pos.lng - dropoffCoords.lng, 2)) * 69;
+          if (dist <= 0.1 && !geofenceProximityNotified.current.has(`${tripKey}_do`)) {
+            geofenceProximityNotified.current.add(`${tripKey}_do`);
+            setTimeout(() => geofenceProximityNotified.current.delete(`${tripKey}_do`), 30000);
+            setShowToast({ message: `Near dropoff: ${trip.patient}. Tap to arrive.`, action: 'arrive-dropoff', trip });
+            setTimeout(() => setShowToast(null), 8000);
+          }
+        }
+      });
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [driverPosition, activeTrips]);
+
   const startGpsTracking = () => {
     if (!navigator.geolocation || gpsWatchId.current) return;
     let lastUpdate = 0;
     let lastLat = 0;
     let lastLng = 0;
+    const stationaryHeartbeatMs = 60000;
     // Request background location permission
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then(result => {
@@ -443,18 +740,26 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
         const now = Date.now();
         if (now - lastUpdate < 8000) return;
         const dist = Math.sqrt(Math.pow(latitude - lastLat, 2) + Math.pow(longitude - lastLng, 2)) * 111320;
-        if (dist < 15 && lastUpdate > 0) return;
+        if (dist < 15 && lastUpdate > 0 && now - lastUpdate < stationaryHeartbeatMs) return;
         lastUpdate = now;
         lastLat = latitude;
         lastLng = longitude;
         setDriverPosition({ lat: latitude, lng: longitude, accuracy });
         const driverId = meRef.current?.id;
+        const nextTelemetry = {
+          accuracy,
+          speedMph: typeof pos.coords.speed === 'number' ? Math.round(pos.coords.speed * 2.23694) : null,
+          heading: pos.coords.heading || null,
+          actorRole: role || 'driver',
+          source: 'driver-pwa',
+          recordedAt: new Date(pos.timestamp || now).toISOString(),
+        };
         if (driverId && navigator.onLine) {
           try {
-            onUpdateDriverLocation && onUpdateDriverLocation(driverId, latitude, longitude);
+            onUpdateDriverLocation && onUpdateDriverLocation(driverId, latitude, longitude, nextTelemetry);
           } catch {}
         } else if (driverId) {
-          addToQueue('updateLocation', { lat: latitude, lng: longitude });
+          addToQueue('updateLocation', { lat: latitude, lng: longitude, telemetry: nextTelemetry });
         }
         setIsGpsTracking(true);
       },
@@ -471,7 +776,12 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   const handleStatusToggle = () => {
     const newStatus = !me?.clockedIn;
-    onDriverStatusUpdate(me?.id, newStatus);
+    const driverId = me?.id || (() => {
+      const normalizedEmail = String(currentUser || '').trim().toLowerCase();
+      const seed = normalizedEmail.replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'USER';
+      return `DRV-${seed}`;
+    })();
+    onDriverStatusUpdate(driverId, newStatus);
   };
 
   const filteredHistory = allHistory.filter(t => {
@@ -495,7 +805,14 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   }
 
   const runAiOptimization = async (silent = false) => {
-    if (selectedTrips.length < 2 && !silent) return;
+    if (selectedTrips.length < 2 && !silent) {
+      if (selectedTrips.length === 1) {
+        setAiOptimizing(true);
+        setAiSuggestions([`Analyzing selected trip...`, `Select 2+ trips for route optimization.`]);
+        setAiOptimizing(false);
+      }
+      return;
+    }
     const tripsToOptimize = selectedTrips.length >= 2
       ? activeTrips.filter(t => selectedTrips.includes(t.id))
       : activeTrips;
@@ -515,6 +832,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     if (!silent) setAiOptimizing(false);
   };
 
+  const selectAllTrips = () => {
+    const allIds = activeTrips.map(t => t.id);
+    setSelectedTrips(prev => prev.length === allIds.length ? [] : allIds);
+  };
+
   // Auto-run AI on mount to pre-sort trips
   useEffect(() => {
     if (activeTrips.length >= 2 && !aiSequence) {
@@ -526,25 +848,48 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   // Auto-advance guided mode when current trip reaches terminal status
   useEffect(() => {
-    if (!guidedMode || !aiSequence || aiSequence.length === 0 || guidedStepIndex >= aiSequence.length) return;
-    const currentId = aiSequence[guidedStepIndex];
-    const currentTrip = trips.find(t => t.id === currentId);
-    if (!currentTrip) return;
-    if (['Completed', 'Cancelled', 'No Show'].includes(currentTrip.status)) {
+    if (!guidedMode || !guidedSteps || guidedSteps.length === 0 || guidedStepIndex >= guidedSteps.length) return;
+    const currentStep = guidedSteps[guidedStepIndex];
+    const trip = trips.find(t => t.id === currentStep.tripId);
+    if (!trip) return;
+
+    let stepCompleted = false;
+    if (currentStep.type === 'PU') {
+      if (['In Transit', 'Navigating Dropoff', 'At Dropoff', 'Completed', 'Cancelled', 'No Show'].includes(trip.status)) {
+        stepCompleted = true;
+      }
+    } else {
+      if (['Completed', 'Cancelled', 'No Show'].includes(trip.status)) {
+        stepCompleted = true;
+      }
+    }
+
+    if (stepCompleted) {
       if (guidedLastAdvance.current === guidedStepIndex) return;
       guidedLastAdvance.current = guidedStepIndex;
       const nextIndex = guidedStepIndex + 1;
-      if (nextIndex >= aiSequence.length) {
+      if (nextIndex >= guidedSteps.length) {
+        if (assignedSequence?.id) {
+          void updateAssignedRouteRecord({
+            assignmentStatus: ROUTE_ASSIGNMENT_STATUS.COMPLETED,
+            completedAt: new Date().toISOString(),
+          }, 'Route Completed', `${currentUser} completed route "${assignedSequence.name || 'Assigned Route'}".`);
+        }
+        releaseWorkflowScrollLock();
         setGuidedMode(false);
+        setGuidedSteps([]);
         setAiSequence(null);
         setAiSuggestions([]);
         setSelectedTrips([]);
-        showLocalNotification('✅ Smart Route Complete', 'All trips in the route have been handled.');
+        setGuidedStepIndex(0);
+        guidedLastAdvance.current = -1;
       } else {
+        const nextStep = guidedSteps[nextIndex];
+        if (nextStep?.tripId) engageWorkflowScrollLock(nextStep.tripId, 'auto');
         setGuidedStepIndex(nextIndex);
       }
     }
-  }, [trips, guidedMode, guidedStepIndex, aiSequence]);
+  }, [trips, guidedMode, guidedStepIndex, guidedSteps, assignedSequence?.id, assignedSequence?.name, currentUser, updateAssignedRouteRecord, engageWorkflowScrollLock, releaseWorkflowScrollLock]);
 
 
   const suggestNavApp = (address) => {
@@ -563,12 +908,16 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   const handleNavigateToPickup = (trip) => {
     impact('heavy');
+    engageWorkflowScrollLock(trip.id);
     onUpdateTrip(trip.id, 'Navigating Pickup', {});
+    preloadGeofence(trip);
     openInNavApp(trip.pickup, navApp);
   };
 
   const handleNavigateToDropoff = (trip) => {
     impact('heavy');
+    preloadGeofence(trip);
+    engageWorkflowScrollLock(trip.id);
     onUpdateTrip(trip.id, 'Navigating Dropoff', {});
     openInNavApp(trip.dropoff, navApp);
   };
@@ -616,10 +965,13 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     const odo = parseInt(odometerValue, 10);
     if (isNaN(odo)) return;
     if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
+    // Record pickup arrival + departure timestamps using canonical fields
+    const nowIso = new Date().toISOString();
+    engageWorkflowScrollLock(showOdometerPrompt.id);
     onUpdateTrip(showOdometerPrompt.id, 'At Pickup', {
       pickupOdometer: odo,
-      startTime: new Date().toISOString(),
-      departureTime: new Date().toISOString(),
+      arrivalTime: nowIso,
+      startTime: nowIso,
     });
     setLastOdometer(odo);
     setShowOdometerPrompt(null);
@@ -628,9 +980,20 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   const handleArriveDropoff = (trip) => {
     setUndoable(trip, trip.status, 'At Dropoff');
+    // Record dropoff arrival in the dedicated field (was incorrectly overwriting pickup arrival)
+    engageWorkflowScrollLock(trip.id);
     onUpdateTrip(trip.id, 'At Dropoff', {
-      arrivalTime: new Date().toISOString(),
+      arrivalDropoffTime: new Date().toISOString(),
     });
+  };
+
+  const handleSkipNav = (trip) => {
+    impact('medium');
+    if (trip.status === 'In Progress') {
+      handleArrivePickup(trip);
+    } else if (trip.status === 'In Transit') {
+      handleArriveDropoff(trip);
+    }
   };
 
   const confirmArrival = () => {
@@ -638,10 +1001,12 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     const odo = parseInt(arrivalOdometer, 10) || lastOdometer;
     if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
     setUndoable(showArrivalConfirm, showArrivalConfirm.status, 'At Pickup');
+    const nowIso = new Date().toISOString();
+    engageWorkflowScrollLock(showArrivalConfirm.id);
     onUpdateTrip(showArrivalConfirm.id, 'At Pickup', {
       pickupOdometer: odo,
-      startTime: new Date().toISOString(),
-      departureTime: new Date().toISOString(),
+      arrivalTime: nowIso,
+      startTime: nowIso,
     });
     setLastOdometer(odo);
     setShowArrivalConfirm(null);
@@ -651,8 +1016,9 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   const confirmSignatureAndBegin = () => {
     if (!showSignatureConfirm || !signatureConfirmed) return;
     setUndoable(showSignatureConfirm, showSignatureConfirm.status, 'In Transit');
+    engageWorkflowScrollLock(showSignatureConfirm.id);
     onUpdateTrip(showSignatureConfirm.id, 'In Transit', {
-      pickupDepartedAt: new Date().toISOString(),
+      departedPickupTime: new Date().toISOString(),
       paperSignatureConfirmed: true,
     });
     setShowSignatureConfirm(null);
@@ -661,21 +1027,78 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   const handleNoShow = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
-    const activeLegsCount = patientActiveLegs[patientKey] || 1;
-    if (activeLegsCount > 1) {
-      setLegActionPrompt({ type: 'noshow', trip, legsCount: activeLegsCount });
+    const activeLegs = driverScopedTrips.filter(t =>
+      (t.patient || '').trim().toLowerCase() === patientKey &&
+      !['Completed', 'Cancelled', 'No Show'].includes(t.status)
+    );
+    if (activeLegs.length > 1) {
+      setCancelPrompt({ type: 'noshow', trip, legs: activeLegs });
     } else {
-      setPasswordPrompt({ type: 'noshow', trip });
+      setPasswordPrompt({ type: 'noshow', trip, selectedLegIds: [trip.id] });
     }
   };
 
   const handleCancel = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
-    const activeLegsCount = patientActiveLegs[patientKey] || 1;
-    if (activeLegsCount > 1) {
-      setLegActionPrompt({ type: 'cancel', trip, legsCount: activeLegsCount });
+    const activeLegs = driverScopedTrips.filter(t =>
+      (t.patient || '').trim().toLowerCase() === patientKey &&
+      !['Completed', 'Cancelled', 'No Show'].includes(t.status)
+    );
+    if (activeLegs.length > 1) {
+      setCancelPrompt({ type: 'cancel', trip, legs: activeLegs });
     } else {
-      setPasswordPrompt({ type: 'cancel', trip });
+      setPasswordPrompt({ type: 'cancel', trip, selectedLegIds: [trip.id] });
+    }
+  };
+
+  const handleReroute = (trip) => {
+    const patientKey = (trip.patient || '').trim().toLowerCase();
+    const activeLegs = driverScopedTrips.filter(t =>
+      (t.patient || '').trim().toLowerCase() === patientKey &&
+      !['Completed', 'Cancelled', 'No Show'].includes(t.status)
+    );
+    if (activeLegs.length > 1) {
+      setCancelPrompt({ type: 'reroute', trip, legs: activeLegs });
+    } else {
+      setPasswordPrompt({ type: 'reroute', trip, selectedLegIds: [trip.id] });
+    }
+  };
+
+  const handleShowLegs = (task) => {
+    const patientKey = (task.patient || task.patientName || '').trim().toLowerCase();
+    const allLegs = driverScopedTrips
+      .filter(t => (t.patient || '').trim().toLowerCase() === patientKey)
+      .map(t => ({
+        id: t.id,
+        bookingId: t.bookingId,
+        time: to12hr(t.time),
+        patient: t.patient,
+        status: t.status,
+        pickup: t.pickup,
+        dropoff: t.dropoff,
+        pickupSite: t.pickupSite,
+        dropoffSite: t.dropoffSite,
+        distance: t.distance,
+        wheelchair: t.wheelchair || t.mobility,
+        pickupPhone: t.pickupPhone,
+        dropoffPhone: t.dropoffPhone,
+      }));
+    setShowLegsModal(allLegs);
+  };
+
+  const handleEditTrip = (task) => {
+    const original = trips.find(t => t.id === task.id);
+    setEditTripModal(original || task);
+  };
+
+  const handleSaveEditedTrip = (editedTrip) => {
+    setEditTripModal(null);
+    const { _pickupTime, _pickupOdometer: _puOdo, _departPickupTime, _dropoffArrivalTime, _dropoffOdometer: _doOdo, _clientSigned, _markCompleted, ...cleanData } = editedTrip;
+    if (_markCompleted) {
+      cleanData.completedAt = new Date().toISOString();
+      setPasswordPrompt({ type: 'edittripcomplete', trip: editedTrip, editedData: cleanData });
+    } else {
+      setPasswordPrompt({ type: 'edittrip', trip: editedTrip, editedData: cleanData });
     }
   };
 
@@ -687,8 +1110,34 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
     try {
       const credential = EmailAuthProvider.credential(auth.currentUser.email, passwordValue);
       await reauthenticateWithCredential(auth.currentUser, credential);
-      const { type, trip, selectedLegIds, reason } = passwordPrompt;
-      if (type === 'restore') {
+      const { type, trip, selectedLegIds, reason, assignedSequence: dismissSequence, editedData } = passwordPrompt;
+      if (type === 'dismiss_route' && dismissSequence) {
+        await updateAssignedRouteRecord({
+          assignmentStatus: ROUTE_ASSIGNMENT_STATUS.DISMISSED,
+          dismissedAt: new Date().toISOString(),
+        }, 'Route Dismissed', `${currentUser} dismissed route "${dismissSequence.name || 'Assigned Route'}".`);
+      } else if (type === 'edittrip') {
+        if (editedData) {
+          onUpdateTrip(trip.id, trip.status, editedData);
+          if (onAddAuditLog) {
+            onAddAuditLog('Trip Updated', `${currentUser} updated trip details for ${trip.patient}.`, 'blue');
+          }
+        }
+      } else if (type === 'edittripcomplete') {
+        if (editedData) {
+          const odo = parseInt(editedData.dropoffOdometer, 10) || 0;
+          onUpdateTrip(trip.id, 'Completed', { ...editedData, completedVehicle: me?.vehicle || '' });
+          if (onAddAuditLog) {
+            onAddAuditLog('Trip Completed via Edit', `${currentUser} completed trip for ${trip.patient} (odo: ${odo.toLocaleString()} mi).`, 'emerald');
+          }
+          setLastOdometer(odo);
+          setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
+          if (navigator.onLine) { saveOdometerReading(trip.id, odo).catch(() => {}); }
+          else { addToQueue('completeTrip', { tripId: trip.id, odometer: odo }); }
+          setExpandedTripId(null);
+          setSelectedTrips(prev => prev.filter(id => id !== trip.id));
+        }
+      } else if (type === 'restore') {
         const legsToRestore = selectedLegIds && selectedLegIds.length > 0
           ? trips.filter(t => selectedLegIds.includes(t.id))
           : [trip];
@@ -697,11 +1146,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           onUpdateTrip(leg.id, prevStatus, {});
         });
       } else {
-        const newStatus = type === 'noshow' ? 'No Show' : 'Cancelled';
-        const legsToProcess = selectedLegIds && selectedLegIds.length > 0
+        const newStatus = type === 'noshow' ? 'No Show' : type === 'reroute' ? 'Rerouted' : 'Cancelled';
+        const legsToUpdate = selectedLegIds && selectedLegIds.length > 0
           ? trips.filter(t => selectedLegIds.includes(t.id))
           : [trip];
-        legsToProcess.forEach(leg => {
+        legsToUpdate.forEach(leg => {
           setUndoable(leg, leg.status, newStatus);
           onUpdateTrip(leg.id, newStatus, {
             completedAt: new Date().toISOString(),
@@ -710,6 +1159,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             cancelledAt: new Date().toISOString(),
           });
         });
+        setExpandedTripId(null);
       }
       setPasswordPrompt(null);
       setPasswordValue('');
@@ -724,7 +1174,9 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   const openCompleteModal = (trip) => {
     setShowCompleteModal(trip);
-    setCompleteOdometer(String(lastOdometer || ''));
+    const odometerSeed = trip.dropoffOdometer || (lastOdometer > 0 ? lastOdometer : trip.pickupOdometer) || '';
+    setCompleteOdometer(odometerSeed ? String(odometerSeed) : '');
+    setCompleteError('');
     const nowLocal = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const defaultTime = `${pad(nowLocal.getHours())}:${pad(nowLocal.getMinutes())}`;
@@ -733,10 +1185,18 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
   };
 
   const submitComplete = () => {
-    if (!showCompleteModal || !completeOdometer) return;
+    if (!showCompleteModal) return;
+    if (!completeOdometer) {
+      setCompleteError('Enter the final odometer reading before completing this trip.');
+      return;
+    }
     const odo = parseInt(completeOdometer, 10);
-    if (isNaN(odo) || odo <= 0) return;
+    if (isNaN(odo) || odo <= 0) {
+      setCompleteError('Use a valid odometer reading greater than zero.');
+      return;
+    }
     if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
+    if (showCompleteModal.pickupOdometer && odo < Number(showCompleteModal.pickupOdometer) && !window.confirm(`Warning: final odometer is less than pickup odometer (${Number(showCompleteModal.pickupOdometer).toLocaleString()} mi). Continue anyway?`)) return;
     setUndoable(showCompleteModal, showCompleteModal.status, 'Completed');
     const now = new Date().toISOString();
     const toIso = (timeStr) => {
@@ -751,13 +1211,15 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       dropoffOdometer: odo,
       completedAt: now,
       departedPickupTime: toIso(departedTime),
-      arrivalDropoffTime: toIso(arrivalDropoffTime),
+      arrivalDropoffTime: showCompleteModal.arrivalDropoffTime ? showCompleteModal.arrivalDropoffTime : toIso(arrivalDropoffTime),
       completedVehicle: me?.vehicle || '',
     });
+    releaseWorkflowScrollLock();
     setLastOdometer(odo);
     setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
     setShowCompleteModal(null);
     setCompleteOdometer('');
+    setCompleteError('');
 
     // Save odometer to Firestore directly
     if (navigator.onLine) {
@@ -766,8 +1228,9 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       addToQueue('completeTrip', { tripId: showCompleteModal.id, odometer: odo });
     }
 
-    // Reset trip selection after completion
+    // Reset trip selection and expanded state after completion
     setSelectedTrips(prev => prev.filter(id => id !== showCompleteModal.id));
+    setExpandedTripId(null);
   };
 
   // Swipe-to-complete gesture handler
@@ -813,46 +1276,71 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
   if (!me) {
     return (
-      <div className="flex-1 bg-slate-50 flex items-center justify-center p-8">
+      <div className="flex-1 bg-[#F3F4F6] flex items-center justify-center p-8">
         <div className="text-center">
           <div className="w-20 h-20 bg-white rounded-[2rem] shadow-lg flex items-center justify-center mx-auto mb-6">
             <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900">Loading profile...</h2>
-          <p className="text-sm text-slate-400 mt-1">Connecting to your driver account</p>
+          <h2 className="text-lg font-black text-slate-900">Loading profile...</h2>
+          <p className="text-slate-500 text-xs font-semibold mt-1">Connecting to your driver account</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#f5f5f7]">
-      {/* Go Online Gate - driver must be clocked in to see trips */}
-      {!isClockedIn && activeNav !== 'settings' && activeNav !== 'chat' && (
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="text-center max-w-sm">
-            <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-200">
-              <Wifi size={32} className="text-white" />
+    <div className="flex-1 flex flex-col bg-[#F3F4F6] text-slate-900" style={{ fontSize: '96%' }}>
+      {activeNav === 'trips' && expandedTripId && (
+        <div
+          className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
+          onClick={() => setExpandedTripId(null)}
+        />
+      )}
+      <div
+        className="sticky top-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="px-3 py-3 flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+            <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <p className="text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">Agape Care Driver</p>
+              <span title={isOnline ? 'Realtime connected' : 'Offline / not realtime'} className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'} inline-block`} />
             </div>
-            <h2 className="text-xl font-extrabold text-slate-900 mb-2">Go Online to Start Working</h2>
-            <p className="text-sm text-slate-500 mb-6 leading-relaxed">You need to be online to view trips and start your shifts. Tap the button below to go online.</p>
+            <p className="mt-1 text-[11px] font-medium text-slate-500 truncate">{me?.name || currentUser}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={handleStatusToggle}
-              className="px-8 h-12 bg-emerald-500 text-white rounded-2xl font-bold text-base active:scale-95 transition-all shadow-lg shadow-emerald-200 flex items-center gap-2 mx-auto">
-              <Wifi size={18} /> Go Online
+              type="button"
+              onClick={() => handleCall(phoneNumbers?.dispatcher || '', 'Dispatcher')}
+              disabled={!phoneNumbers?.dispatcher}
+              title="Call Dispatcher"
+              className="h-7 px-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 text-[10px] font-bold disabled:opacity-50"
+            >
+              <Phone size={11} />
+              <span className="inline">DISP</span>
             </button>
-            <div className="mt-6 flex items-center justify-center">
-              <button onClick={() => setActiveNav('settings')} className="text-xs text-slate-400 hover:text-blue-600 font-semibold flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-blue-50 transition">
-                <Settings size={12} /> Settings
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => handleCall(phoneNumbers?.routing || '', 'Routing')}
+              disabled={!phoneNumbers?.routing}
+              title="Call Routing"
+              className="h-7 px-2 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1 text-[10px] font-bold disabled:opacity-50"
+            >
+              <Phone size={11} />
+              <span className="inline">ROUT</span>
+            </button>
           </div>
         </div>
-      )}
+      </div>
 
       {/* ===== TRIPS PAGE ===== */}
-      {isClockedIn && activeNav === 'trips' && (
-        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2">
+      {activeNav === 'trips' && (
+        <div ref={tripsScrollRef} className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F3F4F6]" style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}>
+
+
           {/* Offline Banner */}
           {!isOnline && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 flex items-center gap-2">
@@ -860,50 +1348,117 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <p className="text-xs font-semibold text-amber-800">You're offline. Changes will sync when connection returns.</p>
             </div>
           )}
-
-          {/* Background Location Warning */}
-          {!backgroundLocation && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2 flex items-center gap-2">
-              <Info size={14} className="text-blue-600 shrink-0" />
-              <p className="text-xs font-semibold text-blue-800">Enable 'Always Allow' location for background tracking.</p>
+          {!isClockedIn && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 flex items-center gap-2">
+              <WifiOff size={14} className="text-amber-600 shrink-0" />
+              <p className="text-xs font-medium text-amber-700">GPS sharing is off. Clock in to enable live trip updates.</p>
             </div>
           )}
 
-          {/* Stats Glass Card */}
-          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600/90 to-indigo-700/90 shadow-sm">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.1),transparent_60%)]" />
-            <div className="relative flex items-center gap-2 px-2.5 py-2">
-              {[
-                { label: 'Total', value: myTrips.length },
-                { label: 'Done', value: completedTrips.length },
-                { label: 'Active', value: Math.max(0, activeTrips.length) },
-                { label: 'GPS', value: isGpsTracking ? 'ON' : 'OFF', color: isGpsTracking ? 'bg-emerald-400/20 text-emerald-300' : 'bg-rose-400/20 text-rose-300' },
-              ].map(stat => (
-                <div key={stat.label} className="flex-1 bg-white/10 rounded-lg px-2 py-1 border border-white/10 text-center">
-                  <p className="text-xs font-black text-white leading-none">{stat.value}</p>
-                  <p className="text-xs text-white/50 uppercase font-bold tracking-wider leading-tight mt-0.5">{stat.label}</p>
+          {/* Dispatcher Assigned Sequence Banner */}
+          {assignedSequence && !guidedMode && (
+            <div className="bg-gradient-to-r from-purple-50 to-violet-100 border-2 border-purple-300 rounded-xl p-3 shadow-md animate-slide-in-top">
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shrink-0 shadow-sm">
+                      <Route size={18} className="text-white" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-purple-900">Assigned Route Plan</h4>
+                      <p className="text-xs font-bold text-purple-700">
+                        {(assignedSequence.assignedByRole === 'dispatcher' || assignedSequence.assignedByRole === 'admin')
+                          ? `Dispatcher assigned a route plan (${assignedSequence.sequence.length} stops)`
+                          : `Your saved route plan (${assignedSequence.sequence.length} stops)`}
+                      </p>
+                      {(() => {
+                        const firstStop = assignedSequence.sequence?.[0];
+                        const firstTrip = firstStop ? trips.find(trip => trip.id === firstStop.clientId) : null;
+                        if (!firstTrip?.time) return null;
+                        return (
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <Clock size={11} className="text-purple-500" />
+                            <span className="text-xs font-black text-purple-800">{to12hr(firstTrip.time)}</span>
+                            {firstStop?.type === 'PU' && <span className="text-[10px] font-bold text-purple-500">Pickup</span>}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-200 text-purple-800 border border-purple-300 shrink-0">
+                    {assignedSequence.statusLabel || 'Assigned Today'}
+                  </span>
                 </div>
-              ))}
-              <div className="flex-shrink-0 border-l border-white/10 pl-2 flex items-center gap-1">
-                {isOnline ? <Wifi size={10} className="text-emerald-300" /> : <WifiOff size={10} className="text-amber-300" />}
-                <p className="text-xs text-white/60 uppercase font-bold whitespace-nowrap">{getTodayStr().slice(5)}</p>
+
+                <div className="flex flex-wrap gap-2">
+                  {assignedSequence.statusKey === ROUTE_ASSIGNMENT_STATUS.ASSIGNED && (
+                    <button
+                      onClick={async () => {
+                        await updateAssignedRouteRecord({
+                          assignmentStatus: ROUTE_ASSIGNMENT_STATUS.ACCEPTED,
+                          driverAcknowledgedAt: new Date().toISOString(),
+                        }, 'Route Accepted', `${currentUser} accepted route "${assignedSequence.name || 'Assigned Route'}".`);
+                      }}
+                      className="px-3 py-2 bg-white text-purple-700 text-[10px] font-bold rounded-lg border-2 border-purple-300 shadow-sm hover:bg-purple-50 active:scale-95 transition-all"
+                    >
+                      Accept
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { void startAssignedRoute(); }}
+                    className="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-black rounded-lg shadow-md hover:from-blue-600 hover:to-purple-700 active:scale-95 transition-all"
+                  >
+                    {assignedSequence.statusKey === ROUTE_ASSIGNMENT_STATUS.ACCEPTED ? 'Start Route' : 'Start Guided'}
+                  </button>
+                  <button
+                    onClick={() => setShowAssignedRouteDetails(prev => !prev)}
+                    className="px-3 py-2 bg-white text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 shadow-sm"
+                  >
+                    {showAssignedRouteDetails ? 'Hide Details' : 'Open Details'}
+                  </button>
+                  <button
+                    onClick={() => setPasswordPrompt({ type: 'dismiss_route', assignedSequence, trip: {} })}
+                    className="px-3 py-2 bg-white text-rose-700 text-[10px] font-bold rounded-lg border border-rose-200 shadow-sm"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+
+                {showAssignedRouteDetails && (
+                  <div className="bg-white/80 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2 border border-purple-200">
+                    {assignedSequence.sequence.map((s, idx) => {
+                      const t = trips.find(trip => trip.id === s.clientId);
+                      if (!t) return null;
+                      return (
+                        <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-slate-100 shadow-sm">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">{idx + 1}</span>
+                            <span className="text-xs font-bold text-slate-800 truncate">{t.patient}</span>
+                            <span className="text-[10px] font-semibold text-slate-500 shrink-0">({s.type === 'PU' ? 'Pickup' : 'Dropoff'})</span>
+                          </div>
+                          <span className="text-sm font-black text-purple-700 shrink-0 ml-2">{to12hr(t.time)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Guided Mode Progress Header */}
-          {guidedMode && aiSequence && aiSequence.length > 0 && guidedStepIndex < aiSequence.length && (() => {
-            const currentTripId = aiSequence[guidedStepIndex];
-            const currentTrip = trips.find(t => t.id === currentTripId);
-            const nextTripId = guidedStepIndex + 1 < aiSequence.length ? aiSequence[guidedStepIndex + 1] : null;
-            const nextTrip = nextTripId ? trips.find(t => t.id === nextTripId) : null;
-            const pct = Math.round((guidedStepIndex / aiSequence.length) * 100);
+          {guidedMode && guidedSteps && guidedSteps.length > 0 && guidedStepIndex < guidedSteps.length && (() => {
+            const currentStep = guidedSteps[guidedStepIndex];
+            const currentTrip = trips.find(t => t.id === currentStep.tripId);
+            const nextStep = guidedStepIndex + 1 < guidedSteps.length ? guidedSteps[guidedStepIndex + 1] : null;
+            const nextTrip = nextStep ? trips.find(t => t.id === nextStep.tripId) : null;
+            const pct = Math.round((guidedStepIndex / guidedSteps.length) * 100);
             return (
               <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-3 shadow-md shadow-indigo-200/40 sticky top-0" style={{ zIndex: 10 }}>
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-black text-white">{guidedStepIndex + 1}</span>
-                    <span className="text-xs font-bold text-white/80 uppercase tracking-wider">of {aiSequence.length}</span>
+                    <span className="text-xs font-bold text-white/80 uppercase tracking-wider">of {guidedSteps.length}</span>
                   </div>
                   <button onClick={() => { setGuidedMode(false); }} className="text-xs text-white/60 font-bold uppercase hover:text-white/90">Exit</button>
                 </div>
@@ -911,12 +1466,15 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   <div className="h-full bg-white rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-white truncate flex-1 min-w-0">
-                    {currentTrip?.patient || 'Loading...'}
-                    <span className="text-white/60 font-medium ml-1 text-xs">· {currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : ''}</span>
+                  <p className="text-xs font-bold text-white truncate flex-1 min-w-0 flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded bg-white/20 text-[10px] uppercase tracking-wider">{currentStep.type === 'PU' ? 'Pickup' : 'Dropoff'}</span>
+                    <span className="truncate">{currentTrip?.patient || 'Loading...'}</span>
+                    <span className="text-white/60 font-medium ml-1 text-xs shrink-0">· {currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : ''}</span>
                   </p>
-                  {nextTrip && (
-                    <span className="text-xs text-white/50 font-medium ml-2 shrink-0">Next: {nextTrip.patient}</span>
+                  {nextStep && nextTrip && (
+                    <span className="text-[10px] text-white/50 font-bold ml-2 shrink-0 uppercase tracking-wider">
+                      Next: {nextStep.type === 'PU' ? 'PU' : 'DO'} {nextTrip.patient}
+                    </span>
                   )}
                 </div>
               </div>
@@ -959,8 +1517,19 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
           {/* Manifest Header */}
           <div className="flex items-center justify-between px-1 pt-1">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-[0.12em]">Today & Tomorrow</h3>
+            <div>
+              <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500">Today & Tomorrow</h3>
+              <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Live trip manifest</p>
+            </div>
             <div className="flex items-center gap-2">
+              {onAddTrip && (
+                  <button
+                    onClick={() => setShowAddTripModal && setShowAddTripModal(true)}
+                    className="text-[10px] text-white font-bold flex items-center gap-1 active:scale-95 bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-1 rounded-lg shadow-sm"
+                >
+                  <span className="text-sm leading-none">+</span> Add Trip
+                </button>
+              )}
               {activeTrips.length > 0 && (
                 <button onClick={exportDailyLog} className="text-xs text-blue-600 font-bold flex items-center gap-1 active:scale-95">
                   <Download size={10} /> Export
@@ -972,249 +1541,317 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
           {/* Trip Cards */}
           {orderedTrips.length === 0 ? (
-            <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-slate-100/50 p-10 text-center shadow-sm mt-2">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-10 text-center mt-2">
               <div className="w-20 h-20 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-[2rem] flex items-center justify-center mx-auto mb-5 shadow-inner">
                 <CheckCircle2 size={36} className="text-emerald-400" />
               </div>
-              <h3 className="text-lg font-bold text-slate-800">All Clear</h3>
-              <p className="text-sm text-slate-400 mt-1.5 max-w-[200px] mx-auto leading-relaxed">No trips assigned. Your manifest is up to date.</p>
+              <h3 className="text-lg font-black text-slate-900">All Clear</h3>
+              <p className="text-slate-500 text-xs font-semibold mt-1.5 max-w-[200px] mx-auto leading-relaxed">No trips assigned. Your manifest is up to date.</p>
             </div>
-          ) : (
-            <div className="space-y-2.5 pb-2">
-              {orderedTrips.map((trip) => {
-                const isActive = !['Assigned', 'Unassigned'].includes(trip.status);
-                const isSelected = selectedTrips.includes(trip.id);
-                const eta = etas[trip.id];
-                const hasConflict = conflicts.some(c => c.tripA === trip.id || c.tripB === trip.id);
-                const rideShareTrip = aiRideShare.find(r => r.tripA === trip.id || r.tripB === trip.id);
-                const urgency = getUrgency(trip);
-                const urgencyBorder = urgency === 2 ? 'border-l-4 border-l-rose-500 shadow-lg shadow-rose-200/50' : urgency === 1 ? 'border-l-4 border-l-amber-500 shadow-md shadow-amber-200/40' : '';
-                const isGuidedCurrent = guidedMode && aiSequence && aiSequence[guidedStepIndex] === trip.id;
-                const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
-                const today = getTodayStr();
-                const isTomorrow = trip.date !== today;
+          ) : guidedMode && guidedSteps && guidedSteps.length > 0 ? (
+            <div className="space-y-2 pb-6 relative px-2 mt-2">
+              <div className="absolute left-[33px] top-6 bottom-6 w-[2px] bg-slate-200 rounded-full" />
+              {guidedSteps.map((step, index) => {
+                const trip = trips.find(t => t.id === step.tripId);
+                if (!trip) return null;
+
+                const isCompleted = index < guidedStepIndex;
+                const isUpcoming = index > guidedStepIndex;
+                
+                if (isCompleted) {
+                  return (
+                    <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                        <Check size={10} className="text-white font-black" />
+                      </div>
+                      <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl px-3 py-2 opacity-60 flex items-center gap-2">
+                         <span className="text-xs font-bold text-emerald-700">{step.type === 'PU' ? 'Picked Up' : 'Dropped Off'}</span>
+                         <span className="text-sm font-semibold text-slate-600 truncate">{trip.patient}</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isUpcoming) {
+                  return (
+                    <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 opacity-50">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                        <span className="text-[9px] font-black text-slate-500">{index + 1}</span>
+                      </div>
+                      <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between">
+                         <div className="flex items-center gap-2 min-w-0">
+                           <div className={`w-1.5 h-4 rounded-full ${step.type === 'PU' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                           <span className="text-sm font-bold text-slate-800 truncate">{trip.patient}</span>
+                         </div>
+                         <span className={`text-xs font-bold ${step.type === 'PU' ? 'text-emerald-600' : 'text-rose-600'} opacity-70`}>{to12hr(trip.time)}</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // isCurrent
+                const workflowSteps = getWorkflowSteps(trip);
+                const currentStepIdx = getCurrentWorkflowStep(trip);
+                const isDropoffPhase = workflowSteps[currentStepIdx]?.phase === 'dropoff';
+                const activeBarColor = isDropoffPhase ? 'bg-orange-400' : 'bg-blue-400';
+                const doneBarColor = 'bg-emerald-400';
+
+                const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
+                const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
+                const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
+                const totalGuidedSteps = workflowSteps.length;
+
+                const renderPrimaryBtn = (label, icon, gradient, onClick) => (
+                  <div className={`rounded-xl border ${borderColor} ${bgColor} p-3`}>
+                    <div className="flex items-center gap-0.5 mb-2">
+                      {workflowSteps.map((ws, idx) => (
+                        <div key={ws.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${labelColor}`}>
+                        {isDropoffPhase ? 'Dropoff Phase' : 'Pickup Phase'}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500">
+                        Step {Math.min(currentStepIdx + 1, totalGuidedSteps)} of {totalGuidedSteps}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }} className={`flex-1 h-10 ${gradient} text-xs text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
+                        {icon} {label}
+                      </button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="h-10 px-3 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-[10px] font-bold shrink-0 cursor-pointer">No Show</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="h-10 px-3 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-[10px] font-bold shrink-0 cursor-pointer">Cancel</button>
+                    </div>
+                  </div>
+                );
 
                 return (
-                  <div key={trip.id}
-                    onTouchStart={(e) => handleTouchStart(e, trip)}
-                    onTouchEnd={handleTouchEnd}
-                    className={`card overflow-hidden rounded-2xl active:scale-[0.985] transition-all duration-200 ${
-                      isActive ? 'border-2 border-blue-200' : 'border border-slate-100'
-                    } ${isSelected ? 'ring-2 ring-blue-400' : ''} ${hasConflict ? 'ring-2 ring-rose-300' : ''} ${urgencyBorder} ${isGuidedCurrent ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-200/40' : ''} transition-all`}>
-                    {/* Compact unified layout */}
-                    <div className={`px-3 pt-2.5 pb-1.5 ${isActive ? 'bg-blue-50/50' : ''}`}>
-                      {/* Row 1: Checkbox + Time + Actions */}
-                      <div className="flex items-center gap-2">
-                        <button type="button" onClick={() => toggleTripSelect(trip.id)} className="shrink-0 text-slate-400 hover:text-blue-600 active:scale-90 transition-all duration-150 cursor-pointer">
-                          {isSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} />}
-                        </button>
-                        <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-                          <span className="text-xl font-black text-blue-600 tracking-tight leading-none">{to12hr(trip.time)}</span>
-                          {isTomorrow && <span className="badge badge-warning shrink-0 text-[9px] px-1.5 py-0.5">Tomorrow</span>}
-                          {urgency === 2 && <span className="badge badge-danger animate-pulse shrink-0 text-[9px] px-1.5 py-0.5">Overdue</span>}
-                          {urgency === 1 && <span className="badge badge-warning shrink-0 text-[9px] px-1.5 py-0.5">Soon</span>}
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button type="button" onClick={() => handleSmartCall(trip)} className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 active:scale-85 transition-all duration-150 cursor-pointer"><Phone size={13} /></button>
-                          <button type="button" onClick={() => handleSmartSMS(trip)} className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 active:scale-85 transition-all duration-150 cursor-pointer"><MessageCircle size={13} /></button>
-                          <button type="button" onClick={() => openContactSelector(trip)} className="w-7 h-7 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 flex items-center justify-center active:scale-85 transition-all duration-150 cursor-pointer" title="All contacts"><PhoneForwarded size={13} /></button>
-                          <button type="button" onClick={() => setShowTripDetails(showTripDetails?.id === trip.id ? null : trip)} className="w-7 h-7 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 flex items-center justify-center active:scale-85 transition-all duration-150 cursor-pointer">
-                            {showTripDetails?.id === trip.id ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Row 2: Patient + Booking ID + Status + Contact Type */}
-                      <div className="flex items-center gap-1.5 mt-0.5 ml-[22px] flex-wrap">
-                        <h3 className="text-base font-extrabold text-slate-900 leading-tight break-words">{trip.patient}</h3>
-                        {trip.bookingId && <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-lg shrink-0">{trip.bookingId}</span>}
-                        {isActive && <span className="badge shrink-0 badge-info text-[8px] px-1.5 py-0.5 leading-none">{trip.status}</span>}
-                        {legsCount > 1 && <button type="button" onClick={() => setLegsDetailPatient(trip.patient)} className="badge badge-info shrink-0 text-[8px] px-1.5 py-0.5 cursor-pointer hover:opacity-80 leading-none">{legsCount} leg{legsCount !== 1 ? 's' : ''}</button>}
-                        {(() => {
-                          const primary = getPrimaryContactForTrip(trip);
-                          if (!primary) return null;
-                          const contactColors = {
-                            patient: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                            facility: 'bg-amber-50 text-amber-700 border-amber-200',
-                            escort: 'bg-purple-50 text-purple-700 border-purple-200',
-                            dispatcher: 'bg-blue-50 text-blue-700 border-blue-200',
-                            routing: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-                          };
-                          return <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${contactColors[primary.role] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>{primary.label}</span>;
-                        })()}
-                        {hasConflict && <AlertTriangle size={11} className="text-rose-500 shrink-0" />}
-                        {rideShareTrip && <Repeat size={11} className="text-emerald-500 shrink-0" />}
-                      </div>
+                  <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 my-4">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-indigo-500 border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
+                      <span className="text-xs font-black text-white">{index + 1}</span>
                     </div>
+                    <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
+                       <div className={`px-3 py-2 border-b flex items-center justify-between ${step.type === 'PU' ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
+                         <div className="flex items-center gap-2">
+                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider uppercase text-white ${step.type === 'PU' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                             {step.type === 'PU' ? 'Pickup' : 'Dropoff'}
+                           </span>
+                           <span className="text-sm font-black text-slate-800">{trip.patient}</span>
+                         </div>
+                         <span className={`text-xs font-black ${step.type === 'PU' ? 'text-emerald-600' : 'text-rose-600'}`}>{to12hr(trip.time)}</span>
+                       </div>
 
-                    {/* Route Section */}
-                    <div className="px-3 pb-2">
-                      <div className="relative pl-5">
-                        <div className="absolute left-[8px] top-0.5 bottom-0.5 w-0.5 bg-slate-200 rounded-full" />
-                        {/* Pickup */}
-                        <div className="flex items-start gap-2">
-                          <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-emerald-100 shrink-0 mt-1 flex items-center justify-center">
-                            <span className="text-[5px] font-black text-white leading-none">P</span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none">Pickup</p>
-                            <p className="text-[13px] font-medium text-slate-700 leading-snug break-words">{trip.pickup}</p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <button type="button" onClick={() => openInNavApp(trip.pickup, suggestNavApp(trip.pickup))} className="text-[10px] text-blue-600 font-semibold flex items-center gap-1 px-2 py-0.5 bg-blue-50/60 rounded-full active:scale-90 transition-all duration-150 cursor-pointer"><Navigation size={9} /> Nav</button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.pickup).catch(() => {}); }} className="text-slate-400 hover:text-blue-600 p-0.5 hover:bg-blue-50 rounded active:scale-90 transition-all duration-150 cursor-pointer" title="Copy"><Copy size={10} /></button>
-                            </div>
-                          </div>
-                        </div>
-                        {/* Dropoff */}
-                        <div className="flex items-start gap-2 mt-1.5">
-                          <div className="w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-rose-100 shrink-0 mt-1 flex items-center justify-center">
-                            <span className="text-[5px] font-black text-white leading-none">D</span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none">Dropoff</p>
-                            <p className="text-[13px] font-medium text-slate-700 leading-snug break-words">{trip.dropoff}</p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <button type="button" onClick={() => openInNavApp(trip.dropoff, suggestNavApp(trip.dropoff))} className="text-[10px] text-rose-600 font-semibold flex items-center gap-1 px-2 py-0.5 bg-rose-50/60 rounded-full active:scale-90 transition-all duration-150 cursor-pointer"><Navigation size={9} /> Nav</button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(trip.dropoff).catch(() => {}); }} className="text-slate-400 hover:text-rose-600 p-0.5 hover:bg-rose-50 rounded active:scale-90 transition-all duration-150 cursor-pointer" title="Copy"><Copy size={10} /></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      {trip.notes && (
-                        <div className="mt-1.5 bg-amber-50/80 rounded-lg px-2 py-1.5 border border-amber-100/50">
-                          <p className="text-[11px] text-amber-800 font-medium leading-relaxed">{trip.notes}</p>
-                        </div>
-                      )}
-                      {trip.distance && (
-                        <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-400 font-medium ml-1">
-                          <MapPin size={10} />
-                          <span>{trip.distance} mi</span>
-                        </div>
-                      )}
+                       <div className="px-3 py-3">
+                         <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${step.type === 'PU' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                           {step.type === 'PU' ? 'Pickup Address' : 'Dropoff Address'}
+                         </p>
+                          <p className={`text-base font-bold leading-tight ${step.type === 'PU' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {step.type === 'PU' ? trip.pickup : trip.dropoff}
+                          </p>
+
+                          {(() => {
+                            const pc = getPrimaryContactForTrip(trip);
+                            if (!pc) return null;
+                            const ps = getContactRoleIcon(pc.role);
+                            return (
+                              <div className="flex items-center gap-2 mt-2 mb-1">
+                                <div className={`flex items-center gap-1.5 ${ps.color} text-xs font-bold`}>
+                                  <Phone size={11} /> {pc.label}
+                                </div>
+                                <span className="text-sm font-bold text-slate-800">{formatPhoneDisplay(pc.phone)}</span>
+                                <button type="button" onClick={() => navigator.clipboard.writeText(pc.phone)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" title="Copy number">
+                                  <Copy size={11} />
+                                </button>
+                              </div>
+                            );
+                          })()}
+                          
+                          <div className="flex items-center gap-2 mt-3 mb-4">
+                            <button type="button" onClick={(e) => { e.stopPropagation(); openInNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff, suggestNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff)); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"><Navigation size={12}/> Navigate</button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartCall(trip); }} className="w-10 h-8 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-all"><Phone size={14}/></button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="w-10 h-8 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all"><MessageCircle size={14}/></button>
+                         </div>
+
+                          {(() => {
+                            if (step.type === 'PU') {
+                              if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
+                                return renderPrimaryBtn('Start Trip', <Play size={14} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); engageWorkflowScrollLock(trip.id); onUpdateTrip(trip.id, 'In Progress', { startedAt: new Date().toISOString() }); });
+                              }
+                              if (trip.status === 'In Progress') {
+                                return renderPrimaryBtn('Navigate to Pickup', <Navigation size={14} />, 'bg-blue-600 hover:bg-blue-700', () => handleNavigateToPickup(trip));
+                              }
+                              if (trip.status === 'Navigating Pickup') {
+                                return renderPrimaryBtn('Arrive at Pickup', <MapPin size={14} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); handleArrivePickup(trip); });
+                              }
+                              if (trip.status === 'At Pickup') {
+                                return renderPrimaryBtn('Begin Transport', <Play size={14} />, 'bg-emerald-600 hover:bg-emerald-700', () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); });
+                              }
+                            } else {
+                              if (trip.status === 'In Transit') {
+                                return renderPrimaryBtn('Navigate to Dropoff', <Navigation size={14} />, 'bg-orange-600 hover:bg-orange-700', () => handleNavigateToDropoff(trip));
+                              }
+                              if (trip.status === 'Navigating Dropoff') {
+                                return renderPrimaryBtn('Arrive at Dropoff', <MapPin size={14} />, 'bg-orange-600 hover:bg-orange-700', () => { impact('heavy'); handleArriveDropoff(trip); });
+                              }
+                              if (trip.status === 'At Dropoff' || trip.status === 'Arrived') {
+                                return renderPrimaryBtn('Complete Trip', <Check size={14} />, 'bg-red-600 hover:bg-red-700', () => { impact('heavy'); openCompleteModal(trip); });
+                              }
+                            }
+                            return <div className="text-center text-xs text-slate-400 italic bg-slate-50 rounded-xl py-2">No action required for this step.</div>;
+                          })()}
+                       </div>
                     </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-1 pb-2">
+              {orderedTrips.map((trip, idx) => {
+                const showWcHeader = isWillCall(trip) && (idx === 0 || !isWillCall(orderedTrips[idx - 1])) && willCallTrips.length > 0;
+                const isSelected = selectedTrips.includes(trip.id);
+                const isSequenced = assignedSequence?.sequence?.some(s => s.clientId === trip.id);
+                const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
+                const isTerminal = ['Completed', 'Cancelled', 'No Show'].includes(trip.status);
+                const s = trip.status || '';
 
-                    {/* Smart Step-by-Step Workflow */}
-                    <div className="px-3 pb-2.5">
-                      {(() => {
-                        const workflowSteps = [
-                          { key: 'start', label: 'Start Trip', done: !['Assigned','Unassigned'].includes(trip.status), phase: 'pickup' },
-                          { key: 'nav-pickup', label: 'Navigate to Pickup', done: !['In Progress'].includes(trip.status), phase: 'pickup' },
-                          { key: 'arrive-pickup', label: 'Arrive at Pickup', done: !['Navigating Pickup'].includes(trip.status), phase: 'pickup' },
-                          { key: 'begin-transport', label: 'Begin Transport', done: !['At Pickup'].includes(trip.status), phase: 'pickup' },
-                          { key: 'nav-dropoff', label: 'Navigate to Dropoff', done: !['In Transit'].includes(trip.status), phase: 'dropoff' },
-                          { key: 'arrive-dropoff', label: 'Arrive at Dropoff', done: !['Navigating Dropoff'].includes(trip.status), phase: 'dropoff' },
-                          { key: 'complete', label: 'Complete Trip', done: ['Completed','Cancelled','No Show','At Dropoff','Arrived'].includes(trip.status), phase: 'dropoff' },
-                        ];
-                        const currentStepIdx = workflowSteps.findIndex(s => !s.done);
-                        const totalSteps = workflowSteps.length;
-                        const isDropoffPhase = workflowSteps[currentStepIdx]?.phase === 'dropoff';
-                        const activeBarColor = isDropoffPhase ? 'bg-orange-400' : 'bg-blue-400';
-                        const doneBarColor = 'bg-emerald-400';
+                const workflowSteps = [
+                  { key: 'start', label: 'Start Trip', phase: 'pickup', done: ['In Progress','Navigating Pickup','At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
+                  { key: 'nav-pickup', label: 'Navigate to Pickup', phase: 'pickup', done: ['Navigating Pickup','At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
+                  { key: 'arrive-pickup', label: 'Arrive at Pickup', phase: 'pickup', done: ['At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
+                  { key: 'begin-transport', label: 'Begin Transport', phase: 'pickup', done: ['In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
+                  { key: 'nav-dropoff', label: 'Navigate to Dropoff', phase: 'dropoff', done: ['Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
+                  { key: 'arrive-dropoff', label: 'Arrive at Dropoff', phase: 'dropoff', done: ['At Dropoff','Arrived','Completed'].includes(s) },
+                  { key: 'complete', label: 'Complete Trip', phase: 'dropoff', done: ['Completed'].includes(s) },
+                ];
+                const currentStepIdx = workflowSteps.findIndex(s => !s.done);
+                const totalSteps = workflowSteps.length;
+                const isDropoffPhase = workflowSteps[currentStepIdx]?.phase === 'dropoff';
+                const activeBarColor = isDropoffPhase ? 'bg-orange-500' : 'bg-blue-500';
+                const doneBarColor = 'bg-emerald-400';
 
-                        const renderPrimaryBtn = (label, icon, gradient, shadow, onClick) => (
-                          <div>
-                            {/* Progress bar */}
-                            <div className="flex items-center gap-0.5 mb-1.5">
+                const getPrimaryAction = () => {
+                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); engageWorkflowScrollLock(trip.id); onUpdateTrip(trip.id, 'In Progress', { startedAt: new Date().toISOString() }); } };
+                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', phase: 'pickup', onClick: () => handleNavigateToPickup(trip) };
+                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
+                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
+                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => handleNavigateToDropoff(trip) };
+                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
+                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-red-600 hover:bg-red-700 shadow-red-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
+                  return null;
+                };
+                const primary = getPrimaryAction();
+                const workflowPhase = primary?.phase;
+
+                return (
+                  <React.Fragment key={trip.id}>
+                    {showWcHeader && (
+                      <div className="flex items-center gap-2 px-1 pt-4 pb-2">
+                        <div className="h-px flex-1 bg-slate-200" />
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Will Call / No Time</span>
+                        <div className="h-px flex-1 bg-slate-200" />
+                      </div>
+                    )}
+                    <TaskCard
+                    task={{
+                      id: trip.id,
+                      time: to12hr(trip.time),
+                      patient: trip.patient,
+                      patientName: trip.patient,
+                      status: trip.status,
+                      bookingId: trip.bookingId,
+                      notes: trip.notes,
+                      legs: legsCount > 1 ? `${legsCount} LEGS` : '1 LEG',
+                      patientPhone: trip.patientPhone,
+                      patientMobile: trip.patientMobile,
+                      pickupPhone: trip.pickupPhone,
+                      dropoffPhone: trip.dropoffPhone,
+                      guardianPhone: trip.guardianPhone,
+                      escortPhone: trip.escortPhone,
+                      emergencyContact: trip.emergencyContact,
+                      details: {
+                        distance: trip.distance ? `${trip.distance} mi` : null,
+                        passengerType: '',
+                        mobility: trip.wheelchair || trip.mobility,
+                      },
+                      tags: [
+                        trip.date !== getTodayStr() ? 'Tomorrow' : null,
+                        isSequenced ? 'Route Plan' : null,
+                      ].filter(Boolean),
+                      pickup: { address: trip.pickup, phone: trip.pickupPhone },
+                      dropoff: { address: trip.dropoff, phone: trip.dropoffPhone, time: null },
+                      workflowPhase,
+                    }}
+                    expandedId={expandedTripId}
+                    onToggle={(id) => setExpandedTripId(prev => prev === id ? null : id)}
+                    isSelected={isSelected}
+                    onSelect={toggleTripSelect}
+                    actions={{
+                      onNavigatePickup: (t) => openInNavApp(t.pickup?.address || t.pickup, suggestNavApp(t.pickup?.address || t.pickup)),
+                      onNavigateDropoff: (t) => openInNavApp(t.dropoff?.address || t.dropoff, suggestNavApp(t.dropoff?.address || t.dropoff)),
+                      onCall: (t) => handleSmartCall(t),
+                      onSms: (t) => handleSmartSMS(t),
+                      onContacts: (t) => openContactSelector(t),
+                      onRevert: revertTripStatus,
+                      onNoShow: handleNoShow,
+                      onCancel: handleCancel,
+                      onReroute: handleReroute,
+                      onShowLegs: handleShowLegs,
+                      onEditTrip: handleEditTrip,
+                      renderWorkflow: !isTerminal && primary ? () => {
+                        const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
+                        const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
+                        const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
+                        return (
+                          <div className={`rounded-xl border ${borderColor} ${bgColor} p-3 w-full`}>
+                            <div className="flex items-center gap-0.5 mb-2">
                               {workflowSteps.map((step, idx) => (
                                 <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
                               ))}
                             </div>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-center">Step {Math.min(currentStepIdx + 1, totalSteps)} of {totalSteps}</p>
-                            <div className="flex items-center gap-1.5">
-                              <button type="button" onClick={onClick} className={`flex-1 h-9 ${gradient} text-white ${shadow} rounded-xl text-xs font-bold active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer`}>
-                                {icon} {label}
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`text-xs font-bold uppercase tracking-wider ${labelColor}`}>
+                                {isDropoffPhase ? 'Dropoff Phase' : 'Pickup Phase'}
+                              </span>
+                              <span className="text-xs font-bold text-slate-500">
+                                Step {Math.min(currentStepIdx + 1, totalSteps)} of {totalSteps}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-12 ${primary.gradient} text-sm text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
+                                {primary.icon} {primary.label}
                               </button>
-                              <button type="button" onClick={() => { impact('medium'); handleNoShow(trip); }} className="h-9 px-3 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 rounded-xl text-[10px] font-bold active:scale-95 transition-all duration-150 shrink-0 cursor-pointer">No Show</button>
-                              <button type="button" onClick={() => { impact('medium'); handleCancel(trip); }} className="h-9 px-3 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 rounded-xl text-[10px] font-bold active:scale-95 transition-all duration-150 shrink-0 cursor-pointer">Cancelled</button>
-                              {currentStepIdx > 0 && (
-                                <button type="button" onClick={() => revertTripStatus(trip)} className="h-9 px-2 text-slate-300 hover:text-blue-500 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition-all duration-150 shrink-0 cursor-pointer"><RotateCcw size={12} /></button>
+                              {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
+                                skipConfirmTripId === trip.id ? (
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); setSkipConfirmTripId(null); handleSkipNav(trip); }} className="flex-1 h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-sm">
+                                    <MapPin size={14} /> {trip.status === 'In Progress' ? 'Arrived to pick up?' : 'Arrived to drop off?'}
+                                  </button>
+                                ) : (
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); setSkipConfirmTripId(trip.id); }} className="flex-1 h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
+                                    <Forward size={14} /> Skip
+                                  </button>
+                                )
                               )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="flex-1 h-10 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
+                                <AlertCircle size={12} /> No Show
+                              </button>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="flex-1 h-10 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
+                                <XCircle size={12} /> Cancel
+                              </button>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleReroute(trip); }} className="flex-1 h-10 bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
+                                <RefreshCw size={12} /> Rerouted
+                              </button>
                             </div>
                           </div>
                         );
-
-                        // STEP 1: Start Trip (blue - pickup phase)
-                        if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
-                          return renderPrimaryBtn(
-                            'Start Trip',
-                            <Play size={13} />,
-                            'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600',
-                            'shadow-md shadow-blue-200/40',
-                            () => { impact('heavy'); onUpdateTrip(trip.id, 'In Progress', { startedAt: new Date().toISOString() }); }
-                          );
-                        }
-
-                        // STEP 2: Navigate to Pickup (blue)
-                        if (trip.status === 'In Progress') {
-                          return renderPrimaryBtn(
-                            'Navigate to Pickup',
-                            <Navigation size={13} />,
-                            'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600',
-                            'shadow-md shadow-blue-200/40',
-                            () => handleNavigateToPickup(trip)
-                          );
-                        }
-
-                        // STEP 3: Arrive at Pickup (blue-green)
-                        if (trip.status === 'Navigating Pickup') {
-                          return renderPrimaryBtn(
-                            'Arrive at Pickup',
-                            <MapPin size={13} />,
-                            'bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600',
-                            'shadow-md shadow-blue-200/40',
-                            () => { impact('heavy'); handleArrivePickup(trip); }
-                          );
-                        }
-
-                        // STEP 4: Begin Transport (green) - requires signature
-                        if (trip.status === 'At Pickup') {
-                          return renderPrimaryBtn(
-                            'Begin Transport',
-                            <Play size={13} />,
-                            'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600',
-                            'shadow-md shadow-green-200/40',
-                            () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); }
-                          );
-                        }
-
-                        // STEP 5: Navigate to Dropoff (orange)
-                        if (trip.status === 'In Transit') {
-                          return renderPrimaryBtn(
-                            'Navigate to Dropoff',
-                            <Navigation size={13} />,
-                            'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600',
-                            'shadow-md shadow-orange-200/40',
-                            () => handleNavigateToDropoff(trip)
-                          );
-                        }
-
-                        // STEP 6: Arrive at Dropoff (orange-red)
-                        if (trip.status === 'Navigating Dropoff') {
-                          return renderPrimaryBtn(
-                            'Arrive at Dropoff',
-                            <MapPin size={13} />,
-                            'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600',
-                            'shadow-md shadow-orange-200/40',
-                            () => { impact('heavy'); handleArriveDropoff(trip); }
-                          );
-                        }
-
-                        // STEP 7: Complete Trip (red)
-                        if (trip.status === 'At Dropoff' || trip.status === 'Arrived') {
-                          return renderPrimaryBtn(
-                            'Complete Trip',
-                            <Check size={13} />,
-                            'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600',
-                            'shadow-md shadow-red-200/40',
-                            () => { impact('heavy'); openCompleteModal(trip); }
-                          );
-                        }
-
-                        return null;
-                      })()}
-                    </div>
-                  </div>
-                );
+                      } : null,
+                    }}
+                  />
+                </React.Fragment>
+              );
               })}
             </div>
           )}
@@ -1241,7 +1878,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Current Odometer (mi)</label>
+                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Current Odometer (mi)</label>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -1258,8 +1895,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 )}
               </div>
               <div className="flex gap-3">
-                <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base disabled:opacity-40 active:scale-95 shadow-sm transition-all cursor-pointer">Confirm Arrival</button>
+                <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm Arrival</button>
               </div>
             </div>
           </div>
@@ -1283,7 +1920,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
             <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Odometer at Arrival (mi)</label>
+                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Odometer at Arrival (mi)</label>
                 <input type="number" inputMode="numeric" value={arrivalOdometer} onChange={e => setArrivalOdometer(e.target.value)}
                   className="w-full mt-1.5 p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none"
                 />
@@ -1325,8 +1962,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             <div className="flex gap-3">
-              <button type="button" onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmArrival} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base active:scale-95 shadow-sm transition-all cursor-pointer">Confirm Arrival</button>
+              <button type="button" onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
+              <button type="button" onClick={confirmArrival} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all cursor-pointer">Confirm Arrival</button>
             </div>
           </div>
         </div>
@@ -1364,8 +2001,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             <div className="flex gap-3">
-              <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmSignatureAndBegin} disabled={!signatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base active:scale-95 shadow-sm disabled:opacity-40 transition-all cursor-pointer">Confirm & Begin</button>
+              <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
+              <button type="button" onClick={confirmSignatureAndBegin} disabled={!signatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm & Begin</button>
             </div>
           </div>
         </div>
@@ -1385,35 +2022,45 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
             <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
               <div className="flex justify-between">
-                <span className="text-xs text-slate-400 font-bold uppercase">Pickup Odometer</span>
-                <span className="text-sm font-bold text-slate-800">{showCompleteModal.pickupOdometer?.toLocaleString() || '—'} mi</span>
+                <span className="text-xs text-emerald-600 font-bold uppercase">Pickup Odometer</span>
+                <span className="text-sm font-bold text-emerald-700">{showCompleteModal.pickupOdometer?.toLocaleString() || '—'} mi</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-xs text-slate-400 font-bold uppercase">Started At</span>
                 <span className="text-sm font-bold text-slate-800">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '—'}</span>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase">Departed Pickup Time</label>
+                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Departed Pickup Time</label>
                 <input type="time" value={departedTime} onChange={(e) => setDepartedTime(e.target.value)}
                   className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5" />
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase">Arrival Dropoff Time</label>
+                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Arrival Dropoff Time</label>
                 <input type="time" value={arrivalDropoffTime} onChange={(e) => setArrivalDropoffTime(e.target.value)}
                   className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5" />
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Final Odometer (mi)</label>
+                <label className="text-micro font-bold uppercase tracking-wider text-rose-600">Final Odometer (mi)</label>
                 <input
                   type="number"
                   inputMode="numeric"
                   value={completeOdometer}
-                  onChange={(e) => setCompleteOdometer(e.target.value)}
+                  onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
                   placeholder="Enter final odometer"
                   className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5"
                   autoFocus
                 />
+                {!completeOdometer && (
+                  <p className="mt-2 text-center text-[11px] font-semibold text-slate-500">
+                    Enter a final odometer reading to enable completion.
+                  </p>
+                )}
               </div>
+              {completeError && (
+                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-bold text-rose-700">
+                  {completeError}
+                </p>
+              )}
               {showCompleteModal.pickupOdometer && completeOdometer && (
                 <div className="text-center text-sm text-blue-600 font-bold">
                   Distance: {(parseInt(completeOdometer) - (showCompleteModal.pickupOdometer || 0)).toLocaleString()} mi
@@ -1422,8 +2069,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             <div className="flex gap-3">
-              <button type="button" onClick={() => setShowCompleteModal(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-base active:scale-95 transition-all cursor-pointer">Cancel</button>
-              <button type="button" onClick={submitComplete} disabled={!completeOdometer} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-base disabled:opacity-40 active:scale-95 shadow-sm transition-all cursor-pointer">Complete Trip</button>
+              <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+              <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
             </div>
           </div>
         </div>
@@ -1479,68 +2126,75 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Trip Information</h3>
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
+              <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500">Trip Information</h3>
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-xs text-slate-400 uppercase font-bold">Booking ID</p>
+                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Booking ID</p>
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.bookingId || '—'}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-xs text-slate-400 uppercase font-bold">Service Type</p>
+                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Service Type</p>
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.type || '—'}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-xs text-slate-400 uppercase font-bold">Distance</p>
+                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Distance</p>
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.distance ? `${showTripDetails.distance} mi` : '—'}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-xs text-slate-400 uppercase font-bold">Driver</p>
+                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Driver</p>
                   <p className="text-sm font-bold text-slate-800">{showTripDetails.driverId || '—'}</p>
                 </div>
               </div>
             </div>
 
             {/* Smart Contacts Section */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><PhoneForwarded size={14} /> Contacts</h3>
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
+              <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2"><PhoneForwarded size={14} /> Contacts</h3>
               {(() => {
                 const contacts = getContactsForTrip(showTripDetails);
                 const warning = getContactWarning(showTripDetails, trips);
-                const roleIcons = {
-                  patient: { icon: User, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-                  facility: { icon: Shield, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
-                  escort: { icon: PhoneForwarded, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
-                  dispatcher: { icon: Headphones, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-                  routing: { icon: Route, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
-                };
                 return (
                   <>
                     {warning.show && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2">
-                        <AlertTriangle size={12} className="text-amber-600 shrink-0" />
-                        <p className="text-xs font-medium text-amber-700">{warning.message}</p>
+                      <div className={`rounded-xl px-3 py-2 flex items-center gap-2 ${warning.severity === 'error' ? 'bg-rose-50 border border-rose-200' : warning.severity === 'warning' ? 'bg-amber-50 border border-amber-200' : 'bg-blue-50 border border-blue-200'}`}>
+                        <AlertTriangle size={12} className={`shrink-0 ${warning.severity === 'error' ? 'text-rose-600' : warning.severity === 'warning' ? 'text-amber-600' : 'text-blue-600'}`} />
+                        <p className={`text-xs font-medium ${warning.severity === 'error' ? 'text-rose-700' : warning.severity === 'warning' ? 'text-amber-700' : 'text-blue-700'}`}>{warning.message}</p>
                       </div>
+                    )}
+                    {/* Primary Contact Quick Action */}
+                    {contacts.length > 0 && (
+                      <button type="button"
+                        onClick={() => { const p = getPrimaryContactForTrip(showTripDetails); if (p) handleCall(p.phone, `${p.label}: ${p.name}`); }}
+                        className="w-full h-10 bg-emerald-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-sm">
+                        <Phone size={14} /> Call {contacts.find(c => c.isPrimary)?.label || 'Primary Contact'} — {formatPhoneDisplay(contacts.find(c => c.isPrimary)?.phone || contacts[0]?.phone)}
+                      </button>
                     )}
                     <div className="space-y-2">
                       {contacts.map((contact, idx) => {
-                        const roleStyle = roleIcons[contact.role] || roleIcons.patient;
+                        const roleStyle = getContactRoleIcon(contact.role);
+                        const roleActions = getContactRoleActions(contact.role);
                         const Icon = roleStyle.icon;
+                        const iconMap = { User, Shield, PhoneForwarded, AlertTriangle, Building, MapPin, Headphones, Route };
+                        const IconComponent = iconMap[Icon] || User;
                         return (
                           <div key={idx} className={`flex items-center justify-between p-3 rounded-xl border ${roleStyle.border} ${roleStyle.bg}`}>
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${roleStyle.bg}`}>
-                                <Icon size={14} className={roleStyle.color} />
+                                <IconComponent size={14} className={roleStyle.color} />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-bold text-slate-900 truncate">{contact.name}</p>
-                                <p className="text-xs text-slate-500">{contact.label}{contact.isPrimary ? ' · Primary' : ''}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-bold text-slate-900 truncate">{contact.name}</p>
+                                  {contact.isPrimary && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">PRIMARY</span>}
+                                </div>
+                                <p className="text-xs text-slate-500">{contact.label} · {formatPhoneDisplay(contact.phone)}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                              <button type="button" onClick={() => handleCall(contact.phone, `${contact.label}: ${contact.name}`)} className="w-8 h-8 rounded-lg bg-white text-emerald-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer"><Phone size={14} /></button>
-                              {contact.role !== 'dispatcher' && contact.role !== 'routing' && (
-                                <button type="button" onClick={() => handleSMS(contact.phone, contact.name)} className="w-8 h-8 rounded-lg bg-white text-blue-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer"><MessageCircle size={14} /></button>
+                              <button type="button" onClick={() => handleCall(contact.phone, `${contact.label}: ${contact.name}`)} className="w-8 h-8 rounded-lg bg-white text-emerald-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer" title={roleActions.callLabel}><Phone size={14} /></button>
+                              {roleActions.smsLabel && (
+                                <button type="button" onClick={() => handleSMS(contact.phone, contact.name)} className="w-8 h-8 rounded-lg bg-white text-blue-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer" title={roleActions.smsLabel}><MessageCircle size={14} /></button>
                               )}
                             </div>
                           </div>
@@ -1558,8 +2212,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               )}
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Timeline & Odometer</h3>
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
+              <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500">Timeline & Odometer</h3>
               <div className="space-y-2.5">
                 {showTripDetails.startTime && (
                   <div className="flex justify-between items-center">
@@ -1581,27 +2235,27 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 )}
                 {showTripDetails.pickupOdometer && (
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">Pickup Odometer</span>
-                    <span className="text-xs font-bold text-slate-800">{showTripDetails.pickupOdometer?.toLocaleString()} mi</span>
+                    <span className="text-xs text-emerald-600">Pickup Odometer</span>
+                    <span className="text-xs font-bold text-emerald-700">{showTripDetails.pickupOdometer?.toLocaleString()} mi</span>
                   </div>
                 )}
                 {showTripDetails.arrivalOdometer && (
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">Arrival Odometer</span>
-                    <span className="text-xs font-bold text-slate-800">{showTripDetails.arrivalOdometer?.toLocaleString()} mi</span>
+                    <span className="text-xs text-emerald-600">Arrival Odometer</span>
+                    <span className="text-xs font-bold text-emerald-700">{showTripDetails.arrivalOdometer?.toLocaleString()} mi</span>
                   </div>
                 )}
                 {showTripDetails.dropoffOdometer && (
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">Dropoff Odometer</span>
-                    <span className="text-xs font-bold text-slate-800">{showTripDetails.dropoffOdometer?.toLocaleString()} mi</span>
+                    <span className="text-xs text-rose-600">Dropoff Odometer</span>
+                    <span className="text-xs font-bold text-rose-700">{showTripDetails.dropoffOdometer?.toLocaleString()} mi</span>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Actions</h3>
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
+              <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500">Actions</h3>
               <div className="flex gap-2">
                 <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={12} /> Google Maps</button>
                 <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'waze')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Waze</button>
@@ -1624,6 +2278,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           aiOptimizing={aiOptimizing}
           guidedMode={guidedMode}
           guidedStepIndex={guidedStepIndex}
+          guidedSteps={guidedSteps}
           driverPosition={driverPosition}
           appSettings={appSettings}
           currentUser={currentUser}
@@ -1633,10 +2288,13 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           onSetAiSequence={setAiSequence}
           onSetAiSuggestions={setAiSuggestions}
           onRunAiOptimization={runAiOptimization}
+          onSelectAllTrips={selectAllTrips}
           selectedTrips={selectedTrips}
           onSetSelectedTrips={setSelectedTrips}
           etas={etas}
           onOpenInNav={(addr) => { impact('medium'); openInNavApp(addr, suggestNavApp(addr)); }}
+          onOpenSequencer={() => setShowSequencerModal(true)}
+          requestAuthAction={requestAuthAction}
         />
       )}
 
@@ -1646,11 +2304,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           <div className="px-1 pt-2 pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">History</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Review past trips and activity</p>
+                <h2 className="text-xl font-black text-slate-900">History</h2>
+                <p className="text-slate-500 text-xs font-semibold mt-0.5">Review past trips and activity</p>
               </div>
               {allHistory.length > 0 && (
-                <button onClick={exportDailyLog} className="px-3 h-8 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95 shadow-sm">
+                <button onClick={exportDailyLog} className="px-3 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 text-xs">
                   <Download size={12} /> Export
                 </button>
               )}
@@ -1672,7 +2330,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               { id: 'cancelled', label: 'Cancelled' },
             ].map(f => (
               <button key={f.id} onClick={() => setHistoryFilter(f.id)}
-                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all active:scale-95 whitespace-nowrap ${historyFilter === f.id ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-100 shadow-sm hover:bg-slate-50'}`}>
+                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all whitespace-nowrap ${historyFilter === f.id ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold'}`}>
                 {f.label} ({f.id === 'all' ? allHistory.length : f.id === 'completed' ? completedTrips.length : f.id === 'noshow' ? noShowTrips.length : cancelledTrips.length})
               </button>
             ))}
@@ -1680,12 +2338,12 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
           <div className="space-y-2">
             {filteredHistory.length === 0 ? (
-              <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-slate-100/50 p-12 text-center shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-12 text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner">
                   <Clock size={28} className="text-slate-300" />
                 </div>
-                <h3 className="text-base font-bold text-slate-700">{historySearch ? 'No matching trips' : 'No history'}</h3>
-                <p className="text-sm text-slate-400 mt-1">{historySearch ? 'Try a different search term.' : 'Your completed trips will appear here.'}</p>
+                <h3 className="text-base font-black text-slate-900">{historySearch ? 'No matching trips' : 'No history'}</h3>
+                <p className="text-slate-500 text-xs font-semibold mt-1">{historySearch ? 'Try a different search term.' : 'Your completed trips will appear here.'}</p>
               </div>
             ) : (
               filteredHistory.map(trip => {
@@ -1696,35 +2354,35 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 };
                 const s = styles[trip.status] || styles['Completed'];
                 return (
-                  <div key={trip.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden active:scale-[0.99] transition-all cursor-pointer">
+                  <div key={trip.id} className="bg-transparent rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer mb-2 border border-slate-200/60">
                     <div onClick={() => setShowTripDetails(trip)} className="p-2.5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <div className={`w-2 h-2 rounded-full ${s.dot}`} />
                             <h4 className="font-bold text-sm text-slate-900 leading-tight break-words">{trip.patient}</h4>
-                            {trip.bookingId && <span className="text-xs text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded shrink-0">{trip.bookingId}</span>}
+                            {trip.bookingId && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs font-bold shrink-0">{trip.bookingId}</span>}
                           </div>
-                          <p className="text-sm font-bold text-blue-600 mt-1">{to12hr(trip.time)}</p>
-                          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-slate-500">
+                          <p className="text-sm font-bold text-emerald-600 mt-1">{to12hr(trip.time)}</p>
+                          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-emerald-600">
                             <ArrowRight size={10} className="text-emerald-500 shrink-0" />
                             <span className="break-words">{trip.pickup}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+                          <div className="flex items-center gap-1.5 text-xs text-rose-600 mt-0.5">
                             <ArrowRight size={10} className="text-rose-500 shrink-0" />
                             <span className="break-words">{trip.dropoff}</span>
                           </div>
                           {(trip.pickupOdometer || trip.dropoffOdometer) && (
-                            <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
-                              {trip.pickupOdometer && <span>Start: {trip.pickupOdometer?.toLocaleString()} mi</span>}
-                              {trip.dropoffOdometer && <span>End: {trip.dropoffOdometer?.toLocaleString()} mi</span>}
+                            <div className="flex items-center gap-3 mt-1.5 text-xs font-semibold">
+                              {trip.pickupOdometer && <span className="text-emerald-600">Start: {trip.pickupOdometer?.toLocaleString()} mi</span>}
+                              {trip.dropoffOdometer && <span className="text-rose-600">End: {trip.dropoffOdometer?.toLocaleString()} mi</span>}
                               {trip.pickupOdometer && trip.dropoffOdometer && (
                                 <span className="text-blue-500">+{(trip.dropoffOdometer - trip.pickupOdometer)?.toLocaleString()} mi</span>
                               )}
                             </div>
                           )}
                           {trip.distance && (
-                            <p className="text-xs text-slate-400 mt-0.5">Distance: {trip.distance} mi</p>
+                            <p className="text-slate-500 text-xs font-semibold mt-0.5">Distance: {trip.distance} mi</p>
                           )}
                           {trip.completedAt && (
                             <p className="text-xs text-slate-400 mt-1">{new Date(trip.completedAt).toLocaleString()}</p>
@@ -1736,8 +2394,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                       </div>
                     </div>
                     <div className="px-2 pb-2 flex gap-2">
-                      <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-9 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><FileText size={12} /> Details</button>
-                      <button type="button" onClick={() => restoreHistoryTrip(trip)} className={`flex-1 h-9 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${trip.status === 'No Show' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}><RotateCcw size={12} /> Restore</button>
+                      <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"><FileText size={12} /> Details</button>
+                      <button type="button" onClick={() => restoreHistoryTrip(trip)} className="flex-1 h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"><RotateCcw size={12} /> Restore</button>
                     </div>
                   </div>
                 );
@@ -1750,7 +2408,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       {/* ===== CHAT PAGE ===== */}
       {activeNav === 'chat' && (
         <div className="flex-1 flex flex-col bg-white">
-          <ChatPage currentUser={currentUser} role={role} />
+          <ChatPage currentUser={currentUser} role={role} drivers={allDrivers || drivers} dispatchers={dispatchers} />
         </div>
       )}
 
@@ -1758,8 +2416,8 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       {activeNav === 'settings' && (
         <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
           <div className="px-1 pt-2 pb-3">
-            <h2 className="text-xl font-bold text-slate-900">Settings</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Account and app preferences</p>
+            <h2 className="text-xl font-black text-slate-900">Settings</h2>
+            <p className="text-slate-500 text-xs font-semibold mt-0.5">Account and app preferences</p>
           </div>
           <div className="space-y-4 px-1">
             {/* Profile Card */}
@@ -1768,16 +2426,16 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <div className="relative px-5 py-5">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl font-black text-white shadow-inner border border-white/10">
-                    {me?.name?.charAt(0)}
+                    {String(me?.name || '?').charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h2 className="text-xl font-bold text-white truncate">{me?.name}</h2>
-                    <p className="text-sm text-white/70 truncate">{me?.email}</p>
+                    <p className="text-sm text-white/70 truncate">{displayLoginId}</p>
                     <p className="text-xs text-white/50 mt-0.5">{me?.vehicle || 'No vehicle'} • {me?.currentZone || '—'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-4">
-                  <button onClick={handleStatusToggle} className={`px-4 h-9 rounded-xl font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-sm border ${isClockedIn ? 'bg-rose-500 text-white border-rose-500' : 'bg-emerald-500 text-white border-emerald-500'}`}>
+                  <button onClick={handleStatusToggle} className={`px-4 h-9 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border ${isClockedIn ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-600' : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'}`}>
                     {isClockedIn ? 'Go Offline' : 'Go Online'}
                   </button>
                   <div className="flex items-center gap-1.5 px-3 h-9 bg-white/10 backdrop-blur-md rounded-xl border border-white/10">
@@ -1789,7 +2447,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             {/* Connection Status */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isOnline ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
@@ -1797,7 +2455,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-900">{isOnline ? 'Connected' : 'Offline'}</p>
-                    <p className="text-xs text-slate-400">Location sharing active</p>
+                    <p className="text-slate-500 text-xs font-semibold">Location sharing active</p>
                   </div>
                 </div>
                 <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'} ${isOnline ? 'animate-pulse' : ''}`} />
@@ -1805,7 +2463,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             {/* Analytics */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
               <button onClick={() => setShowAnalytics(!showAnalytics)} className="w-full p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
@@ -1813,7 +2471,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-900">Today's Analytics</p>
-                    <p className="text-xs text-slate-400">{analytics.tripsCompleted} trips completed</p>
+                    <p className="text-slate-500 text-xs font-semibold">{analytics.tripsCompleted} trips completed</p>
                   </div>
                 </div>
                 <ChevronDown size={16} className={`text-slate-300 transition-transform ${showAnalytics ? 'rotate-180' : ''}`} />
@@ -1832,13 +2490,13 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                         <div key={stat.label} className={`${stat.bg} rounded-xl p-3 text-center`}>
                           <Icon size={16} className={`mx-auto mb-1 ${stat.color}`} />
                           <p className="text-sm font-black text-slate-900">{stat.value}</p>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
+                          <p className="text-micro font-bold uppercase tracking-wider text-slate-500">{stat.label}</p>
                         </div>
                       );
                     })}
                   </div>
-                  <div className="bg-slate-50 rounded-xl p-3">
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">Time Distribution</p>
+                  <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                    <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-2">Time Distribution</p>
                     <div className="space-y-1.5">
                       <div>
                         <div className="flex justify-between text-xs text-slate-500 mb-0.5">
@@ -1865,20 +2523,20 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             {/* Odometer */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.12em]">Odometer</p>
+                  <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Odometer</p>
                   <p className="text-2xl font-bold text-slate-900 mt-1">{me?.odometer?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-400">mi</span></p>
-                  <p className="text-xs text-slate-400 mt-1">Next service at {me?.nextOilChange?.toLocaleString() || '5,000'} mi</p>
+                  <p className="text-slate-500 text-xs font-semibold mt-1">Next service at {me?.nextOilChange?.toLocaleString() || '5,000'} mi</p>
                 </div>
                 <Gauge size={32} className="text-slate-200" />
               </div>
             </div>
 
             {/* Vehicle Info */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.12em] mb-3">Vehicle Info</p>
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
+              <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-3">Vehicle Info</p>
               <div className="space-y-2.5 text-sm">
                 {[
                   ['Vehicle', me?.vehicle || 'N/A'],
@@ -1888,7 +2546,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   ['Background Tracking', backgroundLocation ? 'Enabled' : 'Not Available'],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between items-center">
-                    <span className="text-slate-400 text-xs">{label}</span>
+                    <span className="text-slate-500 text-xs font-semibold">{label}</span>
                     <span className={`font-semibold text-xs ${value === 'Online' || value === 'Active' || value === 'Enabled' ? 'text-emerald-600' : value === 'Offline' || value === 'Inactive' || value === 'Not Available' ? 'text-slate-400' : 'text-slate-800'}`}>{value}</span>
                   </div>
                 ))}
@@ -1896,7 +2554,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             {/* Navigation App */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Route size={16} /> Preferred Navigation App</div>
               <div className="grid grid-cols-1 gap-2">
                 {[
@@ -1918,7 +2576,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             {/* Appearance */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Sun size={16} /> Theme</div>
               <div className="grid grid-cols-2 gap-2">
                 {[
@@ -1960,7 +2618,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             </div>
 
             {/* Sign Out */}
-            <button onClick={() => signOut(auth)} className="w-full flex items-center justify-between px-4 py-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:bg-rose-50/50 transition">
+            <button onClick={() => onLogout?.()} className="w-full flex items-center justify-between px-4 py-3.5 bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:bg-rose-50/50 transition-all">
               <div className="flex items-center gap-3">
                 <LogOut size={17} className="text-rose-400" />
                 <span className="font-medium text-sm text-rose-600">Sign Out</span>
@@ -1971,13 +2629,9 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
         </div>
       )}
 
-      {/* ===== LEG SELECTION MODAL ===== */}
-      {legActionPrompt && !passwordPrompt && (() => {
-        const patientKey = (legActionPrompt.trip.patient || '').trim().toLowerCase();
-        const allLegs = trips.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && (t.driverId === me?.id || (t.driverEmail || '').toLowerCase() === (me?.email || '').toLowerCase()));
-        const activeLegs = allLegs.filter(l => !['Completed','Cancelled','No Show'].includes(l.status));
-        const actionLabel = legActionPrompt.type === 'noshow' ? 'No Show' : 'Cancelled';
-        const allSelected = selectedLegsForAction.size === activeLegs.length;
+      {/* ===== CANCEL / NO-SHOW LEG SELECTION MODAL ===== */}
+      {cancelPrompt && !passwordPrompt && (() => {
+        const allSelected = selectedLegsForAction.size === cancelPrompt.legs.length;
         const toggleLeg = (id) => {
           setSelectedLegsForAction(prev => {
             const next = new Set(prev);
@@ -1986,55 +2640,43 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           });
         };
         const toggleAll = () => {
-          setSelectedLegsForAction(prev => prev.size === activeLegs.length ? new Set() : new Set(activeLegs.map(l => l.id)));
+          setSelectedLegsForAction(prev => prev.size === cancelPrompt.legs.length ? new Set() : new Set(cancelPrompt.legs.map(l => l.id)));
         };
+        const actionLabel = cancelPrompt.type === 'noshow' ? 'No Show' : cancelPrompt.type === 'reroute' ? 'Reroute' : 'Cancel';
+        const gradientFrom = cancelPrompt.type === 'noshow' ? 'from-orange-500 to-amber-600' : cancelPrompt.type === 'reroute' ? 'from-purple-600 to-purple-500' : 'from-rose-600 to-rose-500';
         return (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 150 }} onClick={() => { setLegActionPrompt(null); setSelectedLegsForAction(new Set()); }}>
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 140 }} onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }}>
             <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
-              {/* Header with step indicator */}
-              <div className="px-5 py-4 bg-gradient-to-r from-rose-600 to-rose-500 text-white">
-                <div className="flex items-center gap-0.5 mb-3">
-                  <div className="h-1 flex-1 rounded-full bg-white/90" />
-                  <div className="h-1 flex-1 rounded-full bg-white/30" />
+              <div className={`px-5 py-4 bg-gradient-to-r ${gradientFrom} text-white flex items-center justify-between`}>
+                <div>
+                  <h3 className="text-base font-bold">{actionLabel} Trip Legs</h3>
+                  <p className="text-xs text-white/70 mt-0.5">{cancelPrompt.trip.patient} — {cancelPrompt.legs.length} leg{cancelPrompt.legs.length !== 1 ? 's' : ''}</p>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-white/60">Step 1 of 2</p>
-                    <h3 className="text-base font-bold">Select Legs to {actionLabel}</h3>
-                    <p className="text-xs text-white/70 mt-0.5">{legActionPrompt.trip.patient} — {activeLegs.length} active</p>
-                  </div>
-                  <button type="button" onClick={() => { setLegActionPrompt(null); setSelectedLegsForAction(new Set()); }} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
-                </div>
+                <button type="button" onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
               </div>
               <div className="p-4 space-y-2 max-h-56 overflow-y-auto">
-                {/* Select All toggle */}
                 <button type="button" onClick={toggleAll} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition active:scale-95 cursor-pointer ${allSelected ? 'border-rose-200 bg-rose-50' : 'border-slate-100 hover:bg-slate-50'}`}>
                   <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${allSelected ? 'bg-rose-500 border-rose-500' : 'border-slate-300'}`}>
                     {allSelected && <Check size={12} className="text-white" />}
                   </div>
-                  <span className="text-sm font-bold text-slate-900">Select All ({activeLegs.length})</span>
+                  <span className="text-sm font-bold text-slate-900">Select All ({cancelPrompt.legs.length})</span>
                 </button>
-                {allLegs.map((leg, idx) => {
-                  const isTerminal = ['Completed','Cancelled','No Show'].includes(leg.status);
+                {cancelPrompt.legs.map((leg, idx) => {
                   const isSelected = selectedLegsForAction.has(leg.id);
                   return (
-                    <button
-                      type="button"
-                      key={leg.id}
-                      onClick={() => { if (!isTerminal) toggleLeg(leg.id); }}
-                      disabled={isTerminal}
-                      className={`w-full flex items-center gap-3 p-3 rounded-xl border transition ${isTerminal ? 'opacity-40 cursor-not-allowed border-slate-100 bg-slate-50' : `active:scale-95 cursor-pointer ${isSelected ? 'border-rose-200 bg-rose-50' : 'border-slate-100 hover:bg-slate-50'}`}`}>
-                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${isTerminal ? 'border-slate-200 bg-slate-100' : isSelected ? 'bg-rose-500 border-rose-500' : 'border-slate-300'}`}>
-                        {isTerminal ? <Check size={10} className="text-slate-400" /> : isSelected && <Check size={12} className="text-white" />}
+                    <button type="button" key={leg.id} onClick={() => toggleLeg(leg.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl border transition active:scale-95 cursor-pointer ${isSelected ? 'border-rose-200 bg-rose-50' : 'border-slate-100 hover:bg-slate-50'}`}>
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'bg-rose-500 border-rose-500' : 'border-slate-300'}`}>
+                        {isSelected && <Check size={12} className="text-white" />}
                       </div>
                       <div className="flex-1 min-w-0 text-left">
                         <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[9px] font-black">L{idx + 1}</span>
+                          <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black ${cancelPrompt.type === 'noshow' ? 'bg-amber-100 text-amber-600' : cancelPrompt.type === 'reroute' ? 'bg-purple-100 text-purple-600' : 'bg-rose-100 text-rose-600'}`}>L{idx + 1}</span>
                           <span className="text-sm font-bold text-slate-900 truncate">{leg.patient}</span>
-                          {leg.bookingId && <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded shrink-0">{leg.bookingId}</span>}
-                          {isTerminal && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>}
+                          {leg.bookingId && <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-[9px] font-bold shrink-0">{leg.bookingId}</span>}
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+                        <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
                           <span className="truncate">{leg.pickup}</span>
                           <span className="shrink-0">→</span>
                           <span className="truncate">{leg.dropoff}</span>
@@ -2049,12 +2691,13 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                   type="button"
                   onClick={() => {
                     if (selectedLegsForAction.size === 0) return;
-                    setLegActionPrompt(null);
-                    setPasswordPrompt({ type: legActionPrompt.type, trip: legActionPrompt.trip, selectedLegIds: [...selectedLegsForAction] });
+                    setCancelPrompt(null);
+                    setPasswordPrompt({ type: cancelPrompt.type, trip: cancelPrompt.trip, selectedLegIds: [...selectedLegsForAction], reason: '' });
+                    setSelectedLegsForAction(new Set());
                   }}
                   disabled={selectedLegsForAction.size === 0}
-                  className="w-full py-3 bg-rose-600 text-white rounded-xl font-bold text-sm active:scale-95 transition disabled:opacity-40 cursor-pointer">
-                  {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `Continue with ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
+                  className={`w-full py-3 text-white rounded-xl font-bold text-sm transition disabled:opacity-40 cursor-pointer ${cancelPrompt.type === 'noshow' ? 'bg-orange-600 hover:bg-orange-700' : cancelPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
+                  {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `${actionLabel} ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
                 </button>
               </div>
             </div>
@@ -2104,10 +2747,10 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                         <div className="flex items-center gap-2">
                           <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[9px] font-black">L{idx + 1}</span>
                           <span className="text-sm font-bold text-slate-900 truncate">{leg.patient}</span>
-                          {leg.bookingId && <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded shrink-0">{leg.bookingId}</span>}
+                          {leg.bookingId && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-[9px] font-bold shrink-0">{leg.bookingId}</span>}
                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+                        <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
                           <span className="truncate">{leg.pickup}</span>
                           <span className="shrink-0">→</span>
                           <span className="truncate">{leg.dropoff}</span>
@@ -2126,7 +2769,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                     setPasswordPrompt({ type: 'restore', trip: restorePrompt.trip, selectedLegIds: [...selectedLegsForAction] });
                   }}
                   disabled={selectedLegsForAction.size === 0}
-                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm active:scale-95 transition disabled:opacity-40 cursor-pointer">
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition disabled:opacity-40 cursor-pointer">
                   {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `Restore ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
                 </button>
               </div>
@@ -2142,16 +2785,16 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
             {/* Header with step indicator */}
             <div className="flex items-center gap-0.5 mb-4">
               <div className="h-1 flex-1 rounded-full bg-emerald-400" />
-              <div className={`h-1 flex-1 rounded-full ${passwordPrompt.type === 'restore' ? 'bg-blue-400' : 'bg-rose-400'}`} />
+              <div className={`h-1 flex-1 rounded-full ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-400' : 'bg-rose-400'}`} />
             </div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-4 text-center">Step 2 of 2</p>
+            <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-4 text-center">Step 2 of 2</p>
             <div className="flex items-start justify-between mb-5">
               <div className="text-center flex-1">
-                <div className={`w-14 h-14 bg-gradient-to-br rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg ${passwordPrompt.type === 'restore' ? 'from-blue-600 to-blue-500' : 'from-rose-600 to-rose-500'}`}>
+                <div className={`w-14 h-14 bg-gradient-to-br rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'from-blue-600 to-blue-500' : 'from-rose-600 to-rose-500'}`}>
                   <Lock size={24} className="text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">Confirm {passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'restore' ? 'Restore' : 'Cancelled'}</h3>
-                <p className="text-xs text-slate-500 mt-1">{passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : `Enter your password to mark ${passwordPrompt.trip.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : 'Cancelled'}`}</p>
+                <h3 className="text-lg font-bold text-slate-900">Confirm {passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Reroute' : passwordPrompt.type === 'restore' ? 'Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Edit' : 'Cancel'}</h3>
+                <p className="text-xs text-slate-500 mt-1">{passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Enter your password to save your trip changes' : `Enter your password to mark ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Rerouted' : 'Cancelled'}`}</p>
                 {passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 && (
                   <p className="text-xs text-rose-500 font-semibold mt-1">{passwordPrompt.selectedLegIds.length} leg{passwordPrompt.selectedLegIds.length !== 1 ? 's' : ''} will be affected</p>
                 )}
@@ -2159,9 +2802,9 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
               <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="space-y-4">
-              {passwordPrompt.type !== 'restore' && (
+              {passwordPrompt.type !== 'restore' && passwordPrompt.type !== 'edittrip' && passwordPrompt.type !== 'edittripcomplete' && (
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Reason</label>
+                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Reason</label>
                   <select value={passwordPrompt.reason || ''} onChange={(e) => setPasswordPrompt(prev => ({ ...prev, reason: e.target.value }))}
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm focus:border-rose-500 outline-none">
                     <option value="">Select reason (optional)</option>
@@ -2176,7 +2819,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 </div>
               )}
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Password</label>
+                <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Password</label>
                 <input
                   type="password"
                   value={passwordValue}
@@ -2189,11 +2832,11 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 {passwordError && <p className="text-xs text-rose-600 font-semibold mt-1 text-center">{passwordError}</p>}
               </div>
               <div className="flex gap-2">
-                <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm active:scale-95 cursor-pointer">
+                <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">
                   Back
                 </button>
-                <button type="button" onClick={verifyPasswordAndProceed} disabled={!passwordValue || passwordVerifying} className={`flex-1 py-3 text-white rounded-xl font-bold text-sm disabled:opacity-40 active:scale-95 shadow-sm cursor-pointer ${passwordPrompt.type === 'restore' ? 'bg-blue-600' : 'bg-rose-600'}`}>
-                  {passwordVerifying ? 'Verifying...' : passwordPrompt.type === 'noshow' ? 'Confirm No Show' : passwordPrompt.type === 'restore' ? 'Confirm Restore' : 'Confirm Cancelled'}
+                <button type="button" onClick={verifyPasswordAndProceed} disabled={!passwordValue || passwordVerifying} className={`flex-1 py-3 text-white rounded-xl font-bold text-sm disabled:opacity-40 transition-all cursor-pointer ${passwordPrompt.type === 'restore' ? 'bg-blue-600 hover:bg-blue-700' : passwordPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
+                  {passwordVerifying ? 'Verifying...' : passwordPrompt.type === 'noshow' ? 'Confirm No Show' : passwordPrompt.type === 'reroute' ? 'Confirm Reroute' : passwordPrompt.type === 'restore' ? 'Confirm Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Confirm & Save Changes' : 'Confirm Cancel'}
                 </button>
               </div>
             </div>
@@ -2201,24 +2844,21 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
         </div>
       )}
 
+      {/* ===== EDIT TRIP MODAL (Driver Mode) ===== */}
+      {editTripModal && (
+        <EditTripModal
+          trip={editTripModal}
+          onClose={() => setEditTripModal(null)}
+          onSave={handleSaveEditedTrip}
+          driverMode
+        />
+      )}
+
       {/* ===== SMART CONTACT SELECTOR ===== */}
       {showContactSelector && (() => {
         const contacts = getContactsForTrip(showContactSelector);
         const warning = getContactWarning(showContactSelector, trips);
-        const roleIcons = {
-          patient: { icon: User, color: 'text-emerald-600', bg: 'bg-emerald-50', ring: 'ring-emerald-200' },
-          facility: { icon: Shield, color: 'text-amber-600', bg: 'bg-amber-50', ring: 'ring-amber-200' },
-          escort: { icon: PhoneForwarded, color: 'text-purple-600', bg: 'bg-purple-50', ring: 'ring-purple-200' },
-          dispatcher: { icon: Headphones, color: 'text-blue-600', bg: 'bg-blue-50', ring: 'ring-blue-200' },
-          routing: { icon: Route, color: 'text-indigo-600', bg: 'bg-indigo-50', ring: 'ring-indigo-200' },
-        };
-        const roleActions = {
-          patient: { callLabel: 'Call Patient', smsLabel: 'Message Patient' },
-          facility: { callLabel: 'Call Facility', smsLabel: 'Message Facility' },
-          escort: { callLabel: 'Call Escort', smsLabel: 'Message Escort' },
-          dispatcher: { callLabel: 'Call Dispatch', smsLabel: null },
-          routing: { callLabel: 'Call Routing', smsLabel: null },
-        };
+        const iconMap = { User, Shield, PhoneForwarded, AlertTriangle, Building, MapPin, Headphones, Route };
         return (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end justify-center" style={{ zIndex: 170 }} onClick={() => setShowContactSelector(null)}>
             <div className="bg-white w-full max-w-md rounded-t-3xl shadow-2xl relative overflow-hidden animate-slide-up pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
@@ -2235,20 +2875,37 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
 
               {/* Warning */}
               {warning.show && (
-                <div className="mx-4 mt-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2">
-                  <AlertTriangle size={12} className="text-amber-600 shrink-0" />
-                  <p className="text-xs font-medium text-amber-700">{warning.message}</p>
+                <div className={`mx-4 mt-3 rounded-xl px-3 py-2 flex items-center gap-2 ${warning.severity === 'error' ? 'bg-rose-50 border border-rose-200' : warning.severity === 'warning' ? 'bg-amber-50 border border-amber-200' : 'bg-blue-50 border border-blue-200'}`}>
+                  <AlertTriangle size={12} className={`shrink-0 ${warning.severity === 'error' ? 'text-rose-600' : warning.severity === 'warning' ? 'text-amber-600' : 'text-blue-600'}`} />
+                  <p className={`text-xs font-medium ${warning.severity === 'error' ? 'text-rose-700' : warning.severity === 'warning' ? 'text-amber-700' : 'text-blue-700'}`}>{warning.message}</p>
                 </div>
               )}
+
+              {/* Primary Quick Call */}
+              {contacts.length > 0 && (() => {
+                const primary = contacts.find(c => c.isPrimary) || contacts[0];
+                const ps = getContactRoleIcon(primary.role);
+                const IconComp = iconMap[ps.icon] || User;
+                return (
+                  <div className="px-4 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => { handleCall(primary.phone, `${primary.label}: ${primary.name}`); setShowContactSelector(null); }}
+                      className={`w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer shadow-sm ${ps.bg} ${ps.color} border ${ps.border}`}>
+                      <IconComp size={18} /> Call {primary.label} — {formatPhoneDisplay(primary.phone)}
+                    </button>
+                  </div>
+                );
+              })()}
 
               {/* Contact List */}
               <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
                 {contacts.map((contact, idx) => {
-                  const roleStyle = roleIcons[contact.role] || roleIcons.patient;
-                  const actions = roleActions[contact.role] || roleActions.patient;
-                  const Icon = roleStyle.icon;
+                  const roleStyle = getContactRoleIcon(contact.role);
+                  const actions = getContactRoleActions(contact.role);
+                  const Icon = iconMap[roleStyle.icon] || User;
                   return (
-                    <div key={idx} className={`rounded-xl border-2 ${contact.isPrimary ? `${roleStyle.ring} bg-white` : 'border-slate-100 bg-slate-50'} p-3`}>
+                    <div key={idx} className={`bg-white rounded-xl border-2 shadow-sm ${contact.isPrimary ? 'ring-2 ' + roleStyle.ring : 'border-slate-200'} p-3`}>
                       <div className="flex items-center gap-3 mb-2">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${roleStyle.bg}`}>
                           <Icon size={18} className={roleStyle.color} />
@@ -2287,7 +2944,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 <button
                   type="button"
                   onClick={() => { handleSmartCall(showContactSelector); setShowContactSelector(null); }}
-                  className="w-full h-10 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-95 shadow-sm cursor-pointer">
+                  className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer">
                   <Phone size={14} /> Quick Call Primary Contact
                 </button>
               </div>
@@ -2297,35 +2954,29 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
       })()}
 
       {/* ===== BOTTOM NAVIGATION ===== */}
-      <nav className="fixed bottom-0 left-0 right-0 flex justify-center pointer-events-none" style={{ zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="mx-3 mb-3 w-full max-w-md bg-white/75 backdrop-blur-2xl rounded-2xl shadow-[0_4px_40px_rgba(0,0,0,0.08),0_1px_4px_rgba(0,0,0,0.04)] border border-white/60 px-1.5 py-1 pointer-events-auto">
-          <div className="flex items-center justify-around">
+      <nav className="bottom-nav">
+        <div className="flex items-stretch justify-around px-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActiveTab = activeNav === item.id;
               return (
                 <button key={item.id} onClick={() => setActiveNav(item.id)}
-                  className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all duration-300 relative min-w-[52px] group ${
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${
                     isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
                   }`}>
-                  <div className={`relative flex items-center justify-center transition-all duration-300 ${
-                    isActiveTab
-                      ? 'w-9 h-7 rounded-lg bg-blue-600/10 scale-100'
-                      : 'w-7 h-7 rounded-lg scale-100 group-hover:scale-105'
-                  }`}>
-                    <Icon size={isActiveTab ? 17 : 15} strokeWidth={isActiveTab ? 2.5 : 1.5}
-                      className={`transition-all duration-300 ${isActiveTab ? 'text-blue-600 drop-shadow-[0_0_6px_rgba(37,99,235,0.3)]' : 'text-slate-400'}`}
+                  <div className="relative">
+                    <Icon size={22} strokeWidth={isActiveTab ? 2.5 : 1.5}
+                      className={`transition-all duration-200 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}
                     />
-                    {item.id === 'chat' && chatUnread > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-white text-[8px] font-bold min-w-[13px] h-3.5 px-1 rounded-full flex items-center justify-center leading-none shadow-sm border border-white/80">{chatUnread > 99 ? '99+' : chatUnread}</span>
+                    {item.id === 'chat' && chatUnreadCount > 0 && (
+                      <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-bold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>
                     )}
                   </div>
-                  <span className={`text-[10px] font-semibold tracking-wide transition-all leading-none ${isActiveTab ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>{item.label}</span>
+                  <span className={`text-[10px] tracking-wide transition-all leading-none ${isActiveTab ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>{item.label}</span>
                 </button>
               );
             })}
           </div>
-        </div>
       </nav>
 
       {/* Offline Queue Indicator */}
@@ -2333,6 +2984,51 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
         <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-amber-600 text-white px-4 py-2 rounded-2xl shadow-lg text-xs font-bold flex items-center gap-2" style={{ zIndex: 100 }}>
           <WifiOff size={12} />
           {offlineQueue.length} pending sync
+        </div>
+      )}
+
+      {/* ===== ROUTE SEQUENCER MODAL ===== */}
+      {showSequencerModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setShowSequencerModal(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Route size={16} className="text-indigo-700" /> Route Sequencer
+              </h2>
+              <button onClick={() => setShowSequencerModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <Suspense fallback={<LazyFallback />}>
+                <RouteSequencerApp
+                  trips={trips}
+                  drivers={drivers}
+                  currentUser={currentUser}
+                  role={role}
+                  onRouteSaved={({ route, saveMode, validTripIds }) => {
+                    if (!onAddAuditLog) return;
+                    onAddAuditLog(
+                      saveMode === 'recurring' ? 'Route Created' : 'Route Saved',
+                      saveMode === 'recurring'
+                        ? `${currentUser} saved recurring route "${route.name}" with ${route.sequence?.length || 0} stops.`
+                        : `${currentUser} saved today's route "${route.name}" with ${validTripIds.length} synced trips.`,
+                      saveMode === 'recurring' ? 'indigo' : 'amber'
+                    );
+                  }}
+                  onApplyRoute={({ route, tripIds }) => {
+                    (tripIds || []).forEach((tripId) => {
+                      const trip = trips.find(t => t.id === tripId);
+                      if (trip) onUpdateTrip(trip.id, 'Assigned', { driverId: me?.id || '', driverEmail: me?.email || '', driverName: me?.name || '' });
+                    });
+                    if (onAddAuditLog) {
+                      onAddAuditLog('Route Applied', `${currentUser} applied route "${route.name}" to ${tripIds?.length || 0} trips.`, 'emerald');
+                    }
+                    setShowSequencerModal(false);
+                  }}
+                />
+              </Suspense>
+            </div>
+          </div>
         </div>
       )}
 
@@ -2348,15 +3044,15 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                 <h3 className="text-lg font-bold text-slate-900">{patientName}</h3>
                 <button type="button" onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200 cursor-pointer"><X size={16} /></button>
               </div>
-              <p className="text-xs text-slate-500 font-medium mb-4">{legs.length} leg{legs.length !== 1 ? 's' : ''}</p>
+              <p className="text-slate-500 text-xs font-semibold mb-4">{legs.length} leg{legs.length !== 1 ? 's' : ''}</p>
               <div className="space-y-2">
                 {legs.map((leg, idx) => (
-                  <div key={leg.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <div key={leg.id} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-slate-400 uppercase">Leg {idx + 1}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'In Transit' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{leg.status}</span>
+                      <span className="text-micro font-bold uppercase tracking-wider text-slate-500">Leg {idx + 1}</span>
+                      <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${leg.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : leg.status === 'In Transit' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{leg.status}</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-400 mb-1">Booking: {leg.bookingId || '—'}</p>
+                    <p className="text-slate-500 text-xs font-semibold mb-1">Booking: {leg.bookingId || '—'}</p>
                     <div className="space-y-1.5">
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
@@ -2380,7 +3076,7 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
                       const label = contact ? contact.label : 'Contact';
                       return (
                         <div className="mt-1.5 flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-400 uppercase">{label}</span>
+                          <span className="text-micro font-bold uppercase tracking-wider text-slate-500">{label}</span>
                           <button type="button" onClick={() => handleCall(leg.pickupPhone, `${label}: ${leg.patient}`)} className="text-xs text-blue-600 font-bold flex items-center gap-1 hover:underline cursor-pointer">
                             <Phone size={10} /> {formatPhoneDisplay(leg.pickupPhone)}
                           </button>
@@ -2394,6 +3090,95 @@ const DriverPage = ({ currentUser, role, drivers, trips, activeMission, onUpdate
           </div>
         );
       })()}
+
+      {/* ===== LEGS DETAILS MODAL ===== */}
+      {showLegsModal && (() => {
+        const statusColor = (s) => {
+          if (s === 'Completed' || s === 'Arrived') return 'bg-emerald-100 text-emerald-700';
+          if (s === 'Cancelled' || s === 'No Show') return 'bg-rose-100 text-rose-700';
+          if (s === 'In Transit') return 'bg-blue-100 text-blue-700';
+          return 'bg-slate-100 text-slate-700';
+        };
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" style={{ zIndex: 140 }} onClick={() => setShowLegsModal(null)}>
+            <div className="bg-white rounded-3xl w-full max-w-lg max-h-[80vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between rounded-t-3xl z-10">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">{showLegsModal[0]?.patient || 'Trip Legs'}</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">{showLegsModal.length} leg{showLegsModal.length !== 1 ? 's' : ''} today</p>
+                </div>
+                <button type="button" onClick={() => setShowLegsModal(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-all cursor-pointer shrink-0">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="p-4 space-y-2">
+                {showLegsModal.map((leg) => (
+                  <div key={leg.id} className="border border-slate-100 rounded-xl p-3 hover:border-slate-200 transition-colors">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-400 font-mono">#{leg.bookingId || leg.id}</span>
+                        {leg.wheelchair && leg.wheelchair !== 'WLK' && (
+                          <span className="text-[9px] font-bold bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded">{leg.wheelchair}</span>
+                        )}
+                      </div>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${statusColor(leg.status)}`}>{leg.status}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-start gap-2 text-xs">
+                        <div className="w-1.5 h-1.5 rounded-full shrink-0 mt-1 bg-blue-500"></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-slate-900 font-semibold leading-tight">{leg.pickupSite || 'Pickup'}</p>
+                          <p className="text-slate-500 truncate leading-tight">{leg.pickup}</p>
+                          {leg.pickupPhone && <p className="text-slate-400 text-[9px] font-mono mt-0.5">{leg.pickupPhone}</p>}
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2 text-xs">
+                        <div className="w-1.5 h-1.5 rounded-full shrink-0 mt-1 bg-emerald-500"></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-slate-900 font-semibold leading-tight">{leg.dropoffSite || 'Dropoff'}</p>
+                          <p className="text-slate-500 truncate leading-tight">{leg.dropoff}</p>
+                          {leg.dropoffPhone && <p className="text-slate-400 text-[9px] font-mono mt-0.5">{leg.dropoffPhone}</p>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5 text-[9px] text-slate-400">
+                      {leg.time && <span>{leg.time}</span>}
+                      {leg.distance && <><span>•</span><span>{leg.distance} mi</span></>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ===== GEOFENCE TOAST ===== */}
+      {showToast && (
+        <div className="fixed bottom-6 left-4 right-4 z-50 animate-slide-up">
+          <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-2xl flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0">
+              <MapPin size={20} className="text-blue-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold">{showToast.message}</p>
+            </div>
+            {showToast.action === 'arrive-pickup' && (
+              <button type="button" onClick={() => { setShowToast(null); handleArrivePickup(showToast.trip); }} className="px-4 py-2 bg-blue-500 rounded-xl text-xs font-bold hover:bg-blue-400 transition-all shrink-0 cursor-pointer">
+                Arrive
+              </button>
+            )}
+            {showToast.action === 'arrive-dropoff' && (
+              <button type="button" onClick={() => { setShowToast(null); handleArriveDropoff(showToast.trip); }} className="px-4 py-2 bg-orange-500 rounded-xl text-xs font-bold hover:bg-orange-400 transition-all shrink-0 cursor-pointer">
+                Arrive
+              </button>
+            )}
+            <button type="button" onClick={() => setShowToast(null)} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0 cursor-pointer">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

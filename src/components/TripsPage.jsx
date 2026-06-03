@@ -1,9 +1,32 @@
-import React, { useState } from 'react';
-import { tripMatchesCalendarDay } from '../utils/tripDate';
-import { MapPin, Clock, AlertCircle, Users, UserCheck, X, BrainCircuit, Loader2, Plus, Save, Trash2, Edit2, CheckCircle2, Phone, MessageSquare, Flag, Sparkles, Check } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { tripMatchesCalendarDay, timeToMinutes } from '../utils/tripDate';
+import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, MessageSquare, Flag, Sparkles, Check, Archive } from 'lucide-react';
 import { suggestBatchAssignment } from '../config/ai';
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import { isNativeShell } from '../utils/platform';
+
+const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show'];
+
+const getManifestUrgency = (trip) => {
+  const timeValue = timeToMinutes(trip?.time);
+  const now = new Date();
+  const scheduled = new Date();
+  scheduled.setHours(Math.floor(timeValue / 60), timeValue % 60, 0, 0);
+  if (now > scheduled && !TERMINAL_STATUSES.includes(trip?.status)) return 'late';
+  const diff = scheduled - now;
+  if (diff > 0 && diff < 30 * 60 * 1000) return 'soon';
+  return 'normal';
+};
+
+const getManifestStatusClass = (status) => {
+  if (status === 'Unassigned') return 'bg-rose-100 text-rose-700';
+  if (status === 'Assigned') return 'bg-blue-100 text-blue-700';
+  if (['In Progress', 'In Mission', 'At Pickup', 'In Transit', 'At Dropoff', 'En Route', 'Navigating Pickup', 'Navigating Dropoff', 'Arrived'].includes(status)) return 'bg-amber-100 text-amber-700';
+  if (status === 'Completed') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'Cancelled') return 'bg-rose-100 text-rose-700';
+  if (status === 'No Show') return 'bg-amber-100 text-amber-700';
+  return 'bg-slate-100 text-slate-700';
+};
 
 const getTodayStr = () => {
   const d = new Date();
@@ -25,6 +48,15 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
   const [editTrip, setEditTrip] = useState(null);
   const [manifestDate, setManifestDate] = useState(today);
   const [showAllDates, setShowAllDates] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [driverFilter, setDriverFilter] = useState('all');
+  const [serviceFilter, setServiceFilter] = useState('all');
+  const [layoutMode, setLayoutMode] = useState('grouped');
+  const [groupBy, setGroupBy] = useState('driver');
+  const [attentionOnly, setAttentionOnly] = useState(false);
+  const [renderLimit, setRenderLimit] = useState(150);
+  const [showReassignModal, setShowReassignModal] = useState(false);
 
   const handleBulkAssign = (driverId) => {
     if (assignMode === 'mission') {
@@ -34,11 +66,31 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
     if (onBulkAssignTrips) {
       onBulkAssignTrips(driverId);
       setShowAssign(false);
+      setAssignmentFeedback(`✓ Assigned ${selectedTasks.length} trips`);
+      setTimeout(() => setAssignmentFeedback(''), 3000);
     }
   };
 
+  const handleBulkReassign = (driverId) => {
+    selectedTasks.forEach(tripId => {
+      onAssignTrip(tripId, driverId);
+    });
+    setShowReassignModal(false);
+    setAssignmentFeedback(`✓ Reassigned ${selectedTasks.length} trips`);
+    setTimeout(() => setAssignmentFeedback(''), 3000);
+  };
+
+  const handleBulkUnassign = () => {
+    if (!window.confirm(`Unassign ${selectedTasks.length} trips?`)) return;
+    selectedTasks.forEach(tripId => {
+      onAssignTrip(tripId, '');
+    });
+    setAssignmentFeedback(`✓ Unassigned ${selectedTasks.length} trips`);
+    setTimeout(() => setAssignmentFeedback(''), 3000);
+  };
+
   const handleBulkDelete = () => {
-    if (!window.confirm(`Delete ${selectedTasks.length} selected trips?`)) return;
+    if (!window.confirm(`Archive ${selectedTasks.length} selected trips?`)) return;
     selectedTasks.forEach(id => {
       onDeleteTrip(id);
     });
@@ -47,27 +99,34 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
 
   const getZip = (addr) => (addr || '').match(/\b(\d{5})\b/)?.[1] || '';
 
-  const timeToMinutes = (t) => {
-    if (!t) return 1440;
-    const cleanTime = String(t).toUpperCase().trim();
-    if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
-    
-    // Robust regex: HH:MM AM/PM or HH AM/PM or HH:MM
-    const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
-    if (!m) return 1440;
-    
-    let h = parseInt(m[1], 10);
-    let min = parseInt(m[2] || '0', 10);
-    const p = m[3];
-    
-    if (p === 'PM' && h < 12) h += 12;
-    if (p === 'AM' && h === 12) h = 0;
-    
-    return h * 60 + min;
-  };
+  const serviceOptions = useMemo(
+    () => [...new Set(trips.map((trip) => trip.type || trip.serviceType).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b))),
+    [trips]
+  );
 
-  const filteredTrips = [...trips]
+  const filteredTrips = useMemo(() => [...trips]
     .filter(t => showAllDates || tripMatchesCalendarDay(t.date, manifestDate))
+    .filter((trip) => {
+      if (statusFilter !== 'all' && trip.status !== statusFilter) return false;
+      if (driverFilter === 'unassigned' && trip.driverId) return false;
+      if (driverFilter !== 'all' && driverFilter !== 'unassigned' && trip.driverId !== driverFilter) return false;
+      if (serviceFilter !== 'all' && (trip.type || trip.serviceType || '') !== serviceFilter) return false;
+      if (attentionOnly) {
+        const urgency = getManifestUrgency(trip);
+        if (!(trip.status === 'Unassigned' || urgency === 'late' || urgency === 'soon')) return false;
+      }
+      if (!searchTerm.trim()) return true;
+      const q = searchTerm.trim().toLowerCase();
+      return [
+        trip.patient,
+        trip.bookingId,
+        trip.pickup,
+        trip.dropoff,
+        trip.pickupPhone,
+        trip.dropoffPhone,
+        trip.notes,
+      ].some((value) => String(value || '').toLowerCase().includes(q));
+    })
     .sort((a, b) => {
       if (sortBy === 'time') {
         const timeA = timeToMinutes(a.time);
@@ -84,8 +143,62 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         if (za !== zb) return za.localeCompare(zb);
         return (a.patient || '').localeCompare(b.patient || '');
       }
+      if (sortBy === 'status') return (a.status || '').localeCompare(b.status || '');
       return 0;
+    }), [trips, showAllDates, manifestDate, statusFilter, driverFilter, serviceFilter, attentionOnly, searchTerm, sortBy]);
+
+  const visibleTrips = useMemo(() => filteredTrips.slice(0, renderLimit), [filteredTrips, renderLimit]);
+
+  React.useEffect(() => {
+    setRenderLimit(150);
+  }, [showAllDates, manifestDate, searchTerm, statusFilter, driverFilter, serviceFilter, attentionOnly, sortBy, layoutMode, groupBy]);
+
+  const manifestSummary = useMemo(() => ({
+    total: filteredTrips.length,
+    late: filteredTrips.filter((trip) => getManifestUrgency(trip) === 'late').length,
+    soon: filteredTrips.filter((trip) => getManifestUrgency(trip) === 'soon').length,
+    unassigned: filteredTrips.filter((trip) => !trip.driverId || trip.status === 'Unassigned').length,
+    assigned: filteredTrips.filter((trip) => trip.driverId).length,
+  }), [filteredTrips]);
+
+  const groupedTrips = useMemo(() => {
+    const sections = new Map();
+    visibleTrips.forEach((trip) => {
+      let key = 'all';
+      let label = 'Live Queue';
+      let order = 0;
+      if (groupBy === 'driver') {
+        const driver = drivers.find((entry) => entry.id === trip.driverId);
+        key = driver?.id || 'unassigned';
+        label = driver?.name || 'Unassigned Pool';
+        order = driver ? 1 : 0;
+      } else if (groupBy === 'status') {
+        key = trip.status || 'Unknown';
+        label = trip.status || 'Unknown';
+      } else if (groupBy === 'service') {
+        key = trip.type || trip.serviceType || 'Unclassified';
+        label = key;
+      } else if (groupBy === 'date') {
+        key = trip.date || 'No Date';
+        label = trip.date || 'No Date';
+      }
+      if (!sections.has(key)) {
+        sections.set(key, { key, label, order, trips: [], late: 0 });
+      }
+      const section = sections.get(key);
+      section.trips.push(trip);
+      if (getManifestUrgency(trip) === 'late') section.late += 1;
     });
+    return [...sections.values()]
+      .map((section) => ({
+        ...section,
+        trips: section.trips.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)),
+      }))
+      .sort((a, b) => {
+        if (a.order !== b.order) return a.order - b.order;
+        return String(a.label || '').localeCompare(String(b.label || ''));
+      });
+  }, [drivers, groupBy, visibleTrips]);
 
   const handleAssign = (driverId) => {
     if (onAssignTrip && selectedTrip) {
@@ -110,6 +223,107 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
     setShowEditForm(true);
   };
 
+  const renderManifestTripCard = (trip) => {
+    const driver = drivers.find((entry) => entry.id === trip.driverId);
+    const isSelected = selectedTasks.includes(trip.id);
+    const urgency = getManifestUrgency(trip);
+    const isLate = urgency === 'late';
+
+    const handleAssignClick = () => {
+      setSelectedTrip(trip);
+      setAssignMode('assign');
+      setShowAssign(true);
+    };
+
+    const handleReassignClick = () => {
+      setSelectedTrip(trip);
+      setAssignMode('reassign');
+      setShowReassignModal(true);
+    };
+
+    return (
+      <div key={trip.id} className={`rounded-xl border bg-white p-3 transition-all ${isSelected ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300' : isLate ? 'border-rose-200 bg-white' : 'border-slate-200 hover:border-slate-300'}`}>
+        <div className="flex items-start gap-2">
+          <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} className="mt-1 h-5 w-5 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+          <div className="min-w-0 flex-1">
+            {/* Header Row: Time, Status, Badges */}
+            <div className="mb-2 flex items-center gap-2 flex-wrap">
+              <span className={`text-lg font-black leading-none ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-slate-700'}`}>{trip.time}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${getManifestStatusClass(trip.status)}`}>{trip.status}</span>
+              {trip.type && <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{trip.type}</span>}
+              {trip.bookingId && <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{trip.bookingId}</span>}
+            </div>
+
+            {/* Patient Name */}
+            <div className="mb-2 flex items-center gap-2 flex-wrap">
+              <p className="break-words text-sm font-bold text-slate-900">{trip.patient}</p>
+              {(() => {
+                const legs = filteredTrips.filter((entry) => (entry.patient || '').toLowerCase() === (trip.patient || '').toLowerCase()).length;
+                return legs > 1 ? (
+                  <button onClick={(e) => { e.stopPropagation(); setLegsDetailPatient(trip.patient); }} className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full hover:bg-blue-100 cursor-pointer">
+                    {legs} legs
+                  </button>
+                ) : null;
+              })()}
+            </div>
+
+            {/* Addresses */}
+            <div className="mb-2 grid grid-cols-2 gap-2">
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2">
+                <div className="text-[9px] font-bold uppercase text-emerald-700">Pickup</div>
+                <p className="mt-0.5 break-words text-xs font-semibold text-slate-700 line-clamp-2">{trip.pickup}</p>
+              </div>
+              <div className="rounded-lg border border-rose-100 bg-rose-50 p-2">
+                <div className="text-[9px] font-bold uppercase text-rose-700">Dropoff</div>
+                <p className="mt-0.5 break-words text-xs font-semibold text-slate-700 line-clamp-2">{trip.dropoff}</p>
+              </div>
+            </div>
+
+            {/* Assignment Buttons - PROMINENT */}
+            <div className="flex gap-2 flex-wrap items-center">
+              {driver ? (
+                <>
+                  <div className="flex-1 min-w-[150px]">
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-100 px-2.5 py-1.5 rounded-lg">
+                      <UserCheck size={12} /> {driver.name} {driver.vehicle ? `• ${driver.vehicle}` : ''}
+                    </span>
+                  </div>
+                  <button onClick={handleReassignClick} className="px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold text-xs uppercase hover:bg-amber-600 transition whitespace-nowrap">Reassign</button>
+                  <button onClick={() => onAssignTrip(trip.id, '')} className="px-3 py-1.5 rounded-lg bg-slate-500 text-white font-bold text-xs uppercase hover:bg-slate-600 transition whitespace-nowrap">Remove</button>
+                </>
+              ) : (
+                <button onClick={handleAssignClick} className="w-full px-4 py-2.5 rounded-lg bg-emerald-500 text-white font-bold text-sm uppercase hover:bg-emerald-600 transition flex items-center justify-center gap-2 shadow-md shadow-emerald-500/30 border-2 border-emerald-600">
+                  <Users size={16} /> ASSIGN DRIVER
+                </button>
+              )}
+            </div>
+
+            {/* Contact Info - Compact */}
+            {(role === 'admin' || role === 'dispatcher') && (trip.pickupPhone || trip.notes) && (
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {trip.pickupPhone && (
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => makeCall(trip.pickupPhone, trip.patient)} className="text-blue-600 hover:underline font-bold">{trip.pickupPhone}</button>
+                    <button onClick={() => sendSMS(trip.pickupPhone, trip.patient)} className="text-blue-600 hover:text-blue-700" aria-label="SMS"><MessageSquare size={12} /></button>
+                  </div>
+                )}
+                {trip.notes && (
+                  <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded">📌 {trip.notes}</span>
+                )}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="mt-2 flex gap-2 justify-end">
+              <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition" aria-label="Edit"><Edit2 size={14} /></button>
+              <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" aria-label="Delete"><Archive size={14} /></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Assignment Success Feedback */}
@@ -121,51 +335,144 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         </div>
       )}
       {/* HEADER CONTROLS */}
-      <div className="card p-5 sm:p-6">
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <div className="flex-1 max-w-xs">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Sort Preference</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-base outline-none">
-              <option value="time">Sort by Time</option>
-              <option value="patient">Sort by Patient</option>
-              <option value="zip">Sort by Zip Area</option>
+      <div className="card p-4 sm:p-6 space-y-4">
+        {/* First Row: Main Filters */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Search</label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Patient, booking, phone..."
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-sm outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Sort</label>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-sm outline-none">
+              <option value="time">By Time</option>
+              <option value="patient">By Patient</option>
+              <option value="zip">By Zip</option>
+              <option value="status">By Status</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Status</label>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-sm outline-none">
+              <option value="all">All</option>
+              <option value="Unassigned">Unassigned</option>
+              <option value="Assigned">Assigned</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Driver</label>
+            <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-sm outline-none">
+              <option value="all">All Drivers</option>
+              <option value="unassigned">No Driver</option>
+              {drivers.map((driver) => (
+                <option key={driver.id} value={driver.id}>{driver.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Second Row: Additional Filters & Actions */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Service</label>
+            <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-sm outline-none">
+              <option value="all">All Services</option>
+              {serviceOptions.map((service) => (
+                <option key={service} value={service}>{service}</option>
+              ))}
             </select>
           </div>
 
-          <div className="flex-1 max-w-xs">
-            <div className="flex items-center justify-between mb-1.5 ml-1">
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Manifest Date</label>
-              <button onClick={() => setShowAllDates(!showAllDates)} className={`text-xs font-bold uppercase tracking-widest ${showAllDates ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                {showAllDates ? 'Showing All' : 'Show All'}
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Date</label>
+            <div className="flex gap-2">
+              <input 
+                type="date" 
+                value={manifestDate} 
+                disabled={showAllDates}
+                onChange={(e) => setManifestDate(e.target.value)} 
+                className={`flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-sm outline-none transition-opacity ${showAllDates ? 'opacity-50' : 'opacity-100'}`} 
+              />
+              <button onClick={() => setShowAllDates(!showAllDates)} className={`px-3 py-2.5 rounded-lg text-xs font-bold uppercase whitespace-nowrap ${showAllDates ? 'bg-blue-100 text-blue-700' : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
+                {showAllDates ? 'All' : 'Today'}
               </button>
             </div>
-            <input 
-              type="date" 
-              value={manifestDate} 
-              disabled={showAllDates}
-              onChange={(e) => setManifestDate(e.target.value)} 
-              className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-base outline-none transition-opacity ${showAllDates ? 'opacity-50' : 'opacity-100'}`} 
-            />
           </div>
-          
-          <div className="flex items-center gap-2">
-            {selectedTasks.length > 0 && (
-              <div className="flex items-center gap-2 animate-in">
-                <button onClick={() => { setAssignMode('assign'); setShowAssign(true); }} className="btn bg-emerald-600 text-white">
-                  <Users size={16} /> Assign ({selectedTasks.length})
-                </button>
-                {selectedTasks.length > 1 && (
-                  <button onClick={() => { setAssignMode('mission'); setShowAssign(true); }} className="btn bg-indigo-600 text-white">
-                    <Sparkles size={16} /> Create Mission
-                  </button>
-                )}
-              </div>
-            )}
-            <button onClick={() => setShowCreateForm(true)} className="btn btn-primary">
-              <Plus size={18} /> New Trip
+
+          <div className="flex gap-2">
+            <select value={layoutMode} onChange={(e) => setLayoutMode(e.target.value)} className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-sm outline-none">
+              <option value="grouped">Grouped</option>
+              <option value="list">List</option>
+            </select>
+            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-bold text-sm outline-none">
+              <option value="driver">By Driver</option>
+              <option value="status">By Status</option>
+              <option value="service">By Service</option>
+              <option value="date">By Date</option>
+            </select>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setAttentionOnly((prev) => !prev)}
+              className={`flex-1 px-3 py-2.5 rounded-lg text-xs font-bold uppercase whitespace-nowrap ${attentionOnly ? 'bg-rose-100 text-rose-700' : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+            >
+              {attentionOnly ? '⚠ Attention' : 'Full Queue'}
+            </button>
+            <button onClick={() => setShowCreateForm(true)} className="flex-1 px-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold text-sm uppercase">
+              <Plus size={14} className="inline mr-1" /> New
             </button>
           </div>
         </div>
+
+        {/* Bulk Actions - Only show when items selected */}
+        {selectedTasks.length > 0 && (
+          <div className="flex flex-wrap gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <span className="text-xs font-bold text-blue-700 self-center">{selectedTasks.length} selected:</span>
+            <button onClick={() => { setAssignMode('assign'); setShowAssign(true); }} className="px-3 py-2 bg-emerald-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-emerald-700">
+              <Users size={12} className="inline mr-1" /> Assign
+            </button>
+            <button onClick={() => { setShowReassignModal(true); }} className="px-3 py-2 bg-amber-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-amber-700">
+              <UserCheck size={12} className="inline mr-1" /> Reassign
+            </button>
+            <button onClick={handleBulkUnassign} className="px-3 py-2 bg-slate-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-slate-700">
+              <X size={12} className="inline mr-1" /> Remove
+            </button>
+            {selectedTasks.length > 1 && (
+              <button onClick={() => { setAssignMode('mission'); setShowAssign(true); }} className="px-3 py-2 bg-indigo-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-indigo-700">
+                <Sparkles size={12} className="inline mr-1" /> Mission
+              </button>
+            )}
+            <button onClick={handleBulkDelete} className="px-3 py-2 bg-rose-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-rose-700 ml-auto">
+              <Archive size={12} className="inline mr-1" /> Archive
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {[
+          { label: 'Trips', value: manifestSummary.total, tone: 'text-slate-900 bg-white border-slate-200' },
+          { label: 'Late', value: manifestSummary.late, tone: manifestSummary.late > 0 ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-slate-600 bg-slate-50 border-slate-200' },
+          { label: 'Soon', value: manifestSummary.soon, tone: 'text-amber-700 bg-amber-50 border-amber-200' },
+          { label: 'Open', value: manifestSummary.unassigned, tone: manifestSummary.unassigned > 0 ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-slate-600 bg-slate-50 border-slate-200' },
+          { label: 'Assigned', value: manifestSummary.assigned, tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+        ].map((metric) => (
+          <div key={metric.label} className={`rounded-2xl border px-4 py-3 shadow-sm ${metric.tone}`}>
+            <p className="text-[10px] font-bold uppercase tracking-widest">{metric.label}</p>
+            <p className="mt-1 text-2xl font-black">{metric.value}</p>
+          </div>
+        ))}
       </div>
 
       {/* TABLE / LIST */}
@@ -174,7 +481,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
           <h3 className="text-heading text-slate-900">Live Manifest Queue</h3>
           <div className="flex items-center gap-3">
             {showAllDates && <span className="badge badge-warning text-xs">Viewing All Dates</span>}
-            <span className="badge badge-info">{filteredTrips.length} Trips</span>
+            <span className="badge badge-info">Showing {visibleTrips.length} / {filteredTrips.length}</span>
           </div>
         </div>
 
@@ -185,97 +492,42 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               <p className="text-slate-400 font-bold text-lg">Queue is empty</p>
             </div>
           ) : (
-            filteredTrips.map((trip) => {
-              const driver = drivers.find(d => d.id === trip.driverId);
-              const isSelected = selectedTasks.includes(trip.id);
-              return (
-                <div key={trip.id} className={`p-3 sm:p-4 transition-all border-b border-slate-50 last:border-b-0 ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
-                  <div className="flex items-start gap-3">
-                    <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} className="w-5 h-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0 mt-1" />
-                    <div className="flex-1 min-w-0">
-                      {/* Time + Status row */}
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-2xl font-black text-blue-600 leading-none">{trip.time}</span>
-                          <span className={`badge shrink-0 ${trip.status === 'Assigned' ? 'badge-success' : 'badge-warning'}`}>{trip.status}</span>
-                          {trip.type && <span className="badge badge-info shrink-0 text-xs">{trip.type}</span>}
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"><Edit2 size={16} /></button>
-                          <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"><Trash2 size={16} /></button>
+            layoutMode === 'grouped' ? (
+              <div className="space-y-4 p-3 sm:p-4">
+                {groupedTrips.map((section) => (
+                  <section key={section.key} className="rounded-3xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900">{section.label}</h4>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600">{section.trips.length} trip{section.trips.length !== 1 ? 's' : ''}</span>
+                          {section.late > 0 && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">{section.late} late</span>}
                         </div>
                       </div>
-                      {/* Patient name */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-extrabold text-slate-900 text-base sm:text-lg break-words">{trip.patient}</p>
-                        {(() => {
-                          const legs = filteredTrips.filter(t => (t.patient || '').toLowerCase() === (trip.patient || '').toLowerCase()).length;
-                          return legs > 1 ? (
-                            <button onClick={(e) => { e.stopPropagation(); setLegsDetailPatient(trip.patient); }} className="badge badge-info cursor-pointer hover:opacity-80 shrink-0">
-                              <Users size={12} /> {legs}L
-                            </button>
-                          ) : null;
-                        })()}
-                        {trip.bookingId && (
-                          <span className="badge badge-info bg-slate-100 text-slate-500 shrink-0">{trip.bookingId}</span>
-                        )}
-                      </div>
-                      {/* Route */}
-                      <div className="flex flex-col gap-1.5 mt-2">
-                        <div className="flex items-start gap-2 min-w-0">
-                          <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
-                            <MapPin size={11} className="text-blue-600" />
-                          </div>
-                          <p className="text-sm font-semibold text-slate-600 break-words leading-tight">{trip.pickup}</p>
-                        </div>
-                        <div className="flex items-start gap-2 min-w-0">
-                          <div className="w-5 h-5 rounded-full bg-emerald-50 flex items-center justify-center shrink-0 mt-0.5">
-                            <Flag size={11} className="text-emerald-600" />
-                          </div>
-                          <p className="text-sm font-semibold text-slate-600 break-words leading-tight">{trip.dropoff}</p>
-                        </div>
-                      </div>
-                      {/* Driver assignment */}
-                      <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                        <select 
-                          value={trip.driverId || ''} 
-                          onChange={(e) => onAssignTrip(trip.id, e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-xs font-bold uppercase tracking-wider bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-emerald-500 text-slate-600"
-                        >
-                          <option value="">Quick Assign</option>
-                          {drivers.map(d => (
-                            <option key={d.id} value={d.id}>{d.name}</option>
-                          ))}
-                        </select>
-                        {driver && (
-                          <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                             <UserCheck size={12} /> {driver.name} &bull; {driver.vehicle}
-                          </span>
-                        )}
-                      </div>
-                      {/* Phone & Notes for Admin/Dispatcher */}
-                      {(role === 'admin' || role === 'dispatcher') && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {trip.pickupPhone && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-slate-400 uppercase">Client:</span>
-                              <button onClick={() => makeCall(trip.pickupPhone, trip.patient)} className="text-xs font-bold text-blue-600 hover:underline">{trip.pickupPhone}</button>
-                              <button onClick={() => sendSMS(trip.pickupPhone, trip.patient)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><MessageSquare size={12} /></button>
-                            </div>
-                          )}
-                          {trip.notes && (
-                            <span className="text-xs font-bold text-amber-600 uppercase bg-amber-50 px-2 py-1 rounded-lg">Note: {trip.notes}</span>
-                          )}
-                        </div>
-                      )}
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{groupBy}</span>
                     </div>
-                  </div>
-                </div>
-              );
-            })
+                    <div className="space-y-3">
+                      {section.trips.map((trip) => renderManifestTripCard(trip))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              visibleTrips.map((trip) => renderManifestTripCard(trip))
+            )
           )}
         </div>
+        {filteredTrips.length > visibleTrips.length && (
+          <div className="p-4 border-t border-slate-100 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setRenderLimit((prev) => prev + 150)}
+              className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 transition"
+            >
+              Load 150 More Trips
+            </button>
+          </div>
+        )}
       </div>
 
       {/* CREATE MODAL */}
@@ -285,7 +537,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in my-auto">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> New Manifest Entry</h3>
-              <button onClick={() => setShowCreateForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
+              <button onClick={() => setShowCreateForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={20} /></button>
             </div>
             <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' }); }} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
@@ -346,7 +598,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Edit2 size={28} className="text-blue-500" /> Modify Trip Details</h3>
-              <button onClick={() => setShowEditForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
+              <button onClick={() => setShowEditForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={20} /></button>
             </div>
             <form onSubmit={handleUpdate} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
@@ -408,28 +660,83 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {showAssign && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowAssign(false)} />
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><Users size={24} className="text-blue-600" /> {assignMode === 'mission' ? 'Create Driver Mission' : 'Assign to Driver'}</h3>
-              <button onClick={() => setShowAssign(false)} className="p-2 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={20} /></button>
+          <div className="bg-white w-full max-w-md rounded-2xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                {assignMode === 'mission' ? (
+                  <><Sparkles size={20} className="text-indigo-600" /> Mission</>
+                ) : (
+                  <><Users size={20} className="text-emerald-600" /> Assign</>
+                )}
+              </h3>
+              <button onClick={() => setShowAssign(false)} className="p-1.5 bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={18} /></button>
             </div>
-            <p className="text-xs font-bold text-slate-500 mb-6 uppercase tracking-widest">
+            <p className="text-[11px] font-bold text-slate-500 mb-3 uppercase tracking-widest line-clamp-1">
               {assignMode === 'mission'
-                ? `Create a multi-stop mission for ${selectedTasks.length || 1} trips`
-                : `Select driver for ${selectedTasks.length || 1} trips`}
+                ? `Mission for ${selectedTasks.length || 1} trip${selectedTasks.length !== 1 ? 's' : ''}`
+                : `Select driver (${selectedTasks.length > 0 ? selectedTasks.length : 1})`}
             </p>
-            <div className="space-y-2">
+            <div className="space-y-1.5 overflow-y-auto flex-1 pr-2">
               {drivers.map(d => (
-                <button key={d.id} onClick={() => selectedTasks.length > 0 ? handleBulkAssign(d.id) : handleAssign(d.id)} 
-                  className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-blue-50 border border-slate-100 rounded-2xl transition group">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 font-black shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-colors">{d.name.charAt(0)}</div>
-                    <div className="text-left">
-                      <p className="text-sm font-black text-slate-900">{d.name}</p>
-                      <p className="text-xs font-bold text-slate-400">{d.vehicle || 'No Vehicle'}</p>
+                <button key={d.id} onClick={() => {
+                  if (assignMode === 'mission') {
+                    onCreateLegMission(d.id);
+                    setShowAssign(false);
+                  } else if (selectedTasks.length > 0) {
+                    handleBulkAssign(d.id);
+                  } else if (selectedTrip) {
+                    handleAssign(d.id);
+                  }
+                }} 
+                  className="w-full flex items-center justify-between p-2.5 bg-slate-50 hover:bg-emerald-50 border border-slate-100 rounded-xl transition group">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-emerald-600 font-bold text-sm shadow-sm group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">{String(d?.name || '?').charAt(0)}</div>
+                    <div className="text-left min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate">{d.name}</p>
+                      <p className="text-[10px] font-bold text-slate-400 truncate">{d.vehicle || '—'}</p>
                     </div>
                   </div>
-                  <span className="text-xs font-black text-blue-600 uppercase">Select &rarr;</span>
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase shrink-0 ml-1">→</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REASSIGN MODAL */}
+      {showReassignModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowReassignModal(false)} />
+          <div className="bg-white w-full max-w-md rounded-2xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <UserCheck size={20} className="text-amber-600" /> Reassign
+              </h3>
+              <button onClick={() => setShowReassignModal(false)} className="p-1.5 bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={18} /></button>
+            </div>
+            <p className="text-[11px] font-bold text-slate-500 mb-3 uppercase tracking-widest line-clamp-1">
+              Replace for {selectedTasks.length > 0 ? selectedTasks.length : 1} trip{selectedTasks.length !== 1 ? 's' : ''}
+            </p>
+            <div className="space-y-1.5 overflow-y-auto flex-1 pr-2">
+              {drivers.map(d => (
+                <button key={d.id} onClick={() => {
+                  if (selectedTasks.length > 0) {
+                    handleBulkReassign(d.id);
+                  } else if (selectedTrip) {
+                    handleAssign(d.id);
+                    setShowReassignModal(false);
+                  }
+                }} 
+                  className="w-full flex items-center justify-between p-2.5 bg-slate-50 hover:bg-amber-50 border border-slate-100 rounded-xl transition group">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-amber-600 font-bold text-sm shadow-sm group-hover:bg-amber-600 group-hover:text-white transition-colors shrink-0">{String(d?.name || '?').charAt(0)}</div>
+                    <div className="text-left min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate">{d.name}</p>
+                      <p className="text-[10px] font-bold text-slate-400 truncate">{d.vehicle || '—'}</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-600 uppercase shrink-0 ml-1">→</span>
                 </button>
               ))}
             </div>
@@ -447,7 +754,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
             <div className="bg-white w-full max-w-lg rounded-3xl p-5 relative z-10 shadow-2xl border border-white/20 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-slate-900">{patientName}</h3>
-                <button onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200"><X size={16} /></button>
+                <button onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200" aria-label="Close"><X size={16} /></button>
               </div>
               <p className="text-xs text-slate-500 font-medium mb-4">{legs.length} leg{legs.length !== 1 ? 's' : ''}</p>
               <div className="space-y-2">

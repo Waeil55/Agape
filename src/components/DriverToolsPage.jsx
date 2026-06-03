@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   BrainCircuit, Play, ChevronRight, X, Navigation, Map,
   Route, Repeat, AlertTriangle, Zap, ChevronDown, ChevronUp,
-  Timer, Copy
+  Timer, Copy, CheckSquare
 } from 'lucide-react';
 import LiveRouteMap from './LiveRouteMap';
 import { impact } from '../utils/haptics';
@@ -45,11 +45,13 @@ const formatDuration = (minutes) => {
 
 const DriverToolsPage = ({
   trips, activeTrips, aiSequence, aiSuggestions, aiRideShare, conflicts,
-  aiOptimizing, guidedMode, guidedStepIndex,
+  aiOptimizing, guidedMode, guidedStepIndex, guidedSteps,
   driverPosition, appSettings, currentUser, role,
   onSetGuidedMode, onSetGuidedStepIndex, onSetAiSequence, onSetAiSuggestions,
-  onRunAiOptimization, selectedTrips, onSetSelectedTrips, etas,
-  onOpenInNav
+  onRunAiOptimization, onSelectAllTrips, selectedTrips, onSetSelectedTrips, etas,
+  onOpenInNav,
+  onOpenSequencer,
+  requestAuthAction = () => {}
 }) => {
   const [expandedSection, setExpandedSection] = useState('route');
 
@@ -131,18 +133,42 @@ const DriverToolsPage = ({
       )}
 
       {/* AI Optimize Button */}
-      {selectedTrips.length >= 2 && (
+      {selectedTrips.length >= 1 && (
         <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-3 flex items-center justify-between gap-2">
           <span className="text-xs font-bold text-blue-700">{selectedTrips.length} selected</span>
           <div className="flex gap-2">
-            <button onClick={() => onRunAiOptimization()} disabled={aiOptimizing}
-              className="px-3 h-8 bg-indigo-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95 transition">
-              <BrainCircuit size={12} /> {aiOptimizing ? 'Analyzing...' : 'AI Optimize'}
+            <button onClick={() => onSelectAllTrips()} className="px-3 h-8 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95 transition border border-blue-100 hover:bg-blue-100">
+              <CheckSquare size={12} /> {selectedTrips.length === activeTrips.length ? 'Deselect All' : 'Select All'}
             </button>
+            {selectedTrips.length >= 2 && (
+              <button onClick={() => onRunAiOptimization()} disabled={aiOptimizing}
+                className="px-3 h-8 bg-indigo-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95 transition">
+                <BrainCircuit size={12} /> {aiOptimizing ? 'Analyzing...' : 'AI Optimize'}
+              </button>
+            )}
             <button onClick={() => onSetSelectedTrips([])} className="px-3 h-8 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold active:scale-95 transition">Clear</button>
           </div>
         </div>
       )}
+
+      {/* Advanced Tools Section */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-2">
+        <button
+          onClick={onOpenSequencer}
+          className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-50 transition"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
+              <Route size={16} className="text-indigo-600" />
+            </div>
+            <div className="text-left">
+              <h3 className="text-sm font-bold text-slate-800">Route Sequencer</h3>
+              <p className="text-micro font-semibold text-slate-400">Advanced multi-load engine & templates</p>
+            </div>
+          </div>
+          <ChevronRight size={16} className="text-slate-300" />
+        </button>
+      </div>
 
       {/* Smart Route Panel */}
       {aiSequence && aiSequence.length >= 2 && !guidedMode && (
@@ -165,13 +191,23 @@ const DriverToolsPage = ({
                 );
               })}
             </div>
-            <div className="flex gap-2">
+              <div className="flex gap-2">
               <button onClick={() => { onSetGuidedMode(true); onSetGuidedStepIndex(0); onSetAiSuggestions([]); }}
                 className="flex-1 h-10 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 shadow-sm">
                 <Play size={13} /> Start Smart Route
               </button>
-              <button onClick={() => { onSetAiSequence(null); onSetAiSuggestions([]); }}
-                className="h-10 px-3 bg-slate-100 text-slate-500 rounded-xl text-xs font-bold active:scale-95">Dismiss</button>
+              <button
+                onClick={() => {
+                  // Require password for drivers to dismiss an assigned sequence
+                  if (role === 'driver' && requestAuthAction) {
+                    requestAuthAction('dismiss_assigned_route', () => { onSetAiSequence(null); onSetAiSuggestions([]); });
+                  } else {
+                    onSetAiSequence(null); onSetAiSuggestions([]);
+                  }
+                }}
+                className="h-10 px-3 bg-slate-100 text-slate-500 rounded-xl text-xs font-bold active:scale-95">
+                Dismiss
+              </button>
             </div>
           </div>
         </div>
@@ -211,7 +247,7 @@ const DriverToolsPage = ({
               driverPosition={driverPosition}
               trips={activeTrips}
               aiSequence={aiSequence}
-              activeTripId={aiSequence?.[guidedStepIndex] || null}
+              activeTripId={guidedSteps?.[guidedStepIndex]?.tripId || aiSequence?.[guidedStepIndex] || null}
               theme={appSettings?.theme || 'light'}
               onOpenInNav={onOpenInNav}
               currentUser={currentUser}
@@ -240,7 +276,21 @@ const DriverToolsPage = ({
               {activeTrips.map(trip => (
                 <div key={trip.id} className="px-4 py-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-800">{trip.patient}</span>
+                    <div className="min-w-0">
+                      <span className="block truncate text-xs font-bold text-slate-800">{trip.patient}</span>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {trip.bookingId && (
+                          <span className="rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
+                            {trip.bookingId}
+                          </span>
+                        )}
+                        {(trip.type || trip.serviceType) && (
+                          <span className="rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                            {trip.type || trip.serviceType}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                     <span className="text-xs text-slate-400 font-medium">{to12hr(trip.time)}</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -284,7 +334,14 @@ const DriverToolsPage = ({
                 if (eta === undefined) return null;
                 return (
                   <div key={trip.id} className="flex items-center justify-between px-4 py-2.5">
-                    <span className="text-xs font-medium text-slate-700">{trip.patient}</span>
+                    <div className="min-w-0">
+                      <span className="block truncate text-xs font-medium text-slate-700">{trip.patient}</span>
+                      {trip.bookingId && (
+                        <span className="mt-1 inline-flex rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
+                          {trip.bookingId}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs font-bold text-slate-500">{formatDuration(eta)}</span>
                   </div>
                 );

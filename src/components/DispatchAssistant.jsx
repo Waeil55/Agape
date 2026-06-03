@@ -72,16 +72,16 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
   const [showUnassigned, setShowUnassigned] = useState(true);
   const [aiDriverId, setAiDriverId] = useState(null);
 
-  // Tick every second
+  // Refresh schedule status once a minute; Firestore handles live data changes.
   useEffect(() => {
     const id = setInterval(() => {
       const n = new Date();
       setCurrentMinutes(n.getHours() * 60 + n.getMinutes());
-    }, 1000);
+    }, 60 * 1000);
     return () => clearInterval(id);
   }, []);
 
-  // Re-check schedule status every second (derived from currentMinutes)
+  // Re-check schedule status when the minute changes.
   const driversWithStatus = drivers.map(d => ({
     ...d,
     liveStatus: getDriverScheduleStatus(d),
@@ -118,6 +118,64 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
 
   const isNowInRange = (startMin, endMin) => currentMinutes >= startMin && currentMinutes < endMin;
 
+  // --- AI Operations Insights ---
+  const getInsights = () => {
+    let conflicts = [];
+    let latePickups = [];
+    let idleDrivers = 0;
+    
+    // Check late pickups
+    const now = new Date();
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+    
+    trips.forEach(t => {
+      if (t.date !== manifestDate || ['Completed', 'Cancelled', 'No Show', 'At Dropoff'].includes(t.status)) return;
+      const match = t.time?.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (match) {
+        let h = parseInt(match[1]);
+        if (match[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+        if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
+        const tripMin = h * 60 + parseInt(match[2]);
+        if (currentMins > tripMin + 15) {
+          latePickups.push(t);
+        }
+      }
+    });
+
+    // Check idle drivers
+    driversWithStatus.forEach(d => {
+      if (d.clockedIn && d.liveStatus?.status === 'free') {
+        idleDrivers++;
+      }
+    });
+
+    // Conflict detection (simplified: multiple assigned trips within 30 mins)
+    const driverTrips = {};
+    trips.filter(t => t.date === manifestDate && t.status === 'Assigned' && t.driverId).forEach(t => {
+      if (!driverTrips[t.driverId]) driverTrips[t.driverId] = [];
+      const match = t.time?.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (match) {
+        let h = parseInt(match[1]);
+        if (match[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+        if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
+        driverTrips[t.driverId].push({ ...t, mins: h * 60 + parseInt(match[2]) });
+      }
+    });
+    
+    Object.keys(driverTrips).forEach(dId => {
+      const dts = driverTrips[dId].sort((a,b) => a.mins - b.mins);
+      for (let i = 0; i < dts.length - 1; i++) {
+        if (dts[i+1].mins - dts[i].mins < 30) {
+          conflicts.push({ driverId: dId, trip1: dts[i], trip2: dts[i+1] });
+        }
+      }
+    });
+
+    return { latePickups, idleDrivers, conflicts };
+  };
+
+  const insights = getInsights();
+
   return (
     <div className="space-y-6">
       {/* Live Dispatch Header */}
@@ -146,6 +204,36 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
         </div>
       </div>
 
+      {/* AI OPERATIONS INSIGHTS BANNER */}
+      {(insights.latePickups.length > 0 || insights.conflicts.length > 0 || insights.idleDrivers > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-white rounded-xl border border-rose-200 p-4 flex items-start gap-3 shadow-sm">
+            <div className="p-2 bg-rose-50 text-rose-600 rounded-lg shrink-0"><AlertCircle size={18} /></div>
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase">Late Pickups</p>
+              <p className="text-lg font-black text-slate-900">{insights.latePickups.length}</p>
+              {insights.latePickups.length > 0 && <p className="text-xs text-rose-600 font-medium leading-tight mt-0.5">Trips are &gt;15m past schedule</p>}
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-amber-200 p-4 flex items-start gap-3 shadow-sm">
+            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg shrink-0"><Clock size={18} /></div>
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase">Conflicts</p>
+              <p className="text-lg font-black text-slate-900">{insights.conflicts.length}</p>
+              {insights.conflicts.length > 0 && <p className="text-xs text-amber-600 font-medium leading-tight mt-0.5">Assigned trips overlapping &lt;30m</p>}
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-emerald-200 p-4 flex items-start gap-3 shadow-sm">
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg shrink-0"><Truck size={18} /></div>
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase">Idle Capacity</p>
+              <p className="text-lg font-black text-slate-900">{insights.idleDrivers}</p>
+              <p className="text-xs text-emerald-600 font-medium leading-tight mt-0.5">Clocked in &amp; available now</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Driver Schedule Grid */}
         <div className="lg:col-span-7 space-y-3">
@@ -165,7 +253,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${isClockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                        {d.name.charAt(0)}
+                        {String(d?.name || '?').charAt(0)}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -235,7 +323,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm text-slate-900 break-words">{t.patient}</p>
                           {t.bookingId ? <p className="text-xs text-indigo-600 font-bold break-words">{t.bookingId}</p> : null}
-                          <p className="text-xs text-slate-500 break-words">{t.pickup} → {t.dropoff}</p>
+                          <p className="text-xs text-slate-500 break-words"><span className="text-emerald-600">{t.pickup}</span> → <span className="text-rose-600">{t.dropoff}</span></p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-xs font-bold text-slate-700">{t.time}</p>
@@ -268,7 +356,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                 <h3 className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
                   <BrainCircuit size={14} /> AI Dispatch Suggestion
                 </h3>
-                <button onClick={() => { setSelectedTrip(null); setAiSuggestion(null); }} className="p-1 hover:bg-indigo-100 rounded">
+                <button onClick={() => { setSelectedTrip(null); setAiSuggestion(null); }} className="p-1 hover:bg-indigo-100 rounded" aria-label="Close">
                   <X size={14} />
                 </button>
               </div>
@@ -276,8 +364,8 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                 {/* Selected Trip Info */}
                 <div className="text-sm text-slate-600 bg-slate-50 rounded-lg p-2.5 space-y-1">
                   <p className="font-bold text-slate-900">{selectedTrip.patient}</p>
-                  <p className="flex items-center gap-1"><MapPin size={10} className="text-emerald-600" /> {selectedTrip.pickup}</p>
-                  <p className="flex items-center gap-1"><MapPin size={10} className="text-rose-600" /> {selectedTrip.dropoff}</p>
+                  <p className="flex items-center gap-1 text-emerald-600"><MapPin size={10} /> {selectedTrip.pickup}</p>
+                  <p className="flex items-center gap-1 text-rose-600"><MapPin size={10} /> {selectedTrip.dropoff}</p>
                   <p className="flex items-center gap-1"><Clock size={10} /> {selectedTrip.time} &bull; {selectedTrip.type}</p>
                 </div>
 
@@ -292,7 +380,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                             <div className={`p-3 rounded-xl border-2 transition ${aiSuggestion.score >= 80 ? 'border-emerald-300 bg-emerald-50/50' : aiSuggestion.score >= 50 ? 'border-amber-300 bg-amber-50/50' : 'border-slate-300 bg-slate-50'}`}>
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">{d?.name?.charAt(0) || '?'}</div>
+                                  <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">{String(d?.name || '?').charAt(0)}</div>
                                   <div>
                                     <p className="font-bold text-sm text-slate-900">{d?.name || aiSuggestion.driverId}</p>
                                     <p className="text-xs text-slate-500">{d?.vehicle} &bull; {d?.currentZone}</p>

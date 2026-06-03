@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
-import { User, Truck, Plus, Trash2, Edit2, AlertCircle, X, Save, ClipboardList, Upload, CheckSquare, Clock, Phone, MessageSquare } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { User, Truck, Plus, Trash2, Edit2, AlertCircle, X, Save, ClipboardList, Upload, CheckSquare, Clock, Phone, MessageSquare, BrainCircuit, Loader2, ChevronDown } from 'lucide-react';
 import { makeCall, sendSMS } from '../utils/nativeActions';
+import AIInsightsBanner from './AIInsightsBanner';
+import { aiAnalyzeDriver } from '../config/ai';
 
-const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addAuditLog, currentUser, trips, onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles }) => {
-  const [activeTab, setActiveTab] = useState('drivers');
+const DriversVehiclesPage = ({ role, drivers = [], setDrivers, dispatchers = [], addAuditLog, currentUser, trips = [], onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles, mode = 'all' }) => {
+  const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+  const [activeTab, setActiveTab] = useState(mode !== 'all' ? mode : 'drivers');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ 
-    name: '', email: '', phone: '', vehicle: '', status: 'Available',
-    currentZone: '', vin: '', insuranceExpiry: '', capacity: '1',
-    licenseNumber: '', cdlStatus: 'Active', assignedDispatcher: ''
-  });
+const [form, setForm] = useState({ 
+  name: '', email: '', phone: '', vehicle: '', status: 'Available',
+  currentZone: '', vin: '', insuranceExpiry: '', capacity: '1',
+  licenseNumber: '', cdlStatus: 'Active', assignedDispatcher: '', assignedTo: ''
+});
   const [assignDriver, setAssignDriver] = useState(null);
   const [selectedTrips, setSelectedTrips] = useState([]);
   const [editScheduleDriver, setEditScheduleDriver] = useState(null);
@@ -19,6 +22,12 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
   const [vehicleForm, setVehicleForm] = useState(false);
   const [editVehicleId, setEditVehicleId] = useState(null);
   const [vForm, setVForm] = useState({ name: '', make: '', model: '', year: '', color: '', plate: '', vin: '', odometer: '' });
+  const [aiDriverInsights, setAiDriverInsights] = useState({});
+  const [aiDriverLoading, setAiDriverLoading] = useState({});
+  const [aiDriverModal, setAiDriverModal] = useState(null);
+  const [showFleetSummary, setShowFleetSummary] = useState(false);
+  const [fleetSummary, setFleetSummary] = useState(null);
+  const [fleetSummaryLoading, setFleetSummaryLoading] = useState(false);
   
   const resetVForm = () => setVForm({ name: '', make: '', model: '', year: '', color: '', plate: '', vin: '', odometer: '' });
   
@@ -59,6 +68,38 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
       })
     : drivers;
 
+  const analyzeDriver = useCallback(async (driver) => {
+    if (aiDriverLoading[driver.id]) return;
+    setAiDriverLoading(prev => ({ ...prev, [driver.id]: true }));
+    const driverTrips = trips.filter(t => t.driverId === driver.id || t.driverName === driver.name);
+    const result = await aiAnalyzeDriver(driver, driverTrips);
+    setAiDriverInsights(prev => ({ ...prev, [driver.id]: result }));
+    setAiDriverLoading(prev => ({ ...prev, [driver.id]: false }));
+    setAiDriverModal(driver.id);
+  }, [trips, aiDriverLoading]);
+
+  const runFleetSummary = useCallback(async () => {
+    setFleetSummaryLoading(true);
+    const results = await Promise.all(
+      filteredDrivers.slice(0, 10).map(async (d) => {
+        const driverTrips = trips.filter(t => t.driverId === d.id || t.driverName === d.name);
+        return aiAnalyzeDriver(d, driverTrips);
+      })
+    );
+    const valid = results.filter(Boolean);
+    if (valid.length > 0) {
+      const avgScore = Math.round(valid.reduce((s, r) => s + (r.performanceScore || 0), 0) / valid.length);
+      setFleetSummary({
+        summary: `Fleet performance analysis across ${valid.length} drivers. Average performance score: ${avgScore}/100.`,
+        trends: [...new Set(valid.map(r => r.strengths).flat())].slice(0, 5),
+        recommendations: [...new Set(valid.map(r => r.areasForImprovement).flat())].slice(0, 5),
+      });
+    } else {
+      setFleetSummary({ summary: 'Unable to analyze fleet at this time.', trends: [], recommendations: [] });
+    }
+    setFleetSummaryLoading(false);
+  }, [filteredDrivers, trips]);
+
   const resetForm = () => setForm({ name: '', email: '', phone: '', vehicle: '', status: 'Available', currentZone: '', assignedDispatcher: '', vin: '', insuranceExpiry: '', capacity: '1', licenseNumber: '', cdlStatus: 'Active' });
 
   const openAdd = () => { setEditing(null); resetForm(); setShowForm(true); };
@@ -70,10 +111,9 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
       vehicle: d.vehicle || '', status: d.status, 
       currentZone: d.currentZone || '',
       vin: d.vin || '', insuranceExpiry: d.insuranceExpiry || '',
-      capacity: d.capacity || '1',
-      licenseNumber: d.licenseNumber || '',
-      cdlStatus: d.cdlStatus || 'Active',
-      assignedDispatcher: d.assignedDispatcher || ''
+      capacity: d.capacity || '1', licenseNumber: d.licenseNumber || '',
+      cdlStatus: d.cdlStatus || 'Active', assignedDispatcher: d.assignedDispatcher || '',
+      assignedTo: d.assignedTo || ''
     });
     setShowForm(true);
   };
@@ -85,15 +125,15 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
       addAuditLog('Driver Updated', `${currentUser} updated driver ${form.name}.`, 'blue');
     } else {
       const id = `DRV-${String(drivers.length + 1).padStart(3, '0')}`;
-      setDrivers(prev => [...prev, {
-        id, name: form.name, status: form.status, vehicle: form.vehicle, dist: '--',
-        currentZone: form.currentZone, odometer: 0, nextOilChange: 5000,
-        assignedTo: '', schedule: [],
-        email: form.email, phone: form.phone,
-        vin: form.vin || '', insuranceExpiry: form.insuranceExpiry || '',
-        capacity: form.capacity || '1', licenseNumber: form.licenseNumber || '',
-        cdlStatus: form.cdlStatus || 'Active', assignedDispatcher: form.assignedDispatcher || '',
-      }]);
+       setDrivers(prev => [...prev, {
+         id, name: form.name, status: form.status, vehicle: form.vehicle, dist: '--',
+         currentZone: form.currentZone, odometer: 0, nextOilChange: 5000,
+         assignedTo: form.assignedTo || '', schedule: [],
+         email: form.email, phone: form.phone,
+         vin: form.vin || '', insuranceExpiry: form.insuranceExpiry || '',
+         capacity: form.capacity || '1', licenseNumber: form.licenseNumber || '',
+         cdlStatus: form.cdlStatus || 'Active', assignedDispatcher: form.assignedDispatcher || '',
+       }]);
       addAuditLog('Driver Added', `${currentUser} added driver ${form.name}.`, 'emerald');
     }
     setShowForm(false);
@@ -125,6 +165,14 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
   };
 
   const unassignedTrips = trips.filter(t => t.status === 'Unassigned');
+  const tripBelongsToDriver = (trip, driver) => {
+    if (!trip || !driver) return false;
+    if (trip.driverId && driver.id && trip.driverId === driver.id) return true;
+    return !!normalizeEmail(trip.driverEmail) && normalizeEmail(trip.driverEmail) === normalizeEmail(driver.email);
+  };
+  const assignedTripsForDriver = assignDriver
+    ? trips.filter(trip => tripBelongsToDriver(trip, assignDriver))
+    : [];
 
   const openScheduleEditor = (driver) => {
     setEditScheduleDriver(driver);
@@ -184,41 +232,66 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
     });
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex gap-2 sm:gap-4 flex-wrap">
-        {[
-          { id: 'drivers', label: 'Drivers', icon: User },
-          { id: 'vehicles', label: 'Vehicles', icon: Truck }
-        ].map(tab => {
-          const Icon = tab.icon;
-          return (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold flex items-center gap-2 transition text-sm ${
-                activeTab === tab.id ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
-              }`}>
-              <Icon size={16} /> {tab.label}
-            </button>
-          );
-        })}
-      </div>
+  const resolvedTab = mode !== 'all' ? mode : activeTab;
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+  return (
+    <div className={mode === 'all' ? 'space-y-5' : ''}>
+      {mode === 'all' && (
+        <div className="flex gap-2 flex-wrap sticky top-0 z-10 bg-[#F3F4F6]/95 py-1 backdrop-blur">
+          {[
+            { id: 'drivers', label: 'Drivers', icon: User },
+            { id: 'vehicles', label: 'Vehicles', icon: Truck }
+          ].map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 rounded-xl border font-bold flex items-center gap-2 transition-all text-sm ${
+                  activeTab === tab.id ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-900 shadow-sm' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                }`}>
+                <Icon size={16} /> {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 sticky top-[52px] z-10 bg-[#F3F4F6] py-2">
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-          {activeTab === 'drivers' ? 'Drivers' : 'Vehicles'}
+          {resolvedTab === 'drivers' ? 'Drivers' : 'Vehicles'}
         </h2>
         {(role === 'admin' || role === 'dispatcher') && (
-          <button onClick={activeTab === 'drivers' ? openAdd : openVAdd} className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm">
-            <Plus size={18} /> Add {activeTab === 'drivers' ? 'Driver' : 'Vehicle'}
+          <button onClick={resolvedTab === 'drivers' ? openAdd : openVAdd} className="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2 text-sm">
+            <Plus size={18} /> Add {resolvedTab === 'drivers' ? 'Driver' : 'Vehicle'}
           </button>
         )}
       </div>
 
-      {activeTab === 'drivers' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* AI Fleet Summary */}
+      <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
+        <button onClick={() => setShowFleetSummary(!showFleetSummary)} className="w-full px-5 py-3 flex items-center justify-between text-sm font-bold text-slate-700 hover:bg-slate-50 transition">
+          <span className="flex items-center gap-2"><BrainCircuit size={16} className="text-indigo-600" /> AI Fleet Summary</span>
+          <ChevronDown size={16} className={`transition-transform ${showFleetSummary ? 'rotate-180' : ''}`} />
+        </button>
+        {showFleetSummary && (
+          <div className="px-5 pb-4">
+            {fleetSummaryLoading ? (
+              <div className="flex items-center gap-2 text-slate-500 text-sm"><Loader2 size={14} className="animate-spin" /> AI analyzing fleet performance...</div>
+            ) : fleetSummary ? (
+              <AIInsightsBanner insights={fleetSummary} onClose={() => setFleetSummary(null)} />
+            ) : (
+              <button onClick={runFleetSummary} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition flex items-center gap-2">
+                <BrainCircuit size={14} /> Run Fleet Analysis
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {resolvedTab === 'drivers' && (
+        <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
                   <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Name</th>
                   <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Vehicle</th>
@@ -235,7 +308,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                   <tr><td colSpan="8" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">{role === 'dispatcher' ? 'No drivers assigned to you yet.' : 'No drivers yet. Click "Add Driver" to create one.'}</td></tr>
                 ) : (
                   filteredDrivers.map((d) => {
-                    const assignedCount = trips.filter(t => t.driverId === d.id).length;
+                    const assignedCount = trips.filter(t => tripBelongsToDriver(t, d)).length;
                     return (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900">{d.name}</td>
@@ -258,8 +331,8 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                             }
                             setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, vehicle: newV } : x));
                             addAuditLog('Vehicle Assigned', `${currentUser} assigned ${newV || 'no vehicle'} to ${d.name}.`, 'indigo');
-                          }} className="px-2 py-1 border border-slate-300 rounded-lg text-xs font-semibold bg-white w-full max-w-[140px]">
-                            <option value="">— None —</option>
+                          }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+                            <option value="">- None -</option>
                             {vehicles.filter(v => !drivers.find(x => x.vehicle === v.name && x.id !== d.id) || v.name === d.vehicle).map(v => (
                               <option key={v.id} value={v.name}>{v.name} {v.plate ? `(${v.plate})` : ''}</option>
                             ))}
@@ -267,23 +340,24 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden md:table-cell">{d.currentZone || '-'}</td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden lg:table-cell">
-                          {d.assignedDispatcher ? (dispatchers.find(ds => ds.id === d.assignedDispatcher)?.name || d.assignedDispatcher) : '-'}
+                          <select value={d.assignedDispatcher || d.assignedTo || ''} onChange={(e) => {
+                            const newDisp = e.target.value;
+                            setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, assignedDispatcher: newDisp, assignedTo: newDisp } : x));
+                            addAuditLog('Driver Reassigned', `${currentUser} assigned driver ${d.name} to dispatcher ${dispatchers.find(ds => ds.id === newDisp)?.name || 'None'}.`, 'blue');
+                          }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+                            <option value="">- Unassigned -</option>
+                            {dispatchers.map(ds => (
+                              <option key={ds.id} value={ds.id}>{ds.name}</option>
+                            ))}
+                          </select>
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4">
-                          <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-xs sm:text-xs font-semibold ${d.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
+                          <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${d.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>{d.status}</span>
                           {assignedCount > 0 && <span className="ml-1 text-xs text-blue-600 font-semibold">({assignedCount})</span>}
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4">
-                           {d.phone ? (
-                            <div className="flex gap-2">
-                              <button onClick={() => makeCall(d.phone, d.name)} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition"><Phone size={14} /></button>
-                              <button onClick={() => sendSMS(d.phone, d.name)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition"><MessageSquare size={14} /></button>
-                            </div>
-                          ) : <span className="text-xs text-slate-400 italic">No Phone</span>}
-                        </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4">
                           <div className="flex gap-1">
-                            <button onClick={() => setAssignDriver(d)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 flex items-center gap-1" title="Assign trips">
+                            <button onClick={() => setAssignDriver(d)} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md text-xs font-bold hover:bg-blue-200 flex items-center gap-1" title="Assign trips">
                               <ClipboardList size={12} /> Trips
                             </button>
                             {onUploadForDriver && (
@@ -293,11 +367,20 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                             )}
                           </div>
                         </td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4">
+                           {d.phone ? (
+                            <div className="flex gap-2">
+                              <button onClick={() => makeCall(d.phone, d.name)} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition" aria-label="Call driver"><Phone size={14} /></button>
+                              <button onClick={() => sendSMS(d.phone, d.name)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition" aria-label="Send SMS"><MessageSquare size={14} /></button>
+                            </div>
+                          ) : <span className="text-xs text-slate-400 italic">No Phone</span>}
+                        </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4 flex gap-1 sm:gap-2">
-                          <button onClick={() => openScheduleEditor(d)} className="p-1.5 sm:p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Edit Schedule"><Clock size={14} /></button>
-                          <button onClick={() => openEdit(d)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={14} /></button>
+                          <button onClick={() => analyzeDriver(d)} className="p-1.5 sm:p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="AI Analyze" aria-label="AI Analyze"><BrainCircuit size={14} /></button>
+                          <button onClick={() => openScheduleEditor(d)} className="p-1.5 sm:p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Edit Schedule" aria-label="Edit Schedule"><Clock size={14} /></button>
+                          <button onClick={() => openEdit(d)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" aria-label="Edit driver"><Edit2 size={14} /></button>
                           {(role === 'admin' || role === 'dispatcher') && (
-                            <button onClick={() => deleteDriver(d)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition"><Trash2 size={14} /></button>
+                            <button onClick={() => deleteDriver(d)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" aria-label="Delete driver"><Trash2 size={14} /></button>
                           )}
                         </td>
                       </tr>
@@ -310,11 +393,11 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
         </div>
       )}
 
-      {activeTab === 'vehicles' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {resolvedTab === 'vehicles' && (
+        <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
                   <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Name</th>
                   <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Make / Model</th>
@@ -350,8 +433,8 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                               setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, vehicle: v.name } : d));
                             }
                             addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'indigo');
-                          }} className="px-2 py-1 border border-slate-300 rounded-lg text-xs font-semibold bg-white w-full max-w-[140px]">
-                            <option value="">— Unassigned —</option>
+                          }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+                            <option value="">- Unassigned -</option>
                             {drivers.map(d => (
                               <option key={d.id} value={d.id}>{d.name} {d.vehicle && d.vehicle !== v.name ? `(${d.vehicle})` : ''}</option>
                             ))}
@@ -359,9 +442,9 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4">
                           <div className="flex gap-1">
-                            <button onClick={() => openVEdit(v)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit"><Edit2 size={14} /></button>
+                            <button onClick={() => openVEdit(v)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit" aria-label="Edit"><Edit2 size={14} /></button>
                             {(role === 'admin' || role === 'dispatcher') && (
-                              <button onClick={() => deleteVehicle(v)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete"><Trash2 size={14} /></button>
+                              <button onClick={() => deleteVehicle(v)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete" aria-label="Delete"><Trash2 size={14} /></button>
                             )}
                           </div>
                         </td>
@@ -378,42 +461,82 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
       {/* Assign Trips Modal */}
       {assignDriver && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-0 sm:mx-4">
+          <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">Assign Trips to {assignDriver.name}</h3>
-                  <p className="text-xs sm:text-sm text-slate-500">{unassignedTrips.length} unassigned trips available</p>
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">{assignDriver.name} Trips</h3>
+                  <p className="text-xs sm:text-sm text-slate-500">{assignedTripsForDriver.length} assigned • {unassignedTrips.length} available to assign</p>
                 </div>
-                <button onClick={() => { setAssignDriver(null); setSelectedTrips([]); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
+                <button onClick={() => { setAssignDriver(null); setSelectedTrips([]); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={18} /></button>
               </div>
 
-              {unassignedTrips.length === 0 ? (
+              {assignedTripsForDriver.length === 0 && unassignedTrips.length === 0 ? (
                 <div className="p-8 text-center text-slate-500">
                   <CheckSquare size={40} className="mx-auto text-slate-300 mb-4" />
-                  <p className="font-semibold">No unassigned trips</p>
-                  <p className="text-sm mt-1">All trips are already assigned.</p>
+                  <p className="font-semibold">No trips found</p>
+                  <p className="text-sm mt-1">There are no trips assigned to this driver and no open trips to assign right now.</p>
                 </div>
               ) : (
                 <>
-                  <div className="max-h-64 sm:max-h-80 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+                  {assignedTripsForDriver.length > 0 && (
+                    <div className="mb-5">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Assigned to this driver</p>
+                        <span className="text-xs font-semibold text-slate-500">{assignedTripsForDriver.length}</span>
+                      </div>
+                      <div className="max-h-52 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+                        {assignedTripsForDriver.map(trip => (
+                          <div key={trip.id} className="p-3 sm:p-4 bg-slate-50/70">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-xs sm:text-sm font-semibold text-slate-900 break-words">{trip.patient || 'Unnamed client'}</p>
+                                <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                                  {trip.bookingId ? `Booking ${trip.bookingId}` : trip.clientId ? `Client ${trip.clientId}` : trip.id}
+                                </p>
+                              </div>
+                              <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-[10px] sm:text-xs font-bold shrink-0">{trip.status || 'Assigned'}</span>
+                            </div>
+                            <p className="text-xs mt-2 break-words"><span className="text-emerald-600">{trip.pickup}</span> <span className="text-slate-300">→</span> <span className="text-rose-600">{trip.dropoff}</span></p>
+                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                              <span>{trip.date || 'No date'}</span>
+                              <span>{trip.time || 'No time'}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Available unassigned trips</p>
+                    <span className="text-xs font-semibold text-slate-500">{unassignedTrips.length}</span>
+                  </div>
+                  {unassignedTrips.length === 0 ? (
+                    <div className="border border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-500 text-sm">
+                      All open trips are already assigned.
+                    </div>
+                  ) : (
+                    <div className="max-h-64 sm:max-h-80 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
                     {unassignedTrips.map(trip => (
                       <label key={trip.id} className={`flex items-center gap-3 p-3 sm:p-4 cursor-pointer hover:bg-slate-50 transition ${selectedTrips.includes(trip.id) ? 'bg-blue-50' : ''}`}>
                         <input type="checkbox" checked={selectedTrips.includes(trip.id)} onChange={() => toggleTripSelection(trip.id)} className="w-4 h-4 accent-blue-600 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs sm:text-sm font-semibold text-slate-900 break-words">{trip.patient}</p>
-                          <p className="text-xs sm:text-xs text-slate-500 truncate">{trip.pickup} → {trip.dropoff}</p>
+                          <p className="text-xs sm:text-xs truncate"><span className="text-emerald-600">{trip.pickup}</span> <span className="text-slate-300">→</span> <span className="text-rose-600">{trip.dropoff}</span></p>
                         </div>
                         <span className="text-xs sm:text-xs text-slate-500 shrink-0">{trip.time}</span>
                       </label>
                     ))}
                   </div>
 
+                  )}
+
                   <div className="flex items-center justify-between mt-4 sm:mt-6">
                     <p className="text-xs sm:text-sm text-slate-600 font-semibold">{selectedTrips.length} trip{selectedTrips.length !== 1 ? 's' : ''} selected</p>
                     <div className="flex gap-2 sm:gap-3">
-                      <button onClick={() => { setAssignDriver(null); setSelectedTrips([]); }} className="px-4 py-2 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 text-sm">Cancel</button>
-                      <button onClick={assignSelectedTrips} disabled={selectedTrips.length === 0} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm">
+                      <button onClick={() => { setAssignDriver(null); setSelectedTrips([]); }} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm">Cancel</button>
+                      <button onClick={assignSelectedTrips} disabled={selectedTrips.length === 0} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm">
                         <CheckSquare size={16} /> Assign {selectedTrips.length > 0 ? `(${selectedTrips.length})` : ''}
                       </button>
                     </div>
@@ -428,14 +551,14 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
       {/* Schedule Editor Modal */}
       {editScheduleDriver && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto mx-0 sm:mx-4">
+          <div className="bg-white border border-slate-100/50 rounded-3xl shadow-sm max-w-lg w-full max-h-[90vh] overflow-y-auto mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <div>
                   <h3 className="text-lg sm:text-xl font-bold text-slate-900">Schedule: {editScheduleDriver.name}</h3>
                   <p className="text-xs sm:text-sm text-slate-500">Manage time blocks (6 AM – 8 PM)</p>
                 </div>
-                <button onClick={() => { setEditScheduleDriver(null); setEditingScheduleIdx(null); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
+                <button onClick={() => { setEditScheduleDriver(null); setEditingScheduleIdx(null); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={18} /></button>
               </div>
 
               {/* Timeline Preview */}
@@ -485,8 +608,8 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                       </div>
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <button onClick={() => editScheduleBlock(idx)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 size={14} /></button>
-                      <button onClick={() => deleteScheduleBlock(idx)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={14} /></button>
+                      <button onClick={() => editScheduleBlock(idx)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="Edit schedule block"><Edit2 size={14} /></button>
+                      <button onClick={() => deleteScheduleBlock(idx)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" aria-label="Delete schedule block"><Trash2 size={14} /></button>
                     </div>
                   </div>
                 ))}
@@ -498,7 +621,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1">Start</label>
-                    <select value={scheduleForm.start} onChange={(e) => setScheduleForm({ ...scheduleForm, start: e.target.value })} className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold">
+                    <select value={scheduleForm.start} onChange={(e) => setScheduleForm({ ...scheduleForm, start: e.target.value })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                       {['06:00 AM','07:00 AM','08:00 AM','09:00 AM','10:00 AM','11:00 AM','12:00 PM','01:00 PM','02:00 PM','03:00 PM','04:00 PM','05:00 PM','06:00 PM','07:00 PM','08:00 PM'].map(t => (
                         <option key={t} value={t}>{t}</option>
                       ))}
@@ -506,7 +629,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1">End</label>
-                    <select value={scheduleForm.end} onChange={(e) => setScheduleForm({ ...scheduleForm, end: e.target.value })} className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold">
+                    <select value={scheduleForm.end} onChange={(e) => setScheduleForm({ ...scheduleForm, end: e.target.value })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                       {['06:00 AM','07:00 AM','08:00 AM','09:00 AM','10:00 AM','11:00 AM','12:00 PM','01:00 PM','02:00 PM','03:00 PM','04:00 PM','05:00 PM','06:00 PM','07:00 PM','08:00 PM'].map(t => (
                         <option key={t} value={t}>{t}</option>
                       ))}
@@ -514,7 +637,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1">Status</label>
-                    <select value={scheduleForm.status} onChange={(e) => setScheduleForm({ ...scheduleForm, status: e.target.value })} className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold">
+                    <select value={scheduleForm.status} onChange={(e) => setScheduleForm({ ...scheduleForm, status: e.target.value })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                       <option value="free">Free</option>
                       <option value="busy">Busy</option>
                     </select>
@@ -534,31 +657,55 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
         </div>
       )}
 
+      {/* AI Driver Analysis Modal */}
+      {aiDriverModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-slate-100/50 rounded-3xl shadow-sm max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <BrainCircuit size={18} className="text-indigo-600" />
+                  AI Driver Analysis
+                </h3>
+                <button onClick={() => setAiDriverModal(null)} className="p-1 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
+              </div>
+              {aiDriverLoading[aiDriverModal] ? (
+                <div className="flex items-center gap-2 text-slate-500"><Loader2 size={16} className="animate-spin" /> Analyzing driver...</div>
+              ) : aiDriverInsights[aiDriverModal] ? (
+                <AIInsightsBanner insights={aiDriverInsights[aiDriverModal]} />
+              ) : (
+                <p className="text-slate-400 text-sm">No analysis available.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+          <div className="bg-white border border-slate-100/50 rounded-3xl shadow-sm max-w-md w-full">
             <div className="p-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-slate-900">{editing ? 'Edit Driver' : 'Add Driver'}</h3>
-                <button onClick={() => { setShowForm(false); resetForm(); }} className="p-2 hover:bg-slate-100 rounded-lg"><X size={20} /></button>
+                <button onClick={() => { setShowForm(false); resetForm(); }} className="p-2 hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={20} /></button>
               </div>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Name</label>
-                  <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Driver name" />
+                  <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Driver name" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Email</label>
-                  <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="email@example.com" />
+                  <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="email@example.com" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Phone</label>
-                  <input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="(555) 123-4567" />
+                  <input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="(555) 123-4567" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Vehicle</label>
-                    <select value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
+                    <select value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                       <option value="">— Select Vehicle —</option>
                       {vehicles.map(v => (
                         <option key={v.id} value={v.name}>{v.name} {v.plate ? `(${v.plate})` : ''}</option>
@@ -567,17 +714,17 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">VIN Number</label>
-                    <input type="text" value={form.vin} onChange={(e) => setForm({ ...form, vin: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="17-digit VIN" />
+                    <input type="text" value={form.vin} onChange={(e) => setForm({ ...form, vin: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="17-digit VIN" />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Insurance Expiry</label>
-                    <input type="date" value={form.insuranceExpiry} onChange={(e) => setForm({ ...form, insuranceExpiry: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+                    <input type="date" value={form.insuranceExpiry} onChange={(e) => setForm({ ...form, insuranceExpiry: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Wheelchair Capacity</label>
-                    <select value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
+                    <select value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                       <option value="0">0 (Sedan)</option>
                       <option value="1">1 (Standard Van)</option>
                       <option value="2">2 (Large Van)</option>
@@ -586,7 +733,7 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Assigned Dispatcher</label>
-                  <select value={form.assignedDispatcher} onChange={(e) => setForm({ ...form, assignedDispatcher: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
+                  <select value={form.assignedDispatcher} onChange={(e) => setForm({ ...form, assignedDispatcher: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                     <option value="">Unassigned</option>
                     {dispatchers.map(ds => (
                       <option key={ds.id} value={ds.id}>{ds.name} ({ds.email})</option>
@@ -595,12 +742,12 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Zone</label>
-                  <input type="text" value={form.currentZone} onChange={(e) => setForm({ ...form, currentZone: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Downtown Indy" />
+                  <input type="text" value={form.currentZone} onChange={(e) => setForm({ ...form, currentZone: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Downtown Indy" />
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
-                <button onClick={() => { setShowForm(false); resetForm(); }} className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
-                <button onClick={saveDriver} className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"><Save size={16} /> {editing ? 'Update' : 'Add'}</button>
+                <button onClick={() => { setShowForm(false); resetForm(); }} className="flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold">Cancel</button>
+                <button onClick={saveDriver} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"><Save size={16} /> {editing ? 'Update' : 'Add'}</button>
               </div>
             </div>
           </div>
@@ -610,51 +757,51 @@ const DriversVehiclesPage = ({ role, drivers, setDrivers, dispatchers = [], addA
       {/* Vehicle Form Modal */}
       {vehicleForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+          <div className="bg-white border border-slate-100/50 rounded-3xl shadow-sm max-w-md w-full">
             <div className="p-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-slate-900">{editVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</h3>
-                <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="p-2 hover:bg-slate-100 rounded-lg"><X size={20} /></button>
+                <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="p-2 hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={20} /></button>
               </div>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Vehicle Name</label>
-                    <input type="text" required value={vForm.name} onChange={(e) => setVForm({ ...vForm, name: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Van #42" />
+                    <input type="text" required value={vForm.name} onChange={(e) => setVForm({ ...vForm, name: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Van #42" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Make</label>
-                    <input type="text" value={vForm.make} onChange={(e) => setVForm({ ...vForm, make: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Ford" />
+                    <input type="text" value={vForm.make} onChange={(e) => setVForm({ ...vForm, make: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Ford" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Model</label>
-                    <input type="text" value={vForm.model} onChange={(e) => setVForm({ ...vForm, model: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Transit" />
+                    <input type="text" value={vForm.model} onChange={(e) => setVForm({ ...vForm, model: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Transit" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Year</label>
-                    <input type="text" value={vForm.year} onChange={(e) => setVForm({ ...vForm, year: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="2024" />
+                    <input type="text" value={vForm.year} onChange={(e) => setVForm({ ...vForm, year: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="2024" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Color</label>
-                    <input type="text" value={vForm.color} onChange={(e) => setVForm({ ...vForm, color: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="White" />
+                    <input type="text" value={vForm.color} onChange={(e) => setVForm({ ...vForm, color: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="White" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">License Plate</label>
-                    <input type="text" value={vForm.plate} onChange={(e) => setVForm({ ...vForm, plate: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="ABC-1234" />
+                    <input type="text" value={vForm.plate} onChange={(e) => setVForm({ ...vForm, plate: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="ABC-1234" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">VIN</label>
-                    <input type="text" value={vForm.vin} onChange={(e) => setVForm({ ...vForm, vin: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="17-digit VIN" maxLength="17" />
+                    <input type="text" value={vForm.vin} onChange={(e) => setVForm({ ...vForm, vin: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="17-digit VIN" maxLength="17" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Odometer</label>
-                    <input type="number" value={vForm.odometer} onChange={(e) => setVForm({ ...vForm, odometer: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="0" />
+                    <input type="number" value={vForm.odometer} onChange={(e) => setVForm({ ...vForm, odometer: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="0" />
                   </div>
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
-                <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
-                <button onClick={saveVehicle} className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"><Save size={16} /> {editVehicleId ? 'Update' : 'Add'}</button>
+                <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold">Cancel</button>
+                <button onClick={saveVehicle} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"><Save size={16} /> {editVehicleId ? 'Update' : 'Add'}</button>
               </div>
             </div>
           </div>
