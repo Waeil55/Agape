@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Archive, Calendar, RefreshCcw, Search, X, ChevronDown, ChevronRight, Clock } from 'lucide-react';
 
-const today = new Date().toISOString().split('T')[0];
 
 const formatClock24 = (value) => {
   if (!value) return '—';
@@ -89,33 +88,6 @@ const getDriverLabel = (trip, drivers) => {
   return driver?.name || trip.driverName || '—';
 };
 
-const Columns = [
-  { key: 'date', label: 'Date', sortKey: 'date' },
-  { key: 'driver', label: 'Driver', sortKey: 'driver' },
-  { key: 'time', label: 'Scheduled Time', sortKey: 'time' },
-  { key: 'bookingId', label: 'Trip ID', sortKey: 'bookingId' },
-  { key: 'patient', label: 'Passenger', sortKey: 'patient' },
-  { key: 'pickup', label: 'Pickup Address', sortKey: 'pickup' },
-  { key: 'dropoff', label: 'Dropoff Address', sortKey: 'dropoff' },
-  { key: 'arrivalTime', label: 'Pickup Arrival', sortKey: 'arrivalTime' },
-  { key: 'departedPickupTime', label: 'Departed Pickup', sortKey: 'departedPickupTime' },
-  { key: 'arrivalDropoffTime', label: 'Dropoff Arrival', sortKey: 'arrivalDropoffTime' },
-  { key: 'pickupOdometer', label: 'Start Odometer', sortKey: 'pickupOdometer' },
-  { key: 'dropoffOdometer', label: 'End Odometer', sortKey: 'dropoffOdometer' },
-  { key: 'travelTime', label: 'Travel Time', sortKey: 'travelTime' },
-  { key: 'distance', label: 'Distance (mi)', sortKey: 'distance' },
-  { key: 'signature', label: 'Signature', sortKey: 'signature' },
-  { key: 'vehicle', label: 'Vehicle', sortKey: 'vehicle' },
-];
-
-const FIELD_FOR_COL = {
-  date: 'date', driver: 'driverId', time: 'time', bookingId: 'bookingId',
-  patient: 'patient', pickup: 'pickup', dropoff: 'dropoff',
-  arrivalTime: 'arrivalTime', departedPickupTime: 'departedPickupTime', arrivalDropoffTime: 'arrivalDropoffTime',
-  pickupOdometer: 'pickupOdometer', dropoffOdometer: 'dropoffOdometer',
-  travelTime: 'travelTime', distance: 'distance',
-  signature: 'paperSignatureConfirmed', vehicle: 'completedVehicle',
-};
 
 const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, updateTrashedTrip }) => {
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('agape_archiveSearch') || '');
@@ -171,31 +143,6 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
       case 'signature': return trip.paperSignatureConfirmed ? 1 : 0;
       case 'vehicle': return trip.completedVehicle || '';
       default: return '';
-    }
-  };
-
-  const renderCellValue = (trip, col) => {
-    switch (col.key) {
-      case 'date': return formatDateLabel(trip.date || 'No Date');
-      case 'driver': return getDriverLabel(trip, drivers);
-      case 'time': return formatClock24(trip.time) !== '—' ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
-      case 'bookingId': return trip.bookingId || trip.id || '—';
-      case 'patient': return trip.patient || '—';
-      case 'pickup': return trip.pickup || '—';
-      case 'dropoff': return trip.dropoff || '—';
-      case 'arrivalTime': return formatClock24(trip.arrivalTime);
-      case 'departedPickupTime': return formatClock24(trip.departedPickupTime);
-      case 'arrivalDropoffTime': return formatClock24(trip.arrivalDropoffTime || trip.completedAt);
-      case 'pickupOdometer': return trip.pickupOdometer || '';
-      case 'dropoffOdometer': return trip.dropoffOdometer || '';
-      case 'travelTime': return calcDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
-      case 'distance': { const m = calcMiles(trip.pickupOdometer, trip.dropoffOdometer); return m !== '—' ? m : '—'; }
-      case 'signature': {
-        if (!('paperSignatureConfirmed' in trip)) return '—';
-        return trip.paperSignatureConfirmed ? 'Yes' : 'No';
-      }
-      case 'vehicle': { const v = trip.completedVehicle || ''; return v && v !== 'Pending Assignment' ? v : '—'; }
-      default: return '—';
     }
   };
 

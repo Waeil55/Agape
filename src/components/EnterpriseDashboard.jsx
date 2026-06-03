@@ -1073,7 +1073,7 @@ const EnterpriseDashboard = ({
                   ? 'rounded-3xl border border-slate-100/50 bg-white shadow-sm flex flex-col flex-1 min-h-0'
                   : activePanel === 'chat'
                   ? 'rounded-3xl border border-slate-100/50 bg-white shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
-                  : 'rounded-3xl border border-slate-100/50 bg-white shadow-sm'
+                  : 'rounded-3xl border border-slate-100/50 bg-white shadow-sm flex flex-col flex-1 min-h-0'
               }>
                 {renderPanelContent()}
               </div>
