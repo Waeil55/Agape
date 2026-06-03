@@ -194,9 +194,9 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
       {isExpanded && (
         <>
           {/* Backdrop */}
-          <div className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300" onClick={() => onToggle(task.id)} />
-          {/* Overlay Card */}
-          <div className="fixed inset-0 z-50 flex flex-col bg-white" style={{ margin: '0', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <div className="fixed inset-0 bg-slate-900/15 backdrop-blur-sm z-40 transition-opacity duration-300" onClick={() => onToggle(task.id)} />
+          {/* Modal Card */}
+          <div className="fixed z-50 bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} style={{ top: 'calc(env(safe-area-inset-top) + 8px)', left: '2%', right: '2%', bottom: 'calc(env(safe-area-inset-bottom) + 86px)' }}>
             {/* Header Bar */}
             <div className="shrink-0 bg-white border-b border-slate-200/70 flex items-center justify-between px-4 py-3" style={{ fontSize: '112%' }}>
               <div className="flex items-center gap-3 min-w-0">
@@ -306,12 +306,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                           )}
                         </div>
                       )}
-                      {(task.pickup?.comments || task.pickupNotes) && (
-                        <div className="mt-1 flex gap-1 items-start bg-white p-1 rounded-md border border-slate-100">
-                          <Info size={10} className="text-slate-400 shrink-0 mt-0.5" />
-                          <p className="text-slate-600 text-[0.625em] font-medium leading-tight">{task.pickup?.comments || task.pickupNotes}</p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -366,12 +360,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                               <MessageCircle size={12} /> SMS
                             </button>
                           )}
-                        </div>
-                      )}
-                      {(task.dropoff?.comments || task.dropoffNotes) && (
-                        <div className="mt-1 flex gap-1 items-start bg-white p-1 rounded-md border border-slate-100">
-                          <Info size={10} className="text-slate-400 shrink-0 mt-0.5" />
-                          <p className="text-slate-600 text-[0.625em] font-medium leading-tight">{task.dropoff?.comments || task.dropoffNotes}</p>
                         </div>
                       )}
                     </div>
