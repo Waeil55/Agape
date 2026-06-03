@@ -155,6 +155,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [departedTime, setDepartedTime] = useState('');
   const [arrivalDropoffTime, setArrivalDropoffTime] = useState('');
   const [showTripDetails, setShowTripDetails] = useState(null);
+  const [historyExpandedId, setHistoryExpandedId] = useState(null);
   const [showToast, setShowToast] = useState(null);
   const [expandedTripId, setExpandedTripIdRaw] = useState(() => {
     try { const v = localStorage.getItem('expandedTripId'); return v && v !== 'null' ? v : null; } catch { return null; }
@@ -526,10 +527,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
 
+  const reroutedTrips = driverScopedTrips.filter(t => t.status === 'Rerouted');
   const completedTrips = driverScopedTrips.filter(t => t.status === 'Completed');
   const noShowTrips = driverScopedTrips.filter(t => t.status === 'No Show');
   const cancelledTrips = driverScopedTrips.filter(t => t.status === 'Cancelled');
-  const allHistory = [...completedTrips, ...noShowTrips, ...cancelledTrips].sort((a,b) => { const da = a.completedAt || a.date || ''; const db = b.completedAt || b.date || ''; return db.localeCompare(da); });
+  const allHistory = [...reroutedTrips, ...completedTrips, ...noShowTrips, ...cancelledTrips].sort((a,b) => { const da = a.completedAt || a.date || ''; const db = b.completedAt || b.date || ''; return db.localeCompare(da); });
 
   const activeTrips = myTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
 
@@ -788,7 +790,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const matchFilter = historyFilter === 'all' ? true :
       historyFilter === 'completed' ? t.status === 'Completed' :
       historyFilter === 'noshow' ? t.status === 'No Show' :
-      t.status === 'Cancelled';
+      historyFilter === 'cancelled' ? t.status === 'Cancelled' :
+      t.status === 'Rerouted';
     if (!matchFilter) return false;
     if (!historySearch) return true;
     const q = historySearch.toLowerCase();
@@ -2328,10 +2331,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               { id: 'completed', label: 'Completed' },
               { id: 'noshow', label: 'No Show' },
               { id: 'cancelled', label: 'Cancelled' },
+              { id: 'rerouted', label: 'Rerouted' },
             ].map(f => (
               <button key={f.id} onClick={() => setHistoryFilter(f.id)}
-                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all whitespace-nowrap ${historyFilter === f.id ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold'}`}>
-                {f.label} ({f.id === 'all' ? allHistory.length : f.id === 'completed' ? completedTrips.length : f.id === 'noshow' ? noShowTrips.length : cancelledTrips.length})
+                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all whitespace-nowrap ${historyFilter === f.id ? f.id === 'rerouted' ? 'bg-purple-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold'}`}>
+                {f.label} ({f.id === 'all' ? allHistory.length : f.id === 'rerouted' ? reroutedTrips.length : f.id === 'completed' ? completedTrips.length : f.id === 'noshow' ? noShowTrips.length : cancelledTrips.length})
               </button>
             ))}
           </div>
@@ -2348,55 +2352,74 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             ) : (
               filteredHistory.map(trip => {
                 const styles = {
-                  'Completed': { bg: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
-                  'No Show': { bg: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
-                  'Cancelled': { bg: 'bg-rose-100 text-rose-700', dot: 'bg-rose-500' },
+                  'Completed': { bg: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', border: 'border-l-emerald-400' },
+                  'No Show': { bg: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500', border: 'border-l-amber-400' },
+                  'Cancelled': { bg: 'bg-rose-100 text-rose-700', dot: 'bg-rose-500', border: 'border-l-rose-400' },
+                  'Rerouted': { bg: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500', border: 'border-l-purple-400' },
                 };
                 const s = styles[trip.status] || styles['Completed'];
+                const isExpanded = historyExpandedId === trip.id;
                 return (
-                  <div key={trip.id} className="bg-transparent rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer mb-2 border border-slate-200/60">
-                    <div onClick={() => setShowTripDetails(trip)} className="p-2.5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <div className={`w-2 h-2 rounded-full ${s.dot}`} />
-                            <h4 className="font-bold text-sm text-slate-900 leading-tight break-words">{trip.patient}</h4>
-                            {trip.bookingId && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs font-bold shrink-0">{trip.bookingId}</span>}
-                          </div>
-                          <p className="text-sm font-bold text-emerald-600 mt-1">{to12hr(trip.time)}</p>
-                          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-emerald-600">
-                            <ArrowRight size={10} className="text-emerald-500 shrink-0" />
-                            <span className="break-words">{trip.pickup}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-xs text-rose-600 mt-0.5">
-                            <ArrowRight size={10} className="text-rose-500 shrink-0" />
-                            <span className="break-words">{trip.dropoff}</span>
-                          </div>
-                          {(trip.pickupOdometer || trip.dropoffOdometer) && (
-                            <div className="flex items-center gap-3 mt-1.5 text-xs font-semibold">
-                              {trip.pickupOdometer && <span className="text-emerald-600">Start: {trip.pickupOdometer?.toLocaleString()} mi</span>}
-                              {trip.dropoffOdometer && <span className="text-rose-600">End: {trip.dropoffOdometer?.toLocaleString()} mi</span>}
-                              {trip.pickupOdometer && trip.dropoffOdometer && (
-                                <span className="text-blue-500">+{(trip.dropoffOdometer - trip.pickupOdometer)?.toLocaleString()} mi</span>
-                              )}
-                            </div>
-                          )}
-                          {trip.distance && (
-                            <p className="text-slate-500 text-xs font-semibold mt-0.5">Distance: {trip.distance} mi</p>
-                          )}
-                          {trip.completedAt && (
-                            <p className="text-xs text-slate-400 mt-1">{new Date(trip.completedAt).toLocaleString()}</p>
-                          )}
+                  <div key={trip.id} className={`bg-white rounded-2xl overflow-hidden transition-all duration-300 border border-slate-200/60 ${isExpanded ? 'shadow-md border-blue-200' : 'shadow-sm hover:border-slate-300'}`}>
+                    <div onClick={() => setHistoryExpandedId(prev => prev === trip.id ? null : trip.id)} className="p-3 cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className={`w-2 h-2 rounded-full ${s.dot} shrink-0`} />
+                          <span className="text-sm font-bold text-slate-900 truncate">{trip.patient}</span>
+                          <span className="text-[11px] font-mono text-blue-600 font-semibold shrink-0">#{trip.bookingId || trip.id}</span>
                         </div>
-                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider shrink-0 ${s.bg}`}>
-                          {trip.status}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-bold text-emerald-600">{to12hr(trip.time)}</span>
+                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider ${s.bg}`}>{trip.status}</span>
+                          {isExpanded ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
+                        </div>
                       </div>
                     </div>
-                    <div className="px-2 pb-2 flex gap-2">
-                      <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"><FileText size={12} /> Details</button>
-                      <button type="button" onClick={() => restoreHistoryTrip(trip)} className="flex-1 h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"><RotateCcw size={12} /> Restore</button>
+
+                    {isExpanded && (
+                    <div className="border-t border-slate-100">
+                      <div className="p-3 space-y-3">
+                        {trip.pickup && (
+                        <div className="flex items-center gap-2">
+                          <ArrowRight size={10} className="text-emerald-500 shrink-0" />
+                          <span className="text-xs text-emerald-600 font-medium break-words">{trip.pickup}</span>
+                        </div>
+                        )}
+                        {trip.dropoff && (
+                        <div className="flex items-center gap-2">
+                          <ArrowRight size={10} className="text-rose-500 shrink-0" />
+                          <span className="text-xs text-rose-600 font-medium break-words">{trip.dropoff}</span>
+                        </div>
+                        )}
+                        {(trip.pickupOdometer || trip.dropoffOdometer) && (
+                        <div className="flex items-center gap-3 text-xs font-semibold flex-wrap">
+                          {trip.pickupOdometer && <span className="text-emerald-600">Start: {Number(trip.pickupOdometer).toLocaleString()} mi</span>}
+                          {trip.dropoffOdometer && <span className="text-rose-600">End: {Number(trip.dropoffOdometer).toLocaleString()} mi</span>}
+                          {trip.pickupOdometer && trip.dropoffOdometer && (
+                            <span className="text-blue-500">+{Math.max(0, Number(trip.dropoffOdometer) - Number(trip.pickupOdometer)).toLocaleString()} mi</span>
+                          )}
+                        </div>
+                        )}
+                        {trip.distance && (
+                        <p className="text-xs text-slate-500 font-semibold">Distance: {trip.distance} mi</p>
+                        )}
+                        {trip.status === 'Rerouted' && trip.cancellationReason && (
+                        <div className="bg-purple-50 rounded-xl px-3 py-2 border border-purple-200">
+                          <p className="text-[10px] uppercase tracking-wider text-purple-500 font-bold">Reroute Reason</p>
+                          <p className="text-xs text-slate-700 mt-0.5">{trip.cancellationReason}</p>
+                          {trip.cancelledBy && <p className="text-[10px] text-slate-400 mt-0.5">by {trip.cancelledBy}</p>}
+                        </div>
+                        )}
+                        {trip.completedAt && (
+                        <p className="text-[10px] text-slate-400">{new Date(trip.completedAt).toLocaleString()}</p>
+                        )}
+                      </div>
+                      <div className="px-3 pb-3 flex gap-2">
+                        <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><FileText size={12} /> Details</button>
+                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="flex-1 h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><RotateCcw size={12} /> Restore</button>
+                      </div>
                     </div>
+                    )}
                   </div>
                 );
               })
