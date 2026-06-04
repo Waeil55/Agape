@@ -37,6 +37,213 @@ async function requireAdminOrDispatcher(context) {
   return requireRole(context, ["admin", "dispatcher"]);
 }
 
+function sanitizeForFirestore(value) {
+  return JSON.parse(JSON.stringify(value, (_key, item) => item === undefined ? null : item));
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function buildOdometerDistance(startOdo, endOdo) {
+  const start = Number(startOdo);
+  const end = Number(endOdo);
+  if (Number.isNaN(start) || Number.isNaN(end)) return "";
+  const diff = end - start;
+  return diff >= 0 ? Number(diff.toFixed(1)) : "";
+}
+
+function parseTimeMinutes(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  if (raw.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date.getHours() * 60 + date.getMinutes();
+  }
+  const match = raw.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (!match) return null;
+  let hours = parseInt(match[1], 10);
+  const mins = parseInt(match[2], 10);
+  const ampm = match[3]?.toUpperCase();
+  if (ampm === "PM" && hours !== 12) hours += 12;
+  if (ampm === "AM" && hours === 12) hours = 0;
+  return hours * 60 + mins;
+}
+
+function buildTravelDuration(startTime, endTime) {
+  if (!startTime || !endTime) return "";
+  const startDate = new Date(startTime);
+  const endDate = new Date(endTime);
+  if (!Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime())) {
+    const diff = Math.round((endDate - startDate) / 60000);
+    if (diff < 0) return "";
+    const hours = Math.floor(diff / 60);
+    const mins = diff % 60;
+    return hours > 0 ? `${hours}h${mins > 0 ? mins : ""}` : `${mins}m`;
+  }
+  const start = parseTimeMinutes(startTime);
+  const end = parseTimeMinutes(endTime);
+  if (start === null || end === null || end < start) return "";
+  const diff = end - start;
+  const hours = Math.floor(diff / 60);
+  const mins = diff % 60;
+  return hours > 0 ? `${hours}h${mins > 0 ? mins : ""}` : `${mins}m`;
+}
+
+function enrichTripMetrics(trip) {
+  const travelTime = buildTravelDuration(trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
+  const distance = buildOdometerDistance(trip.pickupOdometer, trip.dropoffOdometer);
+  return {
+    ...trip,
+    travelTime: travelTime || trip.travelTime || "",
+    distance: distance !== "" ? distance : trip.distance || "",
+  };
+}
+
+async function getUserRoleContext(context) {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "You must be logged in.");
+  }
+  const userDoc = await admin.firestore().doc(`users/${context.auth.uid}`).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError("permission-denied", "User profile not found.");
+  }
+  const userData = userDoc.data() || {};
+  return {
+    uid: context.auth.uid,
+    email: normalizeEmail(context.auth.token.email || userData.email),
+    role: String(userData.role || "").toLowerCase(),
+    profileId: userData.profileId || "",
+    userData,
+  };
+}
+
+const DRIVER_TRIP_STATUSES = new Set([
+  "Assigned",
+  "Unassigned",
+  "In Mission",
+  "En Route",
+  "In Progress",
+  "Navigating Pickup",
+  "At Pickup",
+  "In Transit",
+  "Navigating Dropoff",
+  "At Dropoff",
+  "Arrived",
+  "Completed",
+  "No Show",
+  "Cancelled",
+  "Rerouted",
+]);
+
+exports.updateDriverTrip = functions.https.onCall(async (data, context) => {
+  const actor = await getUserRoleContext(context);
+  const tripId = String(data?.tripId || "").trim();
+  const status = String(data?.status || "").trim();
+  const updates = data?.updates && typeof data.updates === "object" && !Array.isArray(data.updates)
+    ? sanitizeForFirestore(data.updates)
+    : {};
+
+  if (!tripId || !status) {
+    throw new functions.https.HttpsError("invalid-argument", "tripId and status are required.");
+  }
+  if (actor.role === "driver" && !DRIVER_TRIP_STATUSES.has(status)) {
+    throw new functions.https.HttpsError("permission-denied", "Drivers cannot apply this trip status.");
+  }
+  if (!["admin", "dispatcher", "driver"].includes(actor.role)) {
+    throw new functions.https.HttpsError("permission-denied", "This action requires an active app role.");
+  }
+
+  const db = admin.firestore();
+  const appDataRef = db.doc("appData/agape");
+  const nowIso = new Date().toISOString();
+  const result = await db.runTransaction(async (transaction) => {
+    const appSnap = await transaction.get(appDataRef);
+    if (!appSnap.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "App data is not initialized.");
+    }
+
+    const appData = appSnap.data() || {};
+    const trips = [...(appData.trips || [])];
+    const drivers = [...(appData.drivers || [])];
+    const tripIndex = trips.findIndex((trip) => String(trip.id) === tripId);
+    if (tripIndex === -1) {
+      throw new functions.https.HttpsError("not-found", "Trip was not found.");
+    }
+
+    const previousTrip = trips[tripIndex] || {};
+    const assignedDriver = drivers.find((driver) => String(driver.id || "") === String(previousTrip.driverId || ""));
+    const driverProfileIds = new Set([
+      actor.profileId,
+      ...drivers
+        .filter((driver) => normalizeEmail(driver.email) === actor.email)
+        .map((driver) => driver.id),
+    ].filter(Boolean).map(String));
+    const tripDriverEmail = normalizeEmail(previousTrip.driverEmail || assignedDriver?.email);
+
+    if (actor.role === "driver" && !driverProfileIds.has(String(previousTrip.driverId || "")) && tripDriverEmail !== actor.email) {
+      throw new functions.https.HttpsError("permission-denied", "Drivers can only update their own assigned trips.");
+    }
+
+    const nextTrip = enrichTripMetrics(sanitizeForFirestore({
+      ...previousTrip,
+      status,
+      ...updates,
+      updatedAtLocal: nowIso,
+      updatedBy: actor.email,
+    }));
+
+    trips[tripIndex] = nextTrip;
+    const appUpdate = {
+      trips,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedField: "trips",
+      updatedAtLocal: nowIso,
+    };
+
+    const finalOdometer = Number(nextTrip.dropoffOdometer);
+    const completedWithOdometer = status === "Completed" && Number.isFinite(finalOdometer) && finalOdometer > 0;
+    const driverId = String(nextTrip.driverId || actor.profileId || assignedDriver?.id || "");
+    if (completedWithOdometer && driverId) {
+      appUpdate.drivers = drivers.map((driver) => (
+        String(driver.id) === driverId
+          ? { ...driver, odometer: finalOdometer, updatedAtLocal: nowIso }
+          : driver
+      ));
+      transaction.set(db.doc(`driverProfiles/${driverId}`), {
+        odometer: finalOdometer,
+        updatedAtLocal: nowIso,
+      }, { merge: true });
+    }
+
+    transaction.set(appDataRef, appUpdate, { merge: true });
+    transaction.set(db.doc(`tripLedger/${tripId}`), {
+      ...nextTrip,
+      archiveState: "active",
+      mirroredAt: nowIso,
+    }, { merge: true });
+    transaction.set(db.collection("logs").doc(), {
+      t: status === "Completed" ? "Trip Completed" : "Driver Trip Update",
+      d: `${actor.email || "Driver"} updated trip ${tripId} (${previousTrip.patient || "Unknown"}) to ${status}.`,
+      c: status === "Completed" ? "emerald" : "blue",
+      type: "audit",
+      time: Date.now(),
+      actor: actor.email,
+      actorRole: actor.role,
+      meta: {
+        entity: "trip",
+        id: tripId,
+        status,
+      },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { trip: nextTrip, driverId, odometer: completedWithOdometer ? finalOdometer : null };
+  });
+
+  return { success: true, ...result };
+});
+
 exports.deleteUser = functions.https.onCall(async (data, context) => {
   await requireAdmin(context);
   const { uid } = data;

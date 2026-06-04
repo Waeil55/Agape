@@ -7,7 +7,7 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   RefreshCcw, X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, onSnapshot, collection, getDocs } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, onSnapshot, collection, getDocs, functions as firebaseFunctions, httpsCallable } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -40,6 +40,7 @@ import { useFirestoreAppData } from './hooks/useFirestoreAppData';
 import { hydrateUserLocalState, startUserLocalStateSync, stopUserLocalStateSync } from './utils/userLocalStateSync';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
+const updateDriverTripCallable = httpsCallable(firebaseFunctions, 'updateDriverTrip');
 
 // Lazy-loaded heavy components
 const lazyWithRetry = (componentImport) =>
@@ -260,6 +261,10 @@ const buildOdometerDistance = (startOdo, endOdo) => {
   const diff = end - start;
   return diff >= 0 ? Number(diff.toFixed(1)) : '';
 };
+
+function sanitizeForCallable(value) {
+  return JSON.parse(JSON.stringify(value || {}, (_key, item) => item === undefined ? null : item));
+}
 
 const TRACKING_ACTIVE_STATUSES = new Set([
   'Assigned',
@@ -1745,6 +1750,46 @@ const App = () => {
     }
   };
 
+  const saveDriverTripUpdate = useCallback(async (tripId, status, extraData = {}) => {
+    const prevTrip = tripsRef.current.find(t => t.id === tripId);
+    if (!prevTrip) {
+      addToast('Trip Not Found', 'The trip could not be found in the live manifest. Refresh and try again.', 'danger');
+      return null;
+    }
+
+    try {
+      const result = await updateDriverTripCallable({
+        tripId,
+        status,
+        updates: sanitizeForCallable(extraData),
+      });
+      const savedTrip = result?.data?.trip || null;
+      if (status === 'Completed' && notificationsEnabled) {
+        playNotificationSound();
+        showLocalNotification('Trip Completed', `${prevTrip.patient || 'Trip'} marked as completed.`);
+      }
+      return savedTrip;
+    } catch (err) {
+      console.error('Driver trip update failed:', err);
+      addToast(
+        'Trip Save Failed',
+        err?.message || 'The trip update could not be saved. Try again when the connection is stable.',
+        'danger'
+      );
+      addLog({
+        t: 'Driver Update Failed',
+        d: `${currentUser || 'Driver'} could not update trip ${tripId} (${prevTrip?.patient || 'Unknown'}) to ${status}.`,
+        c: 'rose',
+        type: 'audit',
+        time: Date.now(),
+        actor: currentUser || 'driver',
+        actorRole: 'driver',
+        meta: { entity: 'trip', id: tripId, status, error: err?.message || String(err) },
+      });
+      return null;
+    }
+  }, [addLog, currentUser, notificationsEnabled]);
+
   const handleUpdateDriverLocation = useCallback(async (driverId, latitude, longitude, telemetry = {}) => {
     if (!driverId) return;
 
@@ -2451,6 +2496,9 @@ const App = () => {
               }}
               onUpdateDriverLocation={handleUpdateDriverLocation}
               onUpdateTrip={(tripId, status, extraData = {}) => {
+                if (role === 'driver') {
+                  saveDriverTripUpdate(tripId, status, extraData);
+                } else {
                 const prevTrip = trips.find(t => t.id === tripId);
                 const newTrip = prevTrip ? { ...prevTrip, status, ...extraData } : null;
                 if (newTrip) {
@@ -2468,12 +2516,20 @@ const App = () => {
                     addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${tripId} (${prevTrip?.patient || 'Unknown'})`, 'blue', { entity: 'trip', id: tripId, diffs: changed, summary: details });
                   }
                 }
+                }
               }}
               onDriverStatusUpdate={handleDriverStatusUpdate}
               onCompleteTrip={(tripId, driverId, odometer) => {
+                if (role === 'driver') {
+                  saveDriverTripUpdate(tripId, 'Completed', {
+                    dropoffOdometer: odometer,
+                    completedAt: new Date().toISOString(),
+                  });
+                } else {
                 handleCompleteTrip(tripId, driverId, odometer);
                 const trip = trips.find(t => t.id === tripId);
                 addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'Unknown'}). Odo: ${odometer}`, 'emerald');
+                }
               }}
               onAddAuditLog={addAuditLog}
               onAddTrip={addTrip}

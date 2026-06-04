@@ -1135,7 +1135,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           }
           setLastOdometer(odo);
           setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
-          if (navigator.onLine) { saveOdometerReading(trip.id, odo).catch(() => {}); }
+          if (navigator.onLine) {
+            if (role !== 'driver') saveOdometerReading(trip.id, odo).catch(() => {});
+          }
           else { addToQueue('completeTrip', { tripId: trip.id, odometer: odo }); }
           setExpandedTripId(null);
           setSelectedTrips(prev => prev.filter(id => id !== trip.id));
@@ -1226,7 +1228,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
     // Save odometer to Firestore directly
     if (navigator.onLine) {
-      saveOdometerReading(showCompleteModal.id, odo).catch(() => {});
+      if (role !== 'driver') saveOdometerReading(showCompleteModal.id, odo).catch(() => {});
     } else {
       addToQueue('completeTrip', { tripId: showCompleteModal.id, odometer: odo });
     }
