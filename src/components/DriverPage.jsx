@@ -235,7 +235,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       }
     });
     return () => unsub();
-  }, [me, trips]);
+  }, [me?.id]);
 
   // Re-compute assignedSequence whenever templates, me, or trips change
   useEffect(() => {
@@ -517,7 +517,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const getTodayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
-  const myTrips = driverScopedTrips
+  const myTrips = useMemo(() => driverScopedTrips
     .filter(t => tripMatchesTodayOrTomorrow(t.date))
     .sort((a, b) => {
       const today = getTodayStr();
@@ -525,43 +525,43 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       const bToday = b.date === today ? 0 : 1;
       if (aToday !== bToday) return aToday - bToday;
       return timeToMinutes(a.time) - timeToMinutes(b.time);
-    });
+    }),
+    [driverScopedTrips]
+  );
 
-  const reroutedTrips = driverScopedTrips.filter(t => t.status === 'Rerouted');
-  const completedTrips = driverScopedTrips.filter(t => t.status === 'Completed');
-  const noShowTrips = driverScopedTrips.filter(t => t.status === 'No Show');
-  const cancelledTrips = driverScopedTrips.filter(t => t.status === 'Cancelled');
-  const allHistory = [...reroutedTrips, ...completedTrips, ...noShowTrips, ...cancelledTrips].sort((a,b) => { const da = a.completedAt || a.date || ''; const db = b.completedAt || b.date || ''; return db.localeCompare(da); });
+  const { reroutedTrips, completedTrips, noShowTrips, cancelledTrips, allHistory } = useMemo(() => {
+    const rerouted = driverScopedTrips.filter(t => t.status === 'Rerouted');
+    const completed = driverScopedTrips.filter(t => t.status === 'Completed');
+    const noShow = driverScopedTrips.filter(t => t.status === 'No Show');
+    const cancelled = driverScopedTrips.filter(t => t.status === 'Cancelled');
+    return {
+      reroutedTrips: rerouted,
+      completedTrips: completed,
+      noShowTrips: noShow,
+      cancelledTrips: cancelled,
+      allHistory: [...rerouted, ...completed, ...noShow, ...cancelled].sort((a, b) => {
+        const da = a.completedAt || a.date || '';
+        const db = b.completedAt || b.date || '';
+        return db.localeCompare(da);
+      })
+    };
+  }, [driverScopedTrips]);
 
-  const activeTrips = myTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
+  const activeTrips = useMemo(() => myTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status)), [myTrips]);
 
-  const orderedTrips = [...activeTrips].sort((a, b) => {
-    // 1. If guided mode is active, the absolute top priority is the current step's trip
+  const orderedTrips = useMemo(() => [...activeTrips].sort((a, b) => {
     if (guidedMode && guidedSteps && guidedSteps[guidedStepIndex]) {
       if (a.id === guidedSteps[guidedStepIndex].tripId && b.id !== guidedSteps[guidedStepIndex].tripId) return -1;
       if (b.id === guidedSteps[guidedStepIndex].tripId && a.id !== guidedSteps[guidedStepIndex].tripId) return 1;
     }
-
-    // 2. Trips that are currently in progress should be pushed to the top
     const inProgressStatuses = [
-      'In Mission',
-      'En Route',
-      'In Progress',
-      'Navigating Pickup',
-      'At Pickup',
-      'In Transit',
-      'Navigating Dropoff',
-      'At Dropoff',
-      'Arrived',
-      'Arrived PU',
-      'Arrived DO',
+      'In Mission', 'En Route', 'In Progress', 'Navigating Pickup', 'At Pickup',
+      'In Transit', 'Navigating Dropoff', 'At Dropoff', 'Arrived', 'Arrived PU', 'Arrived DO',
     ];
     const aInProgress = inProgressStatuses.includes(a.status);
     const bInProgress = inProgressStatuses.includes(b.status);
     if (aInProgress && !bInProgress) return -1;
     if (bInProgress && !aInProgress) return 1;
-
-    // 3. Fall back to AI sequence if it exists
     if (aiSequence && aiSequence.length > 0) {
       const aiA = aiSequence.indexOf(a.id);
       const aiB = aiSequence.indexOf(b.id);
@@ -571,20 +571,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         return aiA - aiB;
       }
     }
-
-    // 4. Will Call / no-time trips always go to the bottom
     const aWC = isWillCall(a);
     const bWC = isWillCall(b);
     if (aWC !== bWC) return aWC ? 1 : -1;
-
-    // 5. Otherwise fall back to urgency and then time.
     const urgencyDiff = getUrgency(b) - getUrgency(a);
     if (urgencyDiff !== 0) return urgencyDiff;
     return timeToMinutes(a.time) - timeToMinutes(b.time);
-  });
+  }), [activeTrips, guidedMode, guidedSteps, guidedStepIndex, aiSequence]);
 
-  const timedTrips = orderedTrips.filter(t => !isWillCall(t));
-  const willCallTrips = orderedTrips.filter(t => isWillCall(t));
+  const timedTrips = useMemo(() => orderedTrips.filter(t => !isWillCall(t)), [orderedTrips]);
+  const willCallTrips = useMemo(() => orderedTrips.filter(t => isWillCall(t)), [orderedTrips]);
 
   useEffect(() => {
     const { tripId, locked } = workflowScrollLockRef.current;
@@ -601,13 +597,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   // Auto-re-optimize when trips or GPS changes
   useEffect(() => {
-    if (selectedTrips.length >= 2 && driverPosition) {
+    if (selectedTrips.length >= 2 && positionRef.current) {
       const timer = setTimeout(() => {
         runAiOptimization(true);
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [trips, driverPosition?.lat, driverPosition?.lng]);
+  }, [selectedTrips.length, activeTrips.length]);
 
   // Detect ride-sharing opportunities — deduplicated, max 3
   useEffect(() => {
@@ -661,12 +657,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   // Calculate ETAs using Google Maps Distance Matrix
   const calculateEta = useCallback(async (trip) => {
-    if (!driverPosition || !trip?.pickup) return;
+    const pos = positionRef.current;
+    if (!pos?.lat || !pos?.lng || !trip?.pickup) return;
     try {
-      const origin = `${driverPosition.lat},${driverPosition.lng}`;
+      const origin = `${pos.lat},${pos.lng}`;
       const dest = trip.pickup;
       const distMiles = await getDistanceMiles(
-        { lat: driverPosition.lat, lng: driverPosition.lng },
+        { lat: pos.lat, lng: pos.lng },
         trip.pickupLat ? { lat: trip.pickupLat, lng: trip.pickupLng } : dest
       );
       if (distMiles !== null) {
@@ -676,23 +673,23 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         setEtas(prev => ({ ...prev, [trip.id]: etaMinutes }));
       }
     } catch {}
-  }, [driverPosition]);
+  }, []);
 
   // Batch update ETAs (limit to first 3 trips, 30s interval to avoid rate limits)
   useEffect(() => {
-    if (!driverPosition || activeTrips.length === 0) return;
+    if (activeTrips.length === 0) return;
     const timer = setInterval(() => {
       activeTrips.slice(0, 3).forEach(t => calculateEta(t));
     }, 30000);
     activeTrips.slice(0, 3).forEach(t => calculateEta(t));
     return () => clearInterval(timer);
-  }, [driverPosition, activeTrips.length]);
+  }, [activeTrips]);
 
   // Geofence proximity detection — check every 15s if near pickup/dropoff
   useEffect(() => {
-    if (!driverPosition || activeTrips.length === 0) return;
+    if (activeTrips.length === 0) return;
     const timer = setInterval(() => {
-      const pos = driverPosition;
+      const pos = positionRef.current;
       if (!pos?.lat || !pos?.lng) return;
       activeTrips.forEach(trip => {
         const tripKey = trip.id;
@@ -722,7 +719,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       });
     }, 15000);
     return () => clearInterval(timer);
-  }, [driverPosition, activeTrips]);
+  }, [activeTrips]);
 
   const startGpsTracking = () => {
     if (!navigator.geolocation || gpsWatchId.current) return;
@@ -786,7 +783,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     onDriverStatusUpdate(driverId, newStatus);
   };
 
-  const filteredHistory = allHistory.filter(t => {
+  const filteredHistory = useMemo(() => allHistory.filter(t => {
     const matchFilter = historyFilter === 'all' ? true :
       historyFilter === 'completed' ? t.status === 'Completed' :
       historyFilter === 'noshow' ? t.status === 'No Show' :
@@ -799,7 +796,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       (t.bookingId || '').toLowerCase().includes(q) ||
       (t.pickup || '').toLowerCase().includes(q) ||
       (t.dropoff || '').toLowerCase().includes(q);
-  });
+  }), [allHistory, historyFilter, historySearch]);
 
   const toggleTripSelect = (tripId) => {
     setSelectedTrips(prev =>

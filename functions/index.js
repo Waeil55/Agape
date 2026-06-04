@@ -273,19 +273,21 @@ exports.sendSms = functions.https.onCall(async (data, context) => {
     if (!apiKey) {
       throw new functions.https.HttpsError("failed-precondition", "Telnyx API key not configured.");
     }
-    const body = { from: fromNumber, to, text, type: "SMS" };
+    const body = { from: fromNumber, to, text };
     if (messagingProfileId) {
       body.messaging_profile_id = messagingProfileId;
     }
+    functions.logger.info("Telnyx send request:", { body, apiKey: apiKey ? "***" : "missing" });
     const res = await axios.post(
       `${TELNYX_API_BASE}/messages`,
       body,
       { headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" } }
     );
+    functions.logger.info("Telnyx API response status:", { status: res.status, statusText: res.statusText });
     const telnyxData = res.data?.data || {};
     const messageId = telnyxData.id;
     const status = telnyxData.to?.[0]?.status || "queued";
-    functions.logger.info("Telnyx send response:", { messageId, status, to, from: fromNumber });
+    functions.logger.info("Telnyx send response:", { messageId, status, to, from: fromNumber, telnyxData });
     if (tripId) {
       await admin.firestore().collection("smsLogs").add({
         tripId,
@@ -302,7 +304,16 @@ exports.sendSms = functions.https.onCall(async (data, context) => {
   } catch (err) {
     const errDetail = err.response?.data?.errors?.[0]?.detail || err.message;
     const errCode = err.response?.data?.errors?.[0]?.code || "";
-    functions.logger.error("Telnyx send error:", { detail: errDetail, code: errCode, response: err.response?.data });
+    const status = err.response?.status || "";
+    functions.logger.error("Telnyx send error:", { 
+      detail: errDetail, 
+      code: errCode, 
+      status,
+      response: err.response?.data,
+      body: body,
+      to,
+      from: fromNumber
+    });
     throw new functions.https.HttpsError("internal", errDetail || "Failed to send SMS.");
   }
 });
@@ -327,7 +338,7 @@ exports.sendBulkSms = functions.https.onCall(async (data, context) => {
   for (const { to: rawTo, text, metadata } of messages) {
     const to = normalizePhone(rawTo);
     try {
-      const body = { from: fromNumber, to, text, type: "SMS" };
+      const body = { from: fromNumber, to, text };
       if (messagingProfileId) {
         body.messaging_profile_id = messagingProfileId;
       }
@@ -355,7 +366,16 @@ exports.sendBulkSms = functions.https.onCall(async (data, context) => {
       }
     } catch (err) {
       const errorMsg = err.response?.data?.errors?.[0]?.detail || err.message;
-      functions.logger.error(`Failed to send SMS to ${to}:`, err.response?.data || err.message);
+      const errCode = err.response?.data?.errors?.[0]?.code || "";
+      const status = err.response?.status || "";
+      functions.logger.error(`Failed to send SMS to ${to}:`, { 
+        errorMsg, 
+        errCode, 
+        status,
+        response: err.response?.data,
+        body,
+        from: fromNumber
+      });
       results.push({ to, success: false, error: errorMsg });
       failed++;
       if (!firstError) firstError = errorMsg;

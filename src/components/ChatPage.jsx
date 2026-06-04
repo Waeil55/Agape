@@ -14,7 +14,7 @@ const normalizePhone = (raw) => {
   return "+" + digits;
 };
 
-const TELNYX_NUMBER = '+18552223330';
+const TELNYX_NUMBER = '+13177999998';
 
 const useMobile = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);

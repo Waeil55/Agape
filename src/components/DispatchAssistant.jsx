@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { tripMatchesCalendarDay } from '../utils/tripDate';
-import { Clock, MapPin, Truck, BrainCircuit, X, Zap, AlertCircle, UserCheck } from 'lucide-react';
+import { Clock, MapPin, Truck, BrainCircuit, X, Zap, AlertCircle, UserCheck, CheckCircle2 } from 'lucide-react';
 import { suggestOptimalDriver, getDriverScheduleStatus, getScheduleBlocks } from '../config/ai';
 
 const HOURS_START = 6 * 60;
@@ -177,97 +177,105 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
   const insights = getInsights();
 
   return (
-    <div className="space-y-6">
-      {/* Live Dispatch Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white space-y-4 md:space-y-6">
+      {/* Mobile-First: Live Dispatch Header */}
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-100 px-4 py-3 md:rounded-b-2xl md:border-slate-100">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
             <Zap size={20} />
           </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900">Dispatch Assistant</h2>
-            <p className="text-xs text-slate-500 font-semibold flex items-center gap-1">
-              <Clock size={10} /> Live: {nowStr} &bull; {drivers.length} drivers &bull; {unassignedTrips.length} unassigned
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg md:text-2xl font-black text-slate-900 leading-tight">Dispatch Assistant</h2>
+            <p className="text-xs text-slate-500 font-semibold flex items-center gap-1 mt-0.5 flex-wrap">
+              <Clock size={10} className="shrink-0" /> {nowStr}
+              {manifestDate === today && (
+                <>
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                </>
+              )}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {manifestDate === today && (
-            <>
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Live View</span>
-            </>
-          )}
+        <div className="grid grid-cols-3 gap-2 md:gap-3">
+          <div className="bg-blue-50 rounded-lg p-2 md:p-3 text-center border border-blue-100">
+            <p className="text-xs md:text-sm font-black text-blue-900">{drivers.length}</p>
+            <p className="text-[10px] md:text-xs text-blue-700 font-semibold">Drivers</p>
+          </div>
+          <div className="bg-amber-50 rounded-lg p-2 md:p-3 text-center border border-amber-100">
+            <p className="text-xs md:text-sm font-black text-amber-900">{unassignedTrips.length}</p>
+            <p className="text-[10px] md:text-xs text-amber-700 font-semibold">Unassigned</p>
+          </div>
+          <div className="bg-emerald-50 rounded-lg p-2 md:p-3 text-center border border-emerald-100">
+            <p className="text-xs md:text-sm font-black text-emerald-900">{insights.idleDrivers}</p>
+            <p className="text-[10px] md:text-xs text-emerald-700 font-semibold">Available</p>
+          </div>
         </div>
       </div>
 
-      {/* AI OPERATIONS INSIGHTS BANNER */}
+      {/* AI Operations Insights - Mobile Responsive */}
       {(insights.latePickups.length > 0 || insights.conflicts.length > 0 || insights.idleDrivers > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="bg-white rounded-xl border border-rose-200 p-4 flex items-start gap-3 shadow-sm">
-            <div className="p-2 bg-rose-50 text-rose-600 rounded-lg shrink-0"><AlertCircle size={18} /></div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase">Late Pickups</p>
-              <p className="text-lg font-black text-slate-900">{insights.latePickups.length}</p>
-              {insights.latePickups.length > 0 && <p className="text-xs text-rose-600 font-medium leading-tight mt-0.5">Trips are &gt;15m past schedule</p>}
-            </div>
-          </div>
-          <div className="bg-white rounded-xl border border-amber-200 p-4 flex items-start gap-3 shadow-sm">
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg shrink-0"><Clock size={18} /></div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase">Conflicts</p>
-              <p className="text-lg font-black text-slate-900">{insights.conflicts.length}</p>
-              {insights.conflicts.length > 0 && <p className="text-xs text-amber-600 font-medium leading-tight mt-0.5">Assigned trips overlapping &lt;30m</p>}
-            </div>
-          </div>
-          <div className="bg-white rounded-xl border border-emerald-200 p-4 flex items-start gap-3 shadow-sm">
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg shrink-0"><Truck size={18} /></div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase">Idle Capacity</p>
-              <p className="text-lg font-black text-slate-900">{insights.idleDrivers}</p>
-              <p className="text-xs text-emerald-600 font-medium leading-tight mt-0.5">Clocked in &amp; available now</p>
-            </div>
+        <div className="px-4 md:px-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {insights.latePickups.length > 0 && (
+              <div className="bg-gradient-to-br from-rose-50 to-rose-100/30 rounded-2xl border border-rose-200 p-4 flex gap-3 shadow-sm hover:shadow-md transition">
+                <div className="p-2.5 bg-rose-600/10 text-rose-600 rounded-xl shrink-0"><AlertCircle size={20} /></div>
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-rose-700 uppercase tracking-wider">Late Pickups</p>
+                  <p className="text-2xl font-black text-rose-900 mt-1">{insights.latePickups.length}</p>
+                  <p className="text-xs text-rose-700 font-medium mt-1">Over 15 min behind schedule</p>
+                </div>
+              </div>
+            )}
+            {insights.conflicts.length > 0 && (
+              <div className="bg-gradient-to-br from-amber-50 to-amber-100/30 rounded-2xl border border-amber-200 p-4 flex gap-3 shadow-sm hover:shadow-md transition">
+                <div className="p-2.5 bg-amber-600/10 text-amber-600 rounded-xl shrink-0"><Clock size={20} /></div>
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Conflicts</p>
+                  <p className="text-2xl font-black text-amber-900 mt-1">{insights.conflicts.length}</p>
+                  <p className="text-xs text-amber-700 font-medium mt-1">Overlapping trips &lt;30m</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Driver Schedule Grid */}
-        <div className="lg:col-span-7 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2"><Truck size={16} /> Driver Schedule Board</h3>
-            <span className="text-xs text-slate-400 font-mono">Updated live every second</span>
+      {/* Mobile-First Grid: Stack on mobile, 2-column on tablet, 12-column on desktop */}
+      <div className="px-4 md:px-0 space-y-4 md:space-y-0 md:grid md:grid-cols-1 lg:grid-cols-12 md:gap-6">
+        {/* Driver Schedule Grid - Full width on mobile, 7 cols on desktop */}
+        <div className="md:col-span-1 lg:col-span-7 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm md:text-base font-bold text-slate-700 flex items-center gap-2 min-w-0">
+              <Truck size={16} className="shrink-0" /> 
+              <span className="truncate">Driver Board</span>
+            </h3>
+            <span className="text-xs text-slate-400 font-mono shrink-0">Live</span>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 md:space-y-3">
             {driversWithStatus.map(d => {
               const statusColor = d.liveStatus?.status === 'free' ? 'bg-emerald-500' :
                 d.liveStatus?.status === 'busy' ? 'bg-amber-500' : 'bg-slate-400';
               const isClockedIn = d.clockedIn || false;
 
               return (
-                <div key={d.id} className="bg-white rounded-xl border border-slate-200 p-3 hover:border-indigo-200 transition">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${isClockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                <div key={d.id} className="bg-white rounded-2xl border border-slate-200 hover:border-indigo-200 hover:shadow-md transition-all p-4 md:p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-base shrink-0 ${isClockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                         {String(d?.name || '?').charAt(0)}
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-sm text-slate-900 break-words">{d.name}</p>
-                          <div className={`w-2 h-2 rounded-full ${statusColor}`} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-sm md:text-base text-slate-900 truncate">{d.name}</p>
+                          <div className={`w-3 h-3 rounded-full ${statusColor} shrink-0`} />
                           {!isClockedIn && <span className="text-xs font-bold text-slate-400 uppercase">Offline</span>}
                         </div>
-                        <p className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
-                          <MapPin size={10} className="shrink-0" /> {d.currentZone} &bull; {d.vehicle}
-                          {d.assignedDispatcher && (
-                            <>
-                              &bull; <span className="text-indigo-600 font-bold">Disp: {d.assignedDispatcher.split('-')[0]}</span>
-                            </>
-                          )}
+                        <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-1">
+                          <MapPin size={12} className="shrink-0" /> <span className="truncate">{d.currentZone}</span> • <span className="truncate">{d.vehicle}</span>
                         </p>
                       </div>
                     </div>
@@ -276,17 +284,17 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                     </Badge>
                   </div>
 
-                  {/* Schedule Timeline */}
+                  {/* Schedule Timeline - Full width, smaller on mobile */}
                   <ScheduleBar schedule={d.schedule} currentMinutes={manifestDate === today ? currentMinutes : -100} />
 
                   {/* Next trip / availability detail */}
-                  <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-500">
+                  <div className="flex flex-wrap gap-1.5 mt-3 text-xs">
                     {d.schedule?.map((slot, idx) => {
                       const sl = getScheduleBlocks([slot])[0];
                       if (!sl) return null;
                       const isActive = isNowInRange(sl.startMin, sl.endMin);
                       return (
-                        <span key={idx} className={`px-2 py-0.5 rounded font-medium ${isActive ? (sl.isFree ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700') : 'bg-slate-50 text-slate-400'}`}>
+                        <span key={idx} className={`px-2 py-1 rounded-lg font-medium ${isActive ? (sl.isFree ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700') : 'bg-slate-100 text-slate-500'}`}>
                           {slot.start}-{slot.end} {sl.isFree ? '✓' : '🚐'}
                         </span>
                       );
@@ -295,78 +303,98 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                 </div>
               );
             })}
+            {driversWithStatus.length === 0 && (
+              <div className="text-center py-8 text-slate-400">
+                <Truck size={32} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm font-medium">No drivers configured</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Trip Assignment Panel */}
-        <div className="lg:col-span-5 space-y-4">
+        {/* Trip Assignment Panel - Full width on mobile, 5 cols on desktop */}
+        <div className="md:col-span-1 lg:col-span-5 space-y-4">
           {/* Unassigned Trips */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="p-3 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                <AlertCircle size={14} className="text-amber-500" /> Unassigned ({unassignedTrips.length})
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
+            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2 min-w-0">
+                <AlertCircle size={16} className="text-amber-500 shrink-0" /> 
+                <span className="truncate">Unassigned</span>
+                <span className="bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 text-xs font-bold shrink-0">({unassignedTrips.length})</span>
               </h3>
-              <button onClick={() => setShowUnassigned(!showUnassigned)} className="text-xs text-blue-600 font-semibold">
-                {showUnassigned ? 'Hide' : 'Show'}
-              </button>
             </div>
-            {showUnassigned && (
-              <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
-                {unassignedTrips.length === 0 ? (
-                  <div className="p-6 text-center text-slate-400 text-sm">All trips assigned</div>
-                ) : (
-                  unassignedTrips.map(t => (
-                    <button key={t.id} onClick={() => handleTripSelect(t)}
-                      className={`w-full text-left p-3 hover:bg-slate-50 transition ${selectedTrip?.id === t.id ? 'bg-indigo-50 border-l-4 border-l-indigo-500' : ''}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-sm text-slate-900 break-words">{t.patient}</p>
-                          {t.bookingId ? <p className="text-xs text-indigo-600 font-bold break-words">{t.bookingId}</p> : null}
-                          <p className="text-xs text-slate-500 break-words"><span className="text-emerald-600">{t.pickup}</span> → <span className="text-rose-600">{t.dropoff}</span></p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-xs font-bold text-slate-700">{t.time}</p>
-                          <Badge variant="info">{t.type}</Badge>
+            {unassignedTrips.length === 0 ? (
+              <div className="p-8 text-center">
+                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle2 className="text-emerald-600" size={24} />
+                </div>
+                <p className="text-sm font-semibold text-slate-600">All trips assigned! 🎉</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 max-h-[60vh] md:max-h-[500px] overflow-y-auto">
+                {unassignedTrips.map(t => (
+                  <button key={t.id} onClick={() => handleTripSelect(t)}
+                    className={`w-full text-left p-4 hover:bg-indigo-50/50 active:bg-indigo-100 transition ${selectedTrip?.id === t.id ? 'bg-indigo-50 border-l-4 border-l-indigo-500' : ''}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm md:text-base text-slate-900">{t.patient}</p>
+                        {t.bookingId && <p className="text-xs text-indigo-600 font-bold mt-1">{t.bookingId}</p>}
+                        <div className="flex items-center gap-1 text-xs text-slate-500 mt-2 flex-wrap">
+                          <MapPin size={12} className="text-emerald-600 shrink-0" />
+                          <span className="text-emerald-600 font-medium truncate">{t.pickup}</span>
+                          <span className="text-slate-300">→</span>
+                          <MapPin size={12} className="text-rose-600 shrink-0" />
+                          <span className="text-rose-600 font-medium truncate">{t.dropoff}</span>
                         </div>
                       </div>
-                    </button>
-                  ))
-                )}
+                      <div className="text-right shrink-0">
+                        <p className="text-sm md:text-base font-bold text-slate-900">{t.time}</p>
+                        <Badge variant="info">{t.type}</Badge>
+                      </div>
+                    </div>
+                  </button>
+                ))}
               </div>
             )}
           </div>
 
           {/* AI Suggestion Panel */}
           {aiLoading && (
-            <div className="bg-white rounded-xl border border-indigo-200 p-6 text-center">
-              <div className="w-10 h-10 mx-auto mb-3 relative">
-                <div className="absolute inset-0 border-4 border-indigo-100 rounded-full"></div>
-                <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
-                <BrainCircuit className="absolute inset-0 m-auto text-indigo-600 animate-pulse" size={18} />
+            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/30 rounded-2xl border border-indigo-200 p-6 md:p-8 text-center shadow-sm">
+              <div className="w-12 h-12 mx-auto mb-4 relative">
+                <div className="absolute inset-0 border-4 border-indigo-200 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent border-r-transparent animate-spin"></div>
+                <BrainCircuit className="absolute inset-0 m-auto text-indigo-600 animate-pulse" size={24} />
               </div>
-              <p className="text-sm font-bold text-slate-800">Analyzing...</p>
-              <p className="text-sm text-slate-500 mt-1">Checking schedules, proximity, and next-trip fit</p>
+              <p className="text-base md:text-lg font-bold text-slate-900">AI Analyzing...</p>
+              <p className="text-sm text-slate-600 mt-2">Checking schedules, proximity & availability</p>
             </div>
           )}
 
           {selectedTrip && !aiLoading && (
-            <div className="bg-white rounded-xl border border-indigo-200 overflow-hidden">
-              <div className="p-3 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                  <BrainCircuit size={14} /> AI Dispatch Suggestion
+            <div className="bg-white rounded-2xl border border-indigo-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
+              <div className="px-4 py-3 bg-gradient-to-r from-indigo-50 to-indigo-100/50 border-b border-indigo-200 flex items-center justify-between gap-2">
+                <h3 className="text-xs md:text-sm font-bold text-indigo-900 flex items-center gap-2">
+                  <BrainCircuit size={16} className="shrink-0" /> AI Suggestion
                 </h3>
-                <button onClick={() => { setSelectedTrip(null); setAiSuggestion(null); }} className="p-1 hover:bg-indigo-100 rounded" aria-label="Close">
-                  <X size={14} />
+                <button onClick={() => { setSelectedTrip(null); setAiSuggestion(null); }} className="p-1.5 hover:bg-indigo-200 rounded-lg transition shrink-0" aria-label="Close">
+                  <X size={18} />
                 </button>
               </div>
-              <div className="p-3 space-y-3">
+              <div className="p-4 md:p-6 space-y-4">
                 {/* Selected Trip Info */}
-                <div className="text-sm text-slate-600 bg-slate-50 rounded-lg p-2.5 space-y-1">
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-2">
                   <p className="font-bold text-slate-900">{selectedTrip.patient}</p>
-                  <p className="flex items-center gap-1 text-emerald-600"><MapPin size={10} /> {selectedTrip.pickup}</p>
-                  <p className="flex items-center gap-1 text-rose-600"><MapPin size={10} /> {selectedTrip.dropoff}</p>
-                  <p className="flex items-center gap-1"><Clock size={10} /> {selectedTrip.time} &bull; {selectedTrip.type}</p>
+                  <div className="flex items-center gap-2 text-emerald-600 text-sm">
+                    <MapPin size={14} className="shrink-0" /> {selectedTrip.pickup}
+                  </div>
+                  <div className="flex items-center gap-2 text-rose-600 text-sm">
+                    <MapPin size={14} className="shrink-0" /> {selectedTrip.dropoff}
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-600 text-sm">
+                    <Clock size={14} className="shrink-0" /> {selectedTrip.time} • {selectedTrip.type}
+                  </div>
                 </div>
 
                 {/* AI Result */}
@@ -376,39 +404,39 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                       (() => {
                         const d = drivers.find(drv => drv.id === aiSuggestion.driverId);
                         return (
-                          <div className="space-y-3">
-                            <div className={`p-3 rounded-xl border-2 transition ${aiSuggestion.score >= 80 ? 'border-emerald-300 bg-emerald-50/50' : aiSuggestion.score >= 50 ? 'border-amber-300 bg-amber-50/50' : 'border-slate-300 bg-slate-50'}`}>
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">{String(d?.name || '?').charAt(0)}</div>
-                                  <div>
-                                    <p className="font-bold text-sm text-slate-900">{d?.name || aiSuggestion.driverId}</p>
-                                    <p className="text-xs text-slate-500">{d?.vehicle} &bull; {d?.currentZone}</p>
-                                  </div>
+                          <div className="space-y-4">
+                            <div className={`p-4 rounded-2xl border-2 transition ${aiSuggestion.score >= 80 ? 'border-emerald-300 bg-emerald-50' : aiSuggestion.score >= 50 ? 'border-amber-300 bg-amber-50' : 'border-slate-300 bg-slate-50'}`}>
+                              <div className="flex items-start gap-3 mb-4">
+                                <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg shrink-0">{String(d?.name || '?').charAt(0)}</div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-slate-900 text-base">{d?.name || aiSuggestion.driverId}</p>
+                                  <p className="text-xs text-slate-500 truncate">{d?.vehicle} • {d?.currentZone}</p>
                                 </div>
-                                <div className="text-right">
-                                  <span className={`text-lg font-black ${aiSuggestion.score >= 80 ? 'text-emerald-600' : aiSuggestion.score >= 50 ? 'text-amber-600' : 'text-slate-500'}`}>
+                                <div className="text-right shrink-0">
+                                  <span className={`text-2xl font-black ${aiSuggestion.score >= 80 ? 'text-emerald-600' : aiSuggestion.score >= 50 ? 'text-amber-600' : 'text-slate-600'}`}>
                                     {aiSuggestion.score}%
                                   </span>
-                                  <p className="text-xs text-slate-400 uppercase">Match</p>
+                                  <p className="text-xs text-slate-500 font-bold uppercase">Match</p>
                                 </div>
                               </div>
-                              <div className="w-full bg-slate-200 rounded-full h-1.5 mb-2">
-                                <div className={`h-1.5 rounded-full ${aiSuggestion.score >= 80 ? 'bg-emerald-500' : aiSuggestion.score >= 50 ? 'bg-amber-500' : 'bg-slate-400'}`}
+                              <div className="w-full bg-slate-300 rounded-full h-2 mb-3 overflow-hidden">
+                                <div className={`h-2 rounded-full transition-all ${aiSuggestion.score >= 80 ? 'bg-emerald-500' : aiSuggestion.score >= 50 ? 'bg-amber-500' : 'bg-slate-400'}`}
                                   style={{ width: `${aiSuggestion.score}%` }} />
                               </div>
-                              <p className="text-sm text-slate-600 leading-snug">{aiSuggestion.reason}</p>
                             </div>
-                            <button onClick={handleAssign} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 active:scale-[0.98] transition flex items-center justify-center gap-2">
-                              <UserCheck size={16} /> Assign to {d?.name || aiSuggestion.driverId}
+                            <button onClick={handleAssign} className="w-full py-4 md:py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl font-bold text-base md:text-sm hover:shadow-lg active:scale-[0.98] transition flex items-center justify-center gap-2 shadow-md">
+                              <UserCheck size={18} className="shrink-0" /> Assign to {d?.name}
                             </button>
                           </div>
                         );
                       })()
                     ) : (
-                      <div className="p-4 text-center">
-                        <AlertCircle size={24} className="mx-auto text-amber-500 mb-2" />
-                        <p className="text-xs font-bold text-slate-600">{aiSuggestion?.reason || 'No suitable driver found'}</p>
+                      <div className="p-6 text-center">
+                        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <AlertCircle size={32} className="text-amber-600" />
+                        </div>
+                        <p className="font-bold text-slate-900 text-base">{aiSuggestion?.reason || 'No suitable driver found'}</p>
+                        <p className="text-sm text-slate-500 mt-2">Try checking driver schedules or reassign later</p>
                       </div>
                     )}
                   </div>
