@@ -52,6 +52,30 @@ const COLUMN_ALIASES = {
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 
+const normalizeStatusKey = (value) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/[_-]+/g, ' ')
+  .replace(/\s+/g, ' ');
+
+const isTerminalImportStatus = (value) => {
+  const status = normalizeStatusKey(value);
+  return /\b(completed?|done|finished|closed|no show|noshow|cancelled|canceled|rerouted|archived|trashed)\b/.test(status);
+};
+
+const normalizeOperationalImportStatus = (value, fallback = 'Unassigned') => {
+  const status = normalizeStatusKey(value);
+  if (!status || isTerminalImportStatus(status)) return fallback;
+  if (['unassigned', 'open', 'new', 'pending', 'scheduled', 'booked'].includes(status)) return 'Unassigned';
+  if (['assigned', 'accepted', 'dispatched'].includes(status)) return 'Assigned';
+  if (status.includes('navigating') && status.includes('pickup')) return 'Navigating Pickup';
+  if (status.includes('navigating') && status.includes('drop')) return 'Navigating Dropoff';
+  if (status.includes('arrived') && status.includes('pickup')) return 'Arrived Pickup';
+  if (status.includes('arrived') && status.includes('drop')) return 'Arrived Dropoff';
+  if (status.includes('transit') || status.includes('en route')) return 'In Transit';
+  return fallback;
+};
+
 function normalizeDateValue(value) {
   if (!value) return '';
   const raw = String(value).trim();
@@ -639,7 +663,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           notes,
 
           // --- STATUS ---
-          status: extract(row['Status'], row['status'], forceCompleted ? 'Completed' : 'Unassigned'),
+          status: forceCompleted ? 'Completed' : normalizeOperationalImportStatus(extract(row['Status'], row['status']), 'Unassigned'),
           driverId: null,
           driverName,
           driverEmail,
@@ -653,7 +677,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           arrivalTime,
           arrivalDropoffTime,
           departedPickupTime,
-          completedAt,
+          completedAt: forceCompleted ? completedAt : null,
           startTime,
 
           // --- MILEAGE ---
@@ -725,21 +749,28 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   const confirmImport = () => {
     const cleanTrips = mappedTrips.map(({ _originalRow, _hasIssues, _issues, _confidence, _travelTime, ...trip }) => {
       const finalDriverId = trip.driverId || assignToDriver || _originalRow['Driver ID'] || null;
+      const fallbackStatus = finalDriverId ? 'Assigned' : 'Unassigned';
       let newStatus = trip.status;
       
       if (forceCompleted) {
         newStatus = 'Completed';
-      } else if (finalDriverId) {
+      } else {
+        newStatus = normalizeOperationalImportStatus(newStatus, fallbackStatus);
+        if (!finalDriverId && newStatus === 'Assigned') newStatus = 'Unassigned';
+      }
+
+      if (!forceCompleted && finalDriverId) {
         const driver = drivers.find(d => d.id === finalDriverId);
         if (newStatus === 'Unassigned' && driver) {
           newStatus = 'Assigned';
         }
       }
       
+      const normalizedTrip = forceCompleted ? trip : { ...trip, completedAt: null };
       if (finalDriverId) {
-        return { ...trip, driverId: finalDriverId, status: newStatus };
+        return { ...normalizedTrip, driverId: finalDriverId, status: newStatus };
       }
-      return { ...trip, status: newStatus };
+      return { ...normalizedTrip, status: newStatus };
     });
     onTripsCreated(cleanTrips);
   };
