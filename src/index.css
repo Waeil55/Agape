@@ -389,16 +389,41 @@ table .font-black { font-weight: 750; }
 
 /* ===== DARK MODE OVERRIDES (for non-palette colors) ===== */
 .dark .bg-white { background-color: var(--bg-surface); }
+.dark .bg-white\/95,
+.dark .bg-white\/90,
 .dark .bg-white\/85 { background-color: var(--nav-bg); }
 .dark .bg-white\/80 { background-color: var(--nav-bg); }
 .dark .bg-white\/72 { background-color: var(--nav-bg); }
+.dark .bg-white\/70,
+.dark .bg-white\/60,
+.dark .bg-white\/50,
+.dark .bg-white\/40 { background-color: color-mix(in srgb, var(--bg-surface) 72%, transparent); }
 
 .dark .bg-\[#F3F4F6\] { background-color: var(--bg-app); }
 .dark .bg-\[#F3F4F6\]\/95 { background-color: color-mix(in srgb, var(--bg-app) 95%, transparent); }
+.dark .bg-\[#f4f7fb\],
+.dark .bg-\[#F4F7FB\],
+.dark .bg-\[#f8fafc\],
+.dark .bg-\[#F8FAFC\] { background-color: var(--bg-app); }
 
 .dark .border-white\/5 { border-color: var(--border-subtle); }
 .dark .border-white\/10 { border-color: var(--border-default); }
 .dark .border-white\/50 { border-color: color-mix(in srgb, var(--border-subtle) 50%, transparent); }
+.dark .border-white\/80 { border-color: color-mix(in srgb, var(--border-default) 70%, transparent); }
+
+.dark .text-black { color: var(--text-primary); }
+.dark .hover\:bg-white:hover { background-color: var(--bg-surface-elevated); }
+.dark .hover\:bg-white\/50:hover { background-color: color-mix(in srgb, var(--bg-surface-elevated) 72%, transparent); }
+.dark .from-white {
+  --tw-gradient-from: var(--bg-surface) var(--tw-gradient-from-position);
+  --tw-gradient-to: color-mix(in srgb, var(--bg-surface) 0%, transparent) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.dark .via-white {
+  --tw-gradient-to: color-mix(in srgb, var(--bg-surface) 0%, transparent) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--bg-surface) var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
+.dark .to-white { --tw-gradient-to: var(--bg-app) var(--tw-gradient-to-position); }
 
 .dark .shadow-sm,
 .dark .shadow-md,

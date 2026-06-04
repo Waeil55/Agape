@@ -1824,13 +1824,25 @@ const App = () => {
       return null;
     }
 
+    const sanitizedUpdates = sanitizeForCallable(extraData);
+    const optimisticTrip = {
+      ...prevTrip,
+      status,
+      ...sanitizedUpdates,
+      updatedAtLocal: new Date().toISOString(),
+    };
+    setTrips(prev => prev.map(t => t.id === tripId ? optimisticTrip : t));
+
     try {
       const result = await updateDriverTripCallable({
         tripId,
         status,
-        updates: sanitizeForCallable(extraData),
+        updates: sanitizedUpdates,
       });
       const savedTrip = result?.data?.trip || null;
+      if (savedTrip) {
+        setTrips(prev => prev.map(t => t.id === tripId ? savedTrip : t));
+      }
       if (status === 'Completed' && notificationsEnabled) {
         playNotificationSound();
         showLocalNotification('Trip Completed', `${prevTrip.patient || 'Trip'} marked as completed.`);

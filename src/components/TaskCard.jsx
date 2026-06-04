@@ -25,6 +25,7 @@ const StatusBadge = ({ status }) => {
     'NAVIGATING DROPOFF': 'bg-orange-100 text-orange-700 border-orange-200',
     'AT DROPOFF': 'bg-purple-100 text-purple-700 border-purple-200',
     'ARRIVED': 'bg-teal-100 text-teal-700 border-teal-200',
+    'REROUTED': 'bg-purple-100 text-purple-700 border-purple-200',
   };
   const key = (status || '').toUpperCase();
   return (
@@ -35,7 +36,7 @@ const StatusBadge = ({ status }) => {
 };
 
 const getTimeUrgency = (timeStr, status) => {
-  if (!timeStr || ['COMPLETED', 'CANCELLED', 'NO SHOW'].includes((status || '').toUpperCase())) return { type: 'normal' };
+  if (!timeStr || ['COMPLETED', 'CANCELLED', 'NO SHOW', 'REROUTED'].includes((status || '').toUpperCase())) return { type: 'normal' };
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
   const p = String(timeStr).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
@@ -67,7 +68,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const [copiedId, setCopiedId] = useState('');
 
   const timeUrgency = getTimeUrgency(task.time, task.status);
-  const isTerminal = ['Completed', 'Cancelled', 'No Show'].includes(task.status);
+  const isTerminal = ['Completed', 'Cancelled', 'No Show', 'Rerouted'].includes(task.status);
   const dropoffAddress = task.dropoff?.address || task.dropoff || '';
   const dropoffSiteName = (task.dropoff?.site || task.dropoffSite || '').trim();
   const pickupAddress = task.pickup?.address || task.pickup || '';
@@ -192,7 +193,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
           {/* Backdrop */}
           <div className="fixed inset-0 bg-slate-900/15 backdrop-blur-sm z-40 transition-opacity duration-300" onClick={() => onToggle(task.id)} />
           {/* Modal Card */}
-          <div className="fixed z-50 bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} style={{ top: 'calc(env(safe-area-inset-top) + 8px)', left: '2%', right: '2%', bottom: 'calc(env(safe-area-inset-bottom) + 86px)' }}>
+          <div className="fixed z-50 bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} style={{ top: 'calc(env(safe-area-inset-top) + 76px)', left: '2%', right: '2%', bottom: 'calc(env(safe-area-inset-bottom) + 90px)' }}>
             {/* Header Bar */}
             <div className="shrink-0 bg-white border-b border-slate-200/70 flex items-center justify-between px-4 py-3" style={{ fontSize: '112%' }}>
               <div className="flex flex-1 items-center gap-3 min-w-0">

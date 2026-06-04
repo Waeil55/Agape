@@ -83,6 +83,64 @@ const buildFallbackDriverProfile = (email = '') => ({
   clockedIn: false,
 });
 
+const WORKFLOW_TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
+
+const WORKFLOW_STATUS_RANK = {
+  Unassigned: 0,
+  Assigned: 0,
+  'In Mission': 1,
+  'En Route': 1,
+  'In Progress': 1,
+  'Navigating Pickup': 2,
+  'At Pickup': 3,
+  'Arrived PU': 3,
+  'In Transit': 4,
+  'Navigating Dropoff': 5,
+  'At Dropoff': 6,
+  Arrived: 6,
+  'Arrived DO': 6,
+  Completed: 7,
+  'No Show': 7,
+  Cancelled: 7,
+  Rerouted: 7,
+};
+
+const getWorkflowRankFromTrip = (trip = {}) => {
+  const persistedRank = Number(trip.workflowStatusRank);
+  const hasPersistedRank = Number.isFinite(persistedRank);
+  let rank = hasPersistedRank ? persistedRank : 0;
+  rank = Math.max(rank, WORKFLOW_STATUS_RANK[trip.status] ?? 0);
+  if (hasPersistedRank) return rank;
+  if (trip.completedAt || trip.status === 'Completed') rank = Math.max(rank, 7);
+  if (trip.arrivalDropoffTime) rank = Math.max(rank, 6);
+  if (trip.departedPickupTime || trip.paperSignatureConfirmed || trip.unableToSign) rank = Math.max(rank, 4);
+  if (trip.pickupOdometer || trip.arrivalTime) rank = Math.max(rank, 3);
+  if (trip.startedAt) rank = Math.max(rank, 1);
+  return rank;
+};
+
+const getWorkflowStatusForRank = (rank, fallbackStatus = 'Assigned') => {
+  if (rank >= 7) return 'Completed';
+  if (rank >= 6) return 'At Dropoff';
+  if (rank >= 5) return 'Navigating Dropoff';
+  if (rank >= 4) return 'In Transit';
+  if (rank >= 3) return 'At Pickup';
+  if (rank >= 2) return 'Navigating Pickup';
+  if (rank >= 1) return 'In Progress';
+  return fallbackStatus === 'Unassigned' ? 'Unassigned' : 'Assigned';
+};
+
+const getWorkflowStepForRank = (rank) => {
+  if (rank >= 7) return 'complete';
+  if (rank >= 6) return 'dropoff-arrived';
+  if (rank >= 5) return 'nav-dropoff';
+  if (rank >= 4) return 'in-transit';
+  if (rank >= 3) return 'pickup-arrived';
+  if (rank >= 2) return 'nav-pickup';
+  if (rank >= 1) return 'started';
+  return 'assigned';
+};
+
 const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers, dispatchers, chatUnreadCount = 0, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction }) => {
   const me = useMemo(
     () =>
@@ -121,6 +179,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     [trips, tripBelongsToCurrentDriver]
   );
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
+  const workflowStorageKey = `agape_driverWorkflow_${userKey}`;
+  const [workflowCheckpoints, setWorkflowCheckpoints] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(workflowStorageKey) || '{}');
+    } catch {
+      return {};
+    }
+  });
   const [activeNav, setActiveNav] = useState(() => {
     const savedNav = localStorage.getItem(`agape_drvNav_${userKey}`) || 'trips';
     return ['trips', 'tools', 'history', 'chat', 'settings'].includes(savedNav) ? savedNav : 'trips';
@@ -133,6 +199,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     localStorage.setItem(`agape_drvHistFilter_${userKey}`, historyFilter);
     localStorage.setItem(`agape_drvHistSearch_${userKey}`, historySearch);
   }, [activeNav, historyFilter, historySearch, userKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(workflowStorageKey, JSON.stringify(workflowCheckpoints));
+    } catch {}
+  }, [workflowStorageKey, workflowCheckpoints]);
   const [selectedTrips, setSelectedTrips] = useState([]);
   const [aiOptimizing, setAiOptimizing] = useState(false);
   const [aiSequence, setAiSequence] = useState(null);
@@ -224,6 +296,96 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     workflowScrollLockRef.current = { tripId: null, locked: false };
   }, []);
 
+  const setWorkflowCheckpoint = useCallback((tripId, status, updates = {}, options = {}) => {
+    if (!tripId || !status) return;
+    const rank = getWorkflowRankFromTrip({ status, ...updates });
+    const checkpoint = {
+      rank,
+      status,
+      step: getWorkflowStepForRank(rank),
+      updates,
+      allowRegression: options.allowRegression === true,
+      updatedAt: new Date().toISOString(),
+    };
+    setWorkflowCheckpoints(prev => {
+      const current = prev[String(tripId)];
+      if (!options.allowRegression && current?.rank > rank && !WORKFLOW_TERMINAL_STATUSES.has(status)) {
+        return prev;
+      }
+      return { ...prev, [String(tripId)]: checkpoint };
+    });
+  }, []);
+
+  const advanceWorkflowTrip = useCallback((tripOrId, status, updates = {}, options = {}) => {
+    const tripId = typeof tripOrId === 'object' ? tripOrId?.id : tripOrId;
+    if (!tripId || !status) return;
+    const baseTrip = typeof tripOrId === 'object'
+      ? tripOrId
+      : driverScopedTrips.find(t => String(t.id) === String(tripId));
+    const nowIso = new Date().toISOString();
+    const rankSource = options.allowRegression
+      ? { status, ...updates }
+      : { ...(baseTrip || {}), status, ...updates };
+    const rank = getWorkflowRankFromTrip(rankSource);
+    const payload = {
+      ...updates,
+      workflowStatusRank: rank,
+      workflowStep: getWorkflowStepForRank(rank),
+      workflowUpdatedAt: nowIso,
+      ...(options.allowRegression ? { allowWorkflowRegression: true } : {}),
+    };
+    setWorkflowCheckpoint(tripId, status, payload, options);
+    onUpdateTrip(tripId, status, payload);
+  }, [driverScopedTrips, onUpdateTrip, setWorkflowCheckpoint]);
+
+  const checkpointedDriverTrips = useMemo(() => driverScopedTrips.map((trip) => {
+    const checkpoint = workflowCheckpoints[String(trip.id)];
+    const serverRank = getWorkflowRankFromTrip(trip);
+    const statusRank = WORKFLOW_STATUS_RANK[trip.status] ?? 0;
+    const serverTrip = !WORKFLOW_TERMINAL_STATUSES.has(trip.status) && serverRank > statusRank
+      ? {
+        ...trip,
+        status: getWorkflowStatusForRank(serverRank, trip.status),
+        workflowStatusRank: serverRank,
+        workflowStep: getWorkflowStepForRank(serverRank),
+      }
+      : trip;
+    if (!checkpoint) return serverTrip;
+    const checkpointIsTerminal = WORKFLOW_TERMINAL_STATUSES.has(checkpoint.status);
+    if (!checkpoint.allowRegression && !checkpointIsTerminal && serverRank >= checkpoint.rank) return serverTrip;
+    if (checkpointIsTerminal && WORKFLOW_TERMINAL_STATUSES.has(trip.status)) return serverTrip;
+    return {
+      ...serverTrip,
+      ...(checkpoint.updates || {}),
+      status: checkpoint.status || getWorkflowStatusForRank(checkpoint.rank, trip.status),
+      workflowRecovered: true,
+      workflowStatusRank: checkpoint.rank,
+      workflowStep: checkpoint.step,
+      workflowUpdatedAt: checkpoint.updatedAt,
+    };
+  }), [driverScopedTrips, workflowCheckpoints]);
+
+  useEffect(() => {
+    setWorkflowCheckpoints(prev => {
+      let changed = false;
+      const next = { ...prev };
+      driverScopedTrips.forEach((trip) => {
+        const checkpoint = next[String(trip.id)];
+        if (!checkpoint) return;
+        const serverRank = getWorkflowRankFromTrip(trip);
+        const serverReachedCheckpoint = serverRank >= checkpoint.rank;
+        const checkpointIsTerminal = WORKFLOW_TERMINAL_STATUSES.has(checkpoint.status);
+        const terminalMatches = checkpointIsTerminal && WORKFLOW_TERMINAL_STATUSES.has(trip.status);
+        const regressionConfirmed = checkpoint.allowRegression && (trip.status === checkpoint.status || serverRank <= checkpoint.rank);
+        if ((!checkpoint.allowRegression && !checkpointIsTerminal && serverReachedCheckpoint) || terminalMatches || regressionConfirmed) {
+          delete next[String(trip.id)];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [driverScopedTrips]);
+
   useEffect(() => {
     if (!me?.id) return;
     const unsub = onSnapshot(doc(db, 'routeData', 'sequences'), (snap) => {
@@ -239,8 +401,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   // Re-compute assignedSequence whenever templates, me, or trips change
   useEffect(() => {
-    setAssignedSequence(getDriverActiveRoutePlan(routeTemplates, me, trips));
-  }, [routeTemplates, me, trips]);
+    setAssignedSequence(getDriverActiveRoutePlan(routeTemplates, me, checkpointedDriverTrips));
+  }, [routeTemplates, me, checkpointedDriverTrips]);
 
   useEffect(() => {
     if (!assignedSequence) {
@@ -293,11 +455,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   // Smart contact system: build contact list per trip with type detection
   const tripContacts = useMemo(() => {
     const map = {};
-    driverScopedTrips.forEach(t => {
+    checkpointedDriverTrips.forEach(t => {
       map[t.id] = buildContactList(t, trips, phoneNumbers);
     });
     return map;
-  }, [driverScopedTrips, trips, phoneNumbers]);
+  }, [checkpointedDriverTrips, trips, phoneNumbers]);
 
   const getPrimaryContactForTrip = (trip) => getPrimaryContact(trip, trips, phoneNumbers);
 
@@ -306,25 +468,25 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   // Count legs per patient for today
   const patientLegs = useMemo(() => {
     const counts = {};
-    driverScopedTrips.forEach(t => {
+    checkpointedDriverTrips.forEach(t => {
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
       counts[key] = (counts[key] || 0) + 1;
     });
     return counts;
-  }, [driverScopedTrips]);
+  }, [checkpointedDriverTrips]);
 
   // Count ACTIVE legs per patient (for no-show/cancel decision)
   const patientActiveLegs = useMemo(() => {
     const counts = {};
-    driverScopedTrips.forEach(t => {
-      if (['Completed','Cancelled','No Show'].includes(t.status)) return;
+    checkpointedDriverTrips.forEach(t => {
+      if (WORKFLOW_TERMINAL_STATUSES.has(t.status)) return;
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
       counts[key] = (counts[key] || 0) + 1;
     });
     return counts;
-  }, [driverScopedTrips]);
+  }, [checkpointedDriverTrips]);
 
   const updateAssignedRouteRecord = useCallback(async (updates, auditTitle, auditMessage) => {
     if (!assignedSequence?.id || routeTemplates.length === 0) return;
@@ -356,7 +518,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }, [assignedSequence, currentUser, updateAssignedRouteRecord, engageWorkflowScrollLock]);
 
   const getUrgency = (trip) => {
-    if (!trip || !trip.time || ['Completed','Cancelled','No Show'].includes(trip.status)) return 0;
+    if (!trip || !trip.time || WORKFLOW_TERMINAL_STATUSES.has(trip.status)) return 0;
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     if (trip.date !== today) return 0;
@@ -390,7 +552,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleUndo = () => {
     if (!undoableAction) return;
     if (!window.confirm(`Are you sure you want to restore ${undoableAction.trip.patient} to "${undoableAction.previousStatus}"?`)) return;
-    onUpdateTrip(undoableAction.trip.id, undoableAction.previousStatus, {});
+    advanceWorkflowTrip(undoableAction.trip, undoableAction.previousStatus, {}, { allowRegression: true });
     setUndoableAction(null);
     if (undoTimeoutRef.current) { clearTimeout(undoTimeoutRef.current); undoTimeoutRef.current = null; }
   };
@@ -403,12 +565,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     } else {
       engageWorkflowScrollLock(trip.id, 'auto');
     }
-    onUpdateTrip(trip.id, prevStatus, {});
+    advanceWorkflowTrip(trip, prevStatus, {}, { allowRegression: true });
   };
 
   const restoreHistoryTrip = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
-    const relatedLegs = driverScopedTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && ['Completed','Cancelled','No Show'].includes(t.status));
+    const relatedLegs = checkpointedDriverTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && WORKFLOW_TERMINAL_STATUSES.has(t.status));
     if (relatedLegs.length > 1) {
       setRestorePrompt({ trip, legs: relatedLegs });
     } else {
@@ -462,11 +624,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   // Load last odometer from completed trips
   useEffect(() => {
     if (!me?.id) return;
-    const completed = driverScopedTrips
+    const completed = checkpointedDriverTrips
       .filter(t => t.status === 'Completed' && t.dropoffOdometer)
       .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
     if (completed.length > 0) setLastOdometer(completed[0].dropoffOdometer);
-  }, [driverScopedTrips, me?.id]);
+  }, [checkpointedDriverTrips, me?.id]);
 
   // GPS is mandatory — always active on mount
   useEffect(() => {
@@ -482,8 +644,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   // Analytics calculation
   useEffect(() => {
     if (me?.clockedIn) {
-      const completed = driverScopedTrips.filter(t => t.status === 'Completed');
-      const allMine = driverScopedTrips;
+      const completed = checkpointedDriverTrips.filter(t => t.status === 'Completed');
+      const allMine = checkpointedDriverTrips;
       const totalDist = allMine.reduce((sum, t) => sum + (t.distance || 0), 0);
       const totalTime = completed.reduce((sum, t) => {
         if (t.startTime && t.completedAt) {
@@ -499,25 +661,25 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         efficiency: completed.length > 0 ? Math.round((completed.length / (totalTime || 1)) * 60) : 0,
       });
     }
-  }, [driverScopedTrips, me?.clockedIn]);
+  }, [checkpointedDriverTrips, me?.clockedIn]);
 
   const getWorkflowSteps = (trip) => {
-    const s = trip.status || '';
+    const rank = getWorkflowRankFromTrip(trip);
     return [
-      { key: 'start', label: 'Start Trip', phase: 'pickup', done: ['In Progress','Navigating Pickup','At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
-      { key: 'nav-pickup', label: 'Navigate to Pickup', phase: 'pickup', done: ['Navigating Pickup','At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
-      { key: 'arrive-pickup', label: 'Arrive at Pickup', phase: 'pickup', done: ['At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
-      { key: 'begin-transport', label: 'Begin Transport', phase: 'pickup', done: ['In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
-      { key: 'nav-dropoff', label: 'Navigate to Dropoff', phase: 'dropoff', done: ['Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
-      { key: 'arrive-dropoff', label: 'Arrive at Dropoff', phase: 'dropoff', done: ['At Dropoff','Arrived','Completed'].includes(s) },
-      { key: 'complete', label: 'Complete Trip', phase: 'dropoff', done: ['Completed'].includes(s) },
+      { key: 'start', label: 'Start Trip', phase: 'pickup', done: rank >= 1 },
+      { key: 'nav-pickup', label: 'Navigate to Pickup', phase: 'pickup', done: rank >= 2 },
+      { key: 'arrive-pickup', label: 'Arrive at Pickup', phase: 'pickup', done: rank >= 3 },
+      { key: 'begin-transport', label: 'Begin Transport', phase: 'pickup', done: rank >= 4 },
+      { key: 'nav-dropoff', label: 'Navigate to Dropoff', phase: 'dropoff', done: rank >= 5 },
+      { key: 'arrive-dropoff', label: 'Arrive at Dropoff', phase: 'dropoff', done: rank >= 6 },
+      { key: 'complete', label: 'Complete Trip', phase: 'dropoff', done: rank >= 7 },
     ];
   };
   const getCurrentWorkflowStep = (trip) => getWorkflowSteps(trip).findIndex(s => !s.done);
 
   const getTodayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
-  const myTrips = useMemo(() => driverScopedTrips
+  const myTrips = useMemo(() => checkpointedDriverTrips
     .filter(t => tripMatchesTodayOrTomorrow(t.date))
     .sort((a, b) => {
       const today = getTodayStr();
@@ -526,14 +688,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       if (aToday !== bToday) return aToday - bToday;
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     }),
-    [driverScopedTrips]
+    [checkpointedDriverTrips]
   );
 
   const { reroutedTrips, completedTrips, noShowTrips, cancelledTrips, allHistory } = useMemo(() => {
-    const rerouted = driverScopedTrips.filter(t => t.status === 'Rerouted');
-    const completed = driverScopedTrips.filter(t => t.status === 'Completed');
-    const noShow = driverScopedTrips.filter(t => t.status === 'No Show');
-    const cancelled = driverScopedTrips.filter(t => t.status === 'Cancelled');
+    const rerouted = checkpointedDriverTrips.filter(t => t.status === 'Rerouted');
+    const completed = checkpointedDriverTrips.filter(t => t.status === 'Completed');
+    const noShow = checkpointedDriverTrips.filter(t => t.status === 'No Show');
+    const cancelled = checkpointedDriverTrips.filter(t => t.status === 'Cancelled');
     return {
       reroutedTrips: rerouted,
       completedTrips: completed,
@@ -545,9 +707,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         return db.localeCompare(da);
       })
     };
-  }, [driverScopedTrips]);
+  }, [checkpointedDriverTrips]);
 
-  const activeTrips = useMemo(() => myTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status)), [myTrips]);
+  const activeTrips = useMemo(() => myTrips.filter(t => !WORKFLOW_TERMINAL_STATUSES.has(t.status)), [myTrips]);
 
   const orderedTrips = useMemo(() => [...activeTrips].sort((a, b) => {
     if (guidedMode && guidedSteps && guidedSteps[guidedStepIndex]) {
@@ -850,16 +1012,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   useEffect(() => {
     if (!guidedMode || !guidedSteps || guidedSteps.length === 0 || guidedStepIndex >= guidedSteps.length) return;
     const currentStep = guidedSteps[guidedStepIndex];
-    const trip = trips.find(t => t.id === currentStep.tripId);
+    const trip = checkpointedDriverTrips.find(t => t.id === currentStep.tripId);
     if (!trip) return;
 
     let stepCompleted = false;
     if (currentStep.type === 'PU') {
-      if (['In Transit', 'Navigating Dropoff', 'At Dropoff', 'Completed', 'Cancelled', 'No Show'].includes(trip.status)) {
+      if (getWorkflowRankFromTrip(trip) >= 4 || WORKFLOW_TERMINAL_STATUSES.has(trip.status)) {
         stepCompleted = true;
       }
     } else {
-      if (['Completed', 'Cancelled', 'No Show'].includes(trip.status)) {
+      if (WORKFLOW_TERMINAL_STATUSES.has(trip.status)) {
         stepCompleted = true;
       }
     }
@@ -889,7 +1051,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         setGuidedStepIndex(nextIndex);
       }
     }
-  }, [trips, guidedMode, guidedStepIndex, guidedSteps, assignedSequence?.id, assignedSequence?.name, currentUser, updateAssignedRouteRecord, engageWorkflowScrollLock, releaseWorkflowScrollLock]);
+  }, [checkpointedDriverTrips, guidedMode, guidedStepIndex, guidedSteps, assignedSequence?.id, assignedSequence?.name, currentUser, updateAssignedRouteRecord, engageWorkflowScrollLock, releaseWorkflowScrollLock]);
 
 
   const suggestNavApp = (address) => {
@@ -909,7 +1071,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleNavigateToPickup = (trip) => {
     impact('heavy');
     engageWorkflowScrollLock(trip.id);
-    onUpdateTrip(trip.id, 'Navigating Pickup', {});
+    advanceWorkflowTrip(trip, 'Navigating Pickup', {});
     preloadGeofence(trip);
     openInNavApp(trip.pickup, navApp);
   };
@@ -918,7 +1080,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     impact('heavy');
     preloadGeofence(trip);
     engageWorkflowScrollLock(trip.id);
-    onUpdateTrip(trip.id, 'Navigating Dropoff', {});
+    advanceWorkflowTrip(trip, 'Navigating Dropoff', {});
     openInNavApp(trip.dropoff, navApp);
   };
 
@@ -968,7 +1130,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     // Record pickup arrival + departure timestamps using canonical fields
     const nowIso = new Date().toISOString();
     engageWorkflowScrollLock(showOdometerPrompt.id);
-    onUpdateTrip(showOdometerPrompt.id, 'At Pickup', {
+    advanceWorkflowTrip(showOdometerPrompt, 'At Pickup', {
       pickupOdometer: odo,
       arrivalTime: nowIso,
       startTime: nowIso,
@@ -982,7 +1144,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setUndoable(trip, trip.status, 'At Dropoff');
     // Record dropoff arrival in the dedicated field (was incorrectly overwriting pickup arrival)
     engageWorkflowScrollLock(trip.id);
-    onUpdateTrip(trip.id, 'At Dropoff', {
+    advanceWorkflowTrip(trip, 'At Dropoff', {
       arrivalDropoffTime: new Date().toISOString(),
     });
   };
@@ -1003,7 +1165,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setUndoable(showArrivalConfirm, showArrivalConfirm.status, 'At Pickup');
     const nowIso = new Date().toISOString();
     engageWorkflowScrollLock(showArrivalConfirm.id);
-    onUpdateTrip(showArrivalConfirm.id, 'At Pickup', {
+    advanceWorkflowTrip(showArrivalConfirm, 'At Pickup', {
       pickupOdometer: odo,
       arrivalTime: nowIso,
       startTime: nowIso,
@@ -1017,7 +1179,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (!showSignatureConfirm || !signatureConfirmed) return;
     setUndoable(showSignatureConfirm, showSignatureConfirm.status, 'In Transit');
     engageWorkflowScrollLock(showSignatureConfirm.id);
-    onUpdateTrip(showSignatureConfirm.id, 'In Transit', {
+    advanceWorkflowTrip(showSignatureConfirm, 'In Transit', {
       departedPickupTime: new Date().toISOString(),
       paperSignatureConfirmed: true,
     });
@@ -1027,9 +1189,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const handleNoShow = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
-    const activeLegs = driverScopedTrips.filter(t =>
+    const activeLegs = checkpointedDriverTrips.filter(t =>
       (t.patient || '').trim().toLowerCase() === patientKey &&
-      !['Completed', 'Cancelled', 'No Show'].includes(t.status)
+      !WORKFLOW_TERMINAL_STATUSES.has(t.status)
     );
     if (activeLegs.length > 1) {
       setCancelPrompt({ type: 'noshow', trip, legs: activeLegs });
@@ -1040,9 +1202,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const handleCancel = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
-    const activeLegs = driverScopedTrips.filter(t =>
+    const activeLegs = checkpointedDriverTrips.filter(t =>
       (t.patient || '').trim().toLowerCase() === patientKey &&
-      !['Completed', 'Cancelled', 'No Show'].includes(t.status)
+      !WORKFLOW_TERMINAL_STATUSES.has(t.status)
     );
     if (activeLegs.length > 1) {
       setCancelPrompt({ type: 'cancel', trip, legs: activeLegs });
@@ -1053,9 +1215,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const handleReroute = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
-    const activeLegs = driverScopedTrips.filter(t =>
+    const activeLegs = checkpointedDriverTrips.filter(t =>
       (t.patient || '').trim().toLowerCase() === patientKey &&
-      !['Completed', 'Cancelled', 'No Show'].includes(t.status)
+      !WORKFLOW_TERMINAL_STATUSES.has(t.status)
     );
     if (activeLegs.length > 1) {
       setCancelPrompt({ type: 'reroute', trip, legs: activeLegs });
@@ -1066,7 +1228,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const handleShowLegs = (task) => {
     const patientKey = (task.patient || task.patientName || '').trim().toLowerCase();
-    const allLegs = driverScopedTrips
+    const allLegs = checkpointedDriverTrips
       .filter(t => (t.patient || '').trim().toLowerCase() === patientKey)
       .map(t => ({
         id: t.id,
@@ -1126,7 +1288,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       } else if (type === 'edittripcomplete') {
         if (editedData) {
           const odo = parseInt(editedData.dropoffOdometer, 10) || 0;
-          onUpdateTrip(trip.id, 'Completed', { ...editedData, completedVehicle: me?.vehicle || '' });
+          advanceWorkflowTrip(trip, 'Completed', { ...editedData, completedVehicle: me?.vehicle || '' });
           if (onAddAuditLog) {
             onAddAuditLog('Trip Completed via Edit', `${currentUser} completed trip for ${trip.patient} (odo: ${odo.toLocaleString()} mi).`, 'emerald');
           }
@@ -1145,7 +1307,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           : [trip];
         legsToRestore.forEach(leg => {
           const prevStatus = leg.status === 'Completed' ? 'Arrived' : 'Assigned';
-          onUpdateTrip(leg.id, prevStatus, {});
+          advanceWorkflowTrip(leg, prevStatus, {}, { allowRegression: true });
         });
       } else {
         const newStatus = type === 'noshow' ? 'No Show' : type === 'reroute' ? 'Rerouted' : 'Cancelled';
@@ -1154,7 +1316,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           : [trip];
         legsToUpdate.forEach(leg => {
           setUndoable(leg, leg.status, newStatus);
-          onUpdateTrip(leg.id, newStatus, {
+          advanceWorkflowTrip(leg, newStatus, {
             completedAt: new Date().toISOString(),
             cancellationReason: reason || undefined,
             cancelledBy: me?.email || '',
@@ -1209,7 +1371,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       d.setHours(parseInt(parts[1], 10), parseInt(parts[2], 10), 0, 0);
       return d.toISOString();
     };
-    onUpdateTrip(showCompleteModal.id, 'Completed', {
+    advanceWorkflowTrip(showCompleteModal, 'Completed', {
       dropoffOdometer: odo,
       completedAt: now,
       departedPickupTime: toIso(departedTime),
@@ -1678,7 +1840,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           {(() => {
                             if (step.type === 'PU') {
                               if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
-                                return renderPrimaryBtn('Start Trip', <Play size={14} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); engageWorkflowScrollLock(trip.id); onUpdateTrip(trip.id, 'In Progress', { startedAt: new Date().toISOString() }); });
+                                return renderPrimaryBtn('Start Trip', <Play size={14} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); engageWorkflowScrollLock(trip.id); advanceWorkflowTrip(trip, 'In Progress', { startedAt: new Date().toISOString() }); });
                               }
                               if (trip.status === 'In Progress') {
                                 return renderPrimaryBtn('Navigate to Pickup', <Navigation size={14} />, 'bg-blue-600 hover:bg-blue-700', () => handleNavigateToPickup(trip));
@@ -1715,18 +1877,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const isSelected = selectedTrips.includes(trip.id);
                 const isSequenced = assignedSequence?.sequence?.some(s => s.clientId === trip.id);
                 const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
-                const isTerminal = ['Completed', 'Cancelled', 'No Show'].includes(trip.status);
-                const s = trip.status || '';
-
-                const workflowSteps = [
-                  { key: 'start', label: 'Start Trip', phase: 'pickup', done: ['In Progress','Navigating Pickup','At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
-                  { key: 'nav-pickup', label: 'Navigate to Pickup', phase: 'pickup', done: ['Navigating Pickup','At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
-                  { key: 'arrive-pickup', label: 'Arrive at Pickup', phase: 'pickup', done: ['At Pickup','In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
-                  { key: 'begin-transport', label: 'Begin Transport', phase: 'pickup', done: ['In Transit','Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
-                  { key: 'nav-dropoff', label: 'Navigate to Dropoff', phase: 'dropoff', done: ['Navigating Dropoff','At Dropoff','Arrived','Completed'].includes(s) },
-                  { key: 'arrive-dropoff', label: 'Arrive at Dropoff', phase: 'dropoff', done: ['At Dropoff','Arrived','Completed'].includes(s) },
-                  { key: 'complete', label: 'Complete Trip', phase: 'dropoff', done: ['Completed'].includes(s) },
-                ];
+                const isTerminal = WORKFLOW_TERMINAL_STATUSES.has(trip.status);
+                const workflowSteps = getWorkflowSteps(trip);
                 const currentStepIdx = workflowSteps.findIndex(s => !s.done);
                 const totalSteps = workflowSteps.length;
                 const isDropoffPhase = workflowSteps[currentStepIdx]?.phase === 'dropoff';
@@ -1734,7 +1886,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const doneBarColor = 'bg-emerald-400';
 
                 const getPrimaryAction = () => {
-                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); engageWorkflowScrollLock(trip.id); onUpdateTrip(trip.id, 'In Progress', { startedAt: new Date().toISOString() }); } };
+                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); engageWorkflowScrollLock(trip.id); advanceWorkflowTrip(trip, 'In Progress', { startedAt: new Date().toISOString() }); } };
                   if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-teal-600 hover:bg-teal-700 shadow-teal-500/25', phase: 'pickup', onClick: () => handleNavigateToPickup(trip) };
                   if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
                   if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };

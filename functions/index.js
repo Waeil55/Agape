@@ -136,6 +136,51 @@ const DRIVER_TRIP_STATUSES = new Set([
   "Rerouted",
 ]);
 
+const TERMINAL_WORKFLOW_STATUSES = new Set(["Completed", "Cancelled", "No Show", "Rerouted"]);
+
+const WORKFLOW_STATUS_RANK = {
+  Unassigned: 0,
+  Assigned: 0,
+  "In Mission": 1,
+  "En Route": 1,
+  "In Progress": 1,
+  "Navigating Pickup": 2,
+  "At Pickup": 3,
+  "In Transit": 4,
+  "Navigating Dropoff": 5,
+  "At Dropoff": 6,
+  Arrived: 6,
+  Completed: 7,
+  "No Show": 7,
+  Cancelled: 7,
+  Rerouted: 7,
+};
+
+function getWorkflowRank(status, data = {}) {
+  const persistedRank = Number(data.workflowStatusRank);
+  const hasPersistedRank = Number.isFinite(persistedRank);
+  let rank = hasPersistedRank ? persistedRank : 0;
+  rank = Math.max(rank, WORKFLOW_STATUS_RANK[status] ?? WORKFLOW_STATUS_RANK[data.status] ?? 0);
+  if (hasPersistedRank) return rank;
+  if (data.completedAt || status === "Completed") rank = Math.max(rank, 7);
+  if (data.arrivalDropoffTime) rank = Math.max(rank, 6);
+  if (data.departedPickupTime || data.paperSignatureConfirmed || data.unableToSign) rank = Math.max(rank, 4);
+  if (data.pickupOdometer || data.arrivalTime) rank = Math.max(rank, 3);
+  if (data.startedAt) rank = Math.max(rank, 1);
+  return rank;
+}
+
+function workflowStepForRank(rank) {
+  if (rank >= 7) return "complete";
+  if (rank >= 6) return "dropoff-arrived";
+  if (rank >= 5) return "nav-dropoff";
+  if (rank >= 4) return "in-transit";
+  if (rank >= 3) return "pickup-arrived";
+  if (rank >= 2) return "nav-pickup";
+  if (rank >= 1) return "started";
+  return "assigned";
+}
+
 exports.updateDriverTrip = functions.https.onCall(async (data, context) => {
   const actor = await getUserRoleContext(context);
   const tripId = String(data?.tripId || "").trim();
@@ -143,6 +188,9 @@ exports.updateDriverTrip = functions.https.onCall(async (data, context) => {
   const updates = data?.updates && typeof data.updates === "object" && !Array.isArray(data.updates)
     ? sanitizeForFirestore(data.updates)
     : {};
+  const allowWorkflowRegression = updates.allowWorkflowRegression === true;
+  const cleanUpdates = { ...updates };
+  delete cleanUpdates.allowWorkflowRegression;
 
   if (!tripId || !status) {
     throw new functions.https.HttpsError("invalid-argument", "tripId and status are required.");
@@ -185,10 +233,28 @@ exports.updateDriverTrip = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError("permission-denied", "Drivers can only update their own assigned trips.");
     }
 
+    const previousRank = getWorkflowRank(previousTrip.status, previousTrip);
+    const requestedRank = getWorkflowRank(status, cleanUpdates);
+    const ignoreDriverRegression = actor.role === "driver" &&
+      !allowWorkflowRegression &&
+      !TERMINAL_WORKFLOW_STATUSES.has(status) &&
+      requestedRank < previousRank;
+    const effectiveStatus = ignoreDriverRegression ? previousTrip.status : status;
+    const effectiveUpdates = ignoreDriverRegression ? {
+      workflowRegressionIgnored: true,
+      workflowRegressionIgnoredAt: nowIso,
+    } : cleanUpdates;
+    const workflowStatusRank = allowWorkflowRegression
+      ? requestedRank
+      : Math.max(previousRank, requestedRank);
+
     const nextTrip = enrichTripMetrics(sanitizeForFirestore({
       ...previousTrip,
-      status,
-      ...updates,
+      status: effectiveStatus,
+      ...effectiveUpdates,
+      workflowStatusRank,
+      workflowStep: workflowStepForRank(workflowStatusRank),
+      workflowUpdatedAt: nowIso,
       updatedAtLocal: nowIso,
       updatedBy: actor.email,
     }));
@@ -202,7 +268,7 @@ exports.updateDriverTrip = functions.https.onCall(async (data, context) => {
     };
 
     const finalOdometer = Number(nextTrip.dropoffOdometer);
-    const completedWithOdometer = status === "Completed" && Number.isFinite(finalOdometer) && finalOdometer > 0;
+    const completedWithOdometer = effectiveStatus === "Completed" && Number.isFinite(finalOdometer) && finalOdometer > 0;
     const driverId = String(nextTrip.driverId || actor.profileId || assignedDriver?.id || "");
     if (completedWithOdometer && driverId) {
       appUpdate.drivers = drivers.map((driver) => (
@@ -223,9 +289,9 @@ exports.updateDriverTrip = functions.https.onCall(async (data, context) => {
       mirroredAt: nowIso,
     }, { merge: true });
     transaction.set(db.collection("logs").doc(), {
-      t: status === "Completed" ? "Trip Completed" : "Driver Trip Update",
-      d: `${actor.email || "Driver"} updated trip ${tripId} (${previousTrip.patient || "Unknown"}) to ${status}.`,
-      c: status === "Completed" ? "emerald" : "blue",
+      t: effectiveStatus === "Completed" ? "Trip Completed" : "Driver Trip Update",
+      d: `${actor.email || "Driver"} updated trip ${tripId} (${previousTrip.patient || "Unknown"}) to ${effectiveStatus}.`,
+      c: effectiveStatus === "Completed" ? "emerald" : "blue",
       type: "audit",
       time: Date.now(),
       actor: actor.email,
@@ -233,7 +299,10 @@ exports.updateDriverTrip = functions.https.onCall(async (data, context) => {
       meta: {
         entity: "trip",
         id: tripId,
-        status,
+        status: effectiveStatus,
+        requestedStatus: status,
+        workflowStatusRank,
+        workflowRegressionIgnored: ignoreDriverRegression,
       },
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -265,15 +334,17 @@ exports.sendSms = functions.https.onCall(async (data, context) => {
   if (!to || !text) {
     throw new functions.https.HttpsError("invalid-argument", "Both 'to' and 'text' are required.");
   }
+  let body = null;
+  let fromNumber = "";
   try {
     const cfg = functions.config();
     const apiKey = cfg.telnyx?.api_key;
-    const fromNumber = cfg.telnyx?.from || "+18552223330";
+    fromNumber = cfg.telnyx?.from || "+18552223330";
     const messagingProfileId = cfg.telnyx?.messaging_profile_id || null;
     if (!apiKey) {
       throw new functions.https.HttpsError("failed-precondition", "Telnyx API key not configured.");
     }
-    const body = { from: fromNumber, to, text };
+    body = { from: fromNumber, to, text };
     if (messagingProfileId) {
       body.messaging_profile_id = messagingProfileId;
     }
@@ -337,8 +408,9 @@ exports.sendBulkSms = functions.https.onCall(async (data, context) => {
   let firstError = null;
   for (const { to: rawTo, text, metadata } of messages) {
     const to = normalizePhone(rawTo);
+    let body = null;
     try {
-      const body = { from: fromNumber, to, text };
+      body = { from: fromNumber, to, text };
       if (messagingProfileId) {
         body.messaging_profile_id = messagingProfileId;
       }
