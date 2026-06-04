@@ -204,13 +204,21 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       localStorage.setItem(workflowStorageKey, JSON.stringify(workflowCheckpoints));
     } catch {}
   }, [workflowStorageKey, workflowCheckpoints]);
-  const [selectedTrips, setSelectedTrips] = useState([]);
+
+  const [selectedTrips, setSelectedTrips] = useState(() => { try { const v = localStorage.getItem('agape_selectedTrips'); return v ? JSON.parse(v) : []; } catch { return []; } });
   const [aiOptimizing, setAiOptimizing] = useState(false);
-  const [aiSequence, setAiSequence] = useState(null);
+  const [aiSequence, setAiSequence] = useState(() => { try { const v = localStorage.getItem('agape_aiSequence'); return v ? JSON.parse(v) : null; } catch { return null; } });
   const [aiSuggestions, setAiSuggestions] = useState([]);
-  const [guidedMode, setGuidedMode] = useState(false);
-  const [guidedStepIndex, setGuidedStepIndex] = useState(0);
-  const [guidedSteps, setGuidedSteps] = useState([]);
+  const [guidedMode, setGuidedMode] = useState(() => localStorage.getItem('agape_guidedMode') === 'true');
+  const [guidedStepIndex, setGuidedStepIndex] = useState(() => { try { const v = localStorage.getItem('agape_guidedStepIndex'); return v ? parseInt(v, 10) : 0; } catch { return 0; } });
+  const [guidedSteps, setGuidedSteps] = useState(() => { try { const v = localStorage.getItem('agape_guidedSteps'); return v ? JSON.parse(v) : []; } catch { return []; } });
+
+  useEffect(() => { try { localStorage.setItem('agape_selectedTrips', JSON.stringify(selectedTrips)); } catch {} }, [selectedTrips]);
+  useEffect(() => { try { if (aiSequence) localStorage.setItem('agape_aiSequence', JSON.stringify(aiSequence)); else localStorage.removeItem('agape_aiSequence'); } catch {} }, [aiSequence]);
+  useEffect(() => { try { localStorage.setItem('agape_guidedMode', String(guidedMode)); } catch {} }, [guidedMode]);
+  useEffect(() => { try { localStorage.setItem('agape_guidedStepIndex', String(guidedStepIndex)); } catch {} }, [guidedStepIndex]);
+  useEffect(() => { try { localStorage.setItem('agape_guidedSteps', JSON.stringify(guidedSteps)); } catch {} }, [guidedSteps]);
+
   const guidedLastAdvance = useRef(-1);
   const [aiRideShare, setAiRideShare] = useState([]);
   const [showOdometerPrompt, setShowOdometerPrompt] = useState(null);
@@ -756,15 +764,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const isClockedIn = me?.clockedIn || false;
 
-  // Auto-re-optimize when trips or GPS changes
+  // Auto-re-optimize when trips or GPS changes (only if no active progress)
   useEffect(() => {
+    if (guidedMode || aiSequence) return;
     if (selectedTrips.length >= 2 && positionRef.current) {
       const timer = setTimeout(() => {
         runAiOptimization(true);
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [selectedTrips.length, activeTrips.length]);
+  }, [selectedTrips.length, activeTrips.length, guidedMode, aiSequence]);
 
   // Detect ride-sharing opportunities — deduplicated, max 3
   useEffect(() => {

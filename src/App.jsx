@@ -958,13 +958,19 @@ const App = () => {
         // No manual hydration needed — the onSnapshot listener provides real-time data.
         setDataLoaded(false);
         authBootResolvedRef.current = true;
+        setStartupIssue('');
         setIsLoading(false);
         
-        try {
+        void (async () => {
           const r = roleRef.current;
           if (r === 'admin' || r === 'dispatcher') {
-            const usersResult = await getDocs(collection(db, 'users'));
-            const allUsers = usersResult.docs.map(u => ({ id: u.id, ...u.data() }));
+            const usersResult = await withTimeout(getDocs(collection(db, 'users')), 7000, 'user directory background refresh');
+            if (cancelled) return;
+            if (!usersResult.ok) {
+              console.warn('User directory background refresh skipped:', usersResult.error || usersResult);
+              return;
+            }
+            const allUsers = usersResult.value.docs.map(u => ({ id: u.id, ...u.data() }));
             
             // Sync new drivers from users collection — batch into single write
             const activeDriverUsers = allUsers.filter(u => u.role && u.role.toLowerCase() === 'driver');
@@ -1025,12 +1031,9 @@ const App = () => {
               return toAdd.length > 0 || normalizedPrev.length !== prev.length ? [...normalizedPrev, ...toAdd] : prev;
             });
           }
-        } catch (err) {
-          console.error("User list sync failed:", err);
-          setStartupIssue('Realtime data is open, but user list sync is delayed.');
-        } finally {
-          // User sync complete
-        }
+        })().catch((err) => {
+          console.warn('User directory background refresh failed:', err);
+        });
       } else {
         if (skipNextSignedOutResetRef.current) {
           skipNextSignedOutResetRef.current = false;

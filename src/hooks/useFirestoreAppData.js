@@ -10,6 +10,7 @@ import {
   getDocs,
   getDoc,
   writeBatch,
+  onAuthStateChanged,
 } from '../config/firebase';
 import { db, auth } from '../config/firebase';
 
@@ -205,6 +206,7 @@ export function useFirestoreAppData() {
     docExists: false,
     lastSavedAt: null,
   });
+  const [authUserId, setAuthUserId] = useState(() => auth.currentUser?.uid || null);
 
   const dataRef = useRef(DEFAULT_DATA);
   const pendingWritesRef = useRef(0);
@@ -217,6 +219,30 @@ export function useFirestoreAppData() {
   });
 
   useEffect(() => {
+    return onAuthStateChanged(auth, (user) => {
+      const nextUserId = user?.uid || null;
+      setAuthUserId(nextUserId);
+      if (!nextUserId) {
+        dataRef.current = DEFAULT_DATA;
+        setState(prev => ({
+          ...prev,
+          ...DEFAULT_DATA,
+          loading: false,
+          error: null,
+          initialized: false,
+          docExists: false,
+        }));
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!authUserId) {
+      setState(prev => ({ ...prev, loading: false, error: null }));
+      return undefined;
+    }
+
+    setState(prev => ({ ...prev, loading: true, error: null }));
     const unsub = onSnapshot(
       doc(db, DATA_DOC),
       (snap) => {
@@ -311,11 +337,12 @@ export function useFirestoreAppData() {
         }
       },
       (err) => {
+        if (shouldIgnoreRealtimePermissionError(err)) return;
         setState(prev => ({ ...prev, error: err.message, loading: false }));
       }
     );
     return unsub;
-  }, []);
+  }, [authUserId]);
 
   useEffect(() => {
     if (!state.initialized) return;
@@ -355,6 +382,8 @@ export function useFirestoreAppData() {
   }, [state.initialized, state.drivers, state.dispatchers, state.vehicles, state.phoneNumbers]);
 
   useEffect(() => {
+    if (!authUserId) return undefined;
+
     const bindCollection = (field, collectionName) => onSnapshot(
       collection(db, collectionName),
       (snap) => {
@@ -415,7 +444,7 @@ export function useFirestoreAppData() {
       unsubVehicles();
       unsubPhones();
     };
-  }, []);
+  }, [authUserId]);
 
   const writeField = useCallback(async (field, value) => {
     const sanitized = sanitizeForFirestore(value);
