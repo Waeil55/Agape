@@ -1,11 +1,42 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BrainCircuit, Play, ChevronRight, X, Navigation, Map,
-  Route, Repeat, AlertTriangle, Zap, ChevronDown, ChevronUp,
-  Timer, Copy, CheckSquare
+  BrainCircuit, Play, ChevronRight, X, Navigation,
+  Route, Repeat, AlertTriangle, ChevronDown, ChevronUp,
+  Timer, CheckSquare, GripHorizontal, Plus, Trash2, Circle
 } from 'lucide-react';
-import LiveRouteMap from './LiveRouteMap';
 import { impact } from '../utils/haptics';
+import { GEMINI_API_CONFIG, GOOGLE_MAPS_API_KEY } from '../config/firebase';
+
+let googleMapsScriptPromise = null;
+
+const loadGoogleMapsScript = () => {
+  const apiKey = GOOGLE_MAPS_API_KEY();
+  if (!apiKey) return Promise.reject(new Error('Google Maps API key is not configured.'));
+  if (window.google?.maps?.DirectionsService) return Promise.resolve();
+  if (googleMapsScriptPromise) return googleMapsScriptPromise;
+
+  const existingScript = document.getElementById('google-maps-script') || document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+  if (existingScript) {
+    googleMapsScriptPromise = new Promise((resolve, reject) => {
+      existingScript.addEventListener('load', resolve, { once: true });
+      existingScript.addEventListener('error', reject, { once: true });
+      if (window.google?.maps?.DirectionsService) resolve();
+    });
+    return googleMapsScriptPromise;
+  }
+
+  const script = document.createElement('script');
+  script.id = 'google-maps-script';
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly`;
+  script.async = true;
+  script.defer = true;
+  googleMapsScriptPromise = new Promise((resolve, reject) => {
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Google Maps script failed to load.'));
+  });
+  document.head.appendChild(script);
+  return googleMapsScriptPromise;
+};
 
 const timeToMinutes = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return 1440;
@@ -43,10 +74,334 @@ const formatDuration = (minutes) => {
   return `${h}h ${m}m`;
 };
 
+const formatPlannerDuration = (minutes) => {
+  if (!Number.isFinite(minutes) || minutes < 0) return 'Unavailable';
+  if (minutes < 60) return `${Math.max(1, Math.round(minutes))} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = Math.round(minutes % 60);
+  return `${hours} hr ${remainingMinutes} min`;
+};
+
+const getStopQuery = (stop) => (stop?.query || stop?.label || '').trim();
+
+const shouldIncludePickup = (trip) => ![
+  'At Pickup',
+  'In Transit',
+  'Navigating Dropoff',
+  'At Dropoff',
+  'Arrived',
+  'Completed',
+  'Cancelled',
+  'No Show',
+  'Rerouted',
+].includes(trip?.status);
+
+const buildRouteStopCandidates = (activeTrips = [], aiSequence = [], driverPosition = null) => {
+  const aiOrder = new Map((aiSequence || []).map((id, index) => [id, index]));
+  const orderedTrips = [...(activeTrips || [])].sort((a, b) => {
+    const aOrder = aiOrder.has(a.id) ? aiOrder.get(a.id) : 9999;
+    const bOrder = aiOrder.has(b.id) ? aiOrder.get(b.id) : 9999;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return timeToMinutes(a.time) - timeToMinutes(b.time);
+  });
+
+  const routeStops = [];
+  orderedTrips.forEach((trip) => {
+    if (shouldIncludePickup(trip) && trip.pickup) {
+      routeStops.push({
+        id: `${trip.id}-pickup`,
+        type: 'pickup',
+        label: trip.pickup,
+        query: trip.pickup,
+        patient: trip.patient,
+        time: trip.time,
+      });
+    }
+    if (trip.dropoff) {
+      routeStops.push({
+        id: `${trip.id}-dropoff`,
+        type: 'dropoff',
+        label: trip.dropoff,
+        query: trip.dropoff,
+        patient: trip.patient,
+        time: trip.time,
+      });
+    }
+  });
+
+  if (driverPosition?.lat && driverPosition?.lng) {
+    return [
+      {
+        id: 'origin-current-location',
+        type: 'origin',
+        label: 'Current driver location',
+        query: `${driverPosition.lat},${driverPosition.lng}`,
+      },
+      ...routeStops,
+    ];
+  }
+
+  if (routeStops.length > 0) {
+    return [
+      { ...routeStops[0], id: `origin-${routeStops[0].id}`, type: 'origin' },
+      ...routeStops.slice(1),
+    ];
+  }
+
+  return [{ id: 'origin-empty', type: 'origin', label: 'Add starting address', query: '' }];
+};
+
+const normalizePlannerStops = (newStops) => newStops.map((stop, index) => {
+  if (index === 0) return { ...stop, type: 'origin', letter: null };
+  return { ...stop, type: stop.type === 'origin' ? 'stop' : stop.type, letter: String.fromCharCode(64 + index) };
+});
+
+const DriverRoutePlanner = ({ activeTrips, aiSequence, driverPosition, onDone }) => {
+  const seedKey = useMemo(
+    () => JSON.stringify({
+      trips: (activeTrips || []).map((trip) => [trip.id, trip.status, trip.pickup, trip.dropoff, trip.time]),
+      aiSequence: aiSequence || [],
+      position: driverPosition ? [driverPosition.lat, driverPosition.lng] : null,
+    }),
+    [activeTrips, aiSequence, driverPosition]
+  );
+  const initialStops = useMemo(
+    () => normalizePlannerStops(buildRouteStopCandidates(activeTrips, aiSequence, driverPosition)),
+    [activeTrips, aiSequence, driverPosition]
+  );
+  const seedKeyRef = useRef(seedKey);
+  const dragItem = useRef(null);
+  const dragOverItem = useRef(null);
+  const [stops, setStops] = useState(initialStops);
+  const [totalTime, setTotalTime] = useState('0 min');
+  const [timeSource, setTimeSource] = useState('');
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  useEffect(() => {
+    if (seedKeyRef.current === seedKey) return;
+    seedKeyRef.current = seedKey;
+    setStops(initialStops);
+  }, [initialStops, seedKey]);
+
+  useEffect(() => {
+    const calculateWithGoogleMaps = async (origin, destination, waypoints) => {
+      await loadGoogleMapsScript();
+      const directionsService = new window.google.maps.DirectionsService();
+      const formattedWaypoints = waypoints.map((waypoint) => ({ location: waypoint, stopover: true }));
+      return new Promise((resolve, reject) => {
+        directionsService.route({
+          origin,
+          destination,
+          waypoints: formattedWaypoints,
+          travelMode: window.google.maps.TravelMode.DRIVING,
+          drivingOptions: { departureTime: new Date(), trafficModel: 'bestguess' },
+          unitSystem: window.google.maps.UnitSystem.IMPERIAL,
+          optimizeWaypoints: false,
+        }, (response, status) => {
+          if (status === 'OK' && response.routes?.length > 0) {
+            const totalSeconds = response.routes[0].legs.reduce(
+              (sum, leg) => sum + (leg.duration_in_traffic?.value || leg.duration?.value || 0),
+              0
+            );
+            resolve(formatPlannerDuration(totalSeconds / 60));
+          } else {
+            reject(new Error(`Directions request failed with status: ${status}`));
+          }
+        });
+      });
+    };
+
+    const calculateWithGemini = async (origin, destination, waypoints) => {
+      const { apiKey } = GEMINI_API_CONFIG();
+      if (!apiKey) throw new Error('Gemini API key is not configured.');
+      const prompt = `You are a route calculation tool. Calculate the estimated driving time from "${origin}" to "${destination}" with stops at "${waypoints.join(', ')}". Respond ONLY with the total time in minutes, like "45 min".`;
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      });
+      if (!response.ok) throw new Error('Gemini route estimate failed.');
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (!text) throw new Error('Gemini did not return a route estimate.');
+      return text;
+    };
+
+    const calculateTripTime = async () => {
+      const routeQueries = stops.map(getStopQuery).filter(Boolean);
+      if (routeQueries.length < 2) {
+        setTotalTime(routeQueries.length === 0 ? 'Add stops' : 'Add destination');
+        setTimeSource('');
+        return;
+      }
+
+      const origin = routeQueries[0];
+      const destination = routeQueries[routeQueries.length - 1];
+      const waypoints = routeQueries.slice(1, -1);
+      setIsCalculating(true);
+      try {
+        const time = await calculateWithGoogleMaps(origin, destination, waypoints);
+        setTotalTime(time);
+        setTimeSource('Google Maps');
+      } catch (mapsError) {
+        try {
+          const time = await calculateWithGemini(origin, destination, waypoints);
+          setTotalTime(time);
+          setTimeSource('AI estimate');
+        } catch (geminiError) {
+          console.error('[DriverRoutePlanner] Route time unavailable:', mapsError, geminiError);
+          setTotalTime('Unavailable');
+          setTimeSource('');
+        }
+      } finally {
+        setIsCalculating(false);
+      }
+    };
+
+    const timeoutId = setTimeout(calculateTripTime, 900);
+    return () => clearTimeout(timeoutId);
+  }, [stops]);
+
+  const updateStops = (newStops) => setStops(normalizePlannerStops(newStops));
+
+  const handleDrop = () => {
+    if (dragItem.current === null || dragOverItem.current === null) return;
+    const nextStops = [...stops];
+    const draggedStop = nextStops[dragItem.current];
+    nextStops.splice(dragItem.current, 1);
+    nextStops.splice(dragOverItem.current, 0, draggedStop);
+    dragItem.current = null;
+    dragOverItem.current = null;
+    updateStops(nextStops);
+  };
+
+  const handleTextChange = (index, newText) => {
+    setStops(prev => prev.map((stop, stopIndex) => (
+      stopIndex === index ? { ...stop, label: newText, query: newText } : stop
+    )));
+  };
+
+  const handleDelete = (indexToRemove) => {
+    if (stops.length <= 1) return;
+    updateStops(stops.filter((_, index) => index !== indexToRemove));
+  };
+
+  const handleAddStop = () => {
+    updateStops([
+      ...stops,
+      {
+        id: `custom-${Date.now()}`,
+        type: 'stop',
+        label: '',
+        query: '',
+      },
+    ]);
+  };
+
+  return (
+    <div className="p-4 bg-white">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-wider text-blue-700">Route Planner</p>
+          <h3 className="mt-0.5 text-lg font-black tracking-tight text-slate-900">Stop order</h3>
+        </div>
+        <button
+          type="button"
+          onClick={handleAddStop}
+          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+        >
+          <Plus size={14} className="mr-1 inline" /> Stop
+        </button>
+      </div>
+
+      <div className="space-y-1">
+        {stops.map((stop, index) => (
+          <React.Fragment key={stop.id}>
+            <div
+              className="flex w-full items-center"
+              draggable
+              onDragStart={() => { dragItem.current = index; }}
+              onDragEnter={() => { dragOverItem.current = index; }}
+              onDragEnd={handleDrop}
+              onDragOver={(event) => event.preventDefault()}
+            >
+              <div className="flex w-[48px] shrink-0 items-center justify-center">
+                {stop.type === 'origin' ? (
+                  <Circle size={20} className="text-slate-900" />
+                ) : (
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-900 bg-white text-[11px] font-black text-slate-900">
+                    {stop.letter}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex min-w-0 flex-1 cursor-move items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+                <div className="min-w-0 flex-1">
+                  <input
+                    type="text"
+                    value={stop.label}
+                    onChange={(event) => handleTextChange(index, event.target.value)}
+                    className="w-full truncate bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400"
+                    placeholder={index === 0 ? 'Starting address' : 'Stop address'}
+                    spellCheck="false"
+                  />
+                  {stop.patient && (
+                    <p className="mt-0.5 truncate text-[11px] font-bold text-slate-400">
+                      {stop.type === 'pickup' ? 'Pickup' : stop.type === 'dropoff' ? 'Dropoff' : 'Stop'} - {stop.patient}
+                    </p>
+                  )}
+                </div>
+                <GripHorizontal size={18} className="ml-2 shrink-0 text-slate-300" />
+              </div>
+
+              <div className="flex w-10 shrink-0 justify-end pl-2">
+                <button
+                  type="button"
+                  onClick={() => handleDelete(index)}
+                  disabled={stops.length <= 1}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 disabled:opacity-30"
+                  aria-label="Remove stop"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+
+            {index < stops.length - 1 && (
+              <div className="flex w-full py-1">
+                <div className="flex w-[48px] shrink-0 flex-col items-center justify-center gap-1">
+                  <span className="h-1 w-1 rounded-full bg-slate-400" />
+                  <span className="h-1 w-1 rounded-full bg-slate-400" />
+                  <span className="h-1 w-1 rounded-full bg-slate-400" />
+                </div>
+              </div>
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total trip</p>
+          <p className="text-lg font-black text-slate-900">{isCalculating ? 'Calculating...' : totalTime}</p>
+          {timeSource && <p className="text-[11px] font-semibold text-slate-400">{timeSource}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={onDone}
+          className="h-10 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white transition hover:bg-slate-800"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const DriverToolsPage = ({
   trips, activeTrips, aiSequence, aiSuggestions, aiRideShare, conflicts,
-  aiOptimizing, guidedMode, guidedStepIndex, guidedSteps,
-  driverPosition, appSettings, currentUser, role,
+  aiOptimizing, guidedMode, guidedStepIndex,
+  driverPosition, role,
   onSetGuidedMode, onSetGuidedStepIndex, onSetAiSequence, onSetAiSuggestions,
   onRunAiOptimization, onSelectAllTrips, selectedTrips, onSetSelectedTrips, etas,
   onOpenInNav,
@@ -229,29 +584,26 @@ const DriverToolsPage = ({
       )}
 
       {/* Collapsible Sections */}
-      {/* Live Route Map */}
+      {/* Driver Route Planner */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <button
           onClick={() => toggleSection('route')}
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition"
         >
           <div className="flex items-center gap-2">
-            <Map size={16} className="text-blue-600" />
-            <span className="text-sm font-bold text-slate-800">Live Route Map</span>
+            <Route size={16} className="text-blue-600" />
+            <span className="text-sm font-bold text-slate-800">Route Planner</span>
+            <span className="text-xs text-slate-400 font-medium">({activeTrips.length})</span>
           </div>
           {expandedSection === 'route' ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
         </button>
         {expandedSection === 'route' && (
           <div className="border-t border-slate-100">
-            <LiveRouteMap
-              driverPosition={driverPosition}
-              trips={activeTrips}
+            <DriverRoutePlanner
+              activeTrips={activeTrips}
               aiSequence={aiSequence}
-              activeTripId={guidedSteps?.[guidedStepIndex]?.tripId || aiSequence?.[guidedStepIndex] || null}
-              theme={appSettings?.theme || 'light'}
-              onOpenInNav={onOpenInNav}
-              currentUser={currentUser}
-              role={role}
+              driverPosition={driverPosition}
+              onDone={() => toggleSection('route')}
             />
           </div>
         )}

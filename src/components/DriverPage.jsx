@@ -3,7 +3,6 @@ import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate } from '../utils/
 import { auth, db, doc, onSnapshot, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles } from '../config/maps';
-import LiveRouteMap from './LiveRouteMap';
 import { showLocalNotification } from '../config/notifications';
 import { playNotificationSound } from '../utils/notificationSound';
 import ChatPage from './ChatPage';
