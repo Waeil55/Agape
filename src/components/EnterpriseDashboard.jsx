@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 import { timeToMinutes, isTripLate } from '../utils/tripDate';
+import { ROUTE_PLANNER_OPEN_EVENT } from '../utils/routePlannerBridge';
 import ChatPage from './ChatPage';
 import ArchivesPage from './ArchivesPage';
 import DriversVehiclesPage from './DriversVehiclesPage';
@@ -135,6 +136,12 @@ const EnterpriseDashboard = ({
   // Persist navigation state to localStorage (survives refresh)
   useEffect(() => { localStorage.setItem('agape_activePanel', activePanel); }, [activePanel]);
   useEffect(() => { localStorage.setItem('agape_operationsTab', operationsTab); }, [operationsTab]);
+
+  useEffect(() => {
+    const openRoutePlanner = () => setActivePanel('routePlanner');
+    window.addEventListener(ROUTE_PLANNER_OPEN_EVENT, openRoutePlanner);
+    return () => window.removeEventListener(ROUTE_PLANNER_OPEN_EVENT, openRoutePlanner);
+  }, []);
   useEffect(() => { if (rightPanelTab) localStorage.setItem('agape_rightPanelTab', rightPanelTab); else localStorage.removeItem('agape_rightPanelTab'); }, [rightPanelTab]);
   useEffect(() => {
     if (showRightPanel && !rightPanelTab) {

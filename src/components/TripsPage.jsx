@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { tripMatchesCalendarDay, timeToMinutes } from '../utils/tripDate';
-import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, MessageSquare, Flag, Sparkles, Check, Archive } from 'lucide-react';
+import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, MessageSquare, Flag, Sparkles, Check, Archive, Route } from 'lucide-react';
 import { suggestBatchAssignment } from '../config/ai';
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import { isNativeShell } from '../utils/platform';
+import { sendTripStopToRoutePlanner } from '../utils/routePlannerBridge';
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show'];
 
@@ -223,6 +224,13 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
     setShowEditForm(true);
   };
 
+  const handleSendToRoutePlanner = (trip, stopType, event) => {
+    event?.stopPropagation?.();
+    const result = sendTripStopToRoutePlanner(trip, stopType);
+    setAssignmentFeedback(result.ok ? `${result.exists ? 'Already in' : 'Sent to'} Route Planner: ${stopType === 'pickup' ? 'Pickup' : 'Dropoff'}` : result.message);
+    setTimeout(() => setAssignmentFeedback(''), 3000);
+  };
+
   const renderManifestTripCard = (trip) => {
     const driver = drivers.find((entry) => entry.id === trip.driverId);
     const isSelected = selectedTasks.includes(trip.id);
@@ -270,11 +278,33 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
             {/* Addresses */}
             <div className="mb-2 grid grid-cols-2 gap-2">
               <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2">
-                <div className="text-[9px] font-bold uppercase text-emerald-700">Pickup</div>
+                <div className="flex items-center justify-between gap-2 text-[9px] font-bold uppercase text-emerald-700">
+                  <span>Pickup</span>
+                  <button
+                    type="button"
+                    onClick={(event) => handleSendToRoutePlanner(trip, 'pickup', event)}
+                    className="rounded-lg border border-emerald-200 bg-white p-1 text-emerald-700 shadow-sm transition hover:bg-emerald-100"
+                    title="Send pickup to Route Planner"
+                    aria-label="Send pickup address to Route Planner"
+                  >
+                    <Route size={12} />
+                  </button>
+                </div>
                 <p className="mt-0.5 break-words text-xs font-semibold text-slate-700 line-clamp-2">{trip.pickup}</p>
               </div>
               <div className="rounded-lg border border-rose-100 bg-rose-50 p-2">
-                <div className="text-[9px] font-bold uppercase text-rose-700">Dropoff</div>
+                <div className="flex items-center justify-between gap-2 text-[9px] font-bold uppercase text-rose-700">
+                  <span>Dropoff</span>
+                  <button
+                    type="button"
+                    onClick={(event) => handleSendToRoutePlanner(trip, 'dropoff', event)}
+                    className="rounded-lg border border-rose-200 bg-white p-1 text-rose-700 shadow-sm transition hover:bg-rose-100"
+                    title="Send dropoff to Route Planner"
+                    aria-label="Send dropoff address to Route Planner"
+                  >
+                    <Route size={12} />
+                  </button>
+                </div>
                 <p className="mt-0.5 break-words text-xs font-semibold text-slate-700 line-clamp-2">{trip.dropoff}</p>
               </div>
             </div>

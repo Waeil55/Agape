@@ -8,6 +8,11 @@ import {
 } from 'lucide-react';
 import { timeToMinutes } from '../utils/tripDate';
 import { optimizeRoute as geminiOptimizeRoute } from '../config/ai';
+import {
+  ROUTE_PLANNER_ADD_STOP_EVENT,
+  ROUTE_PLANNER_STORAGE_KEY,
+  routePlannerStopExists,
+} from '../utils/routePlannerBridge';
 
 const to12hr = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return t || 'WC';
@@ -22,7 +27,7 @@ const to12hr = (t) => {
 const getStopLetter = (i) => String.fromCharCode(65 + i);
 const isLate = (time) => { if (!time || time === 'Will Call') return false; const n = new Date(); const m = timeToMinutes(time); const s = new Date(); s.setHours(Math.floor(m / 60), m % 60, 0, 0); return n > s; };
 const makeStopId = (tripId, type) => `${tripId}_${type}`;
-const STORAGE_KEY = 'agape_routePlanner_v3';
+const STORAGE_KEY = ROUTE_PLANNER_STORAGE_KEY;
 
 const statusColors = {
   Unassigned: 'bg-slate-100 text-slate-600',
@@ -58,6 +63,21 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser }) => {
   useEffect(() => { localStorage.setItem('agape_rp_completed_v3', JSON.stringify([...completed])); }, [completed]);
   useEffect(() => { localStorage.setItem('agape_rp_driver', selectedDriver); }, [selectedDriver]);
   useEffect(() => { localStorage.setItem('agape_rp_date', dateStr); }, [dateStr]);
+
+  useEffect(() => {
+    const handleIncomingStop = (event) => {
+      const stop = event.detail?.stop;
+      if (!stop?.address) return;
+      setStops((prev) => {
+        if (routePlannerStopExists(prev, stop)) return prev;
+        return [...prev, stop];
+      });
+      setAiMsg(event.detail?.exists ? 'That stop is already in Route Planner.' : `${stop.type === 'pickup' ? 'Pickup' : 'Dropoff'} added from trip details.`);
+    };
+
+    window.addEventListener(ROUTE_PLANNER_ADD_STOP_EVENT, handleIncomingStop);
+    return () => window.removeEventListener(ROUTE_PLANNER_ADD_STOP_EVENT, handleIncomingStop);
+  }, []);
 
   const tripStopTypes = useMemo(() => {
     const map = {};

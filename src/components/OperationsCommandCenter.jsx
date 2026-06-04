@@ -15,6 +15,7 @@ import { getOperationalRoutes } from '../utils/routePlans';
 import EditTripModal from './EditTripModal';
 import CommandIntelligencePanel from './CommandIntelligencePanel';
 import { aiPrioritizeTrips } from '../config/ai';
+import { sendTripStopToRoutePlanner } from '../utils/routePlannerBridge';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show'];
@@ -672,6 +673,15 @@ const OperationsCommandCenter = ({
     ));
   }, []);
 
+  const sendAddressToRoutePlanner = useCallback((trip, stopType) => {
+    const result = sendTripStopToRoutePlanner(trip, stopType);
+    if (result.ok) {
+      addToast?.('Route Planner', `${stopType === 'pickup' ? 'Pickup' : 'Dropoff'} ${result.exists ? 'is already in' : 'sent to'} Route Planner.`, result.exists ? 'info' : 'success');
+    } else {
+      addToast?.('Route Planner', result.message, 'warning');
+    }
+  }, [addToast]);
+
   const renderExpandedTripDetails = (trip, options = {}) => {
     const { compact = false, embeddedInTable = false } = options;
     const driver = drivers.find((entry) => entry.id === trip.driverId);
@@ -849,7 +859,20 @@ const OperationsCommandCenter = ({
               {pickupItems.map(([label, value]) => (
                 <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-[10px] font-medium text-slate-600">
                   <span className="font-bold uppercase tracking-wide text-blue-700">{label}</span>
-                  <span className="break-words text-slate-900">{value}</span>
+                  <span className="flex min-w-0 items-start gap-1.5 break-words text-slate-900">
+                    <span className="min-w-0 flex-1 break-words">{value}</span>
+                    {label === 'Address' && (
+                      <button
+                        type="button"
+                        onClick={(event) => { event.stopPropagation(); sendAddressToRoutePlanner(trip, 'pickup'); }}
+                        className="shrink-0 rounded-lg border border-blue-200 bg-white p-1 text-blue-700 shadow-sm transition hover:bg-blue-50"
+                        title="Send pickup to Route Planner"
+                        aria-label="Send pickup address to Route Planner"
+                      >
+                        <Route size={11} />
+                      </button>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>
@@ -861,7 +884,20 @@ const OperationsCommandCenter = ({
               {dropoffItems.map(([label, value]) => (
                 <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-[10px] font-medium text-slate-600">
                   <span className="font-bold uppercase tracking-wide text-emerald-700">{label}</span>
-                  <span className="break-words text-slate-900">{value}</span>
+                  <span className="flex min-w-0 items-start gap-1.5 break-words text-slate-900">
+                    <span className="min-w-0 flex-1 break-words">{value}</span>
+                    {label === 'Address' && (
+                      <button
+                        type="button"
+                        onClick={(event) => { event.stopPropagation(); sendAddressToRoutePlanner(trip, 'dropoff'); }}
+                        className="shrink-0 rounded-lg border border-emerald-200 bg-white p-1 text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+                        title="Send dropoff to Route Planner"
+                        aria-label="Send dropoff address to Route Planner"
+                      >
+                        <Route size={11} />
+                      </button>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>
@@ -1273,6 +1309,24 @@ const OperationsCommandCenter = ({
             <div className="ml-auto flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
+                onClick={() => sendAddressToRoutePlanner(trip, 'pickup')}
+                className="rounded p-0.5 text-blue-600 hover:bg-blue-100"
+                title="Send pickup to Route Planner"
+                aria-label="Send pickup address to Route Planner"
+              >
+                <Route size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() => sendAddressToRoutePlanner(trip, 'dropoff')}
+                className="rounded p-0.5 text-emerald-600 hover:bg-emerald-100"
+                title="Send dropoff to Route Planner"
+                aria-label="Send dropoff address to Route Planner"
+              >
+                <Route size={12} />
+              </button>
+              <button
+                type="button"
                 onClick={() => toggleTripExpanded(trip.id)}
                 className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                 title={isExpanded ? 'Collapse trip details' : 'Expand trip details'}
@@ -1345,11 +1399,29 @@ const OperationsCommandCenter = ({
             <div className="flex min-w-0 items-center gap-1.5 text-[10px]">
               <span className="font-medium text-emerald-700">P:</span>
               <span className="truncate text-slate-700">{trip.pickup || 'Missing pickup address'}</span>
+              <button
+                type="button"
+                onClick={(event) => { event.stopPropagation(); sendAddressToRoutePlanner(trip, 'pickup'); }}
+                className="shrink-0 rounded border border-blue-200 bg-blue-50 p-0.5 text-blue-700 hover:bg-blue-100"
+                title="Send pickup to Route Planner"
+                aria-label="Send pickup address to Route Planner"
+              >
+                <Route size={10} />
+              </button>
             </div>
             <span className="text-slate-300">→</span>
             <div className="flex min-w-0 items-center gap-1.5 text-[10px]">
               <span className="font-medium text-rose-700">D:</span>
               <span className="truncate text-slate-700">{trip.dropoff || 'Missing dropoff address'}</span>
+              <button
+                type="button"
+                onClick={(event) => { event.stopPropagation(); sendAddressToRoutePlanner(trip, 'dropoff'); }}
+                className="shrink-0 rounded border border-emerald-200 bg-emerald-50 p-0.5 text-emerald-700 hover:bg-emerald-100"
+                title="Send dropoff to Route Planner"
+                aria-label="Send dropoff address to Route Planner"
+              >
+                <Route size={10} />
+              </button>
             </div>
             {driver && (
               <span className="text-[10px] text-slate-500">{driver.name}</span>
@@ -1467,7 +1539,18 @@ const OperationsCommandCenter = ({
                       {pickupFacilityName}
                     </div>
                   )}
-                  <div className={`${isReportDensity ? 'mt-0.5 text-[11px]' : 'mt-0.5 text-xs'} font-semibold leading-snug text-slate-800 break-words`} style={getClampStyle(densityProfile.lineCount)}>{trip.pickup || 'Missing pickup address'}</div>
+                  <div className="mt-0.5 flex items-start gap-1.5">
+                    <div className={`${isReportDensity ? 'text-[11px]' : 'text-xs'} min-w-0 flex-1 font-semibold leading-snug text-slate-800 break-words`} style={getClampStyle(densityProfile.lineCount)}>{trip.pickup || 'Missing pickup address'}</div>
+                    <button
+                      type="button"
+                      onClick={(event) => { event.stopPropagation(); sendAddressToRoutePlanner(trip, 'pickup'); }}
+                      className="shrink-0 rounded-lg border border-blue-200 bg-white p-1 text-blue-700 shadow-sm transition hover:bg-blue-50"
+                      title="Send pickup to Route Planner"
+                      aria-label="Send pickup address to Route Planner"
+                    >
+                      <Route size={11} />
+                    </button>
+                  </div>
                   {clientPhone && <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-blue-700`}>Client {clientPhone}</div>}
                   {densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-blue-700`}>Pickup desk {pickupPhone}</div>}
                 </div>
@@ -1478,7 +1561,18 @@ const OperationsCommandCenter = ({
                       {dropoffFacilityName}
                     </div>
                   )}
-                  <div className={`${isReportDensity ? 'mt-0.5 text-[11px]' : 'mt-0.5 text-xs'} font-semibold leading-snug text-slate-800 break-words`} style={getClampStyle(densityProfile.lineCount)}>{trip.dropoff || 'Missing dropoff address'}</div>
+                  <div className="mt-0.5 flex items-start gap-1.5">
+                    <div className={`${isReportDensity ? 'text-[11px]' : 'text-xs'} min-w-0 flex-1 font-semibold leading-snug text-slate-800 break-words`} style={getClampStyle(densityProfile.lineCount)}>{trip.dropoff || 'Missing dropoff address'}</div>
+                    <button
+                      type="button"
+                      onClick={(event) => { event.stopPropagation(); sendAddressToRoutePlanner(trip, 'dropoff'); }}
+                      className="shrink-0 rounded-lg border border-emerald-200 bg-white p-1 text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+                      title="Send dropoff to Route Planner"
+                      aria-label="Send dropoff address to Route Planner"
+                    >
+                      <Route size={11} />
+                    </button>
+                  </div>
                   {densityProfile.showSecondaryPhones && dropoffPhone && <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-emerald-700`}>Hospital {dropoffPhone}</div>}
                 </div>
               </div>
@@ -1822,8 +1916,17 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] font-semibold text-slate-700 truncate`}>
-                            {trip.pickup || '—'}
+                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center gap-1 text-[10px] font-semibold text-slate-700`}>
+                            <span className="min-w-0 flex-1 truncate">{trip.pickup || '—'}</span>
+                            <button
+                              type="button"
+                              onClick={(event) => { event.stopPropagation(); sendAddressToRoutePlanner(trip, 'pickup'); }}
+                              className="shrink-0 rounded border border-blue-200 bg-blue-50 p-0.5 text-blue-700 hover:bg-blue-100"
+                              title="Send pickup to Route Planner"
+                              aria-label="Send pickup address to Route Planner"
+                            >
+                              <Route size={10} />
+                            </button>
                           </div>
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-blue-100 bg-blue-50/70 rounded-lg px-2 py-1' : 'border border-blue-100 bg-blue-50/70 rounded-2xl px-3 py-2'}`}>
@@ -1831,8 +1934,19 @@ const OperationsCommandCenter = ({
                             {densityProfile.lineCount >= 3 && densityProfile.showFacilityNames && pickupFacilityName && (
                               <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-800 truncate">{pickupFacilityName}</div>
                             )}
-                            <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} font-semibold leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
-                              {trip.pickup || 'Missing pickup address'}
+                            <div className="flex items-start gap-1">
+                              <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} min-w-0 flex-1 font-semibold leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
+                                {trip.pickup || 'Missing pickup address'}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(event) => { event.stopPropagation(); sendAddressToRoutePlanner(trip, 'pickup'); }}
+                                className="shrink-0 rounded border border-blue-200 bg-white p-0.5 text-blue-700 hover:bg-blue-50"
+                                title="Send pickup to Route Planner"
+                                aria-label="Send pickup address to Route Planner"
+                              >
+                                <Route size={10} />
+                              </button>
                             </div>
                             {densityProfile.lineCount >= 3 && clientPhone && (
                               <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-blue-700`}>{clientPhone}</div>
@@ -1845,8 +1959,17 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] font-semibold text-slate-700 truncate`}>
-                            {trip.dropoff || '—'}
+                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center gap-1 text-[10px] font-semibold text-slate-700`}>
+                            <span className="min-w-0 flex-1 truncate">{trip.dropoff || '—'}</span>
+                            <button
+                              type="button"
+                              onClick={(event) => { event.stopPropagation(); sendAddressToRoutePlanner(trip, 'dropoff'); }}
+                              className="shrink-0 rounded border border-emerald-200 bg-emerald-50 p-0.5 text-emerald-700 hover:bg-emerald-100"
+                              title="Send dropoff to Route Planner"
+                              aria-label="Send dropoff address to Route Planner"
+                            >
+                              <Route size={10} />
+                            </button>
                           </div>
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-emerald-100 bg-emerald-50/70 rounded-lg px-2 py-1' : 'border border-emerald-100 bg-emerald-50/70 rounded-2xl px-3 py-2'}`}>
@@ -1854,8 +1977,19 @@ const OperationsCommandCenter = ({
                             {densityProfile.lineCount >= 3 && densityProfile.showFacilityNames && dropoffFacilityName && (
                               <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 truncate">{dropoffFacilityName}</div>
                             )}
-                            <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} font-semibold leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
-                              {trip.dropoff || 'Missing dropoff address'}
+                            <div className="flex items-start gap-1">
+                              <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} min-w-0 flex-1 font-semibold leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
+                                {trip.dropoff || 'Missing dropoff address'}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(event) => { event.stopPropagation(); sendAddressToRoutePlanner(trip, 'dropoff'); }}
+                                className="shrink-0 rounded border border-emerald-200 bg-white p-0.5 text-emerald-700 hover:bg-emerald-50"
+                                title="Send dropoff to Route Planner"
+                                aria-label="Send dropoff address to Route Planner"
+                              >
+                                <Route size={10} />
+                              </button>
                             </div>
                             {densityProfile.lineCount >= 3 && densityProfile.showSecondaryPhones && dropoffPhone && (
                               <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-emerald-700`}>Hospital {dropoffPhone}</div>

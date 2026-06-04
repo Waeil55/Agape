@@ -6,8 +6,9 @@ import {
   Ruler, Users, Activity, Building, Home, Accessibility,
   Copy, Check, RotateCcw, PhoneForwarded, MessageCircle,
   Square, CheckSquare, RefreshCw, Forward,
-  Edit2
+  Edit2, Route
 } from 'lucide-react';
+import { sendTripStopToRoutePlanner } from '../utils/routePlannerBridge';
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -66,6 +67,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const isExpanded = expandedId === task.id;
   const isAnotherExpanded = expandedId !== null && expandedId !== task.id;
   const [copiedId, setCopiedId] = useState('');
+  const [routeSentId, setRouteSentId] = useState('');
 
   const timeUrgency = getTimeUrgency(task.time, task.status);
   const isTerminal = ['Completed', 'Cancelled', 'No Show', 'Rerouted'].includes(task.status);
@@ -87,6 +89,13 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
     navigator.clipboard?.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(''), 2000);
+  };
+
+  const handleSendToRoutePlanner = (stopType) => {
+    const result = sendTripStopToRoutePlanner(task, stopType);
+    setRouteSentId(stopType);
+    setTimeout(() => setRouteSentId(''), 2000);
+    return result;
   };
 
   return (
@@ -281,7 +290,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                           )}
                         </div>
                       </div>
-                      {(actions?.onCall || actions?.onSms) && (
+                      {(actions?.onCall || actions?.onSms || pickupAddress) && (
                         <div className="flex items-center gap-2 mt-2">
                           {actions?.onCall && (
                             <button onClick={(e) => { e.stopPropagation(); actions.onCall(task); }}
@@ -293,6 +302,12 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                             <button onClick={(e) => { e.stopPropagation(); actions.onSms(task); }}
                               className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-xl hover:bg-indigo-100 hover:border-indigo-300 hover:shadow-md active:scale-95 transition-all text-[0.75em] font-bold flex items-center gap-1.5 shadow-sm">
                               <MessageCircle size={12} /> SMS
+                            </button>
+                          )}
+                          {pickupAddress && (
+                            <button onClick={(e) => { e.stopPropagation(); handleSendToRoutePlanner('pickup'); }}
+                              className="bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-xl hover:bg-slate-100 hover:border-slate-300 hover:shadow-md active:scale-95 transition-all text-[0.75em] font-bold flex items-center gap-1.5 shadow-sm">
+                              {routeSentId === 'pickup' ? <Check size={12} className="text-emerald-600" /> : <Route size={12} />} Route
                             </button>
                           )}
                         </div>
@@ -333,7 +348,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                           )}
                         </div>
                       </div>
-                      {(actions?.onCall || actions?.onSms) && (
+                      {(actions?.onCall || actions?.onSms || dropoffAddress) && (
                         <div className="flex items-center gap-2 mt-2">
                           {actions?.onCall && (
                             <button onClick={(e) => { e.stopPropagation(); actions.onCall(task); }}
@@ -345,6 +360,12 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                             <button onClick={(e) => { e.stopPropagation(); actions.onSms(task); }}
                               className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-xl hover:bg-indigo-100 hover:border-indigo-300 hover:shadow-md active:scale-95 transition-all text-[0.75em] font-bold flex items-center gap-1.5 shadow-sm">
                               <MessageCircle size={12} /> SMS
+                            </button>
+                          )}
+                          {dropoffAddress && (
+                            <button onClick={(e) => { e.stopPropagation(); handleSendToRoutePlanner('dropoff'); }}
+                              className="bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-xl hover:bg-slate-100 hover:border-slate-300 hover:shadow-md active:scale-95 transition-all text-[0.75em] font-bold flex items-center gap-1.5 shadow-sm">
+                              {routeSentId === 'dropoff' ? <Check size={12} className="text-emerald-600" /> : <Route size={12} />} Route
                             </button>
                           )}
                         </div>
