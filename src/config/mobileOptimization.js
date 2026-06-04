@@ -3,6 +3,8 @@
  * Metrics collection, error tracking, mobile optimization
  */
 
+import React from 'react';
+
 /**
  * Performance Monitor
  */
@@ -203,7 +205,7 @@ export const getDeviceType = () => {
   if (/android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua.toLowerCase())) {
     return 'mobile';
   }
-  if (/tablet|ipad|playbook|silk/(i.test(ua))) {
+  if (/tablet|ipad|playbook|silk/i.test(ua)) {
     return 'tablet';
   }
   return 'desktop';

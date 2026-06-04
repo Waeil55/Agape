@@ -3,11 +3,11 @@
  * Replaces basic dashboard with advanced operational intelligence
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   TrendingUp, TrendingDown, Activity, Truck, Users, MapPin, DollarSign,
   AlertTriangle, CheckCircle, Clock, Zap, BarChart3, LineChart, PieChart,
-  Calendar, Filter, Download, RefreshCw, Target, Gauge
+  Calendar, Filter, Download, RefreshCw, Target, Gauge, BrainCircuit
 } from 'lucide-react';
 import { aiGenerateInsights } from '../config/aiAdvanced';
 
@@ -77,7 +77,7 @@ const MiniChart = ({ data, title, type = 'line' }) => {
 /**
  * Alerts & Issues Panel
  */
-const AlertsPanel = ({ alerts = [] }) => {
+const AlertsPanel = ({ alerts = [], onAction }) => {
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-6">
       <div className="flex items-center gap-3 mb-4">
@@ -94,7 +94,7 @@ const AlertsPanel = ({ alerts = [] }) => {
               <p className="font-semibold text-sm text-amber-900">{alert.title}</p>
               <p className="text-xs text-amber-700 mt-1">{alert.description}</p>
             </div>
-            <button className="ml-3 px-3 py-1 text-xs font-bold text-white bg-amber-600 rounded hover:bg-amber-700 transition-colors opacity-0 group-hover:opacity-100">
+            <button onClick={() => onAction?.(alert)} className="ml-3 px-3 py-1 text-xs font-bold text-white bg-amber-600 rounded hover:bg-amber-700 transition-colors opacity-0 group-hover:opacity-100">
               Action
             </button>
           </div>
@@ -157,16 +157,17 @@ const EnterpriseDashboard = ({ trips = [], drivers = [], vehicles = [], onViewDe
     };
   }, [trips, drivers, vehicles]);
 
+  const loadInsights = useCallback(async () => {
+    setLoading(true);
+    const result = await aiGenerateInsights(trips, drivers, vehicles, timeRange);
+    setInsights(result);
+    setLoading(false);
+  }, [trips, drivers, vehicles, timeRange]);
+
   // Load AI insights
   useEffect(() => {
-    const loadInsights = async () => {
-      setLoading(true);
-      const result = await aiGenerateInsights(trips, drivers, vehicles, '24h');
-      setInsights(result);
-      setLoading(false);
-    };
     loadInsights();
-  }, [trips, drivers, vehicles]);
+  }, [loadInsights]);
 
   // Sample alerts based on metrics
   const alerts = [
@@ -174,6 +175,23 @@ const EnterpriseDashboard = ({ trips = [], drivers = [], vehicles = [], onViewDe
     ...(metrics.pendingTrips > 5 ? [{ title: 'High Pending Trips', description: `${metrics.pendingTrips} trips awaiting assignment` }] : []),
     ...(metrics.cancelledTrips > 2 ? [{ title: 'Elevated Cancellations', description: `${metrics.cancelledTrips} trips cancelled today` }] : []),
   ];
+
+  const handleExportMetrics = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      timeRange,
+      metrics,
+      alerts,
+      insights,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `agape-dashboard-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Chart data
   const hourlyTripsData = Array(12).fill(0).map((_, i) => ({
@@ -205,10 +223,10 @@ const EnterpriseDashboard = ({ trips = [], drivers = [], vehicles = [], onViewDe
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>
             </select>
-            <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+            <button onClick={loadInsights} disabled={loading} className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50">
               <RefreshCw size={20} className="text-slate-600" />
             </button>
-            <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+            <button onClick={handleExportMetrics} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
               <Download size={20} className="text-slate-600" />
             </button>
           </div>
@@ -217,6 +235,15 @@ const EnterpriseDashboard = ({ trips = [], drivers = [], vehicles = [], onViewDe
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6 space-y-6">
+        {selectedMetric && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+            <span>Reviewing alert: {selectedMetric}</span>
+            <button onClick={() => setSelectedMetric(null)} className="rounded-lg bg-white/70 px-3 py-1 text-xs font-bold text-amber-700 hover:bg-white">
+              Clear
+            </button>
+          </div>
+        )}
+
         {/* KPI Row 1 - Operations */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <KPICard
@@ -294,7 +321,7 @@ const EnterpriseDashboard = ({ trips = [], drivers = [], vehicles = [], onViewDe
 
         {/* Alerts & Insights Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <AlertsPanel alerts={alerts} />
+          <AlertsPanel alerts={alerts} onAction={(alert) => setSelectedMetric(alert.title)} />
 
           {/* AI Insights Card */}
           <div className="bg-white rounded-2xl border border-slate-100 p-6">

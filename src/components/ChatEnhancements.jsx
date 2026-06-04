@@ -295,11 +295,13 @@ export const RichMessage = ({ message, currentUserId, onReact, showSuggestions =
 /**
  * Enhanced Message Input
  */
-export const EnhancedMessageInput = ({ onSend, disabled = false, placeholder = 'Type a message...', showAIFeatures = true }) => {
+export const EnhancedMessageInput = ({ onSend, onAttachment, disabled = false, placeholder = 'Type a message...', showAIFeatures = true }) => {
   const [message, setMessage] = useState('');
   const [showAttachments, setShowAttachments] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const pendingAttachmentType = useRef('file');
 
   const handleSend = () => {
     if (message.trim()) {
@@ -327,25 +329,72 @@ export const EnhancedMessageInput = ({ onSend, disabled = false, placeholder = '
     }
   };
 
+  const sendAttachment = (payload) => {
+    if (onAttachment) {
+      onAttachment(payload);
+      return;
+    }
+    onSend(payload);
+  };
+
+  const handleAttachmentClick = (type) => {
+    if (type === 'location') {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition((position) => {
+        sendAttachment({
+          type: 'location',
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          locationName: 'Current location',
+        });
+        setShowAttachments(false);
+      });
+      return;
+    }
+
+    if (type === 'contact') {
+      setMessage(prev => `${prev}${prev ? ' ' : ''}Contact: `);
+      setShowAttachments(false);
+      textareaRef.current?.focus();
+      return;
+    }
+
+    pendingAttachmentType.current = type;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    sendAttachment({
+      type: pendingAttachmentType.current === 'photo' ? 'image' : 'file',
+      file,
+      fileName: file.name,
+    });
+    e.target.value = '';
+    setShowAttachments(false);
+  };
+
   return (
     <div className="border-t border-slate-200 bg-white p-4 space-y-3">
       {/* Attachments Menu */}
       {showAttachments && (
         <div className="flex gap-2 pb-2 border-b border-slate-100">
-          <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex-1 text-sm font-semibold text-slate-600">
+          <button onClick={() => handleAttachmentClick('photo')} className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex-1 text-sm font-semibold text-slate-600">
             📷 Photo
           </button>
-          <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex-1 text-sm font-semibold text-slate-600">
+          <button onClick={() => handleAttachmentClick('file')} className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex-1 text-sm font-semibold text-slate-600">
             📎 File
           </button>
-          <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex-1 text-sm font-semibold text-slate-600">
+          <button onClick={() => handleAttachmentClick('location')} className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex-1 text-sm font-semibold text-slate-600">
             📍 Location
           </button>
-          <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex-1 text-sm font-semibold text-slate-600">
+          <button onClick={() => handleAttachmentClick('contact')} className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex-1 text-sm font-semibold text-slate-600">
             👤 Contact
           </button>
         </div>
       )}
+      <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} accept={pendingAttachmentType.current === 'photo' ? 'image/*' : undefined} />
 
       {/* Input Area */}
       <div className="flex items-end gap-3">

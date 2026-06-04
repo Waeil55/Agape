@@ -284,6 +284,11 @@ function mapColumns(row) {
 async function aiValidate(rows, onProgress) {
   const results = [];
   const batchSize = 10;
+  const geminiConfig = GEMINI_API_CONFIG();
+  if (!geminiConfig.apiKey) {
+    return rows.map(() => ({ issues: [], confidence: 100 }));
+  }
+
   for (let i = 0; i < rows.length; i += batchSize) {
     const batch = rows.slice(i, i + batchSize);
     onProgress(`AI validating batch ${Math.min(i + batchSize, rows.length)} of ${rows.length}...`, Math.round((i / rows.length) * 70) + 15);
@@ -297,7 +302,7 @@ Return ONLY valid JSON array. No markdown. No explanation.`;
 
     try {
       const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_CONFIG.apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiConfig.apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -685,7 +690,9 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       setParsedRows(rows);
       setSelectedCount(mapped.length);
 
-      if (aiEnabled && GEMINI_API_CONFIG?.apiKey) {
+      const geminiConfig = GEMINI_API_CONFIG();
+
+      if (aiEnabled && geminiConfig.apiKey) {
         const aiResults = await aiValidate(mapped, (msg, pct) => {
           setProgressMsg(msg);
           setProgressPct(pct);

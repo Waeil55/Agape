@@ -307,6 +307,7 @@ const CustomDashboardBuilder = () => {
     { id: 3, type: 'table', title: 'Top Drivers', metric: 'drivers' },
   ]);
   const [layout, setLayout] = useState('grid'); // grid, list
+  const [saved, setSaved] = useState(false);
 
   const availableMetrics = [
     { value: 'trips', label: '📦 Total Trips' },
@@ -316,6 +317,34 @@ const CustomDashboardBuilder = () => {
     { value: 'efficiency', label: '⚡ Efficiency' },
     { value: 'compliance', label: '✅ Compliance' },
   ];
+
+  const handleAddWidget = () => {
+    const metric = availableMetrics[widgets.length % availableMetrics.length];
+    setWidgets([...widgets, {
+      id: Date.now(),
+      type: 'kpi',
+      title: metric.label.replace(/[^\w\s]/g, '').trim() || 'New Widget',
+      metric: metric.value,
+    }]);
+    setSaved(false);
+  };
+
+  const handleEditWidget = (widget) => {
+    const title = window.prompt('Widget title', widget.title);
+    if (!title) return;
+    setWidgets(widgets.map(item => item.id === widget.id ? { ...item, title } : item));
+    setSaved(false);
+  };
+
+  const handleRemoveWidget = (widgetId) => {
+    setWidgets(widgets.filter(widget => widget.id !== widgetId));
+    setSaved(false);
+  };
+
+  const handleSaveDashboard = () => {
+    localStorage.setItem('agape_custom_dashboard', JSON.stringify({ widgets, layout, savedAt: new Date().toISOString() }));
+    setSaved(true);
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
@@ -333,7 +362,7 @@ const CustomDashboardBuilder = () => {
           <option value="grid">Grid Layout</option>
           <option value="list">List Layout</option>
         </select>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700">
+        <button onClick={handleAddWidget} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700">
           + Add Widget
         </button>
       </div>
@@ -344,15 +373,15 @@ const CustomDashboardBuilder = () => {
             <p className="font-bold text-slate-900">{widget.title}</p>
             <p className="text-xs text-slate-500 mt-1">Metric: {widget.metric}</p>
             <div className="flex gap-2 mt-3">
-              <button className="text-xs font-bold text-blue-600 hover:underline">Edit</button>
-              <button className="text-xs font-bold text-red-600 hover:underline">Remove</button>
+              <button onClick={() => handleEditWidget(widget)} className="text-xs font-bold text-blue-600 hover:underline">Edit</button>
+              <button onClick={() => handleRemoveWidget(widget.id)} className="text-xs font-bold text-red-600 hover:underline">Remove</button>
             </div>
           </div>
         ))}
       </div>
 
-      <button className="mt-6 w-full px-4 py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors">
-        💾 Save Dashboard
+      <button onClick={handleSaveDashboard} className="mt-6 w-full px-4 py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors">
+        {saved ? 'Dashboard Saved' : 'Save Dashboard'}
       </button>
     </div>
   );
@@ -394,13 +423,15 @@ const ReportingModule = ({ trips = [], drivers = [] }) => {
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-6">
               <p className="font-bold text-slate-900">📊 Analytics Ready</p>
               <p className="text-sm text-slate-600 mt-2">Access AI-powered insights and trends in your dashboard</p>
-              <button className="mt-3 text-sm font-bold text-blue-600 hover:underline">View Analytics →</button>
+              <button onClick={() => document.getElementById('custom-dashboard-builder')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="mt-3 text-sm font-bold text-blue-600 hover:underline">View Analytics →</button>
             </div>
           </div>
         </div>
 
         {/* Custom Dashboard */}
-        <CustomDashboardBuilder />
+        <div id="custom-dashboard-builder">
+          <CustomDashboardBuilder />
+        </div>
       </div>
     </div>
   );

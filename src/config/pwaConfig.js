@@ -3,6 +3,8 @@
  * Service worker, offline sync, local storage, background sync
  */
 
+import React from 'react';
+
 // Enhanced Service Worker with offline support
 export const setupServiceWorker = async () => {
   if (!('serviceWorker' in navigator)) {

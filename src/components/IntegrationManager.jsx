@@ -46,10 +46,10 @@ export const INTEGRATIONS = {
     status: 'not_connected',
   },
   TWILIO: {
-    name: 'Twilio',
+    name: 'Telnyx',
     icon: '📞',
     category: 'Communication',
-    description: 'SMS and voice calls',
+    description: 'SMS and voice messaging',
     status: 'connected',
   },
   ZENDESK: {
@@ -68,10 +68,21 @@ export const INTEGRATIONS = {
   },
 };
 
+const INTEGRATION_DOCS = {
+  STRIPE: 'https://docs.stripe.com/api',
+  GOOGLE_MAPS: 'https://developers.google.com/maps/documentation/javascript',
+  SLACK: 'https://api.slack.com/docs',
+  SALESFORCE: 'https://developer.salesforce.com/docs',
+  QUICKBOOKS: 'https://developer.intuit.com/app/developer/qbo/docs/get-started',
+  TWILIO: 'https://developers.telnyx.com/docs/v2/messaging',
+  ZENDESK: 'https://developer.zendesk.com/api-reference/',
+  HUBSPOT: 'https://developers.hubspot.com/docs/api/overview',
+};
+
 /**
  * API Configuration Component
  */
-const APIConfiguration = ({ integration, onConnect }) => {
+const APIConfiguration = ({ integrationKey, integration, onConnect }) => {
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [testResult, setTestResult] = useState(null);
@@ -87,7 +98,7 @@ const APIConfiguration = ({ integration, onConnect }) => {
 
   const handleConnect = () => {
     if (apiKey.length > 0) {
-      onConnect(integration, apiKey);
+      onConnect(integrationKey, apiKey);
       setApiKey('');
       setTestResult(null);
     }
@@ -157,7 +168,9 @@ const APIConfiguration = ({ integration, onConnect }) => {
 
       <div className="mt-4 p-3 bg-slate-50 rounded-lg text-xs text-slate-600">
         <p className="font-bold mb-1">📚 Documentation</p>
-        <a href="#" className="text-blue-600 hover:underline">View {integration.name} API docs →</a>
+        <a href={INTEGRATION_DOCS[integrationKey]} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+          View {integration.name} API docs →
+        </a>
       </div>
     </div>
   );
@@ -194,6 +207,10 @@ const WebhookManager = () => {
     }
   };
 
+  const handleDeleteWebhook = (id) => {
+    setWebhooks(webhooks.filter(webhook => webhook.id !== id));
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
       <h3 className="text-lg font-bold text-slate-900 mb-4">Webhooks</h3>
@@ -219,7 +236,7 @@ const WebhookManager = () => {
                     Active
                   </span>
                 )}
-                <button className="text-red-600 hover:text-red-700 font-bold text-sm">Delete</button>
+                <button onClick={() => handleDeleteWebhook(webhook.id)} className="text-red-600 hover:text-red-700 font-bold text-sm">Delete</button>
               </div>
             </div>
           </div>
@@ -335,7 +352,7 @@ const APIDocumentation = () => {
         ))}
       </div>
 
-      <a href="#" className="text-blue-600 font-bold text-sm hover:underline flex items-center gap-1">
+      <a href="https://firebase.google.com/docs/functions" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold text-sm hover:underline flex items-center gap-1">
         View Full Documentation <ExternalLink size={14} />
       </a>
     </div>
@@ -347,6 +364,9 @@ const APIDocumentation = () => {
  */
 const IntegrationManager = () => {
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState(() =>
+    Object.fromEntries(Object.entries(INTEGRATIONS).map(([key, integration]) => [key, integration.status]))
+  );
 
   const categories = [...new Set(Object.values(INTEGRATIONS).map(i => i.category))];
   const filteredIntegrations = selectedCategory
@@ -396,7 +416,14 @@ const IntegrationManager = () => {
         {/* Integrations Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredIntegrations.map(([key, integration]) => (
-            <APIConfiguration key={key} integration={integration} onConnect={() => {}} />
+            <APIConfiguration
+              key={key}
+              integrationKey={key}
+              integration={{ ...integration, status: connectionStatus[key] || integration.status }}
+              onConnect={(integrationKey) => {
+                setConnectionStatus(prev => ({ ...prev, [integrationKey]: 'connected' }));
+              }}
+            />
           ))}
         </div>
 

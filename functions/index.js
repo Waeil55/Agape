@@ -187,11 +187,34 @@ function verifyTelnyxSignature(req) {
     return false;
   }
   try {
-    const payload = JSON.stringify(req.body);
-    const signedPayload = timestamp + payload;
-    const verifier = crypto.createVerify("ed25519");
-    verifier.update(signedPayload);
-    return verifier.verify(publicKey, signature, "base64");
+    const timestampValue = Number(timestamp);
+    const timestampMs = timestampValue > 1e12 ? timestampValue : timestampValue * 1000;
+    if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) {
+      functions.logger.warn("Telnyx webhook timestamp outside tolerance", { timestamp });
+      return false;
+    }
+
+    const payload = req.rawBody?.toString("utf8") || JSON.stringify(req.body);
+    const signedPayload = Buffer.from(`${timestamp}|${payload}`, "utf8");
+    const publicKeyMaterial = String(publicKey).trim();
+    let keyObject;
+
+    if (publicKeyMaterial.includes("BEGIN PUBLIC KEY")) {
+      keyObject = crypto.createPublicKey(publicKeyMaterial);
+    } else {
+      const rawKey = Buffer.from(
+        publicKeyMaterial,
+        /^[0-9a-f]{64}$/i.test(publicKeyMaterial) ? "hex" : "base64"
+      );
+      const spkiPrefix = Buffer.from("302a300506032b6570032100", "hex");
+      keyObject = crypto.createPublicKey({
+        key: rawKey.length === 32 ? Buffer.concat([spkiPrefix, rawKey]) : rawKey,
+        format: "der",
+        type: "spki",
+      });
+    }
+
+    return crypto.verify(null, signedPayload, keyObject, Buffer.from(signature, "base64"));
   } catch (err) {
     functions.logger.error("Telnyx signature verification error:", err);
     return false;
@@ -200,6 +223,11 @@ function verifyTelnyxSignature(req) {
 
 exports.handleInboundSms = functions.https.onRequest(async (req, res) => {
   try {
+    if (!verifyTelnyxSignature(req)) {
+      res.status(403).json({ error: "Invalid Telnyx signature" });
+      return;
+    }
+
     const eventType = req.body?.data?.event_type || "";
     const payload = req.body?.data?.payload || req.body;
 
@@ -300,5 +328,114 @@ exports.handleInboundSms = functions.https.onRequest(async (req, res) => {
   } catch (err) {
     functions.logger.error("Inbound SMS handler error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+exports.diagnoseTelnyx = functions.https.onCall(async (data, context) => {
+  await requireAdminOrDispatcher(context);
+  const results = { checks: [], passed: 0, failed: 0, warnings: 0 };
+
+  const addCheck = (name, status, detail) => {
+    results.checks.push({ name, status, detail });
+    if (status === "pass") results.passed++;
+    else if (status === "fail") results.failed++;
+    else results.warnings++;
+  };
+
+  try {
+    const cfg = functions.config();
+    const apiKey = cfg.telnyx?.api_key;
+    const fromNumber = cfg.telnyx?.from;
+    const messagingProfileId = cfg.telnyx?.messaging_profile_id;
+
+    // 1. Check config
+    if (!apiKey) {
+      addCheck("Telnyx API key configured", "fail", "No telnyx.api_key found in Firebase config. Run: firebase functions:config:set telnyx.api_key=\"YOUR_KEY\"");
+    } else {
+      addCheck("Telnyx API key configured", "pass", "API key is set");
+    }
+
+    if (!fromNumber) {
+      addCheck("Telnyx from number configured", "warn", "No telnyx.from found in Firebase config. Using default +18552223330");
+    } else {
+      addCheck("Telnyx from number configured", "pass", `From number: ${fromNumber}`);
+    }
+
+    if (messagingProfileId) {
+      addCheck("Messaging profile ID configured", "pass", `Profile ID: ${messagingProfileId}`);
+    } else {
+      addCheck("Messaging profile ID configured", "warn", "Not set — Telnyx will auto-detect. Set via: firebase functions:config:set telnyx.messaging_profile_id=\"UUID\"");
+    }
+
+    if (!apiKey) {
+      return results;
+    }
+
+    // 2. Test Telnyx API authentication
+    try {
+      const meRes = await axios.get(`${TELNYX_API_BASE}/messaging_profiles`, {
+        headers: { Authorization: `Bearer ${apiKey}` }
+      });
+      const profiles = meRes.data?.data || [];
+      addCheck("Telnyx API authentication", "pass", `Authenticated successfully. Found ${profiles.length} messaging profile(s)`);
+
+      // 3. Check messaging profiles
+      if (profiles.length === 0) {
+        addCheck("Messaging profiles exist", "fail", "No messaging profiles found. Create one in Telnyx Portal → Messaging → Messaging Profiles");
+      } else {
+        addCheck("Messaging profiles exist", "pass", `${profiles.length} profile(s) found`);
+        const hasWebhook = profiles.some(p => p.webhook_url || p.webhook_failover_url);
+        if (hasWebhook) {
+          addCheck("Webhook URL configured", "pass", "At least one profile has a webhook URL");
+        } else {
+          addCheck("Webhook URL configured", "warn", "No webhook URL set on any profile. Set to: https://us-central1-agape-95c9f.cloudfunctions.net/handleInboundSms");
+        }
+        if (messagingProfileId) {
+          const match = profiles.find(p => p.id === messagingProfileId);
+          if (match) {
+            addCheck("Configured profile ID matches", "pass", `Profile "${match.name || match.id}" found`);
+          } else {
+            addCheck("Configured profile ID matches", "warn", `Profile ID "${messagingProfileId}" not found among ${profiles.length} profiles. Check the UUID.`);
+          }
+        }
+      }
+    } catch (err) {
+      const errDetail = err.response?.data?.errors?.[0]?.detail || err.message;
+      addCheck("Telnyx API authentication", "fail", `API call failed: ${errDetail}`);
+    }
+
+    // 4. Check phone number
+    try {
+      const numParams = {};
+      numParams['filter[phone_number]'] = fromNumber;
+      const numRes = await axios.get(`${TELNYX_API_BASE}/phone_numbers`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        params: numParams
+      });
+      const numbers = numRes.data?.data || [];
+      if (numbers.length === 0) {
+        addCheck(`Number ${fromNumber} exists on account`, "fail", `Number ${fromNumber} not found in your Telnyx account. Check the number in Telnyx Portal → Numbers → My Numbers`);
+      } else {
+        const num = numbers[0];
+        const smsEnabled = num.messaging?.product === "SMS" || num.messaging?.enabled === true;
+        if (smsEnabled) {
+          addCheck(`Number ${fromNumber} SMS enabled`, "pass", "SMS is enabled on this number");
+        } else {
+          addCheck(`Number ${fromNumber} SMS enabled`, "fail", "SMS is NOT enabled on this number. In Telnyx Portal, go to Numbers → My Numbers → click the number → enable Messaging");
+        }
+        const status = num.status || "unknown";
+        addCheck(`Number status`, "pass", `Status: ${status}`);
+      }
+    } catch (err) {
+      addCheck("Phone number check", "warn", `Could not check number: ${err.response?.data?.errors?.[0]?.detail || err.message}`);
+    }
+
+    // 5. Test sending a diagnostic message
+    addCheck("TCR / Campaign status", "warn", "Cannot check TCR status via API. Go to Telnyx Portal → Messaging → Toll-Free and verify Brand + Campaign are both APPROVED. This is the #1 reason toll-free messages are queued but never delivered.");
+
+    return results;
+  } catch (err) {
+    functions.logger.error("Telnyx diagnosis error:", err);
+    throw new functions.https.HttpsError("internal", err.message || "Diagnosis failed");
   }
 });

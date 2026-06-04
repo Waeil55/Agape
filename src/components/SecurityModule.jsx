@@ -30,6 +30,16 @@ export const TwoFactorSetup = ({ user, onComplete }) => {
     onComplete({ method, enabled: true });
   };
 
+  const handleCopyRecoveryCodes = () => {
+    const codes = [
+      'A7K9-L2M5-N8P3-Q6R9',
+      'S4T7-U2V5-W8X3-Y6Z9',
+      'B1C4-D7E2-F5G8-H3I6',
+      'J9K2-L5M8-N3O6-P9Q2',
+    ];
+    navigator.clipboard?.writeText(codes.join('\n'));
+  };
+
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded-2xl border border-slate-200">
       <div className="flex items-center gap-3 mb-6">
@@ -105,7 +115,7 @@ export const TwoFactorSetup = ({ user, onComplete }) => {
               <div>B1C4-D7E2-F5G8-H3I6</div>
               <div>J9K2-L5M8-N3O6-P9Q2</div>
             </div>
-            <button className="text-xs font-bold text-amber-700 hover:underline">📋 Copy Codes</button>
+            <button onClick={handleCopyRecoveryCodes} className="text-xs font-bold text-amber-700 hover:underline">📋 Copy Codes</button>
           </div>
 
           <button
@@ -139,6 +149,21 @@ export const AuditLogViewer = ({ logs = [] }) => {
     if (action.includes('update') || action.includes('edit')) return 'text-blue-600 bg-blue-50';
     if (action.includes('access') || action.includes('login')) return 'text-purple-600 bg-purple-50';
     return 'text-slate-600 bg-slate-50';
+  };
+
+  const handleExportLogs = () => {
+    const headers = ['Action', 'Description', 'User', 'Timestamp', 'Status'];
+    const rows = filteredLogs.map(log => [log.action, log.description, log.user, log.timestamp, log.status]);
+    const csv = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `agape-audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -198,7 +223,7 @@ export const AuditLogViewer = ({ logs = [] }) => {
       </div>
 
       {/* Export Button */}
-      <button className="mt-4 w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+      <button onClick={handleExportLogs} className="mt-4 w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
         📥 Export Logs
       </button>
     </div>

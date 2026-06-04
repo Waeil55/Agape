@@ -220,6 +220,14 @@ const SafetyMonitoring = ({ driver, recentTrips = [] }) => {
  * Wellness & Mental Health
  */
 const WellnessPanel = ({ driver }) => {
+  const handleWellness = () => {
+    window.open('https://www.healthcare.gov/preventive-care-benefits/', '_blank', 'noopener,noreferrer');
+  };
+
+  const handleTraining = () => {
+    window.open('https://www.cms.gov/medicare/health-safety-standards/quality-safety-oversight-general-information/training', '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl border border-pink-200 p-6">
       <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -240,11 +248,11 @@ const WellnessPanel = ({ driver }) => {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <button className="p-3 bg-white rounded-lg border border-pink-100 hover:bg-pink-50 transition-colors text-center">
+          <button onClick={handleWellness} className="p-3 bg-white rounded-lg border border-pink-100 hover:bg-pink-50 transition-colors text-center">
             <p className="text-xl mb-1">🧘</p>
             <p className="text-xs font-bold text-slate-900">Wellness</p>
           </button>
-          <button className="p-3 bg-white rounded-lg border border-pink-100 hover:bg-pink-50 transition-colors text-center">
+          <button onClick={handleTraining} className="p-3 bg-white rounded-lg border border-pink-100 hover:bg-pink-50 transition-colors text-center">
             <p className="text-xl mb-1">🎓</p>
             <p className="text-xs font-bold text-slate-900">Training</p>
           </button>
@@ -267,6 +275,51 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [showCoaching, setShowCoaching] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  const notify = (message) => {
+    setNotice(message);
+    window.setTimeout(() => setNotice(''), 3000);
+  };
+
+  const handleAddDriver = () => {
+    if (onEditDriver) {
+      onEditDriver(null);
+      return;
+    }
+    notify('Open Drivers & Vehicles to add a driver profile.');
+  };
+
+  const handleCallDriver = () => {
+    if (!selectedDriver?.phone) {
+      notify('No phone number is saved for this driver.');
+      return;
+    }
+    window.location.href = `tel:${selectedDriver.phone}`;
+  };
+
+  const handleMessageDriver = () => {
+    if (!selectedDriver?.phone) {
+      notify('No phone number is saved for this driver.');
+      return;
+    }
+    window.location.href = `sms:${selectedDriver.phone}`;
+  };
+
+  const handleViewAnalytics = () => {
+    setShowCoaching(true);
+    window.requestAnimationFrame(() => {
+      document.getElementById('driver-ai-coaching')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const handleEditDriver = () => {
+    if (onEditDriver && selectedDriver) {
+      onEditDriver(selectedDriver);
+      return;
+    }
+    notify('Driver editing is available from the main Drivers & Vehicles page.');
+  };
 
   const filteredDrivers = useMemo(() => {
     return drivers.filter(d => {
@@ -285,7 +338,7 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
             <h1 className="text-3xl font-black text-slate-900">Driver Management</h1>
             <p className="text-sm text-slate-500 mt-1">Performance analytics, AI coaching & wellness</p>
           </div>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors">
+          <button onClick={handleAddDriver} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors">
             + Add Driver
           </button>
         </div>
@@ -314,6 +367,11 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
+        {notice && (
+          <div className="mx-6 mt-4 p-3 rounded-xl border border-blue-100 bg-blue-50 text-blue-800 text-sm font-semibold">
+            {notice}
+          </div>
+        )}
         {!selectedDriver ? (
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredDrivers.map(driver => (
@@ -366,7 +424,9 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
               </div>
 
               <SafetyMonitoring driver={selectedDriver} recentTrips={trips} />
-              <DriverCoachingPanel driver={selectedDriver} performanceData={{}} />
+              <div id="driver-ai-coaching">
+                <DriverCoachingPanel driver={selectedDriver} performanceData={{ focused: showCoaching }} />
+              </div>
             </div>
 
             {/* Right Column - Wellness */}
@@ -377,16 +437,16 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
               <div className="bg-white rounded-2xl border border-slate-100 p-6">
                 <h3 className="font-bold text-slate-900 mb-3">Quick Actions</h3>
                 <div className="space-y-2">
-                  <button className="w-full p-3 text-left text-sm font-semibold text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
+                  <button onClick={handleCallDriver} className="w-full p-3 text-left text-sm font-semibold text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
                     📞 Call Driver
                   </button>
-                  <button className="w-full p-3 text-left text-sm font-semibold text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
+                  <button onClick={handleMessageDriver} className="w-full p-3 text-left text-sm font-semibold text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
                     📱 Send Message
                   </button>
-                  <button className="w-full p-3 text-left text-sm font-semibold text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
+                  <button onClick={handleViewAnalytics} className="w-full p-3 text-left text-sm font-semibold text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
                     📊 View Analytics
                   </button>
-                  <button className="w-full p-3 text-left text-sm font-semibold text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
+                  <button onClick={handleEditDriver} className="w-full p-3 text-left text-sm font-semibold text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
                     ✏️ Edit Profile
                   </button>
                 </div>
