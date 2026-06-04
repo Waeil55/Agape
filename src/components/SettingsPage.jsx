@@ -42,11 +42,13 @@ const ActivityRow = ({ index, log }) => {
 };
 
 const FONT_SCALE_OPTIONS = [
+  { value: 'xs', label: 'Dense', desc: 'Smallest readable view for command centers', icon: Minus },
   { value: 'sm', label: 'Small', desc: 'Compact view — more content on screen', icon: Minus },
   { value: 'md', label: 'Default', desc: 'Standard readability — recommended', icon: TextSelect },
   { value: 'lg', label: 'Large', desc: 'Larger text — easier to read', icon: Plus },
   { value: 'xl', label: 'Extra Large', desc: 'Maximum readability — reduced eye strain', icon: Maximize2 },
   { value: 'driver', label: 'Driver Mode', desc: 'Ultra-readable — optimized for in-vehicle use', icon: Smartphone },
+  { value: 'xxl', label: 'Huge', desc: 'Very large text for wall displays and low vision', icon: Maximize2 },
 ];
 
 const THEME_OPTIONS = [

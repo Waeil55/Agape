@@ -195,15 +195,14 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
           <div className="fixed z-50 bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} style={{ top: 'calc(env(safe-area-inset-top) + 8px)', left: '2%', right: '2%', bottom: 'calc(env(safe-area-inset-bottom) + 86px)' }}>
             {/* Header Bar */}
             <div className="shrink-0 bg-white border-b border-slate-200/70 flex items-center justify-between px-4 py-3" style={{ fontSize: '112%' }}>
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex flex-1 items-center gap-3 min-w-0">
                 <Clock size={16} className={`shrink-0 ${timeUrgency.type === 'critical' ? 'text-rose-600' : timeUrgency.type === 'warning' ? 'text-orange-500' : 'text-blue-600'}`} strokeWidth={2.5} />
                 <span className={`font-black tracking-tight ${timeUrgency.type === 'critical' ? 'text-rose-600' : timeUrgency.type === 'warning' ? 'text-orange-500' : 'text-slate-900'}`}>
                   {task.time || 'TBD'}
                 </span>
-                <span className="font-bold text-slate-800 truncate">{task.patient || task.patientName}</span>
+                <span className="font-bold text-slate-800 leading-tight whitespace-normal break-words">{task.patient || task.patientName}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <StatusBadge status={task.status} />
                 <button onClick={() => onToggle(task.id)} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
                   <ChevronDown size={18} className="rotate-180" strokeWidth={2} />
                 </button>
@@ -214,11 +213,10 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
             <div className="flex-1 overflow-y-auto px-4 pb-6 pt-3" style={{ fontSize: '112%' }}>
               {/* Tags Row */}
               <div className="flex flex-wrap gap-2 pb-3 border-b border-slate-100 mb-3">
-                {task.bookingId && (
-                  <span className="text-[0.75em] font-mono font-extrabold text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 shrink-0">
-                    Trip: {task.bookingId}
-                  </span>
-                )}
+                <span className="text-[0.75em] font-mono font-extrabold text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 shrink-0">
+                  Trip: {task.bookingId || task.id}
+                </span>
+                {isExpanded && <StatusBadge status={task.status} />}
                 {(task.details?.passengerType) && (
                   <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-[0.75em] font-bold border border-blue-100">
                     <User size={12} /> {task.details.passengerType.split(',')[0]}

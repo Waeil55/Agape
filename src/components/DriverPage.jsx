@@ -2607,6 +2607,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 {[
                   { value: 'light', label: 'Light', icon: Sun },
                   { value: 'dark', label: 'Dark', icon: Moon },
+                  { value: 'system', label: 'Auto', icon: Settings },
                 ].map((option) => {
                   const Icon = option.icon;
                   const active = appSettings?.theme === option.value;
@@ -2624,9 +2625,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="flex items-center gap-2 mb-2 text-slate-800 font-semibold"><span className="text-sm">A</span> Font Size</div>
                 <div className="grid grid-cols-3 gap-2">
                   {[
+                    { value: 'xs', label: 'Dense' },
                     { value: 'sm', label: 'Compact' },
                     { value: 'md', label: 'Standard' },
                     { value: 'lg', label: 'Large' },
+                    { value: 'xl', label: 'XL' },
+                    { value: 'xxl', label: 'Huge' },
+                    { value: 'driver', label: 'Driver' },
                   ].map((option) => {
                     const active = appSettings?.fontScale === option.value;
                     return (

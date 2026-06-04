@@ -102,6 +102,10 @@ const DEFAULT_APP_SETTINGS = {
   navigationApp: 'google',
 };
 
+const SESSION_IDLE_TIMEOUT_MS = 60 * 60 * 1000;
+const SESSION_ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+const TERMINAL_TRIP_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
+
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
 
 function normalizeUsername(value = '') {
@@ -505,6 +509,10 @@ const App = () => {
       return assignedToCurrentDriver && (tripMatchesTodayOrTomorrow(trip.date) || activeStatus);
     });
   }, [trips, drivers, currentUserDriverProfile, currentUser, role]);
+  const driverHasActiveWork = useMemo(
+    () => currentUserDriverTrips.some((trip) => !TERMINAL_TRIP_STATUSES.has(trip.status)),
+    [currentUserDriverTrips]
+  );
   useEffect(() => {
     if (role !== 'driver' || dataLoading || !auth.currentUser || !currentUserDriverProfile) return;
     const normalizedEmail = normalizeEmail(currentUser);
@@ -772,10 +780,10 @@ const App = () => {
       : appSettings.theme || 'light';
     document.documentElement.dataset.theme = theme;
     document.documentElement.classList.toggle('dark', theme === 'dark');
-    document.documentElement.dataset.fontScale = appSettings.fontScale || 'md';
+    document.documentElement.setAttribute('data-fontscale', appSettings.fontScale || 'md');
     document.documentElement.dataset.readability = appSettings.readability || 'normal';
 
-    const themeColor = theme === 'dark' ? '#020617' : '#f8fafc';
+    const themeColor = theme === 'dark' ? '#10192d' : '#f8fafc';
     let themeMeta = document.querySelector('meta[name="theme-color"]');
     if (!themeMeta) {
       themeMeta = document.createElement('meta');
@@ -1144,6 +1152,65 @@ const App = () => {
     setLogs(prev => [{ t: title, d: desc, c: color, type: 'audit', timestamp: timeStr, time: now, actor: actorEmail, actorRole, meta }, ...prev].slice(0, 100));
     addLog({ t: title, d: desc, c: color, type: 'audit', time: now, actor: actorEmail, actorRole, meta });
   };
+
+  useEffect(() => {
+    if (!isAuthenticated || !role) return undefined;
+    if (role === 'driver' && driverHasActiveWork) return undefined;
+
+    let timeoutId = null;
+    const actor = currentUser || 'unknown';
+    const activityKey = `agape-session-last-activity:${role}:${actor}`;
+    const message = role === 'driver'
+      ? 'Driver session locked after active work finished and 60 minutes of inactivity.'
+      : `${role} session locked after 60 minutes of inactivity.`;
+
+    const lockSession = () => {
+      addLog({
+        t: 'Session Timeout',
+        d: message,
+        c: 'amber',
+        type: 'audit',
+        time: Date.now(),
+        actor,
+        actorRole: role,
+        meta: { reason: 'inactivity', timeoutMinutes: 60 },
+      }).catch(() => {});
+      skipNextSignedOutResetRef.current = true;
+      signOut(auth).finally(() => {
+        resetSessionState({
+          loginErrorMessage: 'Session locked after 60 minutes of inactivity. Please sign in again.',
+          clearStartupIssue: false,
+        });
+      });
+    };
+
+    const storedLastActivity = Number(window.localStorage.getItem(activityKey) || 0);
+    if (role !== 'driver' && storedLastActivity && Date.now() - storedLastActivity >= SESSION_IDLE_TIMEOUT_MS) {
+      lockSession();
+      return undefined;
+    }
+    if (!storedLastActivity || role === 'driver') {
+      window.localStorage.setItem(activityKey, String(Date.now()));
+    }
+
+    const resetIdleTimer = () => {
+      window.localStorage.setItem(activityKey, String(Date.now()));
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(lockSession, SESSION_IDLE_TIMEOUT_MS);
+    };
+
+    SESSION_ACTIVITY_EVENTS.forEach((eventName) => {
+      window.addEventListener(eventName, resetIdleTimer, { passive: true });
+    });
+    resetIdleTimer();
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      SESSION_ACTIVITY_EVENTS.forEach((eventName) => {
+        window.removeEventListener(eventName, resetIdleTimer);
+      });
+    };
+  }, [isAuthenticated, role, driverHasActiveWork, currentUser, addLog, resetSessionState]);
 
 
   const handleCreateAccount = async () => {
@@ -2018,7 +2085,7 @@ const App = () => {
 
     return (
       <div className="flex-1 bg-slate-100 flex flex-col justify-start lg:justify-center items-center px-4 py-6 relative overflow-y-auto font-outfit" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(241,245,249,0.72)),linear-gradient(90deg,rgba(37,99,235,0.06)_1px,transparent_1px),linear-gradient(180deg,rgba(37,99,235,0.05)_1px,transparent_1px)] bg-[length:auto,48px_48px,48px_48px]" />
+        <div className="login-backdrop absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(241,245,249,0.72)),linear-gradient(90deg,rgba(37,99,235,0.06)_1px,transparent_1px),linear-gradient(180deg,rgba(37,99,235,0.05)_1px,transparent_1px)] bg-[length:auto,48px_48px,48px_48px]" />
         
         <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-6 sm:p-8 relative z-10">
           <div className="flex flex-col items-center mb-6 text-center">
