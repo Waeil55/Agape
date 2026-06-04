@@ -208,6 +208,7 @@ export function useFirestoreAppData() {
 
   const dataRef = useRef(DEFAULT_DATA);
   const pendingWritesRef = useRef(0);
+  const writeQueueRef = useRef(Promise.resolve());
   const mirrorBackfillRef = useRef({
     drivers: false,
     dispatchers: false,
@@ -418,10 +419,11 @@ export function useFirestoreAppData() {
 
   const writeField = useCallback(async (field, value) => {
     const sanitized = sanitizeForFirestore(value);
-    dataRef.current = {
+    const nextData = {
       ...normalizeData(dataRef.current),
       [field]: sanitized,
     };
+    dataRef.current = nextData;
 
     pendingWritesRef.current += 1;
     setState(prev => ({
@@ -431,7 +433,7 @@ export function useFirestoreAppData() {
       error: null,
     }));
 
-    try {
+    const performWrite = async () => {
       await setDoc(doc(db, DATA_DOC), {
         [field]: sanitized,
         updatedAt: serverTimestamp(),
@@ -440,17 +442,25 @@ export function useFirestoreAppData() {
       }, { merge: true });
 
       if (MIRRORED_TRIP_FIELDS.has(field)) {
-        await mirrorTripsToLedger(dataRef.current.trips || [], dataRef.current.trashedTrips || []);
+        await mirrorTripsToLedger(nextData.trips || [], nextData.trashedTrips || []);
       } else if (field === 'drivers') {
-        await mirrorRecordsToCollection(DRIVER_PROFILE_COLLECTION, dataRef.current.drivers || []);
+        await mirrorRecordsToCollection(DRIVER_PROFILE_COLLECTION, nextData.drivers || []);
       } else if (field === 'dispatchers') {
-        await mirrorRecordsToCollection(DISPATCHER_PROFILE_COLLECTION, dataRef.current.dispatchers || []);
+        await mirrorRecordsToCollection(DISPATCHER_PROFILE_COLLECTION, nextData.dispatchers || []);
       } else if (field === 'vehicles') {
-        await mirrorRecordsToCollection(VEHICLE_COLLECTION, dataRef.current.vehicles || []);
+        await mirrorRecordsToCollection(VEHICLE_COLLECTION, nextData.vehicles || []);
       } else if (field === 'phoneNumbers') {
         await setDoc(doc(db, PHONE_NUMBERS_DOC), sanitized, { merge: true });
       }
+    };
 
+    const queuedWrite = writeQueueRef.current
+      .catch(() => {})
+      .then(performWrite);
+    writeQueueRef.current = queuedWrite;
+
+    try {
+      await queuedWrite;
       pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
       setState(prev => ({
         ...prev,
@@ -506,18 +516,8 @@ export function useFirestoreAppData() {
       error: null,
     }));
 
-    try {
-      await setDoc(doc(db, DRIVER_PROFILE_COLLECTION, driverId), nextDriver, { merge: true });
-      return true;
-    } catch (err) {
-      console.error('Failed to upsert driver profile:', err);
-      setState(prev => ({
-        ...prev,
-        error: err.message || 'Failed to update driver profile',
-      }));
-      return false;
-    }
-  }, []);
+    return writeField('drivers', nextDrivers);
+  }, [writeField]);
 
   const setDispatchers = useCallback((updater) => {
     const current = dataRef.current.dispatchers || [];

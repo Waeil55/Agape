@@ -37,6 +37,7 @@ import {
 import './utils/clientExport';
 import { registerServiceWorker, requestPeriodicSync, setupSWMessageHandler, triggerSync, skipWaiting } from './utils/swManager';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
+import { hydrateUserLocalState, startUserLocalStateSync, stopUserLocalStateSync } from './utils/userLocalStateSync';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
@@ -654,6 +655,7 @@ const App = () => {
     currentUserRef.current = null;
     authBootResolvedRef.current = true;
     prevChatConvsRef.current = null;
+    stopUserLocalStateSync().catch((err) => console.error('Final user local state sync failed:', err));
 
     setIsAuthenticated(false);
     setRole(null);
@@ -892,6 +894,15 @@ const App = () => {
         loginPortalRoleRef.current = null;
         roleRef.current = userRole;
         currentUserRef.current = userEmail || '';
+        const localStateResult = await withTimeout(
+          hydrateUserLocalState(user.uid),
+          4000,
+          'user local UI state'
+        );
+        if (!localStateResult.ok) {
+          console.error('User local UI state hydration failed:', localStateResult.error || localStateResult);
+        }
+        startUserLocalStateSync(user.uid);
         setRole(userRole);
         setCurrentUser(userEmail);
         setIsAuthenticated(true);
