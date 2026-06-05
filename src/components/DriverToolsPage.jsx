@@ -482,6 +482,11 @@ const RoutePlanSection = ({
   };
 
   const sendToSequencer = () => {
+    if (typeof onSendToSequencer !== 'function') {
+      setRouteError('Route Sequencer is not available from this screen.');
+      return;
+    }
+
     const sequencerStops = routeValidation.routeStops.map((stop, index) => ({
       address: cleanRouteAddress(stop.label),
       clientName: stop.clientName || '',
@@ -497,7 +502,8 @@ const RoutePlanSection = ({
       setRouteError('Add at least one stop before opening Route Sequencer.');
       return;
     }
-    onSendToSequencer?.(sequencerStops);
+    setRouteError('');
+    onSendToSequencer(sequencerStops);
     setRouteNotice(`${sequencerStops.length} route stop${sequencerStops.length !== 1 ? 's' : ''} sent to Route Sequencer.`);
   };
 

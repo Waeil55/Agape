@@ -2456,6 +2456,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           routePlanStops={routePlanStops}
           onSetRoutePlanStops={setRoutePlanStops}
           onSendToSequencer={(stopData) => {
+            if (!Array.isArray(stopData) || stopData.length === 0) {
+              setShowToast({ type: 'error', message: 'Add route stops before opening Route Sequencer.' });
+              return;
+            }
             const stamp = Date.now();
             const items = typeof stopData[0] === 'string'
               ? stopData.map((addr, i) => ({
@@ -2469,7 +2473,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               : (() => {
                   const tripsMap = new Map();
                   const order = [];
-                  stopData.forEach(s => {
+                  stopData.filter(s => s?.address).forEach(s => {
                     if (!s.tripId) {
                       const manualKey = `manual-${stamp}-${Math.random().toString(36).slice(2,6)}`;
                       if (!tripsMap.has(manualKey)) {
@@ -2520,6 +2524,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     };
                   });
                 })();
+            if (!items.length) {
+              setShowToast({ type: 'error', message: 'Route Sequencer needs at least one usable address.' });
+              return;
+            }
+            setSequencerTripFilter(null);
             setRoutePlanSequencerStops(items);
             setSequencerKey(k => k + 1);
             setShowSequencerModal(true);
