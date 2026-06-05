@@ -98,6 +98,7 @@ const DEFAULT_APP_SETTINGS = {
   fontScale: 'md',
   readability: 'normal',
   navigationApp: 'google',
+  routePlanNavApp: 'google',
 };
 
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';

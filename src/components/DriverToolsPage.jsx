@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  BrainCircuit, Play, ChevronRight, X, Navigation, Map,
+  BrainCircuit, Play, ChevronRight, X, Navigation, Map as MapIcon,
   Route, Repeat, AlertTriangle, Zap, ChevronDown, ChevronUp,
-  Timer, Copy, CheckSquare
+  Timer, Copy, CheckSquare, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
 import LiveRouteMap from './LiveRouteMap';
 import { impact } from '../utils/haptics';
+import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
 
 const timeToMinutes = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return 1440;
@@ -43,6 +44,328 @@ const formatDuration = (minutes) => {
   return `${h}h ${m}m`;
 };
 
+const RoutePlanSection = ({ routePlanStops = null, onSetRoutePlanStops = null, appSettings = {}, onSendToSequencer = null }) => {
+  const [stops, setStops] = useState([]);
+  const [totalTime, setTotalTime] = useState('0 min');
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
+
+  const loadGoogleMapsScript = useCallback(() => {
+    return new Promise((resolve, reject) => {
+      if (window.google && window.google.maps) { resolve(); return; }
+      const existing = document.getElementById('gm-script');
+      if (existing) { existing.addEventListener('load', resolve); existing.addEventListener('error', reject); return; }
+      const s = document.createElement('script');
+      s.id = 'gm-script';
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY()}`;
+      s.async = true; s.defer = true;
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }, []);
+
+  const getCurrentAddress = useCallback(() => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve(''); return; }
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const { latitude, longitude } = pos.coords;
+            const res = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY()}`
+            );
+            const data = await res.json();
+            if (data.results?.[0]) resolve(data.results[0].formatted_address);
+            else resolve(`${latitude}, ${longitude}`);
+          } catch { resolve(`${pos.coords.latitude}, ${pos.coords.longitude}`); }
+        },
+        () => resolve(''),
+        { timeout: 8000, enableHighAccuracy: true }
+      );
+    });
+  }, []);
+
+  useEffect(() => {
+    if (routePlanStops && routePlanStops.length > 0) {
+      const items = routePlanStops.map((item, i) => {
+        const addr = (typeof item === 'string' ? item : item.address) || '';
+        return {
+          id: i === 0 ? 'origin' : String.fromCharCode(96 + i),
+          type: i === 0 ? 'origin' : 'stop',
+          letter: i === 0 ? null : String.fromCharCode(64 + i),
+          label: addr,
+          clientName: typeof item === 'string' ? '' : (item.clientName || ''),
+          stopTime: typeof item === 'string' ? '' : (item.time || ''),
+          stopType: typeof item === 'string' ? '' : (item.stopType || ''),
+          tripId: typeof item === 'string' ? null : (item.tripId || null),
+        };
+      });
+      setStops(items);
+      setExpanded(true);
+      if (onSetRoutePlanStops) onSetRoutePlanStops(null);
+      return;
+    }
+    if (stops.length > 0) return;
+    getCurrentAddress().then(address => {
+      const origin = { id: 'origin', type: 'origin', letter: null, label: address || '', clientName: '', stopTime: '', stopType: '', tripId: null };
+      const first = { id: 'a', type: 'stop', letter: 'A', label: '', clientName: '', stopTime: '', stopType: '', tripId: null };
+      setStops(address ? [origin, first] : [origin, first]);
+    });
+  }, [routePlanStops, getCurrentAddress, onSetRoutePlanStops]);
+
+  const updateStops = (newStops) => {
+    const updated = newStops.map((stop, index) => {
+      if (index === 0) return { ...stop, type: 'origin', letter: null };
+      return { ...stop, type: 'stop', letter: String.fromCharCode(64 + index) };
+    });
+    setStops(updated);
+  };
+
+  const handleMoveUp = (index) => {
+    if (index === 0) return;
+    const copy = [...stops];
+    [copy[index - 1], copy[index]] = [copy[index], copy[index - 1]];
+    updateStops(copy);
+  };
+
+  const handleMoveDown = (index) => {
+    if (index === stops.length - 1) return;
+    const copy = [...stops];
+    [copy[index], copy[index + 1]] = [copy[index + 1], copy[index]];
+    updateStops(copy);
+  };
+
+  const handleDelete = (index) => {
+    if (stops.length <= 1) return;
+    const newStops = stops.filter((_, i) => i !== index);
+    updateStops(newStops);
+  };
+
+  const handleTextChange = (index, newText) => {
+    setStops(prev => prev.map((s, i) => i === index ? { ...s, label: newText } : s));
+  };
+
+  const handleAddStop = () => {
+    const nextLetter = String.fromCharCode(65 + stops.length - 1);
+    setStops([...stops, { id: nextLetter.toLowerCase(), type: 'stop', letter: nextLetter, label: '', clientName: '', stopTime: '', stopType: '', tripId: null }]);
+  };
+
+  const handleAddCurrentLocation = async () => {
+    setGettingLocation(true);
+    const address = await getCurrentAddress();
+    setGettingLocation(false);
+    if (!address) return;
+    const nextLetter = String.fromCharCode(65 + stops.length - 1);
+    setStops([...stops, { id: nextLetter.toLowerCase(), type: 'stop', letter: nextLetter, label: address, clientName: '', stopTime: '', stopType: '', tripId: null }]);
+  };
+
+  useEffect(() => {
+    if (!expanded) return;
+    const calculateTripTime = async () => {
+      if (stops.length < 2) { setTotalTime('0 min'); return; }
+      const labels = stops.map(s => s.label.trim()).filter(Boolean);
+      if (labels.length < 2) { setTotalTime('0 min'); return; }
+      setIsCalculating(true);
+      const origin = labels[0];
+      const destination = labels[labels.length - 1];
+      const waypoints = labels.slice(1, -1);
+
+      try {
+        await loadGoogleMapsScript();
+        const directionsService = new window.google.maps.DirectionsService();
+        const formattedWaypoints = waypoints.map(wp => ({ location: wp, stopover: true }));
+        const time = await new Promise((resolve, reject) => {
+          directionsService.route({
+            origin, destination, waypoints: formattedWaypoints,
+            travelMode: window.google.maps.TravelMode.DRIVING
+          }, (response, status) => {
+            if (status === 'OK' && response.routes?.[0]) {
+              let total = 0;
+              response.routes[0].legs.forEach(leg => { total += leg.duration.value; });
+              const mins = Math.round(total / 60);
+              resolve(mins >= 60 ? `${Math.floor(mins / 60)} hr ${mins % 60} min` : `${mins} min`);
+            } else { reject(new Error(status)); }
+          });
+        });
+        setTotalTime(time);
+      } catch {
+        try {
+          const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+          if (!geminiKey) { setTotalTime('Unavailable'); return; }
+          const prompt = `Calculate driving time from "${origin}" to "${destination}"${waypoints.length ? ` with stops at "${waypoints.join(', ')}"` : ''}. Reply only with the time like '45 min'.`;
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          });
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          setTotalTime(data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Unavailable');
+        } catch { setTotalTime('Unavailable'); }
+      } finally { setIsCalculating(false); }
+    };
+    const id = setTimeout(calculateTripTime, 1200);
+    return () => clearTimeout(id);
+  }, [stops, expanded, loadGoogleMapsScript]);
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition"
+      >
+        <div className="flex items-center gap-2">
+          <MapIcon size={16} className="text-emerald-600" />
+          <span className="text-sm font-bold text-slate-800">Route Plan</span>
+        </div>
+        {expanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+      </button>
+      {expanded && (
+        <div className="border-t border-slate-100 px-3 py-2">
+          <div className="w-full font-sans">
+            {stops.map((stop, index) => (
+              <React.Fragment key={stop.id}>
+                <div className="flex items-center w-full">
+                  <div className="flex items-center w-[60px] shrink-0 pr-3">
+                    <div className="w-8 flex justify-start">
+                      {index > 0 && (
+                        <div className="flex flex-col gap-0.5">
+                          <button onClick={() => handleMoveUp(index)} className="cursor-pointer hover:bg-gray-100 rounded p-0.5 transition-colors" disabled={index === 0}>
+                            <ArrowUp size={14} className="text-gray-500" />
+                          </button>
+                          <button onClick={() => handleMoveDown(index)} className="cursor-pointer hover:bg-gray-100 rounded p-0.5 transition-colors" disabled={index === stops.length - 1}>
+                            <ArrowDown size={14} className="text-gray-500" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="w-6 flex justify-center items-center">
+                      {stop.type === 'origin' ? (
+                        <div className="w-[18px] h-[18px] border-[1.5px] border-black rounded-full bg-white flex items-center justify-center">
+                          <span className="text-[9px] font-bold text-black leading-none">O</span>
+                        </div>
+                      ) : (
+                        <div className="w-[20px] h-[20px] border-[1.5px] border-black rounded-full bg-white flex items-center justify-center">
+                          <span className="text-[11px] font-bold text-black leading-none">{stop.letter}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-1 border border-gray-200 rounded-lg px-2 py-[3px] bg-white shadow-sm">
+                    {(stop.clientName || stop.stopTime || stop.stopType) && (
+                      <div className="flex items-center gap-1 mb-0.5">
+                        {stop.stopType && (
+                          <span className={`text-[8px] font-bold px-1 py-[1px] rounded ${stop.stopType === 'PU' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {stop.stopType}
+                          </span>
+                        )}
+                        {stop.clientName && <span className="text-[9px] font-bold text-gray-800 truncate">{stop.clientName}</span>}
+                        {stop.stopTime && <span className="text-[8px] text-gray-500">{stop.stopTime}</span>}
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      value={stop.label}
+                      onChange={(e) => handleTextChange(index, e.target.value)}
+                      className="text-[10px] text-gray-900 truncate bg-transparent outline-none w-full"
+                      placeholder={index === 0 ? 'Starting point' : `Stop ${stop.letter}`}
+                      spellCheck="false"
+                    />
+                  </div>
+                  <div className="w-8 flex justify-end shrink-0 pl-2">
+                    <button onClick={() => handleDelete(index)} className="cursor-pointer hover:bg-gray-100 p-0.5 rounded-full transition-colors" disabled={stops.length <= 1}>
+                      <Trash2 size={14} className="text-gray-400" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex w-full my-0">
+                  <div className="flex items-center w-[60px] shrink-0 pr-3">
+                    <div className="w-8" />
+                    <div className="w-6 flex flex-col items-center justify-center gap-[3px] py-0">
+                      <div className="w-[2px] h-[2px] bg-gray-800 rounded-full" />
+                      <div className="w-[2px] h-[2px] bg-gray-800 rounded-full" />
+                      <div className="w-[2px] h-[2px] bg-gray-800 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              </React.Fragment>
+            ))}
+            <div className="flex items-center gap-2 mt-1">
+              <button
+                onClick={handleAddStop}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl active:scale-95 transition hover:bg-emerald-100"
+              >
+                <span className="text-base leading-none">+</span> Add stop
+              </button>
+              <button
+                onClick={handleAddCurrentLocation}
+                disabled={gettingLocation}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl active:scale-95 transition hover:from-blue-700 hover:to-blue-600 shadow-sm disabled:opacity-50"
+              >
+                <Navigation size={13} /> {gettingLocation ? 'Getting location...' : 'My Location'}
+              </button>
+              <button
+                onClick={() => {
+                  const labels = stops.map(s => s.label.trim()).filter(Boolean);
+                  if (labels.length < 2) return;
+                  const navApp = appSettings?.routePlanNavApp || appSettings?.navigationApp || 'google';
+                  const origin = labels[0];
+                  const destination = labels[labels.length - 1];
+                  const waypoints = labels.slice(1, -1);
+                  if (navApp === 'waze') {
+                    const wazeStops = [origin, ...waypoints, destination];
+                    const url = `https://waze.com/ul?q=${encodeURIComponent(wazeStops.join(', '))}&navigate=yes`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  } else if (navApp === 'apple') {
+                    const appleStops = [origin, ...waypoints, destination].join(', ');
+                    const url = `https://maps.apple.com/?daddr=${encodeURIComponent(appleStops)}&dirflg=d`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  } else {
+                    const originEnc = encodeURIComponent(origin);
+                    const destEnc = encodeURIComponent(destination);
+                    const wps = waypoints.map(w => encodeURIComponent(w)).join('|');
+                    const url = `https://www.google.com/maps/dir/?api=1&origin=${originEnc}&destination=${destEnc}${wps ? `&waypoints=${wps}` : ''}&travelmode=driving`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl active:scale-95 transition hover:from-indigo-700 hover:to-purple-700 shadow-sm"
+              >
+                <Navigation size={13} /> Navigate All
+              </button>
+            </div>
+            <div className="flex justify-between items-center mt-3 px-1">
+              <div className="text-[14px] text-black">
+                Total trip: <span className="font-normal text-gray-700">{isCalculating ? 'Calculating...' : totalTime}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const stopData = stops.map(s => ({
+                      address: s.label.trim(),
+                      clientName: s.clientName || '',
+                      time: s.stopTime || '',
+                      stopType: s.stopType || '',
+                      tripId: s.tripId || null,
+                    })).filter(s => s.address);
+                    if (stopData.length === 0) return;
+                    if (onSendToSequencer) onSendToSequencer(stopData);
+                  }}
+                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors flex items-center gap-1"
+                >
+                  <Route size={13} /> Save to Sequencer
+                </button>
+                <button className="text-emerald-600 font-medium text-[14px] hover:text-emerald-700 transition-colors">
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const DriverToolsPage = ({
   trips, activeTrips, aiSequence, aiSuggestions, aiRideShare, conflicts,
   aiOptimizing, guidedMode, guidedStepIndex, guidedSteps,
@@ -51,7 +374,10 @@ const DriverToolsPage = ({
   onRunAiOptimization, onSelectAllTrips, selectedTrips, onSetSelectedTrips, etas,
   onOpenInNav,
   onOpenSequencer,
-  requestAuthAction = () => {}
+  requestAuthAction = () => {},
+  routePlanStops = null,
+  onSetRoutePlanStops = null,
+  onSendToSequencer = null
 }) => {
   const [expandedSection, setExpandedSection] = useState('route');
 
@@ -170,6 +496,9 @@ const DriverToolsPage = ({
         </button>
       </div>
 
+      {/* Route Plan */}
+      <RoutePlanSection routePlanStops={routePlanStops} onSetRoutePlanStops={onSetRoutePlanStops} appSettings={appSettings} onSendToSequencer={onSendToSequencer} />
+
       {/* Smart Route Panel */}
       {aiSequence && aiSequence.length >= 2 && !guidedMode && (
         <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl p-[1.5px] shadow-lg shadow-indigo-200/50">
@@ -236,7 +565,7 @@ const DriverToolsPage = ({
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition"
         >
           <div className="flex items-center gap-2">
-            <Map size={16} className="text-blue-600" />
+            <MapIcon size={16} className="text-blue-600" />
             <span className="text-sm font-bold text-slate-800">Live Route Map</span>
           </div>
           {expandedSection === 'route' ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}

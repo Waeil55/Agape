@@ -108,12 +108,19 @@ const tripsToClients = (trips, selectedDay) => {
 const SEQUENCES_DOC = 'routeData/sequences';
 const TERMINAL_TRIP_LABELS = new Set(['Completed', 'Cancelled', 'No Show']);
 
-export default function RouteSequencerApp({ trips = [], drivers = [], currentUser, role, onApplyRoute, onRouteSaved }) {
+export default function RouteSequencerApp({ trips = [], drivers = [], currentUser, role, onApplyRoute, onRouteSaved, initialStops = null }) {
   const today = new Date();
   const todayAbbr = DAY_MAP[today.getDay()];
   const [currentDay, setCurrentDay] = useState(() => role === 'driver' ? 'All' : (localStorage.getItem('agape_seqCurrentDay') || todayAbbr));
-  const [mobileView, setMobileView] = useState('pool');
-  const [sequence, setSequence] = useState([]);
+  const [mobileView, setMobileView] = useState(() => initialStops ? 'sequence' : 'pool');
+  const [sequence, setSequence] = useState(() => {
+    if (!initialStops || initialStops.length === 0) return [];
+    const stamp = Date.now();
+    return initialStops.flatMap((s, i) => [
+      { clientId: s.id, type: 'PU', id: `${s.id}-PU-${stamp}`, leg: 'A' },
+      { clientId: s.id, type: 'DO', id: `${s.id}-DO-${stamp}`, leg: 'A' },
+    ]);
+  });
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveType, setSaveType] = useState('recurring');
   const [templateName, setTemplateName] = useState('');
@@ -145,7 +152,24 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
   const [showAddTempModal, setShowAddTempModal] = useState(false);
   const [tempTripForm, setTempTripForm] = useState(initialTempForm);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
-  const [tempClients, setTempClients] = useState([]);
+  const [tempClients, setTempClients] = useState(() => {
+    if (!initialStops || initialStops.length === 0) return [];
+    return initialStops.map((s, i) => ({
+      id: s.id,
+      name: s.name || `Stop ${String.fromCharCode(65 + i)}`,
+      req: 'AMB',
+      pu: s.pu || s.address || '',
+      do: s.do || s.address || '',
+      puTime: s.time || '--:-- AM',
+      doTime: s.time || '--:-- AM',
+      miles: 0,
+      days: [currentDay],
+      todayStatus: 'active',
+      isTemp: true,
+      tripStatus: 'Unassigned',
+      driverName: '',
+    }));
+  });
 
   // Drag & Drop
   const dragItem = useRef(null);
@@ -165,15 +189,18 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
   const allLiveClients = useMemo(() => {
     const realClients = tripsToClients(trips, 'All');
-    return [...tempClients, ...realClients];
+    const tempIds = new Set(tempClients.map(tc => tc.id));
+    return [...tempClients, ...realClients.filter(rc => !tempIds.has(rc.id))];
   }, [trips, tempClients]);
 
   // Build client pool from real trips
   const allClients = useMemo(() => {
     const realClients = tripsToClients(trips, currentDay);
+    const tempIds = new Set(tempClients.map(tc => tc.id));
+    const filteredReals = realClients.filter(rc => !tempIds.has(rc.id));
     return currentDay === 'All'
-      ? [...tempClients, ...realClients]
-      : [...tempClients.filter(tc => tc.days.includes(currentDay)), ...realClients];
+      ? [...tempClients, ...filteredReals]
+      : [...tempClients.filter(tc => tc.days.includes(currentDay)), ...filteredReals];
   }, [trips, currentDay, tempClients]);
 
   const tripById = useMemo(() => new Map((trips || []).map((trip) => [trip.id, trip])), [trips]);

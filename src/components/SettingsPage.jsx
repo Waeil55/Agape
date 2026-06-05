@@ -527,7 +527,7 @@ const SettingsPage = ({
       case 'navigation':
         return (
           <div className="space-y-6">
-            <div><h3 className="text-heading text-slate-900 mb-1">Navigation</h3><p className="text-body text-slate-500">Choose which GPS app opens first for turn-by-turn directions.</p></div>
+            <div><h3 className="text-heading text-slate-900 mb-1">Navigation</h3><p className="text-body text-slate-500">Choose which GPS app opens for directions. Single-trip vs Route Plan can use different apps.</p></div>
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="max-w-3xl">
                 <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-base"><Route size={20} /> Preferred Navigation App</div>
@@ -537,6 +537,25 @@ const SettingsPage = ({
                     const active = appSettings?.navigationApp === option.value;
                     return (
                       <button key={option.value} onClick={() => onUpdateAppSettings?.({ navigationApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
+                        <div className="font-bold text-sm text-slate-900">{option.label}</div>
+                        {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
+              <div className="max-w-3xl">
+                <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-base"><Route size={20} /> Route Plan Navigation</div>
+                <p className="text-sm text-slate-500 mb-3">GPS app for multi-stop Route Plan tool (Navigate All). Separate from single-trip navigation above.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {NAV_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    const active = appSettings?.routePlanNavApp === option.value;
+                    return (
+                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ routePlanNavApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
