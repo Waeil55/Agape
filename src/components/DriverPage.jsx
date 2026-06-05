@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate } from '../utils/tripDate';
-import { auth, db, doc, onSnapshot, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading } from '../config/firebase';
+import { auth, db, doc, onSnapshot, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles } from '../config/maps';
 import LiveRouteMap from './LiveRouteMap';
@@ -84,10 +84,17 @@ const buildFallbackDriverProfile = (email = '') => ({
 });
 
 const WORKFLOW_TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
+const normalizeWorkflowStatus = (status) => String(status || '').trim().toLowerCase();
+const isWorkflowTerminalTrip = (trip) => {
+  if (!trip) return false;
+  const status = normalizeWorkflowStatus(trip.status);
+  if ([...WORKFLOW_TERMINAL_STATUSES].some((terminal) => normalizeWorkflowStatus(terminal) === status)) return true;
+  return Boolean(trip.completedAt || trip.cancelledAt || trip.cancellationReason);
+};
 
 const getWorkflowStepIndex = (trip) => {
   if (!trip) return -1;
-  if (trip.completedAt || trip.status === 'Completed' || WORKFLOW_TERMINAL_STATUSES.has(trip.status)) return 6;
+  if (isWorkflowTerminalTrip(trip)) return 6;
   if (trip.arrivalDropoffTime || trip.status === 'At Dropoff' || trip.status === 'Arrived') return 5;
   if (trip.status === 'Navigating Dropoff') return 4;
   if (trip.departedPickupTime || trip.paperSignatureConfirmed || trip.unableToSign || trip.status === 'In Transit') return 3;
@@ -371,6 +378,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       return { ...prev, [trip.id]: nextProgress };
     });
     onUpdateTrip?.(trip.id, status, extraFields);
+    saveTripWorkflowUpdate(trip.id, {
+      status,
+      ...extraFields,
+      workflowUpdatedAt,
+    }).catch((err) => {
+      console.error('[DriverPage] Failed to persist workflow update:', err);
+    });
   }, [onUpdateTrip, setWorkflowProgressData]);
 
   useEffect(() => {
@@ -387,6 +401,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       if (workflowSyncRef.current[tripId] === signature) return;
       workflowSyncRef.current[tripId] = signature;
       onUpdateTrip?.(tripId, mergedTrip.status, getWorkflowExtraFields(progress));
+      saveTripWorkflowUpdate(tripId, {
+        status: mergedTrip.status,
+        ...getWorkflowExtraFields(progress),
+        workflowUpdatedAt: progress.workflowUpdatedAt || new Date().toISOString(),
+      }).catch((err) => {
+        console.error('[DriverPage] Failed to replay workflow progress:', err);
+      });
     });
   }, [rawDriverScopedTrips, workflowProgress, onUpdateTrip]);
 
@@ -484,7 +505,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const patientActiveLegs = useMemo(() => {
     const counts = {};
     driverScopedTrips.forEach(t => {
-      if (WORKFLOW_TERMINAL_STATUSES.has(t.status)) return;
+      if (isWorkflowTerminalTrip(t)) return;
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
       counts[key] = (counts[key] || 0) + 1;
@@ -521,7 +542,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }, [assignedSequence, currentUser, updateAssignedRouteRecord]);
 
   const getUrgency = (trip) => {
-    if (!trip || !trip.time || WORKFLOW_TERMINAL_STATUSES.has(trip.status)) return 0;
+    if (!trip || !trip.time || isWorkflowTerminalTrip(trip)) return 0;
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     if (trip.date !== today) return 0;
@@ -568,7 +589,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const restoreHistoryTrip = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
-    const relatedLegs = driverScopedTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && WORKFLOW_TERMINAL_STATUSES.has(t.status));
+    const relatedLegs = driverScopedTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && isWorkflowTerminalTrip(t));
     if (relatedLegs.length > 1) {
       setRestorePrompt({ trip, legs: relatedLegs });
     } else {
@@ -623,7 +644,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   useEffect(() => {
     if (!me?.id) return;
     const completed = driverScopedTrips
-      .filter(t => t.status === 'Completed' && t.dropoffOdometer)
+      .filter(t => isWorkflowTerminalTrip(t) && t.dropoffOdometer)
       .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
     if (completed.length > 0) setLastOdometer(completed[0].dropoffOdometer);
   }, [driverScopedTrips, me?.id]);
@@ -642,7 +663,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   // Analytics calculation
   useEffect(() => {
     if (me?.clockedIn) {
-      const completed = driverScopedTrips.filter(t => t.status === 'Completed');
+      const completed = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed' || (t.completedAt && !t.cancelledAt && !t.cancellationReason));
       const allMine = driverScopedTrips;
       const totalDist = allMine.reduce((sum, t) => sum + (t.distance || 0), 0);
       const totalTime = completed.reduce((sum, t) => {
@@ -673,13 +694,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
 
-  const reroutedTrips = driverScopedTrips.filter(t => t.status === 'Rerouted');
-  const completedTrips = driverScopedTrips.filter(t => t.status === 'Completed');
-  const noShowTrips = driverScopedTrips.filter(t => t.status === 'No Show');
-  const cancelledTrips = driverScopedTrips.filter(t => t.status === 'Cancelled');
+  const reroutedTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'rerouted');
+  const completedTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed' || (t.completedAt && !t.cancelledAt && !t.cancellationReason));
+  const noShowTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'no show');
+  const cancelledTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'cancelled' || (t.cancelledAt && normalizeWorkflowStatus(t.status) !== 'no show'));
   const allHistory = [...reroutedTrips, ...completedTrips, ...noShowTrips, ...cancelledTrips].sort((a,b) => { const da = a.completedAt || a.date || ''; const db = b.completedAt || b.date || ''; return db.localeCompare(da); });
 
-  const activeTrips = myTrips.filter(t => !WORKFLOW_TERMINAL_STATUSES.has(t.status));
+  const activeTrips = myTrips.filter(t => !isWorkflowTerminalTrip(t));
 
   const orderedTrips = [...activeTrips].sort((a, b) => {
     // 1. If guided mode is active, the absolute top priority is the current step's trip
@@ -923,10 +944,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const filteredHistory = allHistory.filter(t => {
     const matchFilter = historyFilter === 'all' ? true :
-      historyFilter === 'completed' ? t.status === 'Completed' :
-      historyFilter === 'noshow' ? t.status === 'No Show' :
-      historyFilter === 'cancelled' ? t.status === 'Cancelled' :
-      t.status === 'Rerouted';
+      historyFilter === 'completed' ? normalizeWorkflowStatus(t.status) === 'completed' || (t.completedAt && !t.cancelledAt && !t.cancellationReason) :
+      historyFilter === 'noshow' ? normalizeWorkflowStatus(t.status) === 'no show' :
+      historyFilter === 'cancelled' ? normalizeWorkflowStatus(t.status) === 'cancelled' || (t.cancelledAt && normalizeWorkflowStatus(t.status) !== 'no show') :
+      normalizeWorkflowStatus(t.status) === 'rerouted';
     if (!matchFilter) return false;
     if (!historySearch) return true;
     const q = historySearch.toLowerCase();
@@ -984,11 +1005,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
     let stepCompleted = false;
     if (currentStep.type === 'PU') {
-      if (getWorkflowStepIndex(trip) >= 3 || WORKFLOW_TERMINAL_STATUSES.has(trip.status)) {
+      if (getWorkflowStepIndex(trip) >= 3 || isWorkflowTerminalTrip(trip)) {
         stepCompleted = true;
       }
     } else {
-      if (WORKFLOW_TERMINAL_STATUSES.has(trip.status)) {
+      if (isWorkflowTerminalTrip(trip)) {
         stepCompleted = true;
       }
     }
@@ -1150,7 +1171,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const patientKey = (trip.patient || '').trim().toLowerCase();
     const activeLegs = driverScopedTrips.filter(t =>
       (t.patient || '').trim().toLowerCase() === patientKey &&
-      !WORKFLOW_TERMINAL_STATUSES.has(t.status)
+      !isWorkflowTerminalTrip(t)
     );
     if (activeLegs.length > 1) {
       setCancelPrompt({ type: 'noshow', trip, legs: activeLegs });
@@ -1163,7 +1184,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const patientKey = (trip.patient || '').trim().toLowerCase();
     const activeLegs = driverScopedTrips.filter(t =>
       (t.patient || '').trim().toLowerCase() === patientKey &&
-      !WORKFLOW_TERMINAL_STATUSES.has(t.status)
+      !isWorkflowTerminalTrip(t)
     );
     if (activeLegs.length > 1) {
       setCancelPrompt({ type: 'cancel', trip, legs: activeLegs });
@@ -1176,7 +1197,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const patientKey = (trip.patient || '').trim().toLowerCase();
     const activeLegs = driverScopedTrips.filter(t =>
       (t.patient || '').trim().toLowerCase() === patientKey &&
-      !WORKFLOW_TERMINAL_STATUSES.has(t.status)
+      !isWorkflowTerminalTrip(t)
     );
     if (activeLegs.length > 1) {
       setCancelPrompt({ type: 'reroute', trip, legs: activeLegs });
@@ -1881,7 +1902,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const isSelected = selectedTrips.includes(trip.id);
                 const isSequenced = assignedSequence?.sequence?.some(s => s.clientId === trip.id);
                 const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
-                const isTerminal = WORKFLOW_TERMINAL_STATUSES.has(trip.status);
+                const isTerminal = isWorkflowTerminalTrip(trip);
 
                 const workflowSteps = getWorkflowSteps(trip);
                 const currentStepIdx = getCurrentWorkflowStep(trip);

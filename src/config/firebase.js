@@ -111,6 +111,43 @@ export async function saveOdometerReading(tripId, odometerValue) {
   }, { merge: true });
 }
 
+const cleanFirestoreUpdates = (updates = {}) => Object.fromEntries(
+  Object.entries(updates).filter(([, value]) => value !== undefined)
+);
+
+export async function saveTripWorkflowUpdate(tripId, updates = {}) {
+  if (!tripId) return false;
+  const cleanUpdates = cleanFirestoreUpdates({
+    ...updates,
+    workflowUpdatedAt: updates.workflowUpdatedAt || new Date().toISOString(),
+  });
+  const appDataRef = doc(db, 'appData', 'agape');
+  const ledgerRef = doc(db, 'tripLedger', tripId);
+  const tripsRef = doc(db, 'trips', tripId);
+
+  await runTransaction(db, async (transaction) => {
+    const appSnap = await transaction.get(appDataRef);
+    if (appSnap.exists()) {
+      const data = appSnap.data() || {};
+      const trips = Array.isArray(data.trips) ? data.trips : [];
+      const nextTrips = trips.map((trip) => (
+        String(trip?.id || '') === String(tripId)
+          ? { ...trip, ...cleanUpdates }
+          : trip
+      ));
+      transaction.set(appDataRef, {
+        trips: nextTrips,
+        updatedAt: serverTimestamp(),
+        updatedField: 'trips',
+        updatedAtLocal: new Date().toISOString(),
+      }, { merge: true });
+    }
+    transaction.set(ledgerRef, cleanUpdates, { merge: true });
+    transaction.set(tripsRef, cleanUpdates, { merge: true });
+  });
+  return true;
+}
+
 export async function getDriverDailyTrips(driverId, date) {
   const tripsRef = collection(db, 'trips');
   const snapshot = await getDocs(tripsRef);
