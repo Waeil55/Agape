@@ -500,7 +500,7 @@ const RoutePlanSection = ({
       return;
     }
 
-    const sequencerStops = routeValidation.routeStops.map((stop, index) => ({
+    const sequencerStops = stops.slice(1).map((stop, index) => ({
       address: cleanRouteAddress(stop.label),
       clientName: stop.clientName || '',
       time: stop.stopTime || '',
@@ -511,6 +511,7 @@ const RoutePlanSection = ({
       sequenceIndex: index + 1,
       source: stop.source || 'route-plan',
     })).filter(stop => stop.address);
+
     if (sequencerStops.length === 0) {
       if (openSequencerFallback()) {
         setRouteNotice('Route Sequencer opened. Add stops in the sequencer or return to Route Plan.');
@@ -689,10 +690,11 @@ const RoutePlanSection = ({
                 <Navigation size={14} /> Navigate All
               </button>
               <button
+                type="button"
                 onClick={sendToSequencer}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-black text-white bg-[#121A66] rounded-xl active:scale-95 transition hover:bg-[#182482] shadow-sm"
               >
-                <Route size={14} /> Send to Sequencer
+                <Route size={14} /> Send {routeValidation.routeStops.length} to Sequencer
               </button>
             </div>
             <div className="flex justify-between items-center mt-3 px-1">

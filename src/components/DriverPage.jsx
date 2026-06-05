@@ -2567,6 +2567,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             setRoutePlanSequencerSequence(routePayload.sequence);
             setSequencerKey(k => k + 1);
             setShowSequencerModal(true);
+            setShowToast({ type: 'success', message: `${routePayload.clients.length} route stop${routePayload.clients.length !== 1 ? 's' : ''} loaded in Route Sequencer.` });
           }}
         />
       )}
