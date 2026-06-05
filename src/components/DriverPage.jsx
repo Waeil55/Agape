@@ -87,8 +87,7 @@ const normalizeWorkflowStatus = (status) => String(status || '').trim().toLowerC
 const isWorkflowTerminalTrip = (trip) => {
   if (!trip) return false;
   const status = normalizeWorkflowStatus(trip.status);
-  if ([...WORKFLOW_TERMINAL_STATUSES].some((terminal) => normalizeWorkflowStatus(terminal) === status)) return true;
-  return Boolean(trip.completedAt || trip.cancelledAt || trip.cancellationReason);
+  return [...WORKFLOW_TERMINAL_STATUSES].some((terminal) => normalizeWorkflowStatus(terminal) === status);
 };
 
 const getWorkflowStepIndex = (trip) => {
@@ -662,7 +661,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   // Analytics calculation
   useEffect(() => {
     if (me?.clockedIn) {
-      const completed = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed' || (t.completedAt && !t.cancelledAt && !t.cancellationReason));
+      const completed = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed');
       const allMine = driverScopedTrips;
       const totalDist = allMine.reduce((sum, t) => sum + (t.distance || 0), 0);
       const totalTime = completed.reduce((sum, t) => {
@@ -694,9 +693,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     });
 
   const reroutedTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'rerouted');
-  const completedTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed' || (t.completedAt && !t.cancelledAt && !t.cancellationReason));
+  const completedTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed');
   const noShowTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'no show');
-  const cancelledTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'cancelled' || (t.cancelledAt && normalizeWorkflowStatus(t.status) !== 'no show'));
+  const cancelledTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'cancelled');
   const allHistory = [...reroutedTrips, ...completedTrips, ...noShowTrips, ...cancelledTrips].sort((a,b) => { const da = a.completedAt || a.date || ''; const db = b.completedAt || b.date || ''; return db.localeCompare(da); });
 
   const activeTrips = myTrips.filter(t => !isWorkflowTerminalTrip(t));
@@ -943,9 +942,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const filteredHistory = allHistory.filter(t => {
     const matchFilter = historyFilter === 'all' ? true :
-      historyFilter === 'completed' ? normalizeWorkflowStatus(t.status) === 'completed' || (t.completedAt && !t.cancelledAt && !t.cancellationReason) :
+      historyFilter === 'completed' ? normalizeWorkflowStatus(t.status) === 'completed' :
       historyFilter === 'noshow' ? normalizeWorkflowStatus(t.status) === 'no show' :
-      historyFilter === 'cancelled' ? normalizeWorkflowStatus(t.status) === 'cancelled' || (t.cancelledAt && normalizeWorkflowStatus(t.status) !== 'no show') :
+      historyFilter === 'cancelled' ? normalizeWorkflowStatus(t.status) === 'cancelled' :
       normalizeWorkflowStatus(t.status) === 'rerouted';
     if (!matchFilter) return false;
     if (!historySearch) return true;
