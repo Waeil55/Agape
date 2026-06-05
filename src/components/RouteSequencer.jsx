@@ -111,6 +111,7 @@ const TERMINAL_TRIP_LABELS = new Set(['Completed', 'Cancelled', 'No Show']);
 export default function RouteSequencerApp({ trips = [], drivers = [], currentUser, role, onApplyRoute, onRouteSaved, initialStops = null }) {
   const today = new Date();
   const todayAbbr = DAY_MAP[today.getDay()];
+  const initialTripById = new Map((trips || []).map((trip) => [trip.id, trip]));
   const [currentDay, setCurrentDay] = useState(() => role === 'driver' ? 'All' : (localStorage.getItem('agape_seqCurrentDay') || todayAbbr));
   const [mobileView, setMobileView] = useState(() => initialStops ? 'sequence' : 'pool');
   const [sequence, setSequence] = useState(() => {
@@ -156,18 +157,24 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
     if (!initialStops || initialStops.length === 0) return [];
     return initialStops.map((s, i) => ({
       id: s.id,
-      name: s.name || `Stop ${String.fromCharCode(65 + i)}`,
-      req: 'AMB',
-      pu: s.pu || s.address || '',
-      do: s.do || s.address || '',
-      puTime: s.time || '--:-- AM',
-      doTime: s.time || '--:-- AM',
-      miles: 0,
-      days: [currentDay],
+      name: initialTripById.get(s.id)?.patient || s.name || `Stop ${String.fromCharCode(65 + i)}`,
+      req: initialTripById.get(s.id)?.serviceType || s.serviceType || 'AMB',
+      pu: s.pu || initialTripById.get(s.id)?.pickup || s.address || '',
+      do: s.do || initialTripById.get(s.id)?.dropoff || s.address || '',
+      puTime: s.puTime || s.time || initialTripById.get(s.id)?.time || '--:-- AM',
+      doTime: s.doTime || s.time || initialTripById.get(s.id)?.doTime || '--:-- AM',
+      miles: parseFloat(initialTripById.get(s.id)?.distance) || 0,
+      days: [tripDayAbbr(initialTripById.get(s.id)?.date) || currentDay],
       todayStatus: 'active',
-      isTemp: true,
-      tripStatus: 'Unassigned',
-      driverName: '',
+      isTemp: !initialTripById.has(s.id),
+      tripStatus: initialTripById.get(s.id)?.status || 'Unassigned',
+      driverName: initialTripById.get(s.id)?.driverName || '',
+      bookingId: initialTripById.get(s.id)?.bookingId || s.bookingId || '',
+      patientPhone: initialTripById.get(s.id)?.patientPhone || '',
+      pickupPhone: initialTripById.get(s.id)?.pickupPhone || '',
+      dropoffPhone: initialTripById.get(s.id)?.dropoffPhone || '',
+      notes: initialTripById.get(s.id)?.notes || '',
+      date: initialTripById.get(s.id)?.date || '',
     }));
   });
 

@@ -1652,8 +1652,26 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     const stops = orderedTrips
                       .filter(t => selectedTrips.includes(t.id))
                       .flatMap(t => [
-                        { address: t.pickup, clientName: t.patient, time: t.time, stopType: 'PU', tripId: t.id },
-                        { address: t.dropoff, clientName: t.patient, time: t.time, stopType: 'DO', tripId: t.id },
+                        {
+                          address: t.pickup,
+                          clientName: t.patient,
+                          time: t.time,
+                          stopType: 'PU',
+                          tripId: t.id,
+                          bookingId: t.bookingId || t.tripNumber || '',
+                          serviceType: t.serviceType || t.type || t.req || '',
+                          source: 'driver-trip',
+                        },
+                        {
+                          address: t.dropoff,
+                          clientName: t.patient,
+                          time: t.doTime || t.dropoffTime || t.time,
+                          stopType: 'DO',
+                          tripId: t.id,
+                          bookingId: t.bookingId || t.tripNumber || '',
+                          serviceType: t.serviceType || t.type || t.req || '',
+                          source: 'driver-trip',
+                        },
                       ])
                       .filter(s => s.address);
                     if (stops.length === 0) {
@@ -2437,7 +2455,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           requestAuthAction={requestAuthAction}
           routePlanStops={routePlanStops}
           onSetRoutePlanStops={setRoutePlanStops}
-           onSendToSequencer={(stopData) => {
+          onSendToSequencer={(stopData) => {
             const stamp = Date.now();
             const items = typeof stopData[0] === 'string'
               ? stopData.map((addr, i) => ({
@@ -2455,13 +2473,29 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     if (!s.tripId) {
                       const manualKey = `manual-${stamp}-${Math.random().toString(36).slice(2,6)}`;
                       if (!tripsMap.has(manualKey)) {
-                        tripsMap.set(manualKey, { name: s.clientName || `Stop ${String.fromCharCode(65 + order.length)}`, pu: s.stopType === 'PU' ? s.address : '', do: s.stopType === 'DO' ? s.address : '', time: s.time || '', isManual: true });
+                        tripsMap.set(manualKey, {
+                          name: s.clientName || `Stop ${String.fromCharCode(65 + order.length)}`,
+                          pu: s.stopType === 'DO' ? '' : s.address,
+                          do: s.stopType === 'PU' ? '' : s.address,
+                          time: s.time || '',
+                          serviceType: s.serviceType || '',
+                          bookingId: s.bookingId || '',
+                          isManual: true,
+                        });
                         order.push(manualKey);
                       }
                       return;
                     }
                     if (!tripsMap.has(s.tripId)) {
-                      tripsMap.set(s.tripId, { name: s.clientName || '', pu: '', do: '', time: s.time || '', isManual: false });
+                      tripsMap.set(s.tripId, {
+                        name: s.clientName || '',
+                        pu: '',
+                        do: '',
+                        time: s.time || '',
+                        serviceType: s.serviceType || '',
+                        bookingId: s.bookingId || '',
+                        isManual: false,
+                      });
                       order.push(s.tripId);
                     }
                     const entry = tripsMap.get(s.tripId);
@@ -2469,6 +2503,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     if (s.stopType === 'DO') entry.do = s.address;
                     if (s.clientName && !entry.name) entry.name = s.clientName;
                     if (s.time && !entry.time) entry.time = s.time;
+                    if (s.serviceType && !entry.serviceType) entry.serviceType = s.serviceType;
+                    if (s.bookingId && !entry.bookingId) entry.bookingId = s.bookingId;
                   });
                   return order.map((key, i) => {
                     const data = tripsMap.get(key);
@@ -2479,6 +2515,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       pu: data.pu,
                       do: data.do,
                       time: data.time,
+                      serviceType: data.serviceType || '',
+                      bookingId: data.bookingId || '',
                     };
                   });
                 })();
