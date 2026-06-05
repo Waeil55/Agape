@@ -306,6 +306,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [showSequencerModal, setShowSequencerModal] = useState(false);
   const [sequencerTripFilter, setSequencerTripFilter] = useState(null);
   const [routePlanSequencerStops, setRoutePlanSequencerStops] = useState(null);
+  const [routePlanSequencerSequence, setRoutePlanSequencerSequence] = useState(null);
   const [sequencerKey, setSequencerKey] = useState(0);
   const [driverPosition, setDriverPosition] = useState(null);
   const [analytics, setAnalytics] = useState({ tripsCompleted: 0, totalDistance: 0, timeSaved: 0, totalDriveTime: 0, efficiency: 0 });
@@ -2456,28 +2457,36 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           routePlanStops={routePlanStops}
           onSetRoutePlanStops={setRoutePlanStops}
           onSendToSequencer={(stopData) => {
-            setSequencerTripFilter(null);
-            setRoutePlanSequencerStops(null);
-            setSequencerKey(k => k + 1);
-            setShowSequencerModal(true);
-
             if (!Array.isArray(stopData) || stopData.length === 0) {
+              setSequencerTripFilter(null);
+              setRoutePlanSequencerStops(null);
+              setRoutePlanSequencerSequence(null);
+              setSequencerKey(k => k + 1);
+              setShowSequencerModal(true);
               setShowToast({ type: 'success', message: 'Route Sequencer opened.' });
               return;
             }
             const stamp = Date.now();
-            const items = typeof stopData[0] === 'string'
-              ? stopData.map((addr, i) => ({
+            const routePayload = typeof stopData[0] === 'string'
+              ? (() => {
+                  const clients = stopData.filter(Boolean).map((addr, i) => ({
                   id: `rplan-${stamp}-${i}`,
                   name: `Stop ${String.fromCharCode(65 + i)}`,
                   address: addr,
                   pu: addr,
                   do: addr,
                   time: '',
-                }))
+                  }));
+                  const sequence = clients.flatMap((client) => [
+                    { clientId: client.id, type: 'PU', leg: 'A' },
+                    { clientId: client.id, type: 'DO', leg: 'A' },
+                  ]);
+                  return { clients, sequence };
+                })()
               : (() => {
                   const tripsMap = new Map();
                   const order = [];
+                  const sequence = [];
                   stopData.filter(s => s?.address).forEach(s => {
                     if (!s.tripId) {
                       const manualKey = `manual-${stamp}-${Math.random().toString(36).slice(2,6)}`;
@@ -2492,6 +2501,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           isManual: true,
                         });
                         order.push(manualKey);
+                      }
+                      if (s.stopType === 'PU' || s.stopType === 'DO') {
+                        sequence.push({ clientId: manualKey, type: s.stopType, leg: 'A' });
+                      } else {
+                        sequence.push({ clientId: manualKey, type: 'PU', leg: 'A' });
+                        sequence.push({ clientId: manualKey, type: 'DO', leg: 'A' });
                       }
                       return;
                     }
@@ -2514,8 +2529,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     if (s.time && !entry.time) entry.time = s.time;
                     if (s.serviceType && !entry.serviceType) entry.serviceType = s.serviceType;
                     if (s.bookingId && !entry.bookingId) entry.bookingId = s.bookingId;
+                    if (s.stopType === 'PU' || s.stopType === 'DO') {
+                      sequence.push({ clientId: s.tripId, type: s.stopType, leg: 'A' });
+                    }
                   });
-                  return order.map((key, i) => {
+                  const clients = order.map((key, i) => {
                     const data = tripsMap.get(key);
                     return {
                       id: key,
@@ -2528,13 +2546,27 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       bookingId: data.bookingId || '',
                     };
                   });
+                  const seenStops = new Set(sequence.map((step) => `${step.clientId}:${step.type}`));
+                  clients.forEach((client) => {
+                    if (!seenStops.has(`${client.id}:PU`)) sequence.push({ clientId: client.id, type: 'PU', leg: 'A' });
+                    if (!seenStops.has(`${client.id}:DO`)) sequence.push({ clientId: client.id, type: 'DO', leg: 'A' });
+                  });
+                  return { clients, sequence };
                 })();
-            if (!items.length) {
+            if (!routePayload.clients.length) {
+              setSequencerTripFilter(null);
+              setRoutePlanSequencerStops(null);
+              setRoutePlanSequencerSequence(null);
+              setSequencerKey(k => k + 1);
+              setShowSequencerModal(true);
               setShowToast({ type: 'success', message: 'Route Sequencer opened. Add stops in the sequencer.' });
               return;
             }
-            setRoutePlanSequencerStops(items);
+            setSequencerTripFilter(null);
+            setRoutePlanSequencerStops(routePayload.clients);
+            setRoutePlanSequencerSequence(routePayload.sequence);
             setSequencerKey(k => k + 1);
+            setShowSequencerModal(true);
           }}
         />
       )}
@@ -3250,14 +3282,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== ROUTE SEQUENCER MODAL ===== */}
       {showSequencerModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); }}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); }}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
             <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Route size={16} className="text-indigo-700" /> Route Sequencer
               </h2>
-              <button onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="flex-1 overflow-hidden">
               <Suspense fallback={<LazyFallback />}>
@@ -3267,6 +3299,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   currentUser={currentUser}
                   role={role}
                   initialStops={routePlanSequencerStops}
+                  initialSequence={routePlanSequencerSequence}
                   onRouteSaved={({ route, saveMode, validTripIds }) => {
                     if (!onAddAuditLog) return;
                     onAddAuditLog(
@@ -3287,6 +3320,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     }
                     setShowSequencerModal(false);
                     setRoutePlanSequencerStops(null);
+                    setRoutePlanSequencerSequence(null);
                   }}
                 />
               </Suspense>

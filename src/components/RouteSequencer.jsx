@@ -108,20 +108,55 @@ const tripsToClients = (trips, selectedDay) => {
 const SEQUENCES_DOC = 'routeData/sequences';
 const TERMINAL_TRIP_LABELS = new Set(['Completed', 'Cancelled', 'No Show']);
 
-export default function RouteSequencerApp({ trips = [], drivers = [], currentUser, role, onApplyRoute, onRouteSaved, initialStops = null }) {
+const buildImportedRouteClients = (initialStops, initialTripById, currentDay) => {
+  if (!initialStops || initialStops.length === 0) return [];
+  return initialStops.map((s, i) => ({
+    id: s.id,
+    name: initialTripById.get(s.id)?.patient || s.name || `Stop ${String.fromCharCode(65 + i)}`,
+    req: initialTripById.get(s.id)?.serviceType || s.serviceType || 'AMB',
+    pu: s.pu || initialTripById.get(s.id)?.pickup || s.address || '',
+    do: s.do || initialTripById.get(s.id)?.dropoff || s.address || '',
+    puTime: s.puTime || s.time || initialTripById.get(s.id)?.time || '--:-- AM',
+    doTime: s.doTime || s.time || initialTripById.get(s.id)?.doTime || '--:-- AM',
+    miles: parseFloat(initialTripById.get(s.id)?.distance) || 0,
+    days: [tripDayAbbr(initialTripById.get(s.id)?.date) || currentDay],
+    todayStatus: 'active',
+    isTemp: !initialTripById.has(s.id),
+    tripStatus: initialTripById.get(s.id)?.status || 'Unassigned',
+    driverName: initialTripById.get(s.id)?.driverName || '',
+    bookingId: initialTripById.get(s.id)?.bookingId || s.bookingId || '',
+    patientPhone: initialTripById.get(s.id)?.patientPhone || '',
+    pickupPhone: initialTripById.get(s.id)?.pickupPhone || '',
+    dropoffPhone: initialTripById.get(s.id)?.dropoffPhone || '',
+    notes: initialTripById.get(s.id)?.notes || '',
+    date: initialTripById.get(s.id)?.date || '',
+  }));
+};
+
+const buildImportedRouteSequence = (initialStops, initialSequence) => {
+  const stamp = Date.now();
+  if (initialSequence && initialSequence.length > 0) {
+    return initialSequence.map((step, index) => ({
+      clientId: step.clientId,
+      type: step.type === 'DO' ? 'DO' : 'PU',
+      id: `${step.clientId}-${step.type || 'PU'}-${stamp}-${index}`,
+      leg: step.leg || 'A',
+    }));
+  }
+  if (!initialStops || initialStops.length === 0) return [];
+  return initialStops.flatMap((s, i) => [
+    { clientId: s.id, type: 'PU', id: `${s.id}-PU-${stamp}-${i}`, leg: 'A' },
+    { clientId: s.id, type: 'DO', id: `${s.id}-DO-${stamp}-${i}`, leg: 'A' },
+  ]);
+};
+
+export default function RouteSequencerApp({ trips = [], drivers = [], currentUser, role, onApplyRoute, onRouteSaved, initialStops = null, initialSequence = null }) {
   const today = new Date();
   const todayAbbr = DAY_MAP[today.getDay()];
-  const initialTripById = new Map((trips || []).map((trip) => [trip.id, trip]));
+  const initialTripById = useMemo(() => new Map((trips || []).map((trip) => [trip.id, trip])), [trips]);
   const [currentDay, setCurrentDay] = useState(() => role === 'driver' ? 'All' : (localStorage.getItem('agape_seqCurrentDay') || todayAbbr));
   const [mobileView, setMobileView] = useState(() => initialStops ? 'sequence' : 'pool');
-  const [sequence, setSequence] = useState(() => {
-    if (!initialStops || initialStops.length === 0) return [];
-    const stamp = Date.now();
-    return initialStops.flatMap((s, i) => [
-      { clientId: s.id, type: 'PU', id: `${s.id}-PU-${stamp}`, leg: 'A' },
-      { clientId: s.id, type: 'DO', id: `${s.id}-DO-${stamp}`, leg: 'A' },
-    ]);
-  });
+  const [sequence, setSequence] = useState(() => buildImportedRouteSequence(initialStops, initialSequence));
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveType, setSaveType] = useState('recurring');
   const [templateName, setTemplateName] = useState('');
@@ -153,30 +188,21 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
   const [showAddTempModal, setShowAddTempModal] = useState(false);
   const [tempTripForm, setTempTripForm] = useState(initialTempForm);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
-  const [tempClients, setTempClients] = useState(() => {
-    if (!initialStops || initialStops.length === 0) return [];
-    return initialStops.map((s, i) => ({
-      id: s.id,
-      name: initialTripById.get(s.id)?.patient || s.name || `Stop ${String.fromCharCode(65 + i)}`,
-      req: initialTripById.get(s.id)?.serviceType || s.serviceType || 'AMB',
-      pu: s.pu || initialTripById.get(s.id)?.pickup || s.address || '',
-      do: s.do || initialTripById.get(s.id)?.dropoff || s.address || '',
-      puTime: s.puTime || s.time || initialTripById.get(s.id)?.time || '--:-- AM',
-      doTime: s.doTime || s.time || initialTripById.get(s.id)?.doTime || '--:-- AM',
-      miles: parseFloat(initialTripById.get(s.id)?.distance) || 0,
-      days: [tripDayAbbr(initialTripById.get(s.id)?.date) || currentDay],
-      todayStatus: 'active',
-      isTemp: !initialTripById.has(s.id),
-      tripStatus: initialTripById.get(s.id)?.status || 'Unassigned',
-      driverName: initialTripById.get(s.id)?.driverName || '',
-      bookingId: initialTripById.get(s.id)?.bookingId || s.bookingId || '',
-      patientPhone: initialTripById.get(s.id)?.patientPhone || '',
-      pickupPhone: initialTripById.get(s.id)?.pickupPhone || '',
-      dropoffPhone: initialTripById.get(s.id)?.dropoffPhone || '',
-      notes: initialTripById.get(s.id)?.notes || '',
-      date: initialTripById.get(s.id)?.date || '',
-    }));
-  });
+  const [tempClients, setTempClients] = useState(() => buildImportedRouteClients(initialStops, initialTripById, currentDay));
+
+  useEffect(() => {
+    if (!initialStops || initialStops.length === 0) return;
+    const importedClients = buildImportedRouteClients(initialStops, initialTripById, currentDay);
+    const importedSequence = buildImportedRouteSequence(initialStops, initialSequence);
+    const importedIds = new Set(importedClients.map((client) => client.id));
+    setTempClients((prev) => [
+      ...prev.filter((client) => !importedIds.has(client.id)),
+      ...importedClients,
+    ]);
+    setSequence(importedSequence);
+    setSkippedIds((prev) => new Set([...prev].filter((clientId) => !importedIds.has(clientId))));
+    setMobileView('sequence');
+  }, [initialStops, initialSequence, initialTripById, currentDay]);
 
   // Drag & Drop
   const dragItem = useRef(null);
