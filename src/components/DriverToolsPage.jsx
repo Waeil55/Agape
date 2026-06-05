@@ -139,6 +139,7 @@ const RoutePlanSection = ({
   onSetRoutePlanStops = null,
   appSettings = {},
   onSendToSequencer = null,
+  onOpenSequencer = null,
   currentUser = 'driver',
   driverPosition = null,
 }) => {
@@ -482,7 +483,19 @@ const RoutePlanSection = ({
   };
 
   const sendToSequencer = () => {
+    const openSequencerFallback = () => {
+      if (typeof onOpenSequencer === 'function') {
+        onOpenSequencer();
+        return true;
+      }
+      return false;
+    };
+
     if (typeof onSendToSequencer !== 'function') {
+      if (openSequencerFallback()) {
+        setRouteNotice('Route Sequencer opened.');
+        return;
+      }
       setRouteError('Route Sequencer is not available from this screen.');
       return;
     }
@@ -499,6 +512,10 @@ const RoutePlanSection = ({
       source: stop.source || 'route-plan',
     })).filter(stop => stop.address);
     if (sequencerStops.length === 0) {
+      if (openSequencerFallback()) {
+        setRouteNotice('Route Sequencer opened. Add stops in the sequencer or return to Route Plan.');
+        return;
+      }
       setRouteError('Add at least one stop before opening Route Sequencer.');
       return;
     }
@@ -673,8 +690,7 @@ const RoutePlanSection = ({
               </button>
               <button
                 onClick={sendToSequencer}
-                disabled={routeValidation.routeStops.length === 0}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-black text-white bg-[#121A66] rounded-xl active:scale-95 transition hover:bg-[#182482] shadow-sm disabled:opacity-40"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-black text-white bg-[#121A66] rounded-xl active:scale-95 transition hover:bg-[#182482] shadow-sm"
               >
                 <Route size={14} /> Send to Sequencer
               </button>
@@ -835,6 +851,7 @@ const DriverToolsPage = ({
         onSetRoutePlanStops={onSetRoutePlanStops}
         appSettings={appSettings}
         onSendToSequencer={onSendToSequencer}
+        onOpenSequencer={onOpenSequencer}
         currentUser={currentUser}
         driverPosition={driverPosition}
       />
