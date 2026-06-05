@@ -36,7 +36,7 @@ const statusColors = {
   'No Show': 'bg-rose-100 text-rose-700',
 };
 
-const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser }) => {
+const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendToSequencer }) => {
   const [stops, setStops] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
   });
@@ -193,6 +193,50 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser }) => {
 
   const startNav = () => {
     if (stops.length > 0) { setNavMode(true); const fi = stops.findIndex(s => !completed.has(s.id)); setNavStep(fi >= 0 ? fi : 0); }
+  };
+
+  const sendToSequencer = () => {
+    if (typeof onSendToSequencer !== 'function' || stops.length === 0) return;
+    const clientMap = new Map();
+    const order = [];
+    const sequence = [];
+
+    stops.forEach((stop) => {
+      const id = stop.tripId || stop.id;
+      if (!clientMap.has(id)) {
+        clientMap.set(id, {
+          id,
+          name: stop.patient || 'Route Stop',
+          address: stop.address || '',
+          pu: '',
+          do: '',
+          time: stop.time || '',
+          serviceType: stop.wheelchair ? 'WHEELCHAIR' : '',
+          bookingId: stop.bookingId || '',
+        });
+        order.push(id);
+      }
+
+      const client = clientMap.get(id);
+      if (stop.patient && !client.name) client.name = stop.patient;
+      if (stop.time && !client.time) client.time = stop.time;
+      if (stop.bookingId && !client.bookingId) client.bookingId = stop.bookingId;
+      if (stop.type === 'pickup') client.pu = stop.address || client.pu;
+      if (stop.type === 'dropoff') client.do = stop.address || client.do;
+      sequence.push({ clientId: id, type: stop.type === 'dropoff' ? 'DO' : 'PU', leg: 'A' });
+    });
+
+    const clients = order.map((id, index) => {
+      const client = clientMap.get(id);
+      return {
+        ...client,
+        address: client.pu || client.do || client.address || '',
+        name: client.name || `Stop ${getStopLetter(index)}`,
+      };
+    });
+
+    onSendToSequencer({ clients, sequence });
+    setAiMsg(`${sequence.length} stops sent to Route Sequencer.`);
   };
 
   // === RENDER HELPERS ===
@@ -436,6 +480,9 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser }) => {
                 {optimizing ? <Loader2 size={11} className="animate-spin" /> : <BrainCircuit size={11} />} Optimize
               </button>
               <button onClick={copyRoute} disabled={stops.length === 0} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-30" title="Copy route"><Copy size={13} /></button>
+              <button onClick={sendToSequencer} disabled={stops.length === 0 || typeof onSendToSequencer !== 'function'} className="px-2.5 h-7 bg-[#121A66] text-white rounded-lg text-[10px] font-bold flex items-center gap-1 hover:bg-[#182482] active:scale-95 disabled:opacity-30" title="Send route to sequencer">
+                <Route size={11} /> Sequencer
+              </button>
               <button onClick={clearRoute} disabled={stops.length === 0} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg disabled:opacity-30" title="Clear route"><Trash2 size={13} /></button>
               <button onClick={() => setDark(v => !v)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">{dark ? <Sun size={13} /> : <Moon size={13} />}</button>
             </div>

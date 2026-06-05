@@ -130,6 +130,9 @@ const EnterpriseDashboard = ({
     return t === 'alerts' || t === 'details' || t === 'ai' ? t : 'alerts';
   });
   const [showSequencerModal, setShowSequencerModal] = useState(false);
+  const [routePlannerSequencerStops, setRoutePlannerSequencerStops] = useState(null);
+  const [routePlannerSequencerSequence, setRoutePlannerSequencerSequence] = useState(null);
+  const [routePlannerSequencerKey, setRoutePlannerSequencerKey] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Persist navigation state to localStorage (survives refresh)
@@ -1022,7 +1025,20 @@ const EnterpriseDashboard = ({
         </Suspense>
       );
       case 'chat': return <ChatPage currentUser={currentUser} role={role} drivers={drivers} dispatchers={dispatchers} trips={trips} onSwitchToDispatch={(tripId) => setActivePanel('operations')} />;
-      case 'routePlanner': return <RoutePlannerPage trips={trips} drivers={drivers} role={role} currentUser={currentUser} />;
+      case 'routePlanner': return (
+        <RoutePlannerPage
+          trips={trips}
+          drivers={drivers}
+          role={role}
+          currentUser={currentUser}
+          onSendToSequencer={({ clients, sequence }) => {
+            setRoutePlannerSequencerStops(clients || null);
+            setRoutePlannerSequencerSequence(sequence || null);
+            setRoutePlannerSequencerKey(k => k + 1);
+            setShowSequencerModal(true);
+          }}
+        />
+      );
       case 'reports': return (
         <Suspense fallback={<LazyFallback />}>
           <ReportsPage trips={trips} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} />
@@ -1514,21 +1530,24 @@ const EnterpriseDashboard = ({
       {/* Route Sequencer Modal */}
       {showSequencerModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowSequencerModal(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} />
           <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
             <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Route size={16} className="text-indigo-700" /> Route Sequencer
               </h2>
-              <button onClick={() => setShowSequencerModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="flex-1 overflow-hidden">
               <Suspense fallback={<LazyFallback />}>
-                <RouteSequencerApp 
+                <RouteSequencerApp
+                  key={routePlannerSequencerKey}
                   trips={trips} 
                   drivers={drivers}
                   currentUser={currentUser} 
                   role={role}
+                  initialStops={routePlannerSequencerStops}
+                  initialSequence={routePlannerSequencerSequence}
                   onRouteSaved={({ route, saveMode, driverId, validTripIds }) => {
                     if (saveMode === 'recurring') {
                       addAuditLog('Route Created', `${currentUser} saved recurring route "${route.name}" with ${route.sequence?.length || 0} stops.`, 'indigo');
