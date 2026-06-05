@@ -4,7 +4,6 @@ import {
   Route, Repeat, AlertTriangle, Zap, ChevronDown, ChevronUp,
   Timer, Copy, CheckSquare, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
-import LiveRouteMap from './LiveRouteMap';
 import { impact } from '../utils/haptics';
 import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
 
@@ -915,35 +914,6 @@ const DriverToolsPage = ({
           </div>
         </div>
       )}
-
-      {/* Collapsible Sections */}
-      {/* Live Route Map */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <button
-          onClick={() => toggleSection('route')}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition"
-        >
-          <div className="flex items-center gap-2">
-            <MapIcon size={16} className="text-blue-600" />
-            <span className="text-sm font-bold text-slate-800">Live Route Map</span>
-          </div>
-          {expandedSection === 'route' ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-        </button>
-        {expandedSection === 'route' && (
-          <div className="border-t border-slate-100">
-            <LiveRouteMap
-              driverPosition={driverPosition}
-              trips={activeTrips}
-              aiSequence={aiSequence}
-              activeTripId={guidedSteps?.[guidedStepIndex]?.tripId || aiSequence?.[guidedStepIndex] || null}
-              theme={appSettings?.theme || 'light'}
-              onOpenInNav={onOpenInNav}
-              currentUser={currentUser}
-              role={role}
-            />
-          </div>
-        )}
-      </div>
 
       {/* Route Quick Nav */}
       {activeTrips.length > 0 && (
