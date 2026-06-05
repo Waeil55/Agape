@@ -15,6 +15,7 @@ import { db, auth } from '../config/firebase';
 
 const DATA_DOC = 'appData/agape';
 const TRIP_LEDGER_COLLECTION = 'tripLedger';
+const DRIVER_TRIP_PROGRESS_COLLECTION = 'driverTripProgress';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
 const DISPATCHER_PROFILE_COLLECTION = 'dispatcherProfiles';
 const VEHICLE_COLLECTION = 'fleetVehicles';
@@ -59,6 +60,13 @@ function normalizeData(data = {}) {
     logs: data.logs || [],
     phoneNumbers: data.phoneNumbers || DEFAULT_DATA.phoneNumbers,
   };
+}
+
+function mergeTripProgress(trips = [], progressByTrip = {}) {
+  return (trips || []).map((trip) => {
+    const progress = progressByTrip?.[trip?.id];
+    return progress ? { ...trip, ...progress } : trip;
+  });
 }
 
 function shouldIgnoreRealtimePermissionError(err) {
@@ -207,6 +215,7 @@ export function useFirestoreAppData() {
   });
 
   const dataRef = useRef(DEFAULT_DATA);
+  const tripProgressRef = useRef({});
   const pendingWritesRef = useRef(0);
   const mirrorBackfillRef = useRef({
     drivers: false,
@@ -231,16 +240,20 @@ export function useFirestoreAppData() {
               : currentData.phoneNumbers,
           });
           const applyData = (nextData) => {
-            dataRef.current = nextData;
+            const mergedData = {
+              ...nextData,
+              trips: mergeTripProgress(nextData.trips, tripProgressRef.current),
+            };
+            dataRef.current = mergedData;
             setState(prev => ({
               ...prev,
-              trips: nextData.trips,
-              drivers: nextData.drivers,
-              dispatchers: nextData.dispatchers,
-              vehicles: nextData.vehicles,
-              trashedTrips: nextData.trashedTrips,
-              logs: nextData.logs,
-              phoneNumbers: nextData.phoneNumbers,
+              trips: mergedData.trips,
+              drivers: mergedData.drivers,
+              dispatchers: mergedData.dispatchers,
+              vehicles: mergedData.vehicles,
+              trashedTrips: mergedData.trashedTrips,
+              logs: mergedData.logs,
+              phoneNumbers: mergedData.phoneNumbers,
               loading: false,
               error: null,
               initialized: true,
@@ -407,12 +420,43 @@ export function useFirestoreAppData() {
         console.error('Realtime phone number sync failed:', err);
       }
     );
+    const unsubTripProgress = onSnapshot(
+      collection(db, DRIVER_TRIP_PROGRESS_COLLECTION),
+      (snap) => {
+        const progressByTrip = {};
+        snap.forEach((progressDoc) => {
+          progressByTrip[progressDoc.id] = {
+            id: progressDoc.id,
+            ...progressDoc.data(),
+          };
+          delete progressByTrip[progressDoc.id].tripId;
+        });
+        tripProgressRef.current = progressByTrip;
+        const baseData = normalizeData(dataRef.current);
+        const mergedTrips = mergeTripProgress(baseData.trips, progressByTrip);
+        dataRef.current = {
+          ...baseData,
+          trips: mergedTrips,
+        };
+        setState(prev => ({
+          ...prev,
+          trips: mergedTrips,
+          loading: false,
+          error: null,
+        }));
+      },
+      (err) => {
+        if (shouldIgnoreRealtimePermissionError(err)) return;
+        console.error('Realtime driver workflow sync failed:', err);
+      }
+    );
 
     return () => {
       unsubDrivers();
       unsubDispatchers();
       unsubVehicles();
       unsubPhones();
+      unsubTripProgress();
     };
   }, []);
 

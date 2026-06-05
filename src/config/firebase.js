@@ -121,29 +121,42 @@ export async function saveTripWorkflowUpdate(tripId, updates = {}) {
     ...updates,
     workflowUpdatedAt: updates.workflowUpdatedAt || new Date().toISOString(),
   });
+  const progressRef = doc(db, 'driverTripProgress', tripId);
   const appDataRef = doc(db, 'appData', 'agape');
   const ledgerRef = doc(db, 'tripLedger', tripId);
   const tripsRef = doc(db, 'trips', tripId);
 
-  await runTransaction(db, async (transaction) => {
+  await setDoc(progressRef, {
+    tripId,
+    ...cleanUpdates,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+
+  runTransaction(db, async (transaction) => {
     const appSnap = await transaction.get(appDataRef);
-    if (appSnap.exists()) {
-      const data = appSnap.data() || {};
-      const trips = Array.isArray(data.trips) ? data.trips : [];
-      const nextTrips = trips.map((trip) => (
-        String(trip?.id || '') === String(tripId)
-          ? { ...trip, ...cleanUpdates }
-          : trip
-      ));
-      transaction.set(appDataRef, {
-        trips: nextTrips,
-        updatedAt: serverTimestamp(),
-        updatedField: 'trips',
-        updatedAtLocal: new Date().toISOString(),
-      }, { merge: true });
-    }
-    transaction.set(ledgerRef, cleanUpdates, { merge: true });
-    transaction.set(tripsRef, cleanUpdates, { merge: true });
+    if (!appSnap.exists()) return;
+    const data = appSnap.data() || {};
+    const trips = Array.isArray(data.trips) ? data.trips : [];
+    const nextTrips = trips.map((trip) => (
+      String(trip?.id || '') === String(tripId)
+        ? { ...trip, ...cleanUpdates }
+        : trip
+    ));
+    transaction.set(appDataRef, {
+      trips: nextTrips,
+      updatedAt: serverTimestamp(),
+      updatedField: 'trips',
+      updatedAtLocal: new Date().toISOString(),
+    }, { merge: true });
+  }).catch((err) => {
+    console.warn('Workflow appData mirror skipped:', err);
+  });
+
+  setDoc(ledgerRef, cleanUpdates, { merge: true }).catch((err) => {
+    console.warn('Workflow tripLedger mirror skipped:', err);
+  });
+  setDoc(tripsRef, cleanUpdates, { merge: true }).catch((err) => {
+    console.warn('Workflow trips mirror skipped:', err);
   });
   return true;
 }
