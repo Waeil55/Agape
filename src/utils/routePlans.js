@@ -114,6 +114,11 @@ export const getValidRouteStops = (route, trips = []) => {
 
 export const routeHasAssignedTripsForDriver = (route, driver, trips = []) => {
   if (!route || !driver?.id) return false;
+  const tripIds = new Set((trips || []).map((trip) => trip.id));
+  if ((route.sequence || []).some((stop) => (
+    stop?.source === 'route-plan'
+    || (stop?.address && stop?.clientId && !tripIds.has(stop.clientId))
+  ))) return true;
   const driverEmail = normalizeEmail(driver.email);
   return getValidRouteStops(route, trips).some((stop) => {
     const trip = trips.find((item) => item.id === stop.clientId);

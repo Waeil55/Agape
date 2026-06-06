@@ -197,46 +197,46 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
 
   const sendToSequencer = () => {
     if (typeof onSendToSequencer !== 'function' || stops.length === 0) return;
-    const clientMap = new Map();
-    const order = [];
-    const sequence = [];
-
+    const groups = new Map();
     stops.forEach((stop) => {
-      const id = stop.tripId || stop.id;
-      if (!clientMap.has(id)) {
-        clientMap.set(id, {
-          id,
-          name: stop.patient || 'Route Stop',
-          address: stop.address || '',
+      const id = stop.tripId || stop.id || `manual-${Date.now()}`;
+      if (!groups.has(id)) {
+        groups.set(id, {
+          clientName: stop.patient || 'Route Stop',
           pu: '',
           do: '',
           time: stop.time || '',
           serviceType: stop.wheelchair ? 'WHEELCHAIR' : '',
           bookingId: stop.bookingId || '',
+          phone: stop.phone || '',
         });
-        order.push(id);
       }
-
-      const client = clientMap.get(id);
-      if (stop.patient && !client.name) client.name = stop.patient;
-      if (stop.time && !client.time) client.time = stop.time;
-      if (stop.bookingId && !client.bookingId) client.bookingId = stop.bookingId;
-      if (stop.type === 'pickup') client.pu = stop.address || client.pu;
-      if (stop.type === 'dropoff') client.do = stop.address || client.do;
-      sequence.push({ clientId: id, type: stop.type === 'dropoff' ? 'DO' : 'PU', leg: 'A' });
+      const g = groups.get(id);
+      if (stop.type === 'pickup') g.pu = stop.address || g.pu;
+      if (stop.type === 'dropoff') g.do = stop.address || g.do;
+      if (stop.patient && !g.clientName.startsWith('Stop ')) g.clientName = stop.patient;
+      if (stop.time && !g.time) g.time = stop.time;
+      if (stop.bookingId && !g.bookingId) g.bookingId = stop.bookingId;
+      if (stop.phone && !g.phone) g.phone = stop.phone;
     });
 
-    const clients = order.map((id, index) => {
-      const client = clientMap.get(id);
-      return {
-        ...client,
-        address: client.pu || client.do || client.address || '',
-        name: client.name || `Stop ${getStopLetter(index)}`,
-      };
+    const items = [];
+    const sequence = [];
+    let groupIdx = 0;
+    groups.forEach((g) => {
+      const groupId = `seq-${groupIdx++}-${Date.now()}`;
+      if (g.pu) {
+        items.push({ id: `${groupId}-pu`, address: g.pu, name: g.clientName, pu: g.pu, do: '', time: g.time, serviceType: g.serviceType, bookingId: g.bookingId, phone: g.phone });
+        sequence.push({ clientId: `${groupId}-pu`, type: 'PU', leg: 'A' });
+      }
+      if (g.do) {
+        items.push({ id: `${groupId}-do`, address: g.do, name: g.clientName, pu: '', do: g.do, time: g.time, serviceType: g.serviceType, bookingId: g.bookingId, phone: g.phone });
+        sequence.push({ clientId: `${groupId}-do`, type: 'DO', leg: 'A' });
+      }
     });
 
-    onSendToSequencer({ clients, sequence });
-    setAiMsg(`${sequence.length} stops sent to Route Sequencer.`);
+    onSendToSequencer({ clients: items, sequence });
+    setAiMsg(`${stops.length} stops sent to Route Sequencer.`);
   };
 
   // === RENDER HELPERS ===

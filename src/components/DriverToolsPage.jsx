@@ -499,16 +499,17 @@ const RoutePlanSection = ({
       return;
     }
 
+    const sequencerOrigin = routeValidation.origin?.label ? cleanRouteAddress(routeValidation.origin.label) : '';
     const sequencerStops = stops.slice(1).map((stop, index) => ({
-      address: cleanRouteAddress(stop.label),
-      clientName: stop.clientName || '',
-      time: stop.stopTime || '',
-      stopType: stop.stopType || '',
-      tripId: stop.tripId || null,
-      bookingId: stop.bookingId || '',
-      serviceType: stop.serviceType || '',
+      address: cleanRouteAddress(stop?.label || ''),
+      clientName: stop?.clientName || '',
+      time: stop?.stopTime || '',
+      stopType: stop?.stopType || '',
+      tripId: stop?.tripId || null,
+      bookingId: stop?.bookingId || '',
+      serviceType: stop?.serviceType || '',
       sequenceIndex: index + 1,
-      source: stop.source || 'route-plan',
+      source: stop?.source || 'route-plan',
     })).filter(stop => stop.address);
 
     if (sequencerStops.length === 0) {
@@ -520,7 +521,7 @@ const RoutePlanSection = ({
       return;
     }
     setRouteError('');
-    onSendToSequencer(sequencerStops);
+    onSendToSequencer(sequencerStops, sequencerOrigin || null);
     setRouteNotice(`${sequencerStops.length} route stop${sequencerStops.length !== 1 ? 's' : ''} sent to Route Sequencer.`);
   };
 

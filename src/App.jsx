@@ -496,8 +496,13 @@ const App = () => {
     return trips.filter(trip => {
       const tripEmail = normalizeEmail(trip.driverEmail || drivers.find(driver => driver.id === trip.driverId)?.email);
       const assignedToCurrentDriver = driverIds.has(trip.driverId) || tripEmail === email;
+      const incomingTransfer = trip.transferRequest?.status === 'pending'
+        && (
+          driverIds.has(trip.transferRequest?.toDriverId)
+          || normalizeEmail(trip.transferRequest?.toDriverEmail) === email
+        );
       const activeStatus = !['Completed', 'Cancelled', 'No Show'].includes(trip.status);
-      return assignedToCurrentDriver && (tripMatchesTodayOrTomorrow(trip.date) || activeStatus);
+      return (assignedToCurrentDriver || incomingTransfer) && (tripMatchesTodayOrTomorrow(trip.date) || activeStatus || incomingTransfer);
     });
   }, [trips, drivers, currentUserDriverProfile, currentUser, role]);
   useEffect(() => {
@@ -1540,21 +1545,38 @@ const App = () => {
   };
 
   const addTrip = useCallback((newTrip) => {
-    if (newTrip.driverId) {
-      const selectedDriver = drivers.find(driver => driver.id === newTrip.driverId);
+    let tripToAdd = { ...newTrip };
+    if (role === 'driver') {
+      const driverProfile = currentUserDriverProfile || buildDriverProfileFromEmail(currentUser || '', auth.currentUser?.uid || '');
+      if (!driverProfile?.id) {
+        addAuditLog('Trip Blocked', `${currentUser} attempted to add a trip before driver profile sync completed.`, 'rose');
+        addToast('Trip Not Saved', 'Your driver profile is still syncing. Try again in a moment.', 'danger');
+        return;
+      }
+      tripToAdd = {
+        ...tripToAdd,
+        status: 'Assigned',
+        driverId: driverProfile.id,
+        driverEmail: driverProfile.email || normalizeEmail(currentUser),
+        driverName: driverProfile.name || currentUser,
+        createdByRole: 'driver',
+      };
+    }
+    if (tripToAdd.driverId) {
+      const selectedDriver = drivers.find(driver => driver.id === tripToAdd.driverId) || (role === 'driver' ? currentUserDriverProfile : null);
       if (!canControlDriver(selectedDriver)) {
         addAuditLog('Scope Blocked', `${currentUser} attempted to add a trip for an out-of-scope driver.`, 'rose');
-        addToast('Trip Blocked', 'Dispatchers can only assign trips to their assigned drivers.', 'danger');
+        addToast('Trip Blocked', role === 'driver' ? 'Drivers can only create trips for themselves.' : 'Dispatchers can only assign trips to their assigned drivers.', 'danger');
         return;
       }
     }
     setTrips(prev => {
-      const all = dedupTrips([newTrip, ...prev]);
+      const all = dedupTrips([tripToAdd, ...prev]);
       return all;
     });
-    addAuditLog('Trip Added', `${currentUser} manually added trip for ${newTrip.patient} (${newTrip.bookingId}).`, 'emerald');
-    addToast('Trip Added', `${newTrip.patient}'s trip has been added successfully.`, 'success');
-  }, [currentUser, dedupTrips, drivers, canControlDriver]);
+    addAuditLog('Trip Added', `${currentUser} manually added trip for ${tripToAdd.patient} (${tripToAdd.bookingId}).`, 'emerald');
+    addToast('Trip Added', `${tripToAdd.patient}'s trip has been added successfully.`, 'success');
+  }, [currentUser, role, currentUserDriverProfile, dedupTrips, drivers, canControlDriver]);
 
   const resetSystemData = () => {
     if (role !== 'admin') return;
@@ -2575,7 +2597,7 @@ const App = () => {
               onAddTrip={addTrip}
               role={role}
               currentUser={currentUser}
-              drivers={role === 'dispatcher' ? scopedDrivers : drivers}
+              drivers={role === 'driver' ? (currentUserDriverProfile ? [currentUserDriverProfile] : []) : role === 'dispatcher' ? scopedDrivers : drivers}
               dispatchers={dispatchers}
             />
           )}

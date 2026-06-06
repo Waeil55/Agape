@@ -25,7 +25,9 @@ import { openNavigation, showNavActionSheet, makeCall, sendSMS, showCallActionSh
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
 import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
+import { normalizeEmail } from '../utils/accessControl';
 
+import ErrorBoundary from './ErrorBoundary';
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
@@ -286,6 +288,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [arrivalOdometer, setArrivalOdometer] = useState('');
   const [signatureConfirmed, setSignatureConfirmed] = useState(false);
   const [showSignatureConfirm, setShowSignatureConfirm] = useState(null);
+  const [routeStopOdometerPrompt, setRouteStopOdometerPrompt] = useState(null);
+  const [routeStopOdometerValue, setRouteStopOdometerValue] = useState('');
+  const [routeStopSignaturePrompt, setRouteStopSignaturePrompt] = useState(null);
+  const [routeStopSignatureConfirmed, setRouteStopSignatureConfirmed] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(null);
   const [completeOdometer, setCompleteOdometer] = useState('');
   const [completeError, setCompleteError] = useState('');
@@ -294,6 +300,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [showTripDetails, setShowTripDetails] = useState(null);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
   const [showToast, setShowToast] = useState(null);
+  useEffect(() => {
+    if (!showToast || showToast.action || showToast.type === 'error') return;
+    const t = setTimeout(() => setShowToast(null), 1000);
+    return () => clearTimeout(t);
+  }, [showToast]);
   const [expandedTripId, setExpandedTripIdRaw] = useState(() => {
     try { const v = localStorage.getItem('expandedTripId'); return v && v !== 'null' ? v : null; } catch { return null; }
   });
@@ -312,6 +323,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [sequencerTripFilter, setSequencerTripFilter] = useState(null);
   const [routePlanSequencerStops, setRoutePlanSequencerStops] = useState(null);
   const [routePlanSequencerSequence, setRoutePlanSequencerSequence] = useState(null);
+  const [routePlanSequencerOrigin, setRoutePlanSequencerOrigin] = useState(null);
   const [sequencerKey, setSequencerKey] = useState(0);
   const [driverPosition, setDriverPosition] = useState(null);
   const [analytics, setAnalytics] = useState({ tripsCompleted: 0, totalDistance: 0, timeSaved: 0, totalDriveTime: 0, efficiency: 0 });
@@ -328,6 +340,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [passwordValue, setPasswordValue] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordVerifying, setPasswordVerifying] = useState(false);
+  const [transferPrompt, setTransferPrompt] = useState(null);
+  const [transferTargetDriverId, setTransferTargetDriverId] = useState('');
+  const [transferReason, setTransferReason] = useState('');
   const [showContactSelector, setShowContactSelector] = useState(null);
   const [restorePrompt, setRestorePrompt] = useState(null);
   const [cancelPrompt, setCancelPrompt] = useState(null);
@@ -516,6 +531,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const nextTemplates = routeTemplates.map((template) => (
       template.id === assignedSequence.id ? { ...template, ...updates } : template
     ));
+    setAssignedSequence((prev) => (prev?.id === assignedSequence.id ? { ...prev, ...updates } : prev));
     await setDoc(doc(db, 'routeData', 'sequences'), { templates: nextTemplates }, { merge: true });
     if (auditTitle && auditMessage && onAddAuditLog) {
       onAddAuditLog(auditTitle, auditMessage, 'indigo');
@@ -750,6 +766,77 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const timedTrips = orderedTrips.filter(t => !isWillCall(t));
   const willCallTrips = orderedTrips.filter(t => isWillCall(t));
+  const transferTargetDrivers = useMemo(() => (
+    (allDrivers || drivers || [])
+      .filter((driver) => driver?.id && driver.id !== me?.id)
+      .filter((driver) => String(driver.status || '').toLowerCase() !== 'inactive')
+  ), [allDrivers, drivers, me?.id]);
+  const incomingTransferTrips = useMemo(() => (
+    driverScopedTrips.filter((trip) => (
+      trip.transferRequest?.status === 'pending'
+      && (
+        trip.transferRequest?.toDriverId === me?.id
+        || normalizeEmail(trip.transferRequest?.toDriverEmail) === normalizeEmail(me?.email || currentUser)
+      )
+    ))
+  ), [driverScopedTrips, me?.id, me?.email, currentUser]);
+  const assignedRoutePlanStops = useMemo(() => {
+    if (!assignedSequence?.sequence?.length) return [];
+    const realTripIds = new Set((driverScopedTrips || []).map((trip) => trip.id));
+    return (assignedSequence.sequence || [])
+      .map((stop, index) => ({ ...stop, sequenceIndex: index + 1 }))
+      .filter((stop) => (
+        stop?.source === 'route-plan'
+        || (stop?.address && stop?.clientId && !realTripIds.has(stop.clientId))
+      ));
+  }, [assignedSequence, driverScopedTrips]);
+  const getRoutePlanStopPhone = useCallback((stop) => {
+    if (!stop) return '';
+    const directPhone = stop.phone || stop.patientPhone || stop.pickupPhone || stop.dropoffPhone;
+    if (directPhone) return directPhone;
+    const stopType = String(stop.type || '').toUpperCase() === 'DO' ? 'DO' : 'PU';
+    const bookingId = String(stop.bookingId || '').trim().toLowerCase();
+    const address = String(stop.address || '').trim().toLowerCase();
+    const name = String(stop.name || '').trim().toLowerCase();
+    const matchedTrip = (driverScopedTrips || []).find((trip) => {
+      const tripBooking = String(trip.bookingId || trip.tripNumber || trip.id || '').trim().toLowerCase();
+      const tripName = String(trip.patient || trip.patientName || '').trim().toLowerCase();
+      const pickup = String(trip.pickup || '').trim().toLowerCase();
+      const dropoff = String(trip.dropoff || '').trim().toLowerCase();
+      return (bookingId && tripBooking === bookingId)
+        || (name && tripName === name && ((stopType === 'PU' && pickup === address) || (stopType === 'DO' && dropoff === address)))
+        || (address && (pickup === address || dropoff === address));
+    });
+    if (!matchedTrip) return '';
+    return stopType === 'DO'
+      ? (matchedTrip.dropoffPhone || matchedTrip.patientPhone || matchedTrip.patientMobile || matchedTrip.pickupPhone || '')
+      : (matchedTrip.pickupPhone || matchedTrip.patientPhone || matchedTrip.patientMobile || matchedTrip.dropoffPhone || '');
+  }, [driverScopedTrips]);
+  const getRoutePlanStopKey = useCallback((stop) => (
+    `${stop?.clientId || stop?.id || 'stop'}:${String(stop?.type || 'PU').toUpperCase()}:${stop?.stepNumber || stop?.sequenceIndex || 0}`
+  ), []);
+  const routePlanWorkflow = assignedSequence?.driverWorkflow || {};
+  const getRoutePlanStopWorkflow = useCallback((stop) => (
+    routePlanWorkflow[getRoutePlanStopKey(stop)] || {}
+  ), [getRoutePlanStopKey, routePlanWorkflow]);
+  const isRoutePlanStopCompleted = useCallback((stop) => {
+    const workflow = getRoutePlanStopWorkflow(stop);
+    return ['Completed', 'No Show', 'Cancelled', 'Rerouted'].includes(workflow.status) || !!workflow.completedAt;
+  }, [getRoutePlanStopWorkflow]);
+  const currentRoutePlanStopIndex = assignedRoutePlanStops.findIndex((stop) => !isRoutePlanStopCompleted(stop));
+  const currentRoutePlanStop = currentRoutePlanStopIndex >= 0 ? assignedRoutePlanStops[currentRoutePlanStopIndex] : null;
+  const hasGuidedRenderableTrips = guidedMode
+    && Array.isArray(guidedSteps)
+    && guidedSteps.some((step) => driverScopedTrips.some((trip) => trip.id === step.tripId));
+  const hasRoutePlanGuidedStops = guidedMode && assignedRoutePlanStops.length > 0 && !hasGuidedRenderableTrips;
+  const incomingTransferRoutes = useMemo(() => (
+    (routeTemplates || [])
+      .filter((route) => route.transferRequest?.status === 'pending')
+      .filter((route) => (
+        route.transferRequest?.toDriverId === me?.id
+        || normalizeEmail(route.transferRequest?.toDriverEmail) === normalizeEmail(me?.email || currentUser)
+      ))
+  ), [routeTemplates, me?.id, me?.email, currentUser]);
 
   const isClockedIn = me?.clockedIn || false;
 
@@ -1052,6 +1139,212 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }
   };
 
+  const buildRoutePlanWorkflow = useCallback((stop, updates = {}) => {
+    const key = getRoutePlanStopKey(stop);
+    const nowIso = new Date().toISOString();
+    const existingWorkflow = assignedSequence?.driverWorkflow || {};
+    return {
+      key,
+      workflow: {
+        ...existingWorkflow,
+        [key]: {
+          ...(existingWorkflow[key] || {}),
+          routeId: assignedSequence?.id || '',
+          stopKey: key,
+          stopName: stop?.name || `Stop ${stop?.sequenceIndex || ''}`.trim(),
+          stopType: String(stop?.type || 'PU').toUpperCase() === 'DO' ? 'DO' : 'PU',
+          address: stop?.address || '',
+          bookingId: stop?.bookingId || '',
+          phone: stop?.phone || stop?.patientPhone || stop?.pickupPhone || stop?.dropoffPhone || '',
+          sequenceIndex: stop?.sequenceIndex || 0,
+          ...updates,
+          updatedAt: nowIso,
+        },
+      },
+    };
+  }, [assignedSequence?.driverWorkflow, assignedSequence?.id, getRoutePlanStopKey]);
+
+  const saveRoutePlanStopWorkflow = useCallback(async (stop, updates = {}, auditTitle = null, auditMessage = null) => {
+    if (!stop || !assignedSequence?.id) return null;
+    const { workflow } = buildRoutePlanWorkflow(stop, updates);
+    await updateAssignedRouteRecord({
+      driverWorkflow: workflow,
+      assignmentStatus: ROUTE_ASSIGNMENT_STATUS.IN_PROGRESS,
+    }, auditTitle, auditMessage);
+    return workflow;
+  }, [assignedSequence?.id, buildRoutePlanWorkflow, updateAssignedRouteRecord]);
+
+  const handleStartRoutePlanStop = useCallback((stop) => {
+    if (!stop) return;
+    impact('heavy');
+    void saveRoutePlanStopWorkflow(stop, {
+      status: 'Started',
+      startedAt: new Date().toISOString(),
+    }, 'Route Stop Started', `${currentUser} started stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'}.`);
+  }, [currentUser, saveRoutePlanStopWorkflow]);
+
+  const handleNavigateRoutePlanStop = useCallback((stop) => {
+    if (!stop?.address) return;
+    impact('heavy');
+    void saveRoutePlanStopWorkflow(stop, {
+      status: 'Navigating',
+      navigatingAt: new Date().toISOString(),
+    }, 'Route Stop Navigation', `${currentUser} started navigation to stop ${stop.sequenceIndex}.`);
+    openInNavApp(stop.address, suggestNavApp(stop.address));
+  }, [currentUser, openInNavApp, saveRoutePlanStopWorkflow, suggestNavApp]);
+
+  const handleArriveRoutePlanStop = useCallback((stop) => {
+    if (!stop) return;
+    impact('heavy');
+    setRouteStopOdometerValue(lastOdometer > 0 ? String(lastOdometer) : '');
+    setRouteStopOdometerPrompt(stop);
+  }, [lastOdometer]);
+
+  const submitRouteStopOdometer = useCallback(() => {
+    if (!routeStopOdometerPrompt || !routeStopOdometerValue) return;
+    const odo = parseInt(routeStopOdometerValue, 10);
+    if (Number.isNaN(odo) || odo <= 0) return;
+    if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
+    const nowIso = new Date().toISOString();
+    void saveRoutePlanStopWorkflow(routeStopOdometerPrompt, {
+      status: 'Arrived',
+      odometer: odo,
+      arrivedAt: nowIso,
+      arrivalTime: nowIso,
+    }, 'Route Stop Arrived', `${currentUser} arrived at stop ${routeStopOdometerPrompt.sequenceIndex}.`);
+    setLastOdometer(odo);
+    setRouteStopOdometerPrompt(null);
+    setRouteStopOdometerValue('');
+  }, [currentUser, lastOdometer, routeStopOdometerPrompt, routeStopOdometerValue, saveRoutePlanStopWorkflow]);
+
+  const handleRoutePlanStopSignature = useCallback((stop) => {
+    if (!stop) return;
+    impact('medium');
+    setRouteStopSignatureConfirmed(false);
+    setRouteStopSignaturePrompt(stop);
+  }, []);
+
+  const confirmRoutePlanStopSignature = useCallback(() => {
+    if (!routeStopSignaturePrompt || !routeStopSignatureConfirmed) return;
+    void saveRoutePlanStopWorkflow(routeStopSignaturePrompt, {
+      status: 'Signed',
+      paperSignatureConfirmed: true,
+      signatureConfirmedAt: new Date().toISOString(),
+    }, 'Route Stop Signed', `${currentUser} confirmed signature for stop ${routeStopSignaturePrompt.sequenceIndex}.`);
+    setRouteStopSignaturePrompt(null);
+    setRouteStopSignatureConfirmed(false);
+  }, [currentUser, routeStopSignatureConfirmed, routeStopSignaturePrompt, saveRoutePlanStopWorkflow]);
+
+  const completeRoutePlanStop = useCallback((stop) => {
+    if (!stop || !assignedSequence?.id) return;
+    const currentWorkflow = getRoutePlanStopWorkflow(stop);
+    if (!currentWorkflow.arrivedAt) {
+      handleArriveRoutePlanStop(stop);
+      return;
+    }
+    if (!currentWorkflow.paperSignatureConfirmed) {
+      handleRoutePlanStopSignature(stop);
+      return;
+    }
+    impact('heavy');
+    const completedAt = new Date().toISOString();
+    const { workflow } = buildRoutePlanWorkflow(stop, {
+      status: 'Completed',
+      completedAt,
+      completedBy: currentUser,
+      completedVehicle: me?.vehicle || '',
+    });
+    const allStopsCompleted = assignedRoutePlanStops.every((candidate) => {
+      const key = getRoutePlanStopKey(candidate);
+      return key === getRoutePlanStopKey(stop) || workflow[key]?.completedAt || workflow[key]?.status === 'Completed';
+    });
+    void updateAssignedRouteRecord({
+      driverWorkflow: workflow,
+      assignmentStatus: allStopsCompleted ? ROUTE_ASSIGNMENT_STATUS.COMPLETED : ROUTE_ASSIGNMENT_STATUS.IN_PROGRESS,
+      ...(allStopsCompleted ? { completedAt } : {}),
+    }, allStopsCompleted ? 'Route Completed' : 'Route Stop Completed', allStopsCompleted
+      ? `${currentUser} completed route "${assignedSequence.name || 'Assigned Route'}".`
+      : `${currentUser} completed stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'}.`);
+    if (allStopsCompleted) {
+      setGuidedMode(false);
+      setGuidedSteps([]);
+      setGuidedStepIndex(0);
+      guidedLastAdvance.current = -1;
+    }
+  }, [assignedRoutePlanStops, assignedSequence?.id, assignedSequence?.name, buildRoutePlanWorkflow, currentUser, getRoutePlanStopKey, getRoutePlanStopWorkflow, handleArriveRoutePlanStop, handleRoutePlanStopSignature, me?.vehicle, updateAssignedRouteRecord]);
+
+  const markRoutePlanStopException = useCallback((stop, status, reason = '') => {
+    if (!stop || !assignedSequence?.id) return;
+    impact('heavy');
+    const completedAt = new Date().toISOString();
+    const { workflow } = buildRoutePlanWorkflow(stop, {
+      status,
+      exceptionStatus: status,
+      exceptionReason: reason || undefined,
+      cancellationReason: reason || undefined,
+      exceptionAt: completedAt,
+      completedAt,
+      completedBy: currentUser,
+      completedVehicle: me?.vehicle || '',
+    });
+    const allStopsTerminal = assignedRoutePlanStops.every((candidate) => {
+      const key = getRoutePlanStopKey(candidate);
+      const candidateWorkflow = workflow[key] || {};
+      return ['Completed', 'No Show', 'Cancelled', 'Rerouted'].includes(candidateWorkflow.status) || !!candidateWorkflow.completedAt;
+    });
+    void updateAssignedRouteRecord({
+      driverWorkflow: workflow,
+      assignmentStatus: allStopsTerminal ? ROUTE_ASSIGNMENT_STATUS.COMPLETED : ROUTE_ASSIGNMENT_STATUS.IN_PROGRESS,
+      ...(allStopsTerminal ? { completedAt } : {}),
+    }, `Route Stop ${status}`, `${currentUser} marked stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'} as ${status}${reason ? ` (${reason})` : ''}.`);
+    if (allStopsTerminal) {
+      setGuidedMode(false);
+      setGuidedSteps([]);
+      setGuidedStepIndex(0);
+      guidedLastAdvance.current = -1;
+    }
+  }, [assignedRoutePlanStops, assignedSequence?.id, buildRoutePlanWorkflow, currentUser, getRoutePlanStopKey, me?.vehicle, updateAssignedRouteRecord]);
+
+  const undoRoutePlanStopProgress = useCallback((stop) => {
+    if (!stop || !assignedSequence?.id) return;
+    const key = getRoutePlanStopKey(stop);
+    const existingWorkflow = assignedSequence?.driverWorkflow || {};
+    const current = existingWorkflow[key] || {};
+    if (!Object.keys(current).length) return;
+    const nextStopWorkflow = { ...current };
+    if (nextStopWorkflow.completedAt || nextStopWorkflow.status === 'Completed') {
+      delete nextStopWorkflow.completedAt;
+      delete nextStopWorkflow.completedBy;
+      delete nextStopWorkflow.completedVehicle;
+      nextStopWorkflow.status = nextStopWorkflow.paperSignatureConfirmed ? 'Signed' : nextStopWorkflow.arrivedAt ? 'Arrived' : nextStopWorkflow.navigatingAt ? 'Navigating' : 'Started';
+    } else if (nextStopWorkflow.paperSignatureConfirmed || nextStopWorkflow.signatureConfirmedAt) {
+      delete nextStopWorkflow.paperSignatureConfirmed;
+      delete nextStopWorkflow.signatureConfirmedAt;
+      nextStopWorkflow.status = nextStopWorkflow.arrivedAt ? 'Arrived' : nextStopWorkflow.navigatingAt ? 'Navigating' : 'Started';
+    } else if (nextStopWorkflow.arrivedAt || nextStopWorkflow.odometer) {
+      delete nextStopWorkflow.arrivedAt;
+      delete nextStopWorkflow.arrivalTime;
+      delete nextStopWorkflow.odometer;
+      nextStopWorkflow.status = nextStopWorkflow.navigatingAt ? 'Navigating' : 'Started';
+    } else if (nextStopWorkflow.navigatingAt) {
+      delete nextStopWorkflow.navigatingAt;
+      nextStopWorkflow.status = 'Started';
+    } else if (nextStopWorkflow.startedAt || nextStopWorkflow.status === 'Started') {
+      delete nextStopWorkflow.startedAt;
+      delete nextStopWorkflow.status;
+    }
+    nextStopWorkflow.updatedAt = new Date().toISOString();
+    const nextWorkflow = {
+      ...existingWorkflow,
+      [key]: nextStopWorkflow,
+    };
+    void updateAssignedRouteRecord({
+      driverWorkflow: nextWorkflow,
+      assignmentStatus: ROUTE_ASSIGNMENT_STATUS.IN_PROGRESS,
+      completedAt: null,
+    }, 'Route Stop Undo', `${currentUser} stepped back stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'}.`);
+  }, [assignedSequence?.driverWorkflow, assignedSequence?.id, currentUser, getRoutePlanStopKey, updateAssignedRouteRecord]);
+
   const handleNavigateToPickup = (trip) => {
     impact('heavy');
     advanceWorkflow(trip, 'Navigating Pickup', {});
@@ -1097,6 +1390,113 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleSMS = async (phone, name) => {
     await sendSMS(phone, name);
   }
+
+  const openTransferPrompt = (type, item) => {
+    setTransferPrompt({ type, item });
+    setTransferTargetDriverId('');
+    setTransferReason('');
+  };
+
+  const submitTransferRequest = async () => {
+    if (!transferPrompt || !transferTargetDriverId) return;
+    const targetDriver = transferTargetDrivers.find((driver) => driver.id === transferTargetDriverId);
+    if (!targetDriver) return;
+    const nowIso = new Date().toISOString();
+    const request = {
+      id: `transfer-${Date.now()}`,
+      status: 'pending',
+      type: transferPrompt.type,
+      fromDriverId: me?.id || '',
+      fromDriverEmail: me?.email || currentUser || '',
+      fromDriverName: me?.name || currentUser || 'Driver',
+      toDriverId: targetDriver.id,
+      toDriverEmail: targetDriver.email || '',
+      toDriverName: targetDriver.name || targetDriver.email || 'Driver',
+      reason: transferReason || 'Emergency transfer request',
+      requestedAt: nowIso,
+      requestedBy: currentUser || '',
+    };
+    if (transferPrompt.type === 'trip') {
+      const trip = transferPrompt.item;
+      onUpdateTrip?.(trip.id, trip.status, {
+        transferRequest: request,
+        transferStatus: 'pending',
+      });
+      onAddAuditLog?.('Trip Transfer Requested', `${request.fromDriverName} requested transfer of ${trip.patient || trip.id} to ${request.toDriverName}.`, 'amber');
+    } else if (transferPrompt.type === 'route' && assignedSequence?.id) {
+      await updateAssignedRouteRecord({
+        transferRequest: request,
+        transferStatus: 'pending',
+      }, 'Route Transfer Requested', `${request.fromDriverName} requested transfer of route "${assignedSequence.name || 'Assigned Route'}" to ${request.toDriverName}.`);
+    }
+    setTransferPrompt(null);
+    setTransferTargetDriverId('');
+    setTransferReason('');
+    setShowToast({ type: 'success', message: `Transfer request sent to ${request.toDriverName}.` });
+  };
+
+  const applyTripTransferDecision = (trip, accepted) => {
+    const req = trip?.transferRequest;
+    if (!trip?.id || !req) return;
+    const nowIso = new Date().toISOString();
+    if (accepted) {
+      onUpdateTrip?.(trip.id, 'Assigned', {
+        driverId: me?.id || req.toDriverId || '',
+        driverEmail: me?.email || req.toDriverEmail || '',
+        driverName: me?.name || req.toDriverName || '',
+        transferStatus: 'accepted',
+        transferRequest: { ...req, status: 'accepted', decidedAt: nowIso, decidedBy: currentUser || '' },
+      });
+      onAddAuditLog?.('Trip Transfer Accepted', `${me?.name || currentUser} accepted transfer of ${trip.patient || trip.id}.`, 'emerald');
+    } else {
+      onUpdateTrip?.(trip.id, trip.status, {
+        transferStatus: 'declined',
+        transferRequest: { ...req, status: 'declined', decidedAt: nowIso, decidedBy: currentUser || '' },
+      });
+      onAddAuditLog?.('Trip Transfer Declined', `${me?.name || currentUser} declined transfer of ${trip.patient || trip.id}.`, 'rose');
+    }
+  };
+
+  const applyRouteTransferDecision = async (route, accepted) => {
+    const req = route?.transferRequest;
+    if (!route?.id || !req) return;
+    const nowIso = new Date().toISOString();
+    const nextTemplates = routeTemplates.map((template) => {
+      if (template.id !== route.id) return template;
+      if (!accepted) {
+        return {
+          ...template,
+          transferStatus: 'declined',
+          transferRequest: { ...req, status: 'declined', decidedAt: nowIso, decidedBy: currentUser || '' },
+        };
+      }
+      return {
+        ...template,
+        assignedDriver: me?.id || req.toDriverId || template.assignedDriver,
+        transferStatus: 'accepted',
+        transferRequest: { ...req, status: 'accepted', decidedAt: nowIso, decidedBy: currentUser || '' },
+        assignedAt: nowIso,
+        assignedBy: req.fromDriverEmail || req.fromDriverName || currentUser || '',
+        assignedByRole: 'driver-transfer',
+        assignmentStatus: ROUTE_ASSIGNMENT_STATUS.ASSIGNED,
+        driverAcknowledgedAt: null,
+      };
+    });
+    await setDoc(doc(db, 'routeData', 'sequences'), { templates: nextTemplates }, { merge: true });
+    if (accepted && Array.isArray(route.validTripIds)) {
+      route.validTripIds.forEach((tripId) => {
+        const trip = trips.find((item) => item.id === tripId);
+        if (trip) {
+          onUpdateTrip?.(trip.id, 'Assigned', {
+            driverId: me?.id || req.toDriverId || '',
+            driverEmail: me?.email || req.toDriverEmail || '',
+            driverName: me?.name || req.toDriverName || '',
+          });
+        }
+      });
+    }
+    onAddAuditLog?.(accepted ? 'Route Transfer Accepted' : 'Route Transfer Declined', `${me?.name || currentUser} ${accepted ? 'accepted' : 'declined'} transfer of route "${route.name || 'Assigned Route'}".`, accepted ? 'emerald' : 'rose');
+  };
 
   const handleArrivePickup = (trip) => {
     const autoOdo = lastOdometer > 0 ? String(lastOdometer) : '';
@@ -1251,7 +1651,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       const credential = EmailAuthProvider.credential(auth.currentUser.email, passwordValue);
       await reauthenticateWithCredential(auth.currentUser, credential);
       const { type, trip, selectedLegIds, reason, assignedSequence: dismissSequence, editedData } = passwordPrompt;
-      if (type === 'dismiss_route' && dismissSequence) {
+      if (type === 'route_stop_exception') {
+        markRoutePlanStopException(passwordPrompt.stop, passwordPrompt.status, reason);
+      } else if (type === 'accept_transfer_trip') {
+        applyTripTransferDecision(trip, true);
+      } else if (type === 'decline_transfer_trip') {
+        applyTripTransferDecision(trip, false);
+      } else if (type === 'accept_transfer_route') {
+        await applyRouteTransferDecision(passwordPrompt.route, true);
+      } else if (type === 'decline_transfer_route') {
+        await applyRouteTransferDecision(passwordPrompt.route, false);
+      } else if (type === 'dismiss_route' && dismissSequence) {
         await updateAssignedRouteRecord({
           assignmentStatus: ROUTE_ASSIGNMENT_STATUS.DISMISSED,
           dismissedAt: new Date().toISOString(),
@@ -1494,6 +1904,35 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
           )}
 
+          {(incomingTransferTrips.length > 0 || incomingTransferRoutes.length > 0) && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 shadow-sm space-y-2">
+              <div className="flex items-center gap-2">
+                <Forward size={15} className="text-amber-700" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-amber-900">Incoming Transfer Request</h3>
+              </div>
+              {incomingTransferTrips.map((trip) => (
+                <div key={`incoming-${trip.id}`} className="rounded-xl bg-white border border-amber-100 p-3">
+                  <p className="text-sm font-black text-slate-900">{trip.patient || 'Trip'} · {to12hr(trip.time)}</p>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">From {trip.transferRequest?.fromDriverName || 'Driver'}: {trip.transferRequest?.reason || 'Emergency transfer'}</p>
+                  <div className="flex gap-2 mt-3">
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} className="flex-1 h-9 rounded-xl bg-emerald-600 text-white text-xs font-black">Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_trip', trip })} className="flex-1 h-9 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-black">Decline</button>
+                  </div>
+                </div>
+              ))}
+              {incomingTransferRoutes.map((route) => (
+                <div key={`incoming-route-${route.id}`} className="rounded-xl bg-white border border-amber-100 p-3">
+                  <p className="text-sm font-black text-slate-900">{route.name || 'Route Plan'} · {(route.sequence || []).length} stops</p>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">From {route.transferRequest?.fromDriverName || 'Driver'}: {route.transferRequest?.reason || 'Emergency transfer'}</p>
+                  <div className="flex gap-2 mt-3">
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} className="flex-1 h-9 rounded-xl bg-emerald-600 text-white text-xs font-black">Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_route', route, trip: {} })} className="flex-1 h-9 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-black">Decline</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Dispatcher Assigned Sequence Banner */}
           {assignedSequence && !guidedMode && (
             <div className="bg-gradient-to-r from-purple-50 to-violet-100 border-2 border-purple-300 rounded-xl p-3 shadow-md animate-slide-in-top">
@@ -1513,11 +1952,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       {(() => {
                         const firstStop = assignedSequence.sequence?.[0];
                         const firstTrip = firstStop ? trips.find(trip => trip.id === firstStop.clientId) : null;
-                        if (!firstTrip?.time) return null;
+                        const firstTime = firstTrip?.time || firstStop?.time;
+                        if (!firstTime) return null;
                         return (
                           <div className="flex items-center gap-1.5 mt-1.5">
                             <Clock size={11} className="text-purple-500" />
-                            <span className="text-xs font-black text-purple-800">{to12hr(firstTrip.time)}</span>
+                            <span className="text-xs font-black text-purple-800">{to12hr(firstTime)}</span>
                             {firstStop?.type === 'PU' && <span className="text-[10px] font-bold text-purple-500">Pickup</span>}
                           </div>
                         );
@@ -1556,6 +1996,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     {showAssignedRouteDetails ? 'Hide Details' : 'Open Details'}
                   </button>
                   <button
+                    onClick={() => openTransferPrompt('route', assignedSequence)}
+                    className="px-3 py-2 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-lg border border-amber-200 shadow-sm"
+                  >
+                    Transfer
+                  </button>
+                  <button
                     onClick={() => setPasswordPrompt({ type: 'dismiss_route', assignedSequence, trip: {} })}
                     className="px-3 py-2 bg-white text-rose-700 text-[10px] font-bold rounded-lg border border-rose-200 shadow-sm"
                   >
@@ -1567,15 +2013,22 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <div className="bg-white/80 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2 border border-purple-200">
                     {assignedSequence.sequence.map((s, idx) => {
                       const t = trips.find(trip => trip.id === s.clientId);
-                      if (!t) return null;
+                      const stopName = t?.patient || s.name || `Stop ${idx + 1}`;
+                      const stopTime = t?.time || s.time || '';
+                      const stopAddress = t ? (s.type === 'PU' ? t.pickup : t.dropoff) : s.address;
                       return (
                         <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-slate-100 shadow-sm">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">{idx + 1}</span>
-                            <span className="text-xs font-bold text-slate-800 truncate">{t.patient}</span>
-                            <span className="text-[10px] font-semibold text-slate-500 shrink-0">({s.type === 'PU' ? 'Pickup' : 'Dropoff'})</span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-xs font-bold text-slate-800 truncate">{stopName}</span>
+                                <span className="text-[10px] font-semibold text-slate-500 shrink-0">({s.type === 'PU' ? 'Pickup' : 'Dropoff'})</span>
+                              </div>
+                              {stopAddress && <p className="text-[10px] font-semibold text-slate-400 truncate">{stopAddress}</p>}
+                            </div>
                           </div>
-                          <span className="text-sm font-black text-purple-700 shrink-0 ml-2">{to12hr(t.time)}</span>
+                          {stopTime && <span className="text-sm font-black text-purple-700 shrink-0 ml-2">{to12hr(stopTime)}</span>}
                         </div>
                       );
                     })}
@@ -1591,13 +2044,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             const currentTrip = driverScopedTrips.find(t => t.id === currentStep.tripId);
             const nextStep = guidedStepIndex + 1 < guidedSteps.length ? guidedSteps[guidedStepIndex + 1] : null;
             const nextTrip = nextStep ? driverScopedTrips.find(t => t.id === nextStep.tripId) : null;
-            const pct = Math.round((guidedStepIndex / guidedSteps.length) * 100);
+            const headerRouteStop = hasRoutePlanGuidedStops ? currentRoutePlanStop : null;
+            const headerRouteWorkflow = headerRouteStop ? getRoutePlanStopWorkflow(headerRouteStop) : null;
+            const headerStepIndex = hasRoutePlanGuidedStops ? Math.max(currentRoutePlanStopIndex, 0) : guidedStepIndex;
+            const headerStepTotal = hasRoutePlanGuidedStops ? assignedRoutePlanStops.length : guidedSteps.length;
+            const pct = Math.round((headerStepIndex / Math.max(headerStepTotal, 1)) * 100);
             return (
               <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-3 shadow-md shadow-indigo-200/40 sticky top-0" style={{ zIndex: 10 }}>
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-black text-white">{guidedStepIndex + 1}</span>
-                    <span className="text-xs font-bold text-white/80 uppercase tracking-wider">of {guidedSteps.length}</span>
+                    <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-black text-white">{headerStepIndex + 1}</span>
+                    <span className="text-xs font-bold text-white/80 uppercase tracking-wider">of {headerStepTotal}</span>
                   </div>
                   <button onClick={() => { setGuidedMode(false); }} className="text-xs text-white/60 font-bold uppercase hover:text-white/90">Exit</button>
                 </div>
@@ -1606,11 +2063,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-white truncate flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.5 rounded bg-white/20 text-[10px] uppercase tracking-wider">{currentStep.type === 'PU' ? 'Pickup' : 'Dropoff'}</span>
-                    <span className="truncate">{currentTrip?.patient || 'Loading...'}</span>
-                    <span className="text-white/60 font-medium ml-1 text-xs shrink-0">· {currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : ''}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white/20 text-[10px] uppercase tracking-wider">{(headerRouteStop?.type || currentStep.type) === 'PU' ? 'Pickup' : 'Dropoff'}</span>
+                    <span className="truncate">{headerRouteStop?.name || currentTrip?.patient || 'Route stop'}</span>
+                    <span className="text-white/60 font-medium ml-1 text-xs shrink-0">· {headerRouteWorkflow?.status || (currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : 'In route')}</span>
                   </p>
-                  {nextStep && nextTrip && (
+                  {hasRoutePlanGuidedStops && currentRoutePlanStopIndex + 1 < assignedRoutePlanStops.length ? (
+                    <span className="text-[10px] text-white/50 font-bold ml-2 shrink-0 uppercase tracking-wider">
+                      Next: {assignedRoutePlanStops[currentRoutePlanStopIndex + 1]?.type || 'PU'} {assignedRoutePlanStops[currentRoutePlanStopIndex + 1]?.name || 'Stop'}
+                    </span>
+                  ) : nextStep && nextTrip && (
                     <span className="text-[10px] text-white/50 font-bold ml-2 shrink-0 uppercase tracking-wider">
                       Next: {nextStep.type === 'PU' ? 'PU' : 'DO'} {nextTrip.patient}
                     </span>
@@ -1680,6 +2141,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           tripId: t.id,
                           bookingId: t.bookingId || t.tripNumber || '',
                           serviceType: t.serviceType || t.type || t.req || '',
+                          phone: t.pickupPhone || t.patientPhone || t.patientMobile || '',
                           source: 'driver-trip',
                         },
                         {
@@ -1690,6 +2152,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           tripId: t.id,
                           bookingId: t.bookingId || t.tripNumber || '',
                           serviceType: t.serviceType || t.type || t.req || '',
+                          phone: t.dropoffPhone || t.patientPhone || t.patientMobile || '',
                           source: 'driver-trip',
                         },
                       ])
@@ -1727,7 +2190,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           </div>
 
           {/* Trip Cards */}
-          {orderedTrips.length === 0 ? (
+          {orderedTrips.length === 0 && assignedRoutePlanStops.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-10 text-center mt-2">
               <div className="w-20 h-20 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-[2rem] flex items-center justify-center mx-auto mb-5 shadow-inner">
                 <CheckCircle2 size={36} className="text-emerald-400" />
@@ -1735,7 +2198,207 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <h3 className="text-lg font-black text-slate-900">All Clear</h3>
               <p className="text-slate-500 text-xs font-semibold mt-1.5 max-w-[200px] mx-auto leading-relaxed">No trips assigned. Your manifest is up to date.</p>
             </div>
-          ) : guidedMode && guidedSteps && guidedSteps.length > 0 ? (
+          ) : hasRoutePlanGuidedStops ? (
+            <div className="space-y-2 pb-6 relative px-2 mt-2">
+              <div className="absolute left-[33px] top-6 bottom-6 w-[2px] bg-slate-200 rounded-full" />
+              {assignedRoutePlanStops.map((stop, index) => {
+                const stopType = String(stop.type || '').toUpperCase() === 'DO' ? 'DO' : 'PU';
+                const workflow = getRoutePlanStopWorkflow(stop);
+                const isCompleted = isRoutePlanStopCompleted(stop);
+                const isCurrent = currentRoutePlanStop && getRoutePlanStopKey(currentRoutePlanStop) === getRoutePlanStopKey(stop);
+                const isUpcoming = !isCompleted && !isCurrent;
+                const address = stop.address || '';
+                const stopPhone = getRoutePlanStopPhone(stop);
+                const stopTripId = stop.bookingId || stop.tripNumber || stop.clientId || stop.id || '';
+                const typeColor = stopType === 'DO' ? 'orange' : 'blue';
+
+                if (isCompleted) {
+                  const doneLabel = workflow.status || 'Completed';
+                  const doneClass = doneLabel === 'No Show' ? 'text-orange-700'
+                    : doneLabel === 'Cancelled' ? 'text-rose-700'
+                    : doneLabel === 'Rerouted' ? 'text-purple-700'
+                    : 'text-emerald-700';
+                  return (
+                    <div key={`${getRoutePlanStopKey(stop)}-done`} className="relative pl-12 pr-2">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                        <Check size={10} className="text-white font-black" />
+                      </div>
+                      <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl px-3 py-2 opacity-80 flex items-center gap-2">
+                        <span className={`text-xs font-black ${doneClass}`}>{doneLabel}</span>
+                        <span className="text-sm font-semibold text-slate-600 truncate">{stop.name || `Stop ${index + 1}`}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); undoRoutePlanStopProgress(stop); }}
+                          className="ml-auto h-7 px-2 rounded-lg border border-amber-200 bg-white text-[10px] font-black text-amber-700 flex items-center gap-1 hover:bg-amber-50 transition-all"
+                        >
+                          <RotateCcw size={11} /> Undo
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isUpcoming) {
+                  return (
+                    <div key={`${getRoutePlanStopKey(stop)}-upcoming`} className="relative pl-12 pr-2 opacity-55">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                        <span className="text-[9px] font-black text-slate-500">{index + 1}</span>
+                      </div>
+                      <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`w-1.5 h-4 rounded-full ${stopType === 'DO' ? 'bg-orange-400' : 'bg-blue-400'}`} />
+                            <span className="text-sm font-bold text-slate-800 truncate">{stop.name || `Stop ${index + 1}`}</span>
+                          </div>
+                          <p className="text-[11px] font-semibold text-slate-400 truncate mt-0.5">{address || 'Address pending'}</p>
+                        </div>
+                        <span className={`text-xs font-black ${stopType === 'DO' ? 'text-orange-600' : 'text-blue-600'}`}>{stopType}</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const doneKeys = [
+                  !!workflow.startedAt,
+                  !!workflow.navigatingAt,
+                  !!workflow.arrivedAt,
+                  !!workflow.paperSignatureConfirmed,
+                  !!workflow.completedAt,
+                ];
+                const canUndoRouteStop = doneKeys.some(Boolean);
+                const activeStepIndex = doneKeys.findIndex((done) => !done);
+                const displayStep = activeStepIndex === -1 ? doneKeys.length : activeStepIndex + 1;
+                const routePct = Math.round((index / Math.max(assignedRoutePlanStops.length, 1)) * 100);
+                const nextAction = (() => {
+                  if (!workflow.startedAt) return { label: 'Start Stop', icon: <Play size={14} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleStartRoutePlanStop(stop) };
+                  if (!workflow.navigatingAt) return { label: `Navigate to ${stopType}`, icon: <Navigation size={14} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleNavigateRoutePlanStop(stop) };
+                  if (!workflow.arrivedAt) return { label: `Arrive at ${stopType}`, icon: <MapPin size={14} />, className: typeColor === 'orange' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700', onClick: () => handleArriveRoutePlanStop(stop) };
+                  if (!workflow.paperSignatureConfirmed) return { label: 'Confirm Signature', icon: <CheckSquare size={14} />, className: 'bg-emerald-600 hover:bg-emerald-700', onClick: () => handleRoutePlanStopSignature(stop) };
+                  return { label: 'Complete Stop', icon: <Check size={14} />, className: 'bg-slate-900 hover:bg-slate-800', onClick: () => completeRoutePlanStop(stop) };
+                })();
+
+                return (
+                  <div key={`${getRoutePlanStopKey(stop)}-current`} className="relative pl-12 pr-2 my-4">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-[#121A66] border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
+                      <span className="text-xs font-black text-white">{index + 1}</span>
+                    </div>
+                    <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200">
+                      <div className="bg-[#121A66] px-4 py-3 text-white">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="px-2 py-0.5 rounded-lg bg-white/15 text-[10px] font-black tracking-wider uppercase">{stopType === 'DO' ? 'Dropoff' : 'Pickup'}</span>
+                            <span className="text-sm font-black truncate">{stop.name || `Stop ${index + 1}`}</span>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <span className="block text-[10px] font-black text-blue-100">#{stopTripId || `STOP ${index + 1}`}</span>
+                            <span className="block text-[9px] font-bold text-white/50">STOP {index + 1}/{assignedRoutePlanStops.length}</span>
+                          </div>
+                        </div>
+                        <div className="h-1 bg-white/20 rounded-full overflow-hidden">
+                          <div className="h-full bg-white rounded-full transition-all duration-500" style={{ width: `${routePct}%` }} />
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${stopType === 'DO' ? 'text-orange-600' : 'text-blue-600'}`}>
+                          {stopType === 'DO' ? 'Dropoff Address' : 'Pickup Address'}
+                        </p>
+                        <p className="text-base font-black leading-tight text-slate-900">{address || 'Address pending'}</p>
+                        {stopPhone && (
+                          <div className="mt-3 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleCall(stopPhone, stop.name || `Stop ${index + 1}`); }}
+                              className="h-10 flex-1 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 text-xs font-black flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all"
+                              title="Call client"
+                            >
+                              <Phone size={14} /> Call
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleSMS(stopPhone, stop.name || `Stop ${index + 1}`); }}
+                              className="h-10 flex-1 rounded-xl border border-blue-100 bg-blue-50 text-blue-700 text-xs font-black flex items-center justify-center gap-2 hover:bg-blue-100 transition-all"
+                              title="SMS client"
+                            >
+                              <MessageCircle size={14} /> SMS
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                          <div className="flex items-center gap-1 mb-3">
+                            {doneKeys.map((done, stepIdx) => (
+                              <div key={stepIdx} className={`h-1.5 flex-1 rounded-full transition-all ${done ? 'bg-emerald-400' : stepIdx === activeStepIndex ? 'bg-blue-500' : 'bg-slate-200'}`} />
+                            ))}
+                          </div>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Required Step</span>
+                            <span className="text-[10px] font-black text-slate-500">Step {displayStep} of 5</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-500 mb-3">
+                            <div className="rounded-xl bg-white px-2 py-1.5 border border-slate-100">Started: {workflow.startedAt ? new Date(workflow.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Pending'}</div>
+                            <div className="rounded-xl bg-white px-2 py-1.5 border border-slate-100">Arrived: {workflow.arrivedAt ? new Date(workflow.arrivedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Pending'}</div>
+                            <div className="rounded-xl bg-white px-2 py-1.5 border border-slate-100">Odometer: {workflow.odometer ? `${Number(workflow.odometer).toLocaleString()} mi` : 'Pending'}</div>
+                            <div className="rounded-xl bg-white px-2 py-1.5 border border-slate-100">Signature: {workflow.paperSignatureConfirmed ? 'Confirmed' : 'Pending'}</div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); nextAction.onClick(); }}
+                            className={`w-full h-12 rounded-xl text-white text-sm font-black flex items-center justify-center gap-2 transition-all shadow-sm ${nextAction.className}`}
+                          >
+                            {nextAction.icon} {nextAction.label}
+                          </button>
+                          {address && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleNavigateRoutePlanStop(stop); }}
+                              className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-black flex items-center justify-center gap-2 hover:bg-slate-50 transition-all"
+                            >
+                              <Navigation size={13} /> Open Navigation
+                            </button>
+                          )}
+                          {canUndoRouteStop && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); undoRoutePlanStopProgress(stop); }}
+                              className="mt-2 w-full h-10 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-xs font-black flex items-center justify-center gap-2 hover:bg-amber-100 transition-all"
+                            >
+                              <RotateCcw size={13} /> Undo Last Step
+                            </button>
+                          )}
+                          <div className="mt-2 grid grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'No Show', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
+                              className="h-10 rounded-xl border border-orange-200 bg-white text-orange-700 text-[10px] font-black flex items-center justify-center gap-1.5 hover:bg-orange-50 transition-all"
+                              title="No Show"
+                            >
+                              <AlertCircle size={13} /> No Show
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'Cancelled', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
+                              className="h-10 rounded-xl border border-rose-200 bg-white text-rose-700 text-[10px] font-black flex items-center justify-center gap-1.5 hover:bg-rose-50 transition-all"
+                              title="Cancel stop"
+                            >
+                              <XCircle size={13} /> Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'Rerouted', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
+                              className="h-10 rounded-xl border border-purple-200 bg-white text-purple-700 text-[10px] font-black flex items-center justify-center gap-1.5 hover:bg-purple-50 transition-all"
+                              title="Rerouted"
+                            >
+                              <RefreshCw size={13} /> Reroute
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : hasGuidedRenderableTrips ? (
             <div className="space-y-2 pb-6 relative px-2 mt-2">
               <div className="absolute left-[33px] top-6 bottom-6 w-[2px] bg-slate-200 rounded-full" />
               {guidedSteps.map((step, index) => {
@@ -1977,6 +2640,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       onReroute: handleReroute,
                       onShowLegs: handleShowLegs,
                       onEditTrip: handleEditTrip,
+                      onTransfer: () => openTransferPrompt('trip', trip),
                       renderWorkflow: !isTerminal && primary ? () => {
                         const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
                         const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
@@ -2076,6 +2740,75 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
                 <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm Arrival</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ROUTE STOP ODOMETER PROMPT ===== */}
+      {routeStopOdometerPrompt && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6" style={{ zIndex: 120 }}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
+            <div className="flex items-start justify-between mb-6">
+              <div className="text-center flex-1">
+                <div className="w-16 h-16 bg-[#121A66] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/20">
+                  <Gauge size={28} className="text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Arrived at Stop</h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium">{routeStopOdometerPrompt.name || `Stop ${routeStopOdometerPrompt.sequenceIndex}`}</p>
+                {lastOdometer > 0 && (
+                  <p className="text-sm text-slate-400 mt-2">Current odometer: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
+                )}
+              </div>
+              <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Odometer at Arrival</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={routeStopOdometerValue}
+                  onChange={(e) => setRouteStopOdometerValue(e.target.value)}
+                  placeholder="Enter odometer reading"
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-blue-500 outline-none"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-[#121A66] hover:bg-[#18227d] text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ROUTE STOP SIGNATURE PROMPT ===== */}
+      {routeStopSignaturePrompt && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
+            <div className="flex items-start justify-between mb-5">
+              <div className="text-center flex-1">
+                <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
+                  <Check size={28} className="text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Confirm Signature</h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium">{routeStopSignaturePrompt.name || `Stop ${routeStopSignaturePrompt.sequenceIndex}`}</p>
+              </div>
+              <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-5 mb-4">
+              <button type="button" onClick={() => setRouteStopSignatureConfirmed(!routeStopSignatureConfirmed)} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer ${routeStopSignatureConfirmed ? 'border-green-200 bg-green-50' : 'border-blue-100 bg-white'}`}>
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${routeStopSignatureConfirmed ? 'bg-green-500 border-green-500' : 'border-slate-300'}`}>
+                  {routeStopSignatureConfirmed && <Check size={12} className="text-white" />}
+                </div>
+                <span className="text-sm text-slate-600 font-medium">Client signature obtained</span>
+              </button>
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
+              <button type="button" onClick={confirmRoutePlanStopSignature} disabled={!routeStopSignatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm</button>
             </div>
           </div>
         </div>
@@ -2475,118 +3208,58 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           requestAuthAction={requestAuthAction}
           routePlanStops={routePlanStops}
           onSetRoutePlanStops={setRoutePlanStops}
-          onSendToSequencer={(stopData) => {
+          onSendToSequencer={(stopData, origin) => {
             if (!Array.isArray(stopData) || stopData.length === 0) {
+              if (stopData?.clients?.length) {
+                setSequencerTripFilter(null);
+                setRoutePlanSequencerStops(stopData.clients);
+                setRoutePlanSequencerSequence(stopData.sequence || null);
+                setRoutePlanSequencerOrigin(origin || null);
+                setSequencerKey(k => k + 1);
+                setShowSequencerModal(true);
+                setShowToast({ type: 'success', message: `${stopData.clients.length} route stop${stopData.clients.length !== 1 ? 's' : ''} loaded in Route Sequencer.` });
+                return;
+              }
               setSequencerTripFilter(null);
               setRoutePlanSequencerStops(null);
               setRoutePlanSequencerSequence(null);
+              setRoutePlanSequencerOrigin(null);
               setSequencerKey(k => k + 1);
               setShowSequencerModal(true);
-              setShowToast({ type: 'success', message: 'Route Sequencer opened.' });
               return;
             }
             const stamp = Date.now();
-            const routePayload = typeof stopData[0] === 'string'
-              ? (() => {
-                  const clients = stopData.filter(Boolean).map((addr, i) => ({
-                  id: `rplan-${stamp}-${i}`,
-                  name: `Stop ${String.fromCharCode(65 + i)}`,
-                  address: addr,
-                  pu: addr,
-                  do: addr,
-                  time: '',
-                  }));
-                  const sequence = clients.flatMap((client) => [
-                    { clientId: client.id, type: 'PU', leg: 'A' },
-                    { clientId: client.id, type: 'DO', leg: 'A' },
-                  ]);
-                  return { clients, sequence };
-                })()
-              : (() => {
-                  const tripsMap = new Map();
-                  const order = [];
-                  const sequence = [];
-                  stopData.filter(s => s?.address).forEach(s => {
-                    if (!s.tripId) {
-                      const manualKey = `manual-${stamp}-${Math.random().toString(36).slice(2,6)}`;
-                      if (!tripsMap.has(manualKey)) {
-                        tripsMap.set(manualKey, {
-                          name: s.clientName || `Stop ${String.fromCharCode(65 + order.length)}`,
-                          pu: s.stopType === 'DO' ? '' : s.address,
-                          do: s.stopType === 'PU' ? '' : s.address,
-                          time: s.time || '',
-                          serviceType: s.serviceType || '',
-                          bookingId: s.bookingId || '',
-                          isManual: true,
-                        });
-                        order.push(manualKey);
-                      }
-                      if (s.stopType === 'PU' || s.stopType === 'DO') {
-                        sequence.push({ clientId: manualKey, type: s.stopType, leg: 'A' });
-                      } else {
-                        sequence.push({ clientId: manualKey, type: 'PU', leg: 'A' });
-                        sequence.push({ clientId: manualKey, type: 'DO', leg: 'A' });
-                      }
-                      return;
-                    }
-                    if (!tripsMap.has(s.tripId)) {
-                      tripsMap.set(s.tripId, {
-                        name: s.clientName || '',
-                        pu: '',
-                        do: '',
-                        time: s.time || '',
-                        serviceType: s.serviceType || '',
-                        bookingId: s.bookingId || '',
-                        isManual: false,
-                      });
-                      order.push(s.tripId);
-                    }
-                    const entry = tripsMap.get(s.tripId);
-                    if (s.stopType === 'PU') entry.pu = s.address;
-                    if (s.stopType === 'DO') entry.do = s.address;
-                    if (s.clientName && !entry.name) entry.name = s.clientName;
-                    if (s.time && !entry.time) entry.time = s.time;
-                    if (s.serviceType && !entry.serviceType) entry.serviceType = s.serviceType;
-                    if (s.bookingId && !entry.bookingId) entry.bookingId = s.bookingId;
-                    if (s.stopType === 'PU' || s.stopType === 'DO') {
-                      sequence.push({ clientId: s.tripId, type: s.stopType, leg: 'A' });
-                    }
-                  });
-                  const clients = order.map((key, i) => {
-                    const data = tripsMap.get(key);
-                    return {
-                      id: key,
-                      name: data.name || `Stop ${String.fromCharCode(65 + i)}`,
-                      address: data.pu || data.do || '',
-                      pu: data.pu,
-                      do: data.do,
-                      time: data.time,
-                      serviceType: data.serviceType || '',
-                      bookingId: data.bookingId || '',
-                    };
-                  });
-                  const seenStops = new Set(sequence.map((step) => `${step.clientId}:${step.type}`));
-                  clients.forEach((client) => {
-                    if (!seenStops.has(`${client.id}:PU`)) sequence.push({ clientId: client.id, type: 'PU', leg: 'A' });
-                    if (!seenStops.has(`${client.id}:DO`)) sequence.push({ clientId: client.id, type: 'DO', leg: 'A' });
-                  });
-                  return { clients, sequence };
-                })();
-            if (!routePayload.clients.length) {
-              setSequencerTripFilter(null);
-              setRoutePlanSequencerStops(null);
-              setRoutePlanSequencerSequence(null);
-              setSequencerKey(k => k + 1);
-              setShowSequencerModal(true);
-              setShowToast({ type: 'success', message: 'Route Sequencer opened. Add stops in the sequencer.' });
-              return;
-            }
+            const items = stopData
+              .filter(s => s?.address)
+              .map((s, index) => {
+                const stopType = s.stopType === 'DO' ? 'DO' : 'PU';
+                const id = `route-plan-${stamp}-${index}`;
+                return {
+                  id,
+                  name: s.clientName || `Stop ${String.fromCharCode(65 + index)}`,
+                  address: s.address,
+                  pu: stopType === 'PU' ? s.address : '',
+                  do: stopType === 'DO' ? s.address : '',
+                  time: s.time || '',
+                  serviceType: s.serviceType || '',
+                  bookingId: s.bookingId || '',
+                  phone: s.phone || s.patientPhone || s.pickupPhone || s.dropoffPhone || '',
+                  routePlanTripId: s.tripId || null,
+                };
+              });
+            const sequence = items.map((item, index) => ({
+              clientId: item.id,
+              type: item.do ? 'DO' : 'PU',
+              leg: 'A',
+              stepNumber: index + 1,
+            }));
             setSequencerTripFilter(null);
-            setRoutePlanSequencerStops(routePayload.clients);
-            setRoutePlanSequencerSequence(routePayload.sequence);
+            setRoutePlanSequencerStops(items);
+            setRoutePlanSequencerSequence(sequence);
+            setRoutePlanSequencerOrigin(origin || null);
             setSequencerKey(k => k + 1);
             setShowSequencerModal(true);
-            setShowToast({ type: 'success', message: `${routePayload.clients.length} route stop${routePayload.clients.length !== 1 ? 's' : ''} loaded in Route Sequencer.` });
+            setShowToast({ type: 'success', message: `${items.length} route stop${items.length !== 1 ? 's' : ''} loaded in Route Sequencer.` });
           }}
         />
       )}
@@ -3091,6 +3764,55 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         );
       })()}
 
+      {/* ===== EMERGENCY TRANSFER MODAL ===== */}
+      {transferPrompt && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 175 }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-5">
+              <div className="flex-1 text-center">
+                <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-200">
+                  <Forward size={24} className="text-white" />
+                </div>
+                <h3 className="text-lg font-black text-slate-900">Emergency Transfer</h3>
+                <p className="text-xs font-semibold text-slate-500 mt-1">
+                  Send this {transferPrompt.type === 'route' ? 'route plan' : 'trip'} to another driver for acceptance.
+                </p>
+              </div>
+              <button type="button" onClick={() => setTransferPrompt(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Send To Driver</label>
+                <select value={transferTargetDriverId} onChange={(e) => setTransferTargetDriverId(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:border-amber-500 outline-none">
+                  <option value="">Select driver</option>
+                  {transferTargetDrivers.map((driver) => (
+                    <option key={driver.id} value={driver.id}>{driver.name || driver.email || driver.id}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Reason</label>
+                <select value={transferReason} onChange={(e) => setTransferReason(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:border-amber-500 outline-none">
+                  <option value="">Select reason</option>
+                  <option value="Traffic delay">Traffic delay</option>
+                  <option value="Vehicle issue">Vehicle issue</option>
+                  <option value="Emergency">Emergency</option>
+                  <option value="Running late">Running late</option>
+                  <option value="Other driver closer">Other driver closer</option>
+                </select>
+              </div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-semibold text-amber-800">The receiving driver must accept with password before ownership changes.</p>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setTransferPrompt(null)} className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button type="button" onClick={submitTransferRequest} disabled={!transferTargetDriverId} className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-sm disabled:opacity-40 transition-all cursor-pointer">Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== PASSWORD CONFIRM MODAL ===== */}
       {passwordPrompt && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 180 }} onClick={(e) => { e.stopPropagation(); }}>
@@ -3098,16 +3820,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             {/* Header with step indicator */}
             <div className="flex items-center gap-0.5 mb-4">
               <div className="h-1 flex-1 rounded-full bg-emerald-400" />
-              <div className={`h-1 flex-1 rounded-full ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-400' : 'bg-rose-400'}`} />
+              <div className={`h-1 flex-1 rounded-full ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-400' : 'bg-rose-400'}`} />
             </div>
             <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-4 text-center">Step 2 of 2</p>
             <div className="flex items-start justify-between mb-5">
               <div className="text-center flex-1">
-                <div className={`w-14 h-14 bg-gradient-to-br rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'from-blue-600 to-blue-500' : 'from-rose-600 to-rose-500'}`}>
+                <div className={`w-14 h-14 bg-gradient-to-br rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'from-blue-600 to-blue-500' : 'from-rose-600 to-rose-500'}`}>
                   <Lock size={24} className="text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">Confirm {passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Reroute' : passwordPrompt.type === 'restore' ? 'Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Edit' : 'Cancel'}</h3>
-                <p className="text-xs text-slate-500 mt-1">{passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Enter your password to save your trip changes' : `Enter your password to mark ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Rerouted' : 'Cancelled'}`}</p>
+                <h3 className="text-lg font-bold text-slate-900">Confirm {passwordPrompt.type === 'route_stop_exception' ? passwordPrompt.status : passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Reroute' : passwordPrompt.type === 'restore' ? 'Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Edit' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Cancel'}</h3>
+                <p className="text-xs text-slate-500 mt-1">{passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Enter your password to save your trip changes' : String(passwordPrompt.type || '').includes('transfer') ? 'Enter your password to confirm this transfer decision.' : passwordPrompt.type === 'route_stop_exception' ? `Enter your password to mark ${passwordPrompt.trip?.patient || 'this route stop'} as ${passwordPrompt.status}.` : `Enter your password to mark ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Rerouted' : 'Cancelled'}`}</p>
                 {passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 && (
                   <p className="text-xs text-rose-500 font-semibold mt-1">{passwordPrompt.selectedLegIds.length} leg{passwordPrompt.selectedLegIds.length !== 1 ? 's' : ''} will be affected</p>
                 )}
@@ -3115,7 +3837,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="space-y-4">
-              {passwordPrompt.type !== 'restore' && passwordPrompt.type !== 'edittrip' && passwordPrompt.type !== 'edittripcomplete' && (
+              {passwordPrompt.type !== 'restore' && passwordPrompt.type !== 'edittrip' && passwordPrompt.type !== 'edittripcomplete' && !String(passwordPrompt.type || '').includes('transfer') && (
                 <div>
                   <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Reason</label>
                   <select value={passwordPrompt.reason || ''} onChange={(e) => setPasswordPrompt(prev => ({ ...prev, reason: e.target.value }))}
@@ -3148,8 +3870,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">
                   Back
                 </button>
-                <button type="button" onClick={verifyPasswordAndProceed} disabled={!passwordValue || passwordVerifying} className={`flex-1 py-3 text-white rounded-xl font-bold text-sm disabled:opacity-40 transition-all cursor-pointer ${passwordPrompt.type === 'restore' ? 'bg-blue-600 hover:bg-blue-700' : passwordPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
-                  {passwordVerifying ? 'Verifying...' : passwordPrompt.type === 'noshow' ? 'Confirm No Show' : passwordPrompt.type === 'reroute' ? 'Confirm Reroute' : passwordPrompt.type === 'restore' ? 'Confirm Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Confirm & Save Changes' : 'Confirm Cancel'}
+                <button type="button" onClick={verifyPasswordAndProceed} disabled={!passwordValue || passwordVerifying} className={`flex-1 py-3 text-white rounded-xl font-bold text-sm disabled:opacity-40 transition-all cursor-pointer ${passwordPrompt.type === 'restore' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-600 hover:bg-blue-700' : passwordPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
+                  {passwordVerifying ? 'Verifying...' : passwordPrompt.type === 'route_stop_exception' ? `Confirm ${passwordPrompt.status}` : passwordPrompt.type === 'noshow' ? 'Confirm No Show' : passwordPrompt.type === 'reroute' ? 'Confirm Reroute' : passwordPrompt.type === 'restore' ? 'Confirm Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Confirm & Save Changes' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Confirm Cancel'}
                 </button>
               </div>
             </div>
@@ -3302,47 +4024,50 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== ROUTE SEQUENCER MODAL ===== */}
       {showSequencerModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); }}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); setRoutePlanSequencerOrigin(null); }}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
             <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Route size={16} className="text-indigo-700" /> Route Sequencer
               </h2>
-              <button onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); setRoutePlanSequencerOrigin(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="flex-1 overflow-hidden">
               <Suspense fallback={<LazyFallback />}>
-                <RouteSequencerApp key={sequencerKey}
-                  trips={sequencerTripFilter ? trips.filter(t => sequencerTripFilter.includes(t.id)) : trips}
-                  drivers={drivers}
-                  currentUser={currentUser}
-                  role={role}
-                  initialStops={routePlanSequencerStops}
-                  initialSequence={routePlanSequencerSequence}
-                  onRouteSaved={({ route, saveMode, validTripIds }) => {
-                    if (!onAddAuditLog) return;
-                    onAddAuditLog(
-                      saveMode === 'recurring' ? 'Route Created' : 'Route Saved',
-                      saveMode === 'recurring'
-                        ? `${currentUser} saved recurring route "${route.name}" with ${route.sequence?.length || 0} stops.`
-                        : `${currentUser} saved today's route "${route.name}" with ${validTripIds.length} synced trips.`,
-                      saveMode === 'recurring' ? 'indigo' : 'amber'
-                    );
-                  }}
-                  onApplyRoute={({ route, tripIds }) => {
-                    (tripIds || []).forEach((tripId) => {
-                      const trip = trips.find(t => t.id === tripId);
-                      if (trip) advanceWorkflow(trip, 'Assigned', { driverId: me?.id || '', driverEmail: me?.email || '', driverName: me?.name || '' });
-                    });
-                    if (onAddAuditLog) {
-                      onAddAuditLog('Route Applied', `${currentUser} applied route "${route.name}" to ${tripIds?.length || 0} trips.`, 'emerald');
-                    }
-                    setShowSequencerModal(false);
-                    setRoutePlanSequencerStops(null);
-                    setRoutePlanSequencerSequence(null);
-                  }}
-                />
+                <ErrorBoundary>
+                  <RouteSequencerApp key={sequencerKey}
+                    trips={sequencerTripFilter ? trips.filter(t => sequencerTripFilter.includes(t.id)) : trips}
+                    drivers={drivers}
+                    currentUser={currentUser}
+                    role={role}
+                    initialStops={routePlanSequencerStops}
+                    initialSequence={routePlanSequencerSequence}
+                    initialOrigin={routePlanSequencerOrigin}
+                    onRouteSaved={({ route, saveMode, validTripIds }) => {
+                      if (!onAddAuditLog) return;
+                      onAddAuditLog(
+                        saveMode === 'recurring' ? 'Route Created' : 'Route Saved',
+                        saveMode === 'recurring'
+                          ? `${currentUser} saved recurring route "${route.name}" with ${route.sequence?.length || 0} stops.`
+                          : `${currentUser} saved today's route "${route.name}" with ${validTripIds.length} synced trips.`,
+                        saveMode === 'recurring' ? 'indigo' : 'amber'
+                      );
+                    }}
+                    onApplyRoute={({ route, tripIds }) => {
+                      (tripIds || []).forEach((tripId) => {
+                        const trip = trips.find(t => t.id === tripId);
+                        if (trip) advanceWorkflow(trip, 'Assigned', { driverId: me?.id || '', driverEmail: me?.email || '', driverName: me?.name || '' });
+                      });
+                      if (onAddAuditLog) {
+                        onAddAuditLog('Route Applied', `${currentUser} applied route "${route.name}" to ${tripIds?.length || 0} trips.`, 'emerald');
+                      }
+                      setShowSequencerModal(false);
+                      setRoutePlanSequencerStops(null);
+                      setRoutePlanSequencerSequence(null);
+                    }}
+                  />
+                </ErrorBoundary>
               </Suspense>
             </div>
           </div>

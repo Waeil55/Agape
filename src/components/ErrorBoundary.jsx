@@ -6,15 +6,23 @@ const TDZ_RE = /Cannot access.*before initialization/;
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, componentStack: '' };
   }
 
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
 
+  componentDidCatch(error, info) {
+    const stack = info?.componentStack || '';
+    console.error('[ErrorBoundary] CRASH:', error.message);
+    console.error('[ErrorBoundary] Stack:', error.stack);
+    console.error('[ErrorBoundary] Component Stack:', stack);
+    this.setState({ componentStack: stack });
+  }
+
   handleRetry = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null, componentStack: '' });
   };
 
   handleClearCache = () => {
@@ -43,6 +51,9 @@ export default class ErrorBoundary extends React.Component {
             </div>
             <h2 className="text-xl font-bold text-slate-900 mb-2">Something went wrong</h2>
             <p className="text-sm text-slate-500 mb-6">{this.state.error?.message || 'An unexpected error occurred.'}</p>
+            {this.state.componentStack && (
+              <pre className="text-[10px] text-left text-rose-600 bg-rose-50 rounded-xl p-3 mb-4 max-h-40 overflow-auto font-mono border border-rose-200">{this.state.componentStack}</pre>
+            )}
             {isTDZ && (
               <p className="text-xs text-amber-600 mb-4">Module initialization conflict detected. Clearing cache may resolve this.</p>
             )}

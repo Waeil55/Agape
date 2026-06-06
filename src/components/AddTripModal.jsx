@@ -12,6 +12,8 @@ const generateTripId = () => `TRIP-${Date.now()}-${Math.random().toString(36).su
 const generateBookingId = () => `BK-${Math.floor(100000 + Math.random() * 900000)}`;
 
 const todayStr = () => new Date().toISOString().split('T')[0];
+const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
+const normalizeLogin = (value = '') => normalizeEmail(value).replace(/@auth\.agapecare\.local$/i, '');
 
 const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dispatchers = [] }) => {
   const [form, setForm] = useState({
@@ -45,7 +47,14 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
     }
     if (role === 'driver') {
       // Driver can only see themselves
-      return drivers.filter(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase());
+      const userEmail = normalizeEmail(currentUser);
+      const userLogin = normalizeLogin(currentUser);
+      return drivers.filter((d) => (
+        normalizeEmail(d.email) === userEmail
+        || normalizeLogin(d.email) === userLogin
+        || normalizeLogin(d.name) === userLogin
+        || normalizeLogin(d.id) === userLogin
+      ));
     }
     return [];
   }, [role, currentUser, drivers]);
@@ -53,12 +62,12 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
   // Auto-assign self for driver role
   React.useEffect(() => {
     if (role === 'driver') {
-      const me = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase());
+      const me = selectableDrivers[0];
       if (me) {
         setForm(prev => ({ ...prev, driverId: me.id }));
       }
     }
-  }, [role, currentUser, drivers]);
+  }, [role, selectableDrivers]);
 
   const update = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -81,6 +90,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
     if (!form.dropoff.trim()) e.dropoff = 'Dropoff address is required';
     if (!form.willCall && !form.time.trim()) e.time = 'Time is required (or select Will Call)';
     if (form.recurring && form.schedule.length === 0) e.schedule = 'Select at least one day for recurring trips';
+    if (role === 'driver' && selectableDrivers.length === 0) e.driverId = 'Your driver profile is still syncing. Try again in a moment.';
     return e;
   };
 
@@ -93,7 +103,8 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
     }
     setSubmitting(true);
 
-    const selectedDriver = selectableDrivers.find(d => d.id === form.driverId);
+    const forcedDriver = role === 'driver' ? selectableDrivers[0] : null;
+    const selectedDriver = forcedDriver || selectableDrivers.find(d => d.id === form.driverId);
     const tripDate = form.oneTimeOnly ? form.tripDate : form.date;
 
     const newTrip = {
@@ -108,8 +119,8 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
       dropoffPhone: form.dropoffPhone.trim(),
       patientPhone: form.patientPhone.trim(),
       notes: form.notes.trim(),
-      status: form.driverId ? 'Assigned' : 'Unassigned',
-      driverId: form.driverId || null,
+      status: selectedDriver?.id ? 'Assigned' : 'Unassigned',
+      driverId: selectedDriver?.id || null,
       driverEmail: selectedDriver?.email || null,
       driverName: selectedDriver?.name || null,
       recurring: form.recurring && !form.oneTimeOnly,

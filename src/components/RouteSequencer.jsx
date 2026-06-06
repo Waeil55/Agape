@@ -121,13 +121,14 @@ const buildImportedRouteClients = (initialStops, initialTripById, currentDay) =>
     miles: parseFloat(initialTripById.get(s.id)?.distance) || 0,
     days: [tripDayAbbr(initialTripById.get(s.id)?.date) || currentDay],
     todayStatus: 'active',
-    isTemp: !initialTripById.has(s.id),
+    isRoutePlanImport: !initialTripById.has(s.id),
+    isTemp: false,
     tripStatus: initialTripById.get(s.id)?.status || 'Unassigned',
     driverName: initialTripById.get(s.id)?.driverName || '',
     bookingId: initialTripById.get(s.id)?.bookingId || s.bookingId || '',
-    patientPhone: initialTripById.get(s.id)?.patientPhone || '',
-    pickupPhone: initialTripById.get(s.id)?.pickupPhone || '',
-    dropoffPhone: initialTripById.get(s.id)?.dropoffPhone || '',
+    patientPhone: initialTripById.get(s.id)?.patientPhone || s.patientPhone || s.phone || '',
+    pickupPhone: initialTripById.get(s.id)?.pickupPhone || s.pickupPhone || s.phone || '',
+    dropoffPhone: initialTripById.get(s.id)?.dropoffPhone || s.dropoffPhone || s.phone || '',
     notes: initialTripById.get(s.id)?.notes || '',
     date: initialTripById.get(s.id)?.date || '',
   }));
@@ -150,7 +151,7 @@ const buildImportedRouteSequence = (initialStops, initialSequence) => {
   ]);
 };
 
-export default function RouteSequencerApp({ trips = [], drivers = [], currentUser, role, onApplyRoute, onRouteSaved, initialStops = null, initialSequence = null }) {
+export default function RouteSequencerApp({ trips = [], drivers = [], currentUser, role, onApplyRoute, onRouteSaved, initialStops = null, initialSequence = null, initialOrigin = null }) {
   const today = new Date();
   const todayAbbr = DAY_MAP[today.getDay()];
   const initialTripById = useMemo(() => new Map((trips || []).map((trip) => [trip.id, trip])), [trips]);
@@ -158,7 +159,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
   const [mobileView, setMobileView] = useState(() => initialStops ? 'sequence' : 'pool');
   const [sequence, setSequence] = useState(() => buildImportedRouteSequence(initialStops, initialSequence));
   const [showSaveModal, setShowSaveModal] = useState(false);
-  const [saveType, setSaveType] = useState('recurring');
+  const [saveType, setSaveType] = useState(() => role === 'driver' ? 'today' : 'recurring');
   const [templateName, setTemplateName] = useState('');
   const [templateDays, setTemplateDays] = useState([todayAbbr]);
   const [savedTemplates, setSavedTemplates] = useState([]);
@@ -194,13 +195,14 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
     if (!initialStops || initialStops.length === 0) return;
     const importedClients = buildImportedRouteClients(initialStops, initialTripById, currentDay);
     const importedSequence = buildImportedRouteSequence(initialStops, initialSequence);
-    const importedIds = new Set(importedClients.map((client) => client.id));
+    const importedArr = Array.isArray(importedClients) ? importedClients : [];
+    const importedIds = new Set(importedArr.map((client) => client.id));
     setTempClients((prev) => [
-      ...prev.filter((client) => !importedIds.has(client.id)),
-      ...importedClients,
+      ...(Array.isArray(prev) ? prev : []).filter((client) => client && !importedIds.has(client.id)),
+      ...importedArr,
     ]);
     setSequence(importedSequence);
-    setSkippedIds((prev) => new Set([...prev].filter((clientId) => !importedIds.has(clientId))));
+    setSkippedIds((prev) => new Set([...(prev ? prev : [])].filter((clientId) => !importedIds.has(clientId))));
     setMobileView('sequence');
   }, [initialStops, initialSequence, initialTripById, currentDay]);
 
@@ -222,26 +224,47 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
   const allLiveClients = useMemo(() => {
     const realClients = tripsToClients(trips, 'All');
-    const tempIds = new Set(tempClients.map(tc => tc.id));
-    return [...tempClients, ...realClients.filter(rc => !tempIds.has(rc.id))];
+    const tempArr = Array.isArray(tempClients) ? tempClients : [];
+    const tempIds = new Set(tempArr.map(tc => tc.id));
+    return [...tempArr, ...realClients.filter(rc => !tempIds.has(rc.id))];
   }, [trips, tempClients]);
 
   // Build client pool from real trips
   const allClients = useMemo(() => {
     const realClients = tripsToClients(trips, currentDay);
-    const tempIds = new Set(tempClients.map(tc => tc.id));
+    const tempArr = Array.isArray(tempClients) ? tempClients : [];
+    const tempIds = new Set(tempArr.map(tc => tc.id));
     const filteredReals = realClients.filter(rc => !tempIds.has(rc.id));
     return currentDay === 'All'
-      ? [...tempClients, ...filteredReals]
-      : [...tempClients.filter(tc => tc.days.includes(currentDay)), ...filteredReals];
+      ? [...tempArr, ...filteredReals]
+      : [...tempArr.filter(tc => tc.days.includes(currentDay)), ...filteredReals];
   }, [trips, currentDay, tempClients]);
 
   const tripById = useMemo(() => new Map((trips || []).map((trip) => [trip.id, trip])), [trips]);
-  const clientById = useMemo(() => new Map(allClients.map((client) => [client.id, client])), [allClients]);
+  const clientById = useMemo(() => {
+    try {
+      if (!Array.isArray(allClients)) {
+        console.error('[RouteSequencer] clientById: allClients is not an array', { allClients, tempClients: tempClients?.length, trips: trips?.length });
+        return new Map();
+      }
+      return new Map(allClients.map((client) => [client.id, client]));
+    } catch (e) {
+      console.error('[RouteSequencer] clientById crashed:', e.message, { allClients, tempClients: tempClients?.length });
+      return new Map();
+    }
+  }, [allClients]);
   const currentDriver = useMemo(() => {
     if (role !== 'driver') return null;
     const normalizedUser = String(currentUser || '').trim().toLowerCase();
-    return drivers.find((driver) => String(driver.email || '').trim().toLowerCase() === normalizedUser) || null;
+    const normalizedLogin = normalizedUser.replace(/@auth\.agapecare\.local$/i, '');
+    return drivers.find((driver) => {
+      const email = String(driver.email || '').trim().toLowerCase();
+      const login = email.replace(/@auth\.agapecare\.local$/i, '');
+      return email === normalizedUser
+        || login === normalizedLogin
+        || String(driver.id || '').trim().toLowerCase() === normalizedLogin
+        || String(driver.name || '').trim().toLowerCase() === normalizedLogin;
+    }) || drivers[0] || null;
   }, [drivers, currentUser, role]);
 
   const dayCounts = useMemo(() => {
@@ -588,12 +611,14 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
         return;
       }
 
-      if (!uniqueTripIdSet.has(stop.clientId)) {
+      const isRoutePlanImport = Boolean(client.isRoutePlanImport);
+
+      if (!isRoutePlanImport && !uniqueTripIdSet.has(stop.clientId)) {
         uniqueTripIdSet.add(stop.clientId);
         uniqueTripIds.push(stop.clientId);
       }
 
-      if (client.isTemp) {
+      if (client.isTemp && !isRoutePlanImport) {
         tempStops.push(client.name || stop.clientId);
       }
 
@@ -602,16 +627,20 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
       }
 
       if (stop.type === 'PU') {
-        currentPassengers++;
-        pickedUp.add(stop.clientId);
-        pickupCountByTrip.set(stop.clientId, (pickupCountByTrip.get(stop.clientId) || 0) + 1);
+        if (!isRoutePlanImport) {
+          currentPassengers++;
+          pickedUp.add(stop.clientId);
+          pickupCountByTrip.set(stop.clientId, (pickupCountByTrip.get(stop.clientId) || 0) + 1);
+        }
       } else if (stop.type === 'DO') {
-        if (!pickedUp.has(stop.clientId)) {
+        if (!isRoutePlanImport && !pickedUp.has(stop.clientId)) {
           errors.push(`Logic Error: Cannot drop off ${client?.name || 'client'} before picking them up.`);
-        } else {
+        } else if (!isRoutePlanImport) {
           currentPassengers = Math.max(0, currentPassengers - 1);
         }
-        dropoffCountByTrip.set(stop.clientId, (dropoffCountByTrip.get(stop.clientId) || 0) + 1);
+        if (!isRoutePlanImport) {
+          dropoffCountByTrip.set(stop.clientId, (dropoffCountByTrip.get(stop.clientId) || 0) + 1);
+        }
       }
       if (currentPassengers > VEHICLE_CAPACITY) {
         errors.push(`Capacity Exceeded at step ${index + 1}: ${currentPassengers}/${VEHICLE_CAPACITY} seats.`);
@@ -699,7 +728,9 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
             name: client?.name || '',
             address: stop.type === 'PU' ? (client?.pu || '') : (client?.do || ''),
             time: stop.type === 'PU' ? (client?.puTime || '') : (client?.doTime || ''),
-            source: client?.isTemp ? 'temp' : 'trip',
+            bookingId: client?.bookingId || '',
+            phone: client?.patientPhone || (stop.type === 'PU' ? client?.pickupPhone : client?.dropoffPhone) || client?.pickupPhone || client?.dropoffPhone || '',
+            source: client?.isRoutePlanImport ? 'route-plan' : client?.isTemp ? 'temp' : 'trip',
           };
         }),
         metrics: {
@@ -1164,10 +1195,17 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
           {/* Sequence header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
-            <h3 className="text-sm font-black text-slate-900">
-              Route Sequence
-              {sequence.length > 0 && <span className="ml-2 text-indigo-600">({sequence.length} stops)</span>}
-            </h3>
+            <div className="min-w-0">
+              <h3 className="text-sm font-black text-slate-900">
+                Route Sequence
+                {sequence.length > 0 && <span className="ml-2 text-indigo-600">({sequence.length} stops)</span>}
+              </h3>
+              {initialOrigin && (
+                <p className="text-[10px] font-semibold text-emerald-700 mt-0.5 truncate max-w-full">
+                  Starting from: {initialOrigin}
+                </p>
+              )}
+            </div>
             {sequence.length > 0 && (
               <div className="flex items-center gap-2 text-micro text-slate-500 font-semibold">
                 <GripVertical className="w-3 h-3" /> Drag to reorder
@@ -1332,6 +1370,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
             </div>
 
             <div className="p-5 space-y-4 bg-slate-50">
+              {role !== 'driver' ? (
               <div className="flex bg-white p-1 rounded-xl border border-slate-200">
                 <button
                   type="button"
@@ -1348,6 +1387,12 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                   Today Override
                 </button>
               </div>
+              ) : (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-blue-500">Driver Route</p>
+                  <p className="text-sm font-black text-blue-900 mt-0.5">This route will save for you only.</p>
+                </div>
+              )}
 
               <div>
                 <label className="text-micro font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Template Name</label>
@@ -1362,6 +1407,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
               {saveType === 'recurring' && (
                 <div className="space-y-3">
+                  {role !== 'driver' ? (
                   <div>
                     <label className="text-micro font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Applies On</label>
                     <div className="flex flex-wrap gap-2">
@@ -1381,6 +1427,12 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                       ))}
                     </div>
                   </div>
+                  ) : (
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                      <p className="text-micro font-bold text-slate-400 uppercase tracking-wider">Assigned Driver</p>
+                      <p className="text-sm font-black text-slate-900 mt-1">{currentDriver?.name || currentUser || 'You'}</p>
+                    </div>
+                  )}
                   <div>
                     <label className="text-micro font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Default Driver (Optional)</label>
                     <select
@@ -1400,16 +1452,22 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               {saveType === 'today' && (
                 <div>
                   <label className="text-micro font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Assign To Driver (Optional)</label>
-                  <select
-                    value={selectedDriver}
-                    onChange={e => setSelectedDriver(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:border-indigo-500 transition-all"
-                  >
-                    <option value="">Leave Unassigned</option>
-                    {drivers.map(d => (
-                      <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
-                    ))}
-                  </select>
+                  {role === 'driver' ? (
+                    <div className="w-full px-4 py-2.5 bg-white border border-blue-100 rounded-xl text-sm font-black text-blue-900">
+                      {currentDriver?.name || currentUser || 'You'} (You)
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedDriver}
+                      onChange={e => setSelectedDriver(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:border-indigo-500 transition-all"
+                    >
+                      <option value="">Leave Unassigned</option>
+                      {drivers.map(d => (
+                        <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
 
@@ -1468,6 +1526,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               <button type="button" onClick={() => setShowSaveModal(false)} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 transition-colors">
                 Cancel
               </button>
+              {role !== 'driver' && (
               <button
                 type="button"
                 onClick={() => {
@@ -1479,6 +1538,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               >
                 {saveSuccessMode === 'recurring' ? 'Saved Template' : isSaving && saveType === 'recurring' ? 'Saving Template...' : 'Save Template'}
               </button>
+              )}
               <button
                 type="button"
                 onClick={() => {

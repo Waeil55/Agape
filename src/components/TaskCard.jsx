@@ -424,6 +424,12 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                     <Edit2 size={10} /> Edit
                   </button>
                 )}
+                {actions?.onTransfer && !isTerminal && (
+                  <button onClick={(e) => { e.stopPropagation(); actions.onTransfer(task); }}
+                    className="px-2 py-1 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors text-[0.625em] font-bold flex items-center gap-1 border border-amber-200">
+                    <Forward size={10} /> Transfer
+                  </button>
+                )}
               </div>
 
               {/* Close hint */}
