@@ -835,28 +835,28 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
   };
 
   return (
-    <div className="h-full min-h-0 bg-slate-100 font-sans text-slate-700 flex flex-col overflow-hidden">
+    <div className="h-full min-h-0 w-full max-w-full bg-slate-100 font-sans text-slate-700 flex flex-col overflow-hidden">
 
       {/* ===== HEADER ===== */}
-      <div className="bg-white border-b border-slate-200 px-4 lg:px-5 py-3 flex flex-col lg:flex-row items-start lg:items-center justify-between flex-shrink-0 gap-3">
-        <div className="flex items-center gap-3">
+      <div className="bg-white border-b border-slate-200 px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 flex flex-col lg:flex-row items-start lg:items-center justify-between flex-shrink-0 gap-3">
+        <div className="flex items-center gap-3 min-w-0 w-full lg:w-auto">
           <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-200 flex-shrink-0">
             <Route className="w-5 h-5 text-white" />
           </div>
-          <div>
-            <h2 className="text-base font-black text-slate-900 leading-tight">Route Sequencer</h2>
-            <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Multi-load Engine · Live Data</p>
+          <div className="min-w-0">
+            <h2 className="text-base font-black text-slate-900 leading-tight truncate">Route Sequencer</h2>
+            <p className="text-micro font-bold uppercase tracking-wider text-slate-400 truncate">Multi-load Engine · Live Data</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto hide-scrollbar">
+        <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto hide-scrollbar pb-0.5">
           {/* Day Selector */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl flex overflow-hidden p-0.5 shadow-inner flex-shrink-0">
             {DAY_FILTERS.map(day => (
               <button
                 key={day}
                 onClick={() => { setCurrentDay(day); setSequence([]); setStopOverrides({}); setStopMenuId(null); }}
-                className={`px-2.5 lg:px-3 py-1.5 text-xs font-black rounded-lg transition-all ${
+                className={`min-h-9 px-2.5 lg:px-3 py-1.5 text-xs font-black rounded-lg transition-all whitespace-nowrap ${
                   currentDay === day
                     ? 'bg-white text-indigo-600 shadow-sm border border-slate-200'
                     : 'text-slate-400 hover:text-slate-600'
@@ -871,23 +871,23 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
           {sequence.length > 0 && (
             <button
               onClick={() => setShowSaveModal(true)}
-              className="flex items-center gap-1 px-2.5 sm:gap-1.5 sm:px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] sm:text-xs font-bold rounded-xl shadow-md transition-all flex-shrink-0"
+              className="min-h-9 flex items-center gap-1 px-2.5 sm:gap-1.5 sm:px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] sm:text-xs font-bold rounded-xl shadow-md transition-all flex-shrink-0"
             >
-              <Save className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> <span className="hidden xs:inline">Save Route</span>
+              <Save className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">Save Route</span>
             </button>
           )}
 
           <button
             onClick={() => setShowTemplatesModal(true)}
-            className="flex items-center gap-1 px-2.5 sm:gap-1.5 sm:px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] sm:text-xs font-bold rounded-xl border border-indigo-200 transition-all flex-shrink-0"
+            className="min-h-9 flex items-center gap-1 px-2.5 sm:gap-1.5 sm:px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] sm:text-xs font-bold rounded-xl border border-indigo-200 transition-all flex-shrink-0"
           >
-            <Route className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> <span className="hidden xs:inline">Saved ({savedTemplates.length})</span>
+            <Route className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">Saved ({savedTemplates.length})</span>
           </button>
 
           {sequence.length > 0 && (
             <button
               onClick={clearSequence}
-              className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+              className="min-h-9 min-w-9 p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
               title="Clear sequence"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -897,24 +897,24 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
       </div>
 
       {/* ===== METRICS BAR ===== */}
-      <div className="bg-slate-900 text-white px-3 lg:px-5 py-2 flex justify-between items-center flex-shrink-0">
-        <div className="flex gap-3 sm:gap-5 overflow-x-auto hide-scrollbar">
-          <div className="flex items-center gap-1">
+      <div className="bg-slate-900 text-white px-3 lg:px-5 py-2 flex items-center gap-3 overflow-x-auto hide-scrollbar flex-shrink-0">
+        <div className="flex gap-2 sm:gap-5 min-w-max">
+          <div className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
             <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-400" />
             <span className="hidden sm:inline text-micro uppercase font-bold tracking-wider text-slate-400">Stops:</span>
             <span className="text-xs sm:text-sm font-black">{routeMetrics.stops}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
             <Route className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400" />
             <span className="hidden sm:inline text-micro uppercase font-bold tracking-wider text-slate-400">Miles:</span>
             <span className="text-xs sm:text-sm font-black">{routeMetrics.miles}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
             <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400" />
             <span className="hidden sm:inline text-micro uppercase font-bold tracking-wider text-slate-400">Est:</span>
             <span className="text-xs sm:text-sm font-black">{routeMetrics.estTime}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
             <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-400" />
             <span className="hidden sm:inline text-micro uppercase font-bold tracking-wider text-slate-400">Pool:</span>
             <span className="text-xs sm:text-sm font-black">{availableToday.length}</span>
@@ -928,10 +928,10 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
       </div>
 
       {/* ===== MOBILE TABS ===== */}
-      <div className="lg:hidden p-3 bg-white border-b border-slate-200 flex gap-2 flex-shrink-0">
+      <div className="lg:hidden p-2.5 bg-white border-b border-slate-200 flex gap-2 flex-shrink-0">
         <button
           onClick={() => setMobileView('pool')}
-          className={`flex-1 py-2 rounded-xl text-sm font-black transition-all ${
+          className={`flex-1 min-h-10 py-2 rounded-xl text-sm font-black transition-all ${
             mobileView === 'pool' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'
           }`}
         >
@@ -939,7 +939,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
         </button>
         <button
           onClick={() => setMobileView('sequence')}
-          className={`flex-1 py-2 rounded-xl text-sm font-black transition-all ${
+          className={`flex-1 min-h-10 py-2 rounded-xl text-sm font-black transition-all ${
             mobileView === 'sequence' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'
           }`}
         >
@@ -955,8 +955,8 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
           <div className="flex h-full min-h-0 flex-col overflow-hidden border-y border-slate-200 bg-white shadow-sm lg:rounded-2xl lg:border">
 
             {/* Pool header */}
-            <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 px-3 sm:px-4 py-3 border-b border-slate-100">
+              <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
                 <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
                   <CalendarDays className="w-4 h-4 text-indigo-500" />
                   {currentDay} · {availableToday.length} trip{availableToday.length !== 1 ? 's' : ''}
@@ -966,11 +966,11 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                   <button onClick={() => setActiveLeg('B')} className={`px-2 py-1 text-[10px] font-black rounded-md transition-all ${activeLeg === 'B' ? 'bg-white text-amber-700 shadow-sm border border-amber-200' : 'text-slate-400 hover:text-slate-600'}`}><Flag className="w-3 h-3 inline mr-0.5" />B</button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                 {availableToday.length > 0 && (
                   <button
                     onClick={addAllPickups}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-micro font-bold rounded-lg transition-colors border border-indigo-100"
+                    className="min-h-9 flex flex-1 sm:flex-none items-center justify-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-micro font-bold rounded-lg transition-colors border border-indigo-100"
                     title="Add all pickups"
                   >
                     <Zap className="w-3 h-3" /> All PU
@@ -978,14 +978,14 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 )}
                 <button
                   onClick={() => setShowAddTempModal(true)}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-micro font-bold rounded-lg transition-colors border border-blue-100"
+                  className="min-h-9 flex flex-1 sm:flex-none items-center justify-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-micro font-bold rounded-lg transition-colors border border-blue-100"
                 >
                   <Plus className="w-3 h-3" /> Add
                 </button>
                 <div className="relative">
                   <button
                     onClick={() => setShowFilter(f => !f)}
-                    className={`p-1.5 border rounded-lg text-xs font-bold transition-colors ${filterStatus !== 'all' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                    className={`min-h-9 min-w-9 p-1.5 border rounded-lg text-xs font-bold transition-colors ${filterStatus !== 'all' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
                   >
                     <Filter className="w-3.5 h-3.5" />
                   </button>
@@ -1006,7 +1006,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               </div>
             </div>
 
-            <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/70">
+            <div className="px-3 sm:px-4 py-2.5 border-b border-slate-100 bg-slate-50/70">
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
@@ -1014,13 +1014,13 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                   value={poolSearch}
                   onChange={(e) => setPoolSearch(e.target.value)}
                   placeholder="Search patient, booking, pickup, or dropoff"
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 focus:outline-none focus:border-indigo-400"
+                  className="w-full min-h-11 pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 focus:outline-none focus:border-indigo-400"
                 />
               </div>
             </div>
 
             {/* Pool list */}
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-2">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 sm:p-3 space-y-2">
               {availableToday.length === 0 ? (
                 <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-300 mt-4">
                   <Route className="w-10 h-10 text-slate-300 mx-auto mb-3" />
@@ -1089,7 +1089,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                       </div>
                       <button
                         onClick={() => toggleClientSkip(client.id)}
-                        className="text-slate-300 hover:text-red-500 bg-slate-50 p-1.5 rounded-lg border border-slate-100 transition-colors flex-shrink-0"
+                        className="min-h-9 min-w-9 text-slate-300 hover:text-red-500 bg-slate-50 p-1.5 rounded-lg border border-slate-100 transition-colors flex-shrink-0"
                         title="Skip"
                       >
                         <Ban className="w-3.5 h-3.5" />
@@ -1123,7 +1123,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                       <button
                         onClick={() => addStopToSequence(client.id, 'PU')}
                         disabled={isStopInSequence(client.id, 'PU')}
-                        className={`flex-1 flex justify-between items-center px-2.5 py-1.5 border rounded-xl text-[10px] font-bold transition-all ${
+                        className={`min-h-10 flex-1 flex justify-between items-center px-2.5 py-1.5 border rounded-xl text-[10px] font-bold transition-all ${
                           isStopInSequence(client.id, 'PU')
                             ? 'bg-emerald-50 border-emerald-200 text-emerald-700 opacity-60'
                             : 'bg-white border-slate-200 hover:border-emerald-400 text-slate-700 hover:text-emerald-600 shadow-sm'
@@ -1137,7 +1137,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                       <button
                         onClick={() => addStopToSequence(client.id, 'DO')}
                         disabled={isStopInSequence(client.id, 'DO')}
-                        className={`flex-1 flex justify-between items-center px-2.5 py-1.5 border rounded-xl text-[10px] font-bold transition-all ${
+                        className={`min-h-10 flex-1 flex justify-between items-center px-2.5 py-1.5 border rounded-xl text-[10px] font-bold transition-all ${
                           isStopInSequence(client.id, 'DO')
                             ? 'bg-red-50 border-red-200 text-red-700 opacity-60'
                             : 'bg-white border-slate-200 hover:border-red-400 text-slate-700 hover:text-red-600 shadow-sm'
@@ -1183,7 +1183,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
           {/* Validation errors */}
           {sequenceValidation.errors.length > 0 && (
-            <div className="bg-red-50 border-b border-red-200 px-4 py-2.5">
+            <div className="bg-red-50 border-b border-red-200 px-3 sm:px-4 py-2.5 max-h-28 overflow-y-auto">
               {sequenceValidation.errors.map((err, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs font-bold text-red-700">
                   <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
@@ -1194,7 +1194,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
           )}
 
           {/* Sequence header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 px-3 sm:px-4 py-3 border-b border-slate-100 flex-shrink-0">
             <div className="min-w-0">
               <h3 className="text-sm font-black text-slate-900">
                 Route Sequence
@@ -1213,7 +1213,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
             )}
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-slate-100 p-4 lg:p-5">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-slate-100 p-2.5 sm:p-4 lg:p-5">
             {sequence.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400">
                 <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center mb-4">
@@ -1233,7 +1233,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 )}
               </div>
             ) : (
-              <div className="max-w-2xl mx-auto space-y-2.5 relative pb-8">
+              <div className="w-full max-w-2xl mx-auto space-y-2.5 relative pb-10">
                 {(() => {
                   let lastLeg = null;
                   let globalIdx = 0;
@@ -1287,14 +1287,14 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                     globalIdx++;
                     nodes.push(
                       <div key={stop.id} draggable onDragStart={(e) => handleDragStart(e, idx)} onDragEnter={(e) => handleDragEnter(e, idx)} onDragEnd={handleDragEnd} onDragOver={(e) => e.preventDefault()}
-                        className={`relative z-10 flex gap-2.5 lg:gap-3 items-stretch group transition-all ${isDragging && draggedIndex === idx ? 'opacity-40 scale-95' : 'opacity-100'}`}
+                        className={`relative z-10 flex gap-2 lg:gap-3 items-stretch group transition-all ${isDragging && draggedIndex === idx ? 'opacity-40 scale-95' : 'opacity-100'}`}
                       >
                         <div className="flex flex-col items-center pt-1">
                           <div className={`w-7 h-7 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-lg sm:rounded-xl flex items-center justify-center font-black text-[10px] sm:text-sm border-2 sm:border-4 border-[#f4f7fb] shadow-sm flex-shrink-0 z-10 ${isPU ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
                             {idx + 1}
                           </div>
                         </div>
-                        <div className={`flex-1 bg-white rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-sm flex items-center gap-2 transition-all border ${isPU ? 'border-emerald-100 hover:border-emerald-300' : 'border-red-100 hover:border-red-300'} ${isOverCap ? 'ring-2 ring-red-400' : ''} ${client.urgency === 2 ? 'shadow-[0_0_12px_-2px_rgba(225,29,72,0.4)] border-rose-300' : client.urgency === 1 ? 'shadow-[0_0_10px_-2px_rgba(245,158,11,0.3)] border-amber-300' : ''} ${effectiveOverride ? (effectiveOverride.color === 'rose' ? 'ring-2 ring-rose-300 bg-rose-50/30' : effectiveOverride.color === 'amber' ? 'ring-2 ring-amber-300 bg-amber-50/30' : effectiveOverride.color === 'red' ? 'ring-2 ring-red-400 bg-red-50/30 line-through opacity-60' : effectiveOverride.color === 'emerald' ? 'ring-2 ring-emerald-300 bg-emerald-50/30' : 'ring-2 ring-slate-300 bg-slate-50/30 line-through opacity-60') : ''}`}>
+                        <div className={`min-w-0 flex-1 bg-white rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-sm flex items-start sm:items-center gap-2 transition-all border ${isPU ? 'border-emerald-100 hover:border-emerald-300' : 'border-red-100 hover:border-red-300'} ${isOverCap ? 'ring-2 ring-red-400' : ''} ${client.urgency === 2 ? 'shadow-[0_0_12px_-2px_rgba(225,29,72,0.4)] border-rose-300' : client.urgency === 1 ? 'shadow-[0_0_10px_-2px_rgba(245,158,11,0.3)] border-amber-300' : ''} ${effectiveOverride ? (effectiveOverride.color === 'rose' ? 'ring-2 ring-rose-300 bg-rose-50/30' : effectiveOverride.color === 'amber' ? 'ring-2 ring-amber-300 bg-amber-50/30' : effectiveOverride.color === 'red' ? 'ring-2 ring-red-400 bg-red-50/30 line-through opacity-60' : effectiveOverride.color === 'emerald' ? 'ring-2 ring-emerald-300 bg-emerald-50/30' : 'ring-2 ring-slate-300 bg-slate-50/30 line-through opacity-60') : ''}`}>
                           <div className="cursor-grab active:cursor-grabbing p-1 sm:p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-300 rounded-lg transition-colors hidden sm:flex flex-shrink-0"><GripVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-0.5">
@@ -1314,12 +1314,12 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                             <p className="text-micro font-semibold text-slate-400 truncate flex items-center gap-1 mt-0.5"><MapPin className="w-2.5 h-2.5 text-indigo-400 flex-shrink-0" />{isPU ? client.pu : client.do}</p>
                             {client.notes && <p className="mt-1 truncate text-[10px] font-medium text-amber-700">Notes: {client.notes}</p>}
                           </div>
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <div className="flex items-start sm:items-center gap-1 flex-shrink-0">
                             {!override && (
                               <div className="relative">
-                                <button onClick={() => setStopMenuId(stopMenuId === stop.id ? null : stop.id)} className="p-1.5 text-slate-300 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-colors"><MoreHorizontal className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => setStopMenuId(stopMenuId === stop.id ? null : stop.id)} className="min-h-9 min-w-9 p-1.5 text-slate-300 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-colors"><MoreHorizontal className="w-3.5 h-3.5 mx-auto" /></button>
                 {stopMenuId === stop.id && (
-                    <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[180px]">
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[180px] max-w-[calc(100vw-2rem)]">
                       <div className="px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">Status Override</div>
                       <button onClick={() => handleNoShowToday(stop)} className="w-full px-3 py-2 text-xs font-bold text-left text-amber-700 hover:bg-amber-50 flex items-center gap-2"><UserX className="w-3.5 h-3.5" /> No Show Today</button>
                       <button onClick={() => handleCancelToday(stop)} className="w-full px-3 py-2 text-xs font-bold text-left text-rose-700 hover:bg-rose-50 flex items-center gap-2"><XCircle className="w-3.5 h-3.5" /> Cancel Today</button>
@@ -1335,14 +1335,14 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                               </div>
                             )}
                             {override && (
-                              <button onClick={() => handleClearOverride(stop)} className="px-2 py-1 text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100" title="Clear override">Undo</button>
+                              <button onClick={() => handleClearOverride(stop)} className="min-h-8 px-2 py-1 text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100" title="Clear override">Undo</button>
                             )}
                             <div className={`hidden md:flex flex-col items-center justify-center w-10 h-10 rounded-xl border ${isOverCap ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}><Users className={`w-3.5 h-3.5 ${isOverCap ? 'text-red-500' : 'text-indigo-500'}`} /><span className={`text-[9px] font-black ${isOverCap ? 'text-red-700' : 'text-slate-600'}`}>{passengersInCar}/{VEHICLE_CAPACITY}</span></div>
                             <div className="flex flex-col gap-0.5">
-                              <button onClick={() => moveStopInLeg(stop.id, 'up')} className="p-1 bg-slate-50 hover:bg-slate-100 rounded text-slate-400 disabled:opacity-20 border border-slate-200" title="Move up in leg"><ArrowUp className="w-3 h-3" /></button>
-                              <button onClick={() => moveStopInLeg(stop.id, 'down')} className="p-1 bg-slate-50 hover:bg-slate-100 rounded text-slate-400 disabled:opacity-20 border border-slate-200" title="Move down in leg"><ArrowDown className="w-3 h-3" /></button>
+                              <button onClick={() => moveStopInLeg(stop.id, 'up')} className="min-h-7 min-w-7 p-1 bg-slate-50 hover:bg-slate-100 rounded text-slate-400 disabled:opacity-20 border border-slate-200" title="Move up in leg"><ArrowUp className="w-3 h-3 mx-auto" /></button>
+                              <button onClick={() => moveStopInLeg(stop.id, 'down')} className="min-h-7 min-w-7 p-1 bg-slate-50 hover:bg-slate-100 rounded text-slate-400 disabled:opacity-20 border border-slate-200" title="Move down in leg"><ArrowDown className="w-3 h-3 mx-auto" /></button>
                             </div>
-                            <button onClick={() => removeStopFromSequence(stop.id)} className="p-1.5 text-slate-200 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-200"><X className="w-4 h-4" /></button>
+                            <button onClick={() => removeStopFromSequence(stop.id)} className="min-h-9 min-w-9 p-1.5 text-slate-200 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-200"><X className="w-4 h-4 mx-auto" /></button>
                           </div>
                         </div>
                       </div>
@@ -1358,9 +1358,9 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
       {/* ===== SAVE MODAL ===== */}
       {showSaveModal && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
               <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <Settings2 className="w-5 h-5 text-indigo-600" /> Save Route
               </h2>
@@ -1369,7 +1369,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               </button>
             </div>
 
-            <div className="p-5 space-y-4 bg-slate-50">
+            <div className="p-4 sm:p-5 space-y-4 bg-slate-50 overflow-y-auto">
               {role !== 'driver' ? (
               <div className="flex bg-white p-1 rounded-xl border border-slate-200">
                 <button
@@ -1522,8 +1522,8 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               )}
             </div>
 
-            <div className="p-4 border-t border-slate-100 bg-white flex flex-wrap justify-end gap-3">
-              <button type="button" onClick={() => setShowSaveModal(false)} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 transition-colors">
+            <div className="p-4 border-t border-slate-100 bg-white grid grid-cols-1 sm:flex sm:flex-wrap sm:justify-end gap-3 flex-shrink-0">
+              <button type="button" onClick={() => setShowSaveModal(false)} className="min-h-11 px-4 py-2 rounded-xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 transition-colors">
                 Cancel
               </button>
               {role !== 'driver' && (
@@ -1534,7 +1534,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                   handleSave('recurring');
                 }}
                 disabled={isSaving || saveSuccess}
-                className="px-5 py-2 rounded-xl text-sm font-bold text-white shadow-md transition-all bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 disabled:opacity-70"
+                className="min-h-11 px-5 py-2 rounded-xl text-sm font-bold text-white shadow-md transition-all bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 disabled:opacity-70"
               >
                 {saveSuccessMode === 'recurring' ? 'Saved Template' : isSaving && saveType === 'recurring' ? 'Saving Template...' : 'Save Template'}
               </button>
@@ -1546,7 +1546,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                   handleSave('today');
                 }}
                 disabled={isSaving || saveSuccess}
-                className="px-5 py-2 rounded-xl text-sm font-bold text-white shadow-md transition-all bg-amber-500 hover:bg-amber-600 shadow-amber-200 disabled:opacity-70"
+                className="min-h-11 px-5 py-2 rounded-xl text-sm font-bold text-white shadow-md transition-all bg-amber-500 hover:bg-amber-600 shadow-amber-200 disabled:opacity-70"
               >
                 {saveSuccessMode === 'today' ? 'Saved Override' : isSaving && saveType === 'today' ? 'Saving Override...' : role === 'driver' ? 'Save Today Route' : 'Save Override'}
               </button>
@@ -1557,9 +1557,9 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
       {/* ===== SAVED TEMPLATES MODAL ===== */}
       {showTemplatesModal && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh]">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 flex-shrink-0">
               <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <Route className="w-5 h-5 text-indigo-600" /> Saved Route Sequences
               </h2>
@@ -1568,7 +1568,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               </button>
             </div>
             
-            <div className="p-5 overflow-y-auto space-y-3 flex-1 bg-slate-50/50">
+            <div className="p-3 sm:p-5 overflow-y-auto space-y-3 flex-1 bg-slate-50/50">
               {savedTemplates.length === 0 ? (
                 <div className="py-12 text-center text-slate-500 flex flex-col items-center">
                   <Route className="w-12 h-12 text-slate-200 mb-3" />
@@ -1578,8 +1578,8 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               ) : (
                 [...savedTemplates].reverse().map((tpl) => (
                   <div key={tpl.id} className="bg-white border border-slate-200 p-4 rounded-2xl flex flex-col gap-3 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex justify-between items-start">
-                      <div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                      <div className="min-w-0">
                         <h4 className="font-black text-slate-900 text-base">{tpl.name}</h4>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md border ${normalizeRouteRecord(tpl).statusBadgeClass}`}>
@@ -1596,7 +1596,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                       </div>
                     </div>
                     
-                    <div className="flex gap-4 text-xs font-semibold text-slate-600 border-t border-slate-100 pt-2">
+                    <div className="flex flex-wrap gap-2 sm:gap-4 text-xs font-semibold text-slate-600 border-t border-slate-100 pt-2">
                       <span>{tpl.sequence?.length || 0} Stops</span>
                       <span>{tpl.metrics?.miles || 0} mi</span>
                       <span>{tpl.metrics?.estTime || '0m'}</span>
@@ -1607,9 +1607,9 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                       )}
                     </div>
 
-                    <div className="flex justify-end gap-2 mt-1 border-t border-slate-100 pt-3">
+                    <div className="flex flex-col sm:flex-row sm:justify-end gap-2 mt-1 border-t border-slate-100 pt-3">
                       {reassigningId === tpl.id ? (
-                        <div className="flex items-center gap-2 w-full">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
                           <select
                             value={tpl.assignedDriver || ''}
                             onChange={e => handleReassignDriver(tpl.id, e.target.value)}
@@ -1622,7 +1622,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                           </select>
                           <button
                             onClick={() => setReassigningId(null)}
-                            className="px-3 py-1.5 text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100"
+                            className="min-h-10 px-3 py-1.5 text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100"
                           >
                             Cancel
                           </button>
@@ -1631,7 +1631,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                         <>
                           <button
                             onClick={() => setReassigningId(tpl.id)}
-                            className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
+                            className="min-h-10 px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
                           >
                             Reassign
                           </button>
@@ -1642,7 +1642,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                               setStopOverrides(tpl.stopOverrides || {});
                               setShowTemplatesModal(false);
                             }}
-                            className="px-4 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-lg transition-colors">
+                            className="min-h-10 px-4 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-lg transition-colors">
                             Load to Editor
                           </button>
                         </>
@@ -1658,9 +1658,9 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
       {/* ===== ADD TEMP TRIP MODAL ===== */}
       {showAddTempModal && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
               <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <CalendarDays className="w-5 h-5 text-blue-600" /> One-Time Trip
               </h2>
@@ -1669,7 +1669,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               </button>
             </div>
 
-            <div className="p-5 space-y-3 bg-slate-50 overflow-y-auto max-h-[60vh]">
+            <div className="p-4 sm:p-5 space-y-3 bg-slate-50 overflow-y-auto flex-1">
               {showDuplicateWarning && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2.5">
                   <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -1684,7 +1684,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 <input type="text" value={tempTripForm.name} onChange={e => setTempTripForm({...tempTripForm, name: e.target.value})} placeholder="e.g. John Doe" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-micro font-bold text-slate-400 uppercase tracking-wider block mb-1">Service Type</label>
                   <select value={tempTripForm.req} onChange={e => setTempTripForm({...tempTripForm, req: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:border-blue-500 transition-all">
@@ -1714,12 +1714,12 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-100 bg-white flex justify-end gap-3">
-              <button onClick={() => { setShowAddTempModal(false); setShowDuplicateWarning(false); }} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 transition-colors">Cancel</button>
+            <div className="p-4 border-t border-slate-100 bg-white grid grid-cols-1 sm:flex sm:justify-end gap-3 flex-shrink-0">
+              <button onClick={() => { setShowAddTempModal(false); setShowDuplicateWarning(false); }} className="min-h-11 px-4 py-2 rounded-xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 transition-colors">Cancel</button>
               {showDuplicateWarning ? (
-                <button onClick={() => handleAddTempTrip(true)} className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 shadow-md transition-colors">Add Anyway</button>
+                <button onClick={() => handleAddTempTrip(true)} className="min-h-11 px-5 py-2 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 shadow-md transition-colors">Add Anyway</button>
               ) : (
-                <button onClick={() => handleAddTempTrip()} className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md transition-colors">Add Trip</button>
+                <button onClick={() => handleAddTempTrip()} className="min-h-11 px-5 py-2 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md transition-colors">Add Trip</button>
               )}
             </div>
           </div>
