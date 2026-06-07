@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { db, collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, getDocs, doc, setDoc, getDoc, updateDoc, deleteField, arrayUnion } from '../config/firebase';
 import { limit } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -187,21 +187,20 @@ const TeamChatPanel = ({ currentUser, role }) => {
   const prevConvsRef = useRef({});
   useEffect(() => {
     let isFirst = true;
-    const unsub = onSnapshot(doc(db, 'chatData/conversations'), snap => {
-      if (!snap.exists()) { setDoc(doc(db, 'chatData/conversations'), { conversations: {} }, { merge: true }).catch(() => {}); setConversations([]); return; }
-      const data = snap.data();
-      const convs = Object.entries(data.conversations || {})
-        .map(([id, c]) => ({ id, ...c }))
-        .filter(c => role === 'admin' || c.participants?.includes(currentUser))
+    const unsub = onSnapshot(collection(db, 'chat_threads'), snap => {
+      const convs = [];
+      snap.forEach(d => { const c = { id: d.id, ...d.data() }; convs.push(c); });
+      const filtered = convs
+        .filter(c => c.archiveState !== 'archived' && (role === 'admin' || c.participants?.includes(currentUser)))
         .sort((a, b) => { const aTime = a.lastMessage?.timestamp?.toMillis?.() || 0; const bTime = b.lastMessage?.timestamp?.toMillis?.() || 0; return bTime - aTime; });
       if (!isFirst) {
-        convs.forEach(conv => {
+        filtered.forEach(conv => {
           const prev = prevConvsRef.current[conv.id];
           if (prev && prev.lastMessage?.text !== conv.lastMessage?.text && conv.lastMessage?.sender !== currentUser && (!activeConv || activeConv.id !== conv.id)) playMessageSound();
           prevConvsRef.current[conv.id] = { ...conv };
         });
-      } else { convs.forEach(conv => { prevConvsRef.current[conv.id] = { ...conv }; }); isFirst = false; }
-      const convsWithUnread = convs.map(conv => { const lastMsg = conv.lastMessage || {}; return { ...conv, unreadCount: lastMsg.sender !== currentUser && !(lastMsg.readBy || []).includes(currentUser) ? 1 : 0 }; });
+      } else { filtered.forEach(conv => { prevConvsRef.current[conv.id] = { ...conv }; }); isFirst = false; }
+      const convsWithUnread = filtered.map(conv => { const lastMsg = conv.lastMessage || {}; return { ...conv, unreadCount: lastMsg.sender !== currentUser && !(lastMsg.readBy || []).includes(currentUser) ? 1 : 0 }; });
       setConversations(convsWithUnread);
     });
     return () => unsub();
@@ -224,7 +223,7 @@ const TeamChatPanel = ({ currentUser, role }) => {
       });
       msgs.sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));
       setMessages(msgs);
-      updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${activeConv.id}.lastMessage.readBy`]: arrayUnion(currentUser) }).catch(() => {});
+      updateDoc(doc(db, 'chat_threads', activeConv.id), { 'lastMessage.readBy': arrayUnion(currentUser) }).catch(() => {});
     });
     return () => unsub();
   }, [activeConv?.id, currentUser]);
@@ -237,8 +236,8 @@ const TeamChatPanel = ({ currentUser, role }) => {
     const msg = text.trim();
     setText('');
     try {
-      const msgRef = await addDoc(collection(db, 'chat_messages'), { conversationId: activeConv.id, text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp() });
-      await updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${activeConv.id}.lastMessage`]: { text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp(), readBy: [currentUser] } });
+      await addDoc(collection(db, 'chat_messages'), { conversationId: activeConv.id, text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp() });
+      await updateDoc(doc(db, 'chat_threads', activeConv.id), { lastMessage: { text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp(), readBy: [currentUser] } });
     } catch (err) { console.error('Failed to send message:', err); setText(msg); }
   };
 
@@ -247,7 +246,7 @@ const TeamChatPanel = ({ currentUser, role }) => {
     const participants = [currentUser, ...selected];
     const id = 'conv_' + Date.now();
     try {
-      await setDoc(doc(db, 'chatData/conversations'), { [`conversations.${id}`]: { type: selected.length > 1 ? 'group' : 'direct', participants, name: selected.length > 1 ? 'Group ' + (conversations.length + 1) : selected[0].split('@')[0], createdAt: serverTimestamp(), lastMessage: { text: 'Started', sender: currentUser, timestamp: serverTimestamp(), readBy: [currentUser] } } }, { merge: true });
+      await setDoc(doc(db, 'chat_threads', id), { type: selected.length > 1 ? 'group' : 'direct', participants, name: selected.length > 1 ? 'Group ' + (conversations.length + 1) : selected[0].split('@')[0], createdAt: serverTimestamp(), archiveState: 'active', lastMessage: { text: 'Started', sender: currentUser, timestamp: serverTimestamp(), readBy: [currentUser] } });
     } catch (err) { console.error('Failed to create conversation:', err); return; }
     setShowNew(false); setSelected([]);
     setActiveConv({ id, participants, type: selected.length > 1 ? 'group' : 'direct', name: selected.length > 1 ? 'Group ' + (conversations.length + 1) : selected[0].split('@')[0] });
@@ -256,7 +255,7 @@ const TeamChatPanel = ({ currentUser, role }) => {
 
   const deleteConv = async (convId) => {
     if (!window.confirm('Delete this conversation?')) return;
-    try { await updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${convId}`]: deleteField() }); } catch (err) { console.error('Failed to delete conversation:', err); }
+    try { await setDoc(doc(db, 'chat_threads', convId), { archiveState: 'archived' }, { merge: true }); } catch (err) { console.error('Failed to delete conversation:', err); }
     if (activeConv?.id === convId) setActiveConv(null);
   };
 

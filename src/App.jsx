@@ -37,6 +37,9 @@ import {
 import './utils/clientExport';
 import { registerServiceWorker, requestPeriodicSync, setupSWMessageHandler, triggerSync, skipWaiting } from './utils/swManager';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
+import { useDriverLiveState } from './hooks/useDriverLiveState';
+import { useRealtimeReliability } from './hooks/useRealtimeReliability';
+import { watchSessionValidity, registerSession, invalidateSession } from './services/sessionManager';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
@@ -541,6 +544,29 @@ const App = () => {
       console.error('User profileId sync failed:', err);
     });
   }, [role, dataLoading, currentUser, currentUserDriverProfile, drivers, upsertDriverProfile]);
+
+  // Task 3,4: Heartbeat & Live State for driver role
+  useDriverLiveState(
+    role === 'driver' ? currentUserDriverProfile?.id : null,
+    currentUserDriverProfile?.clockedIn || false,
+    null
+  );
+
+  // Task 7: PWA Reliability
+  const { isOnline: pwaOnline } = useRealtimeReliability();
+
+  // Task 11: Session security - watch for concurrent login invalidation
+  useEffect(() => {
+    if (!isAuthenticated || !auth.currentUser) return undefined;
+    const userId = auth.currentUser.uid;
+    registerSession(userId, role).catch(() => {});
+    const unsub = watchSessionValidity(userId, (reason) => {
+      addToast('Session Ended', reason, 'warning');
+      setTimeout(() => signOut(auth).catch(() => {}), 2000);
+    });
+    return () => unsub();
+  }, [isAuthenticated, auth.currentUser?.uid, role]);
+
   const currentDispatcherRecord = useMemo(
     () => getDispatcherForUser(dispatchers, currentUser),
     [dispatchers, currentUser]
