@@ -1707,23 +1707,19 @@ const App = () => {
 
   const handleDriverStatusUpdate = (driverId, clockedIn) => {
     const prevDriverState = drivers.find(d => d.id === driverId) || {};
-    setDrivers(prevDrivers => {
-      const driverExists = prevDrivers.some(d => d.id === driverId);
-      const workingDrivers = driverExists
-        ? prevDrivers
-        : [...prevDrivers, { ...buildDriverProfileFromEmail(currentUser || '', auth.currentUser?.uid || ''), id: driverId }];
-      const updated = workingDrivers.map(d => d.id === driverId ? {
-        ...d,
-        clockedIn,
-        lastUpdate: new Date().toISOString(),
-        status: clockedIn ? 'Available' : 'Offline',
-      } : d);
-      return updated;
+    const newStatus = clockedIn ? 'Available' : 'Offline';
+    
+    // Save directly to the individual driver profile document
+    upsertDriverProfile(driverId, { 
+      clockedIn, 
+      status: newStatus,
+      lastUpdate: new Date().toISOString()
     });
+
     const driverName = prevDriverState?.name || driverId;
     const changed = [];
     if (Boolean(prevDriverState.clockedIn) !== clockedIn) changed.push({ field: 'clockedIn', before: prevDriverState.clockedIn, after: clockedIn });
-    if (prevDriverState.status !== (clockedIn ? 'Available' : 'Offline')) changed.push({ field: 'status', before: prevDriverState.status, after: clockedIn ? 'Available' : 'Offline' });
+    if (prevDriverState.status !== newStatus) changed.push({ field: 'status', before: prevDriverState.status, after: newStatus });
     addAuditLog(
       clockedIn ? 'Driver Clocked In' : 'Driver Clocked Out',
       `${driverName} ${clockedIn ? 'clocked in' : 'clocked out'}.`,
