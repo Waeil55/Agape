@@ -378,21 +378,31 @@ const App = () => {
   // Handle dynamic import failures (stale chunk hashes after deploy) by reloading
   useEffect(() => {
     const onError = (event) => {
+      // Prevent infinite reload loops!
+      const reloadCount = parseInt(window.sessionStorage.getItem('agape_script_reload') || '0', 10);
+      
       if (event.target?.tagName === 'LINK' && event.target?.rel === 'modulepreload') {
-        event.preventDefault();
-        window.location.reload();
+        if (reloadCount < 2) {
+          window.sessionStorage.setItem('agape_script_reload', (reloadCount + 1).toString());
+          window.location.reload();
+        }
         return;
       }
       if (event.target?.tagName === 'SCRIPT' && event.target?.type === 'module' && event.target?.src) {
         if (!event.target.src.includes(location.origin)) return;
-        event.preventDefault();
-        window.location.reload();
+        if (reloadCount < 2) {
+          window.sessionStorage.setItem('agape_script_reload', (reloadCount + 1).toString());
+          window.location.reload();
+        }
       }
     };
     const onRejection = (event) => {
       if (event.reason && typeof event.reason === 'object' && event.reason?.message?.includes('dynamically imported module')) {
-        event.preventDefault();
-        window.location.reload();
+        const reloadCount = parseInt(window.sessionStorage.getItem('agape_script_reload') || '0', 10);
+        if (reloadCount < 2) {
+          window.sessionStorage.setItem('agape_script_reload', (reloadCount + 1).toString());
+          window.location.reload();
+        }
       }
     };
     window.addEventListener('error', onError, true);

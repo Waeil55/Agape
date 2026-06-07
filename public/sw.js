@@ -13,9 +13,12 @@ self.addEventListener('install', (event) => {
     caches.open(STATIC_CACHE)
       .then((cache) => cache.addAll(PRECACHE_URLS))
       .catch(() => undefined)
-      .then(() => self.skipWaiting())
+    // NOTE: Do NOT call self.skipWaiting() here.
+    // Auto-skipWaiting on install causes a controllerchange → reload loop.
+    // skipWaiting is only called when the app explicitly sends SKIP_WAITING.
   );
 });
+
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
