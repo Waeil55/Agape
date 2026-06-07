@@ -232,12 +232,12 @@ export function useFirestoreAppData() {
           const currentData = normalizeData(dataRef.current);
           const d = normalizeData({
             ...snap.data(),
-            drivers: (snap.data()?.drivers?.length || 0) > 0 ? snap.data().drivers : currentData.drivers,
-            dispatchers: (snap.data()?.dispatchers?.length || 0) > 0 ? snap.data().dispatchers : currentData.dispatchers,
-            vehicles: (snap.data()?.vehicles?.length || 0) > 0 ? snap.data().vehicles : currentData.vehicles,
-            phoneNumbers: snap.data()?.phoneNumbers && Object.keys(snap.data().phoneNumbers || {}).length > 0
-              ? snap.data().phoneNumbers
-              : currentData.phoneNumbers,
+            // CRITICAL FIX: DO NOT overwrite fine-grained collections with monolithic arrays.
+            // Always respect the currentData which is fed by the real-time collection listeners.
+            drivers: currentData.drivers,
+            dispatchers: currentData.dispatchers,
+            vehicles: currentData.vehicles,
+            phoneNumbers: currentData.phoneNumbers,
           });
           const applyData = (nextData) => {
             const mergedData = {

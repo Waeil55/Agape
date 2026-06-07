@@ -14,10 +14,16 @@ const generateDeviceId = () => {
   return id;
 };
 
-export const useDriverLiveState = (driverId, initialClockedIn = false, activeTripId = null) => {
+export const useDriverLiveState = (driverId, clockedIn = false, activeTripId = null) => {
   const heartbeatRef = useRef(null);
   const deviceId = useRef(generateDeviceId());
   const isActiveRef = useRef(false);
+  
+  // Use refs to keep track of dynamic state without triggering effect re-runs
+  const stateRef = useRef({ clockedIn, activeTripId });
+  useEffect(() => {
+    stateRef.current = { clockedIn, activeTripId };
+  }, [clockedIn, activeTripId]);
 
   const sendHeartbeat = useCallback(async () => {
     if (!driverId || document.hidden || !navigator.onLine) return;
@@ -25,8 +31,8 @@ export const useDriverLiveState = (driverId, initialClockedIn = false, activeTri
       const payload = {
         driverId,
         deviceId: deviceId.current,
-        clockedIn: initialClockedIn,
-        activeTripId: activeTripId || null,
+        clockedIn: stateRef.current.clockedIn,
+        activeTripId: stateRef.current.activeTripId || null,
         online: true,
         lastHeartbeat: serverTimestamp(),
         lastHeartbeatLocal: new Date().toISOString(),
@@ -42,7 +48,7 @@ export const useDriverLiveState = (driverId, initialClockedIn = false, activeTri
     } catch (err) {
       console.warn('[Heartbeat] send failed:', err.message);
     }
-  }, [driverId, initialClockedIn, activeTripId]);
+  }, [driverId]);
 
   useEffect(() => {
     if (!driverId) return;
@@ -66,7 +72,7 @@ export const useDriverLiveState = (driverId, initialClockedIn = false, activeTri
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('online', handleOnline);
-      // Mark offline on cleanup
+      // Mark offline ONLY on unmount
       if (driverId) {
         setDoc(doc(db, COLLECTIONS.HEARTBEAT, driverId), {
           online: false,
