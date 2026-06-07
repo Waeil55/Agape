@@ -7,7 +7,7 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   RefreshCcw, X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, onSnapshot, collection, getDocs } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, onSnapshot, collection, getDocs, serverTimestamp } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -34,6 +34,8 @@ import {
   todayLocal,
   trimTelemetryCollections,
 } from './utils/driverTelemetry';
+import { detectLocationFraud, hasFraudFlags } from './utils/antiFraudEngine';
+import { buildFraudEvent, emitSystemEvent } from './services/systemEvents';
 import './utils/clientExport';
 import { registerServiceWorker, requestPeriodicSync, setupSWMessageHandler, triggerSync, skipWaiting } from './utils/swManager';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
@@ -1781,9 +1783,24 @@ const App = () => {
     const speedMph = Number.isFinite(Number(telemetry.speedMph))
       ? Number(telemetry.speedMph)
       : movement.inferredSpeedMph || existingDriver.speedMph || 0;
+    const telemetryDate = todayLocal(updatedAt);
+    const docId = buildTelemetryDocId(driverId, telemetryDate);
+    const previousDoc = getDriverTelemetryForDate(driverTelemetryRef.current, driverId, telemetryDate) || null;
+    const previousSample = previousDoc?.breadcrumbs?.[previousDoc.breadcrumbs.length - 1] || null;
+    const fraudResult = detectLocationFraud({
+      previousDriver: existingDriver,
+      previousSample,
+      latitude,
+      longitude,
+      telemetry: { ...telemetry, speedMph },
+      activeTrip,
+      movement,
+      updatedAt,
+    });
     const mergedTelemetry = {
       ...(existingDriver.telemetry || {}),
       ...telemetry,
+      antiFraud: fraudResult,
       movementState: movement.movementState,
       stoppedSince: movement.stoppedSince,
       movingSince: movement.movingSince,
@@ -1814,6 +1831,11 @@ const App = () => {
       currentDwellMinutes: movement.dwellMinutes,
       currentMovingMinutes: movement.movingMinutes,
       lastMotionChangeAt: movement.stateChanged ? updatedAtIso : (existingDriver.lastMotionChangeAt || updatedAtIso),
+      fraudFlags: fraudResult.flagTypes,
+      fraudFlagCount: fraudResult.flagTypes.length,
+      fraudSeverity: fraudResult.highestSeverity,
+      lastFraudCheckAt: fraudResult.evaluatedAt,
+      lastFraudSignals: fraudResult,
       telemetry: mergedTelemetry,
     };
 
@@ -1821,10 +1843,69 @@ const App = () => {
       await upsertDriverProfile(driverId, profileUpdates);
     }
 
-    const telemetryDate = todayLocal(updatedAt);
-    const docId = buildTelemetryDocId(driverId, telemetryDate);
-    const previousDoc = getDriverTelemetryForDate(driverTelemetryRef.current, driverId, telemetryDate) || null;
-    const previousSample = previousDoc?.breadcrumbs?.[previousDoc.breadcrumbs.length - 1] || null;
+    const locationSample = {
+      driverId,
+      userId: auth.currentUser?.uid || '',
+      driverName: existingDriver.name || '',
+      driverEmail: existingDriver.email || '',
+      lat: Number(Number(latitude).toFixed(6)),
+      lng: Number(Number(longitude).toFixed(6)),
+      accuracy: telemetry.accuracy ?? null,
+      speedMph: Number(Number(speedMph || 0).toFixed(1)),
+      heading: telemetry.heading ?? null,
+      tripId: activeTrip?.id || null,
+      tripStatus: activeTrip?.status || null,
+      activeDestination: phase.destination || '',
+      activePhase: phase.phase,
+      source: telemetry.source || 'driver-pwa',
+      recordedAt: updatedAtIso,
+      fraudFlags: fraudResult.flagTypes,
+      antiFraud: fraudResult,
+    };
+    try {
+      await Promise.all([
+        setDoc(doc(db, 'driver_locations', driverId), {
+          ...locationSample,
+          updatedAt: serverTimestamp(),
+          updatedAtLocal: updatedAtIso,
+        }, { merge: true }),
+        setDoc(doc(db, 'drivers', driverId), {
+          id: driverId,
+          userId: auth.currentUser?.uid || existingDriver.userId || '',
+          name: existingDriver.name || '',
+          email: existingDriver.email || '',
+          latitude,
+          longitude,
+          currentLocation: {
+            lat: latitude,
+            lng: longitude,
+            accuracy: telemetry.accuracy ?? null,
+            speedMph,
+            heading: telemetry.heading ?? null,
+            updatedAt: serverTimestamp(),
+          },
+          lastLocationUpdate: updatedAtIso,
+          fraudFlags: fraudResult.flagTypes,
+          fraudFlagCount: fraudResult.flagTypes.length,
+          fraudSeverity: fraudResult.highestSeverity,
+          lastFraudSignals: fraudResult,
+          updatedAt: serverTimestamp(),
+          updatedAtLocal: updatedAtIso,
+        }, { merge: true }),
+      ]);
+      if (hasFraudFlags(fraudResult)) {
+        emitSystemEvent(buildFraudEvent({
+          driverId,
+          activeTrip,
+          fraudResult,
+          locationSample,
+          driverName: existingDriver.name || '',
+        }));
+      }
+    } catch (err) {
+      console.error('Driver location anti-fraud write failed:', err);
+    }
+
     const distanceContribution = movement.elapsedSeconds > 0 && movement.elapsedSeconds <= 15 * 60
       ? movement.distanceMiles
       : 0;
@@ -1848,6 +1929,7 @@ const App = () => {
       destination: phase.destination || '',
       destinationType: phase.destinationType,
       distanceDeltaMiles: movement.distanceMiles,
+      fraudFlags: fraudResult.flagTypes,
     };
 
     let breadcrumbs = Array.isArray(previousDoc?.breadcrumbs) ? [...previousDoc.breadcrumbs] : [];
@@ -1927,6 +2009,10 @@ const App = () => {
       activePatient: activeTrip?.patient || null,
       activeDestination: phase.destination || '',
       activePhase: phase.phase,
+      fraudFlags: fraudResult.flagTypes,
+      fraudFlagCount: fraudResult.flagTypes.length,
+      fraudSeverity: fraudResult.highestSeverity,
+      lastFraudSignals: fraudResult,
       breadcrumbs,
       stopEvents,
       updatedAtLocal: updatedAtIso,

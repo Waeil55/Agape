@@ -989,6 +989,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         lastLng = longitude;
         setDriverPosition({ lat: latitude, lng: longitude, accuracy });
         const driverId = meRef.current?.id;
+        const activeGpsTrip = (activeTrips || []).find((trip) => [
+          'Navigating Pickup',
+          'At Pickup',
+          'In Transit',
+          'Navigating Dropoff',
+          'At Dropoff',
+          'Arrived',
+          'Arrived PU',
+          'Arrived DO',
+        ].includes(trip.status)) || activeTrips?.[0] || null;
+        const targetType = ['In Transit', 'Navigating Dropoff', 'At Dropoff', 'Arrived DO'].includes(activeGpsTrip?.status) ? 'dropoff' : 'pickup';
+        const targetAddress = targetType === 'dropoff' ? activeGpsTrip?.dropoff : activeGpsTrip?.pickup;
+        const targetCoords = targetAddress ? addressCoordsCache.current[targetAddress] : null;
         const nextTelemetry = {
           accuracy,
           speedMph: typeof pos.coords.speed === 'number' ? Math.round(pos.coords.speed * 2.23694) : null,
@@ -996,6 +1009,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           actorRole: role || 'driver',
           source: 'driver-pwa',
           recordedAt: new Date(pos.timestamp || now).toISOString(),
+          geofence: targetCoords ? {
+            tripId: activeGpsTrip?.id || null,
+            tripStatus: activeGpsTrip?.status || '',
+            targetType,
+            targetAddress,
+            targetLat: targetCoords.lat,
+            targetLng: targetCoords.lng,
+            radiusMiles: 0.2,
+          } : null,
         };
         if (driverId && navigator.onLine) {
           try {

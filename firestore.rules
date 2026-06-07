@@ -61,7 +61,38 @@ service cloud.firestore {
     }
     match /drivers/{driverId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && isOwner(driverId);
+      allow create: if request.auth != null && (
+        isOwner(driverId)
+        || request.resource.data.userId == request.auth.uid
+        || isDispatcher()
+      );
+      allow update: if request.auth != null && (
+        isOwner(driverId)
+        || resource.data.userId == request.auth.uid
+        || request.resource.data.userId == request.auth.uid
+        || isDispatcher()
+      );
+      allow delete: if request.auth != null && isAdmin();
+    }
+    match /driver_locations/{driverId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && (
+        isOwner(driverId)
+        || request.resource.data.userId == request.auth.uid
+        || isDispatcher()
+      );
+      allow update: if request.auth != null && (
+        isOwner(driverId)
+        || resource.data.userId == request.auth.uid
+        || request.resource.data.userId == request.auth.uid
+        || isDispatcher()
+      );
+      allow delete: if request.auth != null && isAdmin();
+    }
+    match /system_events/{eventId} {
+      allow read: if request.auth != null && isDispatcher();
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && isAdmin();
     }
     match /global_chat/{msgId} {
       allow read, write: if request.auth != null && isDispatcher();
