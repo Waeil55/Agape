@@ -3396,88 +3396,82 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     </div>
 
                     {isExpanded && (
-                    <div className="border-t border-slate-100">
-                      <div className="p-4">
-                        <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
-                          <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-200">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center">
-                                  <User size={14} className="text-slate-600" />
+                    <div className="border-t border-slate-100 p-4">
+                      <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200">
+                              <th colSpan="2" className="px-4 py-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-xl bg-white shadow-sm border border-slate-200 flex items-center justify-center">
+                                      <User size={14} className="text-slate-600" />
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-bold text-slate-900">{trip.patient}</p>
+                                      <p className="text-[10px] font-mono text-blue-600 font-semibold">#{trip.bookingId || trip.id}</p>
+                                    </div>
+                                  </div>
+                                  <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${s.bg}`}>{trip.status}</span>
                                 </div>
-                                <div>
-                                  <p className="text-sm font-bold text-slate-900">{trip.patient}</p>
-                                  <p className="text-[10px] font-mono text-blue-600 font-semibold">#{trip.bookingId || trip.id}</p>
-                                </div>
-                              </div>
-                              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${s.bg}`}>{trip.status}</span>
-                            </div>
-                          </div>
-
-                          <div className="divide-y divide-slate-100">
-                            <div className="grid grid-cols-2 divide-x divide-slate-100">
-                              <div className="px-4 py-3">
-                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Pickup Time</p>
-                                <p className="text-sm font-bold text-emerald-600">{trip.time ? to12hr(trip.time) : '—'}</p>
-                              </div>
-                              <div className="px-4 py-3">
-                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Dropoff Time</p>
-                                <p className="text-sm font-bold text-rose-600">{trip.completedAt ? to12hr(new Date(trip.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })) : '—'}</p>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 divide-x divide-slate-100">
-                              <div className="px-4 py-3">
-                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Pickup Odometer</p>
-                                <p className="text-sm font-bold text-slate-800">{trip.pickupOdometer ? `${Number(trip.pickupOdometer).toLocaleString()} mi` : '—'}</p>
-                              </div>
-                              <div className="px-4 py-3">
-                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Dropoff Odometer</p>
-                                <p className="text-sm font-bold text-slate-800">{trip.dropoffOdometer ? `${Number(trip.dropoffOdometer).toLocaleString()} mi` : '—'}</p>
-                              </div>
-                            </div>
-
-                            {trip.pickupOdometer && trip.dropoffOdometer && (
-                            <div className="px-4 py-3">
-                              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Trip Distance</p>
-                              <p className="text-sm font-bold text-blue-600">{Math.max(0, Number(trip.dropoffOdometer) - Number(trip.pickupOdometer)).toLocaleString()} mi driven</p>
-                            </div>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-xs">
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Pickup Time</td>
+                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.time ? to12hr(trip.time) : '—'}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Dropoff Time</td>
+                              <td className="px-4 py-2.5 font-bold text-rose-600">{trip.completedAt ? to12hr(new Date(trip.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })) : '—'}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Pickup Odometer</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-800">{trip.pickupOdometer ? `${Number(trip.pickupOdometer).toLocaleString()} mi` : '—'}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Dropoff Odometer</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-800">{trip.dropoffOdometer ? `${Number(trip.dropoffOdometer).toLocaleString()} mi` : '—'}</td>
+                            </tr>
+                            {(trip.pickupOdometer && trip.dropoffOdometer) && (
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Distance Driven</td>
+                              <td className="px-4 py-2.5 font-bold text-blue-600">{Math.max(0, Number(trip.dropoffOdometer) - Number(trip.pickupOdometer)).toLocaleString()} mi</td>
+                            </tr>
                             )}
-
                             {trip.distance && (
-                            <div className="px-4 py-3">
-                              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Distance</p>
-                              <p className="text-sm font-bold text-slate-800">{trip.distance} mi</p>
-                            </div>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Distance</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-800">{trip.distance} mi</td>
+                            </tr>
                             )}
-
-                            <div className="px-4 py-3">
-                              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Pickup Address</p>
-                              <p className="text-xs font-semibold text-emerald-700 leading-relaxed break-words">{trip.pickup || '—'}</p>
-                            </div>
-
-                            <div className="px-4 py-3">
-                              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Dropoff Address</p>
-                              <p className="text-xs font-semibold text-rose-700 leading-relaxed break-words">{trip.dropoff || '—'}</p>
-                            </div>
-
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 align-top">Pickup Address</td>
+                              <td className="px-4 py-2.5 font-semibold text-emerald-700 leading-relaxed break-words">{trip.pickup || '—'}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 align-top">Dropoff Address</td>
+                              <td className="px-4 py-2.5 font-semibold text-rose-700 leading-relaxed break-words">{trip.dropoff || '—'}</td>
+                            </tr>
                             {trip.status === 'Rerouted' && trip.cancellationReason && (
-                            <div className="px-4 py-3">
-                              <p className="text-[10px] uppercase tracking-wider text-purple-500 font-bold mb-1">Reroute Reason</p>
-                              <p className="text-xs font-semibold text-slate-700">{trip.cancellationReason}</p>
-                              {trip.cancelledBy && <p className="text-[10px] text-slate-400 mt-0.5">by {trip.cancelledBy}</p>}
-                            </div>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-purple-500 uppercase tracking-wider text-[10px] bg-slate-50/50 align-top">Reroute Reason</td>
+                              <td className="px-4 py-2.5">
+                                <p className="font-semibold text-slate-700">{trip.cancellationReason}</p>
+                                {trip.cancelledBy && <p className="text-[10px] text-slate-400 mt-0.5">by {trip.cancelledBy}</p>}
+                              </td>
+                            </tr>
                             )}
-
                             {trip.completedAt && (
-                            <div className="px-4 py-2.5">
-                              <p className="text-[10px] text-slate-400">Completed {new Date(trip.completedAt).toLocaleString()}</p>
-                            </div>
+                            <tr>
+                              <td colSpan="2" className="px-4 py-2 bg-slate-50/50 text-[10px] text-slate-400 text-center">Completed {new Date(trip.completedAt).toLocaleString()}</td>
+                            </tr>
                             )}
-                          </div>
-                        </div>
+                          </tbody>
+                        </table>
                       </div>
-                      <div className="px-4 pb-4 flex gap-2">
+                      <div className="flex gap-2 mt-3">
                         <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><FileText size={12} /> Details</button>
                         <button type="button" onClick={() => restoreHistoryTrip(trip)} className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><RotateCcw size={12} /> Restore</button>
                       </div>
