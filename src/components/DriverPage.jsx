@@ -3419,6 +3419,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           </thead>
                           <tbody className="text-xs">
                             <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Trip ID</td>
+                              <td className="px-4 py-2.5 font-mono font-bold text-blue-600 text-[11px]">{trip.id}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Pickup Time</td>
                               <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.time ? to12hr(trip.time) : '—'}</td>
                             </tr>
