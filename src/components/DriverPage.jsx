@@ -3397,45 +3397,89 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                     {isExpanded && (
                     <div className="border-t border-slate-100">
-                      <div className="p-3 space-y-3">
-                        {trip.pickup && (
-                        <div className="flex items-center gap-2">
-                          <ArrowRight size={10} className="text-emerald-500 shrink-0" />
-                          <span className="text-xs text-emerald-600 font-medium break-words">{trip.pickup}</span>
+                      <div className="p-4">
+                        <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
+                          <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center">
+                                  <User size={14} className="text-slate-600" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-slate-900">{trip.patient}</p>
+                                  <p className="text-[10px] font-mono text-blue-600 font-semibold">#{trip.bookingId || trip.id}</p>
+                                </div>
+                              </div>
+                              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${s.bg}`}>{trip.status}</span>
+                            </div>
+                          </div>
+
+                          <div className="divide-y divide-slate-100">
+                            <div className="grid grid-cols-2 divide-x divide-slate-100">
+                              <div className="px-4 py-3">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Pickup Time</p>
+                                <p className="text-sm font-bold text-emerald-600">{trip.time ? to12hr(trip.time) : '—'}</p>
+                              </div>
+                              <div className="px-4 py-3">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Dropoff Time</p>
+                                <p className="text-sm font-bold text-rose-600">{trip.completedAt ? to12hr(new Date(trip.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })) : '—'}</p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 divide-x divide-slate-100">
+                              <div className="px-4 py-3">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Pickup Odometer</p>
+                                <p className="text-sm font-bold text-slate-800">{trip.pickupOdometer ? `${Number(trip.pickupOdometer).toLocaleString()} mi` : '—'}</p>
+                              </div>
+                              <div className="px-4 py-3">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Dropoff Odometer</p>
+                                <p className="text-sm font-bold text-slate-800">{trip.dropoffOdometer ? `${Number(trip.dropoffOdometer).toLocaleString()} mi` : '—'}</p>
+                              </div>
+                            </div>
+
+                            {trip.pickupOdometer && trip.dropoffOdometer && (
+                            <div className="px-4 py-3">
+                              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Trip Distance</p>
+                              <p className="text-sm font-bold text-blue-600">{Math.max(0, Number(trip.dropoffOdometer) - Number(trip.pickupOdometer)).toLocaleString()} mi driven</p>
+                            </div>
+                            )}
+
+                            {trip.distance && (
+                            <div className="px-4 py-3">
+                              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Distance</p>
+                              <p className="text-sm font-bold text-slate-800">{trip.distance} mi</p>
+                            </div>
+                            )}
+
+                            <div className="px-4 py-3">
+                              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Pickup Address</p>
+                              <p className="text-xs font-semibold text-emerald-700 leading-relaxed break-words">{trip.pickup || '—'}</p>
+                            </div>
+
+                            <div className="px-4 py-3">
+                              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Dropoff Address</p>
+                              <p className="text-xs font-semibold text-rose-700 leading-relaxed break-words">{trip.dropoff || '—'}</p>
+                            </div>
+
+                            {trip.status === 'Rerouted' && trip.cancellationReason && (
+                            <div className="px-4 py-3">
+                              <p className="text-[10px] uppercase tracking-wider text-purple-500 font-bold mb-1">Reroute Reason</p>
+                              <p className="text-xs font-semibold text-slate-700">{trip.cancellationReason}</p>
+                              {trip.cancelledBy && <p className="text-[10px] text-slate-400 mt-0.5">by {trip.cancelledBy}</p>}
+                            </div>
+                            )}
+
+                            {trip.completedAt && (
+                            <div className="px-4 py-2.5">
+                              <p className="text-[10px] text-slate-400">Completed {new Date(trip.completedAt).toLocaleString()}</p>
+                            </div>
+                            )}
+                          </div>
                         </div>
-                        )}
-                        {trip.dropoff && (
-                        <div className="flex items-center gap-2">
-                          <ArrowRight size={10} className="text-rose-500 shrink-0" />
-                          <span className="text-xs text-rose-600 font-medium break-words">{trip.dropoff}</span>
-                        </div>
-                        )}
-                        {(trip.pickupOdometer || trip.dropoffOdometer) && (
-                        <div className="flex items-center gap-3 text-xs font-semibold flex-wrap">
-                          {trip.pickupOdometer && <span className="text-emerald-600">Start: {Number(trip.pickupOdometer).toLocaleString()} mi</span>}
-                          {trip.dropoffOdometer && <span className="text-rose-600">End: {Number(trip.dropoffOdometer).toLocaleString()} mi</span>}
-                          {trip.pickupOdometer && trip.dropoffOdometer && (
-                            <span className="text-blue-500">+{Math.max(0, Number(trip.dropoffOdometer) - Number(trip.pickupOdometer)).toLocaleString()} mi</span>
-                          )}
-                        </div>
-                        )}
-                        {trip.distance && (
-                        <p className="text-xs text-slate-500 font-semibold">Distance: {trip.distance} mi</p>
-                        )}
-                        {trip.status === 'Rerouted' && trip.cancellationReason && (
-                        <div className="bg-purple-50 rounded-xl px-3 py-2 border border-purple-200">
-                          <p className="text-[10px] uppercase tracking-wider text-purple-500 font-bold">Reroute Reason</p>
-                          <p className="text-xs text-slate-700 mt-0.5">{trip.cancellationReason}</p>
-                          {trip.cancelledBy && <p className="text-[10px] text-slate-400 mt-0.5">by {trip.cancelledBy}</p>}
-                        </div>
-                        )}
-                        {trip.completedAt && (
-                        <p className="text-[10px] text-slate-400">{new Date(trip.completedAt).toLocaleString()}</p>
-                        )}
                       </div>
-                      <div className="px-3 pb-3 flex gap-2">
-                        <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><FileText size={12} /> Details</button>
-                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="flex-1 h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><RotateCcw size={12} /> Restore</button>
+                      <div className="px-4 pb-4 flex gap-2">
+                        <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><FileText size={12} /> Details</button>
+                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><RotateCcw size={12} /> Restore</button>
                       </div>
                     </div>
                     )}
