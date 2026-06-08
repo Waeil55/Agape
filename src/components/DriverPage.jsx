@@ -783,9 +783,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         if ((t.patient || '').trim().toLowerCase() !== patientKey) continue;
         if (!t.time || isInOutTrip(t)) continue;
         let score = 0;
-        // Signal 1: Sequential booking ID (strongest)
+        // Signal 1: Sequential booking ID (strongest) — B leg ID must be exactly A leg ID + 1
         const tBookingNum = parseInt(t.bookingId, 10);
-        if (!isNaN(tripBookingNum) && !isNaN(tBookingNum) && Math.abs(tripBookingNum - tBookingNum) === 1) {
+        if (!isNaN(tripBookingNum) && !isNaN(tBookingNum) && (tripBookingNum - tBookingNum) === 1) {
           score += 10;
         }
         // Signal 2: Reversed addresses (confirms pair)
@@ -2626,7 +2626,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         seenA++;
                         let score = 0;
                         const tBookingNum = parseInt(t.bookingId, 10);
-                        if (!isNaN(tripBookingNum) && !isNaN(tBookingNum) && Math.abs(tripBookingNum - tBookingNum) === 1) score += 10;
+                        if (!isNaN(tripBookingNum) && !isNaN(tBookingNum) && (tripBookingNum - tBookingNum) === 1) score += 10;
                         if ((t.dropoff || '').trim().toLowerCase() === tripPickup) score += 5;
                         if (score > bestScore) {
                           bestScore = score;
