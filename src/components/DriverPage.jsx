@@ -2594,6 +2594,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 // Compute leg number: A legs get sequential numbers, B legs reference their A leg
                 let legLabel = null;
+                let isPairedInOut = false;
+                let pairType = null; // 'a-leg' or 'b-leg'
                 if (legsCount > 1) {
                   if (isInOutTrip(trip) && !trip.time) {
                     // B leg — find its paired A leg number
@@ -2613,6 +2615,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       }
                     }
                     legLabel = aLegNum > 0 ? `Return → Leg ${aLegNum}` : 'Return Leg';
+                    isPairedInOut = true;
+                    pairType = 'b-leg';
                   } else if (!isWillCall(trip)) {
                     // A leg — count which leg number this is for this patient
                     const patientKey = (trip.patient || '').trim().toLowerCase();
@@ -2624,6 +2628,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       }
                     }
                     legLabel = `Leg ${legNum}`;
+                    // Check if next trip is a paired B leg
+                    const nextTrip = orderedTrips[idx + 1];
+                    if (nextTrip && isInOutTrip(nextTrip) && !nextTrip.time && (nextTrip.patient || '').trim().toLowerCase() === (trip.patient || '').trim().toLowerCase()) {
+                      isPairedInOut = true;
+                      pairType = 'a-leg';
+                    }
                   }
                 }
 
@@ -2667,6 +2677,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       notes: trip.notes,
                       legs: legsCount > 1 ? `${legsCount} LEGS` : '1 LEG',
                       legLabel,
+                      isPairedInOut,
+                      pairType,
+                      isWillCallTrip: isWillCall(trip),
+                      isInOut: isInOutTrip(trip),
                       patientPhone: trip.patientPhone,
                       patientMobile: trip.patientMobile,
                       pickupPhone: trip.pickupPhone,

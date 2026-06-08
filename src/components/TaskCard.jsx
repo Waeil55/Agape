@@ -97,6 +97,8 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
         ${isAnotherExpanded ? 'opacity-35 scale-[0.98] blur-[1px] pointer-events-none' : ''}
         ${!isExpanded && timeUrgency.type === 'critical' ? 'border-rose-300 shadow-rose-100 shadow-md' : ''}
         ${!isExpanded && timeUrgency.type === 'warning' ? 'border-orange-300 shadow-orange-50 shadow-sm' : ''}
+        ${task.isPairedInOut && task.pairType === 'a-leg' ? 'border-l-4 border-l-amber-400' : ''}
+        ${task.isPairedInOut && task.pairType === 'b-leg' ? 'border-l-4 border-l-amber-300 bg-amber-50/20 -mt-1 rounded-t-none' : ''}
       `}
     >
       {/* Collapsed Header */}
@@ -167,9 +169,17 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
           </div>
 
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-[15px] font-bold text-slate-800 truncate min-w-0">
-              {task.patient || task.patientName}
-            </h3>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-[15px] font-bold text-slate-800 truncate">
+                {task.patient || task.patientName}
+              </h3>
+              {task.isInOut && !isExpanded && (
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-0.5">In/Out — Client returns shortly</p>
+              )}
+              {task.isWillCallTrip && !isExpanded && (
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Will Call — Awaiting client call</p>
+              )}
+            </div>
             {!isExpanded && task.details?.distance && (
               <span className="text-[13px] font-semibold text-slate-400 shrink-0 ml-2">{task.details.distance}</span>
             )}
@@ -229,6 +239,12 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                     <span className="text-[10px] font-mono font-bold text-slate-300">· {task.bookingId}</span>
                   )}
                 </div>
+                {task.isInOut && (
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-1">In/Out — Client returns shortly</p>
+                )}
+                {task.isWillCallTrip && (
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Will Call — Awaiting client call</p>
+                )}
               </div>
               <StatusBadge status={task.status} />
             </div>
