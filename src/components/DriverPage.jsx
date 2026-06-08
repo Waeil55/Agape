@@ -353,6 +353,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [showContactSelector, setShowContactSelector] = useState(null);
   const [restorePrompt, setRestorePrompt] = useState(null);
   const [cancelPrompt, setCancelPrompt] = useState(null);
+  const [odometerInput, setOdometerInput] = useState('');
+  const [editingOdometer, setEditingOdometer] = useState(false);
   const [showLegsModal, setShowLegsModal] = useState(null);
   const [editTripModal, setEditTripModal] = useState(null);
   const [skipConfirmTripId, setSkipConfirmTripId] = useState(null);
@@ -461,6 +463,31 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       setExpandedTripId(null);
     }
   }, [trips, expandedTripId, setExpandedTripId]);
+
+  // Apply theme
+  useEffect(() => {
+    const theme = appSettings?.theme || 'light';
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+      root.style.setProperty('--bg-primary', '#1a1a2e');
+      root.style.setProperty('--text-primary', '#e2e8f0');
+    } else {
+      root.classList.remove('dark');
+      root.style.setProperty('--bg-primary', '#F3F4F6');
+      root.style.setProperty('--text-primary', '#0f172a');
+    }
+    localStorage.setItem('agape_theme', theme);
+  }, [appSettings?.theme]);
+
+  // Apply font scale
+  useEffect(() => {
+    const scale = appSettings?.fontScale || 'md';
+    const root = document.documentElement;
+    const sizes = { sm: '94%', md: '96%', lg: '100%' };
+    root.style.fontSize = sizes[scale] || '96%';
+    localStorage.setItem('agape_fontScale', scale);
+  }, [appSettings?.fontScale]);
 
   const gpsWatchId = useRef(null);
   const meRef = useRef(me);
@@ -3705,9 +3732,45 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             {/* Odometer */}
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex-1">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Odometer</p>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">{me?.odometer?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-400">mi</span></p>
+                  {editingOdometer ? (
+                    <div className="flex items-center gap-2 mt-2">
+                      <input
+                        type="number"
+                        value={odometerInput}
+                        onChange={(e) => setOdometerInput(e.target.value)}
+                        className="flex-1 text-2xl font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => {
+                          const val = parseInt(odometerInput);
+                          if (!isNaN(val) && val >= 0) {
+                            onUpdateAppSettings?.({ odometer: val }, true);
+                          }
+                          setEditingOdometer(false);
+                        }}
+                        className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingOdometer(false)}
+                        className="px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-200 transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setOdometerInput(String(me?.odometer || 0)); setEditingOdometer(true); }}
+                      className="text-2xl font-bold text-slate-900 mt-1 hover:text-blue-600 transition text-left"
+                    >
+                      {me?.odometer?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-400">mi</span>
+                      <span className="text-xs text-blue-500 ml-2 font-medium">Edit</span>
+                    </button>
+                  )}
                   <p className="text-slate-500 text-xs font-semibold mt-1">Next service at {me?.nextOilChange?.toLocaleString() || '5,000'} mi</p>
                 </div>
                 <Gauge size={32} className="text-slate-200" />
@@ -3764,11 +3827,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   { value: 'dark', label: 'Dark', icon: Moon },
                 ].map((option) => {
                   const Icon = option.icon;
-                  const active = appSettings?.theme === option.value;
+                  const active = (appSettings?.theme || 'light') === option.value;
                   return (
                     <button key={option.value}
                       onClick={() => onUpdateAppSettings?.({ theme: option.value })}
-                      className={`p-3 rounded-xl border text-left transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
+                      className={`p-3 rounded-2xl border-2 text-left transition active:scale-95 ${active ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
                     >
                       <div className="flex items-center gap-2 font-bold text-sm"><Icon size={15} /> {option.label}</div>
                     </button>
@@ -3779,20 +3842,70 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="flex items-center gap-2 mb-2 text-slate-800 font-semibold"><span className="text-sm">A</span> Font Size</div>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { value: 'sm', label: 'Compact' },
+                    { value: 'sm', label: 'Small' },
                     { value: 'md', label: 'Standard' },
                     { value: 'lg', label: 'Large' },
                   ].map((option) => {
-                    const active = appSettings?.fontScale === option.value;
+                    const active = (appSettings?.fontScale || 'md') === option.value;
                     return (
                       <button key={option.value}
                         onClick={() => onUpdateAppSettings?.({ fontScale: option.value })}
-                        className={`p-3 rounded-xl border font-bold text-sm transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
+                        className={`p-3 rounded-2xl border-2 font-bold text-sm transition active:scale-95 ${active ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
                       >
                         {option.label}
                       </button>
                     );
                   })}
+                </div>
+              </div>
+            </div>
+
+            {/* Notifications & GPS */}
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                  Preferences
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">Notifications</p>
+                        <p className="text-[10px] text-slate-500">Message and trip alerts</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => onUpdateAppSettings?.({ notifications: !(appSettings?.notifications !== false) })}
+                      className={`w-12 h-7 rounded-full transition-colors relative ${appSettings?.notifications !== false ? 'bg-blue-600' : 'bg-slate-300'}`}
+                    >
+                      <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform shadow-sm ${appSettings?.notifications !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <MapPin size={16} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">GPS Sharing</p>
+                        <p className="text-[10px] text-slate-500">Share location when clocked in</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (isClockedIn) {
+                          handleStatusToggle();
+                        }
+                      }}
+                      className={`w-12 h-7 rounded-full transition-colors relative ${isClockedIn ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                    >
+                      <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform shadow-sm ${isClockedIn ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
