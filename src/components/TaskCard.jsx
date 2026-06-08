@@ -7,7 +7,7 @@ import {
   Ruler, Users, Activity, Building, Home, Accessibility,
   Copy, Check, RotateCcw, PhoneForwarded, MessageCircle,
   Square, CheckSquare, RefreshCw, Forward,
-  Edit2, ArrowLeft, Shield, Zap
+  Edit2, ArrowLeft, Shield, Zap, MoreHorizontal, Undo2
 } from 'lucide-react';
 
 const StatusBadge = ({ status }) => {
@@ -66,6 +66,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const isExpanded = expandedId === task.id;
   const isAnotherExpanded = expandedId !== null && expandedId !== task.id;
   const [copiedId, setCopiedId] = useState('');
+  const [showMoreSheet, setShowMoreSheet] = useState(false);
 
   const timeUrgency = getTimeUrgency(task.time, task.status);
   const isTerminal = ['Completed', 'Cancelled', 'No Show'].includes(task.status);
@@ -323,6 +324,12 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                       className="flex-1 h-10 bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border border-white/5">
                       <PhoneForwarded size={13} /> Contacts
                     </button>
+                    {!isTerminal && (
+                      <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(true); }}
+                        className="h-10 px-3 bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-white/5">
+                        <MoreHorizontal size={13} /> More
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -352,6 +359,13 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                     <span key={step} className={`text-[8px] font-bold tracking-wide ${i <= stepIdx ? 'text-slate-700' : 'text-slate-300'}`}>{step}</span>
                   ))}
                 </div>
+                {/* Undo Back Button */}
+                {!isTerminal && stepIdx > 0 && actions?.onRevert && (
+                  <button onClick={(e) => { e.stopPropagation(); actions.onRevert(task); }}
+                    className="mt-3 w-full h-9 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.97] cursor-pointer border border-slate-200/60">
+                    <Undo2 size={12} /> Undo Last Step
+                  </button>
+                )}
               </div>
 
               {/* --- TAGS --- */}
@@ -425,53 +439,68 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   )}
                 </div>
               )}
-
-              {/* No Show / Cancel / Reroute */}
-              {!isTerminal && (actions?.onNoShow || actions?.onCancel || actions?.onReroute) && (
-                <div className="flex gap-2 mb-2.5">
-                  {actions?.onNoShow && (
-                    <button onClick={(e) => { e.stopPropagation(); actions.onNoShow(task); }}
-                      className="flex-1 h-[42px] flex items-center justify-center gap-1.5 bg-rose-50 text-rose-600 font-bold rounded-2xl hover:bg-rose-100 active:scale-[0.97] transition-all text-[11px] border border-rose-100">
-                      <AlertCircle size={13} /> No Show
-                    </button>
-                  )}
-                  {actions?.onCancel && (
-                    <button onClick={(e) => { e.stopPropagation(); actions.onCancel(task); }}
-                      className="flex-1 h-[42px] flex items-center justify-center gap-1.5 bg-slate-50 text-slate-500 font-bold rounded-2xl hover:bg-slate-100 active:scale-[0.97] transition-all text-[11px] border border-slate-200">
-                      <XCircle size={13} /> Cancel
-                    </button>
-                  )}
-                  {actions?.onReroute && (
-                    <button onClick={(e) => { e.stopPropagation(); actions.onReroute(task); }}
-                      className="flex-1 h-[42px] flex items-center justify-center gap-1.5 bg-purple-50 text-purple-600 font-bold rounded-2xl hover:bg-purple-100 active:scale-[0.97] transition-all text-[11px] border border-purple-100">
-                      <RefreshCw size={13} /> Reroute
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Utility Row */}
-              <div className="flex gap-2">
-                {actions?.onEditTrip && !isTerminal && (
-                  <button onClick={(e) => { e.stopPropagation(); actions.onEditTrip(task); }}
-                    className="flex-1 h-10 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-100 transition-all text-[10px] font-bold flex items-center justify-center gap-1.5 border border-slate-200/60 active:scale-[0.97]">
-                    <Edit2 size={11} /> Edit Trip
-                  </button>
-                )}
-                {actions?.onTransfer && !isTerminal && (
-                  <button onClick={(e) => { e.stopPropagation(); actions.onTransfer(task); }}
-                    className="flex-1 h-10 bg-amber-50/80 text-amber-600 rounded-2xl hover:bg-amber-100 transition-all text-[10px] font-bold flex items-center justify-center gap-1.5 border border-amber-100/60 active:scale-[0.97]">
-                    <Zap size={11} /> Transfer
-                  </button>
-                )}
-                {actions?.onRevert && !isTerminal && (
-                  <button onClick={(e) => { e.stopPropagation(); actions.onRevert(task); }}
-                    className="flex-1 h-10 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-100 transition-all text-[10px] font-bold flex items-center justify-center gap-1.5 border border-slate-200/60 active:scale-[0.97]">
-                    <RotateCcw size={11} /> Revert
-                  </button>
-                )}
-              </div>
             </div>
+
+            {/* === MORE BOTTOM SHEET === */}
+            {showMoreSheet && (
+              <div className="fixed inset-0 flex items-end justify-center" style={{ zIndex: 60 }} onClick={() => setShowMoreSheet(false)}>
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+                <div className="relative w-full max-w-lg bg-white rounded-t-3xl shadow-2xl animate-slide-up"
+                  onClick={(e) => e.stopPropagation()}>
+                  {/* Handle */}
+                  <div className="flex justify-center pt-3 pb-1">
+                    <div className="w-10 h-1 rounded-full bg-slate-200" />
+                  </div>
+                  {/* Header */}
+                  <div className="px-5 pb-3 flex items-center justify-between border-b border-slate-100">
+                    <h3 className="font-extrabold text-[15px] text-slate-900">More Actions</h3>
+                    <button onClick={() => setShowMoreSheet(false)}
+                      className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors cursor-pointer">
+                      <XCircle size={16} className="text-slate-400" />
+                    </button>
+                  </div>
+                  {/* Actions Grid */}
+                  <div className="p-5 space-y-2 pb-[calc(env(safe-area-inset-bottom)+20px)]">
+                    {actions?.onNoShow && (
+                      <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(false); actions.onNoShow(task); }}
+                        className="w-full h-12 flex items-center gap-3 px-4 bg-rose-50 text-rose-600 font-bold rounded-2xl hover:bg-rose-100 active:scale-[0.97] transition-all text-[13px] border border-rose-100">
+                        <AlertCircle size={16} /> No Show
+                      </button>
+                    )}
+                    {actions?.onCancel && (
+                      <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(false); actions.onCancel(task); }}
+                        className="w-full h-12 flex items-center gap-3 px-4 bg-slate-50 text-slate-600 font-bold rounded-2xl hover:bg-slate-100 active:scale-[0.97] transition-all text-[13px] border border-slate-200">
+                        <XCircle size={16} /> Cancel
+                      </button>
+                    )}
+                    {actions?.onReroute && (
+                      <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(false); actions.onReroute(task); }}
+                        className="w-full h-12 flex items-center gap-3 px-4 bg-purple-50 text-purple-600 font-bold rounded-2xl hover:bg-purple-100 active:scale-[0.97] transition-all text-[13px] border border-purple-100">
+                        <RefreshCw size={16} /> Reroute
+                      </button>
+                    )}
+                    {actions?.onEditTrip && !isTerminal && (
+                      <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(false); actions.onEditTrip(task); }}
+                        className="w-full h-12 flex items-center gap-3 px-4 bg-slate-50 text-slate-600 font-bold rounded-2xl hover:bg-slate-100 active:scale-[0.97] transition-all text-[13px] border border-slate-200">
+                        <Edit2 size={16} /> Edit Trip
+                      </button>
+                    )}
+                    {actions?.onTransfer && !isTerminal && (
+                      <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(false); actions.onTransfer(task); }}
+                        className="w-full h-12 flex items-center gap-3 px-4 bg-amber-50 text-amber-600 font-bold rounded-2xl hover:bg-amber-100 active:scale-[0.97] transition-all text-[13px] border border-amber-100">
+                        <Zap size={16} /> Transfer
+                      </button>
+                    )}
+                    {actions?.onRevert && !isTerminal && (
+                      <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(false); actions.onRevert(task); }}
+                        className="w-full h-12 flex items-center gap-3 px-4 bg-slate-50 text-slate-500 font-bold rounded-2xl hover:bg-slate-100 active:scale-[0.97] transition-all text-[13px] border border-slate-200">
+                        <RotateCcw size={16} /> Revert Status
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </>
         );
