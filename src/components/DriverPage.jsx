@@ -32,7 +32,14 @@ import ErrorBoundary from './ErrorBoundary';
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
+const isInOutTrip = (trip) => {
+  if (!trip) return false;
+  const notes = String(trip.notes || '').toUpperCase();
+  return notes.includes('IN/OUT') || notes.includes('IN OUT') || notes.includes('IN & OUT');
+};
+
 const isWillCall = (trip) => {
+  if (isInOutTrip(trip)) return false;
   const t = (trip && typeof trip === 'object') ? trip.time : trip;
   if (t === undefined || t === null) return true;
   const s = String(t).toUpperCase().trim();
@@ -764,15 +771,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (urgencyDiff !== 0) return urgencyDiff;
     return timeToMinutes(a.time) - timeToMinutes(b.time);
   }).reduce((acc, trip) => {
-    // Group multi-leg patients: B leg stays right below A leg (only for timed/in-out trips)
-    const isWC = isWillCall(trip);
-    if (!isWC) {
+    // For IN/OUT trips: pair B leg (no time, notes contain IN/OUT) right below its A leg
+    if (!isWillCall(trip) && isInOutTrip(trip) && !trip.time) {
       const patientKey = (trip.patient || '').trim().toLowerCase();
-      const existing = acc.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && !isWillCall(t));
-      if (existing.length > 0) {
-        const lastIdx = acc.indexOf(existing[existing.length - 1]);
-        acc.splice(lastIdx + 1, 0, trip);
-        return acc;
+      const tripPickup = (trip.pickup || '').trim().toLowerCase();
+      // Find the last A leg for this patient where pickup matches this B leg's dropoff (reversed)
+      for (let i = acc.length - 1; i >= 0; i--) {
+        const t = acc[i];
+        if ((t.patient || '').trim().toLowerCase() === patientKey
+            && t.time && !isInOutTrip(t)
+            && (t.dropoff || '').trim().toLowerCase() === tripPickup) {
+          acc.splice(i + 1, 0, trip);
+          return acc;
+        }
       }
     }
     acc.push(trip);
