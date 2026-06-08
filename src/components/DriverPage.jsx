@@ -511,11 +511,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const getContactsForTrip = (trip) => tripContacts[trip?.id] || [];
 
-  // Count legs per patient (A legs only — exclude IN/OUT B legs)
+  // Count legs per patient (all trips = A legs + B legs)
   const patientLegs = useMemo(() => {
     const counts = {};
     driverScopedTrips.forEach(t => {
-      if (isInOutTrip(t) && !t.time) return;
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
       counts[key] = (counts[key] || 0) + 1;
@@ -772,19 +771,35 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (urgencyDiff !== 0) return urgencyDiff;
     return timeToMinutes(a.time) - timeToMinutes(b.time);
   }).reduce((acc, trip) => {
-    // For IN/OUT trips: pair B leg (no time, notes contain IN/OUT) right below its A leg
+    // Smart pairing: B leg (no time, IN/OUT) → match to its A leg by sequential booking ID + reversed addresses
     if (!isWillCall(trip) && isInOutTrip(trip) && !trip.time) {
       const patientKey = (trip.patient || '').trim().toLowerCase();
       const tripPickup = (trip.pickup || '').trim().toLowerCase();
-      // Find the last A leg for this patient where pickup matches this B leg's dropoff (reversed)
+      const tripBookingNum = parseInt(trip.bookingId, 10);
+      let bestIdx = -1;
+      let bestScore = 0;
       for (let i = acc.length - 1; i >= 0; i--) {
         const t = acc[i];
-        if ((t.patient || '').trim().toLowerCase() === patientKey
-            && t.time && !isInOutTrip(t)
-            && (t.dropoff || '').trim().toLowerCase() === tripPickup) {
-          acc.splice(i + 1, 0, trip);
-          return acc;
+        if ((t.patient || '').trim().toLowerCase() !== patientKey) continue;
+        if (!t.time || isInOutTrip(t)) continue;
+        let score = 0;
+        // Signal 1: Sequential booking ID (strongest)
+        const tBookingNum = parseInt(t.bookingId, 10);
+        if (!isNaN(tripBookingNum) && !isNaN(tBookingNum) && Math.abs(tripBookingNum - tBookingNum) === 1) {
+          score += 10;
         }
+        // Signal 2: Reversed addresses (confirms pair)
+        if ((t.dropoff || '').trim().toLowerCase() === tripPickup) {
+          score += 5;
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = i;
+        }
+      }
+      if (bestIdx >= 0 && bestScore >= 5) {
+        acc.splice(bestIdx + 1, 0, trip);
+        return acc;
       }
     }
     acc.push(trip);
@@ -2592,29 +2607,34 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
                 const isTerminal = isWorkflowTerminalTrip(trip);
 
-                // Compute leg number: A legs get sequential numbers, B legs reference their A leg
+                // Compute leg number: A legs get sequential numbers, B legs reference their paired A leg
                 let legLabel = null;
                 let isPairedInOut = false;
                 let pairType = null; // 'a-leg' or 'b-leg'
                 if (legsCount > 1) {
                   if (isInOutTrip(trip) && !trip.time) {
-                    // B leg — find its paired A leg number
+                    // B leg — find its paired A leg by sequential booking ID + reversed addresses
                     const patientKey = (trip.patient || '').trim().toLowerCase();
                     const tripPickup = (trip.pickup || '').trim().toLowerCase();
-                    let aLegNum = 0;
+                    const tripBookingNum = parseInt(trip.bookingId, 10);
+                    let bestLegNum = 0;
+                    let bestScore = 0;
                     let seenA = 0;
                     for (let i = 0; i < idx; i++) {
                       const t = orderedTrips[i];
-                      if ((t.patient || '').trim().toLowerCase() === patientKey) {
-                        if (!isWillCall(t) && !isInOutTrip(t)) {
-                          seenA++;
-                          if ((t.dropoff || '').trim().toLowerCase() === tripPickup) {
-                            aLegNum = seenA;
-                          }
+                      if ((t.patient || '').trim().toLowerCase() === patientKey && !isWillCall(t) && !isInOutTrip(t)) {
+                        seenA++;
+                        let score = 0;
+                        const tBookingNum = parseInt(t.bookingId, 10);
+                        if (!isNaN(tripBookingNum) && !isNaN(tBookingNum) && Math.abs(tripBookingNum - tBookingNum) === 1) score += 10;
+                        if ((t.dropoff || '').trim().toLowerCase() === tripPickup) score += 5;
+                        if (score > bestScore) {
+                          bestScore = score;
+                          bestLegNum = seenA;
                         }
                       }
                     }
-                    legLabel = aLegNum > 0 ? `Return → Leg ${aLegNum}` : 'Return Leg';
+                    legLabel = bestLegNum > 0 ? `Return → Leg ${bestLegNum}` : 'Return Leg';
                     isPairedInOut = true;
                     pairType = 'b-leg';
                   } else if (!isWillCall(trip)) {
