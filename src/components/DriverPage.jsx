@@ -2704,9 +2704,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== ODOMETER PROMPT MODAL ===== */}
       {showOdometerPrompt && (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => setShowOdometerPrompt(null)}>
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => setShowOdometerPrompt(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-bold text-base text-slate-900">Arrived at Pickup</h2>
@@ -2751,9 +2751,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== ROUTE STOP ODOMETER PROMPT ===== */}
       {routeStopOdometerPrompt && (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => setRouteStopOdometerPrompt(null)}>
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => setRouteStopOdometerPrompt(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-bold text-base text-slate-900">Arrived at Stop</h2>
@@ -2793,9 +2793,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== ROUTE STOP SIGNATURE PROMPT ===== */}
       {routeStopSignaturePrompt && (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }}>
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-bold text-base text-slate-900">Confirm Signature</h2>
@@ -2831,9 +2831,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== ARRIVAL CONFIRM MODAL ===== */}
       {showArrivalConfirm && (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => setShowArrivalConfirm(null)}>
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => setShowArrivalConfirm(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-bold text-base text-slate-900">Arrived at Pickup</h2>
@@ -2897,9 +2897,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== SIGNATURE CONFIRM MODAL (Before Heading to Dropoff) ===== */}
       {showSignatureConfirm && (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }}>
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-bold text-base text-slate-900">Begin Transport</h2>
@@ -2938,9 +2938,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== COMPLETE TRIP MODAL ===== */}
       {showCompleteModal && (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => { setShowCompleteModal(null); setCompleteError(''); }}>
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => { setShowCompleteModal(null); setCompleteError(''); }}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-bold text-base text-slate-900">Complete Trip</h2>
@@ -3689,9 +3689,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         const checkColor = cancelPrompt.type === 'noshow' ? 'bg-orange-500 border-orange-500' : cancelPrompt.type === 'reroute' ? 'bg-purple-500 border-purple-500' : 'bg-rose-500 border-rose-500';
         const activeColor = cancelPrompt.type === 'noshow' ? 'border-orange-200 bg-orange-50' : cancelPrompt.type === 'reroute' ? 'border-purple-200 bg-purple-50' : 'border-rose-200 bg-rose-50';
         return (
-          <div className="fixed inset-0 flex items-end sm:items-center justify-center p-4" style={{ zIndex: 140 }} onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }}>
+          <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 140 }} onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <div>
                   <h2 className="font-bold text-base text-slate-900">{actionLabel} Trip Legs</h2>
@@ -3766,9 +3766,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           setSelectedLegsForAction(prev => prev.size === restorePrompt.legs.length ? new Set() : new Set(restorePrompt.legs.map(l => l.id)));
         };
         return (
-          <div className="fixed inset-0 flex items-end sm:items-center justify-center p-4" style={{ zIndex: 140 }} onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }}>
+          <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 140 }} onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <div>
                   <h2 className="font-bold text-base text-slate-900">Restore Trip Legs</h2>
@@ -3830,9 +3830,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== EMERGENCY TRANSFER MODAL ===== */}
       {transferPrompt && (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center p-4" style={{ zIndex: 175 }} onClick={() => setTransferPrompt(null)}>
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 175 }} onClick={() => setTransferPrompt(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-bold text-base text-slate-900">Emergency Transfer</h2>
@@ -3882,9 +3882,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== PASSWORD CONFIRM MODAL ===== */}
       {passwordPrompt && (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center p-4" style={{ zIndex: 180 }} onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }}>
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 180 }} onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-bold text-base text-slate-900">
@@ -3969,9 +3969,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         const warning = getContactWarning(showContactSelector, trips);
         const iconMap = { User, Shield, PhoneForwarded, AlertTriangle, Building, MapPin, Headphones, Route };
         return (
-          <div className="fixed inset-0 flex items-end sm:items-center justify-center p-4" style={{ zIndex: 170 }} onClick={() => setShowContactSelector(null)}>
+          <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 170 }} onClick={() => setShowContactSelector(null)}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <div>
                   <h2 className="font-bold text-base text-slate-900">Contacts</h2>

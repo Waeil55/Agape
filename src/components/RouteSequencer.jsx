@@ -1352,8 +1352,8 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
       {/* ===== SAVE MODAL ===== */}
       {showSaveModal && (
-        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="absolute inset-0 z-[60] flex items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg max-h-[92vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
               <h2 className="text-[15px] font-extrabold text-slate-900 flex items-center gap-2 tracking-tight">
                 <div className="w-9 h-9 rounded-2xl bg-indigo-50 flex items-center justify-center">
@@ -1554,8 +1554,8 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
       {/* ===== SAVED TEMPLATES MODAL ===== */}
       {showTemplatesModal && (
-        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh]">
+        <div className="absolute inset-0 z-[60] flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh]">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 flex-shrink-0">
               <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <Route className="w-5 h-5 text-indigo-600" /> Saved Route Sequences
@@ -1655,8 +1655,8 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
       {/* ===== ADD TEMP TRIP MODAL ===== */}
       {showAddTempModal && (
-        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="absolute inset-0 z-[60] flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg max-h-[92vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
               <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <CalendarDays className="w-5 h-5 text-blue-600" /> One-Time Trip
