@@ -327,7 +327,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [isGpsTracking, setIsGpsTracking] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlineQueue, setOfflineQueue] = useState([]);
-  const [showSequencerModal, setShowSequencerModal] = useState(false);
   const [sequencerTripFilter, setSequencerTripFilter] = useState(null);
   const [routePlanSequencerStops, setRoutePlanSequencerStops] = useState(null);
   const [routePlanSequencerSequence, setRoutePlanSequencerSequence] = useState(null);
@@ -1858,6 +1857,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const navItems = [
     { id: 'trips', label: 'Trips', icon: Home },
     { id: 'tools', label: 'Tools', icon: Zap },
+    { id: 'sequencer', label: 'Sequencer', icon: Route },
     { id: 'history', label: 'History', icon: Clock },
     { id: 'chat', label: 'Chat', icon: MessageCircle },
     { id: 'settings', label: 'Settings', icon: Settings },
@@ -2214,7 +2214,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   onClick={() => {
                     setSequencerTripFilter(selectedTrips);
-                    setShowSequencerModal(true);
+                    setActiveNav('sequencer');
                   }}
                   className="text-[9px] text-white font-bold flex items-center gap-1 active:scale-95 bg-gradient-to-r from-indigo-600 to-purple-600 px-2 py-0.5 rounded-lg shadow-sm"
                 >
@@ -3356,7 +3356,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           onSetSelectedTrips={setSelectedTrips}
           etas={etas}
           onOpenInNav={(addr) => { impact('medium'); openInNavApp(addr, suggestNavApp(addr)); }}
-          onOpenSequencer={() => setShowSequencerModal(true)}
+          onOpenSequencer={() => setActiveNav('sequencer')}
           requestAuthAction={requestAuthAction}
           routePlanStops={routePlanStops}
           onSetRoutePlanStops={setRoutePlanStops}
@@ -3368,7 +3368,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 setRoutePlanSequencerSequence(stopData.sequence || null);
                 setRoutePlanSequencerOrigin(origin || null);
                 setSequencerKey(k => k + 1);
-                setShowSequencerModal(true);
+                setActiveNav('sequencer');
                 setShowToast({ type: 'success', message: `${stopData.clients.length} route stop${stopData.clients.length !== 1 ? 's' : ''} loaded in Route Sequencer.` });
                 return;
               }
@@ -3377,7 +3377,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               setRoutePlanSequencerSequence(null);
               setRoutePlanSequencerOrigin(null);
               setSequencerKey(k => k + 1);
-              setShowSequencerModal(true);
+              setActiveNav('sequencer');
               return;
             }
             const stamp = Date.now();
@@ -3410,7 +3410,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             setRoutePlanSequencerSequence(sequence);
             setRoutePlanSequencerOrigin(origin || null);
             setSequencerKey(k => k + 1);
-            setShowSequencerModal(true);
+            setActiveNav('sequencer');
             setShowToast({ type: 'success', message: `${items.length} route stop${items.length !== 1 ? 's' : ''} loaded in Route Sequencer.` });
           }}
         />
@@ -4234,54 +4234,45 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
       )}
 
-      {/* ===== ROUTE SEQUENCER MODAL ===== */}
-      {showSequencerModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); setRoutePlanSequencerOrigin(null); }}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
-            <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
-              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Route size={16} className="text-indigo-700" /> Route Sequencer
-              </h2>
-              <button onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); setRoutePlanSequencerOrigin(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <Suspense fallback={<LazyFallback />}>
-                <ErrorBoundary>
-                  <RouteSequencerApp key={sequencerKey}
-                    trips={sequencerTripFilter ? trips.filter(t => sequencerTripFilter.includes(t.id)) : trips}
-                    drivers={drivers}
-                    currentUser={currentUser}
-                    role={role}
-                    initialStops={routePlanSequencerStops}
-                    initialSequence={routePlanSequencerSequence}
-                    initialOrigin={routePlanSequencerOrigin}
-                    onRouteSaved={({ route, saveMode, validTripIds }) => {
-                      if (!onAddAuditLog) return;
-                      onAddAuditLog(
-                        saveMode === 'recurring' ? 'Route Created' : 'Route Saved',
-                        saveMode === 'recurring'
-                          ? `${currentUser} saved recurring route "${route.name}" with ${route.sequence?.length || 0} stops.`
-                          : `${currentUser} saved today's route "${route.name}" with ${validTripIds.length} synced trips.`,
-                        saveMode === 'recurring' ? 'indigo' : 'amber'
-                      );
-                    }}
-                    onApplyRoute={({ route, tripIds }) => {
-                      (tripIds || []).forEach((tripId) => {
-                        const trip = trips.find(t => t.id === tripId);
-                        if (trip) advanceWorkflow(trip, 'Assigned', { driverId: me?.id || '', driverEmail: me?.email || '', driverName: me?.name || '' });
-                      });
-                      if (onAddAuditLog) {
-                        onAddAuditLog('Route Applied', `${currentUser} applied route "${route.name}" to ${tripIds?.length || 0} trips.`, 'emerald');
-                      }
-                      setShowSequencerModal(false);
-                      setRoutePlanSequencerStops(null);
-                      setRoutePlanSequencerSequence(null);
-                    }}
-                  />
-                </ErrorBoundary>
-              </Suspense>
-            </div>
+      {/* ===== ROUTE SEQUENCER PAGE ===== */}
+      {activeNav === 'sequencer' && (
+        <div className="flex-1 overflow-hidden bg-[#F3F4F6] flex flex-col">
+          <div className="flex-1 overflow-hidden">
+            <Suspense fallback={<LazyFallback />}>
+              <ErrorBoundary>
+                <RouteSequencerApp key={sequencerKey}
+                  trips={sequencerTripFilter ? trips.filter(t => sequencerTripFilter.includes(t.id)) : trips}
+                  drivers={drivers}
+                  currentUser={currentUser}
+                  role={role}
+                  initialStops={routePlanSequencerStops}
+                  initialSequence={routePlanSequencerSequence}
+                  initialOrigin={routePlanSequencerOrigin}
+                  onRouteSaved={({ route, saveMode, validTripIds }) => {
+                    if (!onAddAuditLog) return;
+                    onAddAuditLog(
+                      saveMode === 'recurring' ? 'Route Created' : 'Route Saved',
+                      saveMode === 'recurring'
+                        ? `${currentUser} saved recurring route "${route.name}" with ${route.sequence?.length || 0} stops.`
+                        : `${currentUser} saved today's route "${route.name}" with ${validTripIds.length} synced trips.`,
+                      saveMode === 'recurring' ? 'indigo' : 'amber'
+                    );
+                  }}
+                  onApplyRoute={({ route, tripIds }) => {
+                    (tripIds || []).forEach((tripId) => {
+                      const trip = trips.find(t => t.id === tripId);
+                      if (trip) advanceWorkflow(trip, 'Assigned', { driverId: me?.id || '', driverEmail: me?.email || '', driverName: me?.name || '' });
+                    });
+                    if (onAddAuditLog) {
+                      onAddAuditLog('Route Applied', `${currentUser} applied route "${route.name}" to ${tripIds?.length || 0} trips.`, 'emerald');
+                    }
+                    setActiveNav('trips');
+                    setRoutePlanSequencerStops(null);
+                    setRoutePlanSequencerSequence(null);
+                  }}
+                />
+              </ErrorBoundary>
+            </Suspense>
           </div>
         </div>
       )}
