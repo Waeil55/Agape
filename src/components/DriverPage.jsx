@@ -763,7 +763,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const urgencyDiff = getUrgency(b) - getUrgency(a);
     if (urgencyDiff !== 0) return urgencyDiff;
     return timeToMinutes(a.time) - timeToMinutes(b.time);
-  });
+  }).reduce((acc, trip) => {
+    // Group multi-leg patients: B leg stays right below A leg
+    const patientKey = (trip.patient || '').trim().toLowerCase();
+    const isWC = isWillCall(trip);
+    const time = timeToMinutes(trip.time);
+    const existing = acc.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && isWillCall(t) === isWC);
+    if (existing.length > 0) {
+      const lastIdx = acc.indexOf(existing[existing.length - 1]);
+      acc.splice(lastIdx + 1, 0, trip);
+    } else {
+      acc.push(trip);
+    }
+    return acc;
+  }, []);
 
   const timedTrips = orderedTrips.filter(t => !isWillCall(t));
   const willCallTrips = orderedTrips.filter(t => isWillCall(t));
