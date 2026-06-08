@@ -1929,7 +1929,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== TRIPS PAGE ===== */}
       {activeNav === 'trips' && (
-        <div ref={tripsScrollRef} className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F3F4F6]" style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}>
+        <div ref={tripsScrollRef} className="flex-1 overflow-y-auto pb-28 px-3 space-y-2 bg-[#F3F4F6]" style={{ overflowAnchor: 'none', scrollBehavior: 'smooth', paddingTop: 'calc(env(safe-area-inset-top) + 72px)' }}>
 
 
           {/* Offline Banner */}
