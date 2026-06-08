@@ -152,6 +152,13 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   {task.legs}
                 </button>
               )}
+              {task.legLabel && (
+                <span className={`px-2 py-1 rounded-lg text-[10px] font-bold tracking-wider ${
+                  task.legLabel.startsWith('Return') ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                }`}>
+                  {task.legLabel}
+                </span>
+              )}
               {isExpanded && <StatusBadge status={task.status} />}
               <button onClick={(e) => { e.stopPropagation(); onToggle(task.id); }} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
                 <ChevronDown size={18} className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} strokeWidth={2} />

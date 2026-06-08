@@ -511,10 +511,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const getContactsForTrip = (trip) => tripContacts[trip?.id] || [];
 
-  // Count legs per patient for today
+  // Count legs per patient (A legs only — exclude IN/OUT B legs)
   const patientLegs = useMemo(() => {
     const counts = {};
     driverScopedTrips.forEach(t => {
+      if (isInOutTrip(t) && !t.time) return;
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
       counts[key] = (counts[key] || 0) + 1;
@@ -2591,6 +2592,41 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
                 const isTerminal = isWorkflowTerminalTrip(trip);
 
+                // Compute leg number: A legs get sequential numbers, B legs reference their A leg
+                let legLabel = null;
+                if (legsCount > 1) {
+                  if (isInOutTrip(trip) && !trip.time) {
+                    // B leg — find its paired A leg number
+                    const patientKey = (trip.patient || '').trim().toLowerCase();
+                    const tripPickup = (trip.pickup || '').trim().toLowerCase();
+                    let aLegNum = 0;
+                    let seenA = 0;
+                    for (let i = 0; i < idx; i++) {
+                      const t = orderedTrips[i];
+                      if ((t.patient || '').trim().toLowerCase() === patientKey) {
+                        if (!isWillCall(t) && !isInOutTrip(t)) {
+                          seenA++;
+                          if ((t.dropoff || '').trim().toLowerCase() === tripPickup) {
+                            aLegNum = seenA;
+                          }
+                        }
+                      }
+                    }
+                    legLabel = aLegNum > 0 ? `Return → Leg ${aLegNum}` : 'Return Leg';
+                  } else if (!isWillCall(trip)) {
+                    // A leg — count which leg number this is for this patient
+                    const patientKey = (trip.patient || '').trim().toLowerCase();
+                    let legNum = 0;
+                    for (let i = 0; i <= idx; i++) {
+                      const t = orderedTrips[i];
+                      if ((t.patient || '').trim().toLowerCase() === patientKey && !isWillCall(t) && !isInOutTrip(t)) {
+                        legNum++;
+                      }
+                    }
+                    legLabel = `Leg ${legNum}`;
+                  }
+                }
+
                 const workflowSteps = getWorkflowSteps(trip);
                 const currentStepIdx = getCurrentWorkflowStep(trip);
                 const totalSteps = workflowSteps.length;
@@ -2630,6 +2666,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       bookingId: trip.bookingId,
                       notes: trip.notes,
                       legs: legsCount > 1 ? `${legsCount} LEGS` : '1 LEG',
+                      legLabel,
                       patientPhone: trip.patientPhone,
                       patientMobile: trip.patientMobile,
                       pickupPhone: trip.pickupPhone,
