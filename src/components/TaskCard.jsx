@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { resolveStatus } from '../constants/tripSeverity';
 
 import {
   MapPin, Navigation, Clock, User, PhoneCall,
@@ -6,7 +7,7 @@ import {
   Ruler, Users, Activity, Building, Home, Accessibility,
   Copy, Check, RotateCcw, PhoneForwarded, MessageCircle,
   Square, CheckSquare, RefreshCw, Forward,
-  Edit2
+  Edit2, ArrowLeft, Shield, Zap
 } from 'lucide-react';
 
 const StatusBadge = ({ status }) => {
@@ -186,260 +187,295 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
         </div>
       </div>
 
-      {/* Expanded Content - Full Screen Overlay */}
-      {isExpanded && (
+      {/* Expanded Content - Premium Full Screen Page */}
+      {isExpanded && (() => {
+        const sev = resolveStatus(task);
+        const stepIdx = (() => {
+          const s = String(task.status || '').toUpperCase();
+          if (s === 'COMPLETED' || s === 'CANCELLED' || s === 'NO SHOW' || s === 'REROUTED') return 4;
+          if (s === 'AT DROPOFF' || s === 'ARRIVED') return 3;
+          if (s === 'NAVIGATING DROPOFF' || s === 'IN TRANSIT') return 2;
+          if (s === 'EN ROUTE' || s === 'NAVIGATING PICKUP' || s === 'IN PROGRESS') return 1;
+          return 0;
+        })();
+        const steps = ['Scheduled', 'En Route', 'At Pickup', 'In Transit', 'Complete'];
+        const timeUrg = getTimeUrgency(task.time, task.status);
+        return (
         <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 bg-slate-900/15 backdrop-blur-sm z-40 transition-opacity duration-300" onClick={() => onToggle(task.id)} />
-          {/* Modal Card */}
-          <div className="fixed z-50 bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} style={{ top: 'calc(env(safe-area-inset-top) + 8px)', left: '2%', right: '2%', bottom: 'calc(env(safe-area-inset-bottom) + 86px)' }}>
-            {/* Header Bar */}
-            <div className="shrink-0 bg-white border-b border-slate-200/70 flex items-center justify-between px-4 py-3" style={{ fontSize: '112%' }}>
-              <div className="flex items-center gap-3 min-w-0">
-                <Clock size={16} className={`shrink-0 ${timeUrgency.type === 'critical' ? 'text-rose-600' : timeUrgency.type === 'warning' ? 'text-orange-500' : 'text-blue-600'}`} strokeWidth={2.5} />
-                <span className={`font-black tracking-tight ${timeUrgency.type === 'critical' ? 'text-rose-600' : timeUrgency.type === 'warning' ? 'text-orange-500' : 'text-slate-900'}`}>
-                  {task.time || 'TBD'}
-                </span>
-                <span className="font-bold text-slate-800 truncate">{task.patient || task.patientName}</span>
+          <div className="fixed inset-0 flex flex-col" style={{ zIndex: 50, background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)' }}>
+
+            {/* === GLASS HEADER === */}
+            <div className="backdrop-blur-xl bg-white/80 border-b border-slate-200/50 px-4 py-3 flex items-center gap-3 shrink-0">
+              <button onClick={() => onToggle(task.id)}
+                className="w-10 h-10 rounded-2xl bg-white/80 border border-slate-200/60 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 shadow-sm hover:bg-white transition-colors">
+                <ArrowLeft size={18} className="text-slate-600" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <h2 className="font-extrabold text-[15px] text-slate-900 truncate leading-tight">{task.patient || task.patientName}</h2>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Clock size={11} className={`shrink-0 ${timeUrg.type === 'critical' ? 'text-rose-500' : timeUrg.type === 'warning' ? 'text-amber-500' : 'text-slate-400'}`} />
+                  <span className={`text-[11px] font-semibold ${timeUrg.type === 'critical' ? 'text-rose-600' : timeUrg.type === 'warning' ? 'text-amber-600' : 'text-slate-400'}`}>
+                    {task.time || 'TBD'}
+                  </span>
+                  {task.bookingId && (
+                    <span className="text-[10px] font-mono font-bold text-slate-300">· {task.bookingId}</span>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <StatusBadge status={task.status} />
-                <button onClick={() => onToggle(task.id)} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
-                  <ChevronDown size={18} className="rotate-180" strokeWidth={2} />
-                </button>
-              </div>
+              <StatusBadge status={task.status} />
             </div>
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto px-4 pb-6 pt-3" style={{ fontSize: '112%' }}>
-              {/* Tags Row */}
-              <div className="flex flex-wrap gap-2 pb-3 border-b border-slate-100 mb-3">
-                {task.bookingId && (
-                  <span className="text-[0.75em] font-mono font-extrabold text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 shrink-0">
-                    Trip: {task.bookingId}
-                  </span>
-                )}
-                {(task.details?.passengerType) && (
-                  <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-[0.75em] font-bold border border-blue-100">
-                    <User size={12} /> {task.details.passengerType.split(',')[0]}
+            {/* Severity Bar */}
+            {sev && <div className={`h-[3px] shrink-0 ${sev.bg}`} />}
+
+            {/* === SCROLLABLE === */}
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+
+              {/* --- ROUTE CARD --- */}
+              <div className="mx-4 mt-4 rounded-[28px] overflow-hidden shadow-2xl shadow-slate-900/10" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)' }}>
+                <div className="relative p-5 pb-4">
+                  {/* Decorative dots */}
+                  <div className="absolute top-4 right-4 flex gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-white/10" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-white/10" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-white/10" />
                   </div>
-                )}
-                {(task.details?.passengerType || '').includes('ESC') && (
-                  <div className="flex items-center gap-1 bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md text-[0.75em] font-bold border border-indigo-100">
-                    <Users size={12} /> Escort
+
+                  {/* Time + Badge */}
+                  <div className="flex items-end justify-between mb-5">
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/30 mb-1">Scheduled Time</p>
+                      <span className="text-[32px] font-black text-white tracking-tight leading-none">{task.time || 'TBD'}</span>
+                    </div>
+                    {sev && (
+                      <span className={`px-3 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${sev.badge} backdrop-blur-sm`}>
+                        {sev.label}
+                      </span>
+                    )}
                   </div>
-                )}
-                {task.details?.mobility && task.details.mobility !== 'WLK' && (
-                  <div className="flex items-center gap-1 bg-orange-50 text-orange-700 px-2 py-1 rounded-md text-[0.75em] font-bold border border-orange-100">
-                    <Accessibility size={12} /> {task.details.mobility}
+
+                  {/* Route Visualization */}
+                  <div className="flex gap-4">
+                    {/* Vertical Line */}
+                    <div className="flex flex-col items-center pt-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-400 shadow-lg shadow-blue-500/30" />
+                      <div className="w-[2px] flex-1 my-1.5 rounded-full" style={{ background: 'linear-gradient(180deg, rgba(96,165,250,0.5) 0%, rgba(52,211,153,0.5) 100%)' }} />
+                      <div className="w-3 h-3 rounded-full bg-emerald-400 shadow-lg shadow-emerald-500/30" />
+                    </div>
+
+                    {/* Addresses */}
+                    <div className="flex-1 min-w-0 space-y-5">
+                      <div className="group">
+                        <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-blue-400/80 mb-1">From</p>
+                        <p className="text-[13px] font-semibold text-white/95 leading-snug truncate">{pickupAddress}</p>
+                        {pickupSiteName && pickupSiteName !== pickupAddress && (
+                          <p className="text-[11px] text-white/40 mt-0.5 flex items-center gap-1">
+                            {getSiteIcon(pickupSiteName)} {pickupSiteName}
+                          </p>
+                        )}
+                        <div className="flex gap-1.5 mt-2.5">
+                          <button onClick={(e) => { e.stopPropagation(); handleCopy(pickupAddress, 'pickup'); }}
+                            className="h-7 px-2.5 bg-white/8 hover:bg-white/15 rounded-lg text-[10px] font-bold text-white/60 flex items-center gap-1 transition-colors cursor-pointer">
+                            {copiedId === 'pickup' ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                            {copiedId === 'pickup' ? 'Copied' : 'Copy'}
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); actions?.onNavigatePickup?.(task); }}
+                            className="h-7 px-2.5 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-[10px] font-bold text-blue-300 flex items-center gap-1 transition-colors cursor-pointer">
+                            <Navigation size={10} /> Navigate
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="group">
+                        <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-400/80 mb-1">To</p>
+                        <p className="text-[13px] font-semibold text-white/95 leading-snug truncate">{dropoffAddress}</p>
+                        {dropoffSiteName && dropoffSiteName !== dropoffAddress && (
+                          <p className="text-[11px] text-white/40 mt-0.5 flex items-center gap-1">
+                            {getSiteIcon(dropoffSiteName)} {dropoffSiteName}
+                          </p>
+                        )}
+                        <div className="flex gap-1.5 mt-2.5">
+                          <button onClick={(e) => { e.stopPropagation(); handleCopy(dropoffAddress, 'dropoff'); }}
+                            className="h-7 px-2.5 bg-white/8 hover:bg-white/15 rounded-lg text-[10px] font-bold text-white/60 flex items-center gap-1 transition-colors cursor-pointer">
+                            {copiedId === 'dropoff' ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                            {copiedId === 'dropoff' ? 'Copied' : 'Copy'}
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); actions?.onNavigateDropoff?.(task); }}
+                            className="h-7 px-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-lg text-[10px] font-bold text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer">
+                            <Navigation size={10} /> Navigate
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                )}
-                {task.tags?.map((tag, i) => (
-                  <div key={i} className="flex items-center gap-1 bg-slate-50 text-slate-600 px-2 py-1 rounded-md text-[0.75em] font-semibold border border-slate-200">{tag}</div>
-                ))}
+
+                  {/* Quick Contact Strip */}
+                  <div className="flex gap-2 mt-5">
+                    <button onClick={(e) => { e.stopPropagation(); actions?.onCall?.(task); }}
+                      className="flex-1 h-10 bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border border-white/5">
+                      <PhoneCall size={13} /> Call
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); actions?.onSms?.(task); }}
+                      className="flex-1 h-10 bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border border-white/5">
+                      <MessageCircle size={13} /> SMS
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); actions?.onContacts?.(task); }}
+                      className="flex-1 h-10 bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border border-white/5">
+                      <PhoneForwarded size={13} /> Contacts
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* Notes */}
-              {(task.notes || task.details?.generalComments) && (
-                <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg p-2 flex gap-2 items-start">
-                  <AlertCircle size={14} className="text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-amber-800 text-[0.75em] font-medium leading-snug">{task.notes || task.details.generalComments}</p>
+              {/* --- PROGRESS --- */}
+              <div className="mx-4 mt-3 bg-white/80 backdrop-blur rounded-2xl p-4 border border-white shadow-sm">
+                <div className="flex items-center gap-0">
+                  {steps.map((step, i) => (
+                    <div key={step} className="flex items-center flex-1">
+                      <div className={`w-[22px] h-[22px] rounded-full flex items-center justify-center text-[9px] font-extrabold shrink-0 transition-all duration-300 ${
+                        i < stepIdx ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200' :
+                        i === stepIdx ? 'bg-slate-900 text-white shadow-md shadow-slate-300 ring-2 ring-slate-900/10' :
+                        'bg-slate-100 text-slate-400'
+                      }`}>
+                        {i < stepIdx ? <Check size={11} strokeWidth={3} /> : i + 1}
+                      </div>
+                      {i < steps.length - 1 && (
+                        <div className={`flex-1 h-[3px] mx-1 rounded-full transition-all duration-500 ${
+                          i < stepIdx ? 'bg-emerald-400' : i === stepIdx ? 'bg-gradient-to-r from-slate-900 to-slate-200' : 'bg-slate-100'
+                        }`} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between mt-2 px-0.5">
+                  {steps.map((step, i) => (
+                    <span key={step} className={`text-[8px] font-bold tracking-wide ${i <= stepIdx ? 'text-slate-700' : 'text-slate-300'}`}>{step}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* --- TAGS --- */}
+              {(task.bookingId || task.details?.passengerType || task.details?.mobility || (task.tags && task.tags.length > 0) || task.details?.distance) && (
+                <div className="flex flex-wrap gap-1.5 px-4 mt-3">
+                  {task.bookingId && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-extrabold text-blue-600 bg-blue-50/80 px-2.5 py-1 rounded-xl border border-blue-100/60">
+                      {task.bookingId}
+                    </span>
+                  )}
+                  {task.details?.passengerType && (
+                    <span className="inline-flex items-center gap-1 bg-indigo-50/80 text-indigo-600 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-indigo-100/60">
+                      <User size={10} /> {task.details.passengerType.split(',')[0]}
+                    </span>
+                  )}
+                  {(task.details?.passengerType || '').includes('ESC') && (
+                    <span className="inline-flex items-center gap-1 bg-purple-50/80 text-purple-600 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-purple-100/60">
+                      <Users size={10} /> Escort
+                    </span>
+                  )}
+                  {task.details?.mobility && task.details.mobility !== 'WLK' && (
+                    <span className="inline-flex items-center gap-1 bg-orange-50/80 text-orange-600 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-orange-100/60">
+                      <Accessibility size={10} /> {task.details.mobility}
+                    </span>
+                  )}
+                  {task.details?.distance && (
+                    <span className="inline-flex items-center gap-1 bg-slate-100/80 text-slate-500 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-slate-200/60">
+                      <Ruler size={10} /> {task.details.distance}
+                    </span>
+                  )}
+                  {task.tags?.map((tag, i) => (
+                    <span key={i} className="inline-flex items-center bg-slate-50/80 text-slate-400 px-2.5 py-1 rounded-xl text-[10px] font-semibold border border-slate-200/60">{tag}</span>
+                  ))}
                 </div>
               )}
 
-              {/* Pickup / Dropoff */}
-              <div className="space-y-0 mb-4">
-                {/* Pickup */}
-                <div className="flex items-stretch gap-3 mb-3">
-                  <div className="flex flex-col items-center pt-1.5">
-                    <div className="w-3 h-3 rounded-full bg-blue-500 ring-2 ring-blue-100"></div>
-                    <div className="w-0.5 flex-1 bg-slate-200 mt-0.5"></div>
+              {/* --- NOTES --- */}
+              {(task.notes || task.details?.generalComments) && (
+                <div className="mx-4 mt-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/40 rounded-2xl p-4 flex gap-3 items-start">
+                  <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                    <AlertCircle size={15} className="text-amber-600" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 text-blue-600 text-[0.6875em] font-extrabold uppercase tracking-widest mb-1">
-                      <Navigation size={12} /> Pickup
-                    </div>
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="flex-1 min-w-0">
-                          {pickupSiteName && pickupSiteName !== pickupAddress && (
-                            <h4 className="text-slate-900 font-bold text-[0.875em] flex items-center gap-1.5 mb-1 leading-tight">
-                              {getSiteIcon(pickupSiteName)} {pickupSiteName}
-                            </h4>
-                          )}
-                          <p className="text-slate-600 text-[0.75em] leading-tight">{pickupAddress}</p>
-                        </div>
-                        <div className="flex shrink-0 gap-1 items-center">
-                          <button onClick={(e) => { e.stopPropagation(); handleCopy(pickupAddress, 'pickup'); }}
-                            className="bg-white border border-slate-200 text-slate-600 p-1.5 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
-                            {copiedId === 'pickup' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                          </button>
-                          {actions?.onNavigatePickup && (
-                            <button onClick={(e) => { e.stopPropagation(); actions.onNavigatePickup(task); }}
-                              className="bg-blue-50 border border-blue-100 text-blue-700 p-1.5 rounded-xl hover:bg-blue-100 transition-colors shadow-sm">
-                              <Navigation size={12} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {(actions?.onCall || actions?.onSms) && (
-                        <div className="flex items-center gap-2 mt-2">
-                          {actions?.onCall && (
-                            <button onClick={(e) => { e.stopPropagation(); actions.onCall(task); }}
-                              className="bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-xl hover:bg-blue-100 hover:border-blue-300 hover:shadow-md active:scale-95 transition-all text-[0.75em] font-bold flex items-center gap-1.5 shadow-sm">
-                              <PhoneCall size={12} /> Call
-                            </button>
-                          )}
-                          {actions?.onSms && (
-                            <button onClick={(e) => { e.stopPropagation(); actions.onSms(task); }}
-                              className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-xl hover:bg-indigo-100 hover:border-indigo-300 hover:shadow-md active:scale-95 transition-all text-[0.75em] font-bold flex items-center gap-1.5 shadow-sm">
-                              <MessageCircle size={12} /> SMS
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 mb-0.5">Driver Notes</p>
+                    <p className="text-[12px] text-amber-900 font-medium leading-relaxed">{task.notes || task.details.generalComments}</p>
                   </div>
                 </div>
+              )}
 
-                {/* Dropoff */}
-                <div className="flex items-stretch gap-3">
-                  <div className="flex flex-col items-center pb-1.5">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-emerald-100"></div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 text-emerald-600 text-[0.6875em] font-extrabold uppercase tracking-widest mb-1">
-                      <MapPin size={12} /> Dropoff
-                    </div>
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="flex-1 min-w-0">
-                          {dropoffSiteName && dropoffSiteName !== dropoffAddress && (
-                            <h4 className="text-slate-900 font-bold text-[0.875em] flex items-center gap-1.5 mb-1 leading-tight">
-                              {getSiteIcon(dropoffSiteName)} {dropoffSiteName}
-                            </h4>
-                          )}
-                          <p className="text-slate-600 text-[0.75em] leading-tight">{dropoffAddress}</p>
-                        </div>
-                        <div className="flex shrink-0 gap-1 items-center">
-                          <button onClick={(e) => { e.stopPropagation(); handleCopy(dropoffAddress, 'dropoff'); }}
-                            className="bg-white border border-slate-200 text-slate-600 p-1.5 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
-                            {copiedId === 'dropoff' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                          </button>
-                          {actions?.onNavigateDropoff && (
-                            <button onClick={(e) => { e.stopPropagation(); actions.onNavigateDropoff(task); }}
-                              className="bg-emerald-50 border border-emerald-100 text-emerald-700 p-1.5 rounded-xl hover:bg-emerald-100 transition-colors shadow-sm">
-                              <Navigation size={12} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {(actions?.onCall || actions?.onSms) && (
-                        <div className="flex items-center gap-2 mt-2">
-                          {actions?.onCall && (
-                            <button onClick={(e) => { e.stopPropagation(); actions.onCall(task); }}
-                              className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1.5 rounded-xl hover:bg-emerald-100 hover:border-emerald-300 hover:shadow-md active:scale-95 transition-all text-[0.75em] font-bold flex items-center gap-1.5 shadow-sm">
-                              <PhoneCall size={12} /> Call
-                            </button>
-                          )}
-                          {actions?.onSms && (
-                            <button onClick={(e) => { e.stopPropagation(); actions.onSms(task); }}
-                              className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-xl hover:bg-indigo-100 hover:border-indigo-300 hover:shadow-md active:scale-95 transition-all text-[0.75em] font-bold flex items-center gap-1.5 shadow-sm">
-                              <MessageCircle size={12} /> SMS
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+              <div className="h-4" />
+            </div>
+
+            {/* === BOTTOM ACTION BAR === */}
+            <div className="shrink-0 bg-white/90 backdrop-blur-xl border-t border-slate-200/50 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+
+              {/* Workflow (if present) */}
+              {actions?.renderWorkflow && actions.renderWorkflow(task)}
+
+              {/* Primary Action */}
+              {!isTerminal && !actions?.renderWorkflow && actions?.onPrimary && (
+                <div className="flex items-center gap-2.5 mb-2.5">
+                  <button onClick={(e) => { e.stopPropagation(); actions.onPrimary(task); }}
+                    className="flex-[4] h-[50px] bg-slate-900 text-white font-extrabold text-[13px] rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/25 flex items-center justify-center gap-2 active:scale-[0.98]">
+                    {actions.primaryLabel || 'Start'} <Navigation size={16} strokeWidth={2.5} />
+                  </button>
+                  {actions?.onSkipNav && (
+                    <button onClick={(e) => { e.stopPropagation(); actions.onSkipNav(task); }}
+                      className="flex-1 h-[50px] bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-all text-[12px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98]">
+                      <Forward size={14} /> Skip
+                    </button>
+                  )}
                 </div>
-              </div>
+              )}
 
-              {/* Workflow / Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 mb-3">
-                {actions?.renderWorkflow ? (
-                  actions.renderWorkflow(task)
-                ) : !isTerminal ? (
-                  <div className="space-y-2">
-                    {actions?.onPrimary && (
-                      <div className="flex items-center gap-2">
-                         <button onClick={(e) => { e.stopPropagation(); actions.onPrimary(task); }}
-                           className="flex-[4] h-11 bg-slate-900 text-white font-bold text-[0.875em] rounded-xl hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center gap-2">
-                          {actions.primaryLabel || 'Start'} <Navigation size={14} />
-                        </button>
-                        {actions?.onSkipNav && (
-                          <button onClick={(e) => { e.stopPropagation(); actions.onSkipNav(task); }}
-                           className="flex-1 h-11 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors text-[0.75em] font-bold flex items-center justify-center gap-1">
-                             <Forward size={14} /> Skip
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      {actions?.onNoShow && (
-                         <button onClick={(e) => { e.stopPropagation(); actions.onNoShow(task); }}
-                           className="flex-1 h-10 flex items-center justify-center gap-1 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 transition-all text-[0.75em] border border-rose-100">
-                          <AlertCircle size={12} /> No Show
-                        </button>
-                      )}
-                      {actions?.onCancel && (
-                         <button onClick={(e) => { e.stopPropagation(); actions.onCancel(task); }}
-                           className="flex-1 h-10 flex items-center justify-center gap-1 bg-white text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all text-[0.75em] border border-slate-200">
-                          <XCircle size={12} /> Cancel
-                        </button>
-                      )}
-                      {actions?.onReroute && (
-                         <button onClick={(e) => { e.stopPropagation(); actions.onReroute(task); }}
-                           className="flex-1 h-10 flex items-center justify-center gap-1 bg-purple-50 text-purple-700 font-bold rounded-xl hover:bg-purple-100 transition-all text-[0.75em] border border-purple-200">
-                          <RefreshCw size={12} /> Rerouted
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
+              {/* No Show / Cancel / Reroute */}
+              {!isTerminal && (actions?.onNoShow || actions?.onCancel || actions?.onReroute) && (
+                <div className="flex gap-2 mb-2.5">
+                  {actions?.onNoShow && (
+                    <button onClick={(e) => { e.stopPropagation(); actions.onNoShow(task); }}
+                      className="flex-1 h-[42px] flex items-center justify-center gap-1.5 bg-rose-50 text-rose-600 font-bold rounded-2xl hover:bg-rose-100 active:scale-[0.97] transition-all text-[11px] border border-rose-100">
+                      <AlertCircle size={13} /> No Show
+                    </button>
+                  )}
+                  {actions?.onCancel && (
+                    <button onClick={(e) => { e.stopPropagation(); actions.onCancel(task); }}
+                      className="flex-1 h-[42px] flex items-center justify-center gap-1.5 bg-slate-50 text-slate-500 font-bold rounded-2xl hover:bg-slate-100 active:scale-[0.97] transition-all text-[11px] border border-slate-200">
+                      <XCircle size={13} /> Cancel
+                    </button>
+                  )}
+                  {actions?.onReroute && (
+                    <button onClick={(e) => { e.stopPropagation(); actions.onReroute(task); }}
+                      className="flex-1 h-[42px] flex items-center justify-center gap-1.5 bg-purple-50 text-purple-600 font-bold rounded-2xl hover:bg-purple-100 active:scale-[0.97] transition-all text-[11px] border border-purple-100">
+                      <RefreshCw size={13} /> Reroute
+                    </button>
+                  )}
+                </div>
+              )}
 
-              {/* Extra Utility Buttons */}
-              <div className="flex items-center gap-1 justify-center flex-wrap mb-2">
-                {task.details?.distance && (
-                  <span className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg text-[0.625em] font-bold flex items-center gap-1 border border-slate-200">
-                    <Ruler size={10} /> {task.details.distance}
-                  </span>
-                )}
-                {actions?.onContacts && (
-                  <button onClick={(e) => { e.stopPropagation(); actions.onContacts(task); }}
-                    className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors text-[0.625em] font-bold flex items-center gap-1 border border-slate-200">
-                    <PhoneForwarded size={10} /> Contacts
-                  </button>
-                )}
-                {actions?.onRevert && !isTerminal && (
-                  <button onClick={(e) => { e.stopPropagation(); actions.onRevert(task); }}
-                    className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors text-[0.625em] font-bold flex items-center gap-1 border border-slate-200">
-                    <RotateCcw size={10} /> Back
-                  </button>
-                )}
+              {/* Utility Row */}
+              <div className="flex gap-2">
                 {actions?.onEditTrip && !isTerminal && (
                   <button onClick={(e) => { e.stopPropagation(); actions.onEditTrip(task); }}
-                    className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors text-[0.625em] font-bold flex items-center gap-1 border border-slate-200">
-                    <Edit2 size={10} /> Edit
+                    className="flex-1 h-10 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-100 transition-all text-[10px] font-bold flex items-center justify-center gap-1.5 border border-slate-200/60 active:scale-[0.97]">
+                    <Edit2 size={11} /> Edit Trip
                   </button>
                 )}
                 {actions?.onTransfer && !isTerminal && (
                   <button onClick={(e) => { e.stopPropagation(); actions.onTransfer(task); }}
-                    className="px-2 py-1 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors text-[0.625em] font-bold flex items-center gap-1 border border-amber-200">
-                    <Forward size={10} /> Transfer
+                    className="flex-1 h-10 bg-amber-50/80 text-amber-600 rounded-2xl hover:bg-amber-100 transition-all text-[10px] font-bold flex items-center justify-center gap-1.5 border border-amber-100/60 active:scale-[0.97]">
+                    <Zap size={11} /> Transfer
                   </button>
                 )}
-              </div>
-
-              {/* Close hint */}
-              <div className="flex justify-center mt-1" onClick={(e) => { e.stopPropagation(); onToggle(task.id); }}>
-                <ChevronDown size={16} className="text-slate-300 hover:text-slate-500 rotate-180 cursor-pointer transition-colors" />
+                {actions?.onRevert && !isTerminal && (
+                  <button onClick={(e) => { e.stopPropagation(); actions.onRevert(task); }}
+                    className="flex-1 h-10 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-100 transition-all text-[10px] font-bold flex items-center justify-center gap-1.5 border border-slate-200/60 active:scale-[0.97]">
+                    <RotateCcw size={11} /> Revert
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </>
-      )}
+        );
+      })()}
     </div>
   );
 };

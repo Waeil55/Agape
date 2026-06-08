@@ -15,7 +15,7 @@ import {
   AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check,
   ChevronUp, ChevronDown, RotateCcw, Lock, RefreshCw, Forward,
   Home, Settings, LogOut,
-  Wifi, WifiOff, ArrowRight, Search,
+  Wifi, WifiOff, ArrowLeft, ArrowRight, Search,
   Repeat, Zap, X, Route,
   CheckSquare, Square, Map, BarChart3, Sun, Moon,
   Download, Trash2, FileText, AlertTriangle, Info,
@@ -25,6 +25,7 @@ import { openNavigation, showNavActionSheet, makeCall, sendSMS, showCallActionSh
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
 import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
+import { resolveStatus } from '../constants/tripSeverity';
 import { normalizeEmail } from '../utils/accessControl';
 
 import ErrorBoundary from './ErrorBoundary';
@@ -2703,139 +2704,146 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== ODOMETER PROMPT MODAL ===== */}
       {showOdometerPrompt && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="flex items-start justify-between mb-6">
-              <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-200/50">
-                  <MapPin size={28} className="text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900">Arrived at Pickup</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
-                {lastOdometer > 0 && (
-                  <p className="text-sm text-slate-400 mt-2">Current odometer: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
-                )}
-              </div>
-              <button type="button" onClick={() => setShowOdometerPrompt(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 120 }}>
+          <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0">
+            <button type="button" onClick={() => setShowOdometerPrompt(null)} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+              <ArrowLeft size={20} className="text-slate-700" />
+            </button>
+            <div className="flex-1 text-center">
+              <h2 className="font-bold text-base text-slate-900">Arrived at Pickup</h2>
+              <p className="text-xs text-slate-500">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Current Odometer (mi)</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={odometerValue}
-                  onChange={(e) => setOdometerValue(e.target.value)}
-                  placeholder='Enter full odometer reading'
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-blue-500 outline-none"
-                  autoFocus
-                />
-                {lastOdometer > 0 && odometerValue && parseInt(odometerValue, 10) < lastOdometer && (
-                  <p className="text-sm text-amber-700 font-semibold mt-2 text-center bg-amber-50 rounded-xl px-4 py-3 border border-amber-200">
-                    {parseInt(odometerValue, 10).toLocaleString()} mi is less than last reading of {lastOdometer.toLocaleString()} mi. You can continue if you're sure.
-                  </p>
-                )}
+            <div className="w-10 shrink-0" />
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {lastOdometer > 0 && (
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                <p className="text-xs text-slate-400 font-bold uppercase">Current Odometer</p>
+                <p className="text-lg font-bold text-slate-800">{lastOdometer?.toLocaleString()} mi</p>
               </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm Arrival</button>
-              </div>
+            )}
+            <div>
+              <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Enter Odometer Reading (mi)</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={odometerValue}
+                onChange={(e) => setOdometerValue(e.target.value)}
+                placeholder="Enter full odometer reading"
+                className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-emerald-500 outline-none"
+                autoFocus
+              />
+              {lastOdometer > 0 && odometerValue && parseInt(odometerValue, 10) < lastOdometer && (
+                <p className="text-sm text-amber-700 font-semibold mt-3 text-center bg-amber-50 rounded-xl px-4 py-3 border border-amber-200">
+                  {parseInt(odometerValue, 10).toLocaleString()} mi is less than last reading of {lastOdometer.toLocaleString()} mi. You can continue if you're sure.
+                </p>
+              )}
             </div>
+          </div>
+          <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
+            <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+            <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm Arrival</button>
           </div>
         </div>
       )}
 
       {/* ===== ROUTE STOP ODOMETER PROMPT ===== */}
       {routeStopOdometerPrompt && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="flex items-start justify-between mb-6">
-              <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-[#121A66] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/20">
-                  <Gauge size={28} className="text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900">Arrived at Stop</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">{routeStopOdometerPrompt.name || `Stop ${routeStopOdometerPrompt.sequenceIndex}`}</p>
-                {lastOdometer > 0 && (
-                  <p className="text-sm text-slate-400 mt-2">Current odometer: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
-                )}
-              </div>
-              <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 120 }}>
+          <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0">
+            <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+              <ArrowLeft size={20} className="text-slate-700" />
+            </button>
+            <div className="flex-1 text-center">
+              <h2 className="font-bold text-base text-slate-900">Arrived at Stop</h2>
+              <p className="text-xs text-slate-500">{routeStopOdometerPrompt.name || `Stop ${routeStopOdometerPrompt.sequenceIndex}`}</p>
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Odometer at Arrival</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={routeStopOdometerValue}
-                  onChange={(e) => setRouteStopOdometerValue(e.target.value)}
-                  placeholder="Enter odometer reading"
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-blue-500 outline-none"
-                  autoFocus
-                />
+            <div className="w-10 shrink-0" />
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {lastOdometer > 0 && (
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                <p className="text-xs text-slate-400 font-bold uppercase">Current Odometer</p>
+                <p className="text-lg font-bold text-slate-800">{lastOdometer?.toLocaleString()} mi</p>
               </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-[#121A66] hover:bg-[#18227d] text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
-              </div>
+            )}
+            <div>
+              <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Enter Odometer at Arrival (mi)</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={routeStopOdometerValue}
+                onChange={(e) => setRouteStopOdometerValue(e.target.value)}
+                placeholder="Enter odometer reading"
+                className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-blue-500 outline-none"
+                autoFocus
+              />
             </div>
+          </div>
+          <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
+            <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+            <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-[#121A66] hover:bg-[#18227d] text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
           </div>
         </div>
       )}
 
       {/* ===== ROUTE STOP SIGNATURE PROMPT ===== */}
       {routeStopSignaturePrompt && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="flex items-start justify-between mb-5">
-              <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
-                  <Check size={28} className="text-white" />
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 120 }}>
+          <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0">
+            <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+              <ArrowLeft size={20} className="text-slate-700" />
+            </button>
+            <div className="flex-1 text-center">
+              <h2 className="font-bold text-base text-slate-900">Confirm Signature</h2>
+              <p className="text-xs text-slate-500">{routeStopSignaturePrompt.name || `Stop ${routeStopSignaturePrompt.sequenceIndex}`}</p>
+            </div>
+            <div className="w-10 shrink-0" />
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+                  <Check size={18} className="text-emerald-600" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">Confirm Signature</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">{routeStopSignaturePrompt.name || `Stop ${routeStopSignaturePrompt.sequenceIndex}`}</p>
+                <p className="text-sm font-medium text-emerald-800">Client signature obtained</p>
               </div>
-              <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
             </div>
-            <div className="bg-slate-50 rounded-2xl p-5 mb-4">
-              <button type="button" onClick={() => setRouteStopSignatureConfirmed(!routeStopSignatureConfirmed)} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer ${routeStopSignatureConfirmed ? 'border-green-200 bg-green-50' : 'border-blue-100 bg-white'}`}>
-                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${routeStopSignatureConfirmed ? 'bg-green-500 border-green-500' : 'border-slate-300'}`}>
-                  {routeStopSignatureConfirmed && <Check size={12} className="text-white" />}
-                </div>
-                <span className="text-sm text-slate-600 font-medium">Client signature obtained</span>
-              </button>
-            </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmRoutePlanStopSignature} disabled={!routeStopSignatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm</button>
-            </div>
+            <button type="button" onClick={() => setRouteStopSignatureConfirmed(!routeStopSignatureConfirmed)} className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition cursor-pointer ${routeStopSignatureConfirmed ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+              <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${routeStopSignatureConfirmed ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+                {routeStopSignatureConfirmed && <Check size={14} className="text-white" />}
+              </div>
+              <span className="text-sm font-bold text-slate-800">I confirm the client has signed</span>
+            </button>
+          </div>
+          <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
+            <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
+            <button type="button" onClick={confirmRoutePlanStopSignature} disabled={!routeStopSignatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm</button>
           </div>
         </div>
       )}
 
       {/* ===== ARRIVAL CONFIRM MODAL ===== */}
       {showArrivalConfirm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="flex items-start justify-between mb-5">
-              <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
-                  <MapPin size={28} className="text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900">Arrived at Pickup</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">{showArrivalConfirm.patient}</p>
-              </div>
-              <button type="button" onClick={() => setShowArrivalConfirm(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 120 }}>
+          <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0">
+            <button type="button" onClick={() => setShowArrivalConfirm(null)} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+              <ArrowLeft size={20} className="text-slate-700" />
+            </button>
+            <div className="flex-1 text-center">
+              <h2 className="font-bold text-base text-slate-900">Arrived at Pickup</h2>
+              <p className="text-xs text-slate-500">{showArrivalConfirm.patient}</p>
             </div>
-
-            <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Odometer at Arrival (mi)</label>
-                <input type="number" inputMode="numeric" value={arrivalOdometer} onChange={e => setArrivalOdometer(e.target.value)}
-                  className="w-full mt-1.5 p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none"
-                />
-              </div>
+            <div className="w-10 shrink-0" />
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div>
+              <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Odometer at Arrival (mi)</label>
+              <input type="number" inputMode="numeric" value={arrivalOdometer} onChange={e => setArrivalOdometer(e.target.value)}
+                className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-emerald-500 outline-none"
+              />
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-3 border border-slate-200">
               {showArrivalConfirm.bookingId && (
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-400 font-bold uppercase">Booking</span>
@@ -2864,74 +2872,75 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-sm text-slate-700">{showArrivalConfirm.notes}</p>
                 </div>
               )}
-              <div className="pt-3 border-t border-slate-200 space-y-2">
-                <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 rounded-xl px-4 py-3">
-                  <Info size={16} className="shrink-0" />
-                  <span className="font-medium">Confirm arrival details before proceeding.</span>
-                </div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+              <div className="flex items-center gap-2">
+                <Info size={16} className="text-amber-600 shrink-0" />
+                <span className="text-sm font-semibold text-amber-800">Confirm arrival details before proceeding.</span>
               </div>
             </div>
-
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmArrival} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all cursor-pointer">Confirm Arrival</button>
-            </div>
+          </div>
+          <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
+            <button type="button" onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
+            <button type="button" onClick={confirmArrival} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all cursor-pointer">Confirm Arrival</button>
           </div>
         </div>
       )}
 
       {/* ===== SIGNATURE CONFIRM MODAL (Before Heading to Dropoff) ===== */}
       {showSignatureConfirm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="flex items-start justify-between mb-5">
-              <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
-                  <Check size={28} className="text-white" />
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 120 }}>
+          <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0">
+            <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+              <ArrowLeft size={20} className="text-slate-700" />
+            </button>
+            <div className="flex-1 text-center">
+              <h2 className="font-bold text-base text-slate-900">Begin Transport</h2>
+              <p className="text-xs text-slate-500">{showSignatureConfirm.patient}</p>
+            </div>
+            <div className="w-10 shrink-0" />
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+                  <Info size={18} className="text-emerald-600" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">Begin Transport</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">{showSignatureConfirm.patient}</p>
-              </div>
-              <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
-            </div>
-
-            <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 rounded-xl px-4 py-3">
-                <Info size={16} className="shrink-0" />
-                <span className="font-medium">Obtain client signature before heading to dropoff.</span>
-              </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-                <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1.5">Signature Required</p>
-                <button type="button" onClick={() => setSignatureConfirmed(!signatureConfirmed)} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer ${signatureConfirmed ? 'border-green-200 bg-green-50' : 'border-blue-100 bg-white'}`}>
-                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${signatureConfirmed ? 'bg-green-500 border-green-500' : 'border-slate-300'}`}>
-                    {signatureConfirmed && <Check size={12} className="text-white" />}
-                  </div>
-                  <span className="text-sm text-slate-600 font-medium">Client signature obtained</span>
-                </button>
+                <p className="text-sm font-semibold text-emerald-800">Obtain client signature before heading to dropoff.</p>
               </div>
             </div>
-
-            <div className="flex gap-3">
-              <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmSignatureAndBegin} disabled={!signatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm & Begin</button>
-            </div>
+            <button type="button" onClick={() => setSignatureConfirmed(!signatureConfirmed)} className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition cursor-pointer ${signatureConfirmed ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+              <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${signatureConfirmed ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+                {signatureConfirmed && <Check size={14} className="text-white" />}
+              </div>
+              <div className="text-left">
+                <span className="text-sm font-bold text-slate-800 block">Client Signature Required</span>
+                <span className="text-xs text-slate-500">Tap to confirm signature obtained</span>
+              </div>
+            </button>
+          </div>
+          <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
+            <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
+            <button type="button" onClick={confirmSignatureAndBegin} disabled={!signatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm & Begin</button>
           </div>
         </div>
       )}
 
       {/* ===== COMPLETE TRIP MODAL ===== */}
       {showCompleteModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="text-center mb-5">
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
-                <Check size={28} className="text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900">Complete Trip</h3>
-              <p className="text-sm text-slate-500 mt-1 font-medium">{showCompleteModal.patient} — {showCompleteModal.bookingId || ''}</p>
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 120 }}>
+          <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0">
+            <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+              <ArrowLeft size={20} className="text-slate-700" />
+            </button>
+            <div className="flex-1 text-center">
+              <h2 className="font-bold text-base text-slate-900">Complete Trip</h2>
+              <p className="text-xs text-slate-500">{showCompleteModal.patient} — {showCompleteModal.bookingId || ''}</p>
             </div>
-
-            <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
+            <div className="w-10 shrink-0" />
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-3 border border-slate-200">
               <div className="flex justify-between">
                 <span className="text-xs text-emerald-600 font-bold uppercase">Pickup Odometer</span>
                 <span className="text-sm font-bold text-emerald-700">{showCompleteModal.pickupOdometer?.toLocaleString() || '—'} mi</span>
@@ -2940,62 +2949,96 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <span className="text-xs text-slate-400 font-bold uppercase">Started At</span>
                 <span className="text-sm font-bold text-slate-800">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '—'}</span>
               </div>
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Departed Pickup Time</label>
-                <input type="time" value={departedTime} onChange={(e) => setDepartedTime(e.target.value)}
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5" />
-              </div>
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Arrival Dropoff Time</label>
-                <input type="time" value={arrivalDropoffTime} onChange={(e) => setArrivalDropoffTime(e.target.value)}
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5" />
-              </div>
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-rose-600">Final Odometer (mi)</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={completeOdometer}
-                  onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
-                  placeholder="Enter final odometer"
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5"
-                  autoFocus
-                />
-                {!completeOdometer && (
-                  <p className="mt-2 text-center text-[11px] font-semibold text-slate-500">
-                    Enter a final odometer reading to enable completion.
-                  </p>
-                )}
-              </div>
-              {completeError && (
-                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-bold text-rose-700">
-                  {completeError}
+            </div>
+            <div>
+              <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Departed Pickup Time</label>
+              <input type="time" value={departedTime} onChange={(e) => setDepartedTime(e.target.value)}
+                className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base text-center focus:border-emerald-500 outline-none" />
+            </div>
+            <div>
+              <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Arrival Dropoff Time</label>
+              <input type="time" value={arrivalDropoffTime} onChange={(e) => setArrivalDropoffTime(e.target.value)}
+                className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base text-center focus:border-emerald-500 outline-none" />
+            </div>
+            <div>
+              <label className="text-micro font-bold uppercase tracking-wider text-rose-600">Final Odometer (mi)</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={completeOdometer}
+                onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
+                placeholder="Enter final odometer"
+                className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-emerald-500 outline-none"
+                autoFocus
+              />
+              {!completeOdometer && (
+                <p className="mt-2 text-center text-xs font-semibold text-slate-500">
+                  Enter a final odometer reading to enable completion.
                 </p>
               )}
-              {showCompleteModal.pickupOdometer && completeOdometer && (
-                <div className="text-center text-sm text-blue-600 font-bold">
-                  Distance: {(parseInt(completeOdometer) - (showCompleteModal.pickupOdometer || 0)).toLocaleString()} mi
-                </div>
-              )}
             </div>
-
-            <div className="flex gap-3">
-              <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-              <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
-            </div>
+            {completeError && (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                <p className="text-center text-sm font-bold text-rose-700">{completeError}</p>
+              </div>
+            )}
+            {showCompleteModal.pickupOdometer && completeOdometer && (
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
+                <p className="text-xs text-blue-600 font-bold uppercase mb-1">Total Distance</p>
+                <p className="text-lg font-black text-blue-700">{(parseInt(completeOdometer) - (showCompleteModal.pickupOdometer || 0)).toLocaleString()} mi</p>
+              </div>
+            )}
+          </div>
+          <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
+            <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+            <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
           </div>
         </div>
       )}
 
       {/* ===== FULL-SCREEN TRIP DETAILS ===== */}
-      {showTripDetails && (
+      {showTripDetails && (() => {
+        const sev = resolveStatus(showTripDetails);
+        const stepIdx = (() => {
+          const s = String(showTripDetails.status || '').toLowerCase();
+          if (s === 'completed' || s === 'cancelled' || s === 'no show' || s === 'rerouted') return 4;
+          if (s === 'at dropoff' || s === 'arrived' || showTripDetails.arrivalDropoffTime) return 3;
+          if (s === 'navigating dropoff' || s === 'in transit') return 2;
+          if (s === 'en route' || s === 'navigating pickup' || showTripDetails.departedPickupTime || showTripDetails.paperSignatureConfirmed) return 1;
+          return 0;
+        })();
+        const steps = ['Scheduled', 'En Route', 'At Pickup', 'In Transit', 'Complete'];
+        return (
         <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 130 }}>
-          <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
-            <div className="flex-1">
+          <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3 shrink-0">
+            <button type="button" onClick={() => setShowTripDetails(null)} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+              <ArrowLeft size={20} className="text-slate-700" />
+            </button>
+            <div className="flex-1 text-center">
               <h2 className="font-bold text-sm text-slate-900 leading-tight">{showTripDetails.patient}</h2>
               <p className="text-xs text-slate-400">{showTripDetails.bookingId || '—'}</p>
             </div>
-            <button type="button" onClick={() => setShowTripDetails(null)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90 cursor-pointer"><X size={18} /></button>
+            <div className="w-10 shrink-0" />
+          </div>
+          {/* Severity Bar */}
+          {sev && <div className={`h-1 shrink-0 ${sev.bg}`} />}
+          {/* Progress Stepper */}
+          <div className="px-4 py-3 bg-white border-b border-slate-100 shrink-0">
+            <div className="flex items-center gap-1">
+              {steps.map((step, i) => (
+                <React.Fragment key={step}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${i <= stepIdx ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                    {i < stepIdx ? <Check size={12} /> : i + 1}
+                  </div>
+                  {i < steps.length - 1 && <div className={`flex-1 h-0.5 ${i < stepIdx ? 'bg-emerald-400' : 'bg-slate-200'}`} />}
+                </React.Fragment>
+              ))}
+            </div>
+            <div className="flex justify-between mt-1.5">
+              {steps.map((step, i) => (
+                <span key={step} className={`text-[9px] font-bold ${i <= stepIdx ? 'text-emerald-600' : 'text-slate-400'}`}>{step}</span>
+              ))}
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 text-white">
@@ -3175,7 +3218,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
           </div>
         </div>
-      )}
+      );
+      })()}
 
       {/* ===== TOOLS PAGE ===== */}
       {isClockedIn && activeNav === 'tools' && (
@@ -3629,63 +3673,66 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           setSelectedLegsForAction(prev => prev.size === cancelPrompt.legs.length ? new Set() : new Set(cancelPrompt.legs.map(l => l.id)));
         };
         const actionLabel = cancelPrompt.type === 'noshow' ? 'No Show' : cancelPrompt.type === 'reroute' ? 'Reroute' : 'Cancel';
-        const gradientFrom = cancelPrompt.type === 'noshow' ? 'from-orange-500 to-amber-600' : cancelPrompt.type === 'reroute' ? 'from-purple-600 to-purple-500' : 'from-rose-600 to-rose-500';
+        const actionColor = cancelPrompt.type === 'noshow' ? 'bg-orange-600 hover:bg-orange-700' : cancelPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-rose-600 hover:bg-rose-700';
+        const checkColor = cancelPrompt.type === 'noshow' ? 'bg-orange-500 border-orange-500' : cancelPrompt.type === 'reroute' ? 'bg-purple-500 border-purple-500' : 'bg-rose-500 border-rose-500';
+        const activeColor = cancelPrompt.type === 'noshow' ? 'border-orange-200 bg-orange-50' : cancelPrompt.type === 'reroute' ? 'border-purple-200 bg-purple-50' : 'border-rose-200 bg-rose-50';
         return (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 140 }} onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }}>
-            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
-              <div className={`px-5 py-4 bg-gradient-to-r ${gradientFrom} text-white flex items-center justify-between`}>
-                <div>
-                  <h3 className="text-base font-bold">{actionLabel} Trip Legs</h3>
-                  <p className="text-xs text-white/70 mt-0.5">{cancelPrompt.trip.patient} — {cancelPrompt.legs.length} leg{cancelPrompt.legs.length !== 1 ? 's' : ''}</p>
+          <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 140 }}>
+            <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0">
+              <button type="button" onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+                <ArrowLeft size={20} className="text-slate-700" />
+              </button>
+              <div className="flex-1 text-center">
+                <h2 className="font-bold text-base text-slate-900">{actionLabel} Trip Legs</h2>
+                <p className="text-xs text-slate-500">{cancelPrompt.trip.patient} — {cancelPrompt.legs.length} leg{cancelPrompt.legs.length !== 1 ? 's' : ''}</p>
+              </div>
+              <div className="w-10 shrink-0" />
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              <button type="button" onClick={toggleAll} className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition active:scale-95 cursor-pointer ${allSelected ? activeColor : 'border-slate-200 hover:bg-slate-50 bg-white'}`}>
+                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${allSelected ? checkColor : 'border-slate-300'}`}>
+                  {allSelected && <Check size={14} className="text-white" />}
                 </div>
-                <button type="button" onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
-              </div>
-              <div className="p-4 space-y-2 max-h-56 overflow-y-auto">
-                <button type="button" onClick={toggleAll} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition active:scale-95 cursor-pointer ${allSelected ? 'border-rose-200 bg-rose-50' : 'border-slate-100 hover:bg-slate-50'}`}>
-                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${allSelected ? 'bg-rose-500 border-rose-500' : 'border-slate-300'}`}>
-                    {allSelected && <Check size={12} className="text-white" />}
-                  </div>
-                  <span className="text-sm font-bold text-slate-900">Select All ({cancelPrompt.legs.length})</span>
-                </button>
-                {cancelPrompt.legs.map((leg, idx) => {
-                  const isSelected = selectedLegsForAction.has(leg.id);
-                  return (
-                    <button type="button" key={leg.id} onClick={() => toggleLeg(leg.id)}
-                      className={`w-full flex items-center gap-3 p-3 rounded-xl border transition active:scale-95 cursor-pointer ${isSelected ? 'border-rose-200 bg-rose-50' : 'border-slate-100 hover:bg-slate-50'}`}>
-                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'bg-rose-500 border-rose-500' : 'border-slate-300'}`}>
-                        {isSelected && <Check size={12} className="text-white" />}
+                <span className="text-sm font-bold text-slate-900">Select All ({cancelPrompt.legs.length})</span>
+              </button>
+              {cancelPrompt.legs.map((leg, idx) => {
+                const isSelected = selectedLegsForAction.has(leg.id);
+                return (
+                  <button type="button" key={leg.id} onClick={() => toggleLeg(leg.id)}
+                    className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition active:scale-95 cursor-pointer ${isSelected ? activeColor : 'border-slate-200 hover:bg-slate-50 bg-white'}`}>
+                    <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${isSelected ? checkColor : 'border-slate-300'}`}>
+                      {isSelected && <Check size={14} className="text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black ${cancelPrompt.type === 'noshow' ? 'bg-amber-100 text-amber-600' : cancelPrompt.type === 'reroute' ? 'bg-purple-100 text-purple-600' : 'bg-rose-100 text-rose-600'}`}>L{idx + 1}</span>
+                        <span className="text-sm font-bold text-slate-900 truncate">{leg.patient}</span>
+                        {leg.bookingId && <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-[9px] font-bold shrink-0">{leg.bookingId}</span>}
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                       </div>
-                      <div className="flex-1 min-w-0 text-left">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black ${cancelPrompt.type === 'noshow' ? 'bg-amber-100 text-amber-600' : cancelPrompt.type === 'reroute' ? 'bg-purple-100 text-purple-600' : 'bg-rose-100 text-rose-600'}`}>L{idx + 1}</span>
-                          <span className="text-sm font-bold text-slate-900 truncate">{leg.patient}</span>
-                          {leg.bookingId && <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-[9px] font-bold shrink-0">{leg.bookingId}</span>}
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
-                          <span className="truncate">{leg.pickup}</span>
-                          <span className="shrink-0">→</span>
-                          <span className="truncate">{leg.dropoff}</span>
-                        </div>
+                      <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
+                        <span className="truncate">{leg.pickup}</span>
+                        <span className="shrink-0">→</span>
+                        <span className="truncate">{leg.dropoff}</span>
                       </div>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="px-4 pb-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (selectedLegsForAction.size === 0) return;
-                    setCancelPrompt(null);
-                    setPasswordPrompt({ type: cancelPrompt.type, trip: cancelPrompt.trip, selectedLegIds: [...selectedLegsForAction], reason: '' });
-                    setSelectedLegsForAction(new Set());
-                  }}
-                  disabled={selectedLegsForAction.size === 0}
-                  className={`w-full py-3 text-white rounded-xl font-bold text-sm transition disabled:opacity-40 cursor-pointer ${cancelPrompt.type === 'noshow' ? 'bg-orange-600 hover:bg-orange-700' : cancelPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
-                  {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `${actionLabel} ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
-                </button>
-              </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedLegsForAction.size === 0) return;
+                  setCancelPrompt(null);
+                  setPasswordPrompt({ type: cancelPrompt.type, trip: cancelPrompt.trip, selectedLegIds: [...selectedLegsForAction], reason: '' });
+                  setSelectedLegsForAction(new Set());
+                }}
+                disabled={selectedLegsForAction.size === 0}
+                className={`w-full py-3.5 text-white rounded-xl font-bold text-sm transition disabled:opacity-40 cursor-pointer ${actionColor}`}>
+                {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `${actionLabel} ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
+              </button>
             </div>
           </div>
         );
@@ -3705,60 +3752,61 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           setSelectedLegsForAction(prev => prev.size === restorePrompt.legs.length ? new Set() : new Set(restorePrompt.legs.map(l => l.id)));
         };
         return (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 140 }} onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }}>
-            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
-              <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold">Restore Trip Legs</h3>
-                  <p className="text-xs text-white/70 mt-0.5">{restorePrompt.trip.patient} — {restorePrompt.legs.length} leg{restorePrompt.legs.length !== 1 ? 's' : ''}</p>
+          <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 140 }}>
+            <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0">
+              <button type="button" onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+                <ArrowLeft size={20} className="text-slate-700" />
+              </button>
+              <div className="flex-1 text-center">
+                <h2 className="font-bold text-base text-slate-900">Restore Trip Legs</h2>
+                <p className="text-xs text-slate-500">{restorePrompt.trip.patient} — {restorePrompt.legs.length} leg{restorePrompt.legs.length !== 1 ? 's' : ''}</p>
+              </div>
+              <div className="w-10 shrink-0" />
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              <button type="button" onClick={toggleAll} className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition active:scale-95 cursor-pointer ${allSelected ? 'border-blue-200 bg-blue-50' : 'border-slate-200 hover:bg-slate-50 bg-white'}`}>
+                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${allSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}>
+                  {allSelected && <Check size={14} className="text-white" />}
                 </div>
-                <button type="button" onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
-              </div>
-              <div className="p-4 space-y-2 max-h-56 overflow-y-auto">
-                <button type="button" onClick={toggleAll} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition active:scale-95 cursor-pointer ${allSelected ? 'border-blue-200 bg-blue-50' : 'border-slate-100 hover:bg-slate-50'}`}>
-                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${allSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}>
-                    {allSelected && <Check size={12} className="text-white" />}
-                  </div>
-                  <span className="text-sm font-bold text-slate-900">Select All ({restorePrompt.legs.length})</span>
-                </button>
-                {restorePrompt.legs.map((leg, idx) => {
-                  const isSelected = selectedLegsForAction.has(leg.id);
-                  return (
-                    <button type="button" key={leg.id} onClick={() => toggleLeg(leg.id)}
-                      className={`w-full flex items-center gap-3 p-3 rounded-xl border transition active:scale-95 cursor-pointer ${isSelected ? 'border-blue-200 bg-blue-50' : 'border-slate-100 hover:bg-slate-50'}`}>
-                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}>
-                        {isSelected && <Check size={12} className="text-white" />}
+                <span className="text-sm font-bold text-slate-900">Select All ({restorePrompt.legs.length})</span>
+              </button>
+              {restorePrompt.legs.map((leg, idx) => {
+                const isSelected = selectedLegsForAction.has(leg.id);
+                return (
+                  <button type="button" key={leg.id} onClick={() => toggleLeg(leg.id)}
+                    className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition active:scale-95 cursor-pointer ${isSelected ? 'border-blue-200 bg-blue-50' : 'border-slate-200 hover:bg-slate-50 bg-white'}`}>
+                    <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}>
+                      {isSelected && <Check size={14} className="text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-black">L{idx + 1}</span>
+                        <span className="text-sm font-bold text-slate-900 truncate">{leg.patient}</span>
+                        {leg.bookingId && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-[9px] font-bold shrink-0">{leg.bookingId}</span>}
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                       </div>
-                      <div className="flex-1 min-w-0 text-left">
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[9px] font-black">L{idx + 1}</span>
-                          <span className="text-sm font-bold text-slate-900 truncate">{leg.patient}</span>
-                          {leg.bookingId && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-[9px] font-bold shrink-0">{leg.bookingId}</span>}
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
-                          <span className="truncate">{leg.pickup}</span>
-                          <span className="shrink-0">→</span>
-                          <span className="truncate">{leg.dropoff}</span>
-                        </div>
+                      <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
+                        <span className="truncate">{leg.pickup}</span>
+                        <span className="shrink-0">→</span>
+                        <span className="truncate">{leg.dropoff}</span>
                       </div>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="px-4 pb-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (selectedLegsForAction.size === 0) return;
-                    setRestorePrompt(null);
-                    setPasswordPrompt({ type: 'restore', trip: restorePrompt.trip, selectedLegIds: [...selectedLegsForAction] });
-                  }}
-                  disabled={selectedLegsForAction.size === 0}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition disabled:opacity-40 cursor-pointer">
-                  {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `Restore ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
-                </button>
-              </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedLegsForAction.size === 0) return;
+                  setRestorePrompt(null);
+                  setPasswordPrompt({ type: 'restore', trip: restorePrompt.trip, selectedLegIds: [...selectedLegsForAction] });
+                }}
+                disabled={selectedLegsForAction.size === 0}
+                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition disabled:opacity-40 cursor-pointer">
+                {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `Restore ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
+              </button>
             </div>
           </div>
         );
@@ -3766,115 +3814,122 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== EMERGENCY TRANSFER MODAL ===== */}
       {transferPrompt && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 175 }} onClick={(e) => e.stopPropagation()}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between mb-5">
-              <div className="flex-1 text-center">
-                <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-200">
-                  <Forward size={24} className="text-white" />
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 175 }}>
+          <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0">
+            <button type="button" onClick={() => setTransferPrompt(null)} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+              <ArrowLeft size={20} className="text-slate-700" />
+            </button>
+            <div className="flex-1 text-center">
+              <h2 className="font-bold text-base text-slate-900">Emergency Transfer</h2>
+              <p className="text-xs text-slate-500">Send {transferPrompt.type === 'route' ? 'route plan' : 'trip'} to another driver</p>
+            </div>
+            <div className="w-10 shrink-0" />
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div>
+              <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-2 block">Send To Driver</label>
+              <select value={transferTargetDriverId} onChange={(e) => setTransferTargetDriverId(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm focus:border-amber-500 outline-none">
+                <option value="">Select driver</option>
+                {transferTargetDrivers.map((driver) => (
+                  <option key={driver.id} value={driver.id}>{driver.name || driver.email || driver.id}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-2 block">Reason</label>
+              <select value={transferReason} onChange={(e) => setTransferReason(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm focus:border-amber-500 outline-none">
+                <option value="">Select reason</option>
+                <option value="Traffic delay">Traffic delay</option>
+                <option value="Vehicle issue">Vehicle issue</option>
+                <option value="Emergency">Emergency</option>
+                <option value="Running late">Running late</option>
+                <option value="Other driver closer">Other driver closer</option>
+              </select>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+                  <AlertTriangle size={18} className="text-amber-600" />
                 </div>
-                <h3 className="text-lg font-black text-slate-900">Emergency Transfer</h3>
-                <p className="text-xs font-semibold text-slate-500 mt-1">
-                  Send this {transferPrompt.type === 'route' ? 'route plan' : 'trip'} to another driver for acceptance.
-                </p>
-              </div>
-              <button type="button" onClick={() => setTransferPrompt(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Send To Driver</label>
-                <select value={transferTargetDriverId} onChange={(e) => setTransferTargetDriverId(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:border-amber-500 outline-none">
-                  <option value="">Select driver</option>
-                  {transferTargetDrivers.map((driver) => (
-                    <option key={driver.id} value={driver.id}>{driver.name || driver.email || driver.id}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Reason</label>
-                <select value={transferReason} onChange={(e) => setTransferReason(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:border-amber-500 outline-none">
-                  <option value="">Select reason</option>
-                  <option value="Traffic delay">Traffic delay</option>
-                  <option value="Vehicle issue">Vehicle issue</option>
-                  <option value="Emergency">Emergency</option>
-                  <option value="Running late">Running late</option>
-                  <option value="Other driver closer">Other driver closer</option>
-                </select>
-              </div>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                <p className="text-xs font-semibold text-amber-800">The receiving driver must accept with password before ownership changes.</p>
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setTransferPrompt(null)} className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitTransferRequest} disabled={!transferTargetDriverId} className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-sm disabled:opacity-40 transition-all cursor-pointer">Send</button>
+                <p className="text-sm font-semibold text-amber-800">The receiving driver must accept with password before ownership changes.</p>
               </div>
             </div>
+          </div>
+          <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
+            <button type="button" onClick={() => setTransferPrompt(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+            <button type="button" onClick={submitTransferRequest} disabled={!transferTargetDriverId} className="flex-1 py-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-sm disabled:opacity-40 transition-all cursor-pointer">Send Transfer</button>
           </div>
         </div>
       )}
 
       {/* ===== PASSWORD CONFIRM MODAL ===== */}
       {passwordPrompt && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 180 }} onClick={(e) => { e.stopPropagation(); }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative pointer-events-auto" style={{ zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
-            {/* Header with step indicator */}
-            <div className="flex items-center gap-0.5 mb-4">
-              <div className="h-1 flex-1 rounded-full bg-emerald-400" />
-              <div className={`h-1 flex-1 rounded-full ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-400' : 'bg-rose-400'}`} />
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 180 }}>
+          <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0">
+            <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+              <ArrowLeft size={20} className="text-slate-700" />
+            </button>
+            <div className="flex-1 text-center">
+              <h2 className="font-bold text-base text-slate-900">
+                Confirm {passwordPrompt.type === 'route_stop_exception' ? passwordPrompt.status : passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Reroute' : passwordPrompt.type === 'restore' ? 'Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Edit' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Cancel'}
+              </h2>
+              <p className="text-xs text-slate-500">Step 2 of 2</p>
             </div>
-            <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-4 text-center">Step 2 of 2</p>
-            <div className="flex items-start justify-between mb-5">
-              <div className="text-center flex-1">
-                <div className={`w-14 h-14 bg-gradient-to-br rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'from-blue-600 to-blue-500' : 'from-rose-600 to-rose-500'}`}>
-                  <Lock size={24} className="text-white" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">Confirm {passwordPrompt.type === 'route_stop_exception' ? passwordPrompt.status : passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Reroute' : passwordPrompt.type === 'restore' ? 'Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Edit' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Cancel'}</h3>
-                <p className="text-xs text-slate-500 mt-1">{passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Enter your password to save your trip changes' : String(passwordPrompt.type || '').includes('transfer') ? 'Enter your password to confirm this transfer decision.' : passwordPrompt.type === 'route_stop_exception' ? `Enter your password to mark ${passwordPrompt.trip?.patient || 'this route stop'} as ${passwordPrompt.status}.` : `Enter your password to mark ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Rerouted' : 'Cancelled'}`}</p>
-                {passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 && (
-                  <p className="text-xs text-rose-500 font-semibold mt-1">{passwordPrompt.selectedLegIds.length} leg{passwordPrompt.selectedLegIds.length !== 1 ? 's' : ''} will be affected</p>
-                )}
-              </div>
-              <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
+            <div className="w-10 shrink-0" />
+          </div>
+          {/* Step indicator */}
+          <div className="px-4 pt-3 shrink-0">
+            <div className="flex items-center gap-1">
+              <div className="h-1.5 flex-1 rounded-full bg-emerald-400" />
+              <div className={`h-1.5 flex-1 rounded-full ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-400' : 'bg-rose-400'}`} />
             </div>
-            <div className="space-y-4">
-              {passwordPrompt.type !== 'restore' && passwordPrompt.type !== 'edittrip' && passwordPrompt.type !== 'edittripcomplete' && !String(passwordPrompt.type || '').includes('transfer') && (
-                <div>
-                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Reason</label>
-                  <select value={passwordPrompt.reason || ''} onChange={(e) => setPasswordPrompt(prev => ({ ...prev, reason: e.target.value }))}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm focus:border-rose-500 outline-none">
-                    <option value="">Select reason (optional)</option>
-                    <option value="Client Cancelled">Client Cancelled</option>
-                    <option value="Facility Cancelled">Facility Cancelled</option>
-                    <option value="No Answer">No Answer</option>
-                    <option value="No Show">No Show</option>
-                    <option value="Transportation Issue">Transportation Issue</option>
-                    <option value="Weather">Weather</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <p className="text-sm font-medium text-slate-700">
+                {passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Enter your password to save your trip changes' : String(passwordPrompt.type || '').includes('transfer') ? 'Enter your password to confirm this transfer decision.' : passwordPrompt.type === 'route_stop_exception' ? `Enter your password to mark ${passwordPrompt.trip?.patient || 'this route stop'} as ${passwordPrompt.status}.` : `Enter your password to mark ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Rerouted' : 'Cancelled'}`}
+              </p>
+              {passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 && (
+                <p className="text-xs text-rose-500 font-semibold mt-2">{passwordPrompt.selectedLegIds.length} leg{passwordPrompt.selectedLegIds.length !== 1 ? 's' : ''} will be affected</p>
               )}
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Password</label>
-                <input
-                  type="password"
-                  value={passwordValue}
-                  onChange={(e) => setPasswordValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && verifyPasswordAndProceed()}
-                  placeholder="Enter password"
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-center focus:border-rose-500 outline-none"
-                  autoFocus
-                />
-                {passwordError && <p className="text-xs text-rose-600 font-semibold mt-1 text-center">{passwordError}</p>}
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">
-                  Back
-                </button>
-                <button type="button" onClick={verifyPasswordAndProceed} disabled={!passwordValue || passwordVerifying} className={`flex-1 py-3 text-white rounded-xl font-bold text-sm disabled:opacity-40 transition-all cursor-pointer ${passwordPrompt.type === 'restore' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-600 hover:bg-blue-700' : passwordPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
-                  {passwordVerifying ? 'Verifying...' : passwordPrompt.type === 'route_stop_exception' ? `Confirm ${passwordPrompt.status}` : passwordPrompt.type === 'noshow' ? 'Confirm No Show' : passwordPrompt.type === 'reroute' ? 'Confirm Reroute' : passwordPrompt.type === 'restore' ? 'Confirm Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Confirm & Save Changes' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Confirm Cancel'}
-                </button>
-              </div>
             </div>
+            {passwordPrompt.type !== 'restore' && passwordPrompt.type !== 'edittrip' && passwordPrompt.type !== 'edittripcomplete' && !String(passwordPrompt.type || '').includes('transfer') && (
+              <div>
+                <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-2 block">Reason</label>
+                <select value={passwordPrompt.reason || ''} onChange={(e) => setPasswordPrompt(prev => ({ ...prev, reason: e.target.value }))}
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-medium text-sm focus:border-rose-500 outline-none">
+                  <option value="">Select reason (optional)</option>
+                  <option value="Client Cancelled">Client Cancelled</option>
+                  <option value="Facility Cancelled">Facility Cancelled</option>
+                  <option value="No Answer">No Answer</option>
+                  <option value="No Show">No Show</option>
+                  <option value="Transportation Issue">Transportation Issue</option>
+                  <option value="Weather">Weather</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-2 block">Password</label>
+              <input
+                type="password"
+                value={passwordValue}
+                onChange={(e) => setPasswordValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && verifyPasswordAndProceed()}
+                placeholder="Enter password"
+                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base text-center focus:border-rose-500 outline-none"
+                autoFocus
+              />
+              {passwordError && <p className="text-sm text-rose-600 font-semibold mt-2 text-center">{passwordError}</p>}
+            </div>
+          </div>
+          <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
+            <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">
+              Back
+            </button>
+            <button type="button" onClick={verifyPasswordAndProceed} disabled={!passwordValue || passwordVerifying} className={`flex-1 py-3.5 text-white rounded-xl font-bold text-sm disabled:opacity-40 transition-all cursor-pointer ${passwordPrompt.type === 'restore' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-600 hover:bg-blue-700' : passwordPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
+              {passwordVerifying ? 'Verifying...' : passwordPrompt.type === 'route_stop_exception' ? `Confirm ${passwordPrompt.status}` : passwordPrompt.type === 'noshow' ? 'Confirm No Show' : passwordPrompt.type === 'reroute' ? 'Confirm Reroute' : passwordPrompt.type === 'restore' ? 'Confirm Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Confirm & Save Changes' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Confirm Cancel'}
+            </button>
           </div>
         </div>
       )}
@@ -3895,94 +3950,92 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         const warning = getContactWarning(showContactSelector, trips);
         const iconMap = { User, Shield, PhoneForwarded, AlertTriangle, Building, MapPin, Headphones, Route };
         return (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end justify-center" style={{ zIndex: 170 }} onClick={() => setShowContactSelector(null)}>
-            <div className="bg-white w-full max-w-md rounded-t-3xl shadow-2xl relative overflow-hidden animate-slide-up pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
-              {/* Header */}
-              <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-bold">Contact for Trip</h3>
-                    <p className="text-xs text-white/70 mt-0.5">{showContactSelector.patient} · {to12hr(showContactSelector.time)}</p>
-                  </div>
-                  <button type="button" onClick={() => setShowContactSelector(null)} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
-                </div>
+          <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 170 }}>
+            <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0">
+              <button type="button" onClick={() => setShowContactSelector(null)} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+                <ArrowLeft size={20} className="text-slate-700" />
+              </button>
+              <div className="flex-1 text-center">
+                <h2 className="font-bold text-base text-slate-900">Contacts</h2>
+                <p className="text-xs text-slate-500">{showContactSelector.patient} · {to12hr(showContactSelector.time)}</p>
               </div>
+              <div className="w-10 shrink-0" />
+            </div>
 
-              {/* Warning */}
-              {warning.show && (
-                <div className={`mx-4 mt-3 rounded-xl px-3 py-2 flex items-center gap-2 ${warning.severity === 'error' ? 'bg-rose-50 border border-rose-200' : warning.severity === 'warning' ? 'bg-amber-50 border border-amber-200' : 'bg-blue-50 border border-blue-200'}`}>
-                  <AlertTriangle size={12} className={`shrink-0 ${warning.severity === 'error' ? 'text-rose-600' : warning.severity === 'warning' ? 'text-amber-600' : 'text-blue-600'}`} />
-                  <p className={`text-xs font-medium ${warning.severity === 'error' ? 'text-rose-700' : warning.severity === 'warning' ? 'text-amber-700' : 'text-blue-700'}`}>{warning.message}</p>
+            {/* Warning */}
+            {warning.show && (
+              <div className={`mx-4 mt-3 rounded-2xl px-4 py-3 flex items-center gap-3 ${warning.severity === 'error' ? 'bg-rose-50 border border-rose-200' : warning.severity === 'warning' ? 'bg-amber-50 border border-amber-200' : 'bg-blue-50 border border-blue-200'}`}>
+                <AlertTriangle size={16} className={`shrink-0 ${warning.severity === 'error' ? 'text-rose-600' : warning.severity === 'warning' ? 'text-amber-600' : 'text-blue-600'}`} />
+                <p className={`text-sm font-medium ${warning.severity === 'error' ? 'text-rose-700' : warning.severity === 'warning' ? 'text-amber-700' : 'text-blue-700'}`}>{warning.message}</p>
+              </div>
+            )}
+
+            {/* Primary Quick Call */}
+            {contacts.length > 0 && (() => {
+              const primary = contacts.find(c => c.isPrimary) || contacts[0];
+              const ps = getContactRoleIcon(primary.role);
+              const IconComp = iconMap[ps.icon] || User;
+              return (
+                <div className="px-4 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => { handleCall(primary.phone, `${primary.label}: ${primary.name}`); setShowContactSelector(null); }}
+                    className={`w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer shadow-sm ${ps.bg} ${ps.color} border ${ps.border}`}>
+                    <IconComp size={18} /> Call {primary.label} — {formatPhoneDisplay(primary.phone)}
+                  </button>
                 </div>
-              )}
+              );
+            })()}
 
-              {/* Primary Quick Call */}
-              {contacts.length > 0 && (() => {
-                const primary = contacts.find(c => c.isPrimary) || contacts[0];
-                const ps = getContactRoleIcon(primary.role);
-                const IconComp = iconMap[ps.icon] || User;
+            {/* Contact List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {contacts.map((contact, idx) => {
+                const roleStyle = getContactRoleIcon(contact.role);
+                const actions = getContactRoleActions(contact.role);
+                const Icon = iconMap[roleStyle.icon] || User;
                 return (
-                  <div className="px-4 pt-3">
-                    <button
-                      type="button"
-                      onClick={() => { handleCall(primary.phone, `${primary.label}: ${primary.name}`); setShowContactSelector(null); }}
-                      className={`w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer shadow-sm ${ps.bg} ${ps.color} border ${ps.border}`}>
-                      <IconComp size={18} /> Call {primary.label} — {formatPhoneDisplay(primary.phone)}
-                    </button>
-                  </div>
-                );
-              })()}
-
-              {/* Contact List */}
-              <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
-                {contacts.map((contact, idx) => {
-                  const roleStyle = getContactRoleIcon(contact.role);
-                  const actions = getContactRoleActions(contact.role);
-                  const Icon = iconMap[roleStyle.icon] || User;
-                  return (
-                    <div key={idx} className={`bg-white rounded-xl border-2 shadow-sm ${contact.isPrimary ? 'ring-2 ' + roleStyle.ring : 'border-slate-200'} p-3`}>
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${roleStyle.bg}`}>
-                          <Icon size={18} className={roleStyle.color} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-slate-900 truncate">{contact.name}</span>
-                            {contact.isPrimary && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">PRIMARY</span>}
-                          </div>
-                          <p className="text-xs text-slate-500">{contact.label} · {formatPhoneDisplay(contact.phone)}</p>
-                        </div>
+                  <div key={idx} className={`bg-white rounded-2xl border-2 shadow-sm ${contact.isPrimary ? 'ring-2 ' + roleStyle.ring : 'border-slate-200'} p-4`}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${roleStyle.bg}`}>
+                        <Icon size={20} className={roleStyle.color} />
                       </div>
-                      <div className="flex gap-2 ml-13">
-                        <button
-                          type="button"
-                          onClick={() => { handleCall(contact.phone, `${contact.label}: ${contact.name}`); setShowContactSelector(null); }}
-                          className="flex-1 h-8 bg-emerald-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
-                          <Phone size={12} /> {actions.callLabel}
-                        </button>
-                        {actions.smsLabel && (
-                          <button
-                            type="button"
-                            onClick={() => { handleSMS(contact.phone, contact.name); setShowContactSelector(null); }}
-                            className="flex-1 h-8 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
-                            <MessageCircle size={12} /> {actions.smsLabel}
-                          </button>
-                        )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900 truncate">{contact.name}</span>
+                          {contact.isPrimary && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg">PRIMARY</span>}
+                        </div>
+                        <p className="text-xs text-slate-500">{contact.label} · {formatPhoneDisplay(contact.phone)}</p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { handleCall(contact.phone, `${contact.label}: ${contact.name}`); setShowContactSelector(null); }}
+                        className="flex-1 h-10 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
+                        <Phone size={14} /> {actions.callLabel}
+                      </button>
+                      {actions.smsLabel && (
+                        <button
+                          type="button"
+                          onClick={() => { handleSMS(contact.phone, contact.name); setShowContactSelector(null); }}
+                          className="flex-1 h-10 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
+                          <MessageCircle size={14} /> {actions.smsLabel}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-              {/* Quick Actions Footer */}
-              <div className="px-4 pb-4 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => { handleSmartCall(showContactSelector); setShowContactSelector(null); }}
-                  className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer">
-                  <Phone size={14} /> Quick Call Primary Contact
-                </button>
-              </div>
+            {/* Quick Actions Footer */}
+            <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
+              <button
+                type="button"
+                onClick={() => { handleSmartCall(showContactSelector); setShowContactSelector(null); }}
+                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer">
+                <Phone size={16} /> Quick Call Primary Contact
+              </button>
             </div>
           </div>
         );
