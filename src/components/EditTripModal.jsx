@@ -123,7 +123,7 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
             </div>
           </button>
 
-          {driverMode && (
+          {driverMode && editTrip.status !== 'Completed' && (
             <button type="button" onClick={() => handleField('_markCompleted', !editTrip._markCompleted)} className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition cursor-pointer ${editTrip._markCompleted ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
               <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${editTrip._markCompleted ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
                 {editTrip._markCompleted && <CheckSquare size={14} className="text-white" />}
