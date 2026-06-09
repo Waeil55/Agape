@@ -501,8 +501,12 @@ const App = () => {
           driverIds.has(trip.transferRequest?.toDriverId)
           || normalizeEmail(trip.transferRequest?.toDriverEmail) === email
         );
-      const activeStatus = !['Completed', 'Cancelled', 'No Show'].includes(trip.status);
-      return (assignedToCurrentDriver || incomingTransfer) && (tripMatchesTodayOrTomorrow(trip.date) || activeStatus || incomingTransfer);
+      const isTerminal = ['Completed', 'Cancelled', 'No Show', 'Rerouted'].includes(trip.status);
+      const recentCutoff = new Date();
+      recentCutoff.setDate(recentCutoff.getDate() - 60);
+      const tripDate = trip.date || (trip.completedAt || '').slice(0, 10);
+      const isRecent = tripDate && new Date(tripDate) >= recentCutoff;
+      return (assignedToCurrentDriver || incomingTransfer) && (!isTerminal || isRecent || incomingTransfer);
     });
   }, [trips, drivers, currentUserDriverProfile, currentUser, role]);
   useEffect(() => {
