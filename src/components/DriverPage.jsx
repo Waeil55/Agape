@@ -35,7 +35,9 @@ const LazyFallback = () => <div className="flex items-center justify-center p-12
 const isInOutTrip = (trip) => {
   if (!trip) return false;
   const notes = String(trip.notes || '').toUpperCase();
-  return notes.includes('IN/OUT') || notes.includes('IN OUT') || notes.includes('IN & OUT');
+  const general = String(trip.details?.generalComments || '').toUpperCase();
+  const combined = (notes + ' ' + general).replace(/\s+/g, ' ');
+  return combined.includes('IN/OUT') || combined.includes('IN OUT') || combined.includes('IN & OUT') || combined.includes('IN / OUT');
 };
 
 const isWillCall = (trip) => {
