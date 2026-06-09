@@ -1038,7 +1038,7 @@ const OperationsCommandCenter = ({
           ))}
         </div>
 
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-xl text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-2 py-1 text-[10px] card-premiumtext-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
           <option value="all">All</option>
           <option value="Unassigned">Unassigned</option>
           <option value="Assigned">Assigned</option>
@@ -1051,7 +1051,7 @@ const OperationsCommandCenter = ({
         </select>
 
         <div className="flex items-center gap-1">
-          <select value={sortBy} onChange={(e) => handleSortSelect(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-xl text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+          <select value={sortBy} onChange={(e) => handleSortSelect(e.target.value)} className="px-2 py-1 text-[10px] card-premiumtext-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
             {SORT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -1084,7 +1084,7 @@ const OperationsCommandCenter = ({
           )}
           {sortBy === 'ai' && aiSortLoading && <Loader2 size={11} className="text-blue-600 animate-spin shrink-0" />}
         </div>
-        <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-xl text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+        <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-2 py-1 text-[10px] card-premiumtext-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
           <option value="all">Drivers</option>
           <option value="unassigned">No Driver</option>
           {driverOptions.map((driver) => (
@@ -2054,7 +2054,7 @@ const OperationsCommandCenter = ({
           const isExpanded = expandedDriver === d.id;
           const isMaintenanceDue = d.nextOilChange - d.odometer < 200;
           return (
-            <div key={d.id} className={`bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm transition-all duration-300 ${
+            <div key={d.id} className={`card-premium transition-all duration-300 ${
               d.status === 'Available' ? 'border-emerald-200' : ''
             } ${isMaintenanceDue ? 'border-rose-200' : ''}`}>
               {/* Driver header */}
@@ -2228,7 +2228,7 @@ const OperationsCommandCenter = ({
     <div className="flex-1 overflow-y-auto p-3">
       {willCallTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <div className="bg-white border border-slate-200 rounded-3xl p-8 text-center max-w-xs shadow-sm">
+          <div className="card-premiump-8 text-center max-w-xs shadow-sm">
             <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
               <Phone size={28} />
             </div>
@@ -2248,7 +2248,7 @@ const OperationsCommandCenter = ({
             const routeAssignments = routeTripMap[t.id] || [];
             const visibleRouteAssignments = routeAssignments.slice(0, densityProfile.routeChipLimit);
             return (
-            <div key={t.id} className="group bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
+            <div key={t.id} className="group card-premium hover:shadow-xl transition-all duration-300 flex flex-col">
               {/* Top Status Indicator */}
               <div className="h-1.5 w-full bg-blue-500" />
               <div className={`${isLeanDensity ? 'p-3 sm:p-3.5' : 'p-4 sm:p-5'} cursor-pointer`} onClick={() => openTripDetails(t)}>

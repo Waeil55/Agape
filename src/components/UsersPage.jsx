@@ -195,7 +195,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       <>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">User Management</h2>
-        <button onClick={() => setShowForm(true)} className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm">
+        <button onClick={() => setShowForm(true)} className="w-full sm:w-auto px-4 py-2 btn-gradient-primary font-bold transition-all flex items-center justify-center gap-2 text-sm">
           <Plus size={18} /> Add User
         </button>
       </div>
@@ -281,7 +281,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       )}
 
       {/* All Users Table */}
-      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+      <div className="card-premium">
         <div className="p-4 sm:p-6 border-b border-slate-200">
           <h3 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> All Users ({users.length})</h3>
         </div>
@@ -355,7 +355,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       </div>
 
       {/* Dispatcher Assignments */}
-      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+      <div className="card-premium">
         <div className="p-4 sm:p-6 border-b border-slate-200">
           <h3 className="text-lg sm:text-xl font-bold text-slate-900">Driver Assignments</h3>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">Assign drivers to dispatchers</p>
@@ -437,7 +437,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {!hideActivityFeed && (
       <div className={`w-full ${singleColumn || activityFeedOnly ? '' : 'lg:w-1/2'} shrink-0 flex flex-col ${activityFeedOnly ? 'h-full' : ''}`}>
       {/* System Activity Feed */}
-      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-[500px]">
+      <div className="card-premium flex flex-col flex-1 min-h-[500px]">
         <div className="p-4 sm:p-6 border-b border-slate-200 shrink-0">
           <h3 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
             <Activity size={18} /> System Activity Feed
@@ -490,7 +490,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* Add User Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm max-w-md w-full mx-0 sm:mx-4">
+          <div className="card-premium max-w-md w-full mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900">Create User</h3>
@@ -534,8 +534,8 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 </div>
               </form>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-6">
-                <button type="button" onClick={() => { setShowForm(false); setFormError(''); }} className="w-full sm:flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm">Cancel</button>
-                <button type="submit" onClick={createUser} className="w-full sm:flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm"><Save size={16} /> Create</button>
+                <button type="button" onClick={() => { setShowForm(false); setFormError(''); }} className="w-full sm:flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold text-sm">Cancel</button>
+                <button type="submit" onClick={createUser} className="w-full sm:flex-1 px-4 py-2 btn-gradient-primary font-bold transition-all flex items-center justify-center gap-2 text-sm"><Save size={16} /> Create</button>
               </div>
             </div>
           </div>

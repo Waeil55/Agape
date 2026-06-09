@@ -149,7 +149,7 @@ const APIConfiguration = ({ integrationKey, integration, onConnect }) => {
           <button
             onClick={handleConnect}
             disabled={!apiKey}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="flex-1 px-4 py-2 btn-gradient-primary text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             Connect
           </button>
@@ -280,7 +280,7 @@ const WebhookManager = () => {
         <button
           onClick={handleAddWebhook}
           disabled={!newUrl || selectedEvents.length === 0}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm"
+          className="w-full px-4 py-2 btn-gradient-primary font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm"
         >
           Add Webhook
         </button>

@@ -288,7 +288,7 @@ const QuickExport = ({ data = {} }) => {
       <button
         onClick={handleExport}
         disabled={exporting}
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+        className="px-4 py-2 btn-gradient-primary font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
       >
         <Download size={16} />
         {exporting ? 'Exporting...' : 'Export'}
@@ -362,7 +362,7 @@ const CustomDashboardBuilder = () => {
           <option value="grid">Grid Layout</option>
           <option value="list">List Layout</option>
         </select>
-        <button onClick={handleAddWidget} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700">
+        <button onClick={handleAddWidget} className="px-4 py-2 btn-gradient-primary text-sm font-bold hover:bg-blue-700">
           + Add Widget
         </button>
       </div>

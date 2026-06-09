@@ -402,7 +402,7 @@ const TeamChat = ({ currentUser, role }) => {
               <button onClick={() => { setShowNew(false); setSelected([]); }}
                 className="flex-1 py-2.5 min-h-[44px] bg-slate-100 text-slate-600 rounded-xl font-medium text-sm hover:bg-slate-200 transition">Cancel</button>
               <button onClick={handleCreateConv} disabled={selected.length === 0}
-                className="flex-1 py-2.5 min-h-[44px] bg-blue-600 text-white rounded-xl font-medium text-sm disabled:opacity-40 hover:bg-blue-700 transition">Start</button>
+                className="flex-1 py-2.5 min-h-[44px] btn-gradient-primary font-medium text-sm disabled:opacity-40 hover:bg-blue-700 transition">Start</button>
             </div>
           </div>
         </div>
@@ -728,7 +728,7 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
               <button onClick={() => { setShowNewSms(false); setNewSmsPhone(''); setNewSmsText(''); }}
                 className="flex-1 py-2.5 min-h-[44px] bg-slate-100 text-slate-600 rounded-xl font-medium text-sm hover:bg-slate-200 transition">Cancel</button>
               <button onClick={handleNewSms} disabled={!newSmsPhone.trim() || !newSmsText.trim() || newSmsSending}
-                className="flex-1 py-2.5 min-h-[44px] bg-blue-600 text-white rounded-xl font-medium text-sm disabled:opacity-40 hover:bg-blue-700 transition flex items-center justify-center gap-1">
+                className="flex-1 py-2.5 min-h-[44px] btn-gradient-primary font-medium text-sm disabled:opacity-40 hover:bg-blue-700 transition flex items-center justify-center gap-1">
                 {newSmsSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={14} />}
                 Send
               </button>

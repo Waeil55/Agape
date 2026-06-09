@@ -163,7 +163,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
     <div className="fixed inset-0 z-[200] flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
-        className="relative w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col bg-white rounded-3xl shadow-2xl overflow-hidden z-10 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+        className="relative w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col bg-white modal-premium z-10 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

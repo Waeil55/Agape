@@ -676,7 +676,7 @@ const EnterpriseDashboard = ({
         {rightPanelTab === 'alerts' && (
           <div className="space-y-3">
             {logs.slice(0, 20).map((log, i) => (
-              <div key={i} className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-sm mb-1.5 hover:shadow-md transition-all duration-200 group">
+              <div key={i} className="p-2.5 card-premium mb-1.5 hover:shadow-md transition-all duration-200 group">
                 <div className="flex items-start gap-2.5">
                   <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ring-1 ring-slate-200 ${
                     log.c === 'rose' ? 'bg-rose-500 ring-rose-500/20' :
@@ -778,7 +778,7 @@ const EnterpriseDashboard = ({
                 )}
                 <button
                   onClick={() => setShowTripLocations(prev => !prev)}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-[10px] font-bold text-slate-600 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 rounded-xl text-[10px] font-bold text-slate-600 transition-colors"
                 >
                   <Search size={11} /> Find This Trip
                 </button>
@@ -872,7 +872,7 @@ const EnterpriseDashboard = ({
               {unassignedTrips.length > 0 && (
                 <button
                   onClick={() => setShowOptimizeModal(true)}
-                  className="mt-2.5 w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-1.5"
+                  className="mt-2.5 w-full py-1.5 btn-gradient-primary font-bold transition-all duration-200 flex items-center justify-center gap-1.5"
                 >
                   <Wand2 size={12} /> Run Optimization
                 </button>
@@ -1313,7 +1313,7 @@ const EnterpriseDashboard = ({
                       )}
                       <button
                         onClick={() => assignTripToDriver(smartAssignTrip.id, d.id)}
-                        className="mt-3 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2"
+                        className="mt-3 w-full py-2 btn-gradient-primary font-bold transition-all duration-200 flex items-center justify-center gap-2"
                       >
                         <CheckCircle2 size={14} /> Confirm Assignment
                       </button>
@@ -1356,7 +1356,7 @@ const EnterpriseDashboard = ({
                   </div>
                   <button
                     onClick={() => { triggerFleetOptimization(); setTimeout(() => setShowOptimizeModal(false), 3000); }}
-                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2"
+                    className="w-full py-2.5 btn-gradient-primary font-bold transition-all duration-200 flex items-center justify-center gap-2"
                   >
                     <Zap size={16} /> Run Optimization
                   </button>
@@ -1462,7 +1462,7 @@ const EnterpriseDashboard = ({
 
               <button
                 onClick={() => setShowTripLocations(prev => !prev)}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-600 transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 rounded-xl text-xs font-bold text-slate-600 transition-colors"
               >
                 <Search size={13} /> {showTripLocations ? 'Hide' : 'Find This Trip'}
               </button>
@@ -1519,8 +1519,8 @@ const EnterpriseDashboard = ({
               />
               {reAuthError && <p className="text-xs text-rose-700 mb-3">{reAuthError}</p>}
               <div className="flex gap-2">
-                <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all duration-200">Cancel</button>
-                <button type="submit" className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200">Confirm</button>
+                <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition-all duration-200">Cancel</button>
+                <button type="submit" className="flex-1 py-2 btn-gradient-primary font-bold transition-all duration-200">Confirm</button>
               </div>
             </form>
           </div>

@@ -10,6 +10,7 @@ import {
 import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, onSnapshot, collection, getDocs } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
+import CommandPalette from './components/CommandPalette';
 import { hasPermission } from './constants/roles';
 import { timeToMinutes, tripMatchesTodayOrTomorrow, tripMatchesCalendarDay } from './utils/tripDate';
 import { cleanPhone } from './utils/smartContacts';
@@ -588,6 +589,7 @@ const App = () => {
   }, [getTripKey]);
 
   const [activeTab, setActiveTab] = useState(() => 'dashboard');
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [selectedTasks, setSelectedTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1979,7 +1981,7 @@ const App = () => {
       <div className="flex-1 bg-slate-100 flex flex-col justify-start lg:justify-center items-center px-4 py-6 relative overflow-y-auto font-outfit" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(241,245,249,0.72)),linear-gradient(90deg,rgba(37,99,235,0.06)_1px,transparent_1px),linear-gradient(180deg,rgba(37,99,235,0.05)_1px,transparent_1px)] bg-[length:auto,48px_48px,48px_48px]" />
         
-        <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-6 sm:p-8 relative z-10">
+        <div className="w-full max-w-lg card-premium p-6 sm:p-8 relative z-10">
           <div className="flex flex-col items-center mb-6 text-center">
             <div className="w-20 h-20 sm:w-24 sm:h-24 mb-4 relative">
               <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain relative z-10" />
@@ -2056,11 +2058,11 @@ const App = () => {
 
               {loginError && <p className={`text-sm font-semibold text-center mt-2 p-3 rounded-lg border ${loginError.toLowerCase().includes('sent') ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100'}`}>{loginError}</p>}
               
-              <button type="submit" className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg transition-all">Authorize Access</button>
+              <button type="submit" className="w-full py-4 mt-2 btn-gradient-primary font-bold text-lg transition-all">Authorize Access</button>
               
               <div className="pt-2 flex items-center justify-between text-sm font-bold">
-                <button type="button" onClick={handleCreateAccount} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition text-sm">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>
-                <button type="button" onClick={handlePasswordReset} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition text-sm">Reset Help</button>
+                <button type="button" onClick={handleCreateAccount} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition text-sm">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>
+                <button type="button" onClick={handlePasswordReset} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition text-sm">Reset Help</button>
               </div>
             </form>
           )}
@@ -2091,7 +2093,7 @@ const App = () => {
           <form onSubmit={submitAuthAction}>
             <input type="password" required placeholder="Enter your password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full px-3 py-2.5 bg-slate-100/50 rounded-xl font-semibold border border-slate-200/50 focus:border-rose-500 focus:bg-white mb-4" />
             <div className="flex gap-2">
-              <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold active:scale-95 transition-all">Cancel</button>
+              <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold active:scale-95 transition-all">Cancel</button>
               <button type="submit" className="flex-1 py-3.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold active:scale-95 transition-all shadow-md shadow-rose-500/20">Authorize</button>
             </div>
           </form>
@@ -2346,6 +2348,13 @@ const App = () => {
 
   return (
     <>
+      <CommandPalette 
+        isOpen={isCommandPaletteOpen} 
+        onClose={(v) => setIsCommandPaletteOpen(v === undefined ? false : v)} 
+        navigateTo={(tab) => {
+          setActiveTab(tab);
+        }}
+      />
       {/* Offline Banner */}
       <div className={`offline-banner${isOffline ? ' visible' : ''}`}>
         You are offline — changes will sync when connection returns
@@ -2366,7 +2375,7 @@ const App = () => {
       {/* LOADING SCREEN */}
       {isLoading ? (
         <div className="flex-1 bg-slate-100 flex items-center justify-center px-4">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-8 flex flex-col items-center gap-6 text-center">
+          <div className="w-full max-w-md card-premium p-8 flex flex-col items-center gap-6 text-center">
             <img src="/agape.png" alt="Agape Care" className="w-20 h-20 object-contain" />
             <div className="text-center">
               <p className="text-lg font-bold text-slate-700">Loading Agape Care</p>
@@ -2396,7 +2405,7 @@ const App = () => {
         renderLoginScreen()
       ) : dataLoading ? (
         <div className="flex-1 bg-slate-100 flex items-center justify-center px-4">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-8 flex flex-col items-center gap-5 text-center">
+          <div className="w-full max-w-md card-premium p-8 flex flex-col items-center gap-5 text-center">
             <img src="/agape.png" alt="Agape Care" className="w-16 h-16 object-contain" />
             <div>
               <p className="text-lg font-bold text-slate-800">Syncing live operations</p>
@@ -2412,7 +2421,7 @@ const App = () => {
             if (!myDriver) {
               return (
                 <div className="flex-1 bg-slate-100 flex items-center justify-center px-4">
-                  <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl shadow-sm p-6 text-center">
+                  <div className="w-full max-w-md card-premium p-6 text-center">
                     <img src="/agape.png" alt="Agape Care" className="w-16 h-16 object-contain mx-auto mb-4" />
                     <h2 className="text-lg font-black text-slate-900">
                       {dataLoading ? 'Syncing your driver profile...' : 'Driver profile not ready'}

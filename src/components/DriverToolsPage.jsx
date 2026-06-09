@@ -655,7 +655,7 @@ Return ONLY the JSON object. No markdown.`;
                 <ExternalLink size={11} /> Maps
               </button>
               <button onClick={handleSendToSequencer}
-                className="h-10 bg-blue-600 text-white rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 active:bg-blue-700 transition shadow-md shadow-blue-200 cursor-pointer">
+                className="h-10 btn-gradient-primary text-[11px] font-extrabold flex items-center justify-center gap-1 active:bg-blue-700 transition shadow-md shadow-blue-200 cursor-pointer">
                 <Route size={11} /> Sequencer
               </button>
             </div>

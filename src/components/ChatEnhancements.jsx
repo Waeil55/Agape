@@ -433,7 +433,7 @@ export const EnhancedMessageInput = ({ onSend, onAttachment, disabled = false, p
         <button
           onClick={handleSend}
           disabled={disabled || !message.trim()}
-          className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2 btn-gradient-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Send size={20} />
         </button>

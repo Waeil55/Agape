@@ -77,7 +77,7 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
               <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Current Trip</span>
               {onViewTrip && (
-                <button onClick={() => onViewTrip(currentTrip.id)} className="ml-auto flex items-center gap-1 px-3 py-1.5 min-h-[36px] bg-blue-600 text-white rounded-lg text-[9px] font-bold hover:bg-blue-700 transition-colors">
+                <button onClick={() => onViewTrip(currentTrip.id)} className="ml-auto flex items-center gap-1 px-3 py-1.5 min-h-[36px] btn-gradient-primary text-[9px] font-bold hover:bg-blue-700 transition-colors">
                   <ExternalLink size={7} /> View
                 </button>
               )}
@@ -385,7 +385,7 @@ const AdminPage = ({
                         {user.email && (
                           <button
                             onClick={() => handlePasswordReset(user.email)}
-                            className="flex items-center gap-1 px-3 py-1.5 min-h-[36px] bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-[10px] font-bold text-slate-600 transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 min-h-[36px] bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 rounded-lg text-[10px] font-bold text-slate-600 transition-colors"
                             title="Send password reset email"
                           >
                             <KeyRound size={10} /> Reset PW

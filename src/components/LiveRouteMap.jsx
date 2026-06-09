@@ -372,7 +372,7 @@ const LiveRouteMap = React.memo(({
           {ordered.length > 0 && (
             <>
               <button onClick={() => onOpenInNav && onOpenInNav(ordered[0]?.pickup)}
-                className="px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95">
+                className="px-3 py-2 btn-gradient-primary text-xs font-bold flex items-center gap-1.5 active:scale-95">
                 <Navigation size={12} /> Start Route
               </button>
               {ordered.length > 1 && (
@@ -480,7 +480,7 @@ const LiveRouteMap = React.memo(({
                 <p className="text-xs text-slate-500 truncate">{selectedStop.address}</p>
               </div>
               <button onClick={() => onOpenInNav && onOpenInNav(selectedStop.address)}
-                className="px-3 h-7 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 active:scale-90 shrink-0">
+                className="px-3 h-7 btn-gradient-primary text-xs font-bold flex items-center gap-1 active:scale-90 shrink-0">
                 <Navigation size={9} /> Nav
               </button>
               <button onClick={() => setSelectedStop(null)} className="text-slate-300 hover:text-slate-500 shrink-0">

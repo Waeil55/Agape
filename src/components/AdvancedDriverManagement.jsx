@@ -338,7 +338,7 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
             <h1 className="text-3xl font-black text-slate-900">Driver Management</h1>
             <p className="text-sm text-slate-500 mt-1">Performance analytics, AI coaching & wellness</p>
           </div>
-          <button onClick={handleAddDriver} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors">
+          <button onClick={handleAddDriver} className="px-4 py-2 btn-gradient-primary font-bold hover:bg-blue-700 transition-colors">
             + Add Driver
           </button>
         </div>

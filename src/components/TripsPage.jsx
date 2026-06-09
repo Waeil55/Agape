@@ -449,7 +449,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               <X size={12} className="inline mr-1" /> Remove
             </button>
             {selectedTasks.length > 1 && (
-              <button onClick={() => { setAssignMode('mission'); setShowAssign(true); }} className="px-3 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-blue-700">
+              <button onClick={() => { setAssignMode('mission'); setShowAssign(true); }} className="px-3 py-2 btn-gradient-primary font-bold text-xs uppercase hover:bg-blue-700">
                 <Sparkles size={12} className="inline mr-1" /> Mission
               </button>
             )}

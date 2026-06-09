@@ -347,7 +347,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
           <CheckCircle2 size={48} className="mx-auto mb-4 text-emerald-500" />
           <p className="text-lg font-bold">Route Complete</p>
           <p className={`text-sm ${muted} mt-1`}>All stops completed.</p>
-          <button onClick={() => setNavMode(false)} className="mt-6 px-6 h-11 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700">Exit</button>
+          <button onClick={() => setNavMode(false)} className="mt-6 px-6 h-11 btn-gradient-primary font-bold text-sm hover:bg-blue-700">Exit</button>
         </div>
       </div>
     );
@@ -476,7 +476,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
             </div>
             <div className="flex items-center gap-1">
               <button onClick={handleOptimize} disabled={stops.length < 2 || optimizing}
-                className="px-2.5 h-7 bg-blue-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 hover:bg-blue-700 active:scale-95 disabled:opacity-30">
+                className="px-2.5 h-7 btn-gradient-primary text-[10px] font-bold flex items-center gap-1 hover:bg-blue-700 active:scale-95 disabled:opacity-30">
                 {optimizing ? <Loader2 size={11} className="animate-spin" /> : <BrainCircuit size={11} />} Optimize
               </button>
               <button onClick={copyRoute} disabled={stops.length === 0} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-30" title="Copy route"><Copy size={13} /></button>

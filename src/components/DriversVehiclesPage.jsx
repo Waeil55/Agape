@@ -535,8 +535,8 @@ const [form, setForm] = useState({
                   <div className="flex items-center justify-between mt-4 sm:mt-6">
                     <p className="text-xs sm:text-sm text-slate-600 font-semibold">{selectedTrips.length} trip{selectedTrips.length !== 1 ? 's' : ''} selected</p>
                     <div className="flex gap-2 sm:gap-3">
-                      <button onClick={() => { setAssignDriver(null); setSelectedTrips([]); }} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm">Cancel</button>
-                      <button onClick={assignSelectedTrips} disabled={selectedTrips.length === 0} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm">
+                      <button onClick={() => { setAssignDriver(null); setSelectedTrips([]); }} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold text-sm">Cancel</button>
+                      <button onClick={assignSelectedTrips} disabled={selectedTrips.length === 0} className="px-4 py-2 btn-gradient-primary font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm">
                         <CheckSquare size={16} /> Assign {selectedTrips.length > 0 ? `(${selectedTrips.length})` : ''}
                       </button>
                     </div>
@@ -647,7 +647,7 @@ const [form, setForm] = useState({
                   {editingScheduleIdx !== null && (
                     <button onClick={() => { setScheduleForm({ start: '09:00 AM', end: '10:00 AM', status: 'free' }); setEditingScheduleIdx(null); }} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-50">Cancel</button>
                   )}
-                  <button onClick={saveScheduleBlock} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 flex items-center gap-1">
+                  <button onClick={saveScheduleBlock} className="px-3 py-1.5 btn-gradient-primary text-xs font-semibold hover:bg-blue-700 flex items-center gap-1">
                     <Save size={12} /> {editingScheduleIdx !== null ? 'Update' : 'Add'} Block
                   </button>
                 </div>
@@ -746,8 +746,8 @@ const [form, setForm] = useState({
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
-                <button onClick={() => { setShowForm(false); resetForm(); }} className="flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold">Cancel</button>
-                <button onClick={saveDriver} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"><Save size={16} /> {editing ? 'Update' : 'Add'}</button>
+                <button onClick={() => { setShowForm(false); resetForm(); }} className="flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold">Cancel</button>
+                <button onClick={saveDriver} className="flex-1 px-4 py-2 btn-gradient-primary font-bold transition-all flex items-center justify-center gap-2"><Save size={16} /> {editing ? 'Update' : 'Add'}</button>
               </div>
             </div>
           </div>
@@ -800,8 +800,8 @@ const [form, setForm] = useState({
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
-                <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold">Cancel</button>
-                <button onClick={saveVehicle} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"><Save size={16} /> {editVehicleId ? 'Update' : 'Add'}</button>
+                <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold">Cancel</button>
+                <button onClick={saveVehicle} className="flex-1 px-4 py-2 btn-gradient-primary font-bold transition-all flex items-center justify-center gap-2"><Save size={16} /> {editVehicleId ? 'Update' : 'Add'}</button>
               </div>
             </div>
           </div>

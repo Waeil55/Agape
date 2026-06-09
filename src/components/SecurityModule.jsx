@@ -91,7 +91,7 @@ export const TwoFactorSetup = ({ user, onComplete }) => {
           <button
             onClick={handleVerify}
             disabled={verificationCode.length !== 6}
-            className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="w-full px-4 py-3 btn-gradient-primary font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             Verify & Continue
           </button>

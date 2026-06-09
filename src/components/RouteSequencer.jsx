@@ -1003,7 +1003,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                     <Filter className="w-3.5 h-3.5" />
                   </button>
                   {showFilter && (
-                    <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-30 overflow-hidden w-36">
+                    <div className="absolute right-0 top-full mt-1 card-premiumshadow-xl z-30 overflow-hidden w-36">
                       {[['all', 'All Trips'], ['unassigned', 'Unassigned'], ['assigned', 'Assigned']].map(([val, label]) => (
                         <button
                           key={val}
@@ -1332,7 +1332,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                               <div className="relative">
                                 <button onClick={() => setStopMenuId(stopMenuId === stop.id ? null : stop.id)} className="min-h-9 min-w-9 p-1.5 text-slate-300 hover:bg-slate-100 hover:text-slate-600 rounded-xl transition-colors"><MoreHorizontal className="w-3.5 h-3.5 mx-auto" /></button>
                 {stopMenuId === stop.id && (
-                    <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-3xl shadow-2xl py-1 min-w-[180px] max-w-[calc(100vw-2rem)]">
+                    <div className="absolute right-0 top-full mt-1 z-50 card-premiumshadow-2xl py-1 min-w-[180px] max-w-[calc(100vw-2rem)]">
                       <div className="px-3 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.15em] text-slate-400">Status Override</div>
                       <button onClick={() => handleNoShowToday(stop)} className="w-full px-3 py-2 text-[11px] font-extrabold text-left text-amber-700 hover:bg-amber-50 flex items-center gap-2 transition-colors"><UserX className="w-3.5 h-3.5" /> No Show Today</button>
                       <button onClick={() => handleCancelToday(stop)} className="w-full px-3 py-2 text-[11px] font-extrabold text-left text-rose-700 hover:bg-rose-50 flex items-center gap-2 transition-colors"><XCircle className="w-3.5 h-3.5" /> Cancel Today</button>
@@ -1417,7 +1417,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                   value={templateName}
                   onChange={e => setTemplateName(e.target.value)}
                   placeholder="e.g., Northside Dialysis Loop"
-                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                  className="w-full px-4 py-2.5 card-premiumtext-sm font-bold focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
                 />
               </div>
 
@@ -1454,7 +1454,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                     <select
                       value={selectedDriver}
                       onChange={e => setSelectedDriver(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-blue-500 transition-all"
+                      className="w-full px-4 py-2.5 card-premiumtext-sm font-bold focus:outline-none focus:border-blue-500 transition-all"
                     >
                       <option value="">No Default Driver</option>
                       {drivers.map(d => (
@@ -1476,7 +1476,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                     <select
                       value={selectedDriver}
                       onChange={e => setSelectedDriver(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-blue-500 transition-all"
+                      className="w-full px-4 py-2.5 card-premiumtext-sm font-bold focus:outline-none focus:border-blue-500 transition-all"
                     >
                       <option value="">Leave Unassigned</option>
                       {drivers.map(d => (
@@ -1488,7 +1488,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               )}
 
               {/* Sequence preview */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-3 max-h-32 overflow-y-auto">
+              <div className="card-premiump-3 max-h-32 overflow-y-auto">
                 <p className="text-micro font-bold text-slate-400 uppercase tracking-wider mb-2">Preview ({sequence.length} stops)</p>
                 {sequence.map((stop, i) => {
                   const client = allClients.find(c => c.id === stop.clientId);
@@ -1629,7 +1629,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                           <select
                             value={tpl.assignedDriver || ''}
                             onChange={e => handleReassignDriver(tpl.id, e.target.value)}
-                            className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:border-blue-500"
+                            className="flex-1 px-3 py-1.5 card-premiumtext-xs font-bold focus:outline-none focus:border-blue-500"
                           >
                             <option value="">Unassigned</option>
                             {drivers.map(d => (
@@ -1697,13 +1697,13 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
               <div>
                 <label className="text-micro font-bold text-slate-400 uppercase tracking-wider block mb-1">Patient Name *</label>
-                <input type="text" value={tempTripForm.name} onChange={e => setTempTripForm({...tempTripForm, name: e.target.value})} placeholder="e.g. John Doe" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all" />
+                <input type="text" value={tempTripForm.name} onChange={e => setTempTripForm({...tempTripForm, name: e.target.value})} placeholder="e.g. John Doe" className="w-full px-3 py-2 card-premiumtext-sm font-bold focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all" />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-micro font-bold text-slate-400 uppercase tracking-wider block mb-1">Service Type</label>
-                  <select value={tempTripForm.req} onChange={e => setTempTripForm({...tempTripForm, req: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-blue-500 transition-all">
+                  <select value={tempTripForm.req} onChange={e => setTempTripForm({...tempTripForm, req: e.target.value})} className="w-full px-3 py-2 card-premiumtext-sm font-bold focus:outline-none focus:border-blue-500 transition-all">
                     <option value="AMB">AMB</option>
                     <option value="HIP">HIP</option>
                     <option value="CS-HIP">CS-HIP</option>
@@ -1713,7 +1713,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 </div>
                 <div>
                   <label className="text-micro font-bold text-slate-400 uppercase tracking-wider block mb-1">Est. Miles</label>
-                  <input type="number" value={tempTripForm.miles} onChange={e => setTempTripForm({...tempTripForm, miles: e.target.value})} placeholder="5.0" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-blue-500 transition-all" />
+                  <input type="number" value={tempTripForm.miles} onChange={e => setTempTripForm({...tempTripForm, miles: e.target.value})} placeholder="5.0" className="w-full px-3 py-2 card-premiumtext-sm font-bold focus:outline-none focus:border-blue-500 transition-all" />
                 </div>
               </div>
 

@@ -147,7 +147,7 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
         </form>
       </div>
       <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
-        <button type="submit" form="tripEditForm" className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-500/20 active:scale-[0.98] transition">{driverMode ? 'Save & Confirm Password' : 'Save Changes'}</button>
+        <button type="submit" form="tripEditForm" className="w-full py-3.5 btn-gradient-primary font-bold text-sm shadow-lg shadow-blue-500/20 active:scale-[0.98] transition">{driverMode ? 'Save & Confirm Password' : 'Save Changes'}</button>
       </div>
     </div>
   );

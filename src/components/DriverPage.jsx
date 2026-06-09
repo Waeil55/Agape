@@ -2359,7 +2359,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
           {/* Trip Cards */}
           {orderedTrips.length === 0 && assignedRoutePlanStops.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-6 sm:p-8 lg:p-12 text-center mt-2">
+            <div className="card-premium p-6 sm:p-8 lg:p-12 text-center mt-2">
               <div className="w-20 h-20 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
                 <CheckCircle2 size={36} className="text-emerald-400" />
               </div>
@@ -2412,7 +2412,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-slate-50 flex items-center justify-center z-10">
                         <span className="text-[9px] font-black text-slate-500">{index + 1}</span>
                       </div>
-                      <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between gap-3">
+                      <div className="card-premiumpx-3 py-2 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className={`w-1.5 h-4 rounded-full ${stopType === 'DO' ? 'bg-orange-400' : 'bg-blue-400'}`} />
@@ -2596,7 +2596,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-slate-50 flex items-center justify-center z-10">
                         <span className="text-[9px] font-black text-slate-500">{index + 1}</span>
                       </div>
-                      <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between">
+                      <div className="card-premiumpx-3 py-2 flex items-center justify-between">
                          <div className="flex items-center gap-2 min-w-0">
                            <div className={`w-1.5 h-4 rounded-full ${step.type === 'PU' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
                            <span className="text-sm font-bold text-slate-800 truncate">{trip.patient}</span>
@@ -3300,7 +3300,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
+            <div className="card-premium p-4 space-y-3">
               <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500">Trip Information</h3>
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
@@ -3323,7 +3323,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Smart Contacts Section */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
+            <div className="card-premium p-4 space-y-3">
               <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2"><PhoneForwarded size={14} /> Contacts</h3>
               {(() => {
                 const contacts = getContactsForTrip(showTripDetails);
@@ -3386,7 +3386,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               )}
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
+            <div className="card-premium p-4 space-y-3">
               <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500">Timeline & Odometer</h3>
               <div className="space-y-2.5">
                 {showTripDetails.startTime && (
@@ -3440,7 +3440,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
+            <div className="card-premium p-4 space-y-3">
               <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500">Actions</h3>
               <div className="flex gap-2">
                 <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={12} /> Google Maps</button>
@@ -3534,7 +3534,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <p className="text-slate-500 text-xs font-semibold mt-0.5">Review past trips and activity</p>
               </div>
               {allHistory.length > 0 && (
-                <button onClick={exportDailyLog} className="px-4 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 text-xs">
+                <button onClick={exportDailyLog} className="px-4 h-10 btn-gradient-primary font-bold transition-all flex items-center gap-1.5 text-xs">
                   <Download size={12} /> Export
                 </button>
               )}
@@ -3545,10 +3545,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="flex-1 relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input type="text" placeholder="Search patient, booking ID, driver, vehicle..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-400" />
+                className="w-full pl-9 pr-8 py-2 card-premiumtext-xs font-medium outline-none focus:border-blue-400" />
               {historySearch && <button onClick={() => setHistorySearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 min-h-[44px] min-w-[44px] flex items-center justify-center"><X size={14} /></button>}
             </div>
-            <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-xl shrink-0">
+            <div className="flex items-center gap-0.5 card-premiumshrink-0">
               <button onClick={() => { const d = new Date(historyDate + 'T12:00:00'); d.setDate(d.getDate() - 1); setHistoryDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); }}
                 className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-l-xl hover:bg-slate-50 transition">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -3588,7 +3588,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               { id: 'rerouted', label: 'Rerouted' },
             ].map(f => (
               <button key={f.id} onClick={() => setHistoryFilter(f.id)}
-                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${historyFilter === f.id ? f.id === 'rerouted' ? 'bg-purple-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold'}`}>
+                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${historyFilter === f.id ? f.id === 'rerouted' ? 'bg-purple-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 font-semibold'}`}>
                 {f.label} ({f.id === 'all' ? allHistory.length : f.id === 'rerouted' ? reroutedTrips.length : f.id === 'completed' ? completedTrips.length : f.id === 'noshow' ? noShowTrips.length : cancelledTrips.length})
               </button>
             ))}
@@ -3596,7 +3596,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
           <div className="space-y-2">
             {filteredHistory.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-6 sm:p-8 lg:p-12 text-center">
+              <div className="card-premium p-6 sm:p-8 lg:p-12 text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
                   <Clock size={28} className="text-slate-300" />
                 </div>
@@ -3739,8 +3739,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         </table>
                       </div>
                       <div className="flex gap-2 mt-3">
-                        <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><FileText size={12} /> Details</button>
-                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><RotateCcw size={12} /> Restore</button>
+                        <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><FileText size={12} /> Details</button>
+                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><RotateCcw size={12} /> Restore</button>
                       </div>
                     </div>
                     )}
@@ -3796,7 +3796,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Connection Status */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 sm:p-5">
+            <div className="card-premium p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isOnline ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
@@ -3812,7 +3812,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Analytics */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="card-premium">
               <button onClick={() => setShowAnalytics(!showAnalytics)} className="w-full p-4 sm:p-5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -3872,7 +3872,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Odometer */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 sm:p-5">
+            <div className="card-premium p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Odometer</p>
@@ -3920,7 +3920,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Vehicle Info */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 sm:p-5">
+            <div className="card-premium p-4 sm:p-5">
               <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-3">Vehicle Info</p>
               <div className="space-y-2.5 text-sm">
                 {[
@@ -3939,7 +3939,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Navigation App */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 sm:p-5">
+            <div className="card-premium p-4 sm:p-5">
               <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Route size={16} /> Preferred Navigation App</div>
               <div className="grid grid-cols-1 gap-2">
                 {[
@@ -3961,7 +3961,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Appearance */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 sm:p-5">
+            <div className="card-premium p-4 sm:p-5">
               <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Sun size={16} /> Theme</div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                 {[
@@ -4003,7 +4003,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Notifications & GPS */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="card-premium">
               <div className="p-4">
                 <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
@@ -4043,7 +4043,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Sign Out */}
-            <button onClick={() => onLogout?.()} className="w-full flex items-center justify-between px-4 py-3.5 bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:bg-rose-50/50 transition-all">
+            <button onClick={() => onLogout?.()} className="w-full flex items-center justify-between px-4 py-3.5 card-premium hover:bg-rose-50/50 transition-all">
               <div className="flex items-center gap-3">
                 <LogOut size={17} className="text-rose-400" />
                 <span className="font-medium text-sm text-rose-600">Sign Out</span>
@@ -4202,7 +4202,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   setPasswordPrompt({ type: 'restore', trip: restorePrompt.trip, selectedLegIds: [...selectedLegsForAction] });
                 }}
                 disabled={selectedLegsForAction.size === 0}
-                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition disabled:opacity-40 cursor-pointer">
+                className="w-full py-3.5 btn-gradient-primary font-bold text-sm transition disabled:opacity-40 cursor-pointer">
                 {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `Restore ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
               </button>
             </div>
@@ -4421,7 +4421,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <button
                             type="button"
                             onClick={() => { handleSMS(contact.phone, contact.name); setShowContactSelector(null); }}
-                            className="flex-1 h-10 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
+                            className="flex-1 h-10 btn-gradient-primary text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
                             <MessageCircle size={14} /> {actions.smsLabel}
                           </button>
                         )}
@@ -4496,7 +4496,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <p className="text-slate-500 text-xs font-semibold mb-4">{legs.length} leg{legs.length !== 1 ? 's' : ''}</p>
               <div className="space-y-2">
                 {legs.map((leg, idx) => (
-                  <div key={leg.id} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
+                  <div key={leg.id} className="card-premium p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-micro font-bold uppercase tracking-wider text-slate-500">Leg {idx + 1}</span>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${leg.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : leg.status === 'In Transit' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{leg.status}</span>
