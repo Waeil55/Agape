@@ -859,7 +859,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
       {/* ===== HEADER ===== */}
       <div className="backdrop-blur-xl bg-white/90 border-b border-slate-200/50 px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 flex flex-col lg:flex-row items-start lg:items-center justify-between flex-shrink-0 gap-3">
         <div className="flex items-center gap-3 min-w-0 w-full lg:w-auto">
-          <div className="w-10 h-10 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-200/50 flex-shrink-0" style={{ background: 'linear-gradient(135deg, #2563eb, #2563eb)' }}>
+          <div className="w-10 h-10 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-200/50 flex-shrink-0 bg-blue-600">
             <Route className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0">
@@ -916,7 +916,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
       </div>
 
       {/* ===== METRICS BAR ===== */}
-      <div className="px-3 lg:px-5 py-2 flex items-center gap-3 overflow-x-auto hide-scrollbar flex-shrink-0" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
+      <div className="px-3 lg:px-5 py-2 flex items-center gap-3 overflow-x-auto hide-scrollbar flex-shrink-0 bg-gradient-to-br from-slate-900 to-slate-800">
         <div className="flex gap-2 sm:gap-5 min-w-max">
           {[
             [MapPin, 'Stops:', routeMetrics.stops, 'text-blue-400'],
@@ -1303,7 +1303,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                         className={`relative z-10 flex gap-2 lg:gap-3 items-stretch group transition-all ${isDragging && draggedIndex === idx ? 'opacity-40 scale-95' : 'opacity-100'}`}
                       >
                         <div className="flex flex-col items-center pt-1">
-                          <div className={`w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-2xl flex items-center justify-center font-extrabold text-[11px] sm:text-[13px] border-2 sm:border-[3px] border-[#f4f7fb] shadow-sm flex-shrink-0 z-10 ${isPU ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200/50' : 'bg-rose-500 text-white shadow-lg shadow-rose-200/50'}`}>
+                          <div className={`w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-2xl flex items-center justify-center font-extrabold text-[11px] sm:text-[13px] border-2 sm:border-[3px] border-slate-50 shadow-sm flex-shrink-0 z-10 ${isPU ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200/50' : 'bg-rose-500 text-white shadow-lg shadow-rose-200/50'}`}>
                             {idx + 1}
                           </div>
                         </div>

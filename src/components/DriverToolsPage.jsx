@@ -520,7 +520,7 @@ Return ONLY the JSON object. No markdown.`;
                     <div className="relative shrink-0">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[9px] font-extrabold ${
                         isOrigin
-                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
                           : stop.stopType === 'PU'
                             ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200'
                             : stop.stopType === 'DO'
@@ -544,7 +544,7 @@ Return ONLY the JSON object. No markdown.`;
                         placeholder={isOrigin ? 'Starting point (GPS or address)...' : `Stop ${stop.letter}...`}
                         className={`w-full h-10 px-3 rounded-xl text-[12px] font-semibold border transition-all outline-none ${
                           isOrigin
-                            ? 'bg-indigo-50/50 border-indigo-200 text-indigo-900 placeholder-indigo-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
+                            ? 'bg-blue-50/50 border-blue-200 text-blue-900 placeholder-blue-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
                             : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
                         }`}
                       />
@@ -655,7 +655,7 @@ Return ONLY the JSON object. No markdown.`;
                 <ExternalLink size={11} /> Maps
               </button>
               <button onClick={handleSendToSequencer}
-                className="h-10 bg-indigo-600 text-white rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 active:bg-indigo-700 transition shadow-md shadow-indigo-200 cursor-pointer">
+                className="h-10 bg-blue-600 text-white rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 active:bg-blue-700 transition shadow-md shadow-blue-200 cursor-pointer">
                 <Route size={11} /> Sequencer
               </button>
             </div>
@@ -707,7 +707,7 @@ const DriverToolsPage = ({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pb-28 px-3 pt-2 space-y-3" style={{ background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)' }}>
+    <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pb-28 px-3 pt-2 space-y-3 bg-gradient-to-b from-slate-50 to-slate-100">
 
       {/* Route Plan */}
       <RoutePlanSection

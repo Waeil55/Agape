@@ -223,7 +223,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
         const timeUrg = getTimeUrgency(task.time, task.status);
         return (
         <>
-          <div className="fixed inset-0 flex flex-col" style={{ zIndex: 50, background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)' }}>
+          <div className="fixed inset-0 flex flex-col bg-gradient-to-b from-slate-50 to-slate-100" style={{ zIndex: 50 }}>
 
             {/* === GLASS HEADER === */}
             <div className="backdrop-blur-xl bg-white/80 border-b border-slate-200/50 px-4 py-3 flex items-center gap-3 shrink-0">
@@ -256,7 +256,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
             <div className="flex-1 overflow-y-auto overscroll-contain">
 
               {/* --- ROUTE CARD --- */}
-              <div className="mx-4 sm:mx-5 mt-4 rounded-2xl overflow-hidden shadow-2xl shadow-slate-900/10" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)' }}>
+              <div className="mx-4 sm:mx-5 mt-4 rounded-2xl overflow-hidden shadow-2xl shadow-slate-900/10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
                 <div className="relative p-5 pb-4">
                   {/* Decorative dots */}
                   <div className="absolute top-4 right-4 flex gap-1">
@@ -466,7 +466,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
             {/* === MORE BOTTOM SHEET === */}
             {showMoreSheet && (
               <div className="fixed inset-0 flex items-end justify-center" style={{ zIndex: 60 }} onClick={() => setShowMoreSheet(false)}>
-                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
                 <div className="relative w-full max-w-lg bg-white rounded-t-3xl shadow-2xl animate-slide-up"
                   onClick={(e) => e.stopPropagation()}>
                   {/* Handle */}

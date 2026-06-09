@@ -2360,7 +2360,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           {/* Trip Cards */}
           {orderedTrips.length === 0 && assignedRoutePlanStops.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-6 sm:p-8 lg:p-12 text-center mt-2">
-              <div className="w-20 h-20 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-[2rem] flex items-center justify-center mx-auto mb-5 shadow-inner">
+              <div className="w-20 h-20 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
                 <CheckCircle2 size={36} className="text-emerald-400" />
               </div>
               <h3 className="text-lg sm:text-xl font-black text-slate-900">All Clear</h3>
@@ -2388,7 +2388,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     : 'text-emerald-700';
                   return (
                     <div key={`${getRoutePlanStopKey(stop)}-done`} className="relative pl-12 pr-2">
-                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-slate-50 flex items-center justify-center z-10">
                         <Check size={10} className="text-white font-black" />
                       </div>
                       <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl px-3 py-2 opacity-80 flex items-center gap-2">
@@ -2409,7 +2409,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isUpcoming) {
                   return (
                     <div key={`${getRoutePlanStopKey(stop)}-upcoming`} className="relative pl-12 pr-2 opacity-55">
-                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-slate-50 flex items-center justify-center z-10">
                         <span className="text-[9px] font-black text-slate-500">{index + 1}</span>
                       </div>
                       <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between gap-3">
@@ -2447,7 +2447,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 return (
                   <div key={`${getRoutePlanStopKey(stop)}-current`} className="relative pl-12 pr-2 my-4">
-                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-blue-900 border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-blue-300/50">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-blue-900 border-4 border-slate-50 flex items-center justify-center z-10 shadow-md shadow-blue-300/50">
                       <span className="text-xs font-black text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200">
@@ -2579,7 +2579,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isCompleted) {
                   return (
                     <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2">
-                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-slate-50 flex items-center justify-center z-10">
                         <Check size={10} className="text-white font-black" />
                       </div>
                       <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl px-3 py-2 opacity-60 flex items-center gap-2">
@@ -2593,7 +2593,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isUpcoming) {
                   return (
                     <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 opacity-50">
-                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-slate-50 flex items-center justify-center z-10">
                         <span className="text-[9px] font-black text-slate-500">{index + 1}</span>
                       </div>
                       <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between">
@@ -2638,7 +2638,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 return (
                   <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 my-4">
-                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-blue-500 border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-blue-300/50">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-blue-500 border-4 border-slate-50 flex items-center justify-center z-10 shadow-md shadow-blue-300/50">
                       <span className="text-xs font-black text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
@@ -3597,7 +3597,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="space-y-2">
             {filteredHistory.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-6 sm:p-8 lg:p-12 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner">
+                <div className="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
                   <Clock size={28} className="text-slate-300" />
                 </div>
                 <h3 className="text-base sm:text-lg font-black text-slate-900">{historySearch ? 'No matching trips' : 'No history'}</h3>

@@ -156,7 +156,7 @@ const UnifiedRoutePlanner = ({
   }, [routeTemplates]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-x-hidden" style={{ background: '#f1f5f9' }}>
+    <div className="flex-1 flex flex-col min-h-0 overflow-x-hidden bg-slate-100">
 
       {/* === TOP HEADER === */}
       <div className="shrink-0 bg-white border-b border-slate-200/80 shadow-sm">
@@ -240,7 +240,7 @@ const UnifiedRoutePlanner = ({
 
             {/* Smart Route */}
             {aiSequence && aiSequence.length >= 2 && !guidedMode && (
-              <div className="mb-3 rounded-2xl overflow-hidden shadow-lg shadow-indigo-900/10" style={{ background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)' }}>
+              <div className="mb-3 rounded-2xl overflow-hidden shadow-lg shadow-blue-900/10 bg-gradient-to-br from-blue-600 to-blue-500">
                 <div className="p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <BrainCircuit size={14} className="text-white/80" />
