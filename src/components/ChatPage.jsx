@@ -45,9 +45,8 @@ const fmtDate = (ts) => {
 
 const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [], onSwitchToDispatch }) => {
   const [activeTab, setActiveTab] = useState('team');
-  const isMobile = useMobile();
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-[#F3F4F6] overflow-hidden">
+    <div className="flex flex-col min-h-0 flex-1 bg-[#F3F4F6] overflow-hidden">
       {role !== 'driver' && (
         <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2 flex gap-1 z-10">
           <button onClick={() => setActiveTab('team')}
@@ -60,7 +59,7 @@ const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [
           </button>
         </div>
       )}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden">
         {role === 'driver' || activeTab === 'team' ? (
           <TeamChat currentUser={currentUser} role={role} />
         ) : (
@@ -85,13 +84,16 @@ const TeamChat = ({ currentUser, role }) => {
   const msgsEndRef = useRef(null);
   const inputRef = useRef(null);
   const prevConvsRef = useRef({});
+  const activeConvRef = useRef(null);
+
+  useEffect(() => { activeConvRef.current = activeConv; }, [activeConv]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'users'), snap => {
       const arr = [];
       snap.forEach(d => { const data = d.data(); if (data.email && data.email !== currentUser) arr.push(data.email); });
       setAllUsers(arr);
-    });
+    }, (err) => console.error('Users listener error:', err));
     return () => unsub();
   }, [currentUser]);
 
@@ -99,7 +101,7 @@ const TeamChat = ({ currentUser, role }) => {
     let isFirst = true;
     const unsub = onSnapshot(doc(db, 'chatData/conversations'), snap => {
       if (!snap.exists()) {
-        setDoc(doc(db, 'chatData/conversations'), { conversations: {} }, { merge: true }).catch(() => {});
+        setDoc(doc(db, 'chatData/conversations'), { conversations: {} }, { merge: true }).catch((e) => console.error('Failed to init chatData:', e));
         setConversations([]);
         return;
       }
@@ -115,7 +117,8 @@ const TeamChat = ({ currentUser, role }) => {
       if (!isFirst) {
         convs.forEach(conv => {
           const prev = prevConvsRef.current[conv.id];
-          if (prev && prev.lastMessage?.text !== conv.lastMessage?.text && conv.lastMessage?.sender !== currentUser && (!activeConv || activeConv.id !== conv.id)) {
+          const curActive = activeConvRef.current;
+          if (prev && prev.lastMessage?.text !== conv.lastMessage?.text && conv.lastMessage?.sender !== currentUser && (!curActive || curActive.id !== conv.id)) {
             try { playMessageSound(); } catch {}
           }
           prevConvsRef.current[conv.id] = { ...conv };
@@ -129,9 +132,9 @@ const TeamChat = ({ currentUser, role }) => {
         return { ...conv, unreadCount: last.sender !== currentUser && !(last.readBy || []).includes(currentUser) ? 1 : 0 };
       });
       setConversations(withUnread);
-    });
+    }, (err) => console.error('Conversations listener error:', err));
     return () => unsub();
-  }, [currentUser, role, activeConv?.id]);
+  }, [currentUser, role]);
 
   useEffect(() => {
     if (!activeConv?.id) { setMessages([]); return; }
@@ -157,10 +160,12 @@ const TeamChat = ({ currentUser, role }) => {
       });
       msgs.sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));
       setMessages(msgs);
-      updateDoc(doc(db, 'chatData/conversations'), {
-        [`conversations.${activeConv.id}.lastMessage.readBy`]: [...(activeConv.lastMessage?.readBy || []), currentUser]
-      }).catch(() => {});
-    });
+      if (activeConvRef.current?.id === activeConv.id) {
+        updateDoc(doc(db, 'chatData/conversations'), {
+          [`conversations.${activeConv.id}.lastMessage.readBy`]: [...(activeConv.lastMessage?.readBy || []), currentUser]
+        }).catch(() => {});
+      }
+    }, (err) => console.error('Messages listener error:', err));
     return () => unsub();
   }, [activeConv?.id, currentUser]);
 
@@ -185,13 +190,17 @@ const TeamChat = ({ currentUser, role }) => {
     setSending(true);
     try {
       await addDoc(collection(db, 'chat_messages'), {
-        conversationId: activeConv.id, text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp()
+        conversationId: activeConv.id,
+        text: msg,
+        sender: currentUser,
+        senderRole: role,
+        timestamp: serverTimestamp(),
       });
-      updateDoc(doc(db, 'chatData/conversations'), {
+      await updateDoc(doc(db, 'chatData/conversations'), {
         [`conversations.${activeConv.id}.lastMessage`]: {
           text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp(), readBy: [currentUser]
         }
-      }).catch(() => {});
+      });
     } catch (err) {
       console.error('Send failed:', err);
       setText(msg);
@@ -232,132 +241,132 @@ const TeamChat = ({ currentUser, role }) => {
   const showList = isMobile ? !activeConv : true;
   const showChat = isMobile ? !!activeConv : true;
 
-  const renderList = () => (
-    <div className="flex flex-col h-full bg-white">
-      <div className="shrink-0 border-b border-slate-200 px-4 py-3">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-black text-slate-900">Messages</h2>
-          <button onClick={() => setShowNew(true)} className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 active:scale-95 transition">
-            <Plus size={16} />
-          </button>
-        </div>
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search"
-            className="w-full pl-9 pr-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20" />
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {filteredConvs.length === 0 ? (
-          <div className="p-8 text-center text-slate-400">
-            <MessageCircle size={28} className="mx-auto mb-2 opacity-30" />
-            <p className="text-sm font-bold">{search ? 'No results' : 'No conversations'}</p>
-            <p className="text-xs mt-1">{search ? 'Try a different search.' : 'Tap + to start a new chat.'}</p>
-          </div>
-        ) : (
-          filteredConvs.map(c => (
-            <button key={c.id} onClick={() => { setActiveConv(c); inputRef.current?.focus(); }}
-              className={`w-full text-left px-4 py-3 flex items-center gap-3 border-b border-slate-100 transition ${activeConv?.id === c.id ? 'bg-blue-50' : 'active:bg-slate-50'}`}>
-              <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${c.unreadCount > 0 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                {convLabel(c).charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <p className={`text-sm truncate ${c.unreadCount > 0 ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>{convLabel(c)}</p>
-                  {c.lastMessage?.timestamp && <span className="text-[10px] text-slate-400 shrink-0 ml-2">{fmtDate(c.lastMessage.timestamp)}</span>}
-                </div>
-                <div className="flex items-center justify-between mt-0.5">
-                  <p className="text-xs text-slate-400 truncate">
-                    {c.lastMessage?.sender === currentUser ? 'You: ' : ''}{c.lastMessage?.text || 'No messages'}
-                  </p>
-                  {c.unreadCount > 0 && <span className="ml-2 w-[18px] h-[18px] bg-blue-600 text-[10px] text-white rounded-full flex items-center justify-center font-bold shrink-0">1</span>}
-                </div>
-              </div>
-            </button>
-          ))
-        )}
-      </div>
-    </div>
-  );
-
-  const renderChat = () => activeConv ? (
-    <div className="flex flex-col h-full bg-[#F3F4F6]">
-      <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2.5 flex items-center gap-3">
-        {isMobile && (
-          <button onClick={() => setActiveConv(null)} className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg">
-            <ArrowLeft size={20} />
-          </button>
-        )}
-        <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0">
-          {convLabel(activeConv).charAt(0).toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-sm text-slate-900 truncate">{convLabel(activeConv)}</p>
-          <p className="text-[10px] text-slate-400">{activeConv.type === 'group' ? `${activeConv.participants?.length || 0} members` : 'Direct message'}</p>
-        </div>
-        <button onClick={() => handleDeleteConv(activeConv.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-        </button>
-      </div>
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
-        {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-400">
-            <div className="text-center">
-              <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-3">
-                <MessageCircle size={22} className="text-slate-300" />
-              </div>
-              <p className="text-sm font-bold text-slate-600">No messages yet</p>
-              <p className="text-xs mt-1 text-slate-400">Say hello!</p>
+  return (
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      {showList && (
+        <div className={`${isMobile ? 'w-full' : 'w-80 shrink-0 border-r border-slate-200'} flex flex-col min-h-0`}>
+          <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-black text-slate-900">Messages</h2>
+              <button onClick={() => setShowNew(true)} className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 active:scale-95 transition">
+                <Plus size={16} />
+              </button>
+            </div>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search"
+                className="w-full pl-9 pr-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20" />
             </div>
           </div>
-        ) : (
-          messages.map((msg) => {
-            const me = msg.sender === currentUser;
-            return (
-              <div key={msg.id} className={`flex ${me ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] px-3.5 py-2 text-sm leading-relaxed ${
-                  me ? 'bg-blue-600 text-white rounded-2xl rounded-br-md' : 'bg-white text-slate-800 rounded-2xl rounded-bl-md shadow-sm'
-                }`}>
-                  {!me && <p className="text-[10px] font-bold text-blue-600 mb-0.5">{msg.sender?.split('@')[0]}</p>}
-                  <p className="break-words">{msg.text}</p>
-                  <p className={`text-[10px] mt-1 flex items-center gap-1 ${me ? 'text-blue-200 justify-end' : 'text-slate-400'}`}>
-                    {fmtTime(msg.timestamp)}
-                    {me && <CheckCheck size={10} />}
-                  </p>
-                </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {filteredConvs.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                <MessageCircle size={28} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm font-bold">{search ? 'No results' : 'No conversations'}</p>
+                <p className="text-xs mt-1">{search ? 'Try a different search.' : 'Tap + to start a new chat.'}</p>
               </div>
-            );
-          })
-        )}
-        <div ref={msgsEndRef} />
-      </div>
-      <div className="shrink-0 bg-white border-t border-slate-200 px-3 py-2.5 safe-bottom">
-        <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="flex items-center gap-2">
-          <input ref={inputRef} type="text" placeholder="Message" value={text} onChange={e => setText(e.target.value)} onKeyDown={handleKeyDown}
-            className="flex-1 bg-slate-100 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition min-h-[40px] max-h-[40px]" />
-          <button type="submit" disabled={!text.trim() || sending}
-            className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 active:scale-95 transition disabled:opacity-40 shrink-0">
-            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} fill="currentColor" />}
-          </button>
-        </form>
-      </div>
-    </div>
-  ) : (
-    <div className="flex items-center justify-center h-full text-slate-400">
-      <div className="text-center">
-        <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-3">
-          <MessageCircle size={28} className="text-slate-300" />
+            ) : (
+              filteredConvs.map(c => (
+                <button key={c.id} onClick={() => { setActiveConv(c); inputRef.current?.focus(); }}
+                  className={`w-full text-left px-4 py-3 flex items-center gap-3 border-b border-slate-100 transition ${activeConv?.id === c.id ? 'bg-blue-50' : 'active:bg-slate-50'}`}>
+                  <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${c.unreadCount > 0 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                    {convLabel(c).charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className={`text-sm truncate ${c.unreadCount > 0 ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>{convLabel(c)}</p>
+                      {c.lastMessage?.timestamp && <span className="text-[10px] text-slate-400 shrink-0 ml-2">{fmtDate(c.lastMessage.timestamp)}</span>}
+                    </div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className="text-xs text-slate-400 truncate">
+                        {c.lastMessage?.sender === currentUser ? 'You: ' : ''}{c.lastMessage?.text || 'No messages'}
+                      </p>
+                      {c.unreadCount > 0 && <span className="ml-2 w-[18px] h-[18px] bg-blue-600 text-[10px] text-white rounded-full flex items-center justify-center font-bold shrink-0">1</span>}
+                    </div>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
         </div>
-        <p className="text-sm font-bold text-slate-700">Select a chat</p>
-        <p className="text-xs mt-1 text-slate-400">Choose a conversation or start a new one.</p>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="flex h-full overflow-hidden">
-      {showList && <div className={isMobile ? 'w-full' : 'w-80 shrink-0 border-r border-slate-200'}>{renderList()}</div>}
-      {showChat && <div className="flex-1 min-w-0">{renderChat()}</div>}
+      )}
+      {showChat && (
+        <div className="min-h-0 flex-1 flex flex-col">
+          {activeConv ? (
+            <div className="flex flex-col min-h-0 flex-1 bg-[#F3F4F6]">
+              <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2.5 flex items-center gap-3">
+                {isMobile && (
+                  <button onClick={() => setActiveConv(null)} className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg">
+                    <ArrowLeft size={20} />
+                  </button>
+                )}
+                <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0">
+                  {convLabel(activeConv).charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-sm text-slate-900 truncate">{convLabel(activeConv)}</p>
+                  <p className="text-[10px] text-slate-400">{activeConv.type === 'group' ? `${activeConv.participants?.length || 0} members` : 'Direct message'}</p>
+                </div>
+                <button onClick={() => handleDeleteConv(activeConv.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 space-y-1">
+                {messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-slate-400">
+                    <div className="text-center">
+                      <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-3">
+                        <MessageCircle size={22} className="text-slate-300" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-600">No messages yet</p>
+                      <p className="text-xs mt-1 text-slate-400">Say hello!</p>
+                    </div>
+                  </div>
+                ) : (
+                  messages.map((msg) => {
+                    const me = msg.sender === currentUser;
+                    return (
+                      <div key={msg.id} className={`flex ${me ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[75%] px-3.5 py-2 text-sm leading-relaxed ${
+                          me ? 'bg-blue-600 text-white rounded-2xl rounded-br-md' : 'bg-white text-slate-800 rounded-2xl rounded-bl-md shadow-sm'
+                        }`}>
+                          {!me && <p className="text-[10px] font-bold text-blue-600 mb-0.5">{msg.sender?.split('@')[0]}</p>}
+                          <p className="break-words">{msg.text}</p>
+                          <p className={`text-[10px] mt-1 flex items-center gap-1 ${me ? 'text-blue-200 justify-end' : 'text-slate-400'}`}>
+                            {fmtTime(msg.timestamp)}
+                            {me && <CheckCheck size={10} />}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={msgsEndRef} />
+              </div>
+              <div className="shrink-0 bg-white border-t border-slate-200 px-3 py-2.5 safe-bottom">
+                <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="flex items-center gap-2">
+                  <input ref={inputRef} type="text" placeholder="Message" value={text} onChange={e => setText(e.target.value)} onKeyDown={handleKeyDown}
+                    className="flex-1 bg-slate-100 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition min-h-[40px] max-h-[40px]" />
+                  <button type="submit" disabled={!text.trim() || sending}
+                    className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 active:scale-95 transition disabled:opacity-40 shrink-0">
+                    {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} fill="currentColor" />}
+                  </button>
+                </form>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center flex-1 text-slate-400">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-3">
+                  <MessageCircle size={28} className="text-slate-300" />
+                </div>
+                <p className="text-sm font-bold text-slate-700">Select a chat</p>
+                <p className="text-xs mt-1 text-slate-400">Choose a conversation or start a new one.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {showNew && (
         <div className="fixed inset-0 z-[120] bg-black/50 flex items-center justify-center p-4" onClick={() => { setShowNew(false); setSelected([]); }}>
           <div className="bg-white rounded-2xl w-full max-w-sm p-5 relative z-10 shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -415,7 +424,6 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
   const [newSmsText, setNewSmsText] = useState('');
   const [newSmsSending, setNewSmsSending] = useState(false);
   const [aiSuggestedReply, setAiSuggestedReply] = useState(null);
-  const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
   const isMobile = useMobile();
   const msgsEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -431,13 +439,6 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
     });
     return map;
   }, [trips]);
-
-  const resolveClient = useCallback((phone) => {
-    const norm = normalizePhone(phone);
-    const trip = norm ? phoneToTrip[norm] : null;
-    if (trip?.patient) return { name: trip.patient, tripId: trip.id || trip.tripId, trip };
-    return { name: norm || 'Unknown', tripId: null, trip: null };
-  }, [phoneToTrip]);
 
   useEffect(() => {
     let cancelled = false;
@@ -512,13 +513,13 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
 
   const handleNewSms = async () => {
     const phone = newSmsPhone.trim();
-    const text = newSmsText.trim();
-    if (!phone || !text || newSmsSending) return;
+    const smsText = newSmsText.trim();
+    if (!phone || !smsText || newSmsSending) return;
     setNewSmsSending(true);
     try {
       const functions = getFunctions();
       const sendSms = httpsCallable(functions, 'sendSms');
-      await sendSms({ to: phone, text, tripId: null });
+      await sendSms({ to: phone, text: smsText, tripId: null });
       setShowNewSms(false);
       setNewSmsPhone('');
       setNewSmsText('');
@@ -557,151 +558,151 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-[#F3F4F6]">
+      <div className="flex items-center justify-center flex-1 bg-[#F3F4F6]">
         <Loader2 size={24} className="animate-spin text-slate-400" />
       </div>
     );
   }
 
-  const renderList = () => (
-    <div className="flex flex-col h-full bg-white">
-      <div className="shrink-0 border-b border-slate-200 px-4 py-3">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-black text-slate-900">Clients</h2>
-          <button onClick={() => setShowNewSms(true)} className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 active:scale-95 transition">
-            <Plus size={16} />
-          </button>
-        </div>
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search"
-            className="w-full pl-9 pr-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20" />
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {filteredConvs.length === 0 ? (
-          <div className="p-8 text-center text-slate-400">
-            <MessageCircle size={28} className="mx-auto mb-2 opacity-30" />
-            <p className="text-sm font-bold">{search ? 'No results' : 'No client conversations'}</p>
-            <p className="text-xs mt-1">{search ? 'Try a different search.' : 'Send an SMS to start.'}</p>
-          </div>
-        ) : (
-          filteredConvs.map(conv => {
-            const isNamed = conv.clientName && conv.clientName !== conv.phone && !conv.clientName.startsWith('+');
-            return (
-              <button key={conv.phone} onClick={() => { openConversation(conv); inputRef.current?.focus(); }}
-                className={`w-full text-left px-4 py-3 flex items-center gap-3 border-b border-slate-100 transition ${activeConv?.phone === conv.phone ? 'bg-blue-50' : 'active:bg-slate-50'}`}>
-                <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${isNamed ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
-                  {isNamed ? conv.clientName.charAt(0).toUpperCase() : (conv.phone || '').replace(/\D/g, '').slice(-2) || '?'}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{isNamed ? conv.clientName : conv.phone}</p>
-                    {conv.lastMessage?.timestamp && <span className="text-[10px] text-slate-400 shrink-0">{fmtDate(conv.lastMessage.timestamp)}</span>}
-                  </div>
-                  <p className="text-xs text-slate-400 truncate mt-0.5">
-                    {conv.lastMessage?.direction === 'outbound' ? 'You: ' : ''}{conv.lastMessage?.text || 'No messages'}
-                  </p>
-                  {conv.tripId && <p className="text-[10px] text-blue-500 font-medium mt-0.5">Trip #{String(conv.tripId).slice(-6)}</p>}
-                </div>
+  return (
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      {showList && (
+        <div className={`${isMobile ? 'w-full' : 'w-80 shrink-0 border-r border-slate-200'} flex flex-col min-h-0`}>
+          <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-black text-slate-900">Clients</h2>
+              <button onClick={() => setShowNewSms(true)} className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 active:scale-95 transition">
+                <Plus size={16} />
               </button>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-
-  const renderChat = () => activeConv ? (
-    <div className="flex flex-col h-full bg-[#F3F4F6]">
-      <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2.5 flex items-center gap-3">
-        {isMobile && (
-          <button onClick={() => { setActiveConv(null); setClientMessages([]); }} className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg">
-            <ArrowLeft size={20} />
-          </button>
-        )}
-        <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold shrink-0">
-          {convInitial}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-sm text-slate-900 truncate">{convDisplayName}</p>
-          <p className="text-[10px] text-slate-400">{activeConv.phone}</p>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
-        {clientMessages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-400">
-            <div className="text-center">
-              <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-3">
-                <MessageCircle size={22} className="text-slate-300" />
-              </div>
-              <p className="text-sm font-bold text-slate-600">No messages</p>
+            </div>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search"
+                className="w-full pl-9 pr-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20" />
             </div>
           </div>
-        ) : (
-          clientMessages.map((m, i) => {
-            const isOutbound = m.direction === 'outbound';
-            const prev = i > 0 ? clientMessages[i - 1] : null;
-            const showDateHeader = !prev || fmtDate(prev.timestamp) !== fmtDate(m.timestamp);
-            return (
-              <React.Fragment key={m.id || i}>
-                {showDateHeader && <p className="text-[10px] font-bold text-slate-400 text-center pt-2 pb-1">{fmtDate(m.timestamp)}</p>}
-                <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${isOutbound ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white text-slate-800 rounded-bl-md shadow-sm'}`}>
-                    <p className="text-xs leading-relaxed whitespace-pre-wrap break-words">{m.text}</p>
-                    <p className={`text-[10px] mt-1 flex items-center gap-1 ${isOutbound ? 'text-blue-200 justify-end' : 'text-slate-400'}`}>
-                      {fmtTime(m.timestamp)}
-                      {isOutbound && (m.status === 'sent' || m.status === 'delivered') && <CheckCheck size={9} />}
-                    </p>
-                  </div>
-                </div>
-              </React.Fragment>
-            );
-          })
-        )}
-        <div ref={msgsEndRef} />
-      </div>
-      {aiSuggestedReply && (
-        <div className="px-4 py-2 bg-indigo-50 border-t border-indigo-100 shrink-0">
-          <div className="flex items-start gap-2">
-            <div className="flex-1">
-              <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1">AI Suggested Reply</p>
-              <p className="text-xs text-slate-700 bg-white rounded-lg p-2 border border-indigo-100">{aiSuggestedReply.suggestedReply}</p>
-              <div className="flex gap-2 mt-1.5">
-                <button onClick={() => { setReplyText(aiSuggestedReply.suggestedReply); setAiSuggestedReply(null); }} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold">Use Reply</button>
-                <button onClick={() => setAiSuggestedReply(null)} className="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-bold">Dismiss</button>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {filteredConvs.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                <MessageCircle size={28} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm font-bold">{search ? 'No results' : 'No client conversations'}</p>
+                <p className="text-xs mt-1">{search ? 'Try a different search.' : 'Send an SMS to start.'}</p>
               </div>
-            </div>
+            ) : (
+              filteredConvs.map(conv => {
+                const isNamed = conv.clientName && conv.clientName !== conv.phone && !conv.clientName.startsWith('+');
+                return (
+                  <button key={conv.phone} onClick={() => { openConversation(conv); inputRef.current?.focus(); }}
+                    className={`w-full text-left px-4 py-3 flex items-center gap-3 border-b border-slate-100 transition ${activeConv?.phone === conv.phone ? 'bg-blue-50' : 'active:bg-slate-50'}`}>
+                    <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${isNamed ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+                      {isNamed ? conv.clientName.charAt(0).toUpperCase() : (conv.phone || '').replace(/\D/g, '').slice(-2) || '?'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{isNamed ? conv.clientName : conv.phone}</p>
+                        {conv.lastMessage?.timestamp && <span className="text-[10px] text-slate-400 shrink-0">{fmtDate(conv.lastMessage.timestamp)}</span>}
+                      </div>
+                      <p className="text-xs text-slate-400 truncate mt-0.5">
+                        {conv.lastMessage?.direction === 'outbound' ? 'You: ' : ''}{conv.lastMessage?.text || 'No messages'}
+                      </p>
+                      {conv.tripId && <p className="text-[10px] text-blue-500 font-medium mt-0.5">Trip #{String(conv.tripId).slice(-6)}</p>}
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
       )}
-      <div className="shrink-0 bg-white border-t border-slate-200 px-3 py-2.5 safe-bottom">
-        <div className="flex items-center gap-2">
-          <input ref={inputRef} value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={handleKeyDown}
-            placeholder="Message" className="flex-1 bg-slate-100 rounded-xl px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition min-h-[40px] max-h-[40px]" />
-          <button onClick={handleSend} disabled={!replyText.trim() || sending}
-            className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-95 transition disabled:opacity-40 shrink-0">
-            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          </button>
+      {showChat && (
+        <div className="min-h-0 flex-1 flex flex-col">
+          {activeConv ? (
+            <div className="flex flex-col min-h-0 flex-1 bg-[#F3F4F6]">
+              <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2.5 flex items-center gap-3">
+                {isMobile && (
+                  <button onClick={() => { setActiveConv(null); setClientMessages([]); }} className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg">
+                    <ArrowLeft size={20} />
+                  </button>
+                )}
+                <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold shrink-0">
+                  {convInitial}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-sm text-slate-900 truncate">{convDisplayName}</p>
+                  <p className="text-[10px] text-slate-400">{activeConv.phone}</p>
+                </div>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 space-y-1">
+                {clientMessages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-slate-400">
+                    <div className="text-center">
+                      <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-3">
+                        <MessageCircle size={22} className="text-slate-300" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-600">No messages</p>
+                    </div>
+                  </div>
+                ) : (
+                  clientMessages.map((m, i) => {
+                    const isOutbound = m.direction === 'outbound';
+                    const prev = i > 0 ? clientMessages[i - 1] : null;
+                    const showDateHeader = !prev || fmtDate(prev.timestamp) !== fmtDate(m.timestamp);
+                    return (
+                      <React.Fragment key={m.id || i}>
+                        {showDateHeader && <p className="text-[10px] font-bold text-slate-400 text-center pt-2 pb-1">{fmtDate(m.timestamp)}</p>}
+                        <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${isOutbound ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white text-slate-800 rounded-bl-md shadow-sm'}`}>
+                            <p className="text-xs leading-relaxed whitespace-pre-wrap break-words">{m.text}</p>
+                            <p className={`text-[10px] mt-1 flex items-center gap-1 ${isOutbound ? 'text-blue-200 justify-end' : 'text-slate-400'}`}>
+                              {fmtTime(m.timestamp)}
+                              {isOutbound && (m.status === 'sent' || m.status === 'delivered') && <CheckCheck size={9} />}
+                            </p>
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    );
+                  })
+                )}
+                <div ref={msgsEndRef} />
+              </div>
+              {aiSuggestedReply && (
+                <div className="px-4 py-2 bg-indigo-50 border-t border-indigo-100 shrink-0">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1">
+                      <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1">AI Suggested Reply</p>
+                      <p className="text-xs text-slate-700 bg-white rounded-lg p-2 border border-indigo-100">{aiSuggestedReply.suggestedReply}</p>
+                      <div className="flex gap-2 mt-1.5">
+                        <button onClick={() => { setReplyText(aiSuggestedReply.suggestedReply); setAiSuggestedReply(null); }} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold">Use Reply</button>
+                        <button onClick={() => setAiSuggestedReply(null)} className="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-bold">Dismiss</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="shrink-0 bg-white border-t border-slate-200 px-3 py-2.5 safe-bottom">
+                <div className="flex items-center gap-2">
+                  <input ref={inputRef} value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={handleKeyDown}
+                    placeholder="Message" className="flex-1 bg-slate-100 rounded-xl px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition min-h-[40px] max-h-[40px]" />
+                  <button onClick={handleSend} disabled={!replyText.trim() || sending}
+                    className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-95 transition disabled:opacity-40 shrink-0">
+                    {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center flex-1 text-slate-400">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-3">
+                  <MessageCircle size={28} className="text-slate-300" />
+                </div>
+                <p className="text-sm font-bold text-slate-700">Select a conversation</p>
+                <p className="text-xs mt-1 text-slate-400">Choose a client or send an SMS.</p>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-    </div>
-  ) : (
-    <div className="flex items-center justify-center h-full text-slate-400">
-      <div className="text-center">
-        <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-3">
-          <MessageCircle size={28} className="text-slate-300" />
-        </div>
-        <p className="text-sm font-bold text-slate-700">Select a conversation</p>
-        <p className="text-xs mt-1 text-slate-400">Choose a client or send an SMS.</p>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="flex h-full overflow-hidden">
-      {showList && <div className={isMobile ? 'w-full' : 'w-80 shrink-0 border-r border-slate-200'}>{renderList()}</div>}
-      {showChat && <div className="flex-1 min-w-0">{renderChat()}</div>}
+      )}
       {showNewSms && (
         <div className="fixed inset-0 z-[120] bg-black/50 flex items-center justify-center p-4" onClick={() => { setShowNewSms(false); setNewSmsPhone(''); setNewSmsText(''); }}>
           <div className="bg-white rounded-2xl w-full max-w-sm p-5 relative z-10 shadow-2xl" onClick={e => e.stopPropagation()}>
