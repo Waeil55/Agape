@@ -25,11 +25,11 @@ export const ROLE_LABELS = {
 export const ROLE_COLORS = {
   admin: '#2563eb',
   dispatcher: '#059669',
-  driver: '#7c3aed',
+  driver: '#2563eb',
   billing: '#dc2626',
   qa_auditor: '#f59e0b',
   fleet_manager: '#06b6d4',
-  supervisor: '#8b5cf6',
+  supervisor: '#3b82f6',
 };
 
 export const ROLE_BADGE_STYLES = {

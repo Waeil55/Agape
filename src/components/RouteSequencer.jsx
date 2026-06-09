@@ -854,7 +854,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
   };
 
   return (
-    <div className="h-full min-h-0 w-full max-w-full flex flex-col overflow-hidden bg-[#F3F4F6]">
+    <div className="h-full min-h-0 w-full max-w-full flex flex-col overflow-hidden bg-slate-100">
 
       {/* ===== HEADER ===== */}
       <div className="backdrop-blur-xl bg-white/90 border-b border-slate-200/50 px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 flex flex-col lg:flex-row items-start lg:items-center justify-between flex-shrink-0 gap-3">
@@ -1226,7 +1226,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
             )}
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 sm:p-4 lg:p-5 bg-[#F3F4F6]">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 sm:p-4 lg:p-5 bg-slate-100">
             {sequence.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400">
                 <div className="w-16 h-16 bg-white backdrop-blur rounded-3xl shadow-sm border border-slate-200/60 flex items-center justify-center mb-4">

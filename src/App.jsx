@@ -1347,7 +1347,7 @@ const App = () => {
     if (driver) {
       const updatedDrivers = drivers.map(d => d.id === driverId ? { ...d, activeMission: { id: `M-${Date.now()}`, legs, currentLegIndex: 0 } } : d);
       setDrivers(updatedDrivers);
-      addAuditLog('Mission Created', `${currentUser} created a ${legs.length}-leg mission for ${driver.name} with ${selectedTrips.length} patients.`, 'indigo');
+      addAuditLog('Mission Created', `${currentUser} created a ${legs.length}-leg mission for ${driver.name} with ${selectedTrips.length} patients.`, 'blue');
     }
     
     setSelectedTasks([]);
@@ -1452,7 +1452,7 @@ const App = () => {
             };
           }));
           const count = Object.keys(assignments).length;
-          addAuditLog('Fleet Optimized', `${currentUser || 'System'} ran AI optimization. ${count} trip${count !== 1 ? 's' : ''} assigned.`, 'indigo');
+          addAuditLog('Fleet Optimized', `${currentUser || 'System'} ran AI optimization. ${count} trip${count !== 1 ? 's' : ''} assigned.`, 'blue');
           Object.entries(assignments).forEach(([tripId]) => {
             const trip = trips.find(t => t.id === tripId);
             if (trip && notificationsEnabled) {

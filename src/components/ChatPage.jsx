@@ -46,7 +46,7 @@ const fmtDate = (ts) => {
 const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [], onSwitchToDispatch }) => {
   const [activeTab, setActiveTab] = useState('team');
   return (
-    <div className="flex flex-col min-h-0 flex-1 bg-[#F3F4F6] overflow-hidden">
+    <div className="flex flex-col min-h-0 flex-1 bg-slate-100 overflow-hidden">
       {role !== 'driver' && (
         <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2 flex gap-1 z-10">
           <button onClick={() => setActiveTab('team')}
@@ -293,7 +293,7 @@ const TeamChat = ({ currentUser, role }) => {
       {showChat && (
         <div className="min-h-0 flex-1 flex flex-col">
           {activeConv ? (
-            <div className="flex flex-col min-h-0 flex-1 bg-[#F3F4F6]">
+            <div className="flex flex-col min-h-0 flex-1 bg-slate-100">
               <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2.5 flex items-center gap-3">
                 {isMobile && (
                   <button onClick={() => setActiveConv(null)} className="p-2.5 min-h-[44px] min-w-[44px] text-slate-500 hover:bg-slate-100 rounded-lg flex items-center justify-center">
@@ -558,7 +558,7 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center flex-1 bg-[#F3F4F6]">
+      <div className="flex items-center justify-center flex-1 bg-slate-100">
         <Loader2 size={24} className="animate-spin text-slate-400" />
       </div>
     );
@@ -617,7 +617,7 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
       {showChat && (
         <div className="min-h-0 flex-1 flex flex-col">
           {activeConv ? (
-            <div className="flex flex-col min-h-0 flex-1 bg-[#F3F4F6]">
+            <div className="flex flex-col min-h-0 flex-1 bg-slate-100">
               <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2.5 flex items-center gap-3">
                 {isMobile && (
                   <button onClick={() => { setActiveConv(null); setClientMessages([]); }} className="p-2.5 min-h-[44px] min-w-[44px] text-slate-500 hover:bg-slate-100 rounded-lg flex items-center justify-center">

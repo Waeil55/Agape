@@ -1999,7 +1999,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   if (!me) {
     return (
-      <div className="flex-1 bg-[#F3F4F6] flex items-center justify-center p-8">
+      <div className="flex-1 bg-slate-100 flex items-center justify-center p-8">
         <div className="text-center">
           <div className="w-20 h-20 bg-white rounded-2xl shadow-lg flex items-center justify-center mx-auto mb-6">
             <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
@@ -2012,7 +2012,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F3F4F6] text-slate-900" style={{ fontSize: '96%' }}>
+    <div className="flex-1 flex flex-col bg-slate-100 text-slate-900" style={{ fontSize: '96%' }}>
       {activeNav === 'trips' && expandedTripId && (
         <div
           className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
@@ -2020,7 +2020,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         />
       )}
       <div
-        className="sticky top-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
+        className="sticky top-0 z-30 border-b border-slate-200/70 bg-slate-100/95 backdrop-blur-md"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="px-3 sm:px-4 lg:px-6 py-3 flex items-center gap-3">
@@ -2061,7 +2061,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== TRIPS PAGE ===== */}
       {activeNav === 'trips' && (
-        <div ref={tripsScrollRef} className="flex-1 overflow-y-auto pb-28 px-3 sm:px-4 lg:px-6 space-y-2 bg-[#F3F4F6]" style={{ overflowAnchor: 'none', scrollBehavior: 'smooth', paddingTop: 'calc(env(safe-area-inset-top) + 72px)' }}>
+        <div ref={tripsScrollRef} className="flex-1 overflow-y-auto pb-28 px-3 sm:px-4 lg:px-6 space-y-2 bg-slate-100" style={{ overflowAnchor: 'none', scrollBehavior: 'smooth', paddingTop: 'calc(env(safe-area-inset-top) + 72px)' }}>
 
 
           {/* Offline Banner */}
@@ -2447,11 +2447,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 return (
                   <div key={`${getRoutePlanStopKey(stop)}-current`} className="relative pl-12 pr-2 my-4">
-                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-[#121A66] border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-blue-300/50">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-blue-900 border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-blue-300/50">
                       <span className="text-xs font-black text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200">
-                      <div className="bg-[#121A66] px-4 py-3 text-white">
+                      <div className="bg-blue-900 px-4 py-3 text-white">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <span className="px-2.5 py-0.5 rounded-full bg-white/15 text-xs font-semibold uppercase">{stopType === 'DO' ? 'Dropoff' : 'Pickup'}</span>
@@ -2992,7 +2992,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
                 <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-[#121A66] hover:bg-[#18227d] text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
+                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-blue-900 hover:bg-blue-800 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
               </div>
             </div>
           </div>

@@ -92,7 +92,7 @@
   --brand-primary-hover: #1d4ed8;
   --brand-primary-light: #dbeafe;
   --brand-primary-subtle: #eff6ff;
-  --brand-accent: #8b5cf6;
+  --brand-accent: #3b82f6;
 
   /* Status */
   --success: #059669;
@@ -457,7 +457,7 @@ table .font-black { font-weight: 750; }
 
 /* ===== PREMIUM GRADIENTS ===== */
 .gradient-brand-premium {
-  background: linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
 }
 .gradient-emerald-premium {
   background: linear-gradient(135deg, #059669 0%, #10b981 100%);

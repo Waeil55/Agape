@@ -449,7 +449,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               <X size={12} className="inline mr-1" /> Remove
             </button>
             {selectedTasks.length > 1 && (
-              <button onClick={() => { setAssignMode('mission'); setShowAssign(true); }} className="px-3 py-2 bg-indigo-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-indigo-700">
+              <button onClick={() => { setAssignMode('mission'); setShowAssign(true); }} className="px-3 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-blue-700">
                 <Sparkles size={12} className="inline mr-1" /> Mission
               </button>
             )}
@@ -664,7 +664,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 {assignMode === 'mission' ? (
-                  <><Sparkles size={20} className="text-indigo-600" /> Mission</>
+                  <><Sparkles size={20} className="text-blue-600" /> Mission</>
                 ) : (
                   <><Users size={20} className="text-emerald-600" /> Assign</>
                 )}
