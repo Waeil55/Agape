@@ -825,7 +825,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const completedTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed');
   const noShowTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'no show');
   const cancelledTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'cancelled');
-  const allHistory = [...reroutedTrips, ...completedTrips, ...noShowTrips, ...cancelledTrips].sort((a,b) => { const da = a.completedAt || a.date || ''; const db = b.completedAt || b.date || ''; return db.localeCompare(da); });
+  const allHistory = [...reroutedTrips, ...completedTrips, ...noShowTrips, ...cancelledTrips].sort((a,b) => { const da = a.completedAt || a.date || ''; const db = b.completedAt || b.date || ''; return da.localeCompare(db); });
 
   const activeTrips = myTrips.filter(t => !isWorkflowTerminalTrip(t));
 
