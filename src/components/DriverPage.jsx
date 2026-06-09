@@ -3520,6 +3520,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           setShowToast={setShowToast}
           onAddAuditLog={onAddAuditLog}
           setActiveNav={setActiveNav}
+          routeTemplates={routeTemplates}
         />
       )}
 

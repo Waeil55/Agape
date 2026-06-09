@@ -1,11 +1,17 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, lazy, Suspense, useMemo } from 'react';
 import {
   Route, BrainCircuit, Play, MapPin, Navigation,
-  CheckSquare, X, AlertTriangle, Timer, Repeat
+  CheckSquare, X, AlertTriangle, Timer, Repeat,
+  Bookmark, Trash2, ChevronDown, ChevronUp, Calendar,
+  Clock, ArrowRight, FolderOpen
 } from 'lucide-react';
 import DriverToolsPage from './DriverToolsPage';
+import { db, doc, setDoc } from '../config/firebase';
+import { normalizeRouteRecord, ROUTE_STATUS_LABELS, ROUTE_STATUS_BADGES } from '../utils/routePlans';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
+
+const SEQUENCES_DOC = 'routeData/sequences';
 
 const LazyFallback = () => (
   <div className="flex-1 flex items-center justify-center p-8">
@@ -39,8 +45,11 @@ const UnifiedRoutePlanner = ({
   setRoutePlanSequencerStops, setRoutePlanSequencerSequence, setRoutePlanSequencerOrigin,
   setSequencerTripFilter, drivers, setShowToast,
   onAddAuditLog,
+  routeTemplates = [],
 }) => {
   const [activeTab, setActiveTab] = useState('plan');
+  const [expandedTemplateId, setExpandedTemplateId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const handleSendToSequencer = (stopData, origin) => {
     if (!Array.isArray(stopData) || stopData.length === 0) {
@@ -90,6 +99,45 @@ const UnifiedRoutePlanner = ({
     setShowToast({ type: 'success', message: `${items.length} stop${items.length !== 1 ? 's' : ''} loaded.` });
   };
 
+  const handleLoadTemplate = (tpl) => {
+    const items = (tpl.sequence || []).map((stop, index) => ({
+      id: `${stop.clientId || 'stop'}-${Date.now()}-${index}`,
+      name: stop.name || `Stop ${String.fromCharCode(65 + index)}`,
+      address: stop.address || '',
+      pu: stop.type === 'PU' ? (stop.address || '') : '',
+      do: stop.type === 'DO' ? (stop.address || '') : '',
+      time: stop.time || '',
+      serviceType: stop.serviceType || '',
+      bookingId: stop.bookingId || '',
+      phone: stop.phone || '',
+      routePlanTripId: stop.clientId || null,
+    }));
+    const sequence = items.map((item, index) => ({
+      clientId: item.id, type: item.do ? 'DO' : 'PU', leg: 'A', stepNumber: index + 1,
+    }));
+    setSequencerTripFilter(null);
+    setRoutePlanSequencerStops(items);
+    setRoutePlanSequencerSequence(sequence);
+    setRoutePlanSequencerOrigin(null);
+    setSequencerKey(k => k + 1);
+    setActiveTab('build');
+    setShowToast({ type: 'success', message: `"${tpl.name}" loaded with ${items.length} stop${items.length !== 1 ? 's' : ''}.` });
+  };
+
+  const handleDeleteTemplate = async (tplId) => {
+    if (deletingId) return;
+    setDeletingId(tplId);
+    try {
+      const updated = routeTemplates.filter(t => t.id !== tplId);
+      await setDoc(doc(db, SEQUENCES_DOC), { templates: updated }, { merge: true });
+      setShowToast({ type: 'success', message: 'Route deleted.' });
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setShowToast({ type: 'error', message: 'Delete failed.' });
+    }
+    setDeletingId(null);
+  };
+
   const tabs = [
     { id: 'plan', label: 'Plan', icon: MapPin, color: 'emerald' },
     { id: 'build', label: 'Route', icon: Route, color: 'indigo' },
@@ -97,6 +145,14 @@ const UnifiedRoutePlanner = ({
   ];
 
   const activeCount = activeTrips?.length || 0;
+
+  const sortedTemplates = useMemo(() => {
+    return [...(routeTemplates || [])].sort((a, b) => {
+      const aTime = Date.parse(a.createdAt || 0) || 0;
+      const bTime = Date.parse(b.createdAt || 0) || 0;
+      return bTime - aTime;
+    });
+  }, [routeTemplates]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0" style={{ background: '#f1f5f9' }}>
@@ -136,6 +192,9 @@ const UnifiedRoutePlanner = ({
                   {tab.id === 'navigate' && activeCount > 0 && (
                     <span className="ml-0.5 w-4 h-4 rounded-full bg-blue-500 text-white text-[8px] font-bold flex items-center justify-center">{activeCount}</span>
                   )}
+                  {tab.id === 'plan' && sortedTemplates.length > 0 && (
+                    <span className="ml-0.5 w-4 h-4 rounded-full bg-emerald-500 text-white text-[8px] font-bold flex items-center justify-center">{sortedTemplates.length}</span>
+                  )}
                   {isActive && <div className="absolute bottom-0 left-2 right-2 h-[3px] bg-indigo-600 rounded-t-full" />}
                 </button>
               );
@@ -150,6 +209,176 @@ const UnifiedRoutePlanner = ({
         {/* PLAN TAB */}
         {activeTab === 'plan' && (
           <div className="h-full overflow-y-auto overscroll-contain pb-24 px-3 pt-3">
+
+            {/* === SAVED PLANS SECTION === */}
+            {sortedTemplates.length > 0 && (
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <div className="flex items-center gap-1.5">
+                    <Bookmark size={13} className="text-emerald-600" />
+                    <span className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">Saved Plans</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">{sortedTemplates.length}</span>
+                </div>
+                <div className="space-y-2">
+                  {sortedTemplates.map((tpl) => {
+                    const normalized = normalizeRouteRecord(tpl);
+                    const isExpanded = expandedTemplateId === tpl.id;
+                    const isToday = tpl.type === 'today';
+                    const statusClass = normalized?.statusBadgeClass || ROUTE_STATUS_BADGES[ROUTE_ASSIGNMENT_STATUS.ASSIGNED];
+                    const statusLabel = normalized?.statusLabel || 'Template';
+                    const driverName = tpl.assignedDriver
+                      ? (drivers || []).find(d => d.id === tpl.assignedDriver)?.name || tpl.assignedDriver
+                      : null;
+                    const createdDate = tpl.createdAt ? new Date(tpl.createdAt) : null;
+                    const createdStr = createdDate
+                      ? `${createdDate.getMonth() + 1}/${createdDate.getDate()}`
+                      : '';
+                    return (
+                      <div key={tpl.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                        {/* Header row */}
+                        <div className="px-3.5 py-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[13px] font-extrabold text-slate-900 truncate">{tpl.name}</p>
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${statusClass}`}>
+                                  {statusLabel}
+                                </span>
+                                {isToday ? (
+                                  <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                                    <Calendar size={8} /> Today
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-bold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                                    <Repeat size={8} /> Recurring
+                                  </span>
+                                )}
+                                <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                                  <MapPin size={8} /> {tpl.sequence?.length || 0} stops
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button onClick={() => setExpandedTemplateId(isExpanded ? null : tpl.id)}
+                                className="w-7 h-7 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 active:scale-95 transition cursor-pointer">
+                                {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Info row */}
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {driverName && (
+                              <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md">
+                                {driverName}
+                              </span>
+                            )}
+                            {tpl.metrics?.miles > 0 && (
+                              <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                                {tpl.metrics.miles} mi
+                              </span>
+                            )}
+                            {tpl.metrics?.estTime && (
+                              <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                                <Clock size={8} /> {tpl.metrics.estTime}
+                              </span>
+                            )}
+                            {createdStr && (
+                              <span className="text-[9px] font-bold text-slate-400 ml-auto">
+                                {createdStr}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expanded details */}
+                        {isExpanded && (
+                          <div className="px-3.5 pb-3 border-t border-slate-100 pt-2.5">
+                            {/* Sequence preview */}
+                            {tpl.sequence?.length > 0 && (
+                              <div className="mb-3">
+                                <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">Route Sequence</p>
+                                <div className="space-y-1">
+                                  {tpl.sequence.map((stop, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 text-[10px]">
+                                      <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-extrabold flex items-center justify-center shrink-0 text-[8px]">
+                                        {idx + 1}
+                                      </span>
+                                      <span className={`font-bold px-1 py-0 rounded ${stop.type === 'PU' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        {stop.type}
+                                      </span>
+                                      <span className="font-semibold text-slate-700 truncate">{stop.name || 'Unknown'}</span>
+                                      {stop.time && <span className="font-semibold text-slate-400 ml-auto shrink-0">{stop.time}</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Day info for recurring */}
+                            {isToday ? (
+                              <p className="text-[10px] font-semibold text-slate-500 mb-3">
+                                Date: {tpl.assignmentDate || 'Not assigned'}
+                              </p>
+                            ) : tpl.days?.length > 0 && (
+                              <div className="flex gap-1 mb-3">
+                                {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => (
+                                  <span key={day} className={`w-7 h-5 rounded text-[8px] font-extrabold flex items-center justify-center ${
+                                    tpl.days.includes(day)
+                                      ? 'bg-indigo-100 text-indigo-700'
+                                      : 'bg-slate-50 text-slate-300'
+                                  }`}>
+                                    {day.slice(0,2)}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex gap-2">
+                              <button onClick={() => handleLoadTemplate(tpl)}
+                                className="flex-1 h-9 bg-indigo-50 text-indigo-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-indigo-100 transition border border-indigo-100 cursor-pointer">
+                                <FolderOpen size={11} /> Load to Route
+                              </button>
+                              <button onClick={() => { if (window.confirm(`Delete "${tpl.name}"?`)) handleDeleteTemplate(tpl.id); }}
+                                disabled={deletingId === tpl.id}
+                                className="h-9 px-3 bg-rose-50 text-rose-600 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 active:bg-rose-100 transition border border-rose-100 cursor-pointer">
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Collapsed quick action */}
+                        {!isExpanded && (
+                          <div className="px-3.5 pb-2.5 flex gap-1.5">
+                            <button onClick={() => handleLoadTemplate(tpl)}
+                              className="flex-1 h-8 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-extrabold flex items-center justify-center gap-1 active:bg-indigo-100 transition cursor-pointer">
+                              <FolderOpen size={10} /> Load
+                            </button>
+                            <button onClick={() => setExpandedTemplateId(tpl.id)}
+                              className="h-8 px-2.5 bg-slate-50 text-slate-500 rounded-lg text-[10px] font-extrabold flex items-center justify-center gap-1 active:bg-slate-100 transition cursor-pointer">
+                              Details
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Empty state for saved plans */}
+            {sortedTemplates.length === 0 && (
+              <div className="mb-3 bg-white rounded-2xl border border-dashed border-slate-200 p-5 text-center">
+                <Bookmark size={20} className="text-slate-200 mx-auto mb-2" />
+                <p className="text-[11px] font-bold text-slate-400">No saved plans yet</p>
+                <p className="text-[10px] text-slate-300 mt-0.5">Create a route in the Route tab and save it</p>
+              </div>
+            )}
+
             {/* AI Quick Actions */}
             {selectedTrips.length >= 1 && (
               <div className="mb-3 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl p-3 shadow-lg shadow-indigo-200/50">
