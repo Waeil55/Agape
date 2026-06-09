@@ -4418,6 +4418,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   drivers={drivers}
                   currentUser={currentUser}
                   role={role}
+                  me={me}
+                  advanceWorkflow={advanceWorkflow}
                   initialStops={routePlanSequencerStops}
                   initialSequence={routePlanSequencerSequence}
                   initialOrigin={routePlanSequencerOrigin}

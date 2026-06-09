@@ -151,7 +151,7 @@ const buildImportedRouteSequence = (initialStops, initialSequence) => {
   ]);
 };
 
-export default function RouteSequencerApp({ trips = [], drivers = [], currentUser, role, onApplyRoute, onRouteSaved, initialStops = null, initialSequence = null, initialOrigin = null }) {
+export default function RouteSequencerApp({ trips = [], drivers = [], currentUser, role, me, advanceWorkflow, onApplyRoute, onRouteSaved, initialStops = null, initialSequence = null, initialOrigin = null }) {
   const today = new Date();
   const todayAbbr = DAY_MAP[today.getDay()];
   const initialTripById = useMemo(() => new Map((trips || []).map((trip) => [trip.id, trip])), [trips]);
@@ -446,20 +446,32 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
     const key = getStopKey(stop);
     setStopOverrides(prev => ({ ...prev, [key]: { type: 'no-show', scope: 'today', label: 'No Show', color: 'amber' } }));
     setStopMenuId(null);
-  }, [getStopKey]);
+    const trip = tripById.get(stop.clientId);
+    if (trip && advanceWorkflow) {
+      advanceWorkflow(trip, 'No Show', { completedAt: new Date().toISOString(), completedBy: currentUser });
+    }
+  }, [getStopKey, tripById, advanceWorkflow, currentUser]);
 
   const handleCancelToday = useCallback((stop) => {
     const key = getStopKey(stop);
     setStopOverrides(prev => ({ ...prev, [key]: { type: 'cancelled', scope: 'today', label: 'Cancelled Today', color: 'rose' } }));
     setStopMenuId(null);
-  }, [getStopKey]);
+    const trip = tripById.get(stop.clientId);
+    if (trip && advanceWorkflow) {
+      advanceWorkflow(trip, 'Cancelled', { completedAt: new Date().toISOString(), completedBy: currentUser, cancellationReason: 'Cancelled from Route Sequencer' });
+    }
+  }, [getStopKey, tripById, advanceWorkflow, currentUser]);
 
   const handleCancelPermanent = useCallback((stop) => {
     const key = getStopKey(stop);
     setStopOverrides(prev => ({ ...prev, [key]: { type: 'cancelled', scope: 'permanent', label: 'Cancelled', color: 'red' } }));
     setSequence(prev => prev.filter(s => s.clientId !== stop.clientId || s.type !== stop.type));
     setStopMenuId(null);
-  }, [getStopKey]);
+    const trip = tripById.get(stop.clientId);
+    if (trip && advanceWorkflow) {
+      advanceWorkflow(trip, 'Cancelled', { completedAt: new Date().toISOString(), completedBy: currentUser, cancellationReason: 'Cancelled permanently from Route Sequencer' });
+    }
+  }, [getStopKey, tripById, advanceWorkflow, currentUser]);
 
   const handleRemoveWeek = useCallback((stop) => {
     const key = getStopKey(stop);
@@ -500,7 +512,14 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
     const key = getStopKey(stop);
     setStopOverrides(prev => ({ ...prev, [key]: { type: 'completed', scope: 'today', label: 'Completed', color: 'emerald' } }));
     setStopMenuId(null);
-  }, [getStopKey]);
+    const trip = tripById.get(stop.clientId);
+    if (trip && advanceWorkflow) {
+      advanceWorkflow(trip, 'Completed', {
+        completedAt: new Date().toISOString(),
+        completedBy: currentUser,
+      });
+    }
+  }, [getStopKey, tripById, advanceWorkflow, currentUser]);
 
   const moveStopInLeg = useCallback((stopId, direction) => {
     setSequence(prev => {
