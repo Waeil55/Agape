@@ -2553,14 +2553,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div key={ws.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
                       ))}
                     </div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider ${labelColor}`}>
-                        {isDropoffPhase ? 'Dropoff Phase' : 'Pickup Phase'}
-                      </span>
-                      <span className="text-[10px] font-bold text-slate-500">
-                        Step {Math.min(currentStepIdx + 1, totalGuidedSteps)} of {totalGuidedSteps}
-                      </span>
-                    </div>
                     <div className="flex items-center gap-1.5">
                       <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }} className={`flex-1 h-10 ${gradient} text-xs text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
                         {icon} {label}
@@ -2801,14 +2793,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               {workflowSteps.map((step, idx) => (
                                 <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
                               ))}
-                            </div>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className={`text-xs font-bold uppercase tracking-wider ${labelColor}`}>
-                                {isDropoffPhase ? 'Dropoff Phase' : 'Pickup Phase'}
-                              </span>
-                              <span className="text-xs font-bold text-slate-500">
-                                Step {Math.min(currentStepIdx + 1, totalSteps)} of {totalSteps}
-                              </span>
                             </div>
                             <div className="flex items-center gap-2 mb-2">
                               <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-12 ${primary.gradient} text-sm text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
