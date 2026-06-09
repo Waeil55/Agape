@@ -530,7 +530,7 @@ const DriverToolsPage = ({
   onSetRoutePlanStops = null,
   onSendToSequencer = null
 }) => {
-  const [expandedSection, setExpandedSection] = useState('quicknav');
+  const [expandedSection, setExpandedSection] = useState('etas');
 
   const toggleSection = (section) => {
     setExpandedSection(expandedSection === section ? null : section);
@@ -538,61 +538,6 @@ const DriverToolsPage = ({
 
   return (
     <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pb-28 px-3 pt-2 space-y-3" style={{ background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)' }}>
-
-      {/* Quick Navigation */}
-      {activeTrips.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <button onClick={() => toggleSection('quicknav')}
-            className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-slate-50/50 transition cursor-pointer">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                <Navigation size={16} className="text-emerald-600" />
-              </div>
-              <div className="text-left">
-                <span className="block text-[13px] font-extrabold text-slate-900 tracking-tight">Quick Navigation</span>
-                <span className="block text-[11px] font-semibold text-slate-400">{activeTrips.length} active trip{activeTrips.length !== 1 ? 's' : ''}</span>
-              </div>
-            </div>
-            <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${expandedSection === 'quicknav' ? 'rotate-180' : ''}`} />
-          </button>
-          {expandedSection === 'quicknav' && (
-            <div className="border-t border-slate-100 divide-y divide-slate-100/50">
-              {activeTrips.map(trip => (
-                <div key={trip.id} className="px-4 py-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-extrabold text-slate-900">{trip.patient}</span>
-                      <div className="mt-1 flex gap-1 flex-wrap">
-                        {trip.bookingId && (
-                          <span className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-extrabold text-blue-700">
-                            {trip.bookingId}
-                          </span>
-                        )}
-                        {(trip.type || trip.serviceType) && (
-                          <span className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-600">
-                            {trip.type || trip.serviceType}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-400 shrink-0 ml-2">{to12hr(trip.time)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => onOpenInNav(trip.pickup)}
-                      className="flex-1 flex items-center justify-center gap-1.5 h-9 bg-emerald-50 text-emerald-700 rounded-xl text-[11px] font-extrabold active:bg-emerald-100 transition border border-emerald-100 cursor-pointer">
-                      <MapPin size={12} /> Pickup
-                    </button>
-                    <button onClick={() => onOpenInNav(trip.dropoff)}
-                      className="flex-1 flex items-center justify-center gap-1.5 h-9 bg-rose-50 text-rose-700 rounded-xl text-[11px] font-extrabold active:bg-rose-100 transition border border-rose-100 cursor-pointer">
-                      <MapPin size={12} /> Dropoff
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Route Plan */}
       <RoutePlanSection
