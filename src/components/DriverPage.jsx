@@ -296,14 +296,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   });
   const [historyFilter, setHistoryFilter] = useState(() => localStorage.getItem(`agape_drvHistFilter_${userKey}`) || 'all');
   const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
-  const [historyDateFrom, setHistoryDateFrom] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 7);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  });
-  const [historyDateTo, setHistoryDateTo] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  });
+  const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  const [historyDate, setHistoryDate] = useState(todayStr);
 
   useEffect(() => {
     localStorage.setItem(`agape_drvNav_${userKey}`, activeNav);
@@ -1133,9 +1127,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       historyFilter === 'cancelled' ? normalizeWorkflowStatus(t.status) === 'cancelled' :
       normalizeWorkflowStatus(t.status) === 'rerouted';
     if (!matchFilter) return false;
-    const tripDate = (t.completedAt || t.date || '').slice(0, 10);
-    if (historyDateFrom && tripDate && tripDate < historyDateFrom) return false;
-    if (historyDateTo && tripDate && tripDate > historyDateTo) return false;
+    if (historyDate) {
+      const tripDate = (t.completedAt || t.date || '').slice(0, 10);
+      if (tripDate && tripDate !== historyDate) return false;
+    }
     if (!historySearch) return true;
     const q = historySearch.toLowerCase();
     return (t.patient || '').toLowerCase().includes(q) ||
@@ -3494,38 +3489,42 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
           </div>
 
-          <div className="relative mb-3 px-1">
-            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" placeholder="Search by patient, booking ID, address..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl font-medium text-xs outline-none focus:border-blue-400" />
-            {historySearch && <button onClick={() => setHistorySearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X size={14} /></button>}
-          </div>
-
-          <div className="flex items-center gap-2 mb-4 px-1">
-            <div className="flex-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">From</label>
-              <input type="date" value={historyDateFrom} max={historyDateTo}
-                onChange={(e) => setHistoryDateFrom(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-400" />
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <div className="flex-1 relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input type="text" placeholder="Search patient, booking ID..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-400" />
+              {historySearch && <button onClick={() => setHistorySearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"><X size={12} /></button>}
             </div>
-            <div className="flex-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">To</label>
-              <input type="date" value={historyDateTo} min={historyDateFrom} max={new Date().toISOString().slice(0,10)}
-                onChange={(e) => setHistoryDateTo(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-400" />
+            <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-xl shrink-0">
+              <button onClick={() => { const d = new Date(historyDate + 'T12:00:00'); d.setDate(d.getDate() - 1); setHistoryDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); }}
+                className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-l-xl hover:bg-slate-50 transition">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <input type="date" value={historyDate} max={todayStr()}
+                onChange={(e) => setHistoryDate(e.target.value)}
+                className="w-0 h-8 opacity-0 absolute pointer-events-none"
+                id="historyDatePick" />
+              <label htmlFor="historyDatePick"
+                className="px-2 h-8 flex items-center justify-center text-[11px] font-bold text-slate-700 cursor-pointer hover:bg-slate-50 transition whitespace-nowrap select-none">
+                {historyDate ? new Date(historyDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : 'All'}
+              </label>
+              <button onClick={() => {
+                const d = new Date(historyDate + 'T12:00:00'); d.setDate(d.getDate() + 1);
+                const tomorrow = todayStr();
+                const next = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                if (next <= tomorrow) setHistoryDate(next);
+              }}
+                className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-r-xl hover:bg-slate-50 transition">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
             </div>
-            <button onClick={() => {
-              const d = new Date(); d.setDate(d.getDate() - 7);
-              const fmt = (dd) => `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`;
-              setHistoryDateFrom(fmt(d));
-              setHistoryDateTo(fmt(new Date()));
-            }} className="mt-4 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-[10px] font-bold text-slate-600 transition whitespace-nowrap">7 Days</button>
-            <button onClick={() => {
-              const d = new Date(); d.setDate(d.getDate() - 30);
-              const fmt = (dd) => `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`;
-              setHistoryDateFrom(fmt(d));
-              setHistoryDateTo(fmt(new Date()));
-            }} className="mt-4 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-[10px] font-bold text-slate-600 transition whitespace-nowrap">30 Days</button>
+            {historyDate !== todayStr() && (
+              <button onClick={() => setHistoryDate(todayStr())}
+                className="px-2.5 h-8 bg-blue-50 text-blue-600 rounded-xl text-[10px] font-bold hover:bg-blue-100 transition shrink-0">
+                Today
+              </button>
+            )}
           </div>
 
           <div className="flex gap-1.5 mb-5 overflow-x-auto no-scrollbar px-1">
