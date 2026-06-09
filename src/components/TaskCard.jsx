@@ -235,9 +235,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   <span className={`text-[11px] font-semibold ${timeUrg.type === 'critical' ? 'text-rose-600' : timeUrg.type === 'warning' ? 'text-amber-600' : 'text-slate-400'}`}>
                     {task.time || 'TBD'}
                   </span>
-                  {task.bookingId && (
-                    <span className="text-[10px] font-mono font-bold text-slate-300">· {task.bookingId}</span>
-                  )}
                 </div>
                 {task.isInOut && (
                   <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-1">In/Out — Client returns shortly</p>
@@ -297,14 +294,17 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                             {getSiteIcon(pickupSiteName)} {pickupSiteName}
                           </p>
                         )}
-                        <div className="flex gap-1.5 mt-2.5">
+                        <div className="flex items-center gap-1.5 mt-2.5">
                           <button onClick={(e) => { e.stopPropagation(); handleCopy(pickupAddress, 'pickup'); }}
                             className="h-7 px-2.5 bg-white/8 hover:bg-white/15 rounded-lg text-[10px] font-bold text-white/60 flex items-center gap-1 transition-colors cursor-pointer">
                             {copiedId === 'pickup' ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
                             {copiedId === 'pickup' ? 'Copied' : 'Copy'}
                           </button>
+                          {task.details?.distance && (
+                            <span className="text-[10px] font-bold text-white/40 px-1">{task.details.distance}</span>
+                          )}
                           <button onClick={(e) => { e.stopPropagation(); actions?.onNavigatePickup?.(task); }}
-                            className="h-7 px-2.5 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-[10px] font-bold text-blue-300 flex items-center gap-1 transition-colors cursor-pointer">
+                            className="ml-auto h-7 px-2.5 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-[10px] font-bold text-blue-300 flex items-center gap-1 transition-colors cursor-pointer">
                             <Navigation size={10} /> Navigate
                           </button>
                         </div>
@@ -318,14 +318,14 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                             {getSiteIcon(dropoffSiteName)} {dropoffSiteName}
                           </p>
                         )}
-                        <div className="flex gap-1.5 mt-2.5">
+                        <div className="flex items-center gap-1.5 mt-2.5">
                           <button onClick={(e) => { e.stopPropagation(); handleCopy(dropoffAddress, 'dropoff'); }}
                             className="h-7 px-2.5 bg-white/8 hover:bg-white/15 rounded-lg text-[10px] font-bold text-white/60 flex items-center gap-1 transition-colors cursor-pointer">
                             {copiedId === 'dropoff' ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
                             {copiedId === 'dropoff' ? 'Copied' : 'Copy'}
                           </button>
                           <button onClick={(e) => { e.stopPropagation(); actions?.onNavigateDropoff?.(task); }}
-                            className="h-7 px-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-lg text-[10px] font-bold text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer">
+                            className="ml-auto h-7 px-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-lg text-[10px] font-bold text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer">
                             <Navigation size={10} /> Navigate
                           </button>
                         </div>
@@ -376,29 +376,24 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                       )}
                     </div>
                   ))}
+                  {!isTerminal && stepIdx > 0 && actions?.onRevert && (
+                    <button onClick={(e) => { e.stopPropagation(); actions.onRevert(task); }}
+                      className="ml-2 w-[22px] h-[22px] rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer border border-slate-200"
+                      title="Undo last step">
+                      <Undo2 size={11} className="text-slate-600" />
+                    </button>
+                  )}
                 </div>
                 <div className="flex justify-between mt-2 px-0.5">
                   {steps.map((step, i) => (
                     <span key={step} className={`text-[8px] font-bold tracking-wide ${i <= stepIdx ? 'text-slate-700' : 'text-slate-300'}`}>{step}</span>
                   ))}
                 </div>
-                {/* Undo Back Button */}
-                {!isTerminal && stepIdx > 0 && actions?.onRevert && (
-                  <button onClick={(e) => { e.stopPropagation(); actions.onRevert(task); }}
-                    className="mt-3 w-full h-9 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.97] cursor-pointer border border-slate-200/60">
-                    <Undo2 size={12} /> Undo Last Step
-                  </button>
-                )}
               </div>
 
               {/* --- TAGS --- */}
-              {(task.bookingId || task.details?.passengerType || task.details?.mobility || (task.tags && task.tags.length > 0) || task.details?.distance) && (
+              {(task.details?.passengerType || task.details?.mobility || (task.tags && task.tags.length > 0)) && (
                 <div className="flex flex-wrap gap-1.5 px-4 mt-3">
-                  {task.bookingId && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-extrabold text-blue-600 bg-blue-50/80 px-2.5 py-1 rounded-xl border border-blue-100/60">
-                      {task.bookingId}
-                    </span>
-                  )}
                   {task.details?.passengerType && (
                     <span className="inline-flex items-center gap-1 bg-indigo-50/80 text-indigo-600 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-indigo-100/60">
                       <User size={10} /> {task.details.passengerType.split(',')[0]}
@@ -412,11 +407,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   {task.details?.mobility && task.details.mobility !== 'WLK' && (
                     <span className="inline-flex items-center gap-1 bg-orange-50/80 text-orange-600 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-orange-100/60">
                       <Accessibility size={10} /> {task.details.mobility}
-                    </span>
-                  )}
-                  {task.details?.distance && (
-                    <span className="inline-flex items-center gap-1 bg-slate-100/80 text-slate-500 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-slate-200/60">
-                      <Ruler size={10} /> {task.details.distance}
                     </span>
                   )}
                   {task.tags?.map((tag, i) => (
