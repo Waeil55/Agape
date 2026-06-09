@@ -3329,8 +3329,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 )}
                 {showTripDetails.arrivalTime && (
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">Arrived</span>
+                    <span className="text-xs text-slate-500">Arrived at Pickup</span>
                     <span className="text-xs font-bold text-slate-800">{new Date(showTripDetails.arrivalTime).toLocaleString()}</span>
+                  </div>
+                )}
+                {showTripDetails.departedPickupTime && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-slate-500">Departed Pickup</span>
+                    <span className="text-xs font-bold text-slate-800">{new Date(showTripDetails.departedPickupTime).toLocaleString()}</span>
+                  </div>
+                )}
+                {showTripDetails.arrivalDropoffTime && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-slate-500">Arrived at Dropoff</span>
+                    <span className="text-xs font-bold text-slate-800">{new Date(showTripDetails.arrivalDropoffTime).toLocaleString()}</span>
                   </div>
                 )}
                 {showTripDetails.completedAt && (
@@ -3595,11 +3607,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Pickup Time</td>
-                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.time ? to24hr(trip.time) : '—'}</td>
+                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.time ? to24hr(trip.time) : (trip.arrivalTime ? formatIsoTo24hr(trip.arrivalTime) : '—')}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Dropoff Time</td>
-                              <td className="px-4 py-2.5 font-bold text-rose-600">{trip.arrivalDropoffTime ? formatIsoTo24hr(trip.arrivalDropoffTime) : (trip.completedAt ? formatIsoTo24hr(trip.completedAt) : '—')}</td>
+                              <td className="px-4 py-2.5 font-bold text-rose-600">{trip.arrivalDropoffTime ? formatIsoTo24hr(trip.arrivalDropoffTime) : (trip.completedAt ? formatIsoTo24hr(trip.completedAt) : (trip.dropoffTime ? trip.dropoffTime : '—'))}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Pickup Odometer</td>
