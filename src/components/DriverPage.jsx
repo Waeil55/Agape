@@ -85,6 +85,38 @@ const formatIsoTo24hr = (iso) => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
+const parseDateOrClock = (value) => {
+  if (!value) return null;
+  const s = String(value).trim();
+  if (!s) return null;
+  if (s.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const match = s.toUpperCase().match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/);
+  if (!match) return null;
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const meridiem = match[3];
+  if (meridiem === 'PM' && hour < 12) hour += 12;
+  if (meridiem === 'AM' && hour === 12) hour = 0;
+  const d = new Date();
+  d.setHours(hour, minute, 0, 0);
+  return d;
+};
+
+const calcTravelDuration = (start, end) => {
+  if (!start || !end) return '—';
+  const s = parseDateOrClock(start);
+  const e = parseDateOrClock(end);
+  if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return '—';
+  const diff = Math.round((e - s) / 60000);
+  if (diff < 0) return '—';
+  const h = Math.floor(diff / 60);
+  const m = diff % 60;
+  return h > 0 ? `${h}h${m > 0 ? m : ''}` : `${m}m`;
+};
+
 const formatTimeInput = (v) => {
   if (!v) return '';
   const d = new Date(v);
@@ -1146,7 +1178,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     return (t.patient || '').toLowerCase().includes(q) ||
       (t.bookingId || '').toLowerCase().includes(q) ||
       (t.pickup || '').toLowerCase().includes(q) ||
-      (t.dropoff || '').toLowerCase().includes(q);
+      (t.dropoff || '').toLowerCase().includes(q) ||
+      (t.driverName || '').toLowerCase().includes(q) ||
+      (t.completedVehicle || t.vehicle || '').toLowerCase().includes(q);
   });
 
   const toggleTripSelect = (tripId) => {
@@ -1904,18 +1938,39 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   };
 
   const exportDailyLog = () => {
-    const rows = [['Patient', 'Booking ID', 'Time', 'Pickup', 'Dropoff', 'Status', 'Pickup Odo', 'Dropoff Odo', 'Distance', 'Completed At']];
+    const headers = ['Date', 'Driver', 'Vehicle', 'Scheduled Time', 'Trip ID', 'Passenger', 'Pickup Address', 'Pickup Arrival', 'Departed Pickup', 'Start Odometer', 'Dropoff Address', 'Dropoff Arrival', 'End Odometer', 'Travel Time', 'Distance (mi)', 'Signature', 'Status'];
+    const rows = [headers];
     const today = new Date().toISOString().split('T')[0];
     const todayTrips = allHistory.filter(t => (t.date || '').startsWith(today) || (t.completedAt || '').startsWith(today));
     todayTrips.forEach(t => {
-      rows.push([t.patient, t.bookingId || '', t.time, t.pickup, t.dropoff, t.status, t.pickupOdometer || '', t.dropoffOdometer || '', t.distance ? `${t.distance} mi` : '', t.completedAt ? new Date(t.completedAt).toLocaleString() : '']);
+      const travelTime = t.travelTime || calcTravelDuration(t.departedPickupTime || t.arrivalTime, t.arrivalDropoffTime || t.completedAt);
+      const distDriven = (t.pickupOdometer && t.dropoffOdometer) ? `${Math.max(0, Number(t.dropoffOdometer) - Number(t.pickupOdometer))}` : (t.distance || '');
+      rows.push([
+        t.date || (t.completedAt ? new Date(t.completedAt).toLocaleDateString() : ''),
+        t.driverName || '',
+        t.completedVehicle || t.vehicle || '',
+        t.time ? to24hr(t.time) : '',
+        t.bookingId || t.id || '',
+        t.patient || '',
+        t.pickup || '',
+        t.arrivalTime ? formatIsoTo24hr(t.arrivalTime) : '',
+        t.departedPickupTime ? formatIsoTo24hr(t.departedPickupTime) : '',
+        t.pickupOdometer || '',
+        t.dropoff || '',
+        t.arrivalDropoffTime ? formatIsoTo24hr(t.arrivalDropoffTime) : '',
+        t.dropoffOdometer || '',
+        travelTime,
+        distDriven,
+        (t.paperSignatureConfirmed || t.unableToSign) ? 'Yes' : 'No',
+        t.status || '',
+      ]);
     });
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""').replace(/—/g, '')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `daily-log-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `agape-history-${today}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -3494,7 +3549,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="flex items-center gap-2 mb-3 px-1">
             <div className="flex-1 relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input type="text" placeholder="Search patient, booking ID..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
+              <input type="text" placeholder="Search patient, booking ID, driver, vehicle..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
                 className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-400" />
               {historySearch && <button onClick={() => setHistorySearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"><X size={12} /></button>}
             </div>
@@ -3608,20 +3663,44 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               <td className="px-4 py-2.5 font-mono font-bold text-blue-600 text-[11px]">{trip.bookingId || trip.id || '—'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
-                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Pickup Time</td>
-                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.time ? to24hr(trip.time) : (trip.arrivalTime ? formatIsoTo24hr(trip.arrivalTime) : '—')}</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Date</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-700">{trip.date || (trip.completedAt ? new Date(trip.completedAt).toLocaleDateString() : '—')}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
-                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Dropoff Time</td>
-                              <td className="px-4 py-2.5 font-bold text-rose-600">{trip.arrivalDropoffTime ? formatIsoTo24hr(trip.arrivalDropoffTime) : (trip.completedAt ? formatIsoTo24hr(trip.completedAt) : (trip.dropoffTime ? trip.dropoffTime : '—'))}</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Driver</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-700">{trip.driverName || '—'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
-                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Pickup Odometer</td>
-                              <td className="px-4 py-2.5 font-bold text-slate-800">{trip.pickupOdometer ? `${Number(trip.pickupOdometer).toLocaleString()} mi` : '—'}</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Vehicle</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-700 font-mono text-[10px] uppercase tracking-wider">{trip.completedVehicle || trip.vehicle || '—'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
-                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Dropoff Odometer</td>
-                              <td className="px-4 py-2.5 font-bold text-slate-800">{trip.dropoffOdometer ? `${Number(trip.dropoffOdometer).toLocaleString()} mi` : '—'}</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Scheduled Time</td>
+                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.time ? to24hr(trip.time) : '—'}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Pickup Arrival</td>
+                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.arrivalTime ? formatIsoTo24hr(trip.arrivalTime) : '—'}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Departed Pickup</td>
+                              <td className="px-4 py-2.5 font-bold text-amber-600">{trip.departedPickupTime ? formatIsoTo24hr(trip.departedPickupTime) : '—'}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Dropoff Arrival</td>
+                              <td className="px-4 py-2.5 font-bold text-rose-600">{trip.arrivalDropoffTime ? formatIsoTo24hr(trip.arrivalDropoffTime) : (trip.completedAt ? formatIsoTo24hr(trip.completedAt) : '—')}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Travel Time</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-700">{trip.travelTime || calcTravelDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt)}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Start Odometer</td>
+                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.pickupOdometer ? `${Number(trip.pickupOdometer).toLocaleString()} mi` : '—'}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">End Odometer</td>
+                              <td className="px-4 py-2.5 font-bold text-rose-600">{trip.dropoffOdometer ? `${Number(trip.dropoffOdometer).toLocaleString()} mi` : '—'}</td>
                             </tr>
                             {(trip.pickupOdometer && trip.dropoffOdometer) && (
                             <tr className="border-b border-slate-100">
@@ -3642,6 +3721,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 align-top">Dropoff Address</td>
                               <td className="px-4 py-2.5 font-semibold text-rose-700 leading-relaxed break-words">{trip.dropoff || '—'}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Signature</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-700">{trip.paperSignatureConfirmed || trip.unableToSign ? 'Yes' : 'No'}</td>
                             </tr>
                             {trip.status === 'Rerouted' && trip.cancellationReason && (
                             <tr className="border-b border-slate-100">

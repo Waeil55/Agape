@@ -8,7 +8,7 @@ import {
 import { formatTelemetryDuration } from '../utils/driverTelemetry';
 import { aiAnalyzeTrips } from '../config/ai';
 
-const STATUS_OPTIONS = ['Completed', 'No Show', 'Cancelled'];
+const STATUS_OPTIONS = ['Completed', 'No Show', 'Cancelled', 'Rerouted'];
 
 const today = new Date().toISOString().split('T')[0];
 
@@ -523,6 +523,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     completed: reportTrips.filter((t) => t.status === 'Completed').length,
     noShow: reportTrips.filter((t) => t.status === 'No Show').length,
     cancelled: reportTrips.filter((t) => t.status === 'Cancelled').length,
+    rerouted: reportTrips.filter((t) => t.status === 'Rerouted').length,
     reviewed: reportTrips.filter((t) => t.reviewed).length,
     totalRows: reportTrips.length,
   }), [reportTrips]);
@@ -622,8 +623,8 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
   const exportCsv = () => {
     const headers = [
       'Date', 'Driver', 'Vehicle', 'Scheduled Time', 'Trip ID', 'Passenger',
-      'Pickup Address', 'Pickup Time', 'Departed Pickup', 'Start Odometer', 'Dropoff Address', 'Dropoff',
-      'End Odometer', 'Travel Time', 'Distance (mi)', 'Signature', 'Reviewed'
+      'Pickup Address', 'Pickup Arrival', 'Departed Pickup', 'Start Odometer', 'Dropoff Address', 'Dropoff Arrival',
+      'End Odometer', 'Travel Time', 'Distance (mi)', 'Signature', 'Reviewed', 'Status'
     ];
 
     const rows = [];
@@ -663,7 +664,8 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         buildCsvValue(duration),
         buildCsvValue(miles !== '—' ? miles : ''),
         buildCsvValue(signed),
-        buildCsvValue(reviewed)
+        buildCsvValue(reviewed),
+        buildCsvValue(trip.status || '')
       ]);
     });
 
@@ -725,6 +727,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           { label: 'Reviewed', value: stats.reviewed, color: 'text-indigo-600' },
           { label: 'NS', value: stats.noShow, color: 'text-rose-600' },
           { label: 'Canc.', value: stats.cancelled, color: 'text-amber-600' },
+          { label: 'Reroute', value: stats.rerouted, color: 'text-purple-600' },
         ].map((s) => (
           <span key={s.label} className="flex items-center gap-0.5">
             <span className="text-[9px] text-slate-400 font-medium">{s.label}</span>
