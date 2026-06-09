@@ -722,9 +722,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (completed.length > 0) setLastOdometer(completed[0].dropoffOdometer);
   }, [driverScopedTrips, me?.id]);
 
-  // GPS is mandatory — always active on mount
+  // GPS is mandatory — always active on mount. Also auto-clock-in on mount.
   useEffect(() => {
     if (navigator.geolocation) startGpsTracking();
+    if (me?.id && !me?.clockedIn) {
+      onDriverStatusUpdate(me.id, true);
+    }
     return () => { if (gpsWatchId.current) navigator.geolocation.clearWatch(gpsWatchId.current); };
   }, [me?.id]);
 
@@ -931,7 +934,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       ))
   ), [routeTemplates, me?.id, me?.email, currentUser]);
 
-  const isClockedIn = me?.clockedIn || false;
+  const isClockedIn = true;
 
   // Auto-re-optimize when trips or GPS changes
   useEffect(() => {
@@ -1993,12 +1996,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 flex items-center gap-2">
               <WifiOff size={14} className="text-amber-600 shrink-0" />
               <p className="text-xs font-semibold text-amber-800">You're offline. Changes will sync when connection returns.</p>
-            </div>
-          )}
-          {!isClockedIn && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 flex items-center gap-2">
-              <WifiOff size={14} className="text-amber-600 shrink-0" />
-              <p className="text-xs font-medium text-amber-700">GPS sharing is off. Clock in to enable live trip updates.</p>
             </div>
           )}
 
@@ -3704,9 +3701,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-4">
-                  <button onClick={handleStatusToggle} className={`px-4 h-9 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border ${isClockedIn ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-600' : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'}`}>
-                    {isClockedIn ? 'Go Offline' : 'Go Online'}
-                  </button>
+                  <span className="px-4 h-9 rounded-xl font-bold text-xs uppercase tracking-wider bg-emerald-600 text-white border border-emerald-600 flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-white rounded-full animate-pulse" /> Online
+                  </span>
                   <div className="flex items-center gap-1.5 px-3 h-9 bg-white/10 backdrop-blur-md rounded-xl border border-white/10">
                     <Gauge size={12} className="text-white/70" />
                     <span className="text-xs font-medium text-white">{me?.odometer?.toLocaleString() || 0} mi</span>
@@ -3930,44 +3927,34 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   Preferences
                 </div>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">Notifications</p>
+                          <p className="text-[10px] text-slate-500">Message and trip alerts</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">Notifications</p>
-                        <p className="text-[10px] text-slate-500">Message and trip alerts</p>
-                      </div>
+                      <span className="px-3 h-7 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Always On
+                      </span>
                     </div>
-                    <button
-                      onClick={() => onUpdateAppSettings?.({ notifications: !(appSettings?.notifications !== false) })}
-                      className={`w-12 h-7 rounded-full transition-colors relative ${appSettings?.notifications !== false ? 'bg-blue-600' : 'bg-slate-300'}`}
-                    >
-                      <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform shadow-sm ${appSettings?.notifications !== false ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                        <MapPin size={16} />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                          <MapPin size={16} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">GPS Sharing</p>
+                          <p className="text-[10px] text-slate-500">Share location in real time</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">GPS Sharing</p>
-                        <p className="text-[10px] text-slate-500">Share location when clocked in</p>
-                      </div>
+                      <span className="px-3 h-7 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Always On
+                      </span>
                     </div>
-                    <button
-                      onClick={() => {
-                        if (isClockedIn) {
-                          handleStatusToggle();
-                        }
-                      }}
-                      className={`w-12 h-7 rounded-full transition-colors relative ${isClockedIn ? 'bg-emerald-600' : 'bg-slate-300'}`}
-                    >
-                      <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform shadow-sm ${isClockedIn ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>
