@@ -67,6 +67,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const isAnotherExpanded = expandedId !== null && expandedId !== task.id;
   const [copiedId, setCopiedId] = useState('');
   const [showMoreSheet, setShowMoreSheet] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
 
   const timeUrgency = getTimeUrgency(task.time, task.status);
   const isTerminal = ['Completed', 'Cancelled', 'No Show'].includes(task.status);
@@ -415,16 +416,22 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 </div>
               )}
 
-              {/* --- NOTES --- */}
+              {/* --- NOTES (collapsible) --- */}
               {(task.notes || task.details?.generalComments) && (
-                <div className="mx-4 mt-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/40 rounded-2xl p-4 flex gap-3 items-start">
-                  <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-                    <AlertCircle size={15} className="text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 mb-0.5">Driver Notes</p>
-                    <p className="text-[12px] text-amber-900 font-medium leading-relaxed">{task.notes || task.details.generalComments}</p>
-                  </div>
+                <div className="mx-4 mt-3">
+                  <button onClick={(e) => { e.stopPropagation(); setShowNotes(!showNotes); }}
+                    className="w-full flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/40 rounded-xl px-3 py-2 cursor-pointer active:scale-[0.98] transition-all">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle size={13} className="text-amber-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500">Driver Notes</span>
+                    </div>
+                    <ChevronDown size={13} className={`text-amber-400 transition-transform ${showNotes ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showNotes && (
+                    <div className="mt-1.5 bg-amber-50/60 border border-amber-200/30 rounded-xl px-3 py-2.5">
+                      <p className="text-[12px] text-amber-900 font-medium leading-relaxed">{task.notes || task.details.generalComments}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
