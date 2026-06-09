@@ -2842,46 +2842,47 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== ODOMETER PROMPT MODAL ===== */}
       {showOdometerPrompt && (
-        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => setShowOdometerPrompt(null)}>
+        <div className="fixed inset-0" style={{ zIndex: 120 }} onClick={() => setShowOdometerPrompt(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
-              <div>
-                <h2 className="font-bold text-base text-slate-900">Arrived at Pickup</h2>
-                <p className="text-xs text-slate-500">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
-              </div>
-              <button type="button" onClick={() => setShowOdometerPrompt(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
-                <X size={16} className="text-slate-500" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {lastOdometer > 0 && (
-                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
-                  <p className="text-xs text-slate-400 font-bold uppercase">Current Odometer</p>
-                  <p className="text-lg font-bold text-slate-800">{lastOdometer?.toLocaleString()} mi</p>
+          <div className="absolute inset-x-0 bottom-0 flex justify-center p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[85dvh] flex flex-col animate-slide-up">
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div>
+                  <h2 className="font-bold text-base text-slate-900">Arrived at Pickup</h2>
+                  <p className="text-xs text-slate-500">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
                 </div>
-              )}
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Enter Odometer Reading (mi)</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={odometerValue}
-                  onChange={(e) => setOdometerValue(e.target.value)}
-                  placeholder="Enter full odometer reading"
-                  className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-emerald-500 outline-none"
-                  autoFocus
-                />
-                {lastOdometer > 0 && odometerValue && parseInt(odometerValue, 10) < lastOdometer && (
-                  <p className="text-sm text-amber-700 font-semibold mt-3 text-center bg-amber-50 rounded-xl px-4 py-3 border border-amber-200">
-                    {parseInt(odometerValue, 10).toLocaleString()} mi is less than last reading of {lastOdometer.toLocaleString()} mi. You can continue if you're sure.
-                  </p>
-                )}
+                <button type="button" onClick={() => setShowOdometerPrompt(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+                  <X size={16} className="text-slate-500" />
+                </button>
               </div>
-            </div>
-            <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
-              <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-              <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm Arrival</button>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {lastOdometer > 0 && (
+                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                    <p className="text-xs text-slate-400 font-bold uppercase">Current Odometer</p>
+                    <p className="text-lg font-bold text-slate-800">{lastOdometer?.toLocaleString()} mi</p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Enter Odometer Reading (mi)</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={odometerValue}
+                    onChange={(e) => setOdometerValue(e.target.value)}
+                    placeholder="Enter full odometer reading"
+                    className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-emerald-500 outline-none"
+                  />
+                  {lastOdometer > 0 && odometerValue && parseInt(odometerValue, 10) < lastOdometer && (
+                    <p className="text-sm text-amber-700 font-semibold mt-3 text-center bg-amber-50 rounded-xl px-4 py-3 border border-amber-200">
+                      {parseInt(odometerValue, 10).toLocaleString()} mi is less than last reading of {lastOdometer.toLocaleString()} mi. You can continue if you're sure.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
+                <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm Arrival</button>
+              </div>
             </div>
           </div>
         </div>
@@ -2889,41 +2890,42 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== ROUTE STOP ODOMETER PROMPT ===== */}
       {routeStopOdometerPrompt && (
-        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => setRouteStopOdometerPrompt(null)}>
+        <div className="fixed inset-0" style={{ zIndex: 120 }} onClick={() => setRouteStopOdometerPrompt(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
-              <div>
-                <h2 className="font-bold text-base text-slate-900">Arrived at Stop</h2>
-                <p className="text-xs text-slate-500">{routeStopOdometerPrompt.name || `Stop ${routeStopOdometerPrompt.sequenceIndex}`}</p>
-              </div>
-              <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
-                <X size={16} className="text-slate-500" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {lastOdometer > 0 && (
-                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
-                  <p className="text-xs text-slate-400 font-bold uppercase">Current Odometer</p>
-                  <p className="text-lg font-bold text-slate-800">{lastOdometer?.toLocaleString()} mi</p>
+          <div className="absolute inset-x-0 bottom-0 flex justify-center p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[85dvh] flex flex-col animate-slide-up">
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div>
+                  <h2 className="font-bold text-base text-slate-900">Arrived at Stop</h2>
+                  <p className="text-xs text-slate-500">{routeStopOdometerPrompt.name || `Stop ${routeStopOdometerPrompt.sequenceIndex}`}</p>
                 </div>
-              )}
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Enter Odometer at Arrival (mi)</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={routeStopOdometerValue}
-                  onChange={(e) => setRouteStopOdometerValue(e.target.value)}
-                  placeholder="Enter odometer reading"
-                  className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-blue-500 outline-none"
-                  autoFocus
-                />
+                <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
+                  <X size={16} className="text-slate-500" />
+                </button>
               </div>
-            </div>
-            <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
-              <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-              <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-[#121A66] hover:bg-[#18227d] text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {lastOdometer > 0 && (
+                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                    <p className="text-xs text-slate-400 font-bold uppercase">Current Odometer</p>
+                    <p className="text-lg font-bold text-slate-800">{lastOdometer?.toLocaleString()} mi</p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Enter Odometer at Arrival (mi)</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={routeStopOdometerValue}
+                    onChange={(e) => setRouteStopOdometerValue(e.target.value)}
+                    placeholder="Enter odometer reading"
+                    className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
+                <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-[#121A66] hover:bg-[#18227d] text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
+              </div>
             </div>
           </div>
         </div>
