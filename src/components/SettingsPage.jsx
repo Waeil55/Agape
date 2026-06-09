@@ -89,7 +89,7 @@ const ROLE_COLORS = {
   billing: 'bg-purple-100 text-purple-800',
   qa_auditor: 'bg-amber-100 text-amber-800',
   fleet_manager: 'bg-cyan-100 text-cyan-800',
-  supervisor: 'bg-indigo-100 text-indigo-800',
+  supervisor: 'bg-blue-100 text-blue-800',
 };
 
 const SettingsPage = ({
@@ -181,7 +181,7 @@ const SettingsPage = ({
                 { label: 'Dispatchers', value: dispatchers.length, icon: User, color: 'bg-purple-600' },
                 { label: 'Archived', value: trashedTrips.length, icon: Archive, color: 'bg-amber-600' },
                 { label: 'Total Trips', value: trips.length, icon: Activity, color: 'bg-cyan-600' },
-                { label: 'Vehicles', value: vehicles.length, icon: Truck, color: 'bg-indigo-600' },
+                { label: 'Vehicles', value: vehicles.length, icon: Truck, color: 'bg-blue-600' },
                 { label: 'Cancelled / No Show', value: trips.filter(t => ['Cancelled', 'No Show'].includes(t.status)).length, icon: XCircle, color: 'bg-rose-600' },
                 { label: 'Completed Today', value: trips.filter(t => t.status === 'Completed').length, icon: CheckCircle2, color: 'bg-emerald-600' },
               ].map((stat, i) => {
@@ -421,7 +421,7 @@ const SettingsPage = ({
                         <label className="block text-xs font-bold text-slate-600 mb-1.5">Routing Phone</label>
                         <div className="flex gap-2">
                           <input type="tel" value={phoneNumbers?.routing || ''} onChange={(e) => onUpdatePhoneNumbers?.({ routing: e.target.value })} className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777708" />
-                          <button onClick={() => makeCall(phoneNumbers?.routing || '', 'Routing')} className="px-3 py-2.5 bg-indigo-100 text-indigo-700 rounded-xl hover:bg-indigo-200 transition flex items-center" aria-label="Call routing"><Phone size={16} /></button>
+                          <button onClick={() => makeCall(phoneNumbers?.routing || '', 'Routing')} className="px-3 py-2.5 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition flex items-center" aria-label="Call routing"><Phone size={16} /></button>
                         </div>
                       </div>
                     </div>

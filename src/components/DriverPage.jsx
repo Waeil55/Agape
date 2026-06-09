@@ -639,7 +639,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setAssignedSequence((prev) => (prev?.id === assignedSequence.id ? { ...prev, ...updates } : prev));
     await setDoc(doc(db, 'routeData', 'sequences'), { templates: nextTemplates }, { merge: true });
     if (auditTitle && auditMessage && onAddAuditLog) {
-      onAddAuditLog(auditTitle, auditMessage, 'indigo');
+      onAddAuditLog(auditTitle, auditMessage, 'blue');
     }
   }, [assignedSequence?.id, routeTemplates, currentUser, onAddAuditLog]);
 
@@ -2050,7 +2050,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               onClick={() => handleCall(phoneNumbers?.routing || '', 'Routing')}
               disabled={!phoneNumbers?.routing}
               title="Call Routing"
-              className="h-7 px-2 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1 text-[10px] font-bold disabled:opacity-50"
+              className="h-7 px-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 text-[10px] font-bold disabled:opacity-50"
             >
               <Phone size={11} />
               <span className="inline">ROUT</span>
@@ -2218,7 +2218,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             const headerStepTotal = hasRoutePlanGuidedStops ? assignedRoutePlanStops.length : guidedSteps.length;
             const pct = Math.round((headerStepIndex / Math.max(headerStepTotal, 1)) * 100);
             return (
-              <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-3 shadow-md shadow-indigo-200/40 sticky top-0" style={{ zIndex: 10 }}>
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-3 shadow-md shadow-blue-200/40 sticky top-0" style={{ zIndex: 10 }}>
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-black text-white">{headerStepIndex + 1}</span>
@@ -2289,7 +2289,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               {onAddTrip && (
                   <button
                     onClick={() => setShowAddTripModal && setShowAddTripModal(true)}
-                    className="text-[9px] text-white font-bold flex items-center gap-1 active:scale-95 bg-gradient-to-r from-blue-600 to-indigo-600 px-2 py-0.5 rounded-lg shadow-sm"
+                    className="text-[9px] text-white font-bold flex items-center gap-1 active:scale-95 bg-gradient-to-r from-blue-600 to-blue-700 px-2 py-0.5 rounded-lg shadow-sm"
                 >
                   <span className="text-xs leading-none">+</span> Add Trip
                 </button>
@@ -2342,7 +2342,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     setSequencerTripFilter(selectedTrips);
                     setActiveNav('tools');
                   }}
-                  className="text-[9px] text-white font-bold flex items-center gap-1 active:scale-95 bg-gradient-to-r from-indigo-600 to-purple-600 px-2 py-0.5 rounded-lg shadow-sm"
+                  className="text-[9px] text-white font-bold flex items-center gap-1 active:scale-95 bg-gradient-to-r from-blue-600 to-blue-700 px-2 py-0.5 rounded-lg shadow-sm"
                 >
                   <Route size={9} /> Route
                 </button>
@@ -2447,7 +2447,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 return (
                   <div key={`${getRoutePlanStopKey(stop)}-current`} className="relative pl-12 pr-2 my-4">
-                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-[#121A66] border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-[#121A66] border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-blue-300/50">
                       <span className="text-xs font-black text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200">
@@ -2638,7 +2638,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 return (
                   <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 my-4">
-                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-indigo-500 border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-blue-500 border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-blue-300/50">
                       <span className="text-xs font-black text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
@@ -3261,7 +3261,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 text-white">
+            <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-3xl p-5 text-white">
               <div className="flex items-baseline gap-2 mb-3">
                 <span className="text-4xl font-black tracking-tight">{to12hr(showTripDetails.time)}</span>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${showTripDetails.status === 'Completed' ? 'bg-emerald-400/30 text-emerald-100' : showTripDetails.status === 'In Transit' ? 'bg-blue-400/30' : 'bg-white/20'}`}>{showTripDetails.status}</span>
@@ -3504,7 +3504,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               saveMode === 'recurring'
                 ? `${currentUser} saved recurring route "${route.name}" with ${route.sequence?.length || 0} stops.`
                 : `${currentUser} saved today's route "${route.name}" with ${validTripIds.length} synced trips.`,
-              saveMode === 'recurring' ? 'indigo' : 'amber'
+              saveMode === 'recurring' ? 'blue' : 'amber'
             );
           }}
           sequencerKey={sequencerKey}
@@ -3770,7 +3770,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           </div>
           <div className="space-y-4 px-1">
             {/* Profile Card */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/90 to-indigo-700/90 shadow-lg shadow-blue-600/10">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/90 to-blue-700/90 shadow-lg shadow-blue-600/10">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.1),transparent_60%)]" />
               <div className="relative px-5 py-5">
                 <div className="flex items-center gap-4">
@@ -3815,7 +3815,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
               <button onClick={() => setShowAnalytics(!showAnalytics)} className="w-full p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                     <BarChart3 size={18} />
                   </div>
                   <div>
@@ -3831,7 +3831,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     {[
                       { label: 'Trips Done', value: analytics.tripsCompleted, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50' },
                       { label: 'Distance', value: `${analytics.totalDistance} mi`, icon: MapPin, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                      { label: 'Drive Time', value: formatDuration(analytics.totalDriveTime), icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                      { label: 'Drive Time', value: formatDuration(analytics.totalDriveTime), icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
                       { label: 'Efficiency', value: `${analytics.efficiency}/hr`, icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50' },
                     ].map(stat => {
                       const Icon = stat.icon;

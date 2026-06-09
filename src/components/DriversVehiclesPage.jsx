@@ -330,7 +330,7 @@ const [form, setForm] = useState({
                               }
                             }
                             setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, vehicle: newV } : x));
-                            addAuditLog('Vehicle Assigned', `${currentUser} assigned ${newV || 'no vehicle'} to ${d.name}.`, 'indigo');
+                            addAuditLog('Vehicle Assigned', `${currentUser} assigned ${newV || 'no vehicle'} to ${d.name}.`, 'blue');
                           }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                             <option value="">- None -</option>
                             {vehicles.filter(v => !drivers.find(x => x.vehicle === v.name && x.id !== d.id) || v.name === d.vehicle).map(v => (
@@ -361,7 +361,7 @@ const [form, setForm] = useState({
                               <ClipboardList size={12} /> Trips
                             </button>
                             {onUploadForDriver && (
-                              <button onClick={() => onUploadForDriver(d.id)} className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold hover:bg-indigo-200 flex items-center gap-1" title="Upload & assign">
+                              <button onClick={() => onUploadForDriver(d.id)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 flex items-center gap-1" title="Upload & assign">
                                 <Upload size={12} /> Upload
                               </button>
                             )}
@@ -377,7 +377,7 @@ const [form, setForm] = useState({
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4 flex gap-1 sm:gap-2">
                           <button onClick={() => analyzeDriver(d)} className="p-1.5 sm:p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="AI Analyze" aria-label="AI Analyze"><BrainCircuit size={14} /></button>
-                          <button onClick={() => openScheduleEditor(d)} className="p-1.5 sm:p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Edit Schedule" aria-label="Edit Schedule"><Clock size={14} /></button>
+                          <button onClick={() => openScheduleEditor(d)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit Schedule" aria-label="Edit Schedule"><Clock size={14} /></button>
                           <button onClick={() => openEdit(d)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" aria-label="Edit driver"><Edit2 size={14} /></button>
                           {(role === 'admin' || role === 'dispatcher') && (
                             <button onClick={() => deleteDriver(d)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" aria-label="Delete driver"><Trash2 size={14} /></button>
@@ -432,7 +432,7 @@ const [form, setForm] = useState({
                             if (driverId) {
                               setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, vehicle: v.name } : d));
                             }
-                            addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'indigo');
+                            addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'blue');
                           }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                             <option value="">- Unassigned -</option>
                             {drivers.map(d => (
@@ -599,7 +599,7 @@ const [form, setForm] = useState({
                   <p className="text-xs text-slate-400 text-center py-4">No schedule blocks yet. Add one below.</p>
                 )}
                 {(editScheduleDriver.schedule || []).map((block, idx) => (
-                  <div key={idx} className={`flex items-center justify-between p-3 rounded-lg border ${editingScheduleIdx === idx ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 bg-white'}`}>
+                  <div key={idx} className={`flex items-center justify-between p-3 rounded-lg border ${editingScheduleIdx === idx ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-white'}`}>
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-2 h-2 rounded-full shrink-0 ${block.status === 'free' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                       <div className="min-w-0">

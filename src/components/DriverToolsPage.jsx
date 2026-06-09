@@ -452,7 +452,7 @@ Return ONLY the JSON object. No markdown.`;
       {/* Header */}
       <button onClick={() => setExpanded(!expanded)}
         className="w-full cursor-pointer">
-        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-3.5">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur">
@@ -544,8 +544,8 @@ Return ONLY the JSON object. No markdown.`;
                         placeholder={isOrigin ? 'Starting point (GPS or address)...' : `Stop ${stop.letter}...`}
                         className={`w-full h-10 px-3 rounded-xl text-[12px] font-semibold border transition-all outline-none ${
                           isOrigin
-                            ? 'bg-indigo-50/50 border-indigo-200 text-indigo-900 placeholder-indigo-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
-                            : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
+                            ? 'bg-indigo-50/50 border-indigo-200 text-indigo-900 placeholder-indigo-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
+                            : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
                         }`}
                       />
                     </div>
@@ -554,7 +554,7 @@ Return ONLY the JSON object. No markdown.`;
                     <div className="flex items-center gap-0.5 shrink-0">
                       {isOrigin ? (
                         <button onClick={handleUseCurrentLocation} disabled={gettingLocation}
-                          className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center active:bg-indigo-100 transition cursor-pointer"
+                          className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center active:bg-blue-100 transition cursor-pointer"
                           title="Use current location">
                           <Navigation size={14} className={gettingLocation ? 'animate-spin' : ''} />
                         </button>
@@ -581,7 +581,7 @@ Return ONLY the JSON object. No markdown.`;
                   {leg && index < stops.length - 1 && (
                     <div className="ml-4 pl-4 border-l-2 border-dashed border-slate-100 py-1.5 flex items-center gap-3">
                       <span className="text-[10px] font-bold text-slate-400">{leg.distance}</span>
-                      <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded">{leg.duration}</span>
+                      <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">{leg.duration}</span>
                     </div>
                   )}
                 </div>
@@ -591,16 +591,16 @@ Return ONLY the JSON object. No markdown.`;
 
           {/* Route Summary Bar */}
           {routeResult && !isCalculating && (
-            <div className="bg-gradient-to-r from-slate-50 to-indigo-50 rounded-xl p-3 border border-slate-100">
+            <div className="bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl p-3 border border-slate-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5">
-                    <Navigation size={12} className="text-indigo-500" />
+                    <Navigation size={12} className="text-blue-500" />
                     <span className="text-[12px] font-extrabold text-slate-800">{routeResult.totalDistance}</span>
                   </div>
                   <div className="w-px h-4 bg-slate-200" />
                   <div className="flex items-center gap-1.5">
-                    <Clock size={12} className="text-indigo-500" />
+                    <Clock size={12} className="text-blue-500" />
                     <span className="text-[12px] font-extrabold text-slate-800">{routeResult.totalDuration}</span>
                   </div>
                 </div>
@@ -613,7 +613,7 @@ Return ONLY the JSON object. No markdown.`;
 
           {isCalculating && (
             <div className="flex items-center justify-center gap-2 py-3">
-              <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-[11px] font-bold text-slate-400">Calculating route...</span>
             </div>
           )}
@@ -625,7 +625,7 @@ Return ONLY the JSON object. No markdown.`;
               + Add Stop
             </button>
             <button onClick={handleUseCurrentLocation} disabled={gettingLocation}
-              className="h-10 bg-indigo-50 text-indigo-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-indigo-100 transition cursor-pointer">
+              className="h-10 bg-blue-50 text-blue-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-blue-100 transition cursor-pointer">
               <Navigation size={12} className={gettingLocation ? 'animate-spin' : ''} />
               {gettingLocation ? 'Locating...' : 'My Location'}
             </button>

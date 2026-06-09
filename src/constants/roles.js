@@ -39,7 +39,7 @@ export const ROLE_BADGE_STYLES = {
   billing: 'bg-red-100 text-red-800',
   qa_auditor: 'bg-amber-100 text-amber-800',
   fleet_manager: 'bg-cyan-100 text-cyan-800',
-  supervisor: 'bg-indigo-100 text-indigo-800',
+  supervisor: 'bg-blue-100 text-blue-800',
 };
 
 export const PERMISSIONS = {

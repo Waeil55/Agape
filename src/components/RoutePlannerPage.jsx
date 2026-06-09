@@ -27,7 +27,7 @@ const STORAGE_KEY = 'agape_routePlanner_v3';
 const statusColors = {
   Unassigned: 'bg-slate-100 text-slate-600',
   Assigned: 'bg-blue-100 text-blue-700',
-  'In Mission': 'bg-indigo-100 text-indigo-700',
+  'In Mission': 'bg-blue-100 text-blue-700',
   'En Route': 'bg-amber-100 text-amber-700',
   'At Pickup': 'bg-cyan-100 text-cyan-700',
   'At Dropoff': 'bg-purple-100 text-purple-700',

@@ -249,7 +249,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
               const isClockedIn = d.clockedIn || false;
 
               return (
-                <div key={d.id} className="bg-white rounded-xl border border-slate-200 p-3 hover:border-indigo-200 transition">
+                <div key={d.id} className="bg-white rounded-xl border border-slate-200 p-3 hover:border-blue-200 transition">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${isClockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -265,7 +265,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                           <MapPin size={10} className="shrink-0" /> {d.currentZone} &bull; {d.vehicle}
                           {d.assignedDispatcher && (
                             <>
-                              &bull; <span className="text-indigo-600 font-bold">Disp: {d.assignedDispatcher.split('-')[0]}</span>
+                              &bull; <span className="text-blue-600 font-bold">Disp: {d.assignedDispatcher.split('-')[0]}</span>
                             </>
                           )}
                         </p>
@@ -317,12 +317,12 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                 ) : (
                   unassignedTrips.map(t => (
                     <button key={t.id} onClick={() => handleTripSelect(t)}
-                      className={`w-full text-left p-3 hover:bg-slate-50 transition ${selectedTrip?.id === t.id ? 'bg-indigo-50 border-l-4 border-l-indigo-500' : ''}`}
+                      className={`w-full text-left p-3 hover:bg-slate-50 transition ${selectedTrip?.id === t.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm text-slate-900 break-words">{t.patient}</p>
-                          {t.bookingId ? <p className="text-xs text-indigo-600 font-bold break-words">{t.bookingId}</p> : null}
+                          {t.bookingId ? <p className="text-xs text-blue-600 font-bold break-words">{t.bookingId}</p> : null}
                           <p className="text-xs text-slate-500 break-words"><span className="text-emerald-600">{t.pickup}</span> → <span className="text-rose-600">{t.dropoff}</span></p>
                         </div>
                         <div className="text-right shrink-0">

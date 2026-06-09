@@ -78,7 +78,7 @@ const Badge = ({ children, variant = 'info' }) => {
 };
 
 const getLogTextColor = (color) => {
-  const colors = { amber: 'text-amber-600', emerald: 'text-emerald-600', rose: 'text-rose-600', blue: 'text-blue-600', indigo: 'text-indigo-600' };
+  const colors = { amber: 'text-amber-600', emerald: 'text-emerald-600', rose: 'text-rose-600', blue: 'text-blue-600', indigo: 'text-blue-600' };
   return colors[color] || 'text-slate-600';
 };
 
@@ -2002,7 +2002,7 @@ const App = () => {
                 ].map(r => {
                   const Icon = r.Icon;
                   const colorMap = {
-                    indigo: 'bg-indigo-600 shadow-indigo-600/20',
+                    indigo: 'bg-blue-600 shadow-blue-600/20',
                     blue: 'bg-blue-600 shadow-blue-600/20',
                     emerald: 'bg-emerald-600 shadow-emerald-600/20'
                   };

@@ -265,14 +265,14 @@ export const ComplianceChecklist = () => {
       </h3>
 
       {/* Overall Progress */}
-      <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+      <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border border-blue-200">
         <div className="flex items-center justify-between mb-2">
           <p className="font-bold text-slate-900">Overall Compliance</p>
           <p className="text-2xl font-black text-blue-600">{totalPercentage}%</p>
         </div>
         <div className="w-full h-3 bg-white rounded-full overflow-hidden border border-blue-200">
           <div
-            className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all"
+            className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all"
             style={{ width: `${totalPercentage}%` }}
           />
         </div>

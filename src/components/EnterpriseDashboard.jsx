@@ -752,11 +752,11 @@ const EnterpriseDashboard = ({
                   </div>
                 </div>
                 {tripDetails.routeAssignments?.length > 0 && (
-                  <div className="bg-white rounded-xl border border-indigo-100 p-2.5 shadow-sm">
-                    <p className="text-micro font-bold uppercase tracking-wider text-indigo-500 mb-1">Route Plans</p>
+                  <div className="bg-white rounded-xl border border-blue-100 p-2.5 shadow-sm">
+                    <p className="text-micro font-bold uppercase tracking-wider text-blue-500 mb-1">Route Plans</p>
                     <div className="flex flex-wrap gap-1.5">
                       {tripDetails.routeAssignments.map((route, index) => (
-                        <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 border border-indigo-100">
+                        <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 border border-blue-100">
                           {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` • ${route.statusLabel}` : ''}
                         </span>
                       ))}
@@ -791,13 +791,13 @@ const EnterpriseDashboard = ({
                         <button
                           key={i}
                           onClick={() => { setActivePanel(loc.panel); setTripDetails(null); setShowRightPanel(false); setShowTripLocations(false); }}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-colors text-left"
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-100 transition-colors text-left"
                         >
-                          {loc.icon === 'Zap' && <Zap size={12} className="text-indigo-600" />}
-                          {loc.icon === 'Archive' && <Archive size={12} className="text-indigo-600" />}
-                          {loc.icon === 'BarChart2' && <BarChart2 size={12} className="text-indigo-600" />}
-                          {loc.icon === 'Route' && <Route size={12} className="text-indigo-600" />}
-                          <span className="text-[10px] font-semibold text-indigo-700">{loc.label}</span>
+                          {loc.icon === 'Zap' && <Zap size={12} className="text-blue-600" />}
+                          {loc.icon === 'Archive' && <Archive size={12} className="text-blue-600" />}
+                          {loc.icon === 'BarChart2' && <BarChart2 size={12} className="text-blue-600" />}
+                          {loc.icon === 'Route' && <Route size={12} className="text-blue-600" />}
+                          <span className="text-[10px] font-semibold text-blue-700">{loc.label}</span>
                         </button>
                       ))}
                     </div>
@@ -1433,11 +1433,11 @@ const EnterpriseDashboard = ({
               </div>
 
               {tripDetails.routeAssignments?.length > 0 && (
-                <div className="bg-white rounded-xl border border-indigo-100 p-3 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-indigo-500">Route Plans</p>
+                <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-blue-500">Route Plans</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {tripDetails.routeAssignments.map((route, index) => (
-                      <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700">
+                      <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700">
                         {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` • ${route.statusLabel}` : ''}
                       </span>
                     ))}
@@ -1476,13 +1476,13 @@ const EnterpriseDashboard = ({
                       <button
                         key={i}
                         onClick={() => { setActivePanel(loc.panel); setTripDetails(null); setShowTripLocations(false); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-colors text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 transition-colors text-left"
                       >
-                        {loc.icon === 'Zap' && <Zap size={14} className="text-indigo-600" />}
-                        {loc.icon === 'Archive' && <Archive size={14} className="text-indigo-600" />}
-                        {loc.icon === 'BarChart2' && <BarChart2 size={14} className="text-indigo-600" />}
-                        {loc.icon === 'Route' && <Route size={14} className="text-indigo-600" />}
-                        <span className="text-xs font-semibold text-indigo-700">{loc.label}</span>
+                        {loc.icon === 'Zap' && <Zap size={14} className="text-blue-600" />}
+                        {loc.icon === 'Archive' && <Archive size={14} className="text-blue-600" />}
+                        {loc.icon === 'BarChart2' && <BarChart2 size={14} className="text-blue-600" />}
+                        {loc.icon === 'Route' && <Route size={14} className="text-blue-600" />}
+                        <span className="text-xs font-semibold text-blue-700">{loc.label}</span>
                       </button>
                     ))}
                   </div>
@@ -1534,7 +1534,7 @@ const EnterpriseDashboard = ({
           <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
             <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Route size={16} className="text-indigo-700" /> Route Sequencer
+                <Route size={16} className="text-blue-700" /> Route Sequencer
               </h2>
               <button onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>

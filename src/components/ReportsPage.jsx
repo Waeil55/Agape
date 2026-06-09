@@ -715,7 +715,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         {selectedTasks.length > 0 && (
           <button onClick={() => requestBulkDelete(selectedTasks, () => setSelectedTasks([]))} className="flex items-center gap-0.5 px-1 py-0.5 bg-rose-50 text-rose-600 rounded font-semibold"><Archive size={9} /> Arch {selectedTasks.length}</button>
         )}
-        <button onClick={() => setShowUploadModal(true)} className="px-1 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold"><UploadCloud size={9} /> Upload</button>
+        <button onClick={() => setShowUploadModal(true)} className="px-1 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold"><UploadCloud size={9} /> Upload</button>
         <button onClick={exportCsv} disabled={reportTrips.length === 0} className="px-1 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold disabled:opacity-40"><Download size={9} /> CSV</button>
         <button onClick={generateAiReport} disabled={reportTrips.length === 0 || aiReportLoading} className="px-1 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold disabled:opacity-40 flex items-center gap-1">
           {aiReportLoading ? <Loader2 size={9} className="animate-spin" /> : <BrainCircuit size={9} />} AI Report
@@ -724,7 +724,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         {[
           { label: 'Total', value: stats.total, color: 'text-slate-700' },
           { label: 'Done', value: stats.completed, color: 'text-emerald-600' },
-          { label: 'Reviewed', value: stats.reviewed, color: 'text-indigo-600' },
+          { label: 'Reviewed', value: stats.reviewed, color: 'text-blue-600' },
           { label: 'NS', value: stats.noShow, color: 'text-rose-600' },
           { label: 'Canc.', value: stats.cancelled, color: 'text-amber-600' },
           { label: 'Reroute', value: stats.rerouted, color: 'text-purple-600' },

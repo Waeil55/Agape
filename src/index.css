@@ -85,13 +85,13 @@
   --text-secondary: #475569;
   --text-tertiary: #94a3b8;
   --text-inverse: #ffffff;
-  --text-link: #1B5DB3;
+  --text-link: #2563eb;
 
   /* Brand */
-  --brand-primary: #1B5DB3;
-  --brand-primary-hover: #154A8F;
-  --brand-primary-light: #e3edf7;
-  --brand-primary-subtle: #f0f5fb;
+  --brand-primary: #2563eb;
+  --brand-primary-hover: #1d4ed8;
+  --brand-primary-light: #dbeafe;
+  --brand-primary-subtle: #eff6ff;
   --brand-accent: #8b5cf6;
 
   /* Status */
@@ -104,7 +104,7 @@
   --danger: #dc2626;
   --danger-bg: #fef2f2;
   --danger-border: #fecaca;
-  --info: #1B5DB3;
+  --info: #2563eb;
   --info-bg: #eff6ff;
   --info-border: #bfdbfe;
 
@@ -128,7 +128,7 @@
   --glass-blur: 12px;
 
   /* Gradient accents */
-  --gradient-brand: linear-gradient(135deg, #1B5DB3, #2A6FB0);
+  --gradient-brand: linear-gradient(135deg, #2563eb, #3b82f6);
   --gradient-success: linear-gradient(135deg, #059669, #10b981);
   --gradient-warning: linear-gradient(135deg, #d97706, #f59e0b);
   --gradient-danger: linear-gradient(135deg, #dc2626, #ef4444);
@@ -685,25 +685,7 @@ button:disabled,
   filter: saturate(0.85);
 }
 
-button[class*="bg-blue-600"][class*="text-white"],
-button[class*="bg-indigo-600"][class*="text-white"],
-button[class*="bg-slate-900"][class*="text-white"],
-a[class*="bg-blue-600"][class*="text-white"],
-a[class*="bg-indigo-600"][class*="text-white"],
-a[class*="bg-slate-900"][class*="text-white"] {
-  background-color: #1B5DB3 !important;
-  border-color: #1B5DB3 !important;
-}
 
-button[class*="bg-blue-600"][class*="text-white"]:hover,
-button[class*="bg-indigo-600"][class*="text-white"]:hover,
-button[class*="bg-slate-900"][class*="text-white"]:hover,
-a[class*="bg-blue-600"][class*="text-white"]:hover,
-a[class*="bg-indigo-600"][class*="text-white"]:hover,
-a[class*="bg-slate-900"][class*="text-white"]:hover {
-  background-color: #1D2F86 !important;
-  border-color: #1D2F86 !important;
-}
 
 input:not([type="checkbox"]):not([type="radio"]),
 select,
@@ -717,8 +699,8 @@ input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: #1B5DB3 !important;
-  box-shadow: 0 0 0 3px rgba(18, 26, 102, 0.16);
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 
 table {
@@ -730,7 +712,7 @@ table thead,
 table thead[class],
 table thead tr,
 table thead tr[class] {
-  background: linear-gradient(135deg, #1B5DB3 0%, #2A6FB0 100%) !important;
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
 }
 
 table thead th,

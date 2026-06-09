@@ -16,7 +16,7 @@ const SEQUENCES_DOC = 'routeData/sequences';
 const LazyFallback = () => (
   <div className="flex-1 flex items-center justify-center p-8">
     <div className="text-center">
-      <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+      <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
       <p className="text-xs font-semibold text-slate-400">Loading...</p>
     </div>
   </div>
@@ -168,10 +168,10 @@ const UnifiedRoutePlanner = ({
             </div>
             {guidedMode && (
               <button onClick={() => { onSetGuidedMode(false); onSetAiSequence(null); onSetAiSuggestions([]); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 rounded-full border border-indigo-100 active:scale-95 transition cursor-pointer">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                <span className="text-[10px] font-extrabold text-indigo-600">Guided On</span>
-                <X size={11} className="text-indigo-400" />
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100 active:scale-95 transition cursor-pointer">
+                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <span className="text-[10px] font-extrabold text-blue-600">Guided On</span>
+                <X size={11} className="text-blue-400" />
               </button>
             )}
           </div>
@@ -185,7 +185,7 @@ const UnifiedRoutePlanner = ({
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                   className={`relative flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-extrabold rounded-t-xl transition-all cursor-pointer ${
                     isActive
-                      ? 'text-indigo-600 bg-slate-50'
+                      ? 'text-blue-600 bg-slate-50'
                       : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50/50'
                   }`}>
                   <Icon size={12} strokeWidth={isActive ? 2.5 : 2} />
@@ -196,7 +196,7 @@ const UnifiedRoutePlanner = ({
                   {tab.id === 'saved' && sortedTemplates.length > 0 && (
                     <span className="ml-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 text-white text-[7px] font-bold flex items-center justify-center">{sortedTemplates.length}</span>
                   )}
-                  {isActive && <div className="absolute bottom-0 left-2 right-2 h-[3px] bg-indigo-600 rounded-t-full" />}
+                  {isActive && <div className="absolute bottom-0 left-2 right-2 h-[3px] bg-blue-600 rounded-t-full" />}
                 </button>
               );
             })}
@@ -409,7 +409,7 @@ const UnifiedRoutePlanner = ({
                               <div className="space-y-1">
                                 {tpl.sequence.map((stop, idx) => (
                                   <div key={idx} className="flex items-center gap-2 text-[10px] min-w-0">
-                                    <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-extrabold flex items-center justify-center shrink-0 text-[8px]">
+                                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-extrabold flex items-center justify-center shrink-0 text-[8px]">
                                       {idx + 1}
                                     </span>
                                     <span className={`font-bold px-1 rounded ${stop.type === 'PU' ? 'text-emerald-600' : 'text-rose-600'} shrink-0`}>
@@ -432,7 +432,7 @@ const UnifiedRoutePlanner = ({
                               {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => (
                                 <span key={day} className={`w-7 h-5 rounded text-[8px] font-extrabold flex items-center justify-center ${
                                   tpl.days.includes(day)
-                                    ? 'bg-indigo-100 text-indigo-700'
+                                    ? 'bg-blue-100 text-blue-700'
                                     : 'bg-slate-50 text-slate-300'
                                 }`}>
                                   {day.slice(0,2)}
@@ -443,7 +443,7 @@ const UnifiedRoutePlanner = ({
 
                           <div className="flex gap-2">
                             <button onClick={() => handleLoadTemplate(tpl)}
-                              className="flex-1 h-9 bg-indigo-50 text-indigo-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-indigo-100 transition border border-indigo-100 cursor-pointer">
+                              className="flex-1 h-9 bg-blue-50 text-blue-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-blue-100 transition border border-blue-100 cursor-pointer">
                               <FolderOpen size={11} /> Load to Route
                             </button>
                             <button onClick={() => { if (window.confirm(`Delete "${tpl.name}"?`)) handleDeleteTemplate(tpl.id); }}
@@ -458,7 +458,7 @@ const UnifiedRoutePlanner = ({
                       {!isExpanded && (
                         <div className="px-3.5 pb-2.5 flex gap-1.5">
                           <button onClick={() => handleLoadTemplate(tpl)}
-                            className="flex-1 h-8 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-extrabold flex items-center justify-center gap-1 active:bg-indigo-100 transition cursor-pointer">
+                            className="flex-1 h-8 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-extrabold flex items-center justify-center gap-1 active:bg-blue-100 transition cursor-pointer">
                             <FolderOpen size={10} /> Load
                           </button>
                           <button onClick={() => setExpandedTemplateId(tpl.id)}

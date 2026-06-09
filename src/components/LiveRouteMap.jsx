@@ -21,7 +21,7 @@ const stopIcons = {
   driver: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#2563eb" stroke="#fff" stroke-width="3"/><circle cx="12" cy="12" r="4" fill="#fff"/></svg>'),
   pickup: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40"><path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.268 21.732 0 14 0z" fill="#10b981" stroke="#fff" stroke-width="2"/><text x="14" y="18" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">P</text></svg>'),
   dropoff: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40"><path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.268 21.732 0 14 0z" fill="#ef4444" stroke="#fff" stroke-width="2"/><text x="14" y="18" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">D</text></svg>'),
-  waypoint: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36"><path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 24 12 24s12-15 12-24C24 5.373 18.627 0 12 0z" fill="#6366f1" stroke="#fff" stroke-width="2"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">S</text></svg>'),
+  waypoint: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36"><path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 24 12 24s12-15 12-24C24 5.373 18.627 0 12 0z" fill="#2563eb" stroke="#fff" stroke-width="2"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">S</text></svg>'),
 };
 
 const LiveRouteMap = React.memo(({
@@ -432,7 +432,7 @@ const LiveRouteMap = React.memo(({
 
         {/* Route Loading */}
         {routeLoading && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-indigo-600/90 backdrop-blur-md rounded-xl px-3 py-1.5 shadow-sm flex items-center gap-1.5">
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-blue-600/90 backdrop-blur-md rounded-xl px-3 py-1.5 shadow-sm flex items-center gap-1.5">
             <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             <span className="text-xs font-bold text-white">Calculating route...</span>
           </div>

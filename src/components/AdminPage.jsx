@@ -158,7 +158,7 @@ const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
     <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
       <div className="p-3.5 border-b border-slate-100 bg-slate-50/70">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-sm font-black text-indigo-700 uppercase shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-sm font-black text-blue-700 uppercase shrink-0">
             {(dispatcher.name || '?')[0]}
           </div>
           <div className="flex-1 min-w-0">
@@ -446,7 +446,7 @@ const AdminPage = ({
           </div>
           <div className="flex flex-wrap gap-2">
             <span className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">{drivers?.length || 0} drivers</span>
-            <span className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700">{dispatchers?.length || 0} dispatchers</span>
+            <span className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">{dispatchers?.length || 0} dispatchers</span>
             <span className="rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">{vehicles?.length || 0} vehicles</span>
           </div>
         </div>

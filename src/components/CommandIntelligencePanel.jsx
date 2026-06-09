@@ -18,7 +18,6 @@ const toneClasses = {
   blue: { text: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200', fill: 'bg-blue-500' },
   amber: { text: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', fill: 'bg-amber-500' },
   rose: { text: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200', fill: 'bg-rose-500' },
-  indigo: { text: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-200', fill: 'bg-indigo-500' },
   slate: { text: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200', fill: 'bg-slate-500' },
 };
 

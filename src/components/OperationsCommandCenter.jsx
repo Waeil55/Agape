@@ -882,14 +882,14 @@ const OperationsCommandCenter = ({
 
         {(routeAssignments.length > 0 || noteItems.length > 0 || mobility.length > 0 || mobilityAids) && (
           <div className="grid gap-3 xl:grid-cols-[0.95fr_1.25fr]">
-            <div className="rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-700">Route & Transport</p>
+            <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-700">Route & Transport</p>
               {routeAssignments.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {routeAssignments.map((route, index) => (
                     <span
                       key={`${route.templateId || route.routeName}-${index}`}
-                      className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700"
+                      className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700"
                     >
                       <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` - ${route.statusLabel}` : ''}
                     </span>
@@ -1261,7 +1261,7 @@ const OperationsCommandCenter = ({
             </button>
             <span className="truncate text-[11px] font-black text-slate-900">{trip.patient || 'Unnamed Client'}</span>
             {routeAssignments.length > 0 && (
-              <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">
+              <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-semibold text-blue-700">
                 <Route size={9} /> {routeAssignments[0].routeName}
               </span>
             )}
@@ -1315,7 +1315,7 @@ const OperationsCommandCenter = ({
             )}
             <span className="truncate text-sm font-black text-slate-900">{trip.patient || 'Unnamed Client'}</span>
             {routeAssignments.length > 0 && (
-              <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+              <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                 <Route size={10} /> {routeAssignments[0].routeName}{routeAssignments.length > 1 ? ` +${routeAssignments.length - 1}` : ''}
               </span>
             )}
@@ -1416,7 +1416,7 @@ const OperationsCommandCenter = ({
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   <p className={`truncate font-black text-slate-900 ${densityProfile.cardTitle}`}>{trip.patient || 'Unnamed Client'}</p>
                   {routeAssignments.length > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                       <Route size={10} /> {routeAssignments[0].routeName}{routeAssignments.length > 1 ? ` +${routeAssignments.length - 1}` : ''}
                     </span>
                   )}
@@ -1516,7 +1516,7 @@ const OperationsCommandCenter = ({
                     {routeAssignments.length > 0 && (
                       <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} flex flex-wrap gap-1`}>
                         {visibleRouteAssignments.map((route, index) => (
-                          <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                          <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                             {route.routeName}{route.time ? ` @ ${route.time}` : ''}
                           </span>
                         ))}
@@ -1766,7 +1766,7 @@ const OperationsCommandCenter = ({
                             </div>
                           )}
                           {densityProfile.lineCount >= 3 && densityProfile.showStatusMeta && routeAssignments.length > 0 && (
-                            <div className="text-[10px] font-semibold text-indigo-700">
+                            <div className="text-[10px] font-semibold text-blue-700">
                               {routeAssignments.length} routed stop{routeAssignments.length !== 1 ? 's' : ''}
                             </div>
                           )}
@@ -1881,7 +1881,7 @@ const OperationsCommandCenter = ({
                             )}
                             {routeAssignments.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-0.5">
-                                <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">
+                                <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-semibold text-blue-700">
                                   {routeAssignments[0].routeName}{routeAssignments.length > 1 ? ` +${routeAssignments.length - 1}` : ''}
                                 </span>
                               </div>
@@ -1905,7 +1905,7 @@ const OperationsCommandCenter = ({
                             {routeAssignments.length > 0 && (
                               <div className={`${isLeanDensity ? 'mt-1' : 'mt-2'} flex flex-wrap gap-1`}>
                                 {visibleRouteAssignments.map((route, routeIndex) => (
-                                  <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                  <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                                     {route.routeName}{route.time ? ` @ ${route.time}` : ''}
                                   </span>
                                 ))}
@@ -2173,7 +2173,7 @@ const OperationsCommandCenter = ({
                                 </span>
                               )}
                               {visibleRouteAssignments.map((route, routeIndex) => (
-                                <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">
+                                <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
                                   <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}
                                 </span>
                               ))}
@@ -2291,7 +2291,7 @@ const OperationsCommandCenter = ({
                           </span>
                         )}
                         {visibleRouteAssignments.map((route, routeIndex) => (
-                          <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                          <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                             <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}
                           </span>
                         ))}

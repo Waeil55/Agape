@@ -218,7 +218,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {!hideRoleCards && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {[
-          { key: 'admin', bg: 'bg-indigo-50', border: 'border-indigo-200', iconBg: 'bg-indigo-500', Icon: ShieldCheck, label: 'Admin' },
+          { key: 'admin', bg: 'bg-blue-50', border: 'border-blue-200', iconBg: 'bg-blue-500', Icon: ShieldCheck, label: 'Admin' },
           { key: 'dispatcher', bg: 'bg-blue-50', border: 'border-blue-200', iconBg: 'bg-blue-500', Icon: Briefcase, label: 'Dispatcher' },
           { key: 'driver', bg: 'bg-emerald-50', border: 'border-emerald-200', iconBg: 'bg-emerald-500', Icon: Truck, label: 'Driver' },
         ].map(c => {
@@ -516,7 +516,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Role</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { key: 'admin', Icon: ShieldCheck, label: 'Admin', activeBorder: 'border-indigo-500', activeBg: 'bg-indigo-50', text: 'text-indigo-600', textBold: 'text-indigo-700' },
+                      { key: 'admin', Icon: ShieldCheck, label: 'Admin', activeBorder: 'border-blue-500', activeBg: 'bg-blue-50', text: 'text-blue-600', textBold: 'text-blue-700' },
                       { key: 'dispatcher', Icon: Briefcase, label: 'Dispatcher', activeBorder: 'border-blue-500', activeBg: 'bg-blue-50', text: 'text-blue-600', textBold: 'text-blue-700' },
                       { key: 'driver', Icon: Truck, label: 'Driver', activeBorder: 'border-emerald-500', activeBg: 'bg-emerald-50', text: 'text-emerald-600', textBold: 'text-emerald-700' },
                     ].map(c => {

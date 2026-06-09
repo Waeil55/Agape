@@ -188,13 +188,13 @@ const getContactRoleIcon = (role) => {
   const icons = {
     patient: { icon: 'User', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', ring: 'ring-emerald-200' },
     guardian: { icon: 'Shield', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200', ring: 'ring-purple-200' },
-    escort: { icon: 'PhoneForwarded', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200', ring: 'ring-indigo-200' },
+    escort: { icon: 'PhoneForwarded', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', ring: 'ring-blue-200' },
     emergency: { icon: 'AlertTriangle', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200', ring: 'ring-rose-200' },
     facility: { icon: 'Building', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', ring: 'ring-amber-200' },
     pickup: { icon: 'MapPin', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', ring: 'ring-blue-200' },
     dropoff: { icon: 'MapPin', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', ring: 'ring-emerald-200' },
     dispatcher: { icon: 'Headphones', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', ring: 'ring-blue-200' },
-    routing: { icon: 'Route', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200', ring: 'ring-indigo-200' },
+    routing: { icon: 'Route', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', ring: 'ring-blue-200' },
   };
   return icons[role] || icons.patient;
 };

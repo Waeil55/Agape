@@ -17,7 +17,7 @@ const StatusBadge = ({ status }) => {
     'COMPLETED': 'bg-emerald-100 text-emerald-700 border-emerald-200',
     'CANCELLED': 'bg-rose-100 text-rose-700 border-rose-200',
     'NO SHOW': 'bg-rose-100 text-rose-700 border-rose-200',
-    'ASSIGNED': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    'ASSIGNED': 'bg-blue-100 text-blue-700 border-blue-200',
     'UNASSIGNED': 'bg-slate-100 text-slate-500 border-slate-200',
     'IN PROGRESS': 'bg-cyan-100 text-cyan-700 border-cyan-200',
     'EN ROUTE': 'bg-blue-100 text-blue-700 border-blue-200',
@@ -150,7 +150,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
               {task.legs && (
                 <button onClick={(e) => { e.stopPropagation(); actions?.onShowLegs?.(task); }}
                   className={`border px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wider cursor-pointer transition-colors ${
-                    isExpanded ? 'border-indigo-100 text-indigo-600 bg-indigo-50' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    isExpanded ? 'border-blue-100 text-blue-600 bg-blue-50' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                   }`}>
                   {task.legs}
                 </button>
@@ -396,7 +396,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
               {(task.details?.passengerType || task.details?.mobility || (task.tags && task.tags.length > 0)) && (
                 <div className="flex flex-wrap gap-1.5 px-4 mt-3">
                   {task.details?.passengerType && (
-                    <span className="inline-flex items-center gap-1 bg-indigo-50/80 text-indigo-600 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-indigo-100/60">
+                    <span className="inline-flex items-center gap-1 bg-blue-50/80 text-blue-600 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-blue-100/60">
                       <User size={10} /> {task.details.passengerType.split(',')[0]}
                     </span>
                   )}
