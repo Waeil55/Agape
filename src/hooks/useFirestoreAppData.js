@@ -49,10 +49,17 @@ function normalizeTrip(trip) {
 }
 
 function normalizeData(data = {}) {
+  const safeTrips = (data.trips || []).map(trip => {
+    if (trip?.driverName && typeof trip.driverName === 'string' && trip.driverName.toLowerCase().includes('agape care medical')) {
+      return { ...trip, driverName: '' };
+    }
+    return trip;
+  });
+
   return {
     ...DEFAULT_DATA,
     ...data,
-    trips: data.trips || [],
+    trips: safeTrips,
     drivers: data.drivers || [],
     dispatchers: data.dispatchers || [],
     vehicles: data.vehicles || [],
