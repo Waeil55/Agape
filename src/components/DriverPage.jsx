@@ -655,9 +655,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   };
 
   const revertTripStatus = (trip) => {
-    const prevStatus = trip.status === 'Navigating Dropoff' ? 'In Transit' : trip.status === 'At Dropoff' ? 'In Transit' : trip.status === 'In Transit' ? 'At Pickup' : trip.status === 'At Pickup' ? 'In Progress' : trip.status === 'Navigating Pickup' ? 'In Progress' : trip.status === 'In Progress' ? 'Assigned' : trip.status === 'Arrived' ? 'In Transit' : null;
-    if (!prevStatus) return;
-    advanceWorkflow(trip, prevStatus, {}, { allowRegression: true });
+    const s = (trip.status || '').toUpperCase();
+    if (s === 'IN TRANSIT' || s === 'NAVIGATING DROPOFF' || s === 'AT DROPOFF' || s === 'ARRIVED') {
+      advanceWorkflow(trip, 'At Pickup', {}, { allowRegression: true });
+    } else if (s === 'AT PICKUP') {
+      advanceWorkflow(trip, 'In Progress', {}, { allowRegression: true });
+    } else if (s === 'EN ROUTE' || s === 'NAVIGATING PICKUP' || s === 'IN PROGRESS') {
+      advanceWorkflow(trip, 'Assigned', {}, { allowRegression: true });
+    }
   };
 
   const restoreHistoryTrip = (trip) => {

@@ -212,8 +212,8 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
         const stepIdx = (() => {
           const s = String(task.status || '').toUpperCase();
           if (s === 'COMPLETED' || s === 'CANCELLED' || s === 'NO SHOW' || s === 'REROUTED') return 4;
-          if (s === 'AT DROPOFF' || s === 'ARRIVED') return 3;
-          if (s === 'NAVIGATING DROPOFF' || s === 'IN TRANSIT') return 2;
+          if (s === 'IN TRANSIT' || s === 'NAVIGATING DROPOFF' || s === 'AT DROPOFF' || s === 'ARRIVED') return 3;
+          if (s === 'AT PICKUP') return 2;
           if (s === 'EN ROUTE' || s === 'NAVIGATING PICKUP' || s === 'IN PROGRESS') return 1;
           return 0;
         })();
