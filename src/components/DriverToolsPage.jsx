@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
-  ChevronRight, ChevronDown, Navigation, Route,
-  MapPin, Clock, Copy, Check, XCircle
+  ChevronDown, ChevronUp, Navigation, Route, MapPin, Clock,
+  Copy, Check, Compass, Zap, Trash2, ArrowUp, ArrowDown,
+  ExternalLink, RotateCcw, Sparkles, AlertTriangle, GripVertical
 } from 'lucide-react';
-import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
+import { GOOGLE_MAPS_API_KEY, GEMINI_API_CONFIG } from '../config/firebase';
+import { geocodeAddress, getDistanceMiles } from '../config/maps';
 
 const timeToMinutes = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return 1440;
@@ -17,20 +19,6 @@ const timeToMinutes = (t) => {
     if (p.toUpperCase() === 'AM' && h === 12) h = 0;
   }
   return h * 60 + min;
-};
-
-const to12hr = (time) => {
-  if (!time || time === 'Will Call' || time === 'WC') return time || 'Will Call';
-  const m = String(time).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-  if (m && m[3]) return time;
-  const parts = String(time).match(/(\d{1,2}):(\d{2})/);
-  if (!parts) return time;
-  let h = parseInt(parts[1], 10);
-  const min = parts[2];
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  if (h === 0) h = 12;
-  else if (h > 12) h -= 12;
-  return `${h}:${min} ${ampm}`;
 };
 
 const formatDuration = (minutes) => {
@@ -78,11 +66,6 @@ const normalizeStopOrder = (items = [], driverPosition = null) => {
   };
   const rest = safeItems
     .filter((stop) => stop.type !== 'origin' && stop.id !== 'origin')
-    .sort((a, b) => {
-      const rankDiff = stopTypeRank(a.stopType) - stopTypeRank(b.stopType);
-      if (rankDiff !== 0) return rankDiff;
-      return timeToMinutes(a.stopTime) - timeToMinutes(b.stopTime);
-    })
     .map((stop, index) => ({
       ...stop,
       letter: String.fromCharCode(65 + index),
@@ -114,6 +97,40 @@ const readSavedRoutePlan = (storageKey, driverPosition) => {
   return [createBlankStop('Origin'), createBlankStop('A')];
 };
 
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_CONFIG().apiKey}`;
+
+async function callGemini(prompt) {
+  try {
+    const resp = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
+      }),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    let text = data?.candidates?.[0]?.parts?.[0]?.text || '';
+    text = text.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
+    return text;
+  } catch { return null; }
+}
+
+const loadGoogleMapsScript = () => {
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.maps) { resolve(); return; }
+    const existing = document.getElementById('gm-script');
+    if (existing) { existing.addEventListener('load', resolve); existing.addEventListener('error', reject); return; }
+    const s = document.createElement('script');
+    s.id = 'gm-script';
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY()}&libraries=places`;
+    s.async = true; s.defer = true;
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+};
+
 const RoutePlanSection = ({
   routePlanStops = null,
   onSetRoutePlanStops = null,
@@ -124,51 +141,18 @@ const RoutePlanSection = ({
   driverPosition = null,
 }) => {
   const storageKey = `agape_routePlan_${sanitizeStorageKey(currentUser)}`;
-  const dragItem = useRef(null);
-  const dragOverItem = useRef(null);
   const [stops, setStops] = useState(() => readSavedRoutePlan(storageKey, driverPosition));
-  const [routeSummary, setRouteSummary] = useState({ duration: '0 min', distance: '--', legs: [] });
+  const [routeResult, setRouteResult] = useState(null);
+  const [legs, setLegs] = useState([]);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [expanded, setExpanded] = useState(() => localStorage.getItem(`${storageKey}:expanded`) !== '0');
   const [gettingLocation, setGettingLocation] = useState(false);
   const [routeError, setRouteError] = useState('');
   const [routeNotice, setRouteNotice] = useState('');
   const [copiedRoute, setCopiedRoute] = useState(false);
-
-  const loadGoogleMapsScript = useCallback(() => {
-    return new Promise((resolve, reject) => {
-      if (window.google && window.google.maps) { resolve(); return; }
-      const existing = document.getElementById('gm-script');
-      if (existing) { existing.addEventListener('load', resolve); existing.addEventListener('error', reject); return; }
-      const s = document.createElement('script');
-      s.id = 'gm-script';
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY()}`;
-      s.async = true; s.defer = true;
-      s.onload = resolve; s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }, []);
-
-  const getCurrentAddress = useCallback(() => {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) { resolve(''); return; }
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          try {
-            const { latitude, longitude } = pos.coords;
-            const res = await fetch(
-              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY()}`
-            );
-            const data = await res.json();
-            if (data.results?.[0]) resolve(data.results[0].formatted_address);
-            else resolve(`${latitude}, ${longitude}`);
-          } catch { resolve(`${pos.coords.latitude}, ${pos.coords.longitude}`); }
-        },
-        () => resolve(''),
-        { timeout: 8000, enableHighAccuracy: true }
-      );
-    });
-  }, []);
+  const [optimizationResult, setOptimizationResult] = useState(null);
+  const inputRefs = useRef({});
 
   const updateStops = (newStops) => {
     setStops(normalizeStopOrder(newStops, driverPosition));
@@ -195,45 +179,46 @@ const RoutePlanSection = ({
   };
 
   const handleTextChange = (index, newText) => {
-    setStops(prev => normalizeStopOrder(prev.map((s, i) => i === index ? { ...s, label: newText, source: s.source || 'manual' } : s), driverPosition));
+    setStops(prev => prev.map((s, i) => i === index ? { ...s, label: newText, source: s.source || 'manual' } : s));
   };
 
   const handleAddStop = () => {
     setStops(prev => normalizeStopOrder([...prev, createBlankStop(String.fromCharCode(64 + prev.length))], driverPosition));
   };
 
+  const handleClearAll = () => {
+    setStops([createBlankStop('Origin'), createBlankStop('A')]);
+    setRouteResult(null);
+    setLegs([]);
+    setOptimizationResult(null);
+    setRouteError('');
+    setRouteNotice('');
+  };
+
   const handleUseCurrentLocation = async () => {
     setGettingLocation(true);
     setRouteError('');
-    const address = await getCurrentAddress();
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) reject(new Error('No geolocation'));
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: true });
+      });
+      const { latitude, longitude } = pos.coords;
+      const res = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY()}`
+      );
+      const data = await res.json();
+      const address = data.results?.[0]?.formatted_address || `${latitude}, ${longitude}`;
+      setStops(prev => {
+        const copy = [...prev];
+        copy[0] = { ...copy[0], label: address, source: 'gps' };
+        return copy;
+      });
+      setRouteNotice('Current location set as starting point.');
+    } catch {
+      setRouteError('Unable to get current location. Enter manually.');
+    }
     setGettingLocation(false);
-    if (!address) {
-      setRouteError('Unable to read current location. Enter a starting point manually.');
-      return;
-    }
-    setStops(prev => normalizeStopOrder(prev.map((stop, index) => index === 0 ? { ...stop, label: address, source: 'gps' } : s => s), driverPosition));
-    setRouteNotice('Starting point updated from current location.');
-  };
-
-  const handleDragStart = (index) => {
-    if (index === 0) return;
-    dragItem.current = index;
-  };
-
-  const handleDragEnter = (index) => {
-    if (index === 0) return;
-    dragOverItem.current = index;
-  };
-
-  const handleDragEnd = () => {
-    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
-      const copy = [...stops];
-      const dragged = copy.splice(dragItem.current, 1)[0];
-      copy.splice(dragOverItem.current, 0, dragged);
-      updateStops(copy);
-    }
-    dragItem.current = null;
-    dragOverItem.current = null;
   };
 
   const routeValidation = useMemo(() => {
@@ -242,33 +227,15 @@ const RoutePlanSection = ({
     const labels = [origin, ...routeStops].map(stop => cleanRouteAddress(stop.label)).filter(Boolean);
     const errors = [];
     const warnings = [];
-    const duplicateAddresses = [];
     const seen = new Set();
     routeStops.forEach((stop) => {
       const key = cleanRouteAddress(stop.label).toLowerCase();
       if (!key) return;
-      if (seen.has(key) && !duplicateAddresses.includes(stop.label)) duplicateAddresses.push(stop.label);
+      if (seen.has(key)) warnings.push(`Duplicate: ${stop.label}`);
       seen.add(key);
     });
-
-    if (!cleanRouteAddress(origin.label)) errors.push('Add a starting point before navigating the full route.');
-    if (routeStops.length === 0) errors.push('Add at least one destination stop.');
-    if (duplicateAddresses.length > 0) warnings.push(`${duplicateAddresses.length} duplicate address${duplicateAddresses.length > 1 ? 'es' : ''} found.`);
-
-    const tripGroups = new Map();
-    routeStops.forEach((stop) => {
-      if (!stop.tripId) return;
-      if (!tripGroups.has(stop.tripId)) tripGroups.set(stop.tripId, { pu: false, do: false, name: stop.clientName || stop.tripId });
-      const group = tripGroups.get(stop.tripId);
-      if (stop.stopType === 'PU') group.pu = true;
-      if (stop.stopType === 'DO') group.do = true;
-      if (stop.clientName) group.name = stop.clientName;
-    });
-    const incompleteTrips = [...tripGroups.values()].filter(group => !group.pu || !group.do);
-    if (incompleteTrips.length > 0) {
-      warnings.push(`${incompleteTrips.length} trip${incompleteTrips.length > 1 ? 's are' : ' is'} missing a pickup or dropoff stop.`);
-    }
-
+    if (!cleanRouteAddress(origin.label)) errors.push('Add a starting point.');
+    if (routeStops.length === 0) errors.push('Add at least one stop.');
     return {
       ready: errors.length === 0,
       labels,
@@ -276,13 +243,78 @@ const RoutePlanSection = ({
       routeStops,
       errors,
       warnings,
-      duplicateAddresses,
-      tripCount: tripGroups.size,
-      pickupCount: routeStops.filter(stop => stop.stopType === 'PU').length,
-      dropoffCount: routeStops.filter(stop => stop.stopType === 'DO').length,
+      pickupCount: routeStops.filter(s => s.stopType === 'PU').length,
+      dropoffCount: routeStops.filter(s => s.stopType === 'DO').length,
     };
   }, [stops]);
 
+  // Auto-calculate route via Google Maps Directions API
+  useEffect(() => {
+    if (!expanded || !routeValidation.ready || routeValidation.labels.length < 2) {
+      setRouteResult(null);
+      setLegs([]);
+      return;
+    }
+    let cancelled = false;
+    const calculate = async () => {
+      setIsCalculating(true);
+      try {
+        await loadGoogleMapsScript();
+        const labels = routeValidation.labels;
+        const origin = labels[0];
+        const destination = labels[labels.length - 1];
+        const waypoints = labels.slice(1, -1).map(wp => ({ location: wp, stopover: true }));
+
+        const result = await new Promise((resolve, reject) => {
+          new window.google.maps.DirectionsService().route({
+            origin, destination, waypoints,
+            travelMode: window.google.maps.TravelMode.DRIVING,
+            drivingOptions: { departureTime: new Date(), trafficModel: 'best_guess' },
+          }, (response, status) => {
+            if (status === 'OK' && response.routes?.[0]) resolve(response.routes[0]);
+            else reject(new Error(status));
+          });
+        });
+
+        if (cancelled) return;
+        let totalSeconds = 0;
+        let totalMeters = 0;
+        const parsedLegs = result.legs.map((leg) => {
+          totalSeconds += leg.duration_in_traffic?.value || leg.duration?.value || 0;
+          totalMeters += leg.distance?.value || 0;
+          return {
+            startAddress: leg.start_address,
+            endAddress: leg.end_address,
+            distance: leg.distance?.text || '--',
+            distanceMeters: leg.distance?.value || 0,
+            duration: leg.duration_in_traffic?.text || leg.duration?.text || '--',
+            durationSeconds: leg.duration_in_traffic?.value || leg.duration?.value || 0,
+          };
+        });
+        const totalMins = Math.round(totalSeconds / 60);
+        const totalMiles = totalMeters / 1609.344;
+        setRouteResult({
+          totalDuration: formatDuration(totalMins),
+          totalDistance: `${totalMiles.toFixed(1)} mi`,
+          totalMins,
+          totalMiles,
+          summary: result.summary || '',
+        });
+        setLegs(parsedLegs);
+        setRouteError('');
+      } catch (err) {
+        if (!cancelled) {
+          setRouteResult({ totalDuration: 'Unavailable', totalDistance: '--', totalMins: 0, totalMiles: 0, summary: '' });
+          setLegs([]);
+        }
+      }
+      if (!cancelled) setIsCalculating(false);
+    };
+    calculate();
+    return () => { cancelled = true; };
+  }, [expanded, routeValidation.ready, routeValidation.labels.join('|')]);
+
+  // Save to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(stops));
@@ -290,15 +322,15 @@ const RoutePlanSection = ({
     } catch {}
   }, [storageKey, stops, expanded]);
 
+  // Import from routePlanStops
   useEffect(() => {
     if (!routePlanStops || routePlanStops.length === 0) return;
     const imported = routePlanStops.map(normalizeImportedStop).filter(stop => cleanRouteAddress(stop.label));
     if (imported.length === 0) {
-      setRouteError('No usable addresses were found in the selected trips.');
+      setRouteError('No usable addresses found in selected trips.');
       if (onSetRoutePlanStops) onSetRoutePlanStops(null);
       return;
     }
-
     setStops(prev => {
       const base = normalizeStopOrder(prev, driverPosition);
       const keep = base.filter((stop, index) => index === 0 || cleanRouteAddress(stop.label));
@@ -312,61 +344,63 @@ const RoutePlanSection = ({
       return normalizeStopOrder([...keep, ...additions], driverPosition);
     });
     setExpanded(true);
-    setRouteError('');
-    setRouteNotice(`${imported.length} stop${imported.length !== 1 ? 's' : ''} added from selected trips.`);
+    setRouteNotice(`${imported.length} stop${imported.length !== 1 ? 's' : ''} imported from trips.`);
     if (onSetRoutePlanStops) onSetRoutePlanStops(null);
   }, [routePlanStops, driverPosition, onSetRoutePlanStops]);
 
-  useEffect(() => {
-    if (!expanded) return;
-    const calculateTripTime = async () => {
-      if (!routeValidation.ready || routeValidation.labels.length < 2) {
-        setRouteSummary({ duration: '0 min', distance: '--', legs: [] });
-        return;
-      }
-      const labels = routeValidation.labels;
-      setIsCalculating(true);
-      const origin = labels[0];
-      const destination = labels[labels.length - 1];
-      const waypoints = labels.slice(1, -1);
+  // AI Optimize via Gemini
+  const handleAiOptimize = async () => {
+    if (stops.length < 3 || isOptimizing) return;
+    setIsOptimizing(true);
+    setOptimizationResult(null);
+    try {
+      const stopData = stops.slice(1).map((s, i) => ({
+        index: i + 1,
+        label: s.label,
+        clientName: s.clientName || `Stop ${s.letter}`,
+        stopType: s.stopType || '',
+        time: s.stopTime || '',
+      }));
+      const prompt = `You are a route optimization AI for an NEMT (Non-Emergency Medical Transportation) vehicle. Given a starting point and a list of stops, determine the optimal order to minimize total driving time while respecting pickup-before-dropoff constraints for the same client.
 
-      try {
-        await loadGoogleMapsScript();
-        const directionsService = new window.google.maps.DirectionsService();
-        const formattedWaypoints = waypoints.map(wp => ({ location: wp, stopover: true }));
-        const summary = await new Promise((resolve, reject) => {
-          directionsService.route({
-            origin, destination, waypoints: formattedWaypoints,
-            travelMode: window.google.maps.TravelMode.DRIVING
-          }, (response, status) => {
-            if (status === 'OK' && response.routes?.[0]) {
-              let seconds = 0;
-              let meters = 0;
-              const legs = response.routes[0].legs.map((leg) => {
-                seconds += leg.duration?.value || 0;
-                meters += leg.distance?.value || 0;
-                return {
-                  duration: leg.duration?.text || '',
-                  distance: leg.distance?.text || '',
-                };
-              });
-              const mins = Math.round(seconds / 60);
-              const duration = mins >= 60 ? `${Math.floor(mins / 60)} hr ${mins % 60} min` : `${mins} min`;
-              const miles = meters / 1609.344;
-              resolve({ duration, distance: miles > 0 ? `${miles.toFixed(1)} mi` : '--', legs });
-            } else {
-              reject(new Error(status));
-            }
+Starting Point: ${stops[0].label}
+
+Stops:
+${JSON.stringify(stopData, null, 2)}
+
+Rules:
+- Pickup (PU) must come before Dropoff (DO) for the same client
+- Minimize total driving distance and time
+- Consider logical geographic routing
+- Respect time constraints if specified
+
+Return a JSON object:
+{
+  "optimizedOrder": [1, 3, 2, 4] (array of original indices in new order),
+  "reason": "Brief explanation of the optimization",
+  "estimatedTimeSaved": "X minutes"
+}
+Return ONLY the JSON object. No markdown.`;
+
+      const text = await callGemini(prompt);
+      if (text) {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed.optimizedOrder)) {
+          const newStops = [stops[0], ...parsed.optimizedOrder.map(i => stops[i]).filter(Boolean)];
+          const reordered = normalizeStopOrder(newStops, driverPosition);
+          setStops(reordered);
+          setOptimizationResult({
+            reason: parsed.reason || 'Route optimized by AI',
+            timeSaved: parsed.estimatedTimeSaved || '',
           });
-        });
-        setRouteSummary(summary);
-      } catch {
-        setRouteSummary({ duration: 'Unavailable', distance: '--', legs: [] });
+          setRouteNotice('Route optimized by AI. Review the new order.');
+        }
       }
-      setIsCalculating(false);
-    };
-    calculateTripTime();
-  }, [expanded, routeValidation.ready, routeValidation.labels, loadGoogleMapsScript]);
+    } catch (err) {
+      setRouteError('AI optimization failed. Try again.');
+    }
+    setIsOptimizing(false);
+  };
 
   const handleCopyRoute = () => {
     const lines = stops.map((stop, i) => {
@@ -379,114 +413,245 @@ const RoutePlanSection = ({
     setTimeout(() => setCopiedRoute(false), 1500);
   };
 
+  const handleOpenInGoogleMaps = () => {
+    const validStops = stops.filter(s => cleanRouteAddress(s.label));
+    if (validStops.length < 2) return;
+    const origin = encodeURIComponent(validStops[0].label);
+    const destination = encodeURIComponent(validStops[validStops.length - 1].label);
+    const waypoints = validStops.slice(1, -1).map(s => encodeURIComponent(s.label)).join('|');
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+    if (waypoints) url += `&waypoints=${waypoints}`;
+    window.open(url, '_blank');
+  };
+
+  const handleSendToSequencer = () => {
+    const seqStops = stops.slice(1).map((stop, i) => ({
+      address: stop.label,
+      clientName: stop.clientName || `Stop ${stop.letter}`,
+      stopType: stop.stopType || '',
+      time: stop.stopTime || '',
+      tripId: stop.tripId || null,
+      bookingId: stop.bookingId || '',
+    }));
+    if (onSendToSequencer) {
+      onSendToSequencer(seqStops, stops[0]?.label || '');
+    } else if (onOpenSequencer) {
+      onOpenSequencer();
+    }
+  };
+
+  const stopCount = stops.length - 1;
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+    <div className="rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm">
+      {/* Header */}
       <button onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-slate-50/50 transition cursor-pointer">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center">
-            <Route size={17} className="text-indigo-600" />
-          </div>
-          <div className="text-left">
-            <h3 className="text-[13px] font-extrabold text-slate-900 tracking-tight">Route Plan</h3>
-            <p className="text-[11px] font-semibold text-slate-400">{stops.length - 1} stop{stops.length - 1 !== 1 ? 's' : ''}</p>
+        className="w-full cursor-pointer">
+        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-3.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur">
+                <Route size={18} className="text-white" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-[14px] font-extrabold text-white tracking-tight">Route Plan</h3>
+                <p className="text-[11px] font-semibold text-white/60">
+                  {isCalculating ? 'Calculating...' : stopCount > 0 ? `${stopCount} stop${stopCount !== 1 ? 's' : ''}` : 'Add stops to plan'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {routeResult && !isCalculating && (
+                <div className="flex items-center gap-2 mr-2">
+                  <span className="text-[10px] font-bold text-white/80 bg-white/15 px-2 py-1 rounded-lg">{routeResult.totalDistance}</span>
+                  <span className="text-[10px] font-bold text-white/80 bg-white/15 px-2 py-1 rounded-lg">{routeResult.totalDuration}</span>
+                </div>
+              )}
+              <ChevronDown size={18} className={`text-white/60 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+            </div>
           </div>
         </div>
-        <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
       </button>
 
       {expanded && (
-        <div className="border-t border-slate-100 p-4 space-y-3">
-          {/* Summary bar */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2.5 py-1.5">
-              <Clock size={11} className="text-slate-400" />
-              <span className="text-[11px] font-bold text-slate-600">{isCalculating ? '...' : routeSummary.duration}</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2.5 py-1.5">
-              <Navigation size={11} className="text-slate-400" />
-              <span className="text-[11px] font-bold text-slate-600">{routeSummary.distance}</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2.5 py-1.5">
-              <MapPin size={11} className="text-slate-400" />
-              <span className="text-[11px] font-bold text-slate-600">{routeValidation.pickupCount}PU / {routeValidation.dropoffCount}DO</span>
-            </div>
-          </div>
+        <div className="bg-white p-4 space-y-3">
 
-          {/* Errors */}
+          {/* Error / Notice */}
           {routeError && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-[11px] font-semibold text-rose-600">{routeError}</div>
+            <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2.5 flex items-start gap-2">
+              <AlertTriangle size={13} className="text-rose-500 shrink-0 mt-0.5" />
+              <p className="text-[11px] font-semibold text-rose-600">{routeError}</p>
+            </div>
           )}
-
-          {/* Notices */}
           {routeNotice && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-[11px] font-semibold text-emerald-600">{routeNotice}</div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 flex items-start gap-2">
+              <Check size={13} className="text-emerald-500 shrink-0 mt-0.5" />
+              <p className="text-[11px] font-semibold text-emerald-600">{routeNotice}</p>
+            </div>
           )}
 
-          {/* Stops list */}
-          <div className="space-y-2">
-            {stops.map((stop, index) => (
-              <div key={stop.id} className="flex items-center gap-2">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[9px] font-extrabold ${
-                  index === 0 ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {index === 0 ? 'ORG' : stop.letter}
-                </div>
-                <input
-                  type="text"
-                  value={stop.label}
-                  onChange={(e) => handleTextChange(index, e.target.value)}
-                  placeholder={index === 0 ? 'Starting point...' : `Stop ${stop.letter}...`}
-                  className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[12px] font-semibold text-slate-700 placeholder-slate-300 focus:outline-none focus:border-indigo-400 min-w-0"
-                />
-                {index > 0 && (
-                  <div className="flex gap-0.5 shrink-0">
-                    <button onClick={() => handleMoveUp(index)} className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer">▲</button>
-                    <button onClick={() => handleMoveDown(index)} className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer">▼</button>
-                    <button onClick={() => handleDelete(index)} className="w-7 h-7 flex items-center justify-center text-rose-400 hover:text-rose-600 cursor-pointer">✕</button>
-                  </div>
+          {/* Optimization Result */}
+          {optimizationResult && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2.5 flex items-start gap-2">
+              <Sparkles size={13} className="text-indigo-500 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-indigo-700">{optimizationResult.reason}</p>
+                {optimizationResult.timeSaved && (
+                  <p className="text-[10px] font-bold text-indigo-500 mt-0.5">Est. saved: {optimizationResult.timeSaved}</p>
                 )}
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Stops List */}
+          <div className="space-y-2">
+            {stops.map((stop, index) => {
+              const isOrigin = index === 0;
+              const leg = legs[index - 1];
+              return (
+                <div key={stop.id}>
+                  <div className="flex items-center gap-2">
+                    {/* Stop indicator */}
+                    <div className="relative shrink-0">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[9px] font-extrabold ${
+                        isOrigin
+                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                          : stop.stopType === 'PU'
+                            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200'
+                            : stop.stopType === 'DO'
+                              ? 'bg-rose-500 text-white shadow-md shadow-rose-200'
+                              : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {isOrigin ? <Compass size={13} /> : stop.letter}
+                      </div>
+                      {index < stops.length - 1 && (
+                        <div className="absolute top-8 left-1/2 -translate-x-1/2 w-0.5 h-2 bg-slate-200" />
+                      )}
+                    </div>
+
+                    {/* Input */}
+                    <div className="flex-1 min-w-0">
+                      <input
+                        ref={el => inputRefs.current[index] = el}
+                        type="text"
+                        value={stop.label}
+                        onChange={(e) => handleTextChange(index, e.target.value)}
+                        placeholder={isOrigin ? 'Starting point (GPS or address)...' : `Stop ${stop.letter}...`}
+                        className={`w-full h-10 px-3 rounded-xl text-[12px] font-semibold border transition-all outline-none ${
+                          isOrigin
+                            ? 'bg-indigo-50/50 border-indigo-200 text-indigo-900 placeholder-indigo-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
+                            : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
+                        }`}
+                      />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {isOrigin ? (
+                        <button onClick={handleUseCurrentLocation} disabled={gettingLocation}
+                          className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center active:bg-indigo-100 transition cursor-pointer"
+                          title="Use current location">
+                          <Navigation size={14} className={gettingLocation ? 'animate-spin' : ''} />
+                        </button>
+                      ) : (
+                        <>
+                          <button onClick={() => handleMoveUp(index)}
+                            className="w-7 h-7 rounded-lg text-slate-300 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer">
+                            <ArrowUp size={12} />
+                          </button>
+                          <button onClick={() => handleMoveDown(index)}
+                            className="w-7 h-7 rounded-lg text-slate-300 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer">
+                            <ArrowDown size={12} />
+                          </button>
+                          <button onClick={() => handleDelete(index)}
+                            className="w-7 h-7 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer">
+                            <Trash2 size={12} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Leg info */}
+                  {leg && index < stops.length - 1 && (
+                    <div className="ml-4 pl-4 border-l-2 border-dashed border-slate-100 py-1.5 flex items-center gap-3">
+                      <span className="text-[10px] font-bold text-slate-400">{leg.distance}</span>
+                      <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded">{leg.duration}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-2">
+          {/* Route Summary Bar */}
+          {routeResult && !isCalculating && (
+            <div className="bg-gradient-to-r from-slate-50 to-indigo-50 rounded-xl p-3 border border-slate-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <Navigation size={12} className="text-indigo-500" />
+                    <span className="text-[12px] font-extrabold text-slate-800">{routeResult.totalDistance}</span>
+                  </div>
+                  <div className="w-px h-4 bg-slate-200" />
+                  <div className="flex items-center gap-1.5">
+                    <Clock size={12} className="text-indigo-500" />
+                    <span className="text-[12px] font-extrabold text-slate-800">{routeResult.totalDuration}</span>
+                  </div>
+                </div>
+                {routeResult.summary && (
+                  <span className="text-[9px] font-bold text-slate-400 truncate ml-2 max-w-[120px]">{routeResult.summary}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {isCalculating && (
+            <div className="flex items-center justify-center gap-2 py-3">
+              <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-[11px] font-bold text-slate-400">Calculating route...</span>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="grid grid-cols-2 gap-2">
             <button onClick={handleAddStop}
-              className="flex-1 h-9 bg-slate-50 text-slate-600 rounded-xl text-[11px] font-extrabold border border-slate-200 active:bg-slate-100 transition cursor-pointer">
+              className="h-10 bg-slate-100 text-slate-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-slate-200 transition cursor-pointer">
               + Add Stop
             </button>
             <button onClick={handleUseCurrentLocation} disabled={gettingLocation}
-              className="flex-1 h-9 bg-indigo-50 text-indigo-700 rounded-xl text-[11px] font-extrabold border border-indigo-100 active:bg-indigo-100 transition cursor-pointer">
-              {gettingLocation ? 'Locating...' : '📍 Current Location'}
+              className="h-10 bg-indigo-50 text-indigo-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-indigo-100 transition cursor-pointer">
+              <Navigation size={12} className={gettingLocation ? 'animate-spin' : ''} />
+              {gettingLocation ? 'Locating...' : 'My Location'}
             </button>
           </div>
 
-          {/* Navigation buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={handleAiOptimize} disabled={stops.length < 3 || isOptimizing}
+              className="h-10 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:scale-[0.98] transition shadow-md shadow-purple-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+              <Sparkles size={12} />
+              {isOptimizing ? 'Optimizing...' : 'AI Optimize'}
+            </button>
+            <button onClick={handleClearAll}
+              className="h-10 bg-slate-100 text-slate-500 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-slate-200 transition cursor-pointer">
+              <RotateCcw size={12} /> Clear All
+            </button>
+          </div>
+
           {routeValidation.ready && (
-            <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button onClick={handleCopyRoute}
-                className="flex-1 h-9 bg-slate-50 text-slate-600 rounded-xl text-[11px] font-extrabold border border-slate-200 flex items-center justify-center gap-1 active:bg-slate-100 transition cursor-pointer">
+                className="h-10 bg-slate-100 text-slate-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 active:bg-slate-200 transition cursor-pointer">
                 {copiedRoute ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
-                {copiedRoute ? 'Copied!' : 'Copy'}
+                {copiedRoute ? 'Copied' : 'Copy'}
               </button>
-              <button onClick={() => {
-                if (onSendToSequencer) {
-                  const seqStops = stops.slice(1).map((stop, i) => ({
-                    address: stop.label,
-                    clientName: stop.clientName || `Stop ${stop.letter}`,
-                    stopType: stop.stopType || '',
-                    time: stop.stopTime || '',
-                    tripId: stop.tripId || null,
-                    bookingId: stop.bookingId || '',
-                  }));
-                  onSendToSequencer(seqStops, stops[0]?.label || '');
-                } else if (onOpenSequencer) {
-                  onOpenSequencer();
-                }
-              }}
-                className="flex-1 h-9 bg-indigo-600 text-white rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 active:bg-indigo-700 transition shadow-md shadow-indigo-200 cursor-pointer">
-                <Navigation size={11} /> Open in Sequencer
+              <button onClick={handleOpenInGoogleMaps}
+                className="h-10 bg-emerald-50 text-emerald-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 active:bg-emerald-100 transition border border-emerald-100 cursor-pointer">
+                <ExternalLink size={11} /> Maps
+              </button>
+              <button onClick={handleSendToSequencer}
+                className="h-10 bg-indigo-600 text-white rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 active:bg-indigo-700 transition shadow-md shadow-indigo-200 cursor-pointer">
+                <Route size={11} /> Sequencer
               </button>
             </div>
           )}
@@ -494,7 +659,7 @@ const RoutePlanSection = ({
           {/* Warnings */}
           {routeValidation.warnings.length > 0 && (
             <div className="space-y-1">
-              {routeValidation.warnings.map((w, i) => (
+              {routeValidation.warnings.slice(0, 3).map((w, i) => (
                 <p key={i} className="text-[10px] font-semibold text-amber-600 bg-amber-50 rounded-lg px-2.5 py-1.5">{w}</p>
               ))}
             </div>
