@@ -1063,3 +1063,5 @@ table tbody tr:hover {
 .admin-bg-main .hover\:bg-white\/\[0\.02\]:hover { background-color: var(--admin-hover-mid); }
 .admin-bg-main .hover\:bg-white\/\[0\.04\]:hover { background-color: var(--admin-hover-mid); }
 .admin-bg-main .bg-slate-500\/15 { background-color: color-mix(in srgb, var(--text-tertiary) 15%, transparent); }
+
+.safe-bottom { padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)); }
