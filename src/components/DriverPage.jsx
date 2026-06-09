@@ -3740,6 +3740,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       </div>
                       <div className="flex gap-2 mt-3">
                         <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><FileText size={12} /> Details</button>
+                        <button type="button" onClick={() => handleEditTrip(trip)} className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><Edit2 size={12} /> Edit</button>
                         <button type="button" onClick={() => restoreHistoryTrip(trip)} className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><RotateCcw size={12} /> Restore</button>
                       </div>
                     </div>

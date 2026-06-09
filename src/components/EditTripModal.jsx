@@ -40,7 +40,9 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
       if (!timeStr) return '';
       const parts = timeStr.match(/(\d{1,2}):(\d{2})/);
       if (!parts) return '';
-      const d = new Date();
+      // Use original date to avoid resetting history trips to today
+      const d = new Date(editTrip.completedAt || editTrip.arrivalTime || editTrip.startTime || editTrip.date || Date.now());
+      if (isNaN(d.getTime())) d.setTime(Date.now());
       d.setHours(parseInt(parts[1], 10), parseInt(parts[2], 10), 0, 0);
       return d.toISOString();
     };
