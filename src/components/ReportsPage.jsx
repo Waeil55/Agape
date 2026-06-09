@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import {
   ChevronDown, ChevronUp, Download, UploadCloud, RefreshCw,
   X, Search, FileText, Calendar, Archive, Eye, RotateCcw,
@@ -320,8 +320,8 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
       case 'arrivalTime': return formatClock24(trip.arrivalTime);
       case 'departedPickupTime': return formatClock24(trip.departedPickupTime);
       case 'arrivalDropoffTime': return formatClock24(trip.arrivalDropoffTime || trip.completedAt);
-      case 'pickupOdometer': return trip.pickupOdometer || '';
-      case 'dropoffOdometer': return trip.dropoffOdometer || '';
+      case 'pickupOdometer': return trip.pickupOdometer || '—';
+      case 'dropoffOdometer': return trip.dropoffOdometer || '—';
       case 'travelTime': return trip.travelTime || calcDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
       case 'distance': { const m = calcMiles(trip.pickupOdometer, trip.dropoffOdometer); return m !== 'â€”' ? m : 'â€”'; }
       case 'signature': {
