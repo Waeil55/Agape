@@ -124,7 +124,7 @@ const loadGoogleMapsScript = () => {
     if (existing) { existing.addEventListener('load', resolve); existing.addEventListener('error', reject); return; }
     const s = document.createElement('script');
     s.id = 'gm-script';
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY()}&libraries=places`;
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY()}`;
     s.async = true; s.defer = true;
     s.onload = resolve; s.onerror = reject;
     document.head.appendChild(s);
@@ -266,11 +266,12 @@ const RoutePlanSection = ({
         const waypoints = labels.slice(1, -1).map(wp => ({ location: wp, stopover: true }));
 
         const result = await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('TIMEOUT')), 15000);
           new window.google.maps.DirectionsService().route({
             origin, destination, waypoints,
             travelMode: window.google.maps.TravelMode.DRIVING,
-            drivingOptions: { departureTime: new Date(), trafficModel: 'best_guess' },
           }, (response, status) => {
+            clearTimeout(timer);
             if (status === 'OK' && response.routes?.[0]) resolve(response.routes[0]);
             else reject(new Error(status));
           });
@@ -280,15 +281,15 @@ const RoutePlanSection = ({
         let totalSeconds = 0;
         let totalMeters = 0;
         const parsedLegs = result.legs.map((leg) => {
-          totalSeconds += leg.duration_in_traffic?.value || leg.duration?.value || 0;
+          totalSeconds += leg.duration?.value || 0;
           totalMeters += leg.distance?.value || 0;
           return {
             startAddress: leg.start_address,
             endAddress: leg.end_address,
             distance: leg.distance?.text || '--',
             distanceMeters: leg.distance?.value || 0,
-            duration: leg.duration_in_traffic?.text || leg.duration?.text || '--',
-            durationSeconds: leg.duration_in_traffic?.value || leg.duration?.value || 0,
+            duration: leg.duration?.text || '--',
+            durationSeconds: leg.duration?.value || 0,
           };
         });
         const totalMins = Math.round(totalSeconds / 60);
@@ -304,7 +305,11 @@ const RoutePlanSection = ({
         setRouteError('');
       } catch (err) {
         if (!cancelled) {
-          setRouteResult({ totalDuration: 'Unavailable', totalDistance: '--', totalMins: 0, totalMiles: 0, summary: '' });
+          const msg = err?.message === 'TIMEOUT'
+            ? 'Route calculation timed out. Check your internet connection.'
+            : 'Could not calculate route. Verify addresses are valid.';
+          setRouteError(msg);
+          setRouteResult(null);
           setLegs([]);
         }
       }
