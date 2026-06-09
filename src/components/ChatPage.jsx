@@ -168,7 +168,7 @@ const TeamChatPanel = ({ currentUser, role }) => {
   useEffect(() => {
     if (!activeConv?.id) { setMessages([]); return; }
     let firstSnapshot = true;
-    const q = query(collection(db, 'chat_messages'), where('conversationId', '==', activeConv.id));
+    const q = query(collection(db, 'chat_messages'), where('conversationId', '==', activeConv.id), limit(300));
     const unsub = onSnapshot(q, snap => {
       snap.docChanges().forEach(change => {
         if (change.type === 'added' && !firstSnapshot) { const newMsg = { id: change.doc.id, ...change.doc.data() }; if (newMsg.sender !== currentUser) playMessageSound(); }
@@ -196,7 +196,7 @@ const TeamChatPanel = ({ currentUser, role }) => {
     setText('');
     try {
       await addDoc(collection(db, 'chat_messages'), { conversationId: activeConv.id, text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp() });
-      await updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${activeConv.id}.lastMessage`]: { text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp(), readBy: [currentUser] } });
+      updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${activeConv.id}.lastMessage`]: { text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp(), readBy: [currentUser] } }).catch(() => {});
     } catch (err) { console.error('Failed to send message:', err); setText(msg); }
   };
 
