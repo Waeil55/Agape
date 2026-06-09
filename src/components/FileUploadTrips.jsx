@@ -29,7 +29,7 @@ const COLUMN_ALIASES = {
   date: ['date', 'trip date', 'service date', 'requested date', 'scheduled date', 'appt date', 'appointment date', 'day', 'calendar date', 'schedule date'],
   type: ['type', 'trip type', 'am/pm', 'run', 'shift', 'route type', 'service type', 'schedule type', 'trip_type', 'mode', 'vehicle type', 'req', 'service', 'transport type', 'transportation type'],
   notes: ['notes', 'special instructions', 'instructions', 'comment', 'comments', 'note', 'memo', 'remarks', 'additional info', 'info', 'pickup comments', 'dropoff comments', 'message', 'purpose', 'driver notes', 'trip notes', 'special', 'special needs', 'alert'],
-  driver: ['driver', 'driver name', 'assigned to', 'chauffeur', 'provider', 'assigned driver', 'driver id', 'driverid'],
+  driver: ['driver', 'driver name', 'assigned to', 'chauffeur', 'assigned driver', 'driver id', 'driverid'],
   driverEmail: ['driver email', 'driver_email', 'driver email address', 'email'],
   vehicle: ['vehicle', 'vehicle id', 'car', 'van', 'fleet', 'assigned vehicle', 'truck', 'vehicle number', 'unit #', 'unit number'],
   pickupOdometer: ['pickup odometer', 'pu odometer', 'start odometer', 'start mileage', 'pickup mileage', 'odometer start', 'pu odo', 'start odo', 'begin odo', 'begin odometer', 'start odo reading'],
