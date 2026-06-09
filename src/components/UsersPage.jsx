@@ -28,7 +28,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showAssign, setShowAssign] = useState(null);
-  const [form, setForm] = useState({ username: '', password: '', role: 'driver', phone: '' });
+  const [form, setForm] = useState({ username: '', fullName: '', password: '', role: 'driver', phone: '' });
   const [formError, setFormError] = useState('');
   const [editingDispatcher, setEditingDispatcher] = useState(null);
   const [editName, setEditName] = useState('');
@@ -90,7 +90,8 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       
       const userCred = await createUserWithEmailAndPassword(secondaryAuth, authEmail, form.password);
       const profileId = buildStableProfileId(form.role, userCred.user.uid);
-      await setDoc(doc(db, 'users', userCred.user.uid), { email: authEmail, username, name: username, role: form.role, phone: form.phone, profileId, loginType: 'username' }, { merge: true });
+      const actualName = form.fullName.trim() || username;
+      await setDoc(doc(db, 'users', userCred.user.uid), { email: authEmail, username, name: actualName, role: form.role, phone: form.phone, profileId, loginType: 'username' }, { merge: true });
       
       // Cleanup: sign out and delete secondary app
       await authSignOut(secondaryAuth);
@@ -98,11 +99,11 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       
       if (form.role === 'dispatcher') {
         const id = profileId;
-        setDispatchers(prev => [...prev, { id, name: username, email: authEmail, username }]);
+        setDispatchers(prev => [...prev, { id, name: actualName, email: authEmail, username }]);
       } else if (form.role === 'driver') {
         const id = profileId;
         const newDriver = {
-          id, name: username, email: authEmail, username, phone: form.phone, status: 'Available', vehicle: 'Pending', dist: '--',
+          id, name: actualName, email: authEmail, username, phone: form.phone, status: 'Available', vehicle: 'Pending', dist: '--',
           currentZone: 'TBD', odometer: 0, nextOilChange: 5000,
           assignedTo: '', schedule: [], clockedIn: false
         };
@@ -112,7 +113,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       addAuditLog('User Created', `${currentUser} created ${form.role} account: ${username}`, 'emerald', { entity: 'user', id: username, diffs: [{ field: 'role', before: null, after: form.role }, { field: 'username', before: null, after: username }] });
       await loadUsers();
       setShowForm(false);
-      setForm({ username: '', password: '', role: 'driver', phone: '' });
+      setForm({ username: '', fullName: '', password: '', role: 'driver', phone: '' });
     } catch (err) {
       if (secondaryApp) await deleteApp(secondaryApp).catch(() => {});
       setFormError(err.message.replace('Firebase: ', ''));
@@ -498,9 +499,14 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               </div>
               <form onSubmit={(e) => { e.preventDefault(); createUser(); }} className="space-y-3 sm:space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Username</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Username (Login)</label>
                   <input type="text" required autoCapitalize="none" autoCorrect="off" spellCheck="false" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm" placeholder="driver.waeil" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Full Name (First & Last)</label>
+                  <input type="text" required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm" placeholder="John Doe" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Password</label>

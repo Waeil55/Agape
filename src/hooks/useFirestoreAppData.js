@@ -49,11 +49,25 @@ function normalizeTrip(trip) {
 }
 
 function normalizeData(data = {}) {
+  const drivers = data.drivers || [];
   const safeTrips = (data.trips || []).map(trip => {
-    if (trip?.driverName && typeof trip.driverName === 'string' && trip.driverName.toLowerCase().includes('agape care medical')) {
-      return { ...trip, driverName: '' };
+    let dName = trip?.driverName;
+    if (dName && typeof dName === 'string' && dName.toLowerCase().includes('agape care medical')) {
+      dName = '';
     }
-    return trip;
+    
+    // Auto-resolve missing driver name from the admin users/drivers list
+    if (!dName) {
+      const matchedDriver = 
+        (trip.driverId && drivers.find(d => d.id === trip.driverId)) ||
+        (trip.driverEmail && drivers.find(d => d.email === trip.driverEmail));
+      
+      if (matchedDriver && matchedDriver.name) {
+        dName = matchedDriver.name;
+      }
+    }
+
+    return { ...trip, driverName: dName || '' };
   });
 
   return {
