@@ -296,6 +296,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   });
   const [historyFilter, setHistoryFilter] = useState(() => localStorage.getItem(`agape_drvHistFilter_${userKey}`) || 'all');
   const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
+  const [historyDateFrom, setHistoryDateFrom] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 7);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  });
+  const [historyDateTo, setHistoryDateTo] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  });
 
   useEffect(() => {
     localStorage.setItem(`agape_drvNav_${userKey}`, activeNav);
@@ -1125,6 +1133,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       historyFilter === 'cancelled' ? normalizeWorkflowStatus(t.status) === 'cancelled' :
       normalizeWorkflowStatus(t.status) === 'rerouted';
     if (!matchFilter) return false;
+    const tripDate = (t.completedAt || t.date || '').slice(0, 10);
+    if (historyDateFrom && tripDate && tripDate < historyDateFrom) return false;
+    if (historyDateTo && tripDate && tripDate > historyDateTo) return false;
     if (!historySearch) return true;
     const q = historySearch.toLowerCase();
     return (t.patient || '').toLowerCase().includes(q) ||
@@ -3488,6 +3499,33 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <input type="text" placeholder="Search by patient, booking ID, address..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl font-medium text-xs outline-none focus:border-blue-400" />
             {historySearch && <button onClick={() => setHistorySearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X size={14} /></button>}
+          </div>
+
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <div className="flex-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">From</label>
+              <input type="date" value={historyDateFrom} max={historyDateTo}
+                onChange={(e) => setHistoryDateFrom(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-400" />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">To</label>
+              <input type="date" value={historyDateTo} min={historyDateFrom} max={new Date().toISOString().slice(0,10)}
+                onChange={(e) => setHistoryDateTo(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-400" />
+            </div>
+            <button onClick={() => {
+              const d = new Date(); d.setDate(d.getDate() - 7);
+              const fmt = (dd) => `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`;
+              setHistoryDateFrom(fmt(d));
+              setHistoryDateTo(fmt(new Date()));
+            }} className="mt-4 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-[10px] font-bold text-slate-600 transition whitespace-nowrap">7 Days</button>
+            <button onClick={() => {
+              const d = new Date(); d.setDate(d.getDate() - 30);
+              const fmt = (dd) => `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`;
+              setHistoryDateFrom(fmt(d));
+              setHistoryDateTo(fmt(new Date()));
+            }} className="mt-4 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-[10px] font-bold text-slate-600 transition whitespace-nowrap">30 Days</button>
           </div>
 
           <div className="flex gap-1.5 mb-5 overflow-x-auto no-scrollbar px-1">
