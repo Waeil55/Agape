@@ -117,6 +117,17 @@ const calcTravelDuration = (start, end) => {
   return h > 0 ? `${h}h${m > 0 ? m : ''}` : `${m}m`;
 };
 
+const getLocalDateStr = (trip) => {
+  const raw = trip.completedAt || trip.date || '';
+  if (!raw) return '';
+  if (raw.includes('T')) {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw.slice(0, 10);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  return raw.slice(0, 10);
+};
+
 const formatTimeInput = (v) => {
   if (!v) return '';
   const d = new Date(v);
@@ -1170,7 +1181,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       normalizeWorkflowStatus(t.status) === 'rerouted';
     if (!matchFilter) return false;
     if (historyDate) {
-      const tripDate = (t.completedAt || t.date || '').slice(0, 10);
+      const tripDate = getLocalDateStr(t);
       if (tripDate && tripDate !== historyDate) return false;
     }
     if (!historySearch) return true;
