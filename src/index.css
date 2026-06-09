@@ -71,7 +71,7 @@
 :root,
 [data-theme="light"] {
   /* Backgrounds */
-  --bg-app: #F3F4F6;
+  --bg-app: #f1f5f9;
   --bg-surface: #ffffff;
   --bg-surface-elevated: #ffffff;
   --bg-surface-subtle: #f8fafc;

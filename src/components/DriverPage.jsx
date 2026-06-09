@@ -545,7 +545,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       root.style.setProperty('--text-primary', '#e2e8f0');
     } else {
       root.classList.remove('dark');
-      root.style.setProperty('--bg-primary', '#F3F4F6');
+      root.style.setProperty('--bg-primary', '#f1f5f9');
       root.style.setProperty('--text-primary', '#0f172a');
     }
     localStorage.setItem('agape_theme', theme);
