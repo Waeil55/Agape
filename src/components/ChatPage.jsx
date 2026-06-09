@@ -248,7 +248,7 @@ const TeamChat = ({ currentUser, role }) => {
           <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-3">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-black text-slate-900">Messages</h2>
-              <button onClick={() => setShowNew(true)} className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 active:scale-95 transition">
+              <button onClick={() => setShowNew(true)} className="w-11 h-11 min-h-[44px] bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 active:scale-95 transition">
                 <Plus size={16} />
               </button>
             </div>
@@ -296,7 +296,7 @@ const TeamChat = ({ currentUser, role }) => {
             <div className="flex flex-col min-h-0 flex-1 bg-[#F3F4F6]">
               <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2.5 flex items-center gap-3">
                 {isMobile && (
-                  <button onClick={() => setActiveConv(null)} className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg">
+                  <button onClick={() => setActiveConv(null)} className="p-2.5 min-h-[44px] min-w-[44px] text-slate-500 hover:bg-slate-100 rounded-lg flex items-center justify-center">
                     <ArrowLeft size={20} />
                   </button>
                 )}
@@ -307,7 +307,7 @@ const TeamChat = ({ currentUser, role }) => {
                   <p className="font-bold text-sm text-slate-900 truncate">{convLabel(activeConv)}</p>
                   <p className="text-[10px] text-slate-400">{activeConv.type === 'group' ? `${activeConv.participants?.length || 0} members` : 'Direct message'}</p>
                 </div>
-                <button onClick={() => handleDeleteConv(activeConv.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                <button onClick={() => handleDeleteConv(activeConv.id)} className="p-2.5 min-h-[44px] min-w-[44px] text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                 </button>
               </div>
@@ -348,7 +348,7 @@ const TeamChat = ({ currentUser, role }) => {
                   <input ref={inputRef} type="text" placeholder="Message" value={text} onChange={e => setText(e.target.value)} onKeyDown={handleKeyDown}
                     className="flex-1 bg-slate-100 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition min-h-[40px] max-h-[40px]" />
                   <button type="submit" disabled={!text.trim() || sending}
-                    className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 active:scale-95 transition disabled:opacity-40 shrink-0">
+                    className="w-11 h-11 min-h-[44px] bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 active:scale-95 transition disabled:opacity-40 shrink-0">
                     {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} fill="currentColor" />}
                   </button>
                 </form>
@@ -372,7 +372,7 @@ const TeamChat = ({ currentUser, role }) => {
           <div className="bg-white rounded-2xl w-full max-w-sm p-5 relative z-10 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-bold text-slate-900">New Chat</h3>
-              <button onClick={() => { setShowNew(false); setSelected([]); }} className="p-1 text-slate-400 hover:bg-slate-100 rounded-lg">
+              <button onClick={() => { setShowNew(false); setSelected([]); }} className="p-2.5 min-h-[44px] min-w-[44px] text-slate-400 hover:bg-slate-100 rounded-lg flex items-center justify-center">
                 <X size={18} />
               </button>
             </div>
@@ -400,9 +400,9 @@ const TeamChat = ({ currentUser, role }) => {
             </div>
             <div className="flex gap-2">
               <button onClick={() => { setShowNew(false); setSelected([]); }}
-                className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-medium text-sm hover:bg-slate-200 transition">Cancel</button>
+                className="flex-1 py-2.5 min-h-[44px] bg-slate-100 text-slate-600 rounded-xl font-medium text-sm hover:bg-slate-200 transition">Cancel</button>
               <button onClick={handleCreateConv} disabled={selected.length === 0}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-medium text-sm disabled:opacity-40 hover:bg-blue-700 transition">Start</button>
+                className="flex-1 py-2.5 min-h-[44px] bg-blue-600 text-white rounded-xl font-medium text-sm disabled:opacity-40 hover:bg-blue-700 transition">Start</button>
             </div>
           </div>
         </div>
@@ -571,7 +571,7 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
           <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-3">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-black text-slate-900">Clients</h2>
-              <button onClick={() => setShowNewSms(true)} className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 active:scale-95 transition">
+              <button onClick={() => setShowNewSms(true)} className="w-11 h-11 min-h-[44px] bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 active:scale-95 transition">
                 <Plus size={16} />
               </button>
             </div>
@@ -620,7 +620,7 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
             <div className="flex flex-col min-h-0 flex-1 bg-[#F3F4F6]">
               <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2.5 flex items-center gap-3">
                 {isMobile && (
-                  <button onClick={() => { setActiveConv(null); setClientMessages([]); }} className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg">
+                  <button onClick={() => { setActiveConv(null); setClientMessages([]); }} className="p-2.5 min-h-[44px] min-w-[44px] text-slate-500 hover:bg-slate-100 rounded-lg flex items-center justify-center">
                     <ArrowLeft size={20} />
                   </button>
                 )}
@@ -672,8 +672,8 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
                       <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1">AI Suggested Reply</p>
                       <p className="text-xs text-slate-700 bg-white rounded-lg p-2 border border-indigo-100">{aiSuggestedReply.suggestedReply}</p>
                       <div className="flex gap-2 mt-1.5">
-                        <button onClick={() => { setReplyText(aiSuggestedReply.suggestedReply); setAiSuggestedReply(null); }} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold">Use Reply</button>
-                        <button onClick={() => setAiSuggestedReply(null)} className="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-bold">Dismiss</button>
+                        <button onClick={() => { setReplyText(aiSuggestedReply.suggestedReply); setAiSuggestedReply(null); }} className="px-3 py-2 min-h-[40px] bg-indigo-600 text-white rounded-lg text-[10px] font-bold flex items-center justify-center">Use Reply</button>
+                        <button onClick={() => setAiSuggestedReply(null)} className="px-3 py-2 min-h-[40px] bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-bold flex items-center justify-center">Dismiss</button>
                       </div>
                     </div>
                   </div>
@@ -684,7 +684,7 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
                   <input ref={inputRef} value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={handleKeyDown}
                     placeholder="Message" className="flex-1 bg-slate-100 rounded-xl px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition min-h-[40px] max-h-[40px]" />
                   <button onClick={handleSend} disabled={!replyText.trim() || sending}
-                    className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-95 transition disabled:opacity-40 shrink-0">
+                    className="w-11 h-11 min-h-[44px] rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-95 transition disabled:opacity-40 shrink-0">
                     {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                   </button>
                 </div>
@@ -708,7 +708,7 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
           <div className="bg-white rounded-2xl w-full max-w-sm p-5 relative z-10 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-bold text-slate-900">New Message</h3>
-              <button onClick={() => { setShowNewSms(false); setNewSmsPhone(''); setNewSmsText(''); }} className="p-1 text-slate-400 hover:bg-slate-100 rounded-lg">
+              <button onClick={() => { setShowNewSms(false); setNewSmsPhone(''); setNewSmsText(''); }} className="p-2.5 min-h-[44px] min-w-[44px] text-slate-400 hover:bg-slate-100 rounded-lg flex items-center justify-center">
                 <X size={18} />
               </button>
             </div>
@@ -726,9 +726,9 @@ const ClientChat = ({ currentUser, role, drivers = [], dispatchers = [], trips =
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => { setShowNewSms(false); setNewSmsPhone(''); setNewSmsText(''); }}
-                className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-medium text-sm hover:bg-slate-200 transition">Cancel</button>
+                className="flex-1 py-2.5 min-h-[44px] bg-slate-100 text-slate-600 rounded-xl font-medium text-sm hover:bg-slate-200 transition">Cancel</button>
               <button onClick={handleNewSms} disabled={!newSmsPhone.trim() || !newSmsText.trim() || newSmsSending}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-medium text-sm disabled:opacity-40 hover:bg-blue-700 transition flex items-center justify-center gap-1">
+                className="flex-1 py-2.5 min-h-[44px] bg-blue-600 text-white rounded-xl font-medium text-sm disabled:opacity-40 hover:bg-blue-700 transition flex items-center justify-center gap-1">
                 {newSmsSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={14} />}
                 Send
               </button>

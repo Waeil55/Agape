@@ -209,10 +209,10 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       </>
       )}
 
-      <div className={`flex flex-col ${singleColumn && !activityFeedOnly ? '' : 'xl:flex-row'} gap-6 items-stretch ${activityFeedOnly ? 'h-full' : ''}`}>
+      <div className={`flex flex-col ${singleColumn && !activityFeedOnly ? '' : 'lg:flex-row'} gap-6 items-stretch ${activityFeedOnly ? 'h-full' : ''}`}>
         {!activityFeedOnly && (
         // Left Column: Management & Insights
-        <div className={`w-full ${singleColumn ? '' : 'xl:w-1/2'} space-y-6 min-w-0 flex flex-col`}>
+        <div className={`w-full ${singleColumn ? '' : 'lg:w-1/2'} space-y-6 min-w-0 flex flex-col`}>
 
       {/* Role Summary Cards */}
       {!hideRoleCards && (
@@ -327,19 +327,19 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                                     className="w-24 px-1.5 py-0.5 border border-blue-300 rounded text-xs font-semibold outline-none focus:border-blue-500"
                                     onKeyDown={(e) => { if (e.key === 'Enter') saveDispatcherName(); if (e.key === 'Escape') setEditingDispatcher(null); }}
                                     autoFocus />
-                                  <button onClick={saveDispatcherName} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition" title="Save"><Check size={14} /></button>
-                                  <button onClick={() => setEditingDispatcher(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition" title="Cancel"><X size={14} /></button>
+                                   <button onClick={saveDispatcherName} className="p-2 min-h-[36px] min-w-[36px] text-emerald-600 hover:bg-emerald-50 rounded transition" title="Save"><Check size={14} /></button>
+                                   <button onClick={() => setEditingDispatcher(null)} className="p-2 min-h-[36px] min-w-[36px] text-slate-400 hover:text-slate-600 rounded transition" title="Cancel"><X size={14} /></button>
                                 </div>
                               );
                             }
                             return (
-                              <button onClick={() => startRenameDispatcher(disp)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Rename dispatcher" aria-label="Rename dispatcher">
+                              <button onClick={() => startRenameDispatcher(disp)} className="p-2 min-h-[36px] text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Rename dispatcher" aria-label="Rename dispatcher">
                                 <Edit2 size={14} />
                               </button>
                             );
                           })()}
                           {role === 'admin' && user.email !== currentUser && (
-                            <button onClick={() => requestAuthAction ? requestAuthAction('Delete User', () => deleteUserAccount(user)) : deleteUserAccount(user)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Remove user" aria-label="Remove user">
+                            <button onClick={() => requestAuthAction ? requestAuthAction('Delete User', () => deleteUserAccount(user)) : deleteUserAccount(user)} className="p-2 min-h-[36px] text-red-600 hover:bg-red-50 rounded-lg transition" title="Remove user" aria-label="Remove user">
                               <Trash2 size={14} />
                             </button>
                           )}
@@ -392,7 +392,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                                 <option key={ds.id} value={ds.id}>{ds.name}</option>
                               ))}
                             </select>
-                            <button onClick={() => setShowAssign(null)} className="p-1 text-slate-500 hover:text-slate-700" aria-label="Close"><X size={14} /></button>
+                            <button onClick={() => setShowAssign(null)} className="min-h-[44px] min-w-[44px] p-2 text-slate-500 hover:text-slate-700 flex items-center justify-center" aria-label="Close"><X size={14} /></button>
                           </div>
                         ) : (
                           <span className="text-slate-600">{dispatcher?.name || <span className="text-slate-400 italic">Unassigned</span>}</span>
@@ -414,7 +414,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                             // If no user found, just remove from drivers list
                             setDrivers(prev => prev.filter(drv => drv.id !== d.id));
                           }
-                        }} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition" aria-label="Delete driver">
+                        }} className="p-2 min-h-[36px] text-rose-600 hover:bg-rose-50 rounded-lg transition" aria-label="Delete driver">
                           <Trash2 size={14} />
                         </button>
                       </td>
@@ -435,7 +435,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
 
       {/* Right Column: Activity Feed */}
       {!hideActivityFeed && (
-      <div className={`w-full ${singleColumn || activityFeedOnly ? '' : 'xl:w-1/2'} shrink-0 flex flex-col ${activityFeedOnly ? 'h-full' : ''}`}>
+      <div className={`w-full ${singleColumn || activityFeedOnly ? '' : 'lg:w-1/2'} shrink-0 flex flex-col ${activityFeedOnly ? 'h-full' : ''}`}>
       {/* System Activity Feed */}
       <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-[500px]">
         <div className="p-4 sm:p-6 border-b border-slate-200 shrink-0">

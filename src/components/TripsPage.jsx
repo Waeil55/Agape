@@ -268,12 +268,12 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
             </div>
 
             {/* Addresses */}
-            <div className="mb-2 grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2">
+            <div className="mb-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-2">
                 <div className="text-[9px] font-bold uppercase text-emerald-700">Pickup</div>
                 <p className="mt-0.5 break-words text-xs font-semibold text-slate-700 line-clamp-2">{trip.pickup}</p>
               </div>
-              <div className="rounded-lg border border-rose-100 bg-rose-50 p-2">
+              <div className="rounded-xl border border-rose-100 bg-rose-50 p-2">
                 <div className="text-[9px] font-bold uppercase text-rose-700">Dropoff</div>
                 <p className="mt-0.5 break-words text-xs font-semibold text-slate-700 line-clamp-2">{trip.dropoff}</p>
               </div>
@@ -304,7 +304,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                 {trip.pickupPhone && (
                   <div className="flex items-center gap-1">
                     <button onClick={() => makeCall(trip.pickupPhone, trip.patient)} className="text-blue-600 hover:underline font-bold">{trip.pickupPhone}</button>
-                    <button onClick={() => sendSMS(trip.pickupPhone, trip.patient)} className="text-blue-600 hover:text-blue-700" aria-label="SMS"><MessageSquare size={12} /></button>
+                    <button onClick={() => sendSMS(trip.pickupPhone, trip.patient)} className="text-blue-600 hover:text-blue-700 min-h-[36px] min-w-[36px] inline-flex items-center justify-center" aria-label="SMS"><MessageSquare size={12} /></button>
                   </div>
                 )}
                 {trip.notes && (
@@ -315,8 +315,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
 
             {/* Action Buttons */}
             <div className="mt-2 flex gap-2 justify-end">
-              <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition" aria-label="Edit"><Edit2 size={14} /></button>
-              <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" aria-label="Delete"><Archive size={14} /></button>
+              <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-2 min-h-[36px] text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition" aria-label="Edit"><Edit2 size={14} /></button>
+              <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-2 min-h-[36px] text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" aria-label="Delete"><Archive size={14} /></button>
             </div>
           </div>
         </div>
@@ -533,11 +533,11 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {/* CREATE MODAL */}
       {showCreateForm && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-8 overflow-y-auto">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowCreateForm(false)} />
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in my-auto">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreateForm(false)} />
+          <div className="bg-white w-full max-w-2xl rounded-t-3xl sm:rounded-3xl p-8 shadow-2xl relative z-10 border border-white/20 animate-in fade-in zoom-in-95 duration-200 my-auto">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> New Manifest Entry</h3>
-              <button onClick={() => setShowCreateForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={20} /></button>
+              <button onClick={() => setShowCreateForm(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-500 min-h-[44px] min-w-[44px]" aria-label="Close"><X size={20} /></button>
             </div>
             <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' }); }} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
@@ -594,11 +594,11 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {/* EDIT MODAL */}
       {showEditForm && editTrip && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowEditForm(false)} />
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowEditForm(false)} />
+          <div className="bg-white w-full max-w-2xl rounded-t-3xl sm:rounded-3xl p-8 shadow-2xl relative z-10 border border-white/20 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Edit2 size={28} className="text-blue-500" /> Modify Trip Details</h3>
-              <button onClick={() => setShowEditForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={20} /></button>
+              <button onClick={() => setShowEditForm(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-500 min-h-[44px] min-w-[44px]" aria-label="Close"><X size={20} /></button>
             </div>
             <form onSubmit={handleUpdate} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
@@ -659,8 +659,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {/* ASSIGN MODAL */}
       {showAssign && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowAssign(false)} />
-          <div className="bg-white w-full max-w-md rounded-2xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowAssign(false)} />
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 {assignMode === 'mission' ? (
@@ -669,7 +669,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                   <><Users size={20} className="text-emerald-600" /> Assign</>
                 )}
               </h3>
-              <button onClick={() => setShowAssign(false)} className="p-1.5 bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={18} /></button>
+              <button onClick={() => setShowAssign(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-500 min-h-[44px] min-w-[44px]" aria-label="Close"><X size={18} /></button>
             </div>
             <p className="text-[11px] font-bold text-slate-500 mb-3 uppercase tracking-widest line-clamp-1">
               {assignMode === 'mission'
@@ -707,13 +707,13 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {/* REASSIGN MODAL */}
       {showReassignModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowReassignModal(false)} />
-          <div className="bg-white w-full max-w-md rounded-2xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowReassignModal(false)} />
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <UserCheck size={20} className="text-amber-600" /> Reassign
               </h3>
-              <button onClick={() => setShowReassignModal(false)} className="p-1.5 bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={18} /></button>
+              <button onClick={() => setShowReassignModal(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-500 min-h-[44px] min-w-[44px]" aria-label="Close"><X size={18} /></button>
             </div>
             <p className="text-[11px] font-bold text-slate-500 mb-3 uppercase tracking-widest line-clamp-1">
               Replace for {selectedTasks.length > 0 ? selectedTasks.length : 1} trip{selectedTasks.length !== 1 ? 's' : ''}
@@ -750,11 +750,11 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         const legs = filteredTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientName.trim().toLowerCase());
         return (
           <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" onClick={() => setLegsDetailPatient(null)}>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className="bg-white w-full max-w-lg rounded-3xl p-5 relative z-10 shadow-2xl border border-white/20 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-5 relative z-10 shadow-2xl border border-white/20 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-slate-900">{patientName}</h3>
-                <button onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200" aria-label="Close"><X size={16} /></button>
+                <button onClick={() => setLegsDetailPatient(null)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-500 min-h-[44px] min-w-[44px]" aria-label="Close"><X size={16} /></button>
               </div>
               <p className="text-xs text-slate-500 font-medium mb-4">{legs.length} leg{legs.length !== 1 ? 's' : ''}</p>
               <div className="space-y-2">

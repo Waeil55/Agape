@@ -63,7 +63,7 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <p className="font-bold text-slate-900 truncate">{driver.name}</p>
-              <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${statusColor(driver.status)}`}>{driver.status || 'Unknown'}</span>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor(driver.status)}`}>{driver.status || 'Unknown'}</span>
             </div>
             <p className="text-[11px] text-slate-500">{driver.vehicle || 'No vehicle'} {driver.phone ? `- ${driver.phone}` : ''}</p>
           </div>
@@ -77,7 +77,7 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
               <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Current Trip</span>
               {onViewTrip && (
-                <button onClick={() => onViewTrip(currentTrip.id)} className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-blue-600 text-white rounded-lg text-[9px] font-bold hover:bg-blue-700 transition-colors">
+                <button onClick={() => onViewTrip(currentTrip.id)} className="ml-auto flex items-center gap-1 px-3 py-1.5 min-h-[36px] bg-blue-600 text-white rounded-lg text-[9px] font-bold hover:bg-blue-700 transition-colors">
                   <ExternalLink size={7} /> View
                 </button>
               )}
@@ -115,7 +115,7 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
                   <span className="font-semibold text-slate-700 min-w-[80px]">{trip.time}</span>
                   <span className="text-slate-600 truncate">{trip.patient}</span>
                   {onViewTrip && (
-                    <button onClick={() => onViewTrip(trip.id)} className="ml-auto text-blue-600 hover:text-blue-800 font-bold text-[9px] shrink-0">View</button>
+                    <button onClick={() => onViewTrip(trip.id)} className="ml-auto text-blue-600 hover:text-blue-800 font-bold text-[9px] shrink-0 min-h-[36px] px-2 py-1">View</button>
                   )}
                 </div>
               ))}
@@ -190,7 +190,7 @@ const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className="text-slate-400">{fmtTime(log.time)}</span>
                     {tripId && onViewTrip && (
-                      <button onClick={() => onViewTrip(tripId)} className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 bg-blue-600 text-white rounded text-[8px] font-bold transition-opacity"><ExternalLink size={7} /></button>
+                      <button onClick={() => onViewTrip(tripId)} className="opacity-0 group-hover:opacity-100 px-2 py-1 min-h-[36px] bg-blue-600 text-white rounded text-[8px] font-bold transition-opacity"><ExternalLink size={7} /></button>
                     )}
                   </div>
                 </div>
@@ -304,7 +304,7 @@ const AdminPage = ({
   const sections = [
     { id: 'dispatchers', title: 'Dispatcher Activity', icon: ClipboardList, count: dispatchers.length,
       content: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {dispatchers.filter(d => d.name).map((disp, i) => (
             <DispatcherActivityCard key={disp.id || i} dispatcher={disp} logs={entityLogs.dispatcher} onViewTrip={onViewTrip} />
           ))}
@@ -315,7 +315,7 @@ const AdminPage = ({
       ) },
     { id: 'drivers', title: 'Driver Activity', icon: Truck, count: drivers.length,
       content: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {activeDrivers.map((driver, i) => (
             <DriverActivityCard key={driver.id || i} driver={driver} trips={trips} logs={entityLogs.driver} onViewTrip={onViewTrip} />
           ))}
@@ -360,7 +360,7 @@ const AdminPage = ({
                             handleRoleChange(user, newRole);
                           }
                         }}
-                        className="px-2 py-1 rounded-lg border border-slate-200 text-[11px] font-bold bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className="px-3 py-1.5 min-h-[36px] rounded-lg border border-slate-200 text-[11px] font-bold bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       >
                         <option value="admin">Admin</option>
                         <option value="dispatcher">Dispatcher</option>
@@ -385,7 +385,7 @@ const AdminPage = ({
                         {user.email && (
                           <button
                             onClick={() => handlePasswordReset(user.email)}
-                            className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-[10px] font-bold text-slate-600 transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 min-h-[36px] bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-[10px] font-bold text-slate-600 transition-colors"
                             title="Send password reset email"
                           >
                             <KeyRound size={10} /> Reset PW
@@ -393,7 +393,7 @@ const AdminPage = ({
                         )}
                         <button
                           onClick={() => handleDeleteUser(user)}
-                          className="flex items-center gap-1 px-2 py-1 bg-white border border-rose-200 hover:bg-rose-50 rounded-lg text-[10px] font-bold text-rose-600 transition-colors"
+                          className="flex items-center gap-1 px-3 py-1.5 min-h-[36px] bg-white border border-rose-200 hover:bg-rose-50 rounded-lg text-[10px] font-bold text-rose-600 transition-colors"
                           title="Delete user"
                         >
                           <Trash2 size={10} /> Delete

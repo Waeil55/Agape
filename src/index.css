@@ -657,7 +657,7 @@ table .font-black { font-weight: 750; }
 }
 [data-theme="dark"] .bottom-nav {
   background: rgba(15, 20, 34, 0.92);
-  border-top: 1px solid rgba(51, 65, 85, 0.5);
+  border: 0.5px solid rgba(51, 65, 85, 0.5);
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
 }
 
@@ -699,7 +699,7 @@ input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: #2563eb !important;
+  border-color: var(--brand-primary) !important;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 
@@ -712,7 +712,7 @@ table thead,
 table thead[class],
 table thead tr,
 table thead tr[class] {
-  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
+  background: var(--gradient-brand) !important;
 }
 
 table thead th,
@@ -778,7 +778,7 @@ table tbody tr:hover {
 
 /* Premium gradient button */
 .btn-gradient-primary {
-  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   color: white;
   border-radius: 0.875rem;
   font-weight: 800;
@@ -804,7 +804,7 @@ table tbody tr:hover {
   width: 52px;
   height: 52px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
   color: white;
   display: flex;
   align-items: center;
@@ -827,8 +827,8 @@ table tbody tr:hover {
 
 /* Rounded enterprise cards */
 .enterprise-card {
-  background: white;
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
   border-radius: 1.25rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
   transition: all 0.2s ease;
@@ -838,8 +838,8 @@ table tbody tr:hover {
   transform: translateY(-1px);
 }
 [data-theme="dark"] .enterprise-card {
-  background: #1a2035;
-  border-color: rgba(30, 41, 59, 0.8);
+  background: var(--bg-card);
+  border-color: var(--border-default);
 }
 
 /* Animate in from bottom */
@@ -859,10 +859,10 @@ table tbody tr:hover {
   animation: slideInFromBottom 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 .animate-slide-in-top {
-  animation: slideInFromTop 0.25s ease-out both;
+  animation: slideInFromTop 0.2s ease-out both;
 }
 .animate-zoom-in {
-  animation: zoomInScale 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: zoomInScale 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 /* ===== OFFLINE BANNER ===== */

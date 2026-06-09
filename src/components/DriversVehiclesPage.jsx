@@ -268,12 +268,12 @@ const [form, setForm] = useState({
 
       {/* AI Fleet Summary */}
       <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
-        <button onClick={() => setShowFleetSummary(!showFleetSummary)} className="w-full px-5 py-3 flex items-center justify-between text-sm font-bold text-slate-700 hover:bg-slate-50 transition">
+        <button onClick={() => setShowFleetSummary(!showFleetSummary)} className="w-full px-4 sm:px-5 py-3 flex items-center justify-between text-sm font-bold text-slate-700 hover:bg-slate-50 transition">
           <span className="flex items-center gap-2"><BrainCircuit size={16} className="text-indigo-600" /> AI Fleet Summary</span>
           <ChevronDown size={16} className={`transition-transform ${showFleetSummary ? 'rotate-180' : ''}`} />
         </button>
         {showFleetSummary && (
-          <div className="px-5 pb-4">
+          <div className="px-4 sm:px-5 pb-4">
             {fleetSummaryLoading ? (
               <div className="flex items-center gap-2 text-slate-500 text-sm"><Loader2 size={14} className="animate-spin" /> AI analyzing fleet performance...</div>
             ) : fleetSummary ? (
@@ -357,11 +357,11 @@ const [form, setForm] = useState({
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4">
                           <div className="flex gap-1">
-                            <button onClick={() => setAssignDriver(d)} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md text-xs font-bold hover:bg-blue-200 flex items-center gap-1" title="Assign trips">
+                            <button onClick={() => setAssignDriver(d)} className="px-2 py-1 min-h-[36px] bg-blue-100 text-blue-700 rounded-md text-xs font-bold hover:bg-blue-200 flex items-center gap-1" title="Assign trips">
                               <ClipboardList size={12} /> Trips
                             </button>
                             {onUploadForDriver && (
-                              <button onClick={() => onUploadForDriver(d.id)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 flex items-center gap-1" title="Upload & assign">
+                              <button onClick={() => onUploadForDriver(d.id)} className="px-2 py-1.5 min-h-[36px] bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 flex items-center gap-1" title="Upload & assign">
                                 <Upload size={12} /> Upload
                               </button>
                             )}
@@ -376,8 +376,8 @@ const [form, setForm] = useState({
                           ) : <span className="text-xs text-slate-400 italic">No Phone</span>}
                         </td>
                         <td className="px-3 sm:px-6 py-2 sm:py-4 flex gap-1 sm:gap-2">
-                          <button onClick={() => analyzeDriver(d)} className="p-1.5 sm:p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="AI Analyze" aria-label="AI Analyze"><BrainCircuit size={14} /></button>
-                          <button onClick={() => openScheduleEditor(d)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit Schedule" aria-label="Edit Schedule"><Clock size={14} /></button>
+                          <button onClick={() => analyzeDriver(d)} className="p-1.5 sm:p-2 min-h-[36px] text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="AI Analyze" aria-label="AI Analyze"><BrainCircuit size={14} /></button>
+                          <button onClick={() => openScheduleEditor(d)} className="p-1.5 sm:p-2 min-h-[36px] text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit Schedule" aria-label="Edit Schedule"><Clock size={14} /></button>
                           <button onClick={() => openEdit(d)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" aria-label="Edit driver"><Edit2 size={14} /></button>
                           {(role === 'admin' || role === 'dispatcher') && (
                             <button onClick={() => deleteDriver(d)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" aria-label="Delete driver"><Trash2 size={14} /></button>
@@ -468,7 +468,7 @@ const [form, setForm] = useState({
                   <h3 className="text-lg sm:text-xl font-bold text-slate-900">{assignDriver.name} Trips</h3>
                   <p className="text-xs sm:text-sm text-slate-500">{assignedTripsForDriver.length} assigned • {unassignedTrips.length} available to assign</p>
                 </div>
-                <button onClick={() => { setAssignDriver(null); setSelectedTrips([]); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={18} /></button>
+                <button onClick={() => { setAssignDriver(null); setSelectedTrips([]); }} className="p-1.5 sm:p-2 min-h-[36px] min-w-[36px] hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={18} /></button>
               </div>
 
               {assignedTripsForDriver.length === 0 && unassignedTrips.length === 0 ? (
@@ -558,7 +558,7 @@ const [form, setForm] = useState({
                   <h3 className="text-lg sm:text-xl font-bold text-slate-900">Schedule: {editScheduleDriver.name}</h3>
                   <p className="text-xs sm:text-sm text-slate-500">Manage time blocks (6 AM – 8 PM)</p>
                 </div>
-                <button onClick={() => { setEditScheduleDriver(null); setEditingScheduleIdx(null); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={18} /></button>
+                <button onClick={() => { setEditScheduleDriver(null); setEditingScheduleIdx(null); }} className="p-1.5 sm:p-2 min-h-[36px] min-w-[36px] hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={18} /></button>
               </div>
 
               {/* Timeline Preview */}
@@ -608,8 +608,8 @@ const [form, setForm] = useState({
                       </div>
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <button onClick={() => editScheduleBlock(idx)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="Edit schedule block"><Edit2 size={14} /></button>
-                      <button onClick={() => deleteScheduleBlock(idx)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" aria-label="Delete schedule block"><Trash2 size={14} /></button>
+                      <button onClick={() => editScheduleBlock(idx)} className="p-2 min-h-[36px] text-blue-600 hover:bg-blue-50 rounded-lg" aria-label="Edit schedule block"><Edit2 size={14} /></button>
+                      <button onClick={() => deleteScheduleBlock(idx)} className="p-2 min-h-[36px] text-red-600 hover:bg-red-50 rounded-lg" aria-label="Delete schedule block"><Trash2 size={14} /></button>
                     </div>
                   </div>
                 ))}
@@ -667,7 +667,7 @@ const [form, setForm] = useState({
                   <BrainCircuit size={18} className="text-indigo-600" />
                   AI Driver Analysis
                 </h3>
-                <button onClick={() => setAiDriverModal(null)} className="p-1 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
+                <button onClick={() => setAiDriverModal(null)} className="p-2 min-h-[36px] min-w-[36px] hover:bg-slate-100 rounded-lg"><X size={18} /></button>
               </div>
               {aiDriverLoading[aiDriverModal] ? (
                 <div className="flex items-center gap-2 text-slate-500"><Loader2 size={16} className="animate-spin" /> Analyzing driver...</div>

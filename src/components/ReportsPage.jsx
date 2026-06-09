@@ -597,7 +597,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
   const renderSortableHeader = (column, children, className = '') => (
     <th
       onClick={() => handleSort(column)}
-      className={`p-2 text-left whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors ${className}`}
+      className={`p-2 text-left whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors min-h-[44px] ${className}`}
     >
       <div className="flex items-center">
         <span className="text-[10px]">{children}</span>
@@ -695,7 +695,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         <div className="flex items-center gap-1 bg-slate-100 rounded px-1.5 py-0.5 min-w-[90px]">
           <Search size={10} className="text-slate-400 shrink-0" />
           <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-transparent outline-none w-full min-w-0 placeholder:text-slate-400" />
-          {searchQuery && <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600"><X size={10} /></button>}
+          {searchQuery && <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600 min-h-[44px] min-w-[44px] p-2 flex items-center justify-center"><X size={10} /></button>}
         </div>
         <div className="flex items-center gap-0.5 bg-slate-100 rounded px-1.5 py-0.5">
           <Calendar size={10} className="text-slate-400 shrink-0" />
@@ -711,7 +711,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           <option value="all">Drivers</option>
           {drivers.map((d) => (<option key={d.id} value={d.id || d.email}>{d.name}</option>))}
         </select>
-        <button onClick={resetFilters} className="p-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200" title="Reset"><RefreshCw size={9} /></button>
+        <button onClick={resetFilters} className="p-2 min-h-[44px] rounded bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center" title="Reset"><RefreshCw size={9} /></button>
         {selectedTasks.length > 0 && (
           <button onClick={() => requestBulkDelete(selectedTasks, () => setSelectedTasks([]))} className="flex items-center gap-0.5 px-1 py-0.5 bg-rose-50 text-rose-600 rounded font-semibold"><Archive size={9} /> Arch {selectedTasks.length}</button>
         )}
@@ -754,7 +754,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
               <BrainCircuit size={14} className="text-indigo-600" />
               <span className="text-[10px] font-black text-indigo-700 uppercase tracking-wider">AI Report Insights</span>
             </div>
-            <button onClick={() => setAiReport(null)} className="text-slate-400 hover:text-slate-600"><X size={12} /></button>
+            <button onClick={() => setAiReport(null)} className="text-slate-400 hover:text-slate-600 min-h-[44px] min-w-[44px] p-2 flex items-center justify-center"><X size={12} /></button>
           </div>
           <p className="text-xs text-slate-700 leading-relaxed">{aiReport.summary}</p>
           {aiReport.trends?.length > 0 && (
@@ -816,7 +816,6 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                 {/* Date Group Header */}
                 <div
                   className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-2 cursor-pointer hover:bg-slate-200 transition-colors w-max min-w-full"
-                  style={{ minWidth: reportTableMinWidth }}
                   onClick={() => toggleDay(dateLabel)}
                 >
                   <div className="flex flex-wrap items-center gap-2">
@@ -845,13 +844,13 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                     <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => markTripsReviewed(dayTrips, true)}
-                        className="px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-200 transition-colors"
+                        className="px-3 py-1.5 min-h-[36px] rounded-lg bg-emerald-100 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-200 transition-colors flex items-center"
                       >
                         Mark Day Done
                       </button>
                       <button
                         onClick={() => markTripsReviewed(dayTrips, false)}
-                        className="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold hover:bg-slate-200 transition-colors"
+                        className="px-3 py-1.5 min-h-[36px] rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold hover:bg-slate-200 transition-colors flex items-center"
                       >
                         Reset Review
                       </button>
@@ -862,8 +861,8 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
 
                 {!isCollapsed && (
                   <>
-                    {/* Table */}
-                    <div className="w-full overflow-x-auto">
+                    {/* Table — hidden on mobile */}
+                    <div className="w-full overflow-x-auto hidden lg:block">
                   <table className="resizable-table text-xs" style={{ tableLayout: 'fixed', width: '100%', minWidth: reportTableMinWidth }}>
                     <colgroup>
                       <col style={{ width: ROW_CONTROL_COL_WIDTH }} />
@@ -873,33 +872,35 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                     </colgroup>
                     <thead className="bg-slate-800 text-slate-100 border-b border-slate-200">
                       <tr>
-                        <th className="p-2 text-center align-middle resizable-th" style={{ width: ROW_CONTROL_COL_WIDTH }}>
+                        <th className="p-2 text-center align-middle resizable-th min-h-[44px]" style={{ width: ROW_CONTROL_COL_WIDTH }}>
                           <div className="flex items-center justify-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const dayTripIds = dayTrips.map(t => t.id);
-                                const allSelected = dayTripIds.every(id => selectedTasks.includes(id));
-                                if (allSelected) {
-                                  setSelectedTasks(selectedTasks.filter(id => !dayTripIds.includes(id)));
-                                } else {
-                                  const newSelection = [...new Set([...selectedTasks, ...dayTripIds])];
-                                  setSelectedTasks(newSelection);
-                                }
-                              }}
-                              className={`p-0.5 rounded transition-all duration-150 ${dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
-                              title="Select all trips for this day"
-                              aria-label="Select all trips for this day"
-                            >
-                              {dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? <CheckSquare size={14} /> : <Square size={14} />}
-                            </button>
+                            <div className="min-h-[44px] min-w-[44px] flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const dayTripIds = dayTrips.map(t => t.id);
+                                  const allSelected = dayTripIds.every(id => selectedTasks.includes(id));
+                                  if (allSelected) {
+                                    setSelectedTasks(selectedTasks.filter(id => !dayTripIds.includes(id)));
+                                  } else {
+                                    const newSelection = [...new Set([...selectedTasks, ...dayTripIds])];
+                                    setSelectedTasks(newSelection);
+                                  }
+                                }}
+                                className={`p-0.5 rounded transition-all duration-150 ${dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
+                                title="Select all trips for this day"
+                                aria-label="Select all trips for this day"
+                              >
+                                {dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? <CheckSquare size={14} /> : <Square size={14} />}
+                              </button>
+                            </div>
                             {canEdit && <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Edit</span>}
                           </div>
                         </th>
                         {Columns.map(col => (
                           <th
                             key={col.key}
-                            className="resizable-th p-0 text-left select-none"
+                            className="resizable-th p-0 text-left select-none min-h-[44px]"
                             style={{ width: colWidths[col.key] || 100 }}
                           >
                             <div
@@ -934,30 +935,32 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                           >
                             <td className="p-2 align-middle">
                               <div className="flex items-center gap-1 whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const isSelected = selectedTasks.includes(trip.id);
-                                    if (isSelected) {
-                                      setSelectedTasks(selectedTasks.filter(id => id !== trip.id));
-                                    } else {
-                                      setSelectedTasks([...selectedTasks, trip.id]);
-                                    }
-                                  }}
-                                  className={`p-0.5 rounded transition-all duration-150 ${selectedTasks.includes(trip.id) ? 'text-blue-600' : 'text-slate-300 hover:text-slate-500'}`}
-                                  title={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
-                                  aria-label={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
-                                >
-                                  {selectedTasks.includes(trip.id) ? <CheckSquare size={14} /> : <Square size={14} />}
-                                </button>
+                                <div className="min-h-[44px] min-w-[44px] flex items-center justify-center">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const isSelected = selectedTasks.includes(trip.id);
+                                      if (isSelected) {
+                                        setSelectedTasks(selectedTasks.filter(id => id !== trip.id));
+                                      } else {
+                                        setSelectedTasks([...selectedTasks, trip.id]);
+                                      }
+                                    }}
+                                    className={`p-0.5 rounded transition-all duration-150 ${selectedTasks.includes(trip.id) ? 'text-blue-600' : 'text-slate-300 hover:text-slate-500'}`}
+                                    title={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
+                                    aria-label={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
+                                  >
+                                    {selectedTasks.includes(trip.id) ? <CheckSquare size={14} /> : <Square size={14} />}
+                                  </button>
+                                </div>
                                 {canEdit && (
                                   editingRow === trip.id ? (
                                     <div className="flex items-center gap-1">
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); finishRowEdit(); }}
-                                        className="p-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150"
+                                        className="min-h-[44px] min-w-[44px] p-2 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150 flex items-center justify-center"
                                         title="Keep changes"
                                         aria-label="Keep changes"
                                       >
@@ -966,7 +969,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); revertRowEdit(); }}
-                                        className="p-0.5 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150"
+                                        className="min-h-[44px] min-w-[44px] p-2 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150 flex items-center justify-center"
                                         title="Cancel and restore original row"
                                         aria-label="Cancel and restore original row"
                                       >
@@ -977,7 +980,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                                     <button
                                       type="button"
                                       onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
-                                      className="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
+                                      className="min-h-[44px] min-w-[44px] p-2 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150 flex items-center justify-center"
                                       title="Edit row"
                                       aria-label="Edit row"
                                     >
@@ -1024,6 +1027,75 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                   </table>
                 </div>
 
+                {/* Mobile Card View — visible below lg */}
+                <div className="lg:hidden divide-y divide-slate-100">
+                  {dayTrips.map((trip) => {
+                    const statusClass = STATUS_VARIANT[trip.status] || 'bg-slate-100 text-slate-600 border-slate-200';
+                    const driverLabel = getDriverLabel(trip, drivers);
+                    const scheduledTime = formatClock24(trip.time) !== '—' ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
+                    return (
+                      <div
+                        key={trip.id}
+                        className={`px-4 py-3 ${activeRow === trip.id ? 'bg-blue-50' : 'bg-white'} hover:bg-blue-50/70 transition-colors`}
+                        onClick={() => setActiveRow(trip.id)}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const isSelected = selectedTasks.includes(trip.id);
+                                  setSelectedTasks(isSelected ? selectedTasks.filter(id => id !== trip.id) : [...selectedTasks, trip.id]);
+                                }}
+                                className={`p-0.5 rounded transition-all duration-150 shrink-0 ${selectedTasks.includes(trip.id) ? 'text-blue-600' : 'text-slate-300'}`}
+                              >
+                                {selectedTasks.includes(trip.id) ? <CheckSquare size={14} /> : <Square size={14} />}
+                              </button>
+                            )}
+                            <span className="font-bold text-sm text-slate-900 truncate">{trip.patient || '—'}</span>
+                          </div>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${statusClass}`}>
+                            {trip.status || '—'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                          <div>
+                            <span className="text-slate-400 text-[10px] uppercase tracking-wide">Pickup</span>
+                            <p className="text-emerald-600 truncate" title={trip.pickup}>{trip.pickup || '—'}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 text-[10px] uppercase tracking-wide">Dropoff</span>
+                            <p className="text-rose-600 truncate" title={trip.dropoff}>{trip.dropoff || '—'}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 text-[10px] uppercase tracking-wide">Time</span>
+                            <p className="font-mono text-slate-700">{scheduledTime}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 text-[10px] uppercase tracking-wide">Driver</span>
+                            <p className="font-semibold text-slate-700 truncate">{driverLabel}</p>
+                          </div>
+                        </div>
+
+                        {canEdit && (
+                          <div className="mt-2 pt-2 border-t border-slate-100 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
+                              className="px-3 py-1.5 min-h-[36px] rounded-lg bg-blue-50 text-blue-600 text-[11px] font-semibold hover:bg-blue-100 transition-colors flex items-center gap-1"
+                            >
+                              <SquarePen size={11} /> Edit
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
                 {/* Daily Summary per Driver */}
                 {(() => {
                   const byDriver = {};
@@ -1036,7 +1108,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                     if (trip.patient) byDriver[driverName].passengers.add(trip.patient);
                   });
                   return Object.entries(byDriver).map(([driverName, info]) => (
-                    <div key={driverName} className="px-4 py-2 bg-slate-50/80 border-t border-slate-200 flex items-center gap-4 text-xs">
+                    <div key={driverName} className="px-4 py-2 bg-slate-50/80 border-t border-slate-200 flex flex-wrap items-center gap-2 sm:gap-4 text-xs">
                       <span className="font-bold text-slate-700 min-w-[100px]">{driverName}</span>
                       <span className="text-slate-500">{info.trips} trips</span>
                       <span className="text-slate-500">{info.totalDistance.toFixed(1)} mi</span>

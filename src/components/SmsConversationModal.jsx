@@ -94,7 +94,7 @@ const SmsConversationModal = ({ trip, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div className="bg-white w-full max-w-md rounded-3xl shadow-sm relative z-10 border border-slate-200 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -104,7 +104,7 @@ const SmsConversationModal = ({ trip, onClose }) => {
               <p className="text-[10px] text-slate-500">{phone || 'No phone'}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors shrink-0"><X size={16} className="text-slate-500" /></button>
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition shrink-0 min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-[200px]">

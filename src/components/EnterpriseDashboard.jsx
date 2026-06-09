@@ -917,8 +917,8 @@ const EnterpriseDashboard = ({
     if (!commandPaletteOpen) return null;
     return (
       <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[20vh]" onClick={() => setCommandPaletteOpen(false)}>
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
-        <div className="w-full max-w-lg bg-white backdrop-blur-xl border border-slate-200 rounded-3xl shadow-sm overflow-hidden relative z-10 animate-in fade-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+        <div className="w-full max-w-lg bg-white backdrop-blur-xl border border-slate-200 rounded-3xl shadow-sm overflow-hidden relative z-10 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100">
             <Search size={16} className="text-slate-400" />
             <input
@@ -1106,7 +1106,7 @@ const EnterpriseDashboard = ({
       <div className="block md:hidden">
         {showRightPanel && (
           <div className="fixed inset-0 z-[100] flex items-start justify-end">
-            <div className="absolute inset-0 bg-black/60" onClick={() => setShowRightPanel(false)} />
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRightPanel(false)} />
             <div className="w-[320px] max-w-full bg-white border-l border-slate-200 flex flex-col h-full shadow-xl z-10 relative">
               {renderRightPanel()}
             </div>
@@ -1123,13 +1123,13 @@ const EnterpriseDashboard = ({
       {/* ==================== MODALS ==================== */}
       {showUploadModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowUploadModal(false)} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowUploadModal(false)} />
           <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Upload size={16} className="text-blue-700" /> Upload Trips
               </h2>
-              <button onClick={() => setShowUploadModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setShowUploadModal(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="p-6">
               <Suspense fallback={<LazyFallback />}>
@@ -1186,13 +1186,13 @@ const EnterpriseDashboard = ({
 
       {bulkAssignModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBulkAssignModal(false)} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setBulkAssignModal(false)} />
           <div className="bg-white w-full max-w-md max-h-[80vh] overflow-y-auto rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Users size={16} className="text-emerald-700" /> Assign {selectedTasks.length} Trips
               </h2>
-              <button onClick={() => setBulkAssignModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setBulkAssignModal(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="p-4 space-y-1.5">
               {drivers.map(d => (
@@ -1218,13 +1218,13 @@ const EnterpriseDashboard = ({
 
       {manualAssignTrip && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setManualAssignTrip(null)} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setManualAssignTrip(null)} />
           <div className="bg-white w-full max-w-md max-h-[80vh] overflow-y-auto rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Users size={16} className="text-emerald-700" /> Assign: {manualAssignTrip.patient}
               </h2>
-              <button onClick={() => setManualAssignTrip(null)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setManualAssignTrip(null)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="p-4 space-y-1.5">
               <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">Available Drivers</p>
@@ -1273,13 +1273,13 @@ const EnterpriseDashboard = ({
 
       {smartAssignTrip && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} />
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <BrainCircuit size={16} className="text-indigo-700" /> AI Assignment
               </h2>
-              <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="p-5">
               {aiAnalyzing ? (
@@ -1335,13 +1335,13 @@ const EnterpriseDashboard = ({
 
       {showOptimizeModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !aiAnalyzing && setShowOptimizeModal(false)} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !aiAnalyzing && setShowOptimizeModal(false)} />
           <div className="bg-white w-full max-w-md rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Wand2 size={16} className="text-indigo-700" /> Fleet Optimization
               </h2>
-              {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>}
+              {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>}
             </div>
             <div className="p-5">
               {aiAnalyzing ? (
@@ -1370,14 +1370,14 @@ const EnterpriseDashboard = ({
       {/* Trip Details Modal */}
       {tripDetails && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" onClick={() => setTripDetails(null)}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-sm relative z-10 border border-slate-200 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white backdrop-blur-md border-b border-slate-100 px-5 py-3.5 flex items-center justify-between z-10">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-blue-500" />
                 <h3 className="text-sm font-bold text-slate-900">Trip Details</h3>
               </div>
-              <button onClick={() => setTripDetails(null)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setTripDetails(null)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="p-5 space-y-3">
               <div className="flex items-start justify-between">
@@ -1498,7 +1498,7 @@ const EnterpriseDashboard = ({
       {/* Auth Modal */}
       {showAuthModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div className="bg-white w-full max-w-sm rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="px-5 py-3.5 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -1530,13 +1530,13 @@ const EnterpriseDashboard = ({
       {/* Route Sequencer Modal */}
       {showSequencerModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} />
           <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
             <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Route size={16} className="text-blue-700" /> Route Sequencer
               </h2>
-              <button onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="flex-1 overflow-hidden">
               <Suspense fallback={<LazyFallback />}>

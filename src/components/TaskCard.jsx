@@ -121,9 +121,11 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-3 min-w-0 pr-2">
               {onSelect && (
-                <button onClick={(e) => { e.stopPropagation(); onSelect(task.id); }} className="shrink-0">
-                  {isSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} className="text-slate-300" />}
-                </button>
+                <div className="min-h-[44px] min-w-[44px] flex items-center justify-center">
+                  <button onClick={(e) => { e.stopPropagation(); onSelect(task.id); }} className="shrink-0">
+                    {isSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} className="text-slate-300" />}
+                  </button>
+                </div>
               )}
               <Clock size={timeUrgency.type === 'critical' ? 18 : 16} className={`shrink-0 ${
                 timeUrgency.type === 'critical' ? 'text-rose-600 animate-pulse' :
@@ -149,7 +151,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
             <div className="flex items-center gap-1.5 shrink-0">
               {task.legs && (
                 <button onClick={(e) => { e.stopPropagation(); actions?.onShowLegs?.(task); }}
-                  className={`border px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wider cursor-pointer transition-colors ${
+                  className={`border px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold tracking-wider cursor-pointer transition-colors ${
                     isExpanded ? 'border-blue-100 text-blue-600 bg-blue-50' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                   }`}>
                   {task.legs}
@@ -163,7 +165,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 </span>
               )}
               {isExpanded && <StatusBadge status={task.status} />}
-              <button onClick={(e) => { e.stopPropagation(); onToggle(task.id); }} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); onToggle(task.id); }} className="w-10 h-10 min-h-[44px] rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
                 <ChevronDown size={18} className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} strokeWidth={2} />
               </button>
             </div>
@@ -226,7 +228,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
             {/* === GLASS HEADER === */}
             <div className="backdrop-blur-xl bg-white/80 border-b border-slate-200/50 px-4 py-3 flex items-center gap-3 shrink-0">
               <button onClick={() => onToggle(task.id)}
-                className="w-10 h-10 rounded-2xl bg-white/80 border border-slate-200/60 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 shadow-sm hover:bg-white transition-colors">
+                className="w-11 h-11 rounded-2xl bg-white/80 border border-slate-200/60 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 shadow-sm hover:bg-white transition-colors">
                 <ArrowLeft size={18} className="text-slate-600" />
               </button>
               <div className="flex-1 min-w-0">
@@ -254,7 +256,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
             <div className="flex-1 overflow-y-auto overscroll-contain">
 
               {/* --- ROUTE CARD --- */}
-              <div className="mx-4 mt-4 rounded-[28px] overflow-hidden shadow-2xl shadow-slate-900/10" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)' }}>
+              <div className="mx-4 sm:mx-5 mt-4 rounded-2xl overflow-hidden shadow-2xl shadow-slate-900/10" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)' }}>
                 <div className="relative p-5 pb-4">
                   {/* Decorative dots */}
                   <div className="absolute top-4 right-4 flex gap-1">
@@ -296,18 +298,18 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                           </p>
                         )}
                         <div className="flex items-center gap-1.5 mt-2.5">
-                          <button onClick={(e) => { e.stopPropagation(); handleCopy(pickupAddress, 'pickup'); }}
-                            className="h-7 px-2.5 bg-white/8 hover:bg-white/15 rounded-lg text-[10px] font-bold text-white/60 flex items-center gap-1 transition-colors cursor-pointer">
-                            {copiedId === 'pickup' ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
-                            {copiedId === 'pickup' ? 'Copied' : 'Copy'}
-                          </button>
+                           <button onClick={(e) => { e.stopPropagation(); handleCopy(pickupAddress, 'pickup'); }}
+                             className="min-h-[40px] px-3 py-2 bg-white/8 hover:bg-white/15 rounded-lg text-[10px] font-bold text-white/60 flex items-center gap-1 transition-colors cursor-pointer">
+                             {copiedId === 'pickup' ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                             {copiedId === 'pickup' ? 'Copied' : 'Copy'}
+                           </button>
                           {task.details?.distance && (
                             <span className="text-[10px] font-bold text-white/40 px-1">{task.details.distance}</span>
                           )}
-                          <button onClick={(e) => { e.stopPropagation(); actions?.onNavigatePickup?.(task); }}
-                            className="ml-auto h-7 px-2.5 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-[10px] font-bold text-blue-300 flex items-center gap-1 transition-colors cursor-pointer">
-                            <Navigation size={10} /> Navigate
-                          </button>
+                           <button onClick={(e) => { e.stopPropagation(); actions?.onNavigatePickup?.(task); }}
+                             className="ml-auto min-h-[40px] px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-[10px] font-bold text-blue-300 flex items-center gap-1 transition-colors cursor-pointer">
+                             <Navigation size={10} /> Navigate
+                           </button>
                         </div>
                       </div>
 
@@ -320,15 +322,15 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                           </p>
                         )}
                         <div className="flex items-center gap-1.5 mt-2.5">
-                          <button onClick={(e) => { e.stopPropagation(); handleCopy(dropoffAddress, 'dropoff'); }}
-                            className="h-7 px-2.5 bg-white/8 hover:bg-white/15 rounded-lg text-[10px] font-bold text-white/60 flex items-center gap-1 transition-colors cursor-pointer">
-                            {copiedId === 'dropoff' ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
-                            {copiedId === 'dropoff' ? 'Copied' : 'Copy'}
-                          </button>
-                          <button onClick={(e) => { e.stopPropagation(); actions?.onNavigateDropoff?.(task); }}
-                            className="ml-auto h-7 px-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-lg text-[10px] font-bold text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer">
-                            <Navigation size={10} /> Navigate
-                          </button>
+                           <button onClick={(e) => { e.stopPropagation(); handleCopy(dropoffAddress, 'dropoff'); }}
+                             className="min-h-[40px] px-3 py-2 bg-white/8 hover:bg-white/15 rounded-lg text-[10px] font-bold text-white/60 flex items-center gap-1 transition-colors cursor-pointer">
+                             {copiedId === 'dropoff' ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                             {copiedId === 'dropoff' ? 'Copied' : 'Copy'}
+                           </button>
+                           <button onClick={(e) => { e.stopPropagation(); actions?.onNavigateDropoff?.(task); }}
+                             className="ml-auto min-h-[40px] px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-lg text-[10px] font-bold text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer">
+                             <Navigation size={10} /> Navigate
+                           </button>
                         </div>
                       </div>
                     </div>
@@ -337,20 +339,20 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   {/* Quick Contact Strip */}
                   <div className="flex gap-2 mt-5">
                     <button onClick={(e) => { e.stopPropagation(); actions?.onCall?.(task); }}
-                      className="flex-1 h-10 bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border border-white/5">
+                      className="flex-1 min-h-[44px] bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border border-white/5">
                       <PhoneCall size={13} /> Call
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); actions?.onSms?.(task); }}
-                      className="flex-1 h-10 bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border border-white/5">
+                      className="flex-1 min-h-[44px] bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border border-white/5">
                       <MessageCircle size={13} /> SMS
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); actions?.onContacts?.(task); }}
-                      className="flex-1 h-10 bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border border-white/5">
+                      className="flex-1 min-h-[44px] bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border border-white/5">
                       <PhoneForwarded size={13} /> Contacts
                     </button>
                     {!isTerminal && (
                       <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(true); }}
-                        className="h-10 px-3 bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-white/5">
+                        className="min-h-[44px] px-3 bg-white/10 backdrop-blur hover:bg-white/15 rounded-2xl text-[11px] font-bold text-white/80 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-white/5">
                         <MoreHorizontal size={13} /> More
                       </button>
                     )}
@@ -359,7 +361,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
               </div>
 
               {/* --- PROGRESS --- */}
-              <div className="mx-4 mt-3 bg-white/80 backdrop-blur rounded-2xl p-4 border border-white shadow-sm">
+              <div className="mx-4 sm:mx-5 mt-3 bg-white/80 backdrop-blur rounded-2xl p-4 border border-white shadow-sm">
                 <div className="flex items-center gap-0">
                   {steps.map((step, i) => (
                     <div key={step} className="flex items-center flex-1">
@@ -379,7 +381,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   ))}
                   {!isTerminal && stepIdx > 0 && actions?.onRevert && (
                     <button onClick={(e) => { e.stopPropagation(); actions.onRevert(task); }}
-                      className="ml-2 w-[22px] h-[22px] rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer border border-slate-200"
+                      className="ml-2 min-h-[36px] min-w-[36px] rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer border border-slate-200"
                       title="Undo last step">
                       <Undo2 size={11} className="text-slate-600" />
                     </button>
@@ -394,7 +396,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
 
               {/* --- TAGS --- */}
               {(task.details?.passengerType || task.details?.mobility || (task.tags && task.tags.length > 0)) && (
-                <div className="flex flex-wrap gap-1.5 px-4 mt-3">
+                <div className="flex flex-wrap gap-1.5 px-4 sm:px-5 mt-3">
                   {task.details?.passengerType && (
                     <span className="inline-flex items-center gap-1 bg-blue-50/80 text-blue-600 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-blue-100/60">
                       <User size={10} /> {task.details.passengerType.split(',')[0]}
@@ -418,7 +420,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
 
               {/* --- NOTES (collapsible) --- */}
               {(task.notes || task.details?.generalComments) && (
-                <div className="mx-4 mt-3">
+                <div className="mx-4 sm:mx-5 mt-3">
                   <button onClick={(e) => { e.stopPropagation(); setShowNotes(!showNotes); }}
                     className="w-full flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/40 rounded-xl px-3 py-2 cursor-pointer active:scale-[0.98] transition-all">
                     <div className="flex items-center gap-2">
@@ -439,7 +441,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
             </div>
 
             {/* === BOTTOM ACTION BAR === */}
-            <div className="shrink-0 bg-white/90 backdrop-blur-xl border-t border-slate-200/50 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+            <div className="shrink-0 bg-white/90 backdrop-blur-xl border-t border-slate-200/50 px-4 sm:px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
 
               {/* Workflow (if present) */}
               {actions?.renderWorkflow && actions.renderWorkflow(task)}
@@ -475,7 +477,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   <div className="px-5 pb-3 flex items-center justify-between border-b border-slate-100">
                     <h3 className="font-extrabold text-[15px] text-slate-900">More Actions</h3>
                     <button onClick={() => setShowMoreSheet(false)}
-                      className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors cursor-pointer">
+                      className="w-11 h-11 min-h-[44px] rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors cursor-pointer">
                       <XCircle size={16} className="text-slate-400" />
                     </button>
                   </div>

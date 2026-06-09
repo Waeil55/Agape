@@ -168,7 +168,7 @@ const UnifiedRoutePlanner = ({
             </div>
             {guidedMode && (
               <button onClick={() => { onSetGuidedMode(false); onSetAiSequence(null); onSetAiSuggestions([]); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100 active:scale-95 transition cursor-pointer">
+                className="flex items-center gap-1.5 px-3 min-h-[44px] bg-blue-50 rounded-full border border-blue-100 active:scale-95 transition cursor-pointer">
                 <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                 <span className="text-[10px] font-extrabold text-blue-600">Guided On</span>
                 <X size={11} className="text-blue-400" />
@@ -177,13 +177,13 @@ const UnifiedRoutePlanner = ({
           </div>
 
           {/* Tab Bar */}
-          <div className="flex gap-1">
+          <div className="flex gap-1 overflow-x-auto">
             {tabs.map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-extrabold rounded-t-xl transition-all cursor-pointer ${
+                  className={`relative flex-1 flex items-center justify-center gap-1 min-h-[44px] py-3 text-[10px] font-extrabold rounded-t-xl transition-all cursor-pointer ${
                     isActive
                       ? 'text-blue-600 bg-slate-50'
                       : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50/50'
@@ -209,7 +209,7 @@ const UnifiedRoutePlanner = ({
 
         {/* PLAN TAB */}
         {activeTab === 'plan' && (
-          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 pt-3">
+          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
             {/* AI Quick Actions */}
             {selectedTrips.length >= 1 && (
               <div className="mb-3 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl p-3 shadow-lg shadow-indigo-200/50">
@@ -222,17 +222,17 @@ const UnifiedRoutePlanner = ({
                   </div>
                   <div className="flex gap-1.5 shrink-0">
                     <button onClick={() => onSelectAllTrips()}
-                      className="px-2.5 h-7 bg-white/20 text-white rounded-lg text-[10px] font-extrabold active:scale-95 transition cursor-pointer">
+                      className="px-3 min-h-[40px] py-2 bg-white/20 text-white rounded-lg text-[10px] font-extrabold active:scale-95 transition cursor-pointer">
                       {selectedTrips.length === activeTrips.length ? 'Deselect' : 'All'}
                     </button>
                     {selectedTrips.length >= 2 && (
                       <button onClick={() => onRunAiOptimization()} disabled={aiOptimizing}
-                        className="px-2.5 h-7 bg-white text-indigo-700 rounded-lg text-[10px] font-extrabold flex items-center gap-1 active:scale-95 shadow cursor-pointer">
+                        className="px-3 min-h-[40px] py-2 bg-white text-indigo-700 rounded-lg text-[10px] font-extrabold flex items-center gap-1 active:scale-95 shadow cursor-pointer">
                         <BrainCircuit size={10} /> {aiOptimizing ? '...' : 'Optimize'}
                       </button>
                     )}
                     <button onClick={() => onSetSelectedTrips([])}
-                      className="px-2.5 h-7 bg-white/10 text-white/70 rounded-lg text-[10px] font-extrabold active:scale-95 cursor-pointer">Clear</button>
+                      className="px-3 min-h-[40px] py-2 bg-white/10 text-white/70 rounded-lg text-[10px] font-extrabold active:scale-95 cursor-pointer">Clear</button>
                   </div>
                 </div>
               </div>
@@ -240,7 +240,7 @@ const UnifiedRoutePlanner = ({
 
             {/* Smart Route */}
             {aiSequence && aiSequence.length >= 2 && !guidedMode && (
-              <div className="mb-3 rounded-2xl overflow-hidden shadow-lg shadow-indigo-900/10" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #2563eb 100%)' }}>
+              <div className="mb-3 rounded-2xl overflow-hidden shadow-lg shadow-indigo-900/10" style={{ background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)' }}>
                 <div className="p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <BrainCircuit size={14} className="text-white/80" />
@@ -259,11 +259,11 @@ const UnifiedRoutePlanner = ({
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => { onSetGuidedMode(true); onSetGuidedStepIndex(0); onSetAiSuggestions([]); }}
-                      className="flex-1 h-9 bg-white text-indigo-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:scale-[0.98] shadow-lg cursor-pointer">
+                      className="flex-1 min-h-[44px] bg-white text-indigo-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:scale-[0.98] shadow-lg cursor-pointer">
                       <Play size={12} strokeWidth={2.5} /> Start Route
                     </button>
                     <button onClick={() => { onSetAiSequence(null); onSetAiSuggestions([]); }}
-                      className="h-9 px-3 bg-white/15 text-white/70 rounded-xl text-[11px] font-extrabold active:scale-[0.98] cursor-pointer">Dismiss</button>
+                      className="min-h-[44px] px-3 bg-white/15 text-white/70 rounded-xl text-[11px] font-extrabold active:scale-[0.98] cursor-pointer">Dismiss</button>
                   </div>
                 </div>
               </div>
@@ -276,7 +276,7 @@ const UnifiedRoutePlanner = ({
                 <div className="flex-1 min-w-0">
                   {aiSuggestions.map((s, i) => <p key={i} className="text-[11px] font-semibold text-indigo-600 leading-relaxed">{s}</p>)}
                 </div>
-                <button onClick={() => onSetAiSuggestions([])} className="text-indigo-300 hover:text-indigo-500 shrink-0 cursor-pointer"><X size={12} /></button>
+                <button onClick={() => onSetAiSuggestions([])} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-indigo-300 hover:text-indigo-500 shrink-0 cursor-pointer"><X size={12} /></button>
               </div>
             )}
 
@@ -331,7 +331,7 @@ const UnifiedRoutePlanner = ({
 
         {/* SAVED TAB */}
         {activeTab === 'saved' && (
-          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 pt-3">
+          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
             {sortedTemplates.length > 0 ? (
               <div className="space-y-2">
                 {sortedTemplates.map((tpl) => {
@@ -372,7 +372,7 @@ const UnifiedRoutePlanner = ({
                             </div>
                           </div>
                           <button onClick={() => setExpandedTemplateId(isExpanded ? null : tpl.id)}
-                            className="w-7 h-7 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 active:scale-95 transition shrink-0 cursor-pointer">
+                            className="min-h-[44px] min-w-[44px] rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 active:scale-95 transition shrink-0 cursor-pointer">
                             {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                           </button>
                         </div>
@@ -443,12 +443,12 @@ const UnifiedRoutePlanner = ({
 
                           <div className="flex gap-2">
                             <button onClick={() => handleLoadTemplate(tpl)}
-                              className="flex-1 h-9 bg-blue-50 text-blue-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-blue-100 transition border border-blue-100 cursor-pointer">
+                              className="flex-1 min-h-[44px] bg-blue-50 text-blue-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-blue-100 transition border border-blue-100 cursor-pointer">
                               <FolderOpen size={11} /> Load to Route
                             </button>
                             <button onClick={() => { if (window.confirm(`Delete "${tpl.name}"?`)) handleDeleteTemplate(tpl.id); }}
                               disabled={deletingId === tpl.id}
-                              className="h-9 px-3 bg-rose-50 text-rose-600 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 active:bg-rose-100 transition border border-rose-100 cursor-pointer">
+                              className="min-h-[44px] px-3 bg-rose-50 text-rose-600 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 active:bg-rose-100 transition border border-rose-100 cursor-pointer">
                               <Trash2 size={11} />
                             </button>
                           </div>
@@ -458,11 +458,11 @@ const UnifiedRoutePlanner = ({
                       {!isExpanded && (
                         <div className="px-3.5 pb-2.5 flex gap-1.5">
                           <button onClick={() => handleLoadTemplate(tpl)}
-                            className="flex-1 h-8 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-extrabold flex items-center justify-center gap-1 active:bg-blue-100 transition cursor-pointer">
+                            className="flex-1 min-h-[44px] bg-blue-50 text-blue-700 rounded-lg text-[10px] font-extrabold flex items-center justify-center gap-1 active:bg-blue-100 transition cursor-pointer">
                             <FolderOpen size={10} /> Load
                           </button>
                           <button onClick={() => setExpandedTemplateId(tpl.id)}
-                            className="h-8 px-2.5 bg-slate-50 text-slate-500 rounded-lg text-[10px] font-extrabold flex items-center justify-center gap-1 active:bg-slate-100 transition cursor-pointer">
+                            className="min-h-[44px] px-3 bg-slate-50 text-slate-500 rounded-lg text-[10px] font-extrabold flex items-center justify-center gap-1 active:bg-slate-100 transition cursor-pointer">
                             Details
                           </button>
                         </div>
@@ -472,7 +472,7 @@ const UnifiedRoutePlanner = ({
                 })}
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-8 text-center">
+              <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-6 sm:p-8 text-center">
                 <Bookmark size={24} className="text-slate-200 mx-auto mb-3" />
                 <p className="text-[12px] font-bold text-slate-400">No saved plans yet</p>
                 <p className="text-[10px] text-slate-300 mt-1">Create a route in the Route tab and save it</p>
@@ -490,17 +490,17 @@ const UnifiedRoutePlanner = ({
                   <span className="text-[10px] font-extrabold text-white truncate">{selectedTrips.length} selected</span>
                   <div className="flex gap-1 shrink-0">
                     <button onClick={() => onSelectAllTrips()}
-                      className="px-2 h-6 bg-white/20 text-white rounded-lg text-[9px] font-extrabold active:scale-95 cursor-pointer">
+                      className="px-3 min-h-[40px] py-2 bg-white/20 text-white rounded-lg text-[9px] font-extrabold active:scale-95 cursor-pointer">
                       {selectedTrips.length === activeTrips.length ? 'Deselect' : 'All'}
                     </button>
                     {selectedTrips.length >= 2 && (
                       <button onClick={() => onRunAiOptimization()} disabled={aiOptimizing}
-                        className="px-2 h-6 bg-white text-indigo-700 rounded-lg text-[9px] font-extrabold flex items-center gap-1 active:scale-95 cursor-pointer">
+                        className="px-3 min-h-[40px] py-2 bg-white text-indigo-700 rounded-lg text-[9px] font-extrabold flex items-center gap-1 active:scale-95 cursor-pointer">
                         <BrainCircuit size={9} /> {aiOptimizing ? '...' : 'AI'}
                       </button>
                     )}
                     <button onClick={() => onSetSelectedTrips([])}
-                      className="px-2 h-6 bg-white/10 text-white/60 rounded-lg text-[9px] font-extrabold active:scale-95 cursor-pointer">X</button>
+                      className="px-3 min-h-[40px] py-2 bg-white/10 text-white/60 rounded-lg text-[9px] font-extrabold active:scale-95 cursor-pointer">X</button>
                   </div>
                 </div>
               </div>
@@ -530,7 +530,7 @@ const UnifiedRoutePlanner = ({
 
         {/* NAVIGATE TAB */}
         {activeTab === 'navigate' && (
-          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 pt-3">
+          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
             {activeTrips.length > 0 ? (
               <div className="space-y-2">
                 {Object.keys(etas).length > 0 && (
@@ -569,11 +569,11 @@ const UnifiedRoutePlanner = ({
                       </div>
                       <div className="grid grid-cols-2 gap-1.5">
                         <button onClick={() => onOpenInNav(trip.pickup)}
-                          className="h-9 bg-emerald-50 text-emerald-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-emerald-100 transition border border-emerald-100 cursor-pointer">
+                          className="min-h-[44px] bg-emerald-50 text-emerald-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-emerald-100 transition border border-emerald-100 cursor-pointer">
                           <MapPin size={12} /> Pickup
                         </button>
                         <button onClick={() => onOpenInNav(trip.dropoff)}
-                          className="h-9 bg-rose-50 text-rose-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-rose-100 transition border border-rose-100 cursor-pointer">
+                          className="min-h-[44px] bg-rose-50 text-rose-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 active:bg-rose-100 transition border border-rose-100 cursor-pointer">
                           <MapPin size={12} /> Dropoff
                         </button>
                       </div>
@@ -582,7 +582,7 @@ const UnifiedRoutePlanner = ({
                 ))}
               </div>
             ) : (
-              <div className="text-center py-20">
+              <div className="text-center py-12 sm:py-20">
                 <div className="w-16 h-16 rounded-3xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
                   <Navigation size={24} className="text-slate-300" />
                 </div>

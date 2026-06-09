@@ -341,7 +341,7 @@ const Badge = ({ children, variant = 'info' }) => {
     info: "bg-blue-50 text-blue-700 border-blue-100",
     ai: "bg-indigo-50 text-indigo-700 border-indigo-100",
   };
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
+  return <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border uppercase whitespace-nowrap ${variants[variant]}`}>{children}</span>;
 };
 
 const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', uploadContext = 'operations' }) => {

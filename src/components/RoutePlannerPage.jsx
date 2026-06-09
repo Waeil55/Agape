@@ -257,7 +257,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
           <span className="text-slate-400 font-mono text-[9px]">{to12hr(trip.time)}</span>
         </div>
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${statusClass}`}>{trip.status || 'Unassigned'}</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusClass}`}>{trip.status || 'Unassigned'}</span>
           {driverName && <span className="text-[9px] text-slate-400">{driverName}</span>}
           {trip.wheelchair && <Users size={9} className="text-blue-500" />}
           {trip.bookingId && <span className="text-[8px] text-blue-300 font-mono">{trip.bookingId}</span>}

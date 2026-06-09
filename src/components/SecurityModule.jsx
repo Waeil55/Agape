@@ -84,7 +84,7 @@ export const TwoFactorSetup = ({ user, onComplete }) => {
               onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="000000"
               maxLength={6}
-              className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-2xl tracking-widest text-center"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-2xl tracking-widest text-center"
             />
           </div>
 
@@ -180,12 +180,12 @@ export const AuditLogViewer = ({ logs = [] }) => {
           placeholder="Search logs..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+          className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
         />
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+          className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
         >
           <option value="all">All Actions</option>
           <option value="login">Login</option>
@@ -330,7 +330,7 @@ const SecurityModule = ({ user, onLogout }) => {
   return (
     <div className="flex-1 flex flex-col bg-slate-50 overflow-auto">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white border-b border-slate-200 p-6">
+      <div className="sticky top-0 z-10 bg-white border-b border-slate-200 p-6 pt-[env(safe-area-inset-top,0px)]">
         <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
           <Shield size={32} className="text-blue-600" />
           Security & Compliance

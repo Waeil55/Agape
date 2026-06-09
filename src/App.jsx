@@ -2042,7 +2042,7 @@ const App = () => {
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Username</label>
                 <div className="relative">
                   <input type="text" required autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="waeil.admin" value={email} onChange={(e) => setEmail(e.target.value)} 
-                    className="w-full p-3.5 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
+                    className="w-full px-3 py-2.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
 
@@ -2050,7 +2050,7 @@ const App = () => {
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
                 <div className="relative">
                   <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} 
-                    className="w-full p-3.5 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
+                    className="w-full px-3 py-2.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
 
@@ -2080,8 +2080,8 @@ const App = () => {
     if (!showAuthModal) return null;
     return (
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setShowAuthModal(false)} />
-        <div className="bg-white w-full max-w-sm rounded-3xl p-8 shadow-sm relative z-10 border border-slate-200">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowAuthModal(false)} />
+        <div className="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-8 shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
           <div className="w-16 h-16 bg-gradient-to-tr from-rose-600 to-rose-400 text-white rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-rose-500/30">
             <Lock size={32} />
           </div>
@@ -2089,7 +2089,7 @@ const App = () => {
           <p className="text-xs text-center text-slate-500 font-medium mb-2">Re-enter your password to authorize: <span className="font-bold text-slate-800">{authActionPayload?.label || 'Action'}</span></p>
           {reAuthError && <p className="text-xs text-center text-rose-600 font-semibold mb-4">{reAuthError}</p>}
           <form onSubmit={submitAuthAction}>
-            <input type="password" required placeholder="Enter your password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full p-4 bg-slate-100/50 rounded-[1rem] font-semibold border border-slate-200/50 focus:border-rose-500 focus:bg-white mb-4" />
+            <input type="password" required placeholder="Enter your password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full px-3 py-2.5 bg-slate-100/50 rounded-xl font-semibold border border-slate-200/50 focus:border-rose-500 focus:bg-white mb-4" />
             <div className="flex gap-2">
               <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold active:scale-95 transition-all">Cancel</button>
               <button type="submit" className="flex-1 py-3.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold active:scale-95 transition-all shadow-md shadow-rose-500/20">Authorize</button>
@@ -2104,13 +2104,13 @@ const App = () => {
     if (!bulkAssignModal) return null;
     return (
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setBulkAssignModal(false)} />
-        <div className="bg-white/90 backdrop-blur-xl w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/50 max-h-[85vh] overflow-y-auto">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setBulkAssignModal(false)} />
+        <div className="bg-white/90 backdrop-blur-xl w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-8 shadow-2xl relative z-10 border border-white/50 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
               <Truck size={24} className="text-emerald-600" /> Bulk Assignment
             </h3>
-            <button onClick={() => setBulkAssignModal(false)} className="p-2 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
+            <button onClick={() => setBulkAssignModal(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-600 min-h-[44px] min-w-[44px] active:scale-95 transition-all"><X size={20} /></button>
           </div>
           
           <div className="bg-emerald-50 rounded-2xl p-4 mb-6 border border-emerald-100">
@@ -2150,8 +2150,8 @@ const App = () => {
     if (!smartAssignTrip) return null;
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-12">
-        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} />
-        <div className="bg-white/90 backdrop-blur-xl w-full max-w-2xl rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl relative z-10 border border-white/50 max-h-[90vh] overflow-y-auto">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} />
+        <div className="bg-white/90 backdrop-blur-xl w-full max-w-2xl rounded-t-3xl sm:rounded-3xl p-6 sm:p-10 shadow-2xl relative z-10 border border-white/50 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
           <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-6">
             <div className="flex items-center gap-4">
               <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center shadow-md ${aiAnalyzing ? 'bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white animate-pulse' : 'bg-indigo-100 text-indigo-700'}`}>
@@ -2162,7 +2162,7 @@ const App = () => {
                 <p className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-widest">Target: {smartAssignTrip.patient}</p>
               </div>
             </div>
-            <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
+            <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-600 min-h-[44px] min-w-[44px] active:scale-95 transition-all"><X size={20} /></button>
           </div>
           <div className="bg-slate-50/80 rounded-2xl p-4 mb-6 border border-slate-200/50">
             <div className="grid grid-cols-2 gap-4 text-xs font-bold text-slate-600">
@@ -2239,8 +2239,8 @@ const App = () => {
     
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-12">
-        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setManualAssignTrip(null)} />
-        <div className="bg-white/95 backdrop-blur-xl w-full max-w-xl rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl relative z-10 border border-white/50 max-h-[90vh] flex flex-col">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setManualAssignTrip(null)} />
+        <div className="bg-white/95 backdrop-blur-xl w-full max-w-xl rounded-t-3xl sm:rounded-3xl p-6 sm:p-10 shadow-2xl relative z-10 border border-white/50 max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
           <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-[1rem] bg-blue-100 text-blue-700 flex items-center justify-center shadow-sm">
@@ -2251,7 +2251,7 @@ const App = () => {
                 <p className="text-xs font-bold text-slate-500 mt-0.5 uppercase tracking-widest">Assign: {manualAssignTrip.patient}</p>
               </div>
             </div>
-            <button onClick={() => setManualAssignTrip(null)} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
+            <button onClick={() => setManualAssignTrip(null)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-600 min-h-[44px] min-w-[44px] active:scale-95 transition-all"><X size={20} /></button>
           </div>
           
           <div className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-thin">
@@ -2306,14 +2306,14 @@ const App = () => {
     if (!showOptimizeModal) return null;
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-12">
-        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => !aiAnalyzing && setShowOptimizeModal(false)} />
-        <div className="bg-white/90 backdrop-blur-xl w-full max-w-xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/50">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !aiAnalyzing && setShowOptimizeModal(false)} />
+        <div className="bg-white/90 backdrop-blur-xl w-full max-w-xl rounded-t-3xl sm:rounded-3xl p-8 shadow-2xl relative z-10 border border-white/50 animate-in fade-in zoom-in-95 duration-200">
           <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
             <div className="flex items-center gap-3">
               <div className="bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white p-3 rounded-[1rem] shadow-md"><Wand2 size={24} /></div>
               <h3 className="text-2xl font-black text-slate-900">Fleet AI Optimizer</h3>
             </div>
-            {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>}
+            {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-600 min-h-[44px] min-w-[44px] active:scale-95 transition-all"><X size={20} /></button>}
           </div>
           {aiAnalyzing ? (
             <div className="py-8 flex flex-col items-center justify-center text-center space-y-6">
@@ -2350,7 +2350,7 @@ const App = () => {
       <div className={`offline-banner${isOffline ? ' visible' : ''}`}>
         You are offline — changes will sync when connection returns
       </div>
-      <div className="min-h-screen flex-1 flex flex-col bg-slate-100 overflow-visible w-full">
+      <div className="min-h-screen flex-1 flex flex-col bg-slate-100 overflow-visible w-full pt-[env(safe-area-inset-top,0px)]">
       {/* Header removed: DriverPage handles its own UI */}
       {startupIssue && !isLoading && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-2 text-xs sm:text-sm font-semibold text-amber-800 flex items-center justify-between gap-3">

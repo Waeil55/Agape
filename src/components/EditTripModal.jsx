@@ -62,7 +62,7 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
     }
   };
 
-  const inputClass = "w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-[0.875em] focus:border-blue-500 focus:bg-white outline-none transition-all";
+  const inputClass = "w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 focus:bg-white outline-none transition-all";
 
   return (
     <div className="fixed inset-0 z-[120] bg-white flex flex-col animate-slide-up">

@@ -196,10 +196,10 @@ const CommandIntelligencePanel = ({
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
+              <span className={`px-2.5 py-0.5 rounded-full border text-xs font-semibold uppercase ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
                 {aiInsights ? 'AI Intelligence' : 'Operations Monitor'}
               </span>
-              <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
+              <span className={`px-2.5 py-0.5 rounded-full border text-xs font-semibold uppercase ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
                 {riskLabel} {heuristic.score}
               </span>
             </div>

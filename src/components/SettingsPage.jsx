@@ -613,7 +613,7 @@ const SettingsPage = ({
                       <label className="block text-sm font-bold text-slate-700 mb-2">New Password</label>
                       <div className="relative">
                         <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
-                        <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-600" aria-label="Toggle password visibility">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
+                        <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-600 min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Toggle password visibility">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
                       </div>
                     </div>
                     <div>
