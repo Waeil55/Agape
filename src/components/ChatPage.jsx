@@ -47,7 +47,7 @@ const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [
   const [activeTab, setActiveTab] = useState('team');
   const isMobile = useMobile();
   return (
-    <div className="flex flex-col h-full bg-[#F3F4F6] overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 bg-[#F3F4F6] overflow-hidden">
       {role !== 'driver' && (
         <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2 flex gap-1 z-10">
           <button onClick={() => setActiveTab('team')}

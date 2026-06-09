@@ -435,7 +435,7 @@ const App = () => {
   const {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
     loading: dataLoading, saving: dataSaving, error: dataError, lastSavedAt,
-    setTrips, setDrivers, upsertDriverProfile, setDispatchers, setVehicles,
+    setTrips, setDrivers, upsertDriverProfile, setDispatchers, upsertDispatcherProfile, setVehicles,
     setTrashedTrips, setLogs, setPhoneNumbers,
     addLog, initializeAppData,
   } = useFirestoreAppData();
@@ -1671,19 +1671,11 @@ const App = () => {
 
   const handleDriverStatusUpdate = (driverId, clockedIn) => {
     const prevDriverState = drivers.find(d => d.id === driverId) || {};
-    setDrivers(prevDrivers => {
-      const driverExists = prevDrivers.some(d => d.id === driverId);
-      const workingDrivers = driverExists
-        ? prevDrivers
-        : [...prevDrivers, { ...buildDriverProfileFromEmail(currentUser || '', auth.currentUser?.uid || ''), id: driverId }];
-      const updated = workingDrivers.map(d => d.id === driverId ? {
-        ...d,
-        clockedIn,
-        lastUpdate: new Date().toISOString(),
-        status: clockedIn ? 'Available' : 'Offline',
-      } : d);
-      return updated;
-    });
+    upsertDriverProfile(driverId, {
+      clockedIn,
+      lastUpdate: new Date().toISOString(),
+      status: clockedIn ? 'Available' : 'Offline',
+    }).catch(err => console.error('Failed to persist driver status:', err));
     const driverName = prevDriverState?.name || driverId;
     const changed = [];
     if (Boolean(prevDriverState.clockedIn) !== clockedIn) changed.push({ field: 'clockedIn', before: prevDriverState.clockedIn, after: clockedIn });
@@ -1698,14 +1690,10 @@ const App = () => {
 
   const handleDispatcherStatusUpdate = (dispatcherId, clockedIn) => {
     const prevState = dispatchers.find(d => d.id === dispatcherId) || {};
-    setDispatchers(prevDispatchers => {
-      const updated = prevDispatchers.map(d => d.id === dispatcherId ? {
-        ...d,
-        clockedIn,
-        lastUpdate: new Date().toISOString(),
-      } : d);
-      return updated;
-    });
+    upsertDispatcherProfile(dispatcherId, {
+      clockedIn,
+      lastUpdate: new Date().toISOString(),
+    }).catch(err => console.error('Failed to persist dispatcher status:', err));
     const changed = [];
     if (Boolean(prevState.clockedIn) !== clockedIn) changed.push({ field: 'clockedIn', before: prevState.clockedIn, after: clockedIn });
     addAuditLog(

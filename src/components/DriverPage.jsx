@@ -3674,7 +3674,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== CHAT PAGE ===== */}
       {activeNav === 'chat' && (
-        <div className="flex-1 flex flex-col bg-white">
+        <div className="flex-1 flex flex-col bg-white overflow-hidden" style={{ paddingBottom: '80px' }}>
           <ChatPage currentUser={currentUser} role={role} drivers={allDrivers || drivers} dispatchers={dispatchers} trips={trips} />
         </div>
       )}

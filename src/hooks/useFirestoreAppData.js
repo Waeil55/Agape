@@ -569,6 +569,43 @@ export function useFirestoreAppData() {
     return writeField('dispatchers', next);
   }, [writeField]);
 
+  const upsertDispatcherProfile = useCallback(async (dispatcherId, updates = {}) => {
+    if (!dispatcherId) return false;
+    const currentDispatchers = dataRef.current.dispatchers || [];
+    const existing = currentDispatchers.find((d) => d.id === dispatcherId) || { id: dispatcherId };
+    const nextDispatcher = sanitizeForFirestore({
+      ...existing,
+      ...updates,
+      id: dispatcherId,
+      updatedAtLocal: updates.updatedAtLocal || new Date().toISOString(),
+    });
+    const nextDispatchers = currentDispatchers.some((d) => d.id === dispatcherId)
+      ? currentDispatchers.map((d) => (d.id === dispatcherId ? nextDispatcher : d))
+      : [...currentDispatchers, nextDispatcher];
+
+    dataRef.current = {
+      ...normalizeData(dataRef.current),
+      dispatchers: nextDispatchers,
+    };
+    setState(prev => ({
+      ...prev,
+      dispatchers: nextDispatchers,
+      error: null,
+    }));
+
+    try {
+      await setDoc(doc(db, DISPATCHER_PROFILE_COLLECTION, dispatcherId), nextDispatcher, { merge: true });
+      return true;
+    } catch (err) {
+      console.error('Failed to upsert dispatcher profile:', err);
+      setState(prev => ({
+        ...prev,
+        error: err.message || 'Failed to update dispatcher profile',
+      }));
+      return false;
+    }
+  }, []);
+
   const setVehicles = useCallback((updater) => {
     const current = dataRef.current.vehicles || [];
     const next = typeof updater === 'function' ? updater(current) : updater;
@@ -633,6 +670,7 @@ export function useFirestoreAppData() {
     setDrivers,
     upsertDriverProfile,
     setDispatchers,
+    upsertDispatcherProfile,
     setVehicles,
     setTrashedTrips,
     setLogs,
