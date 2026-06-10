@@ -530,7 +530,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 </div>
               )}
 
-              <div className="h-4" />
+              <div className="h-1" />
             </div>
 
             {/* === BOTTOM ACTION BAR === */}
