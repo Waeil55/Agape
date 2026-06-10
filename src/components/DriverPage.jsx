@@ -1935,41 +1935,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setExpandedTripId(null);
   };
 
-  // Inline complete: enter odometer directly in workflow bar
-  const handleInlineComplete = (trip) => {
-    if (!trip) return;
-    if (!completeOdometer) {
-      setCompleteError('Enter the final odometer reading before completing this trip.');
-      return;
-    }
-    const odo = parseInt(completeOdometer, 10);
-    if (isNaN(odo) || odo <= 0) {
-      setCompleteError('Use a valid odometer reading greater than zero.');
-      return;
-    }
-    if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
-    if (trip.pickupOdometer && odo < Number(trip.pickupOdometer) && !window.confirm(`Warning: final odometer is less than pickup odometer (${Number(trip.pickupOdometer).toLocaleString()} mi). Continue anyway?`)) return;
-    setUndoable(trip, trip.status, 'Completed');
-    const now = new Date().toISOString();
-    advanceWorkflow(trip, 'Completed', {
-      dropoffOdometer: odo,
-      completedAt: now,
-      completedVehicle: me?.vehicle || '',
-    });
-    setLastOdometer(odo);
-    setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
-    setCompleteOdometer('');
-    setCompleteError('');
-
-    if (navigator.onLine) {
-      saveOdometerReading(trip.id, odo).catch(() => {});
-    } else {
-      addToQueue('completeTrip', { tripId: trip.id, odometer: odo });
-    }
-    setSelectedTrips(prev => prev.filter(id => id !== trip.id));
-    setExpandedTripId(null);
-  };
-
   // Swipe-to-complete gesture handler
   const handleTouchStart = (e, trip) => {
     setTouchStart({ x: e.touches[0].clientX, trip });
@@ -2742,34 +2707,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                 return renderPrimaryBtn('Arrive at Dropoff', <MapPin size={14} />, 'bg-orange-600 hover:bg-orange-700', () => { impact('heavy'); handleArriveDropoff(trip); });
                               }
                               if (trip.status === 'At Dropoff' || trip.status === 'Arrived') {
-                                return (
-                                  <div className={`rounded-xl border ${borderColor} ${bgColor} p-3`}>
-                                    <div className="flex items-center gap-0.5 mb-2">
-                                      {workflowSteps.map((ws, idx) => (
-                                        <div key={ws.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
-                                      ))}
-                                    </div>
-                                    <div className="space-y-2">
-                                      <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Final Odometer (mi)</label>
-                                        <input type="number" inputMode="numeric" value={completeOdometer} onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
-                                          placeholder="Enter final odometer"
-                                          className="w-full h-12 px-3 bg-white border border-orange-200 rounded-xl font-bold text-base text-center focus:border-rose-400 outline-none" />
-                                      </div>
-                                      {completeError && <p className="text-xs font-bold text-rose-700">{completeError}</p>}
-                                      <div className="flex items-center gap-1.5">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); setCompleteOdometer(''); setCompleteError(''); openCompleteModal(trip); }} className="flex-1 h-10 bg-white border border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 transition-all text-[10px] font-bold cursor-pointer flex items-center justify-center gap-1">
-                                          <Clock size={12} /> Times
-                                        </button>
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); impact('heavy'); handleInlineComplete(trip); }} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-[2] h-10 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs transition-all disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm">
-                                          <Check size={12} /> Complete Trip
-                                        </button>
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="h-10 px-3 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-[10px] font-bold shrink-0 cursor-pointer">No Show</button>
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="h-10 px-3 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-[10px] font-bold shrink-0 cursor-pointer">Cancel</button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
+                                return renderPrimaryBtn('Complete Trip', <Check size={14} />, 'bg-red-600 hover:bg-red-700', () => { impact('heavy'); openCompleteModal(trip); });
                               }
                             }
                             return <div className="text-center text-xs text-slate-400 italic bg-slate-50 rounded-xl py-2">No action required for this step.</div>;
@@ -2853,7 +2791,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
                   if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/25', phase: 'dropoff', onClick: () => handleNavigateToDropoff(trip) };
                   if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
-                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return null;
+                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-red-600 hover:bg-red-700 shadow-red-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
                   return null;
                 };
                 const primary = getPrimaryAction();
@@ -2920,10 +2858,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       onShowLegs: handleShowLegs,
                       onEditTrip: handleEditTrip,
                       onTransfer: () => openTransferPrompt('trip', trip),
-                      renderWorkflow: !isTerminal && (primary || trip.status === 'At Dropoff' || trip.status === 'Arrived') ? () => {
-                        const isFinalStep = trip.status === 'At Dropoff' || trip.status === 'Arrived';
-                        const borderColor = isFinalStep ? 'border-orange-200' : isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
-                        const bgColor = isFinalStep ? 'bg-orange-50' : isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
+                      renderWorkflow: !isTerminal && primary ? () => {
+                        const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
+                        const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
+                        const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
                         return (
                           <div className={`rounded-xl border ${borderColor} ${bgColor} p-3 w-full`}>
                             <div className="flex items-center gap-0.5 mb-2">
@@ -2931,66 +2869,33 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                 <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
                               ))}
                             </div>
-                            {isFinalStep ? (
-                              <div className="space-y-2">
-                                <div>
-                                  <label className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Final Odometer (mi)</label>
-                                  <input type="number" inputMode="numeric" value={completeOdometer} onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
-                                    placeholder="Enter final odometer"
-                                    className="w-full h-12 px-3 bg-white border border-orange-200 rounded-xl font-bold text-base text-center focus:border-rose-400 outline-none" />
-                                </div>
-                                {completeError && <p className="text-xs font-bold text-rose-700">{completeError}</p>}
-                                <div className="flex items-center gap-2">
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); setCompleteOdometer(''); setCompleteError(''); openCompleteModal(trip); }} className="flex-1 h-12 bg-white border border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                    <Clock size={14} /> Times
+                            <div className="flex items-center gap-2 mb-2">
+                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-12 ${primary.gradient} text-sm text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
+                                {primary.icon} {primary.label}
+                              </button>
+                              {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
+                                skipConfirmTripId === trip.id ? (
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); setSkipConfirmTripId(null); handleSkipNav(trip); }} className="flex-1 h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-sm">
+                                    <MapPin size={14} /> {trip.status === 'In Progress' ? 'Arrived to pick up?' : 'Arrived to drop off?'}
                                   </button>
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('heavy'); handleInlineComplete(trip); }} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-[2] h-12 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2 shadow-sm">
-                                    <Check size={14} /> Complete Trip
+                                ) : (
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); setSkipConfirmTripId(trip.id); }} className="flex-1 h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
+                                    <Forward size={14} /> Skip
                                   </button>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="flex-1 h-10 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                    <AlertCircle size={12} /> No Show
-                                  </button>
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="flex-1 h-10 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                    <XCircle size={12} /> Cancel
-                                  </button>
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleReroute(trip); }} className="flex-1 h-10 bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                    <RefreshCw size={12} /> Rerouted
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-12 ${primary.gradient} text-sm text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
-                                    {primary.icon} {primary.label}
-                                  </button>
-                                  {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
-                                    skipConfirmTripId === trip.id ? (
-                                      <button type="button" onClick={(e) => { e.stopPropagation(); setSkipConfirmTripId(null); handleSkipNav(trip); }} className="flex-1 h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-sm">
-                                        <MapPin size={14} /> {trip.status === 'In Progress' ? 'Arrived to pick up?' : 'Arrived to drop off?'}
-                                      </button>
-                                    ) : (
-                                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); setSkipConfirmTripId(trip.id); }} className="flex-1 h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                        <Forward size={14} /> Skip
-                                      </button>
-                                    )
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="flex-1 h-10 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                    <AlertCircle size={12} /> No Show
-                                  </button>
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="flex-1 h-10 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                    <XCircle size={12} /> Cancel
-                                  </button>
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleReroute(trip); }} className="flex-1 h-10 bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                    <RefreshCw size={12} /> Rerouted
-                                  </button>
-                                </div>
-                              </>
-                            )}
+                                )
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="flex-1 h-10 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
+                                <AlertCircle size={12} /> No Show
+                              </button>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="flex-1 h-10 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
+                                <XCircle size={12} /> Cancel
+                              </button>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleReroute(trip); }} className="flex-1 h-10 bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
+                                <RefreshCw size={12} /> Rerouted
+                              </button>
+                            </div>
                           </div>
                         );
                       } : null,
