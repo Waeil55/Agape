@@ -889,6 +889,35 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
           {sequence.length > 0 && (
             <button
+              onClick={() => {
+                const validAddresses = [];
+                if (initialOrigin) validAddresses.push(initialOrigin);
+                sequence.forEach(stop => {
+                  const client = allClients.find(c => c.id === stop.clientId);
+                  if (!client) return;
+                  const addr = stop.type === 'PU' ? client.pickup : client.dropoff;
+                  if (addr && addr.address) validAddresses.push(addr.address);
+                  else if (typeof addr === 'string' && addr.trim() !== '') validAddresses.push(addr);
+                });
+                if (validAddresses.length < 2) {
+                  alert('Not enough valid addresses to navigate.');
+                  return;
+                }
+                const origin = encodeURIComponent(validAddresses[0]);
+                const destination = encodeURIComponent(validAddresses[validAddresses.length - 1]);
+                const waypoints = validAddresses.slice(1, -1).map(s => encodeURIComponent(s)).join('|');
+                let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+                if (waypoints) url += `&waypoints=${waypoints}`;
+                window.open(url, '_blank');
+              }}
+              className="min-h-9 flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-extrabold rounded-2xl shadow-lg shadow-indigo-200/50 transition-all flex-shrink-0 active:scale-[0.97]"
+            >
+              <Navigation className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Navigate All</span>
+            </button>
+          )}
+
+          {sequence.length > 0 && (
+            <button
               onClick={() => setShowSaveModal(true)}
               className="min-h-9 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold rounded-2xl shadow-lg shadow-emerald-200/50 transition-all flex-shrink-0 active:scale-[0.97]"
             >
