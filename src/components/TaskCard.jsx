@@ -576,6 +576,12 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   </div>
                   {/* Actions Grid */}
                   <div className="p-5 space-y-2 pb-[calc(env(safe-area-inset-bottom)+20px)]">
+                    {actions?.onSms && (
+                      <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(false); actions.onSms({ ...task, _smsMessage: readyMessage }); }}
+                        className="w-full h-12 flex items-center gap-3 px-4 bg-emerald-50 text-emerald-700 font-bold rounded-2xl hover:bg-emerald-100 active:scale-[0.97] transition-all text-[13px] border border-emerald-200">
+                        <MessageCircle size={16} /> Quick SMS
+                      </button>
+                    )}
                     {actions?.onNoShow && (
                       <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(false); actions.onNoShow(task); }}
                         className="w-full h-12 flex items-center gap-3 px-4 bg-rose-50 text-rose-600 font-bold rounded-2xl hover:bg-rose-100 active:scale-[0.97] transition-all text-[13px] border border-rose-100">
