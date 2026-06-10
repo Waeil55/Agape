@@ -2725,6 +2725,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const isSelected = selectedTrips.includes(trip.id);
                 const isSequenced = assignedSequence?.sequence?.some(s => s.clientId === trip.id);
                 const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
+                const activeLegsCount = patientActiveLegs[(trip.patient || '').trim().toLowerCase()];
                 const isTerminal = isWorkflowTerminalTrip(trip);
 
                 // Compute leg number: A legs get sequential numbers, B legs reference their paired A leg
@@ -2815,7 +2816,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       status: trip.status,
                       bookingId: trip.bookingId,
                       notes: trip.notes,
-                      legs: legsCount > 1 ? `${legsCount} LEGS` : '1 LEG',
+                      legs: activeLegsCount > 0 ? `${activeLegsCount} LEG${activeLegsCount > 1 ? 'S' : ''}` : null,
                       legLabel,
                       isPairedInOut,
                       pairType,
