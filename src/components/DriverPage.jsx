@@ -2845,7 +2845,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
                         const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
                         return (
-                          <div className={`rounded-xl border ${borderColor} ${bgColor} p-3 w-full`}>
+                          <div className={`rounded-xl border ${borderColor} ${bgColor} px-3 py-2 w-full`}>
                             <div className="flex items-center gap-0.5 mb-2">
                               {workflowSteps.map((step, idx) => (
                                 <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />

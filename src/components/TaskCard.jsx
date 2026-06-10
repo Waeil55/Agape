@@ -515,7 +515,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
               {(task.notes || task.details?.generalComments) && (
                 <div className="mx-4 sm:mx-5 mt-1.5">
                   <button onClick={(e) => { e.stopPropagation(); setShowNotes(!showNotes); }}
-                    className="w-full flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/40 rounded-xl px-3 py-1.5 cursor-pointer active:scale-[0.98] transition-all">
+                    className="w-full flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/40 rounded-xl px-3 py-1 cursor-pointer active:scale-[0.98] transition-all">
                     <div className="flex items-center gap-2">
                       <AlertCircle size={13} className="text-amber-500" />
                       <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500">Driver Notes</span>
@@ -529,12 +529,10 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   )}
                 </div>
               )}
-
-              <div className="h-1" />
             </div>
 
             {/* === BOTTOM ACTION BAR === */}
-            <div className="shrink-0 bg-white/90 backdrop-blur-xl border-t border-slate-200/50 px-4 sm:px-5 pt-2 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+            <div className="shrink-0 bg-white/90 backdrop-blur-xl border-t border-slate-200/30 px-4 sm:px-5 pt-0.5 pb-[calc(env(safe-area-inset-bottom)+12px)]">
 
               {/* Workflow (if present) */}
               {actions?.renderWorkflow && actions.renderWorkflow(task)}
