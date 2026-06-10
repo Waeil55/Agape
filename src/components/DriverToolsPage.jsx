@@ -707,7 +707,7 @@ const DriverToolsPage = ({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pb-28 px-3 pt-2 space-y-3 bg-gradient-to-b from-slate-50 to-slate-100">
+    <div className="space-y-3 w-full">
 
       {/* Route Plan */}
       <RoutePlanSection

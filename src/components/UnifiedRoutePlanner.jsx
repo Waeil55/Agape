@@ -209,7 +209,7 @@ const UnifiedRoutePlanner = ({
 
         {/* PLAN TAB */}
         {activeTab === 'plan' && (
-          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
+          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 lg:px-6 pt-3">
             {/* AI Quick Actions */}
             {selectedTrips.length >= 1 && (
               <div className="mb-3 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl p-3 shadow-lg shadow-indigo-200/50">
@@ -331,7 +331,7 @@ const UnifiedRoutePlanner = ({
 
         {/* SAVED TAB */}
         {activeTab === 'saved' && (
-          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
+          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 lg:px-6 pt-3">
             {sortedTemplates.length > 0 ? (
               <div className="space-y-2">
                 {sortedTemplates.map((tpl) => {
@@ -530,7 +530,7 @@ const UnifiedRoutePlanner = ({
 
         {/* NAVIGATE TAB */}
         {activeTab === 'navigate' && (
-          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
+          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 lg:px-6 pt-3">
             {activeTrips.length > 0 ? (
               <div className="space-y-2">
                 {Object.keys(etas).length > 0 && (

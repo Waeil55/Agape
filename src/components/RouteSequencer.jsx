@@ -1246,7 +1246,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 )}
               </div>
             ) : (
-              <div className="w-full max-w-2xl mx-auto space-y-2.5 relative pb-10">
+              <div className="w-full space-y-2.5 relative pb-10">
                 {(() => {
                   let lastLeg = null;
                   let globalIdx = 0;
