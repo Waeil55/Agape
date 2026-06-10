@@ -151,9 +151,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
             <div className="flex items-center gap-1.5 shrink-0">
               {task.legLabel && (
                 <button onClick={(e) => { e.stopPropagation(); actions?.onShowLegs?.(task); }}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-bold tracking-wider cursor-pointer transition-colors ${
-                    task.legLabel.startsWith('Return') ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-                  }`}>
+                  className="px-2.5 py-1 min-h-[36px] rounded-lg text-[10px] font-bold tracking-wider cursor-pointer transition-colors bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100">
                   {task.legLabel}
                 </button>
               )}

@@ -631,6 +631,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     return counts;
   }, [driverScopedTrips]);
 
+  // Count today's legs per patient (assigned to this driver)
+  const patientTodayLegs = useMemo(() => {
+    const counts = {};
+    const today = getTodayStr();
+    driverScopedTrips.forEach(t => {
+      if (t.date !== today) return;
+      const key = (t.patient || '').trim().toLowerCase();
+      if (!key) return;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }, [driverScopedTrips]);
+
   const updateAssignedRouteRecord = useCallback(async (updates, auditTitle, auditMessage) => {
     if (!assignedSequence?.id || routeTemplates.length === 0) return;
     const nextTemplates = routeTemplates.map((template) => (
@@ -2729,52 +2742,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const isTerminal = isWorkflowTerminalTrip(trip);
 
                 // Compute leg number: A legs get sequential numbers, B legs reference their paired A leg
-                let legLabel = null;
+                const todayLegsCount = patientTodayLegs[(trip.patient || '').trim().toLowerCase()] || 0;
+                let legLabel = todayLegsCount > 1 ? `${todayLegsCount} LEGS` : '1 LEG';
                 let isPairedInOut = false;
-                let pairType = null; // 'a-leg' or 'b-leg'
-                if (legsCount > 1) {
-                  if (isInOutTrip(trip) && !trip.time) {
-                    // B leg — find its paired A leg by sequential booking ID + reversed addresses
-                    const patientKey = (trip.patient || '').trim().toLowerCase();
-                    const tripPickup = (trip.pickup || '').trim().toLowerCase();
-                    const tripBookingNum = parseInt(trip.bookingId, 10);
-                    let bestLegNum = 0;
-                    let bestScore = 0;
-                    let seenA = 0;
-                    for (let i = 0; i < idx; i++) {
-                      const t = orderedTrips[i];
-                      if ((t.patient || '').trim().toLowerCase() === patientKey && !isWillCall(t) && !isInOutTrip(t)) {
-                        seenA++;
-                        let score = 0;
-                        const tBookingNum = parseInt(t.bookingId, 10);
-                        if (!isNaN(tripBookingNum) && !isNaN(tBookingNum) && (tripBookingNum - tBookingNum) === 1) score += 10;
-                        if ((t.dropoff || '').trim().toLowerCase() === tripPickup) score += 5;
-                        if (score > bestScore) {
-                          bestScore = score;
-                          bestLegNum = seenA;
-                        }
-                      }
-                    }
-                    legLabel = bestLegNum > 0 ? `Return → Leg ${bestLegNum}` : 'Return Leg';
+                let pairType = null;
+                if (isInOutTrip(trip) && !trip.time) {
+                  isPairedInOut = true;
+                  pairType = 'b-leg';
+                } else if (isInOutTrip(trip)) {
+                  const nextTrip = orderedTrips[idx + 1];
+                  if (nextTrip && isInOutTrip(nextTrip) && !nextTrip.time && (nextTrip.patient || '').trim().toLowerCase() === (trip.patient || '').trim().toLowerCase()) {
                     isPairedInOut = true;
-                    pairType = 'b-leg';
-                  } else if (!isWillCall(trip)) {
-                    // A leg — count which leg number this is for this patient
-                    const patientKey = (trip.patient || '').trim().toLowerCase();
-                    let legNum = 0;
-                    for (let i = 0; i <= idx; i++) {
-                      const t = orderedTrips[i];
-                      if ((t.patient || '').trim().toLowerCase() === patientKey && !isWillCall(t) && !isInOutTrip(t)) {
-                        legNum++;
-                      }
-                    }
-                    legLabel = `Leg ${legNum}`;
-                    // Check if next trip is a paired B leg
-                    const nextTrip = orderedTrips[idx + 1];
-                    if (nextTrip && isInOutTrip(nextTrip) && !nextTrip.time && (nextTrip.patient || '').trim().toLowerCase() === (trip.patient || '').trim().toLowerCase()) {
-                      isPairedInOut = true;
-                      pairType = 'a-leg';
-                    }
+                    pairType = 'a-leg';
                   }
                 }
 
