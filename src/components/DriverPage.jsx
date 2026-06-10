@@ -1759,24 +1759,25 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const handleShowLegs = (task) => {
     const patientKey = (task.patient || task.patientName || '').trim().toLowerCase();
-    const allLegs = driverScopedTrips
-      .filter(t => (t.patient || '').trim().toLowerCase() === patientKey)
-      .map(t => ({
-        id: t.id,
-        bookingId: t.bookingId,
-        time: to12hr(t.time),
-        patient: t.patient,
-        status: t.status,
-        pickup: t.pickup,
-        dropoff: t.dropoff,
-        pickupSite: t.pickupSite,
-        dropoffSite: t.dropoffSite,
-        distance: t.distance,
-        wheelchair: t.wheelchair || t.mobility,
-        pickupPhone: t.pickupPhone,
-        dropoffPhone: t.dropoffPhone,
-      }));
-    setShowLegsModal(allLegs);
+    const today = getTodayStr();
+    const todaysTrips = driverScopedTrips
+      .filter(t => (t.patient || '').trim().toLowerCase() === patientKey && t.date === today);
+    const count = todaysTrips.length;
+    setShowLegsModal(todaysTrips.map(t => ({
+      id: t.id,
+      bookingId: t.bookingId,
+      time: to12hr(t.time),
+      patient: t.patient,
+      status: t.status,
+      pickup: t.pickup,
+      dropoff: t.dropoff,
+      pickupSite: t.pickupSite,
+      dropoffSite: t.dropoffSite,
+      distance: t.distance,
+      wheelchair: t.wheelchair || t.mobility,
+      pickupPhone: t.pickupPhone,
+      dropoffPhone: t.dropoffPhone,
+    })));
   };
 
   const handleEditTrip = (task) => {
@@ -2725,7 +2726,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const isSelected = selectedTrips.includes(trip.id);
                 const isSequenced = assignedSequence?.sequence?.some(s => s.clientId === trip.id);
                 const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
-                const activeLegsCount = patientActiveLegs[(trip.patient || '').trim().toLowerCase()];
                 const isTerminal = isWorkflowTerminalTrip(trip);
 
                 // Compute leg number: A legs get sequential numbers, B legs reference their paired A leg
@@ -2816,7 +2816,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       status: trip.status,
                       bookingId: trip.bookingId,
                       notes: trip.notes,
-                      legs: activeLegsCount > 0 ? `${activeLegsCount} LEG${activeLegsCount > 1 ? 'S' : ''}` : null,
                       legLabel,
                       isPairedInOut,
                       pairType,
