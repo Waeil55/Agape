@@ -268,6 +268,26 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                     {contacts.length === 0 && (
                       <p className="text-center text-[13px] text-slate-400 py-8">No contact numbers available</p>
                     )}
+                    <div className="border-t border-slate-100 pt-4 space-y-2">
+                      {actions?.onNoShow && (
+                        <button onClick={(e) => { e.stopPropagation(); setShowContactSheet(false); actions.onNoShow(task); }}
+                          className="w-full h-12 flex items-center gap-3 px-4 bg-rose-50 text-rose-600 font-bold rounded-2xl hover:bg-rose-100 active:scale-[0.97] transition-all text-[13px] border border-rose-100">
+                          <AlertCircle size={16} /> No Show
+                        </button>
+                      )}
+                      {actions?.onCancel && (
+                        <button onClick={(e) => { e.stopPropagation(); setShowContactSheet(false); actions.onCancel(task); }}
+                          className="w-full h-12 flex items-center gap-3 px-4 bg-slate-50 text-slate-600 font-bold rounded-2xl hover:bg-slate-100 active:scale-[0.97] transition-all text-[13px] border border-slate-200">
+                          <XCircle size={16} /> Cancelled
+                        </button>
+                      )}
+                      {actions?.onReroute && (
+                        <button onClick={(e) => { e.stopPropagation(); setShowContactSheet(false); actions.onReroute(task); }}
+                          className="w-full h-12 flex items-center gap-3 px-4 bg-purple-50 text-purple-600 font-bold rounded-2xl hover:bg-purple-100 active:scale-[0.97] transition-all text-[13px] border border-purple-100">
+                          <RefreshCw size={16} /> Rerouted
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -562,13 +582,13 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                     {actions?.onCancel && (
                       <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(false); actions.onCancel(task); }}
                         className="w-full h-12 flex items-center gap-3 px-4 bg-slate-50 text-slate-600 font-bold rounded-2xl hover:bg-slate-100 active:scale-[0.97] transition-all text-[13px] border border-slate-200">
-                        <XCircle size={16} /> Cancel
+                        <XCircle size={16} /> Cancelled
                       </button>
                     )}
                     {actions?.onReroute && (
                       <button onClick={(e) => { e.stopPropagation(); setShowMoreSheet(false); actions.onReroute(task); }}
                         className="w-full h-12 flex items-center gap-3 px-4 bg-purple-50 text-purple-600 font-bold rounded-2xl hover:bg-purple-100 active:scale-[0.97] transition-all text-[13px] border border-purple-100">
-                        <RefreshCw size={16} /> Reroute
+                        <RefreshCw size={16} /> Rerouted
                       </button>
                     )}
                     {actions?.onEditTrip && !isTerminal && (
