@@ -250,15 +250,17 @@ export async function makeCall(phone, name) {
   showWebFallbackModal('call', phone, name);
 }
 
-export async function sendSMS(phone, name) {
+export async function sendSMS(phone, name, body) {
   await impact('medium');
 
   const cleaned = cleanPhone(phone);
   if (!cleaned) return;
 
+  const bodyParam = body ? `?body=${encodeURIComponent(body)}` : '';
+
   if (isNativeShell()) {
     try {
-      await App.openUrl({ url: `sms:${cleaned}` });
+      await App.openUrl({ url: `sms:${cleaned}${bodyParam}` });
       return;
     } catch (err) {
       console.error('Native SMS failed:', err);
@@ -271,7 +273,7 @@ export async function sendSMS(phone, name) {
     try {
       // Try opening sms: protocol
       const a = document.createElement('a');
-      a.href = `sms:${cleaned}`;
+      a.href = `sms:${cleaned}${bodyParam}`;
       a.click();
       return;
     } catch (err) {
@@ -280,7 +282,7 @@ export async function sendSMS(phone, name) {
   }
 
   // Web/Desktop fallback: show helpful modal
-  showWebFallbackModal('sms', phone, name);
+  showWebFallbackModal('sms', phone, name, body);
 }
 
 export async function showCallActionSheet(phone, name) {

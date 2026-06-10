@@ -1547,15 +1547,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleSmartSMS = (trip) => {
     const primary = getPrimaryContactForTrip(trip);
     if (!primary) return;
-    sendSMS(primary.phone, primary.name);
+    sendSMS(primary.phone, primary.name, trip._smsMessage);
   };
 
   const openContactSelector = (trip) => {
     setShowContactSelector(trip);
   };
 
-  const handleSMS = async (phone, name) => {
-    await sendSMS(phone, name);
+  const handleSMS = async (phone, name, message) => {
+    await sendSMS(phone, name, message);
   }
 
   const openTransferPrompt = (type, item) => {
@@ -2831,7 +2831,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       onCall: (t) => handleSmartCall(t),
                       onSms: (t) => handleSmartSMS(t),
                       onCallNumber: (phone, label) => handleCall(phone, label),
-                      onSmsNumber: (phone, label) => handleSMS(phone, label),
+                      onSmsNumber: (phone, label, message) => handleSMS(phone, label, message),
                       onContacts: (t) => openContactSelector(t),
                       onRevert: revertTripStatus,
                       onNoShow: handleNoShow,

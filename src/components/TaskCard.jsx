@@ -249,10 +249,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   <div className="p-5 space-y-4 pb-[calc(env(safe-area-inset-bottom)+20px)]">
                     <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
                       <p className="text-[13px] text-blue-900 leading-relaxed">{readyMessage}</p>
-                      <button onClick={() => handleCopy(readyMessage, 'msg')}
-                        className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 transition-colors">
-                        {copiedId === 'msg' ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy message</>}
-                      </button>
                     </div>
                     <div className="flex gap-2">
                       {actions?.onCall && (
@@ -262,7 +258,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                         </button>
                       )}
                       {actions?.onSms && (
-                        <button onClick={(e) => { e.stopPropagation(); actions.onSms(task); setShowContactSheet(false); }}
+                        <button onClick={(e) => { e.stopPropagation(); actions.onSms({ ...task, _smsMessage: readyMessage }); setShowContactSheet(false); }}
                           className="flex-1 h-12 flex items-center justify-center gap-2 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 active:scale-[0.97] transition-all text-[13px]">
                           <MessageCircle size={15} /> Quick SMS
                         </button>
@@ -279,7 +275,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                             className="w-11 h-11 min-h-[44px] rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-90 transition-all cursor-pointer">
                             <PhoneCall size={16} />
                           </button>
-                          <button onClick={(e) => { e.stopPropagation(); actions?.onSmsNumber?.(c.phone, c.label); }}
+                          <button onClick={(e) => { e.stopPropagation(); actions?.onSmsNumber?.(c.phone, c.label, readyMessage); }}
                             className="w-11 h-11 min-h-[44px] rounded-xl bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 active:scale-90 transition-all cursor-pointer">
                             <MessageCircle size={16} />
                           </button>
