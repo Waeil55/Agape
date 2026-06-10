@@ -2867,17 +2867,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                 )
                               )}
                             </div>
-                            <div className="flex items-center gap-2">
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="flex-1 h-10 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                <AlertCircle size={12} /> No Show
-                              </button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="flex-1 h-10 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                <XCircle size={12} /> Cancel
-                              </button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleReroute(trip); }} className="flex-1 h-10 bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                <RefreshCw size={12} /> Rerouted
-                              </button>
-                            </div>
                           </div>
                         );
                       } : null,

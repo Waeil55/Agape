@@ -488,12 +488,12 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
 
               {/* --- DRIVER NOTES BOX (between progress and workflow) --- */}
               {(task.notes || task.details?.generalComments) && (
-                <div className="mx-4 sm:mx-5 mt-3 rounded-xl border border-amber-200/40 bg-amber-50/80 px-3 py-2 w-full">
+                <div className="mx-4 sm:mx-5 mt-3 rounded-xl border border-amber-200/40 bg-amber-50/80 px-3 py-2">
                   <div className="flex items-center gap-1.5 mb-1">
                     <AlertCircle size={12} className="text-amber-500" />
                     <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Driver Notes</span>
                   </div>
-                  <div className="max-h-[72px] overflow-y-auto text-[12px] text-amber-900 font-medium leading-relaxed">
+                  <div className="max-h-[64px] overflow-y-auto text-[12px] text-amber-900 font-medium leading-relaxed">
                     {task.notes || task.details.generalComments}
                   </div>
                 </div>
