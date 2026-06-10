@@ -51,6 +51,11 @@ function normalizeTrip(trip) {
 function normalizeData(data = {}) {
   const drivers = data.drivers || [];
   const safeTrips = (data.trips || []).map(trip => {
+    let safePatient = trip?.patient;
+    if (safePatient && typeof safePatient === 'object') {
+      safePatient = 'Unknown Client';
+    }
+
     let dName = trip?.driverName;
     if (dName && typeof dName === 'string' && dName.toLowerCase().includes('agape care medical')) {
       dName = '';
@@ -67,7 +72,7 @@ function normalizeData(data = {}) {
       }
     }
 
-    return { ...trip, driverName: dName || '' };
+    return { ...trip, driverName: dName || '', patient: safePatient };
   });
 
   return {

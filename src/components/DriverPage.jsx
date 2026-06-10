@@ -2275,7 +2275,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-xs font-bold text-emerald-800">Ride-share possible</p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {aiRideShare.map((r, i) => (
-                      <span key={i} className="text-xs text-emerald-700 bg-white/60 rounded-lg px-2 py-0.5">{r.tripA.patient} + {r.tripB.patient}</span>
+                      <span key={i} className="text-xs text-emerald-700 bg-white/60 rounded-lg px-2 py-0.5">
+                        {typeof r.tripA.patient === 'string' ? r.tripA.patient : 'Client A'} + {typeof r.tripB.patient === 'string' ? r.tripB.patient : 'Client B'}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -2910,13 +2912,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== ODOMETER PROMPT MODAL ===== */}
       {showOdometerPrompt && (
-        <div className="fixed inset-0" style={{ zIndex: 120 }} onClick={() => setShowOdometerPrompt(null)}>
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => setShowOdometerPrompt(null)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div className="absolute inset-x-0 bottom-0 flex justify-center p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]" onClick={(e) => e.stopPropagation()}>
-            <div className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl overflow-hidden max-h-[85dvh] flex flex-col animate-slide-up">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
-                <div>
-                  <h2 className="font-bold text-base text-slate-900">Arrived at Pickup</h2>
+          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="font-bold text-base text-slate-900">Arrived at Pickup</h2>
                   <p className="text-xs text-slate-500">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
                 </div>
                 <button type="button" onClick={() => setShowOdometerPrompt(null)} className="min-h-[44px] min-w-[44px] rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]">
@@ -2953,26 +2954,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
             </div>
           </div>
-        </div>
       )}
 
       {/* ===== ROUTE STOP ODOMETER PROMPT ===== */}
       {routeStopOdometerPrompt && (
-        <div className="fixed inset-0" style={{ zIndex: 120 }} onClick={() => setRouteStopOdometerPrompt(null)}>
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => setRouteStopOdometerPrompt(null)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div className="absolute inset-x-0 bottom-0 flex justify-center p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]" onClick={(e) => e.stopPropagation()}>
-            <div className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl overflow-hidden max-h-[85dvh] flex flex-col animate-slide-up">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
-                <div>
-                  <h2 className="font-bold text-base text-slate-900">Arrived at Stop</h2>
-                  <p className="text-xs text-slate-500">{routeStopOdometerPrompt.name || `Stop ${routeStopOdometerPrompt.sequenceIndex}`}</p>
-                </div>
-                <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="min-h-[44px] min-w-[44px] rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]">
-                  <X size={16} className="text-slate-500" />
-                </button>
+          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="font-bold text-base text-slate-900">Arrived at Stop</h2>
+                <p className="text-xs text-slate-500">{routeStopOdometerPrompt.name || `Stop ${routeStopOdometerPrompt.sequenceIndex}`}</p>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {lastOdometer > 0 && (
+              <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="min-h-[44px] min-w-[44px] rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]">
+                <X size={16} className="text-slate-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {lastOdometer > 0 && (
                   <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
                     <p className="text-xs text-slate-400 font-bold uppercase">Current Odometer</p>
                     <p className="text-lg font-bold text-slate-800">{lastOdometer?.toLocaleString()} mi</p>
@@ -2996,7 +2995,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
             </div>
           </div>
-        </div>
       )}
 
       {/* ===== ROUTE STOP SIGNATURE PROMPT ===== */}
@@ -3670,24 +3668,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               <td className="px-4 py-2.5 font-bold text-slate-700 font-mono text-[10px] uppercase tracking-wider">{trip.completedVehicle || trip.vehicle || '—'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
-                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Scheduled Time</td>
-                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.time ? to24hr(trip.time) : '—'}</td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Pickup Arrival</td>
                               <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.arrivalTime ? formatIsoTo24hr(trip.arrivalTime) : '—'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
-                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Departed Pickup</td>
-                              <td className="px-4 py-2.5 font-bold text-amber-600">{trip.departedPickupTime ? formatIsoTo24hr(trip.departedPickupTime) : '—'}</td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Dropoff Arrival</td>
                               <td className="px-4 py-2.5 font-bold text-rose-600">{trip.arrivalDropoffTime ? formatIsoTo24hr(trip.arrivalDropoffTime) : (trip.completedAt ? formatIsoTo24hr(trip.completedAt) : '—')}</td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
-                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Travel Time</td>
-                              <td className="px-4 py-2.5 font-bold text-slate-700">{trip.travelTime || calcTravelDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt)}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Start Odometer</td>
@@ -3697,18 +3683,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">End Odometer</td>
                               <td className="px-4 py-2.5 font-bold text-rose-600">{trip.dropoffOdometer ? `${Number(trip.dropoffOdometer).toLocaleString()} mi` : '—'}</td>
                             </tr>
-                            {(trip.pickupOdometer && trip.dropoffOdometer) && (
-                            <tr className="border-b border-slate-100">
-                              <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Distance Driven</td>
-                              <td className="px-4 py-2.5 font-bold text-blue-600">{Math.max(0, Number(trip.dropoffOdometer) - Number(trip.pickupOdometer)).toLocaleString()} mi</td>
-                            </tr>
-                            )}
-                            {trip.distance && (
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Distance</td>
-                              <td className="px-4 py-2.5 font-bold text-slate-800">{trip.distance} mi</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-800">{trip.distance ? `${trip.distance} mi` : (trip.pickupOdometer && trip.dropoffOdometer ? `${Math.max(0, Number(trip.dropoffOdometer) - Number(trip.pickupOdometer)).toLocaleString()} mi` : '—')}</td>
                             </tr>
-                            )}
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 align-top">Pickup Address</td>
                               <td className="px-4 py-2.5 font-semibold text-emerald-700 leading-relaxed break-words">{trip.pickup || '—'}</td>
@@ -3721,20 +3699,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Signature</td>
                               <td className="px-4 py-2.5 font-bold text-slate-700">{trip.paperSignatureConfirmed || trip.unableToSign ? 'Yes' : 'No'}</td>
                             </tr>
-                            {trip.status === 'Rerouted' && trip.cancellationReason && (
-                            <tr className="border-b border-slate-100">
-                              <td className="px-4 py-2.5 font-bold text-purple-500 uppercase tracking-wider text-[10px] bg-slate-50/50 align-top">Reroute Reason</td>
-                              <td className="px-4 py-2.5">
-                                <p className="font-semibold text-slate-700">{trip.cancellationReason}</p>
-                                {trip.cancelledBy && <p className="text-[10px] text-slate-400 mt-0.5">by {trip.cancelledBy}</p>}
-                              </td>
-                            </tr>
-                            )}
-                            {trip.completedAt && (
-                            <tr>
-                              <td colSpan="2" className="px-4 py-2 bg-slate-50/50 text-[10px] text-slate-400 text-center">Completed {new Date(trip.completedAt).toLocaleString()}</td>
-                            </tr>
-                            )}
                           </tbody>
                         </table>
                       </div>

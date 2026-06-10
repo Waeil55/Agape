@@ -295,7 +295,7 @@ const UnifiedRoutePlanner = ({
               <div className="mb-3 bg-emerald-50 border border-emerald-200/60 rounded-2xl p-3 flex items-start gap-2">
                 <Repeat size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  {aiRideShare.map((r, i) => <p key={i} className="text-[11px] font-semibold text-emerald-700">{r.text || r}</p>)}
+                  {aiRideShare.map((r, i) => <p key={i} className="text-[11px] font-semibold text-emerald-700">{typeof r.tripA?.patient === 'string' ? r.tripA.patient : 'A'} + {typeof r.tripB?.patient === 'string' ? r.tripB.patient : 'B'}</p>)}
                 </div>
               </div>
             )}
