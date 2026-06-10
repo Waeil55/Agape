@@ -2845,13 +2845,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
                         const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
                         return (
-                          <div className={`rounded-xl border ${borderColor} ${bgColor} px-3 py-2 w-full`}>
-                            <div className="flex items-center gap-0.5 mb-2">
+                          <div className={`rounded-xl border ${borderColor} ${bgColor} px-3 py-1.5 w-full`}>
+                            <div className="flex items-center gap-0.5 mb-1.5">
                               {workflowSteps.map((step, idx) => (
                                 <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
                               ))}
                             </div>
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-2">
                               <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-12 ${primary.gradient} text-sm text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
                                 {primary.icon} {primary.label}
                               </button>
