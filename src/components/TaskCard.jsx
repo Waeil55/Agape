@@ -68,6 +68,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const [copiedId, setCopiedId] = useState('');
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [showContactSheet, setShowContactSheet] = useState(false);
 
   const timeUrgency = getTimeUrgency(task.time, task.status);
   const isTerminal = ['Completed', 'Cancelled', 'No Show'].includes(task.status);
@@ -90,6 +91,42 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
     setCopiedId(id);
     setTimeout(() => setCopiedId(''), 2000);
   };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const getEta = () => {
+    if (!task.time) return '';
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const p = String(task.time).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (!p) return '';
+    let h = parseInt(p[1]), m = parseInt(p[2]);
+    const ampm = p[3]?.toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    const tripMins = h * 60 + m;
+    const diff = tripMins - nowMins;
+    if (diff > 0) return `ETA: ${diff} min`;
+    if (diff > -30) return 'Arriving now';
+    return '';
+  };
+
+  const readyMessage = `${getGreeting()}, I'm on my way. Medical Transportation thank you. ${getEta()}`.trim();
+
+  const contacts = [
+    { label: 'Patient', phone: task.patientPhone },
+    { label: 'Patient Mobile', phone: task.patientMobile },
+    { label: 'Pickup', phone: task.pickupPhone },
+    { label: 'Dropoff', phone: task.dropoffPhone },
+    { label: 'Guardian', phone: task.guardianPhone },
+    { label: 'Escort', phone: task.escortPhone },
+    { label: 'Emergency', phone: task.emergencyContact },
+  ].filter(c => c.phone);
 
   return (
     <div
@@ -156,7 +193,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 </button>
               )}
               {isExpanded && <StatusBadge status={task.status} />}
-              <button onClick={(e) => { e.stopPropagation(); onToggle(task.id); }} className="w-10 h-10 min-h-[44px] rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); setShowContactSheet(true); }} className="w-10 h-10 min-h-[44px] rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
                 <ChevronDown size={18} className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} strokeWidth={2} />
               </button>
             </div>
@@ -196,8 +233,67 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 </div>
               </div>
             </div>
-          )}
-        </div>
+            )}
+            {showContactSheet && (
+              <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center" onClick={() => setShowContactSheet(false)}>
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+                <div onClick={(e) => e.stopPropagation()}
+                  className="relative w-full sm:w-[400px] max-h-[85vh] bg-white rounded-t-3xl sm:rounded-3xl animate-scale-in overflow-y-auto shadow-2xl">
+                  <div className="sticky top-0 bg-white z-10 px-5 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="font-extrabold text-[15px] text-slate-900">Quick Contact</h3>
+                    <button onClick={() => setShowContactSheet(false)}
+                      className="w-11 h-11 min-h-[44px] rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors cursor-pointer">
+                      <XCircle size={16} className="text-slate-400" />
+                    </button>
+                  </div>
+                  <div className="p-5 space-y-4 pb-[calc(env(safe-area-inset-bottom)+20px)]">
+                    <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+                      <p className="text-[13px] text-blue-900 leading-relaxed">{readyMessage}</p>
+                      <button onClick={() => handleCopy(readyMessage, 'msg')}
+                        className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 transition-colors">
+                        {copiedId === 'msg' ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy message</>}
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      {actions?.onCall && (
+                        <button onClick={(e) => { e.stopPropagation(); actions.onCall(task); setShowContactSheet(false); }}
+                          className="flex-1 h-12 flex items-center justify-center gap-2 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 active:scale-[0.97] transition-all text-[13px]">
+                          <PhoneCall size={15} /> Quick Call
+                        </button>
+                      )}
+                      {actions?.onSms && (
+                        <button onClick={(e) => { e.stopPropagation(); actions.onSms(task); setShowContactSheet(false); }}
+                          className="flex-1 h-12 flex items-center justify-center gap-2 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 active:scale-[0.97] transition-all text-[13px]">
+                          <MessageCircle size={15} /> Quick SMS
+                        </button>
+                      )}
+                    </div>
+                    {contacts.map((c, i) => (
+                      <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-bold text-slate-700">{c.label}</p>
+                          <p className="text-[12px] text-slate-500 truncate">{c.phone}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 ml-3">
+                          <button onClick={(e) => { e.stopPropagation(); actions?.onCallNumber?.(c.phone, c.label); }}
+                            className="w-11 h-11 min-h-[44px] rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-90 transition-all cursor-pointer">
+                            <PhoneCall size={16} />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); actions?.onSmsNumber?.(c.phone, c.label); }}
+                            className="w-11 h-11 min-h-[44px] rounded-xl bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 active:scale-90 transition-all cursor-pointer">
+                            <MessageCircle size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {contacts.length === 0 && (
+                      <p className="text-center text-[13px] text-slate-400 py-8">No contact numbers available</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
       </div>
 
       {/* Expanded Content - Premium Full Screen Page */}

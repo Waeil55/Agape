@@ -2830,6 +2830,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       onNavigateDropoff: (t) => openInNavApp(t.dropoff?.address || t.dropoff, suggestNavApp(t.dropoff?.address || t.dropoff)),
                       onCall: (t) => handleSmartCall(t),
                       onSms: (t) => handleSmartSMS(t),
+                      onCallNumber: (phone, label) => handleCall(phone, label),
+                      onSmsNumber: (phone, label) => handleSMS(phone, label),
                       onContacts: (t) => openContactSelector(t),
                       onRevert: revertTripStatus,
                       onNoShow: handleNoShow,
