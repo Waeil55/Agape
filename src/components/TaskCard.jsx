@@ -67,7 +67,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const isAnotherExpanded = expandedId !== null && expandedId !== task.id;
   const [copiedId, setCopiedId] = useState('');
   const [showMoreSheet, setShowMoreSheet] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
   const [showContactSheet, setShowContactSheet] = useState(false);
 
   const timeUrgency = getTimeUrgency(task.time, task.status);
@@ -487,6 +486,40 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 </div>
               </div>
 
+              {/* --- DRIVER NOTES BOX (between progress and workflow) --- */}
+              {(task.notes || task.details?.generalComments) && (
+                <div className="mx-4 sm:mx-5 mt-3 rounded-xl border border-amber-200/40 bg-amber-50/80 px-3 py-2 w-full">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <AlertCircle size={12} className="text-amber-500" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Driver Notes</span>
+                  </div>
+                  <div className="max-h-[72px] overflow-y-auto text-[12px] text-amber-900 font-medium leading-relaxed">
+                    {task.notes || task.details.generalComments}
+                  </div>
+                </div>
+              )}
+
+              {/* --- PRIMARY ACTION (right after progress) --- */}
+              {actions?.renderWorkflow && (
+                <div className="mx-4 sm:mx-5 mt-3">
+                  {actions.renderWorkflow(task)}
+                </div>
+              )}
+              {!isTerminal && !actions?.renderWorkflow && actions?.onPrimary && (
+                <div className="mx-4 sm:mx-5 mt-3 flex items-center gap-2.5">
+                  <button onClick={(e) => { e.stopPropagation(); actions.onPrimary(task); }}
+                    className="flex-[4] h-[50px] bg-slate-900 text-white font-extrabold text-[13px] rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/25 flex items-center justify-center gap-2 active:scale-[0.98]">
+                    {actions.primaryLabel || 'Start'} <Navigation size={16} strokeWidth={2.5} />
+                  </button>
+                  {actions?.onSkipNav && (
+                    <button onClick={(e) => { e.stopPropagation(); actions.onSkipNav(task); }}
+                      className="flex-1 h-[50px] bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-all text-[12px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98]">
+                      <Forward size={14} /> Skip
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* --- TAGS --- */}
               {(task.details?.passengerType || task.details?.mobility || (task.tags && task.tags.length > 0)) && (
                 <div className="flex flex-wrap gap-1.5 px-4 sm:px-5 mt-3">
@@ -508,48 +541,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   {task.tags?.map((tag, i) => (
                     <span key={i} className="inline-flex items-center bg-slate-50/80 text-slate-400 px-2.5 py-1 rounded-xl text-[10px] font-semibold border border-slate-200/60">{tag}</span>
                   ))}
-                </div>
-              )}
-
-              {/* --- NOTES (collapsible) --- */}
-              {(task.notes || task.details?.generalComments) && (
-                <div className="mx-4 sm:mx-5 mt-1.5">
-                  <button onClick={(e) => { e.stopPropagation(); setShowNotes(!showNotes); }}
-                    className="w-full flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/40 rounded-xl px-3 py-1 cursor-pointer active:scale-[0.98] transition-all">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle size={13} className="text-amber-500" />
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500">Driver Notes</span>
-                    </div>
-                    <ChevronDown size={13} className={`text-amber-400 transition-transform ${showNotes ? 'rotate-180' : ''}`} />
-                  </button>
-                  {showNotes && (
-                    <div className="mt-1.5 bg-amber-50/60 border border-amber-200/30 rounded-xl px-3 py-2.5">
-                      <p className="text-[12px] text-amber-900 font-medium leading-relaxed">{task.notes || task.details.generalComments}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* === BOTTOM ACTION BAR === */}
-            <div className="shrink-0 bg-white/90 backdrop-blur-xl border-t border-slate-200/30 px-4 sm:px-5 pt-0.5 pb-[calc(env(safe-area-inset-bottom)+12px)]">
-
-              {/* Workflow (if present) */}
-              {actions?.renderWorkflow && actions.renderWorkflow(task)}
-
-              {/* Primary Action */}
-              {!isTerminal && !actions?.renderWorkflow && actions?.onPrimary && (
-                <div className="flex items-center gap-2.5 mb-2.5">
-                  <button onClick={(e) => { e.stopPropagation(); actions.onPrimary(task); }}
-                    className="flex-[4] h-[50px] bg-slate-900 text-white font-extrabold text-[13px] rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/25 flex items-center justify-center gap-2 active:scale-[0.98]">
-                    {actions.primaryLabel || 'Start'} <Navigation size={16} strokeWidth={2.5} />
-                  </button>
-                  {actions?.onSkipNav && (
-                    <button onClick={(e) => { e.stopPropagation(); actions.onSkipNav(task); }}
-                      className="flex-1 h-[50px] bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-all text-[12px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98]">
-                      <Forward size={14} /> Skip
-                    </button>
-                  )}
                 </div>
               )}
             </div>
