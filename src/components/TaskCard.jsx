@@ -166,10 +166,8 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
             <div className="min-w-0 flex-1">
               <h3 className="text-[15px] font-bold text-slate-800 truncate">
                 {task.patient || task.patientName}
+                {task.bookingId && <span className="ml-1.5 text-xs font-bold text-blue-600">#{task.bookingId}</span>}
               </h3>
-              {task.bookingId && (
-                <p className="text-xs font-bold text-blue-600 mt-0.5">#{task.bookingId}</p>
-              )}
               {task.isInOut && !isExpanded && (
                 <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-0.5">In/Out — Client returns shortly</p>
               )}
@@ -226,15 +224,15 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 <ArrowLeft size={18} className="text-slate-600" />
               </button>
               <div className="flex-1 min-w-0">
-                <h2 className="font-extrabold text-[15px] text-slate-900 truncate leading-tight">{task.patient || task.patientName}</h2>
+                <h2 className="font-extrabold text-[15px] text-slate-900 truncate leading-tight">
+                  {task.patient || task.patientName}
+                  {task.bookingId && <span className="ml-1.5 text-xs font-bold text-blue-500">#{task.bookingId}</span>}
+                </h2>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <Clock size={11} className={`shrink-0 ${timeUrg.type === 'critical' ? 'text-rose-500' : timeUrg.type === 'warning' ? 'text-amber-500' : 'text-slate-400'}`} />
                   <span className={`text-[11px] font-semibold ${timeUrg.type === 'critical' ? 'text-rose-600' : timeUrg.type === 'warning' ? 'text-amber-600' : 'text-slate-400'}`}>
                     {task.time || 'TBD'}
                   </span>
-                  {task.bookingId && (
-                    <span className="text-xs font-bold text-blue-500 ml-1">#{task.bookingId}</span>
-                  )}
                 </div>
                 {task.isInOut && (
                   <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-1">In/Out — Client returns shortly</p>
