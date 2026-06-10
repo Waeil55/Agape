@@ -221,15 +221,18 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
               <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center" onClick={() => setShowContactSheet(false)}>
                 <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
                 <div onClick={(e) => e.stopPropagation()}
-                  className="relative w-full sm:w-[400px] max-h-[85vh] bg-white rounded-t-3xl sm:rounded-3xl animate-scale-in overflow-y-auto shadow-2xl">
-                  <div className="sticky top-0 bg-white z-10 px-5 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between">
-                    <h3 className="font-extrabold text-[15px] text-slate-900">Quick Contact</h3>
+                  className="relative w-full sm:w-[420px] max-h-[85vh] bg-white rounded-t-[2rem] sm:rounded-[2rem] animate-scale-in overflow-hidden shadow-2xl shadow-slate-900/20 ring-1 ring-black/5">
+                  <div className="flex justify-center pt-3 pb-1">
+                    <div className="w-10 h-1 rounded-full bg-slate-300" />
+                  </div>
+                  <div className="px-5 flex items-center justify-between border-b border-slate-100">
+                    <h3 className="font-extrabold text-[15px] text-slate-900 py-3">Quick Contact</h3>
                     <button onClick={() => setShowContactSheet(false)}
                       className="w-11 h-11 min-h-[44px] rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors cursor-pointer">
                       <XCircle size={16} className="text-slate-400" />
                     </button>
                   </div>
-                  <div className="p-5 space-y-4 pb-[calc(env(safe-area-inset-bottom)+20px)]">
+                  <div className="overflow-y-auto p-5 space-y-4 pb-[calc(env(safe-area-inset-bottom)+20px)]">
                     <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
                       <p className="text-[13px] text-blue-900 leading-relaxed">{readyMessage}</p>
                     </div>
