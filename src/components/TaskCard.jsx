@@ -99,24 +99,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
     return 'Good evening';
   };
 
-  const getEta = () => {
-    if (!task.time) return '';
-    const now = new Date();
-    const nowMins = now.getHours() * 60 + now.getMinutes();
-    const p = String(task.time).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-    if (!p) return '';
-    let h = parseInt(p[1]), m = parseInt(p[2]);
-    const ampm = p[3]?.toUpperCase();
-    if (ampm === 'PM' && h !== 12) h += 12;
-    if (ampm === 'AM' && h === 12) h = 0;
-    const tripMins = h * 60 + m;
-    const diff = tripMins - nowMins;
-    if (diff > 0) return `ETA: ${diff} min`;
-    if (diff > -30) return 'Arriving now';
-    return '';
-  };
-
-  const readyMessage = `${getGreeting()}, I'm on my way. Medical Transportation thank you. ${getEta()}`.trim();
+  const readyMessage = `${getGreeting()}, I'm on my way. Medical Transportation thank you. ETA:`;
 
   const contacts = [
     { label: 'Patient', phone: task.patientPhone },
