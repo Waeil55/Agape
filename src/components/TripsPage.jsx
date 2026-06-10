@@ -534,7 +534,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {showCreateForm && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-8 overflow-y-auto">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreateForm(false)} />
-          <div className="bg-white w-full max-w-2xl rounded-t-3xl sm:rounded-3xl p-8 shadow-2xl relative z-10 border border-white/20 animate-in fade-in zoom-in-95 duration-200 my-auto">
+          <div className="bg-white w-[94%] max-w-2xl rounded-3xl p-8 shadow-2xl relative z-10 border border-white/20 animate-in fade-in zoom-in-95 duration-200 my-auto">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> New Manifest Entry</h3>
               <button onClick={() => setShowCreateForm(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-500 min-h-[44px] min-w-[44px]" aria-label="Close"><X size={20} /></button>
@@ -595,7 +595,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {showEditForm && editTrip && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowEditForm(false)} />
-          <div className="bg-white w-full max-w-2xl rounded-t-3xl sm:rounded-3xl p-8 shadow-2xl relative z-10 border border-white/20 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white w-[94%] max-w-2xl rounded-3xl p-8 shadow-2xl relative z-10 border border-white/20 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Edit2 size={28} className="text-blue-500" /> Modify Trip Details</h3>
               <button onClick={() => setShowEditForm(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-500 min-h-[44px] min-w-[44px]" aria-label="Close"><X size={20} /></button>
@@ -660,7 +660,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {showAssign && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowAssign(false)} />
-          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white w-[94%] max-w-md rounded-3xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 {assignMode === 'mission' ? (
@@ -708,7 +708,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {showReassignModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowReassignModal(false)} />
-          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white w-[94%] max-w-md rounded-3xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <UserCheck size={20} className="text-amber-600" /> Reassign
@@ -751,7 +751,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         return (
           <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" onClick={() => setLegsDetailPatient(null)}>
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-            <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-5 relative z-10 shadow-2xl border border-white/20 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="bg-white w-[94%] max-w-lg rounded-3xl p-5 relative z-10 shadow-2xl border border-white/20 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-slate-900">{patientName}</h3>
                 <button onClick={() => setLegsDetailPatient(null)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition text-slate-500 min-h-[44px] min-w-[44px]" aria-label="Close"><X size={16} /></button>
