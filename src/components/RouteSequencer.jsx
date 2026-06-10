@@ -1353,8 +1353,8 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                               <span className={`rounded-2xl border px-1.5 py-0.5 text-[9px] font-extrabold ${tripStatus === 'In Progress' ? 'border-blue-200 bg-blue-100 text-blue-800 ring-1 ring-blue-300' : 'border-blue-100 bg-blue-50 text-blue-700'}`}>{client.bookingId || tripIdForDisplay}</span>
                               {client.req && <span className="rounded-2xl border border-slate-200/60 bg-slate-100 px-1.5 py-0.5 text-[9px] font-extrabold text-slate-600">{client.req}</span>}
                             </div>
-                            <p className="text-[10px] font-semibold text-slate-400 truncate flex items-center gap-1 mt-0.5"><MapPin className="w-2.5 h-2.5 text-blue-400 flex-shrink-0" />{isPU ? client.pu : client.do}</p>
-                            {client.notes && <p className="mt-1 truncate text-[10px] font-semibold text-amber-600">Notes: {client.notes}</p>}
+                            <p className="text-[10px] font-semibold text-slate-400 flex items-start gap-1 mt-0.5"><MapPin className="w-2.5 h-2.5 text-blue-400 flex-shrink-0 mt-0.5" />{isPU ? client.pu : client.do}</p>
+                            {client.notes && <p className="mt-1 text-[10px] font-semibold text-amber-600">Notes: {client.notes}</p>}
                           </div>
                           <div className="flex items-start sm:items-center gap-1 flex-shrink-0">
                             {!override && (

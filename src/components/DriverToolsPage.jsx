@@ -515,9 +515,9 @@ Return ONLY the JSON object. No markdown.`;
               const leg = legs[index - 1];
               return (
                 <div key={stop.id}>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-start gap-2">
                     {/* Stop indicator */}
-                    <div className="relative shrink-0">
+                    <div className="relative shrink-0 mt-1.5">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[9px] font-extrabold ${
                         isOrigin
                           ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
@@ -530,19 +530,19 @@ Return ONLY the JSON object. No markdown.`;
                         {isOrigin ? <Compass size={13} /> : stop.letter}
                       </div>
                       {index < stops.length - 1 && (
-                        <div className="absolute top-8 left-1/2 -translate-x-1/2 w-0.5 h-2 bg-slate-200" />
+                        <div className="absolute top-8 left-1/2 -translate-x-1/2 w-0.5 h-full bg-slate-200" />
                       )}
                     </div>
 
                     {/* Input */}
                     <div className="flex-1 min-w-0">
-                      <input
+                      <textarea
                         ref={el => inputRefs.current[index] = el}
-                        type="text"
+                        rows={2}
                         value={stop.label}
                         onChange={(e) => handleTextChange(index, e.target.value)}
                         placeholder={isOrigin ? 'Starting point (GPS or address)...' : `Stop ${stop.letter}...`}
-                        className={`w-full h-10 px-3 rounded-xl text-[12px] font-semibold border transition-all outline-none ${
+                        className={`w-full min-h-[44px] py-2 px-3 rounded-xl text-[10px] font-semibold border transition-all outline-none resize-none leading-tight ${
                           isOrigin
                             ? 'bg-blue-50/50 border-blue-200 text-blue-900 placeholder-blue-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
                             : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
@@ -551,7 +551,7 @@ Return ONLY the JSON object. No markdown.`;
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-0.5 shrink-0">
+                    <div className="flex items-start gap-0.5 shrink-0 mt-1.5">
                       {isOrigin ? (
                         <button onClick={handleUseCurrentLocation} disabled={gettingLocation}
                           className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center active:bg-blue-100 transition cursor-pointer"
