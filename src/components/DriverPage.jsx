@@ -3618,7 +3618,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <div className={`w-2 h-2 rounded-full ${s.dot} shrink-0`} />
                           <span className="text-sm font-bold text-slate-900 truncate">{trip.patient}</span>
-                          <span className="text-[11px] font-mono text-blue-600 font-semibold shrink-0">#{trip.bookingId || trip.id}</span>
+                          <span className="text-xs font-bold text-blue-600 shrink-0">#{trip.bookingId || trip.id}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-sm font-bold text-emerald-600">{to24hr(trip.time)}</span>
@@ -3642,7 +3642,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                     </div>
                                     <div>
                                       <p className="text-sm font-bold text-slate-900">{trip.patient}</p>
-                                      <p className="text-[10px] font-mono text-blue-600 font-semibold">#{trip.bookingId || trip.id}</p>
+                                      <p className="text-xs font-bold text-blue-600">#{trip.bookingId || trip.id}</p>
                                     </div>
                                   </div>
                                   <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${s.bg}`}>{trip.status}</span>
@@ -3653,7 +3653,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <tbody className="text-xs">
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Trip ID</td>
-                              <td className="px-4 py-2.5 font-mono font-bold text-blue-600 text-[11px]">{trip.bookingId || trip.id || '—'}</td>
+                              <td className="px-4 py-2.5 font-bold text-blue-600 text-xs">{trip.bookingId || trip.id || '—'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Date</td>
@@ -4530,7 +4530,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <div key={leg.id} className="border border-slate-100 rounded-xl p-3 hover:border-slate-200 transition-colors">
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-400 font-mono">#{leg.bookingId || leg.id}</span>
+                        <span className="text-xs font-bold text-slate-400">#{leg.bookingId || leg.id}</span>
                         {leg.wheelchair && leg.wheelchair !== 'WLK' && (
                           <span className="text-xs font-semibold bg-orange-50 text-orange-600 px-2.5 py-0.5 rounded-full">{leg.wheelchair}</span>
                         )}

@@ -177,7 +177,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 {task.patient || task.patientName}
               </h3>
               {task.bookingId && (
-                <p className="text-[10px] font-mono font-semibold text-blue-600 mt-0.5">#{task.bookingId}</p>
+                <p className="text-xs font-bold text-blue-600 mt-0.5">#{task.bookingId}</p>
               )}
               {task.isInOut && !isExpanded && (
                 <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-0.5">In/Out — Client returns shortly</p>
@@ -242,7 +242,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                     {task.time || 'TBD'}
                   </span>
                   {task.bookingId && (
-                    <span className="text-[10px] font-mono font-semibold text-blue-500 ml-1">#{task.bookingId}</span>
+                    <span className="text-xs font-bold text-blue-500 ml-1">#{task.bookingId}</span>
                   )}
                 </div>
                 {task.isInOut && (
