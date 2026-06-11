@@ -17,6 +17,7 @@ import DriversVehiclesPage from './DriversVehiclesPage';
 import SettingsPage from './SettingsPage';
 import UsersPage from './UsersPage';
 import OperationsCommandCenter from './OperationsCommandCenter';
+import EnterpriseNemtCommandCenter from './EnterpriseNemtCommandCenter';
 import AdminPage from './AdminPage';
 import DriverPage from './DriverPage';
 import RoutePlannerPage from './RoutePlannerPage';
@@ -964,49 +965,67 @@ const EnterpriseDashboard = ({
 
   // ==================== OPERATIONS PAGE ====================
   const renderOperationsPage = () => (
-    <OperationsCommandCenter
+    <EnterpriseNemtCommandCenter
       role={role}
       currentUser={currentUser}
       trips={trips}
       drivers={drivers}
       dispatchers={dispatchers}
-      selectedTasks={selectedTasks}
-      setSelectedTasks={setSelectedTasks}
-      searchQuery={searchQuery}
-      setSearchQuery={setSearchQuery}
       operationsTab={operationsTab}
       setOperationsTab={setOperationsTab}
-      smartAssignTrip={smartAssignTrip}
-      setSmartAssignTrip={setSmartAssignTrip}
-      manualAssignTrip={manualAssignTrip}
-      setManualAssignTrip={setManualAssignTrip}
-      smartAssignResult={smartAssignResult}
-      setSmartAssignResult={setSmartAssignResult}
-      aiAnalyzing={aiAnalyzing}
-      setAiAnalyzing={setAiAnalyzing}
-      addToast={addToast}
-      addAuditLog={addAuditLog}
-      persistState={persistState}
-      hasPermission={hasPermission}
-      requestAuthAction={requestAuthAction}
-      triggerSmartAssign={triggerSmartAssign}
-      triggerFleetOptimization={triggerFleetOptimization}
-      assignTripToDriver={assignTripToDriver}
-      bulkAssignTrips={bulkAssignTrips}
-      setBulkAssignModal={setBulkAssignModal}
-      requestDeleteTrip={requestDeleteTrip}
-      updateTrip={updateTrip}
-      makeCall={makeCall}
-      sendSMS={sendSMS}
-      setTripDetails={setTripDetails}
-      setShowAddTripModal={setShowAddTripModal}
+      setSearchQuery={setSearchQuery}
       setShowUploadModal={setShowUploadModal}
       onOpenSequencer={() => setShowSequencerModal(true)}
       onOpenLiveMap={() => setActivePanel('liveMap')}
-      showRightPanel={showRightPanel}
       onTogglePanel={toggleRightPanel}
+      addToast={addToast}
       isOnline={isOnline}
-      phoneNumbers={phoneNumbers}
+      operationsBoard={(
+        <OperationsCommandCenter
+          role={role}
+          currentUser={currentUser}
+          trips={trips}
+          drivers={drivers}
+          dispatchers={dispatchers}
+          selectedTasks={selectedTasks}
+          setSelectedTasks={setSelectedTasks}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          operationsTab={operationsTab}
+          setOperationsTab={setOperationsTab}
+          smartAssignTrip={smartAssignTrip}
+          setSmartAssignTrip={setSmartAssignTrip}
+          manualAssignTrip={manualAssignTrip}
+          setManualAssignTrip={setManualAssignTrip}
+          smartAssignResult={smartAssignResult}
+          setSmartAssignResult={setSmartAssignResult}
+          aiAnalyzing={aiAnalyzing}
+          setAiAnalyzing={setAiAnalyzing}
+          addToast={addToast}
+          addAuditLog={addAuditLog}
+          persistState={persistState}
+          hasPermission={hasPermission}
+          requestAuthAction={requestAuthAction}
+          triggerSmartAssign={triggerSmartAssign}
+          triggerFleetOptimization={triggerFleetOptimization}
+          assignTripToDriver={assignTripToDriver}
+          bulkAssignTrips={bulkAssignTrips}
+          setBulkAssignModal={setBulkAssignModal}
+          requestDeleteTrip={requestDeleteTrip}
+          updateTrip={updateTrip}
+          makeCall={makeCall}
+          sendSMS={sendSMS}
+          setTripDetails={setTripDetails}
+          setShowAddTripModal={setShowAddTripModal}
+          setShowUploadModal={setShowUploadModal}
+          onOpenSequencer={() => setShowSequencerModal(true)}
+          onOpenLiveMap={() => setActivePanel('liveMap')}
+          showRightPanel={showRightPanel}
+          onTogglePanel={toggleRightPanel}
+          isOnline={isOnline}
+          phoneNumbers={phoneNumbers}
+        />
+      )}
     />
   );
 
