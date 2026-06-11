@@ -75,7 +75,7 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
             <div className="flex items-center gap-1.5 mb-2">
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Current Trip</span>
+              <span className="text-[10.5px] font-bold uppercase tracking-wider text-blue-700">Current Trip</span>
               {onViewTrip && (
                 <button onClick={() => onViewTrip(currentTrip.id)} className="ml-auto flex items-center gap-1 px-3 py-1.5 min-h-[36px] btn-gradient-primary text-[9px] font-bold hover:bg-blue-700 transition-colors">
                   <ExternalLink size={7} /> View
@@ -83,13 +83,13 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
               )}
             </div>
             <p className="font-bold text-slate-900 text-sm">{currentTrip.patient}</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">{currentTrip.time} - {displayRef(currentTrip)}</p>
+            <p className="text-[10.5px] text-slate-500 mt-0.5">{currentTrip.time} - {displayRef(currentTrip)}</p>
             <div className="mt-2 space-y-1">
-              <div className="flex items-start gap-2 text-[10px]">
+              <div className="flex items-start gap-2 text-[10.5px]">
                 <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-px"><span className="text-[6px] font-black text-white">P</span></div>
                 <span className="text-slate-600">{currentTrip.pickup || '-'}</span>
               </div>
-              <div className="flex items-start gap-2 text-[10px]">
+              <div className="flex items-start gap-2 text-[10.5px]">
                 <div className="w-4 h-4 rounded-full bg-rose-500 flex items-center justify-center shrink-0 mt-px"><span className="text-[6px] font-black text-white">D</span></div>
                 <span className="text-slate-600">{currentTrip.dropoff || '-'}</span>
               </div>
@@ -99,15 +99,15 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
 
         {nextTrip && !currentTrip && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1">Next Trip</p>
+            <p className="text-[10.5px] font-bold uppercase tracking-wider text-blue-700 mb-1">Next Trip</p>
             <p className="font-bold text-slate-900 text-sm">{nextTrip.patient}</p>
-            <p className="text-[10px] text-slate-500">{nextTrip.time} - {nextTrip.pickup} to {nextTrip.dropoff}</p>
+            <p className="text-[10.5px] text-slate-500">{nextTrip.time} - {nextTrip.pickup} to {nextTrip.dropoff}</p>
           </div>
         )}
 
         {completedTrips.length > 0 && (
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Recent Completed</p>
+            <p className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Recent Completed</p>
             <div className="space-y-1">
               {completedTrips.map((trip, i) => (
                 <div key={i} className="flex items-center gap-2 text-[11px] bg-emerald-50/50 rounded-lg px-2.5 py-1.5">
@@ -125,10 +125,10 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
 
         {driverLogs.length > 0 && (
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Activity</p>
+            <p className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Activity</p>
             <div className="space-y-1">
               {driverLogs.map((log, i) => (
-                <div key={i} className="flex items-center gap-2 text-[10px] text-slate-500">
+                <div key={i} className="flex items-center gap-2 text-[10.5px] text-slate-500">
                   <span className={`w-1 h-1 rounded-full shrink-0 ${log.c === 'emerald' ? 'bg-emerald-500' : log.c === 'rose' ? 'bg-rose-500' : log.c === 'amber' ? 'bg-amber-500' : 'bg-blue-500'}`} />
                   <span className="font-semibold text-slate-600 capitalize shrink-0">{log.t}</span>
                   <span className="truncate">{log.meta?.summary || log.d}</span>
@@ -171,7 +171,7 @@ const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-500">{dispatcher.email || ''}</p>
+            <p className="text-[10.5px] text-slate-500">{dispatcher.email || ''}</p>
           </div>
         </div>
       </div>
@@ -181,7 +181,7 @@ const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
             {dispLogs.map((log, i) => {
               const tripId = getTripIdFromLog(log);
               return (
-                <div key={i} className="flex items-start gap-2 text-[10px] group hover:bg-slate-50 rounded-lg px-2 py-1.5 -mx-2 transition-colors">
+                <div key={i} className="flex items-start gap-2 text-[10.5px] group hover:bg-slate-50 rounded-lg px-2 py-1.5 -mx-2 transition-colors">
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-0.5 ${log.c === 'emerald' ? 'bg-emerald-500' : log.c === 'rose' ? 'bg-rose-500' : log.c === 'amber' ? 'bg-amber-500' : 'bg-blue-500'}`} />
                   <div className="flex-1 min-w-0">
                     <span className="font-bold text-slate-700">{log.t}</span>
@@ -331,24 +331,24 @@ const AdminPage = ({
             <table className="w-full">
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">User</th>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Email</th>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Role</th>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Status</th>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Actions</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">User</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">Email</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">Role</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">Status</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {allUsers.map((user, i) => (
                   <tr key={`${user._source}-${user.id || i}`} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-black text-slate-700 uppercase shrink-0">{(user.name || '?')[0]}</div>
-                        <span className="font-semibold text-slate-900 text-sm">{user.name}</span>
+                    <td className="px-2 py-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10.5px] font-black text-slate-700 uppercase shrink-0">{(user.name || '?')[0]}</div>
+                        <span className="font-semibold text-slate-900 text-[10.5px]">{user.name}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-slate-600">{user.email || '-'}</td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-2 py-1.5 text-[10.5px] text-slate-600">{user.email || '-'}</td>
+                    <td className="px-2 py-1.5">
                       <select
                         value={user._role}
                         onChange={(e) => {
@@ -360,15 +360,15 @@ const AdminPage = ({
                             handleRoleChange(user, newRole);
                           }
                         }}
-                        className="px-3 py-1.5 min-h-[36px] rounded-lg border border-slate-200 text-[11px] font-bold bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className="px-2 py-1 rounded-lg border border-slate-200 text-[10.5px] font-bold bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       >
                         <option value="admin">Admin</option>
                         <option value="dispatcher">Dispatcher</option>
                         <option value="driver">Driver</option>
                       </select>
                     </td>
-                    <td className="px-3 py-2.5">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${statusColor(user.clockedIn !== undefined ? (user.clockedIn ? 'online' : 'offline') : user.status)}`}>
+                    <td className="px-2 py-1.5">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-bold ${statusColor(user.clockedIn !== undefined ? (user.clockedIn ? 'online' : 'offline') : user.status)}`}>
                         {user.clockedIn !== undefined ? (user.clockedIn ? <Wifi size={10} /> : <WifiOff size={10} />) : null}
                         {user.clockedIn !== undefined ? (user.clockedIn ? 'Online' : 'Offline') : (user.status || '-')}
                       </span>
@@ -380,12 +380,12 @@ const AdminPage = ({
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-1.5">
+                    <td className="px-2 py-1.5">
+                      <div className="flex items-center gap-1">
                         {user.email && (
                           <button
                             onClick={() => handlePasswordReset(user.email)}
-                            className="flex items-center gap-1 px-3 py-1.5 min-h-[36px] bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 rounded-lg text-[10px] font-bold text-slate-600 transition-colors"
+                            className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 rounded-lg text-[10.5px] font-bold text-slate-600 transition-colors"
                             title="Send password reset email"
                           >
                             <KeyRound size={10} /> Reset PW
@@ -393,7 +393,7 @@ const AdminPage = ({
                         )}
                         <button
                           onClick={() => handleDeleteUser(user)}
-                          className="flex items-center gap-1 px-3 py-1.5 min-h-[36px] bg-white border border-rose-200 hover:bg-rose-50 rounded-lg text-[10px] font-bold text-rose-600 transition-colors"
+                          className="flex items-center gap-1 px-2 py-1 bg-white border border-rose-200 hover:bg-rose-50 rounded-lg text-[10.5px] font-bold text-rose-600 transition-colors"
                           title="Delete user"
                         >
                           <Trash2 size={10} /> Delete

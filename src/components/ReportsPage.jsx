@@ -600,7 +600,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
       className={`p-2 text-left whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors min-h-[44px] ${className}`}
     >
       <div className="flex items-center">
-        <span className="text-[10px]">{children}</span>
+        <span className="text-[10.5px]">{children}</span>
         {renderSortIcon(column)}
       </div>
     </th>
@@ -691,7 +691,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-slate-100">
-      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-2 py-1 flex items-center gap-2 flex-wrap text-[10px]">
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-2 py-1 flex items-center gap-2 flex-wrap text-[10.5px]">
         <div className="flex items-center gap-1 bg-slate-100 rounded px-1.5 py-0.5 min-w-[90px]">
           <Search size={10} className="text-slate-400 shrink-0" />
           <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-transparent outline-none w-full min-w-0 placeholder:text-slate-400" />
@@ -731,7 +731,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         ].map((s) => (
           <span key={s.label} className="flex items-center gap-0.5">
             <span className="text-[9px] text-slate-400 font-medium">{s.label}</span>
-            <span className={`text-[10px] font-bold ${s.color}`}>{s.value}</span>
+            <span className={`text-[10.5px] font-bold ${s.color}`}>{s.value}</span>
           </span>
         ))}
         <span className="text-[9px] text-slate-400">{reportTrips.length > 0 && `${reportTrips.length}`}</span>
@@ -752,24 +752,24 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <BrainCircuit size={14} className="text-indigo-600" />
-              <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">AI Report Insights</span>
+              <span className="text-[10.5px] font-bold text-indigo-700 uppercase tracking-wider">AI Report Insights</span>
             </div>
             <button onClick={() => setAiReport(null)} className="text-slate-400 hover:text-slate-600 min-h-[44px] min-w-[44px] p-2 flex items-center justify-center"><X size={12} /></button>
           </div>
           <p className="text-xs text-slate-700 leading-relaxed">{aiReport.summary}</p>
           {aiReport.trends?.length > 0 && (
             <div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Trends</p>
+              <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider mb-1">Trends</p>
               <div className="flex flex-wrap gap-1.5">
                 {aiReport.trends.map((t, i) => (
-                  <span key={i} className="px-2 py-0.5 bg-white rounded-full border border-slate-200 text-[10px] font-semibold text-slate-700">{t}</span>
+                  <span key={i} className="px-2 py-0.5 bg-white rounded-full border border-slate-200 text-[10.5px] font-semibold text-slate-700">{t}</span>
                 ))}
               </div>
             </div>
           )}
           {aiReport.anomalies?.length > 0 && (
             <div>
-              <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1 flex items-center gap-1"><AlertTriangle size={10} /> Anomalies</p>
+              <p className="text-[10.5px] font-bold text-rose-500 uppercase tracking-wider mb-1 flex items-center gap-1"><AlertTriangle size={10} /> Anomalies</p>
               <div className="space-y-0.5">
                 {aiReport.anomalies.map((a, i) => (
                   <p key={i} className="text-xs text-rose-700">{a}</p>
@@ -779,7 +779,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           )}
           {aiReport.recommendations?.length > 0 && (
             <div>
-              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Lightbulb size={10} /> Recommendations</p>
+              <p className="text-[10.5px] font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Lightbulb size={10} /> Recommendations</p>
               <div className="space-y-0.5">
                 {aiReport.recommendations.map((r, i) => (
                   <p key={i} className="text-xs text-emerald-800">{r}</p>
@@ -862,19 +862,13 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                 {!isCollapsed && (
                   <>
                     {/* Table â€” hidden on mobile */}
-                    <div className="w-full overflow-x-auto hidden lg:block">
-                  <table className="resizable-table text-xs" style={{ tableLayout: 'fixed', width: '100%', minWidth: reportTableMinWidth }}>
-                    <colgroup>
-                      <col style={{ width: ROW_CONTROL_COL_WIDTH }} />
-                      {Columns.map(col => (
-                        <col key={col.key} style={{ width: colWidths[col.key] || 100 }} />
-                      ))}
-                    </colgroup>
+                    <div className="w-full hidden lg:block">
+                    <table className="resizable-table text-[10.5px]" style={{ width: '100%' }}>
                     <thead className="bg-slate-800 text-slate-100 border-b border-slate-200">
                       <tr>
-                        <th className="p-2 text-center align-middle resizable-th min-h-[44px]" style={{ width: ROW_CONTROL_COL_WIDTH }}>
+                        <th className="px-2 py-1.5 text-center align-middle resizable-th">
                           <div className="flex items-center justify-center gap-2">
-                            <div className="min-h-[44px] min-w-[44px] flex items-center justify-center">
+                            <div className="flex items-center justify-center">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -891,7 +885,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                                 title="Select all trips for this day"
                                 aria-label="Select all trips for this day"
                               >
-                                {dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? <CheckSquare size={14} /> : <Square size={14} />}
+                                {dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? <CheckSquare size={12} /> : <Square size={12} />}
                               </button>
                             </div>
                             {canEdit && <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Edit</span>}
@@ -900,22 +894,15 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                         {Columns.map(col => (
                           <th
                             key={col.key}
-                            className="resizable-th p-0 text-left select-none min-h-[44px]"
-                            style={{ width: colWidths[col.key] || 100 }}
+                            className="px-2 py-1.5 text-left select-none resizable-th"
                           >
                             <div
-                              className="flex items-center justify-between cursor-pointer group hover:bg-slate-700 transition-colors px-2 py-2 h-full"
+                              className="flex items-center justify-between cursor-pointer group hover:bg-slate-700 transition-colors"
                               onClick={() => handleSort(col.key)}
                             >
-                              <span className="text-[10px] font-semibold truncate">{col.label}</span>
+                              <span className="text-[10.5px] font-semibold truncate">{col.label}</span>
                               <span className="ml-1 shrink-0">{renderSortIcon(col.key)}</span>
                             </div>
-                            {/* Resize handle */}
-                            <div
-                              className="col-resize-handle"
-                              onMouseDown={(e) => startColResize(e, col.key)}
-                              title="Drag to resize column"
-                            />
                           </th>
                         ))}
                       </tr>
@@ -933,9 +920,9 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                               setActiveRow(trip.id);
                             }}
                           >
-                            <td className="p-2 align-middle">
-                              <div className="flex items-center gap-1 whitespace-nowrap">
-                                <div className="min-h-[44px] min-w-[44px] flex items-center justify-center">
+                            <td className="px-2 py-1.5 align-top">
+                              <div className="flex items-center gap-1">
+                                <div className="flex items-center justify-center">
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -960,7 +947,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); finishRowEdit(); }}
-                                        className="min-h-[44px] min-w-[44px] p-2 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150 flex items-center justify-center"
+                                        className="p-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150 flex items-center justify-center"
                                         title="Keep changes"
                                         aria-label="Keep changes"
                                       >
@@ -969,7 +956,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); revertRowEdit(); }}
-                                        className="min-h-[44px] min-w-[44px] p-2 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150 flex items-center justify-center"
+                                        className="p-1 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150 flex items-center justify-center"
                                         title="Cancel and restore original row"
                                         aria-label="Cancel and restore original row"
                                       >
@@ -980,7 +967,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                                     <button
                                       type="button"
                                       onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
-                                      className="min-h-[44px] min-w-[44px] p-2 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150 flex items-center justify-center"
+                                      className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150 flex items-center justify-center"
                                       title="Edit row"
                                       aria-label="Edit row"
                                     >
@@ -995,27 +982,27 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                               const displayValue = renderCellValue(trip, col);
                               const isEditing = isEditingCell(trip.id, cellKey);
                               return (
-                                <td key={cellKey} className={`p-2 whitespace-nowrap ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== 'â€”' ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 text-[10px] font-mono tracking-wider uppercase' : ''}`}
+                                <td key={cellKey} className={`px-2 py-1.5 ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== 'â€”' ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 text-[10.5px] font-mono tracking-wider uppercase' : ''}`}
                                   title={cellKey === 'pickup' || cellKey === 'dropoff' ? displayValue : undefined}
                                 >
                                   {isEditing ? (
                                     renderCellEditor(trip, col)
                                   ) : canEdit && editingRow === trip.id && cellKey !== 'signature' ? (
                                     <span
-                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
+                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block"
                                       onClick={() => startCellEdit(trip.id, cellKey, (trip[FIELD_FOR_COL[cellKey]] ?? ''))}
                                     >
                                       {displayValue}
                                     </span>
                                   ) : cellKey === 'signature' && canEdit && editingRow === trip.id ? (
                                     <span
-                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
+                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block"
                                       onClick={() => saveCell(trip, 'paperSignatureConfirmed', !trip.paperSignatureConfirmed)}
                                     >
                                       {displayValue}
                                     </span>
                                   ) : (
-                                    <span className="block leading-5">{displayValue}</span>
+                                    <span className="block">{displayValue}</span>
                                   )}
                                 </td>
                               );
@@ -1056,26 +1043,26 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                             )}
                             <span className="font-bold text-sm text-slate-900 truncate">{trip.patient || 'â€”'}</span>
                           </div>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${statusClass}`}>
+                          <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${statusClass}`}>
                             {trip.status || 'â€”'}
                           </span>
                         </div>
 
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                           <div>
-                            <span className="text-slate-400 text-[10px] uppercase tracking-wide">Pickup</span>
+                            <span className="text-slate-400 text-[10.5px] uppercase tracking-wide">Pickup</span>
                             <p className="text-emerald-600 truncate" title={trip.pickup}>{trip.pickup || 'â€”'}</p>
                           </div>
                           <div>
-                            <span className="text-slate-400 text-[10px] uppercase tracking-wide">Dropoff</span>
+                            <span className="text-slate-400 text-[10.5px] uppercase tracking-wide">Dropoff</span>
                             <p className="text-rose-600 truncate" title={trip.dropoff}>{trip.dropoff || 'â€”'}</p>
                           </div>
                           <div>
-                            <span className="text-slate-400 text-[10px] uppercase tracking-wide">Time</span>
+                            <span className="text-slate-400 text-[10.5px] uppercase tracking-wide">Time</span>
                             <p className="font-mono text-slate-700">{scheduledTime}</p>
                           </div>
                           <div>
-                            <span className="text-slate-400 text-[10px] uppercase tracking-wide">Driver</span>
+                            <span className="text-slate-400 text-[10.5px] uppercase tracking-wide">Driver</span>
                             <p className="font-semibold text-slate-700 truncate">{driverLabel}</p>
                           </div>
                         </div>

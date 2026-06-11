@@ -1086,32 +1086,49 @@ const App = () => {
       if (!snap.exists()) { setChatUnreadCount(0); return; }
       const curr = snap.data().conversations || {};
       // Calculate unread count for nav badge
-      let totalUnread = 0;
       const normalizedCurrentUser = String(currentUser || '').trim().toLowerCase();
+      let totalUnread = 0;
       for (const c of Object.values(curr)) {
-        if (Array.isArray(c?.participants) && !c.participants.includes(normalizedCurrentUser)) continue;
+        const nParticipants = (c?.participants || []).map(p => p.toLowerCase());
+        if (!nParticipants.includes(normalizedCurrentUser)) continue;
         const explicitUnread = (c?.unread || {})[normalizedCurrentUser] || 0;
         if (explicitUnread > 0) {
           totalUnread += explicitUnread;
-        } else if (c?.lastMessage?.sender && c.lastMessage.sender !== normalizedCurrentUser &&
-            !(c.lastMessage?.readBy || []).includes(normalizedCurrentUser)) {
-          totalUnread += 1;
+        } else {
+          const lm = c?.lastMessage;
+          const lmSender = typeof lm === 'string' ? null : (lm?.sender || null);
+          const lmReadBy = typeof lm === 'string' ? [] : (lm?.readBy || []);
+          if (lmSender && lmSender !== normalizedCurrentUser && !lmReadBy.includes(normalizedCurrentUser)) {
+            totalUnread += 1;
+          }
         }
       }
       setChatUnreadCount(totalUnread);
-      if (firstSnapshot) { firstSnapshot = false; prevChatConvsRef.current = curr; return; }
+      if (firstSnapshot) {
+        firstSnapshot = false;
+        const initial = {};
+        for (const [id, c] of Object.entries(curr)) {
+          const lm = c?.lastMessage;
+          initial[id] = typeof lm === 'string' ? lm : (lm?.text || '');
+        }
+        prevChatConvsRef.current = initial;
+        return;
+      }
       const prev = prevChatConvsRef.current || {};
       for (const [id, c] of Object.entries(curr)) {
-        const prevLast = prev[id]?.lastMessage;
+        const prevLast = prev[id];
         const currLast = c?.lastMessage;
-        if (currLast && currLast.sender && currLast.sender !== normalizedCurrentUser &&
-            (!c?.participants || c.participants.includes(normalizedCurrentUser)) &&
-            (!prevLast || prevLast.text !== currLast.text || prevLast.timestamp !== currLast.timestamp)) {
+        const nParticipants = (c?.participants || []).map(p => p.toLowerCase());
+        if (!currLast || !nParticipants.includes(normalizedCurrentUser)) continue;
+        const currSender = typeof currLast === 'string' ? null : (currLast.sender || null);
+        const currText = typeof currLast === 'string' ? currLast : (currLast.text || '');
+        const prevText = typeof prevLast === 'string' ? prevLast : '';
+        if (currSender && currSender !== normalizedCurrentUser && currText && currText !== prevText) {
           if (activeTab !== 'chat') {
             playMessageSound();
             showLocalNotification(
-              `New message from ${currLast.sender.split('@')[0]}`,
-              currLast.text,
+              `New message from ${currSender.split('@')[0]}`,
+              currText,
               'message'
             );
           } else {
@@ -1120,7 +1137,13 @@ const App = () => {
           break;
         }
       }
-      prevChatConvsRef.current = curr;
+      // Store normalized prev (text only) to avoid timestamp object-reference drift
+      const normalizedPrev = {};
+      for (const [id, c] of Object.entries(curr)) {
+        const lm = c?.lastMessage;
+        normalizedPrev[id] = typeof lm === 'string' ? lm : (lm?.text || '');
+      }
+      prevChatConvsRef.current = normalizedPrev;
     });
     return () => { unsub(); };
   }, [isAuthenticated, currentUser, role, activeTab]);

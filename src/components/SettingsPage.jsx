@@ -35,7 +35,7 @@ const ActivityRow = ({ index, log }) => {
             </div>
           )}
         </div>
-        <span className="text-[10px] font-bold text-slate-400 flex-shrink-0">{log.timestamp}</span>
+        <span className="text-[10.5px] font-bold text-slate-400 flex-shrink-0">{log.timestamp}</span>
       </div>
     </div>
   );
@@ -210,34 +210,34 @@ const SettingsPage = ({
             </div>
             <div className="card-premium">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-[10.5px]">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="px-4 py-3 text-left font-bold text-slate-600">Name</th>
-                      <th className="px-4 py-3 text-left font-bold text-slate-600">Email</th>
-                      <th className="px-4 py-3 text-left font-bold text-slate-600">Role</th>
-                      <th className="px-4 py-3 text-left font-bold text-slate-600">Status</th>
+                      <th className="px-2 py-1.5 text-left font-bold text-slate-600">Name</th>
+                      <th className="px-2 py-1.5 text-left font-bold text-slate-600">Email</th>
+                      <th className="px-2 py-1.5 text-left font-bold text-slate-600">Role</th>
+                      <th className="px-2 py-1.5 text-left font-bold text-slate-600">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {dispatchers.map((d, i) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-4 py-3 font-bold text-slate-900">{d.name || '—'}</td>
-                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
-                        <td className="px-4 py-3"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${ROLE_COLORS[d.role] || 'bg-slate-100 text-slate-600'}`}>{ROLE_LABELS[d.role] || d.role}</span></td>
-                        <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 text-xs font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
+                        <td className="px-2 py-1.5 font-bold text-slate-900">{d.name || '—'}</td>
+                        <td className="px-2 py-1.5 text-slate-600 font-mono">{d.email || '—'}</td>
+                        <td className="px-2 py-1.5"><span className={`inline-block px-2 py-0.5 rounded-full font-bold ${ROLE_COLORS[d.role] || 'bg-slate-100 text-slate-600'}`}>{ROLE_LABELS[d.role] || d.role}</span></td>
+                        <td className="px-2 py-1.5"><span className={`inline-flex items-center gap-1 font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
                       </tr>
                     ))}
                     {drivers.map((d, i) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-4 py-3 font-bold text-slate-900">{d.name || '—'}</td>
-                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
-                        <td className="px-4 py-3"><span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Driver</span></td>
-                        <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 text-xs font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
+                        <td className="px-2 py-1.5 font-bold text-slate-900">{d.name || '—'}</td>
+                        <td className="px-2 py-1.5 text-slate-600 font-mono">{d.email || '—'}</td>
+                        <td className="px-2 py-1.5"><span className="inline-block px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800">Driver</span></td>
+                        <td className="px-2 py-1.5"><span className={`inline-flex items-center gap-1 font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
                       </tr>
                     ))}
                     {(dispatchers.length + drivers.length) === 0 && (
-                      <tr><td colSpan="4" className="px-4 py-12 text-center text-slate-500">No users found.</td></tr>
+                      <tr><td colSpan="4" className="px-2 py-1.5 text-center text-slate-500">No users found.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -281,24 +281,24 @@ const SettingsPage = ({
             </div>
             <div className="card-premium p-5 sm:p-8">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-[10.5px]">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="px-3 py-3 text-left font-bold text-slate-700 whitespace-nowrap">Permission</th>
+                      <th className="px-2 py-1.5 text-left font-bold text-slate-700 whitespace-nowrap">Permission</th>
                       {Object.keys(ROLE_LABELS).map(r => (
-                        <th key={r} className="px-3 py-3 text-center font-bold text-slate-700 whitespace-nowrap">{ROLE_LABELS[r]}</th>
+                        <th key={r} className="px-2 py-1.5 text-center font-bold text-slate-700 whitespace-nowrap">{ROLE_LABELS[r]}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {Object.keys(PERMISSION_LABELS).map(pkey => (
                       <tr key={pkey} className="border-b border-slate-100 hover:bg-slate-50/50">
-                        <td className="px-3 py-3 font-bold text-slate-800 whitespace-nowrap">{PERMISSION_LABELS[pkey]}</td>
+                        <td className="px-2 py-1.5 font-bold text-slate-800 whitespace-nowrap">{PERMISSION_LABELS[pkey]}</td>
                         {Object.keys(ROLE_LABELS).map(r => {
                           const allowed = hasPermission ? hasPermission(r, pkey) : false;
                           return (
-                            <td key={r} className="px-3 py-3 text-center">
-                              {allowed ? <CheckCircle2 size={18} className="inline text-emerald-600" /> : <XCircle size={18} className="inline text-slate-300" />}
+                            <td key={r} className="px-2 py-1.5 text-center">
+                              {allowed ? <CheckCircle2 size={14} className="inline text-emerald-600" /> : <XCircle size={14} className="inline text-slate-300" />}
                             </td>
                           );
                         })}
@@ -331,24 +331,24 @@ const SettingsPage = ({
                     <table className="w-full">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
-                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600">Booking ID</th>
-                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600">Patient</th>
-                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600 hidden sm:table-cell">Pickup</th>
-                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600 hidden sm:table-cell">Dropoff</th>
-                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600">Time</th>
+                          <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600">Booking ID</th>
+                          <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600">Patient</th>
+                          <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 hidden sm:table-cell">Pickup</th>
+                          <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 hidden sm:table-cell">Dropoff</th>
+                          <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600">Time</th>
                         </tr>
                       </thead>
                       <tbody>
                         {trashedTrips.length === 0 ? (
-                          <tr><td colSpan="5" className="px-4 sm:px-6 py-12 text-center text-slate-500 text-base">No archived trips.</td></tr>
+                          <tr><td colSpan="5" className="px-2 py-1.5 text-center text-slate-500 text-[10.5px]">No archived trips.</td></tr>
                         ) : (
                           trashedTrips.map((trip) => (
                             <tr key={trip.id} className="border-b border-slate-100 hover:bg-slate-50">
-                              <td className="px-4 sm:px-6 py-3 font-mono text-sm text-slate-600">{trip.bookingId || '—'}</td>
-                              <td className="px-4 sm:px-6 py-3 text-sm font-bold text-slate-900">{trip.patient}</td>
-                              <td className="px-4 sm:px-6 py-3 text-sm text-emerald-600 hidden sm:table-cell">{trip.pickup}</td>
-                              <td className="px-4 sm:px-6 py-3 text-sm text-rose-600 hidden sm:table-cell">{trip.dropoff}</td>
-                              <td className="px-4 sm:px-6 py-3 text-sm text-slate-600">{trip.time}</td>
+                              <td className="px-2 py-1.5 font-mono text-[10.5px] text-slate-600">{trip.bookingId || '—'}</td>
+                              <td className="px-2 py-1.5 text-[10.5px] font-bold text-slate-900">{trip.patient}</td>
+                              <td className="px-2 py-1.5 text-[10.5px] text-emerald-600 hidden sm:table-cell">{trip.pickup}</td>
+                              <td className="px-2 py-1.5 text-[10.5px] text-rose-600 hidden sm:table-cell">{trip.dropoff}</td>
+                              <td className="px-2 py-1.5 text-[10.5px] text-slate-600">{trip.time}</td>
                             </tr>
                           ))
                         )}
@@ -640,7 +640,7 @@ const SettingsPage = ({
         <div className="card-premium sticky top-4">
           {navItems.map((group, gi) => (
             <div key={gi}>
-              <div className="px-4 pt-4 pb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">{group.group}</div>
+              <div className="px-4 pt-4 pb-1 text-[10.5px] font-black uppercase tracking-widest text-slate-400">{group.group}</div>
               {group.items.map(item => {
                 const Icon = item.icon;
                 const isActive = activeSection === item.id;

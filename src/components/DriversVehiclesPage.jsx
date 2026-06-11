@@ -293,26 +293,26 @@ const [form, setForm] = useState({
             <table className="w-full">
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Name</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Vehicle</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden md:table-cell">Zone</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden lg:table-cell">Dispatcher</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Status</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Assign</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Contact</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Actions</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Name</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600 hidden sm:table-cell">Vehicle</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600 hidden md:table-cell">Zone</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600 hidden lg:table-cell">Dispatcher</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Status</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Assign</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Contact</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredDrivers.length === 0 ? (
-                  <tr><td colSpan="8" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">{role === 'dispatcher' ? 'No drivers assigned to you yet.' : 'No drivers yet. Click "Add Driver" to create one.'}</td></tr>
+                  <tr><td colSpan="8" className="px-2 py-1.5 text-center text-slate-500 text-[10.5px]">{role === 'dispatcher' ? 'No drivers assigned to you yet.' : 'No drivers yet. Click "Add Driver" to create one.'}</td></tr>
                 ) : (
                   filteredDrivers.map((d) => {
                     const assignedCount = trips.filter(t => tripBelongsToDriver(t, d)).length;
                     return (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900">{d.name}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden sm:table-cell">
+                        <td className="px-2 py-1.5 text-[10.5px] font-semibold text-slate-900">{d.name}</td>
+                        <td className="px-2 py-1.5 text-[10.5px] text-slate-600 hidden sm:table-cell">
                           <select value={d.vehicle || ''} onChange={(e) => {
                             const newV = e.target.value;
                             // Unassign previous driver from this vehicle
@@ -331,56 +331,56 @@ const [form, setForm] = useState({
                             }
                             setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, vehicle: newV } : x));
                             addAuditLog('Vehicle Assigned', `${currentUser} assigned ${newV || 'no vehicle'} to ${d.name}.`, 'blue');
-                          }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+                          }} className="px-2 py-1 border border-slate-200 rounded-xl text-[10.5px] font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                             <option value="">- None -</option>
                             {vehicles.filter(v => !drivers.find(x => x.vehicle === v.name && x.id !== d.id) || v.name === d.vehicle).map(v => (
                               <option key={v.id} value={v.name}>{v.name} {v.plate ? `(${v.plate})` : ''}</option>
                             ))}
                           </select>
                         </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden md:table-cell">{d.currentZone || '-'}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden lg:table-cell">
+                        <td className="px-2 py-1.5 text-[10.5px] text-slate-600 hidden md:table-cell">{d.currentZone || '-'}</td>
+                        <td className="px-2 py-1.5 text-[10.5px] text-slate-600 hidden lg:table-cell">
                           <select value={d.assignedDispatcher || d.assignedTo || ''} onChange={(e) => {
                             const newDisp = e.target.value;
                             setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, assignedDispatcher: newDisp, assignedTo: newDisp } : x));
                             addAuditLog('Driver Reassigned', `${currentUser} assigned driver ${d.name} to dispatcher ${dispatchers.find(ds => ds.id === newDisp)?.name || 'None'}.`, 'blue');
-                          }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+                          }} className="px-2 py-1 border border-slate-200 rounded-xl text-[10.5px] font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                             <option value="">- Unassigned -</option>
                             {dispatchers.map(ds => (
                               <option key={ds.id} value={ds.id}>{ds.name}</option>
                             ))}
                           </select>
                         </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4">
-                          <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${d.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>{d.status}</span>
-                          {assignedCount > 0 && <span className="ml-1 text-xs text-blue-600 font-semibold">({assignedCount})</span>}
+                        <td className="px-2 py-1.5">
+                          <span className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold ${d.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>{d.status}</span>
+                          {assignedCount > 0 && <span className="ml-1 text-[10.5px] text-blue-600 font-semibold">({assignedCount})</span>}
                         </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4">
+                        <td className="px-2 py-1.5">
                           <div className="flex gap-1">
-                            <button onClick={() => setAssignDriver(d)} className="px-2 py-1 min-h-[36px] bg-blue-100 text-blue-700 rounded-md text-xs font-bold hover:bg-blue-200 flex items-center gap-1" title="Assign trips">
+                            <button onClick={() => setAssignDriver(d)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-[10.5px] font-bold hover:bg-blue-200 flex items-center gap-1" title="Assign trips">
                               <ClipboardList size={12} /> Trips
                             </button>
                             {onUploadForDriver && (
-                              <button onClick={() => onUploadForDriver(d.id)} className="px-2 py-1.5 min-h-[36px] bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200 flex items-center gap-1" title="Upload & assign">
+                              <button onClick={() => onUploadForDriver(d.id)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-[10.5px] font-semibold hover:bg-blue-200 flex items-center gap-1" title="Upload & assign">
                                 <Upload size={12} /> Upload
                               </button>
                             )}
                           </div>
                         </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4">
+                        <td className="px-2 py-1.5">
                            {d.phone ? (
                             <div className="flex gap-2">
-                              <button onClick={() => makeCall(d.phone, d.name)} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition" aria-label="Call driver"><Phone size={14} /></button>
-                              <button onClick={() => sendSMS(d.phone, d.name)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition" aria-label="Send SMS"><MessageSquare size={14} /></button>
+                              <button onClick={() => makeCall(d.phone, d.name)} className="p-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition" aria-label="Call driver"><Phone size={12} /></button>
+                              <button onClick={() => sendSMS(d.phone, d.name)} className="p-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition" aria-label="Send SMS"><MessageSquare size={12} /></button>
                             </div>
-                          ) : <span className="text-xs text-slate-400 italic">No Phone</span>}
+                          ) : <span className="text-[10.5px] text-slate-400 italic">No Phone</span>}
                         </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 flex gap-1 sm:gap-2">
-                          <button onClick={() => analyzeDriver(d)} className="p-1.5 sm:p-2 min-h-[36px] text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="AI Analyze" aria-label="AI Analyze"><BrainCircuit size={14} /></button>
-                          <button onClick={() => openScheduleEditor(d)} className="p-1.5 sm:p-2 min-h-[36px] text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit Schedule" aria-label="Edit Schedule"><Clock size={14} /></button>
-                          <button onClick={() => openEdit(d)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" aria-label="Edit driver"><Edit2 size={14} /></button>
+                        <td className="px-2 py-1.5 flex gap-1">
+                          <button onClick={() => analyzeDriver(d)} className="p-1 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="AI Analyze" aria-label="AI Analyze"><BrainCircuit size={12} /></button>
+                          <button onClick={() => openScheduleEditor(d)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit Schedule" aria-label="Edit Schedule"><Clock size={12} /></button>
+                          <button onClick={() => openEdit(d)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition" aria-label="Edit driver"><Edit2 size={12} /></button>
                           {(role === 'admin' || role === 'dispatcher') && (
-                            <button onClick={() => deleteDriver(d)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" aria-label="Delete driver"><Trash2 size={14} /></button>
+                            <button onClick={() => deleteDriver(d)} className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition" aria-label="Delete driver"><Trash2 size={12} /></button>
                           )}
                         </td>
                       </tr>
@@ -399,29 +399,29 @@ const [form, setForm] = useState({
             <table className="w-full">
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Name</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden sm:table-cell">Make / Model</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden md:table-cell">Year / Color</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden lg:table-cell">Plate / VIN</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600 hidden lg:table-cell">Odometer</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Driver</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-slate-600">Actions</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Name</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600 hidden sm:table-cell">Make / Model</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600 hidden md:table-cell">Year / Color</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600 hidden lg:table-cell">Plate / VIN</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600 hidden lg:table-cell">Odometer</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Driver</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {vehicles.length === 0 ? (
-                  <tr><td colSpan="7" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">No vehicles yet. Click "Add Vehicle" to create one.</td></tr>
+                  <tr><td colSpan="7" className="px-2 py-1.5 text-center text-slate-500 text-[10.5px]">No vehicles yet. Click "Add Vehicle" to create one.</td></tr>
                 ) : (
                   vehicles.map((v) => {
                     const assignedDriver = drivers.find(d => d.vehicle === v.name);
                     return (
                       <tr key={v.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900">{v.name}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden sm:table-cell">{v.make || '-'} {v.model || ''}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden md:table-cell">{v.year || '-'} / {v.color || '-'}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden lg:table-cell font-mono">{v.plate || '-'} / {v.vin ? v.vin.slice(-6) : '-'}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600 hidden lg:table-cell">{v.odometer ? Number(v.odometer).toLocaleString() : '0'} mi</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-slate-600">
+                        <td className="px-2 py-1.5 text-[10.5px] font-semibold text-slate-900">{v.name}</td>
+                        <td className="px-2 py-1.5 text-[10.5px] text-slate-600 hidden sm:table-cell">{v.make || '-'} {v.model || ''}</td>
+                        <td className="px-2 py-1.5 text-[10.5px] text-slate-600 hidden md:table-cell">{v.year || '-'} / {v.color || '-'}</td>
+                        <td className="px-2 py-1.5 text-[10.5px] text-slate-600 hidden lg:table-cell font-mono">{v.plate || '-'} / {v.vin ? v.vin.slice(-6) : '-'}</td>
+                        <td className="px-2 py-1.5 text-[10.5px] text-slate-600 hidden lg:table-cell">{v.odometer ? Number(v.odometer).toLocaleString() : '0'} mi</td>
+                        <td className="px-2 py-1.5 text-[10.5px] text-slate-600">
                           <select value={assignedDriver?.id || ''} onChange={(e) => {
                             const driverId = e.target.value;
                             const oldDriverId = assignedDriver?.id;
@@ -433,18 +433,18 @@ const [form, setForm] = useState({
                               setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, vehicle: v.name } : d));
                             }
                             addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'blue');
-                          }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+                          }} className="px-2 py-1 border border-slate-200 rounded-xl text-[10.5px] font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                             <option value="">- Unassigned -</option>
                             {drivers.map(d => (
                               <option key={d.id} value={d.id}>{d.name} {d.vehicle && d.vehicle !== v.name ? `(${d.vehicle})` : ''}</option>
                             ))}
                           </select>
                         </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4">
+                        <td className="px-2 py-1.5">
                           <div className="flex gap-1">
-                            <button onClick={() => openVEdit(v)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit" aria-label="Edit"><Edit2 size={14} /></button>
+                            <button onClick={() => openVEdit(v)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit" aria-label="Edit"><Edit2 size={12} /></button>
                             {(role === 'admin' || role === 'dispatcher') && (
-                              <button onClick={() => deleteVehicle(v)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete" aria-label="Delete"><Trash2 size={14} /></button>
+                              <button onClick={() => deleteVehicle(v)} className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete" aria-label="Delete"><Trash2 size={12} /></button>
                             )}
                           </div>
                         </td>
@@ -495,7 +495,7 @@ const [form, setForm] = useState({
                                   {trip.bookingId ? `Booking ${trip.bookingId}` : trip.clientId ? `Client ${trip.clientId}` : trip.id}
                                 </p>
                               </div>
-                              <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-[10px] sm:text-xs font-bold shrink-0">{trip.status || 'Assigned'}</span>
+                              <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-[10.5px] sm:text-xs font-bold shrink-0">{trip.status || 'Assigned'}</span>
                             </div>
                             <p className="text-xs mt-2 break-words"><span className="text-emerald-600">{trip.pickup}</span> <span className="text-slate-300">→</span> <span className="text-rose-600">{trip.dropoff}</span></p>
                             <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">

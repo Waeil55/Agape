@@ -390,7 +390,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
   const renderSortableHeader = (column, children, className = '') => (
     <th onClick={() => handleSort(column)}
       className={`p-2 text-left whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors ${className}`}>
-      <div className="flex items-center"><span className="text-[10px]">{children}</span>{renderSortIcon(column)}</div>
+      <div className="flex items-center"><span className="text-[10.5px]">{children}</span>{renderSortIcon(column)}</div>
     </th>
   );
 
@@ -410,10 +410,10 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
           <div className="flex items-center gap-1 bg-slate-100 rounded px-2 py-1">
             <Calendar size={11} className="text-slate-400" />
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-              className="px-1 py-0.5 border border-slate-200 rounded text-[10px] outline-none focus:border-blue-500 w-[110px]" />
+              className="px-1 py-0.5 border border-slate-200 rounded text-[10.5px] outline-none focus:border-blue-500 w-[110px]" />
             <span className="text-[9px] text-slate-400">to</span>
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-              className="px-1 py-0.5 border border-slate-200 rounded text-[10px] outline-none focus:border-blue-500 w-[110px]" />
+              className="px-1 py-0.5 border border-slate-200 rounded text-[10.5px] outline-none focus:border-blue-500 w-[110px]" />
           </div>
         </div>
       </div>
@@ -440,38 +440,25 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
               </div>
 
               {isExpanded && (
-              <div className="w-full overflow-x-auto">
-                <table className="resizable-table text-xs" style={{ tableLayout: 'fixed', width: '100%', minWidth: Object.values(colWidths).reduce((a, b) => a + b, 0) + 100 }}>
-                  <colgroup>
-                    {Columns.map(col => (
-                      <col key={col.key} style={{ width: colWidths[col.key] || 100 }} />
-                    ))}
-                    <col style={{ width: 80 }} />
-                  </colgroup>
+              <div className="w-full hidden lg:block">
+                <table className="resizable-table text-[10.5px]" style={{ width: '100%' }}>
                   <thead className="bg-slate-800 text-slate-100 border-b border-slate-200">
                     <tr>
                       {Columns.map(col => (
                         <th
                           key={col.key}
-                          className="resizable-th p-0 text-left select-none"
-                          style={{ width: colWidths[col.key] || 100 }}
+                          className="px-2 py-1.5 text-left select-none resizable-th"
                         >
                           <div
-                            className="flex items-center justify-between cursor-pointer group hover:bg-slate-700 transition-colors px-2 py-2 h-full"
+                            className="flex items-center justify-between cursor-pointer group hover:bg-slate-700 transition-colors"
                             onClick={() => handleSort(col.key)}
                           >
-                            <span className="text-[10px] font-semibold truncate">{col.label}</span>
+                            <span className="text-[10.5px] font-semibold truncate">{col.label}</span>
                             <span className="ml-1 shrink-0">{renderSortIcon(col.key)}</span>
                           </div>
-                          {/* Resize handle */}
-                          <div
-                            className="col-resize-handle"
-                            onMouseDown={(e) => startColResize(e, col.key)}
-                            title="Drag to resize column"
-                          />
                         </th>
                       ))}
-                      <th className="resizable-th p-2 text-left text-[10px] font-semibold">Actions</th>
+                      <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
@@ -492,35 +479,35 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                             const isEditing = isEditingCell(trip.id, cellKey);
 
                             return (
-                              <td key={cellKey} className={`p-2 whitespace-nowrap ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== '—' ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 text-[10px] font-mono tracking-wider uppercase' : ''}`}
+                              <td key={cellKey} className={`px-2 py-1.5 ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== '—' ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 font-mono tracking-wider uppercase' : ''}`}
                                 title={cellKey === 'pickup' || cellKey === 'dropoff' ? displayValue : undefined}
                               >
                                 {isEditing ? (
                                   renderCellEditor(trip, col)
                                 ) : canEdit && cellKey !== 'signature' ? (
                                   <span
-                                    className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
+                                    className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block"
                                     onClick={() => startCellEdit(trip.id, cellKey, (trip[FIELD_FOR_COL[cellKey]] ?? ''))}
                                   >
                                     {displayValue}
                                   </span>
                                 ) : cellKey === 'signature' && canEdit ? (
                                   <span
-                                    className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
+                                    className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block"
                                     onClick={() => saveCell(trip, 'paperSignatureConfirmed', !trip.paperSignatureConfirmed)}
                                   >
                                     {displayValue}
                                   </span>
                                 ) : (
-                                  <span className="block leading-5">{displayValue}</span>
+                                  <span className="block">{displayValue}</span>
                                 )}
                               </td>
                             );
                           })}
-                          <td className="p-2 whitespace-nowrap">
+                          <td className="px-2 py-1.5">
                             {restoreTrip && (
                               <button onClick={() => restoreTrip(trip.id)}
-                                className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-bold hover:bg-slate-200 transition-colors">
+                                className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-[10.5px] font-bold hover:bg-slate-200 transition-colors">
                                 <RefreshCcw size={12} /> Restore
                               </button>
                             )}

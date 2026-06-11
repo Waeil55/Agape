@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
-import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate } from '../utils/tripDate';
+import { compareTripsBySchedule, tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate } from '../utils/tripDate';
 import { auth, db, doc, onSnapshot, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles } from '../config/maps';
@@ -35,18 +35,57 @@ const LazyFallback = () => <div className="flex items-center justify-center p-12
 
 const isInOutTrip = (trip) => {
   if (!trip) return false;
+  if (trip.isInOut === true || trip.timingType === 'in_out' || trip.timingType === 'scheduled_in_out') return true;
   const notes = String(trip.notes || '').toUpperCase();
   const general = String(trip.details?.generalComments || '').toUpperCase();
-  const combined = (notes + ' ' + general).replace(/\s+/g, ' ');
+  const pickupComments = String(trip.pickupComments || '').toUpperCase();
+  const dropoffComments = String(trip.dropoffComments || '').toUpperCase();
+  const time = String(trip.time || '').toUpperCase();
+  const combined = (notes + ' ' + general + ' ' + pickupComments + ' ' + dropoffComments + ' ' + time).replace(/\s+/g, ' ');
   return combined.includes('IN/OUT') || combined.includes('IN OUT') || combined.includes('IN & OUT') || combined.includes('IN / OUT');
 };
 
 const isWillCall = (trip) => {
   if (isInOutTrip(trip)) return false;
+  if (trip?.isWillCallTrip === true || trip?.timingType === 'will_call' || trip?.willCall === true) return true;
   const t = (trip && typeof trip === 'object') ? trip.time : trip;
   if (t === undefined || t === null) return true;
   const s = String(t).toUpperCase().trim();
   return s === '' || s === 'WILL CALL' || s === 'WC';
+};
+
+const getTripIdNumberParts = (trip) => {
+  const values = [trip?.bookingId, trip?.id, trip?.tripId, trip?.tripNumber].filter(Boolean);
+  return values.flatMap((value) => {
+    const groups = String(value).match(/\d+/g);
+    if (!groups?.length) return [];
+    const last = groups[groups.length - 1];
+    const parts = [{ value: Number.parseInt(last, 10), basis: 'full', width: last.length }];
+    [4, 3, 2].forEach((width) => {
+      if (last.length > width) parts.push({ value: Number.parseInt(last.slice(-width), 10), basis: `last${width}`, width });
+    });
+    return parts.filter((part) => Number.isFinite(part.value));
+  });
+};
+
+const getSequencePairScore = (aLeg, bLeg) => {
+  let best = 0;
+  getTripIdNumberParts(aLeg).forEach((aPart) => {
+    getTripIdNumberParts(bLeg).forEach((bPart) => {
+      const gap = bPart.value - aPart.value;
+      if (gap <= 0 || gap > 12) return;
+      let score = 0;
+      if (aPart.basis === 'full' && bPart.basis === 'full') score = gap === 1 ? 30 : Math.max(0, 10 - gap);
+      else if (aPart.basis === bPart.basis) {
+        const base = aPart.width === 4 ? 24 : aPart.width === 3 ? 22 : 18;
+        score = gap === 1 ? base : Math.max(0, base - 12 - gap);
+      } else if (gap === 1) {
+        score = 12;
+      }
+      best = Math.max(best, score);
+    });
+  });
+  return best;
 };
 
 const to12hr = (time) => {
@@ -832,7 +871,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       const aToday = a.date === today ? 0 : 1;
       const bToday = b.date === today ? 0 : 1;
       if (aToday !== bToday) return aToday - bToday;
-      return timeToMinutes(a.time) - timeToMinutes(b.time);
+      return compareTripsBySchedule(a, b);
     });
 
   const reroutedTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'rerouted');
@@ -888,26 +927,31 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     // 5. Otherwise fall back to urgency and then time.
     const urgencyDiff = getUrgency(b) - getUrgency(a);
     if (urgencyDiff !== 0) return urgencyDiff;
-    return timeToMinutes(a.time) - timeToMinutes(b.time);
+    return compareTripsBySchedule(a, b);
   }).reduce((acc, trip) => {
     // Smart pairing: B leg (no time, IN/OUT) → match to its A leg by sequential booking ID + reversed addresses
-    if (!isWillCall(trip) && isInOutTrip(trip) && !trip.time) {
+    if (!isWillCall(trip) && isInOutTrip(trip) && (!trip.time || trip.timingType === 'in_out' || trip.legRelationship === 'in_out_return')) {
       const patientKey = (trip.patient || '').trim().toLowerCase();
       const tripPickup = (trip.pickup || '').trim().toLowerCase();
-      const tripBookingNum = parseInt(trip.bookingId, 10);
       let bestIdx = -1;
       let bestScore = 0;
       for (let i = acc.length - 1; i >= 0; i--) {
         const t = acc[i];
-        if ((t.patient || '').trim().toLowerCase() !== patientKey) continue;
-        if (!t.time || isInOutTrip(t)) continue;
-        let score = 0;
-        // Signal 1: Sequential booking ID (strongest) — B leg ID must be exactly A leg ID + 1
-        const tBookingNum = parseInt(t.bookingId, 10);
-        if (!isNaN(tripBookingNum) && !isNaN(tBookingNum) && (tripBookingNum - tBookingNum) === 1) {
-          score += 10;
+        if (trip.pairedAfterTripId && t.id === trip.pairedAfterTripId) {
+          bestIdx = i;
+          bestScore = 100;
+          break;
         }
-        // Signal 2: Reversed addresses (confirms pair)
+        if (trip.pairedAfterBookingId && t.bookingId === trip.pairedAfterBookingId) {
+          bestIdx = i;
+          bestScore = 100;
+          break;
+        }
+        if ((t.patient || '').trim().toLowerCase() !== patientKey) continue;
+        if (!t.time || t.timingType === 'in_out' || t.legRelationship === 'in_out_return') continue;
+        let score = 0;
+        score += getSequencePairScore(t, trip);
+        // Reversed addresses confirm the pair when IDs are incomplete.
         if ((t.dropoff || '').trim().toLowerCase() === tripPickup) {
           score += 5;
         }
@@ -2747,7 +2791,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 let legLabel = todayLegsCount > 1 ? `${todayLegsCount} LEGS` : '1 LEG';
                 let isPairedInOut = false;
                 let pairType = null;
-                if (isInOutTrip(trip) && !trip.time) {
+                if (isInOutTrip(trip) && (!trip.time || trip.timingType === 'in_out' || trip.legRelationship === 'in_out_return')) {
                   isPairedInOut = true;
                   pairType = 'b-leg';
                 } else if (isInOutTrip(trip)) {

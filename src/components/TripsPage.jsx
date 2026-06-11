@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { tripMatchesCalendarDay, timeToMinutes } from '../utils/tripDate';
+import { compareTripsBySchedule, getTripTimeLabel, isInOutTrip, isWillCallTrip, timeToMinutes, tripMatchesCalendarDay, UNSCHEDULED_SORT_MINUTES } from '../utils/tripDate';
 import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, MessageSquare, Flag, Sparkles, Check, Archive } from 'lucide-react';
 import { suggestBatchAssignment } from '../config/ai';
 import { makeCall, sendSMS } from '../utils/nativeActions';
@@ -8,6 +8,7 @@ import { isNativeShell } from '../utils/platform';
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show'];
 
 const getManifestUrgency = (trip) => {
+  if (isWillCallTrip(trip) || (isInOutTrip(trip) && timeToMinutes(trip?.time) === UNSCHEDULED_SORT_MINUTES)) return 'normal';
   const timeValue = timeToMinutes(trip?.time);
   const now = new Date();
   const scheduled = new Date();
@@ -129,12 +130,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
     })
     .sort((a, b) => {
       if (sortBy === 'time') {
-        const timeA = timeToMinutes(a.time);
-        const timeB = timeToMinutes(b.time);
-        
-        if (timeA !== timeB) return timeA - timeB;
-        // If times are same, sort by patient
-        return (a.patient || '').localeCompare(b.patient || '');
+        return compareTripsBySchedule(a, b);
       }
       if (sortBy === 'patient') return (a.patient || '').localeCompare(b.patient || '');
       if (sortBy === 'zip') {
@@ -192,7 +188,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
     return [...sections.values()]
       .map((section) => ({
         ...section,
-        trips: section.trips.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)),
+        trips: section.trips.sort(compareTripsBySchedule),
       }))
       .sort((a, b) => {
         if (a.order !== b.order) return a.order - b.order;
@@ -248,8 +244,10 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
           <div className="min-w-0 flex-1">
             {/* Header Row: Time, Status, Badges */}
             <div className="mb-2 flex items-center gap-2 flex-wrap">
-              <span className={`text-lg font-black leading-none ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-slate-700'}`}>{trip.time}</span>
+              <span className={`text-lg font-black leading-none ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-slate-700'}`}>{getTripTimeLabel(trip)}</span>
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${getManifestStatusClass(trip.status)}`}>{trip.status}</span>
+              {trip.legRelationship === 'in_out_return' && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">IN/OUT Return</span>}
+              {trip.hasInOutReturn && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Driver Waits</span>}
               {trip.type && <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{trip.type}</span>}
               {trip.bookingId && <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{trip.bookingId}</span>}
             </div>

@@ -295,9 +295,9 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Username</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Role</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Username</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Role</th>
+                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -306,17 +306,17 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                   const RoleIcon = user.role === 'admin' ? ShieldCheck : user.role === 'dispatcher' ? Briefcase : Truck;
                   return (
                     <tr key={user.uid} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900 truncate max-w-[150px] sm:max-w-none">
+                      <td className="px-2 py-1.5 text-[10.5px] font-semibold text-slate-900 truncate max-w-[150px] sm:max-w-none">
                         <div>{user.username || authEmailToUsername(user.email)}</div>
-                        <div className="text-[11px] font-medium text-slate-400 mt-0.5">{user.email}</div>
+                        <div className="text-[10.5px] font-medium text-slate-400 mt-0.5">{user.email}</div>
                       </td>
-                      <td className="px-3 sm:px-6 py-2 sm:py-4">
-                        <span className={`flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-xs font-bold w-fit ${roleStyle}`}>
+                      <td className="px-2 py-1.5">
+                        <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold w-fit ${roleStyle}`}>
                           <RoleIcon size={10} /> {String(user?.role || '').charAt(0).toUpperCase() + String(user?.role || '').slice(1)}
                         </span>
-                        {user.phone && <p className="text-xs text-slate-500 font-mono mt-1">{user.phone}</p>}
+                        {user.phone && <p className="text-[10.5px] text-slate-500 font-mono mt-1">{user.phone}</p>}
                       </td>
-                      <td className="px-3 sm:px-6 py-2 sm:py-4">
+                      <td className="px-2 py-1.5">
                         <div className="flex items-center gap-1">
                           {user.role === 'dispatcher' && role === 'admin' && (() => {
                             const disp = dispatchers.find(d => d.email === user.email);
@@ -325,23 +325,23 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                               return (
                                 <div className="flex items-center gap-1">
                                   <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
-                                    className="w-24 px-1.5 py-0.5 border border-blue-300 rounded text-xs font-semibold outline-none focus:border-blue-500"
+                                    className="w-24 px-1.5 py-0.5 border border-blue-300 rounded text-[10.5px] font-semibold outline-none focus:border-blue-500"
                                     onKeyDown={(e) => { if (e.key === 'Enter') saveDispatcherName(); if (e.key === 'Escape') setEditingDispatcher(null); }}
                                     autoFocus />
-                                   <button onClick={saveDispatcherName} className="p-2 min-h-[36px] min-w-[36px] text-emerald-600 hover:bg-emerald-50 rounded transition" title="Save"><Check size={14} /></button>
-                                   <button onClick={() => setEditingDispatcher(null)} className="p-2 min-h-[36px] min-w-[36px] text-slate-400 hover:text-slate-600 rounded transition" title="Cancel"><X size={14} /></button>
+                                   <button onClick={saveDispatcherName} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition" title="Save"><Check size={12} /></button>
+                                   <button onClick={() => setEditingDispatcher(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition" title="Cancel"><X size={12} /></button>
                                 </div>
                               );
                             }
                             return (
-                              <button onClick={() => startRenameDispatcher(disp)} className="p-2 min-h-[36px] text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Rename dispatcher" aria-label="Rename dispatcher">
-                                <Edit2 size={14} />
+                              <button onClick={() => startRenameDispatcher(disp)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Rename dispatcher" aria-label="Rename dispatcher">
+                                <Edit2 size={12} />
                               </button>
                             );
                           })()}
                           {role === 'admin' && user.email !== currentUser && (
-                            <button onClick={() => requestAuthAction ? requestAuthAction('Delete User', () => deleteUserAccount(user)) : deleteUserAccount(user)} className="p-2 min-h-[36px] text-red-600 hover:bg-red-50 rounded-lg transition" title="Remove user" aria-label="Remove user">
-                              <Trash2 size={14} />
+                            <button onClick={() => requestAuthAction ? requestAuthAction('Delete User', () => deleteUserAccount(user)) : deleteUserAccount(user)} className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition" title="Remove user" aria-label="Remove user">
+                              <Trash2 size={12} />
                             </button>
                           )}
                         </div>
@@ -365,46 +365,46 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Driver</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Assigned To</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Remove</th>
+                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Driver</th>
+                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Assigned To</th>
+                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Actions</th>
+                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Remove</th>
               </tr>
             </thead>
             <tbody>
               {drivers.length === 0 ? (
-                <tr><td colSpan="4" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">No drivers yet.</td></tr>
+                <tr><td colSpan="4" className="px-2 py-1.5 text-center text-slate-500 text-[10.5px]">No drivers yet.</td></tr>
               ) : (
                 drivers.map(d => {
                   const dispatcher = dispatchers.find(ds => ds.id === (d.assignedDispatcher || d.assignedTo));
                   return (
                     <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900">{d.name}</td>
-                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm">
+                      <td className="px-2 py-1.5 text-[10.5px] font-semibold text-slate-900">{d.name}</td>
+                      <td className="px-2 py-1.5 text-[10.5px]">
                         {showAssign === d.id ? (
                           <div className="flex gap-2">
                             <select
                               value={d.assignedDispatcher || d.assignedTo || ''}
                               onChange={(e) => assignDriver(d.id, e.target.value)}
-                              className="px-2 sm:px-3 py-1 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:border-blue-500 max-w-[120px] sm:max-w-none"
+                              className="px-2 py-1 border border-slate-300 rounded-lg text-[10.5px] focus:outline-none focus:border-blue-500 max-w-[120px] sm:max-w-none"
                             >
                               <option value="">Unassigned</option>
                               {dispatchers.map(ds => (
                                 <option key={ds.id} value={ds.id}>{ds.name}</option>
                               ))}
                             </select>
-                            <button onClick={() => setShowAssign(null)} className="min-h-[44px] min-w-[44px] p-2 text-slate-500 hover:text-slate-700 flex items-center justify-center" aria-label="Close"><X size={14} /></button>
+                            <button onClick={() => setShowAssign(null)} className="p-1 text-slate-500 hover:text-slate-700 flex items-center justify-center" aria-label="Close"><X size={12} /></button>
                           </div>
                         ) : (
                           <span className="text-slate-600">{dispatcher?.name || <span className="text-slate-400 italic">Unassigned</span>}</span>
                         )}
                       </td>
-                      <td className="px-3 sm:px-6 py-2 sm:py-4">
-                        <button onClick={() => setShowAssign(showAssign === d.id ? null : d.id)} className="px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs sm:text-xs font-bold hover:bg-blue-200">
+                      <td className="px-2 py-1.5">
+                        <button onClick={() => setShowAssign(showAssign === d.id ? null : d.id)} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md text-[10.5px] font-bold hover:bg-blue-200">
                           {showAssign === d.id ? 'Cancel' : 'Assign'}
                         </button>
                       </td>
-                      <td className="px-3 sm:px-6 py-2 sm:py-4">
+                      <td className="px-2 py-1.5">
                         <button onClick={() => {
                           const user = users.find(u => u.email === d.email);
                           if (user) {
@@ -415,8 +415,8 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                             // If no user found, just remove from drivers list
                             setDrivers(prev => prev.filter(drv => drv.id !== d.id));
                           }
-                        }} className="p-2 min-h-[36px] text-rose-600 hover:bg-rose-50 rounded-lg transition" aria-label="Delete driver">
-                          <Trash2 size={14} />
+                        }} className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition" aria-label="Delete driver">
+                          <Trash2 size={12} />
                         </button>
                       </td>
                     </tr>
@@ -449,21 +449,21 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
           <table className="w-full relative">
             <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
               <tr>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm font-semibold text-slate-600">Time</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm font-semibold text-slate-600">Action</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm font-semibold text-slate-600">Details</th>
+                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Time</th>
+                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Action</th>
+                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {(() => {
-                if (visibleLogs.length === 0) return <tr><td colSpan="3" className="px-3 sm:px-6 py-8 text-center text-slate-500 text-sm">No activity recorded yet.</td></tr>;
+                if (visibleLogs.length === 0) return <tr><td colSpan="3" className="px-2 py-1.5 text-center text-slate-500 text-[10.5px]">No activity recorded yet.</td></tr>;
                 return visibleLogs.map((log, i) => (
                   <tr key={i} onClick={() => setSelectedLog(log)} className="hover:bg-slate-50 cursor-pointer transition-colors">
-                    <td className="px-3 sm:px-6 py-2 sm:py-3 text-xs text-slate-500 whitespace-nowrap">
+                    <td className="px-2 py-1.5 text-[10.5px] text-slate-500 whitespace-nowrap">
                       {log.time ? new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : log.timestamp}
                     </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold 
+                    <td className="px-2 py-1.5">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-bold 
                         ${log.c === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
                           log.c === 'rose' ? 'bg-rose-100 text-rose-700' :
                           log.c === 'amber' ? 'bg-amber-100 text-amber-700' :
@@ -471,12 +471,12 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         {log.t}
                       </span>
                       {log.actorRole && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-slate-100 text-slate-600">
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-bold uppercase bg-slate-100 text-slate-600">
                           {log.actorRole}
                         </span>
                       )}
                     </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-3 text-sm text-slate-700 max-w-xs truncate">{log.meta?.summary || log.d}</td>
+                    <td className="px-2 py-1.5 text-[10.5px] text-slate-700 max-w-xs truncate">{log.meta?.summary || log.d}</td>
                   </tr>
                 ));
               })()}

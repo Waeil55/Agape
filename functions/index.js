@@ -15,6 +15,97 @@ function normalizePhone(raw) {
   return "+" + digits;
 }
 
+function phoneConversationId(rawPhone) {
+  const normalized = normalizePhone(rawPhone || "");
+  const digits = String(normalized || "").replace(/\D/g, "");
+  return digits ? `sms_${digits}` : "";
+}
+
+function extractTelnyxPhone(val) {
+  if (!val) return "";
+  if (typeof val === "string") return val;
+  if (Array.isArray(val)) return val[0]?.phone_number || val[0] || "";
+  return val.phone_number || val.phone || "";
+}
+
+async function mirrorDeliveryStatusToChat(messageId, status) {
+  if (!messageId || !status) return;
+  try {
+    const snapshot = await admin.firestore()
+      .collectionGroup("messages")
+      .where("telnyxMessageId", "==", messageId)
+      .limit(10)
+      .get();
+    if (snapshot.empty) return;
+    const batch = admin.firestore().batch();
+    snapshot.docs.forEach((messageDoc) => {
+      batch.update(messageDoc.ref, {
+        status,
+        telnyxStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    await batch.commit();
+  } catch (err) {
+    functions.logger.warn("Unable to mirror Telnyx delivery status to chat:", {
+      messageId,
+      status,
+      error: err.message,
+    });
+  }
+}
+
+async function writeInboundSmsToChat({ from, to, text, messageId, payload }) {
+  const normalizedFrom = normalizePhone(from);
+  const normalizedTo = normalizePhone(to);
+  const conversationId = phoneConversationId(normalizedFrom);
+  if (!conversationId) return;
+
+  const conversationRef = admin.firestore().collection("chat_conversations").doc(conversationId);
+  const conversationSnap = await conversationRef.get();
+  const existing = conversationSnap.exists ? conversationSnap.data() || {} : {};
+  const participants = Array.isArray(existing.participants) ? existing.participants : [];
+  const assignedStaff = new Set([
+    ...participants,
+    ...(Array.isArray(existing.assignedStaff) ? existing.assignedStaff : []),
+    ...(existing.assignedTo ? [existing.assignedTo] : []),
+  ].filter(Boolean));
+  const unreadUpdates = {};
+  assignedStaff.forEach((uid) => {
+    unreadUpdates[`unread.${uid}`] = admin.firestore.FieldValue.increment(1);
+  });
+
+  await conversationRef.set({
+    id: conversationId,
+    type: "sms",
+    clientPhone: normalizedFrom,
+    clientName: existing.clientName || normalizedFrom,
+    participants,
+    participantNames: existing.participantNames || {},
+    participantRoles: existing.participantRoles || {},
+    assignedTo: existing.assignedTo || "",
+    assignedStaff: Array.from(assignedStaff),
+    lastMessage: text,
+    lastMessageTime: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: existing.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    ...unreadUpdates,
+  }, { merge: true });
+
+  await conversationRef.collection("messages").add({
+    senderId: "client",
+    senderName: existing.clientName || normalizedFrom,
+    senderRole: "client",
+    text,
+    ts: admin.firestore.FieldValue.serverTimestamp(),
+    status: "received",
+    isClient: true,
+    from: normalizedFrom,
+    to: normalizedTo,
+    telnyxMessageId: messageId || "",
+    raw: payload || null,
+  });
+}
+
 async function requireRole(context, allowedRoles) {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "You must be logged in.");
@@ -53,7 +144,7 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
 
 exports.sendSms = functions.https.onCall(async (data, context) => {
   await requireAdminOrDispatcher(context);
-  const { to: rawTo, text, tripId } = data;
+  const { to: rawTo, text, tripId, conversationId } = data;
   const to = normalizePhone(rawTo);
   if (!to || !text) {
     throw new functions.https.HttpsError("invalid-argument", "Both 'to' and 'text' are required.");
@@ -79,19 +170,19 @@ exports.sendSms = functions.https.onCall(async (data, context) => {
     const messageId = telnyxData.id;
     const status = telnyxData.to?.[0]?.status || "queued";
     functions.logger.info("Telnyx send response:", { messageId, status, to, from: fromNumber });
-    if (tripId) {
-      await admin.firestore().collection("smsLogs").add({
-        tripId,
-        direction: "outbound",
-        to,
-        from: fromNumber,
-        text,
-        status,
-        messageId,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-    return { success: true, messageId, status };
+    await admin.firestore().collection("smsLogs").add({
+      tripId: tripId || "",
+      conversationId: conversationId || phoneConversationId(to),
+      direction: "outbound",
+      to,
+      from: fromNumber,
+      text,
+      status,
+      messageId,
+      senderUid: context.auth.uid,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { success: true, messageId, status, from: fromNumber, to };
   } catch (err) {
     const errDetail = err.response?.data?.errors?.[0]?.detail || err.message;
     const errCode = err.response?.data?.errors?.[0]?.code || "";
@@ -237,8 +328,7 @@ exports.handleInboundSms = functions.https.onRequest(async (req, res) => {
     if (eventType === "message.finalized" || eventType === "message.sent") {
       const messageId = payload?.id || "";
       const status = payload?.to?.[0]?.status || payload?.status || "";
-      const toNumber = typeof payload?.to === "string" ? payload.to :
-                       payload?.to?.[0]?.phone_number || payload?.to?.phone_number || "";
+      const toNumber = extractTelnyxPhone(payload?.to);
       functions.logger.info("Delivery receipt:", { messageId, status, to: toNumber });
       if (messageId && status) {
         const smsSnapshot = await admin.firestore()
@@ -251,6 +341,7 @@ exports.handleInboundSms = functions.https.onRequest(async (req, res) => {
           functions.logger.info("Updated smsLog status:", { messageId, status });
         }
       }
+      await mirrorDeliveryStatusToChat(messageId, status);
       res.status(200).json({ ok: true });
       return;
     }
@@ -262,14 +353,8 @@ exports.handleInboundSms = functions.https.onRequest(async (req, res) => {
     }
 
     // Extract fields — handle both string and object formats
-    const extractPhone = (val) => {
-      if (!val) return "";
-      if (typeof val === "string") return val;
-      if (Array.isArray(val)) return val[0]?.phone_number || val[0] || "";
-      return val.phone_number || val.phone || "";
-    };
-    const from = extractPhone(payload.from);
-    const to = extractPhone(payload.to);
+    const from = extractTelnyxPhone(payload.from);
+    const to = extractTelnyxPhone(payload.to);
     const text = payload.text || payload.body || "";
     const messageId = payload.id || payload.message_id || "";
 
@@ -281,20 +366,21 @@ exports.handleInboundSms = functions.https.onRequest(async (req, res) => {
 
     await admin.firestore().collection("smsLogs").add({
       direction: "inbound",
-      from,
-      to,
+      from: normalizePhone(from),
+      to: normalizePhone(to),
       text,
       messageId,
       raw: JSON.stringify(payload),
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
+    await writeInboundSmsToChat({ from, to, text, messageId, payload });
     functions.logger.info("Inbound SMS logged:", { from, to, messageId });
 
     const confirmation = parseConfirmation(text);
     if (confirmation && from) {
       const smsSnapshot = await admin.firestore()
         .collection("smsLogs")
-        .where("to", "==", from)
+        .where("to", "==", normalizePhone(from))
         .where("direction", "==", "outbound")
         .orderBy("timestamp", "desc")
         .limit(1)
