@@ -2228,7 +2228,7 @@ const OperationsCommandCenter = ({
     <div className="flex-1 overflow-y-auto p-3">
       {willCallTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <div className="card-premiump-8 text-center max-w-xs shadow-sm">
+          <div className="card-premium p-8 text-center max-w-xs shadow-sm">
             <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
               <Phone size={28} />
             </div>

@@ -169,6 +169,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
   const [saveSuccessMode, setSaveSuccessMode] = useState(null);
   const [saveError, setSaveError] = useState('');
   const [saveNotice, setSaveNotice] = useState('');
+  const [navigationNotice, setNavigationNotice] = useState('');
   const saveSuccess = Boolean(saveSuccessMode);
   const [skippedIds, setSkippedIds] = useState(new Set());
   const [filterStatus, setFilterStatus] = useState(() => localStorage.getItem('agape_seqFilterStatus') || 'all');
@@ -890,6 +891,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
           {sequence.length > 0 && (
             <button
               onClick={() => {
+                setNavigationNotice('');
                 const validAddresses = [];
                 if (initialOrigin) validAddresses.push(initialOrigin);
                 sequence.forEach(stop => {
@@ -900,7 +902,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                   else if (typeof addr === 'string' && addr.trim() !== '') validAddresses.push(addr);
                 });
                 if (validAddresses.length < 2) {
-                  alert('Not enough valid addresses to navigate.');
+                  setNavigationNotice('Add at least two valid addresses before opening turn-by-turn navigation.');
                   return;
                 }
                 const origin = encodeURIComponent(validAddresses[0]);
@@ -909,6 +911,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
                 if (waypoints) url += `&waypoints=${waypoints}`;
                 window.open(url, '_blank');
+                setNavigationNotice('Navigation opened in a new tab with the current sequence.');
               }}
               className="min-h-9 flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-extrabold rounded-2xl shadow-lg shadow-indigo-200/50 transition-all flex-shrink-0 active:scale-[0.97]"
             >
@@ -943,6 +946,13 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
           )}
         </div>
       </div>
+
+      {navigationNotice && (
+        <div className="mx-3 mt-3 flex flex-shrink-0 items-start gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 lg:mx-5">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" />
+          <span>{navigationNotice}</span>
+        </div>
+      )}
 
       {/* ===== METRICS BAR ===== */}
       <div className="px-3 lg:px-5 py-2 flex items-center gap-3 overflow-x-auto hide-scrollbar flex-shrink-0 bg-gradient-to-br from-slate-900 to-slate-800">
@@ -1517,7 +1527,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
               )}
 
               {/* Sequence preview */}
-              <div className="card-premiump-3 max-h-32 overflow-y-auto">
+              <div className="card-premium p-3 max-h-32 overflow-y-auto">
                 <p className="text-micro font-bold text-slate-400 uppercase tracking-wider mb-2">Preview ({sequence.length} stops)</p>
                 {sequence.map((stop, i) => {
                   const client = allClients.find(c => c.id === stop.clientId);

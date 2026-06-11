@@ -1046,3 +1046,308 @@ table tbody tr:hover {
 .admin-bg-main .bg-slate-500\/15 { background-color: color-mix(in srgb, var(--text-tertiary) 15%, transparent); }
 
 .safe-bottom { padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)); }
+
+/* ===== ENTERPRISE UI STABILIZATION LAYER =====
+   Final-pass rules that make legacy and new screens share one calm operating-system feel. */
+:root {
+  --enterprise-radius: 8px;
+  --enterprise-radius-pill: 9999px;
+  --enterprise-border: #dbe3ee;
+  --enterprise-border-soft: #e8edf5;
+  --enterprise-surface: #ffffff;
+  --enterprise-surface-muted: #f8fafc;
+  --enterprise-surface-hover: #f1f5f9;
+  --enterprise-ink: #0f172a;
+  --enterprise-muted: #64748b;
+  --enterprise-blue: #2563eb;
+  --enterprise-blue-strong: #1d4ed8;
+  --enterprise-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  --enterprise-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+*,
+*::before,
+*::after {
+  min-width: 0;
+  letter-spacing: 0 !important;
+}
+
+html,
+body,
+#root {
+  background: #f3f6fb;
+  color: var(--enterprise-ink);
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+main,
+section,
+article,
+aside,
+header,
+footer {
+  min-width: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--enterprise-ink);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+p,
+label,
+span,
+td,
+th,
+button,
+input,
+select,
+textarea {
+  text-wrap: pretty;
+}
+
+.text-display,
+.big-time,
+.text-heading,
+.font-black {
+  letter-spacing: 0 !important;
+}
+
+.card,
+.card-premium,
+.enterprise-card,
+.modal-premium,
+.glass-card,
+.premium-card {
+  border: 1px solid var(--enterprise-border-soft) !important;
+  border-radius: var(--enterprise-radius) !important;
+  background: var(--enterprise-surface);
+  box-shadow: var(--enterprise-shadow) !important;
+}
+
+.card:hover,
+.card-premium:hover,
+.enterprise-card:hover,
+.premium-card:hover {
+  transform: none !important;
+  box-shadow: var(--enterprise-shadow) !important;
+}
+
+.card-active,
+[aria-selected="true"] {
+  border-color: rgba(37, 99, 235, 0.45) !important;
+  box-shadow: var(--enterprise-focus-ring) !important;
+}
+
+.rounded-xl,
+.rounded-2xl,
+.rounded-3xl {
+  border-radius: var(--enterprise-radius) !important;
+}
+
+.rounded-full {
+  border-radius: var(--enterprise-radius-pill) !important;
+}
+
+button,
+.btn,
+.btn-premium,
+[role="button"] {
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  line-height: 1.15;
+  text-decoration: none;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 80ms ease !important;
+}
+
+button:not(:disabled):hover,
+.btn:not(:disabled):hover,
+.btn-premium:not(:disabled):hover {
+  transform: none !important;
+}
+
+button:not(:disabled):active,
+.btn:not(:disabled):active,
+.btn-premium:not(:disabled):active {
+  transform: translateY(1px) !important;
+}
+
+button:focus-visible,
+.btn:focus-visible,
+.btn-premium:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: none !important;
+  box-shadow: var(--enterprise-focus-ring) !important;
+}
+
+button:disabled,
+.btn:disabled,
+.btn-premium:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.btn-primary,
+.btn-premium-brand,
+.btn-gradient-primary,
+.gradient-brand-premium {
+  background: var(--enterprise-blue) !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.22) !important;
+}
+
+.btn-primary:hover,
+.btn-premium-brand:hover,
+.btn-gradient-primary:hover {
+  background: var(--enterprise-blue-strong) !important;
+}
+
+input,
+select,
+textarea,
+.input,
+.input-premium {
+  border-color: var(--enterprise-border) !important;
+  border-radius: var(--enterprise-radius) !important;
+  background-color: #ffffff;
+  color: var(--enterprise-ink);
+  box-shadow: none !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.input:focus,
+.input-premium:focus {
+  border-color: var(--enterprise-blue) !important;
+  box-shadow: var(--enterprise-focus-ring) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
+}
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+table thead,
+table thead tr,
+table thead[class],
+table thead tr[class] {
+  background: var(--enterprise-surface-muted) !important;
+}
+
+table th {
+  color: #334155 !important;
+  font-size: 0.75rem !important;
+  font-weight: 800 !important;
+  line-height: 1.25;
+  text-transform: none !important;
+  border-bottom: 1px solid var(--enterprise-border-soft);
+}
+
+table td {
+  color: #334155;
+  line-height: 1.35;
+  border-bottom-color: var(--enterprise-border-soft) !important;
+}
+
+tbody tr:hover {
+  background: rgba(241, 245, 249, 0.72);
+}
+
+.badge,
+.status-badge,
+[class*="badge"] {
+  border-radius: var(--enterprise-radius-pill) !important;
+  font-weight: 800;
+  text-transform: none !important;
+  box-shadow: none !important;
+}
+
+.shadow-lg,
+.shadow-xl,
+.shadow-2xl,
+.shadow-premium {
+  box-shadow: var(--enterprise-shadow) !important;
+}
+
+.active\:scale-95:active,
+.hover\:-translate-y-0\.5:hover,
+.hover\:-translate-y-1:hover,
+.hover\:scale-105:hover {
+  transform: none !important;
+}
+
+.text-micro {
+  font-size: 0.72rem;
+  line-height: 1rem;
+  font-weight: 800;
+  color: var(--enterprise-muted);
+  text-transform: none;
+}
+
+.overflow-x-auto,
+.overflow-y-auto,
+.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+.bottom-nav,
+.mobile-tabbar,
+[data-bottom-nav="true"] {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+.page-shell,
+.enterprise-shell,
+.app-shell {
+  min-height: 100dvh;
+}
+
+@media (max-width: 640px) {
+  .card,
+  .card-premium,
+  .enterprise-card,
+  .premium-card {
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+  }
+
+  table th,
+  table td {
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

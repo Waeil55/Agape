@@ -81,7 +81,7 @@ Answer in 2-3 sentences maximum. Be specific and actionable.` }] }],
             ))}
             {loading && (
               <div className="flex justify-start">
-                <div className="card-premiumpx-2.5 py-1.5 flex items-center gap-2">
+                <div className="card-premium px-2.5 py-1.5 flex items-center gap-2">
                   <Loader2 size={12} className="animate-spin text-indigo-600" />
                   <span className="text-[10px] text-slate-500">Thinking...</span>
                 </div>

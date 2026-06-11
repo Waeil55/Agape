@@ -122,6 +122,7 @@ const SettingsPage = ({
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [pwMsg, setPwMsg] = useState('');
+  const [systemNotice, setSystemNotice] = useState('');
 
   const handlePasswordChange = async () => {
     setPwMsg('');
@@ -187,7 +188,7 @@ const SettingsPage = ({
               ].map((stat, i) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={i} className="card-premiump-4 shadow-sm">
+                  <div key={i} className="card-premium p-4 shadow-sm">
                     <div className={`w-9 h-9 rounded-xl ${stat.color} flex items-center justify-center mb-3`}>
                       <Icon size={16} className="text-white" />
                     </div>
@@ -370,18 +371,23 @@ const SettingsPage = ({
               <p className="text-body text-slate-500">Global system controls and data management.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="card-premiump-5 shadow-sm">
+              <div className="card-premium p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-base mb-1"><Database size={18} /> System Logs</div>
                 <p className="text-sm text-slate-500 mb-4">View all system logs and user activities from the dashboard audit panel.</p>
-                <button onClick={() => alert('View system logs from the Dashboard → Audit panel.')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition text-sm">View Logs</button>
+                <button type="button" onClick={() => setSystemNotice('System logs are available in the System Activity section.')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition text-sm">View Logs</button>
+                {systemNotice && (
+                  <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">
+                    {systemNotice}
+                  </div>
+                )}
               </div>
-              <div className="card-premiump-5 shadow-sm">
+              <div className="card-premium p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-base mb-1"><RefreshCw size={18} /> Data Sync Status</div>
                 <p className="text-sm text-slate-500 mb-4">Firestore real-time sync is active. Data is synchronized across all connected clients.</p>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Live</div>
               </div>
             </div>
-            <div className="card-premiump-5 shadow-sm border-rose-200 bg-rose-50">
+            <div className="card-premium p-5 shadow-sm border-rose-200 bg-rose-50">
               <h4 className="font-bold text-rose-900 mb-2 flex items-center gap-2 text-base"><AlertCircle size={20} /> Master Reset</h4>
               <p className="text-sm text-rose-700 mb-4">Warning: This will permanently delete all trips, drivers, and fleet data. This action cannot be undone.</p>
               <button onClick={() => { requestAuthAction?.('Master System Reset — This will permanently delete ALL trips, drivers, and fleet data. This action cannot be undone.', () => onResetSystem?.()); }} className="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition text-sm shadow-lg shadow-rose-600/20">
@@ -413,14 +419,14 @@ const SettingsPage = ({
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1.5">Dispatcher Phone</label>
                         <div className="flex gap-2">
-                          <input type="tel" value={phoneNumbers?.dispatcher || ''} onChange={(e) => onUpdatePhoneNumbers?.({ dispatcher: e.target.value })} className="flex-1 card-premiumpx-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777707" />
+                          <input type="tel" value={phoneNumbers?.dispatcher || ''} onChange={(e) => onUpdatePhoneNumbers?.({ dispatcher: e.target.value })} className="flex-1 card-premium px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777707" />
                           <button onClick={() => makeCall(phoneNumbers?.dispatcher || '', 'Dispatcher')} className="px-3 py-2.5 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition flex items-center" aria-label="Call dispatcher"><Phone size={16} /></button>
                         </div>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1.5">Routing Phone</label>
                         <div className="flex gap-2">
-                          <input type="tel" value={phoneNumbers?.routing || ''} onChange={(e) => onUpdatePhoneNumbers?.({ routing: e.target.value })} className="flex-1 card-premiumpx-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777708" />
+                          <input type="tel" value={phoneNumbers?.routing || ''} onChange={(e) => onUpdatePhoneNumbers?.({ routing: e.target.value })} className="flex-1 card-premium px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777708" />
                           <button onClick={() => makeCall(phoneNumbers?.routing || '', 'Routing')} className="px-3 py-2.5 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition flex items-center" aria-label="Call routing"><Phone size={16} /></button>
                         </div>
                       </div>
@@ -429,14 +435,14 @@ const SettingsPage = ({
                 )}
                 {role === 'driver' && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="card-premiump-4">
+                    <div className="card-premium p-4">
                       <p className="text-micro">Vehicle</p>
                       <p className="text-lg font-bold text-slate-900 mt-2">{driverProfile?.vehicle || 'Not Assigned'}</p>
                     </div>
-                    <div className="card-premiump-4">
+                    <div className="card-premium p-4">
                       <p className="text-micro">Current Odometer</p>
                       <div className="flex items-center gap-2 mt-2">
-                        <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) onUpdateAppSettings?.({ odometer: val }, true); }} className="w-full card-premiumpx-3 py-1.5 font-bold text-slate-900 focus:border-blue-500 outline-none text-base" />
+                        <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) onUpdateAppSettings?.({ odometer: val }, true); }} className="w-full card-premium px-3 py-1.5 font-bold text-slate-900 focus:border-blue-500 outline-none text-base" />
                         <span className="text-sm font-bold text-slate-400">mi</span>
                       </div>
                     </div>
@@ -465,7 +471,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.theme === option.value;
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ theme: option.value })} className={`card-premiump-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ theme: option.value })} className={`card-premium p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
@@ -492,7 +498,7 @@ const SettingsPage = ({
                     const active = appSettings?.fontScale === option.value;
                     const isDriverMode = option.value === 'driver';
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ fontScale: option.value })} className={`card-premiump-4 text-left transition-all ${active ? (isDriverMode ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'card-active bg-blue-50') : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ fontScale: option.value })} className={`card-premium p-4 text-left transition-all ${active ? (isDriverMode ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'card-active bg-blue-50') : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? (isDriverMode ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white') : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
@@ -505,13 +511,13 @@ const SettingsPage = ({
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-base"><Accessibility size={20} /> Readability Mode</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
-                  <button onClick={() => onUpdateAppSettings?.({ readability: 'normal' })} className={`card-premiump-4 text-left transition-all ${appSettings?.readability !== 'enhanced' ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                  <button onClick={() => onUpdateAppSettings?.({ readability: 'normal' })} className={`card-premium p-4 text-left transition-all ${appSettings?.readability !== 'enhanced' ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability !== 'enhanced' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><TextSelect size={20} /></div>
                     <div className="font-bold text-sm text-slate-900">Standard</div>
                     <p className="text-xs text-slate-500 mt-0.5">Normal contrast and font weights</p>
                     {appSettings?.readability !== 'enhanced' && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
                   </button>
-                  <button onClick={() => onUpdateAppSettings?.({ readability: 'enhanced' })} className={`card-premiump-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
+                  <button onClick={() => onUpdateAppSettings?.({ readability: 'enhanced' })} className={`card-premium p-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability === 'enhanced' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Eye size={20} /></div>
                     <div className="font-bold text-sm text-slate-900">Enhanced</div>
                     <p className="text-xs text-slate-500 mt-0.5">Bolder text, stronger contrast, better spacing</p>
@@ -536,7 +542,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.navigationApp === option.value;
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ navigationApp: option.value })} className={`card-premiump-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ navigationApp: option.value })} className={`card-premium p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
@@ -555,7 +561,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.routePlanNavApp === option.value;
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ routePlanNavApp: option.value })} className={`card-premiump-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ routePlanNavApp: option.value })} className={`card-premium p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}

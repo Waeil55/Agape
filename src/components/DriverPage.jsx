@@ -2473,7 +2473,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-slate-50 flex items-center justify-center z-10">
                         <span className="text-[9px] font-black text-slate-500">{index + 1}</span>
                       </div>
-                      <div className="card-premiumpx-3 py-2 flex items-center justify-between gap-3">
+                      <div className="card-premium px-3 py-2 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className={`w-1.5 h-4 rounded-full ${stopType === 'DO' ? 'bg-orange-400' : 'bg-blue-400'}`} />
@@ -2657,7 +2657,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-slate-50 flex items-center justify-center z-10">
                         <span className="text-[9px] font-black text-slate-500">{index + 1}</span>
                       </div>
-                      <div className="card-premiumpx-3 py-2 flex items-center justify-between">
+                      <div className="card-premium px-3 py-2 flex items-center justify-between">
                          <div className="flex items-center gap-2 min-w-0">
                            <div className={`w-1.5 h-4 rounded-full ${step.type === 'PU' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
                            <span className="text-sm font-bold text-slate-800 truncate">{trip.patient}</span>
