@@ -306,6 +306,7 @@ function canUseSms(user) {
 }
 
 function isSmsConversation(conversation = {}) {
+  if (!conversation) return false;
   return conversation.type === 'sms'
     || conversation.isClient === true
     || !!conversation.clientPhone
@@ -331,7 +332,9 @@ function isDriverRestrictedFromUser(currentUser, otherUser) {
 }
 
 function sortConversations(list) {
-  return [...list].sort((a, b) => millis(b.lastMessageTime || b.createdAt) - millis(a.lastMessageTime || a.createdAt));
+  return [...(list || [])]
+    .filter(Boolean)
+    .sort((a, b) => millis(b.lastMessageTime || b.createdAt) - millis(a.lastMessageTime || a.createdAt));
 }
 
 function sanitizeUser(input = {}) {
@@ -350,6 +353,7 @@ function makeId(prefix) {
 }
 
 function normalizeConversationDoc(id, data = {}) {
+  if (!id || !data) return null;
   const type = data.type === 'sms' || data.isClient === true || data.clientPhone || String(id || '').startsWith('sms_')
     ? 'sms'
     : 'internal';
@@ -453,7 +457,7 @@ function useAgapeChatData({ db, currentUser, demoUsers }) {
     const unsubscribeConversations = onSnapshot(convQuery, snapshot => {
       const next = snapshot.docs
         .map(item => normalizeConversationDoc(item.id, item.data()))
-        .filter(conv => !conv.archived && canAccessConversation(currentUser, conv));
+        .filter(conv => conv && !conv.archived && canAccessConversation(currentUser, conv));
       setConversations(sortConversations(next));
     }, error => {
       setLoadError(error.message || 'Unable to load conversations.');
