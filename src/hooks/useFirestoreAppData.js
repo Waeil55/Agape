@@ -368,7 +368,7 @@ export function useFirestoreAppData() {
         },
       },
     }));
-  }, [setListenerStatus]);
+  }, []);
 
   useEffect(() => {
     const unsub = onSnapshot(
