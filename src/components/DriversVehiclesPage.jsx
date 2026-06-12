@@ -164,6 +164,19 @@ const [form, setForm] = useState({
     setAssignDriver(null);
   };
 
+  const assignVehicleToDriver = useCallback((driverId, vehicleName) => {
+    const changedAt = new Date().toISOString();
+    setDrivers(prev => prev.map(driver => {
+      if (driver.id === driverId) {
+        return { ...driver, vehicle: vehicleName, updatedAtLocal: changedAt };
+      }
+      if (vehicleName && driver.vehicle === vehicleName) {
+        return { ...driver, vehicle: '', updatedAtLocal: changedAt };
+      }
+      return driver;
+    }));
+  }, [setDrivers]);
+
   const unassignedTrips = trips.filter(t => t.status === 'Unassigned');
   const tripBelongsToDriver = (trip, driver) => {
     if (!trip || !driver) return false;
@@ -315,21 +328,7 @@ const [form, setForm] = useState({
                         <td className="px-2 py-1.5 text-[10.5px] text-slate-600 hidden sm:table-cell">
                           <select value={d.vehicle || ''} onChange={(e) => {
                             const newV = e.target.value;
-                            // Unassign previous driver from this vehicle
-                            if (d.vehicle) {
-                              const prevDriver = drivers.find(x => x.vehicle === d.vehicle && x.id !== d.id);
-                              if (prevDriver) {
-                                setDrivers(prev => prev.map(x => x.id === prevDriver.id ? { ...x, vehicle: '' } : x));
-                              }
-                            }
-                            // If new vehicle is taken, unassign that driver
-                            if (newV) {
-                              const currentOccupant = drivers.find(x => x.vehicle === newV && x.id !== d.id);
-                              if (currentOccupant) {
-                                setDrivers(prev => prev.map(x => x.id === currentOccupant.id ? { ...x, vehicle: '' } : x));
-                              }
-                            }
-                            setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, vehicle: newV } : x));
+                            assignVehicleToDriver(d.id, newV);
                             addAuditLog('Vehicle Assigned', `${currentUser} assigned ${newV || 'no vehicle'} to ${d.name}.`, 'blue');
                           }} className="px-2 py-1 border border-slate-200 rounded-xl text-[10.5px] font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                             <option value="">- None -</option>
@@ -426,12 +425,7 @@ const [form, setForm] = useState({
                             const driverId = e.target.value;
                             const oldDriverId = assignedDriver?.id;
                             if (driverId === oldDriverId) return; // no change
-                            if (oldDriverId) {
-                              setDrivers(prev => prev.map(d => d.id === oldDriverId ? { ...d, vehicle: '' } : d));
-                            }
-                            if (driverId) {
-                              setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, vehicle: v.name } : d));
-                            }
+                            assignVehicleToDriver(driverId || oldDriverId, driverId ? v.name : '');
                             addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'blue');
                           }} className="px-2 py-1 border border-slate-200 rounded-xl text-[10.5px] font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                             <option value="">- Unassigned -</option>

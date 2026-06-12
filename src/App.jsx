@@ -218,6 +218,38 @@ function getBestDriverProfileForEmail(drivers = [], email = '', trips = []) {
   })[0];
 }
 
+function hasAssignedVehicle(vehicle) {
+  const normalized = String(vehicle || '').trim().toLowerCase();
+  return Boolean(normalized) && !['pending', 'pending assignment', 'assigned route', 'no vehicle'].includes(normalized);
+}
+
+function mergeDriverRecord(existing = {}, incoming = {}) {
+  const next = { ...existing, ...incoming };
+  if (hasAssignedVehicle(existing.vehicle) && !hasAssignedVehicle(incoming.vehicle)) {
+    next.vehicle = existing.vehicle;
+  }
+  return next;
+}
+
+function mergeDriverLists(...lists) {
+  const records = new Map();
+  const aliases = new Map();
+
+  lists.flat().filter(Boolean).forEach((driver) => {
+    const idKey = driver.id ? `id:${driver.id}` : '';
+    const emailKey = normalizeEmail(driver.email) ? `email:${normalizeEmail(driver.email)}` : '';
+    const existingKey = (idKey && aliases.get(idKey)) || (emailKey && aliases.get(emailKey)) || idKey || emailKey;
+    if (!existingKey) return;
+
+    const merged = mergeDriverRecord(records.get(existingKey) || {}, driver);
+    records.set(existingKey, merged);
+    if (idKey) aliases.set(idKey, existingKey);
+    if (emailKey) aliases.set(emailKey, existingKey);
+  });
+
+  return [...records.values()];
+}
+
 const FIRESTORE_BOOT_TIMEOUT_MS = 12000;
 const AUTH_WATCHDOG_TIMEOUT_MS = 18000;
 
@@ -951,8 +983,18 @@ const App = () => {
         try {
           const r = roleRef.current;
           if (r === 'admin' || r === 'dispatcher') {
-            const usersResult = await getDocs(collection(db, 'users'));
+            const [usersResult, driverProfilesResult] = await Promise.all([
+              getDocs(collection(db, 'users')),
+              getDocs(collection(db, 'driverProfiles')).catch(() => null),
+            ]);
             const allUsers = usersResult.docs.map(u => ({ id: u.id, ...u.data() }));
+            const appDataDrivers = dataSnap?.exists() && Array.isArray(dataSnap.data()?.drivers)
+              ? dataSnap.data().drivers
+              : [];
+            const profileDrivers = driverProfilesResult
+              ? driverProfilesResult.docs.map(profileDoc => ({ id: profileDoc.id, ...profileDoc.data() }))
+              : [];
+            const cloudDriverBase = mergeDriverLists(appDataDrivers, profileDrivers);
             
             // Sync new drivers from users collection — batch into single write
             const activeDriverUsers = allUsers.filter(u => u.role && u.role.toLowerCase() === 'driver');
@@ -963,7 +1005,8 @@ const App = () => {
                 .filter(Boolean)
             );
             setDrivers(prev => {
-              const normalizedPrev = prev.filter((driver) => {
+              const sourceDrivers = prev.length > 0 ? mergeDriverLists(cloudDriverBase, prev) : cloudDriverBase;
+              const normalizedPrev = sourceDrivers.filter((driver) => {
                 const email = normalizeEmail(driver.email);
                 if (!email) return true;
                 return !nonDriverEmails.has(email);
