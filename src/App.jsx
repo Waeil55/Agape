@@ -467,10 +467,10 @@ const App = () => {
   // ALL DATA COMES FROM FIRESTORE VIA onSnapshot — single source of truth
   const {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
-    loading: dataLoading, saving: dataSaving, error: dataError, lastSavedAt,
+    loading: dataLoading, saving: dataSaving, error: dataError, lastSavedAt, syncHealth,
     setTrips, setDrivers, upsertDriverProfile, setDispatchers, upsertDispatcherProfile, setVehicles,
     setTrashedTrips, setLogs, setPhoneNumbers,
-    addLog, initializeAppData,
+    addLog, initializeAppData, repairCloudMirrors, createCloudBackup,
   } = useFirestoreAppData();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -663,6 +663,16 @@ const App = () => {
   const handleUpdatePhoneNumbers = useCallback((updates) => {
     setPhoneNumbers(prev => ({ ...prev, ...updates }));
   }, [setPhoneNumbers]);
+
+  useEffect(() => {
+    if (!isAuthenticated || dataLoading || !createCloudBackup) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const key = `agape_dailyBackup_${today}`;
+    if (localStorage.getItem(key) === 'done') return;
+    createCloudBackup('automatic').then((result) => {
+      if (result?.ok) localStorage.setItem(key, 'done');
+    });
+  }, [isAuthenticated, dataLoading, createCloudBackup]);
 
   const requestAuthAction = (label, callback) => {
     setReAuthError('');
@@ -2519,6 +2529,9 @@ const App = () => {
               dispatchers={dispatchers}
               chatUnreadCount={chatUnreadCount}
               appSettings={appSettings}
+              syncHealth={syncHealth}
+              onRepairCloudMirrors={repairCloudMirrors}
+              onCreateCloudBackup={createCloudBackup}
               activeMission={myDriver?.activeMission}
               phoneNumbers={phoneNumbers}
               onOpenSettings={() => setActiveTab('settings')}
@@ -2582,6 +2595,9 @@ const App = () => {
               setTrashedTrips={setTrashedTrips}
               appSettings={appSettings}
               updateAppSettings={updateAppSettings}
+              syncHealth={syncHealth}
+              onRepairCloudMirrors={repairCloudMirrors}
+              onCreateCloudBackup={createCloudBackup}
               selectedTasks={selectedTasks}
               setSelectedTasks={setSelectedTasks}
               searchQuery={searchQuery}

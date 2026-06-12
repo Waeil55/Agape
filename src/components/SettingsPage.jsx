@@ -110,6 +110,9 @@ const SettingsPage = ({
   dispatchers = [],
   vehicles = [],
   logs = [],
+  syncHealth = {},
+  onRepairCloudMirrors,
+  onCreateCloudBackup,
 }) => {
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
   const [activeSection, setActiveSection] = useState(() => localStorage.getItem(`agape_settingsSection_${userKey}`) || 'overview');
@@ -123,6 +126,28 @@ const SettingsPage = ({
   const [confirmPw, setConfirmPw] = useState('');
   const [pwMsg, setPwMsg] = useState('');
   const [systemNotice, setSystemNotice] = useState('');
+  const [syncActionBusy, setSyncActionBusy] = useState('');
+
+  const formatSyncTime = (value) => {
+    if (!value) return 'Never';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString();
+  };
+
+  const runSyncAction = async (label, action) => {
+    if (!action) return;
+    setSystemNotice('');
+    setSyncActionBusy(label);
+    try {
+      const result = await action();
+      setSystemNotice(result?.message || `${label} completed.`);
+    } catch (err) {
+      setSystemNotice(err?.message || `${label} failed.`);
+    } finally {
+      setSyncActionBusy('');
+    }
+  };
 
   const handlePasswordChange = async () => {
     setPwMsg('');
@@ -383,8 +408,56 @@ const SettingsPage = ({
               </div>
               <div className="card-premium p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-base mb-1"><RefreshCw size={18} /> Data Sync Status</div>
-                <p className="text-sm text-slate-500 mb-4">Firestore real-time sync is active. Data is synchronized across all connected clients.</p>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Live</div>
+                <p className="text-sm text-slate-500 mb-4">Firestore real-time sync, mirror recovery, and cloud backup status.</p>
+                <div className="grid grid-cols-1 gap-2 text-xs">
+                  {[
+                    ['Cloud listeners', syncHealth?.error ? 'Attention' : 'Live'],
+                    ['Last cloud read', formatSyncTime(syncHealth?.lastLoadedAt)],
+                    ['Last confirmed save', formatSyncTime(syncHealth?.lastSavedAt)],
+                    ['Last recovery', formatSyncTime(syncHealth?.lastRecoveredAt)],
+                    ['Last backup', formatSyncTime(syncHealth?.lastBackupAt)],
+                    ['Last repair', formatSyncTime(syncHealth?.lastRepairAt)],
+                    ['Pending writes', String(syncHealth?.pendingWrites || 0)],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                      <span className="font-bold text-slate-500">{label}</span>
+                      <span className={`font-black ${value === 'Live' || value === '0' ? 'text-emerald-700' : value === 'Attention' ? 'text-rose-700' : 'text-slate-800'}`}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={!!syncActionBusy || !onCreateCloudBackup}
+                    onClick={() => runSyncAction('Cloud backup', () => onCreateCloudBackup?.('manual'))}
+                    className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black disabled:opacity-50"
+                  >
+                    {syncActionBusy === 'Cloud backup' ? 'Backing Up...' : 'Create Backup'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!syncActionBusy || !onRepairCloudMirrors}
+                    onClick={() => requestAuthAction?.('Repair cloud mirrors and rebuild app data from Firestore backups.', () => runSyncAction('Mirror repair', onRepairCloudMirrors))}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-black disabled:opacity-50"
+                  >
+                    {syncActionBusy === 'Mirror repair' ? 'Repairing...' : 'Repair Mirrors'}
+                  </button>
+                </div>
+                {Object.keys(syncHealth?.listenerStatus || {}).length > 0 && (
+                  <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Live listeners</p>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {Object.entries(syncHealth.listenerStatus).map(([name, info]) => (
+                        <div key={name} className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="font-bold text-slate-600">{name}</span>
+                          <span className={`font-black ${info?.status === 'live' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {info?.status || 'unknown'} · {formatSyncTime(info?.at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="card-premium p-5 shadow-sm border-rose-200 bg-rose-50">

@@ -21,6 +21,7 @@ const DISPATCHER_PROFILE_COLLECTION = 'dispatcherProfiles';
 const VEHICLE_COLLECTION = 'fleetVehicles';
 const LOG_COLLECTION = 'logs';
 const PHONE_NUMBERS_DOC = 'systemConfig/phoneNumbers';
+const BACKUP_COLLECTION = 'systemBackups';
 const MIRRORED_TRIP_FIELDS = new Set(['trips', 'trashedTrips']);
 
 const DEFAULT_DATA = {
@@ -337,6 +338,11 @@ export function useFirestoreAppData() {
     initialized: false,
     docExists: false,
     lastSavedAt: null,
+    lastLoadedAt: null,
+    lastRecoveredAt: null,
+    lastBackupAt: null,
+    lastRepairAt: null,
+    listenerStatus: {},
   });
 
   const dataRef = useRef(DEFAULT_DATA);
@@ -350,10 +356,25 @@ export function useFirestoreAppData() {
     phoneNumbers: false,
   });
 
+  const setListenerStatus = useCallback((name, status, err = null) => {
+    setState(prev => ({
+      ...prev,
+      listenerStatus: {
+        ...prev.listenerStatus,
+        [name]: {
+          status,
+          at: new Date().toISOString(),
+          error: err ? (err.message || String(err)) : null,
+        },
+      },
+    }));
+  }, [setListenerStatus]);
+
   useEffect(() => {
     const unsub = onSnapshot(
       doc(db, DATA_DOC),
       (snap) => {
+        setListenerStatus('appData', 'live');
         if (snap.exists()) {
           const currentData = normalizeData(dataRef.current);
           const d = normalizeData({
@@ -384,6 +405,7 @@ export function useFirestoreAppData() {
               error: null,
               initialized: true,
               docExists: true,
+              lastLoadedAt: new Date().toISOString(),
             }));
           };
 
@@ -409,6 +431,7 @@ export function useFirestoreAppData() {
                   updatedField: 'trips',
                   updatedAtLocal: new Date().toISOString(),
                 }, { merge: true });
+                setState(prev => ({ ...prev, lastRecoveredAt: new Date().toISOString() }));
               } catch (recoveryErr) {
                 console.error('Ledger recovery patch failed:', recoveryErr);
               }
@@ -441,6 +464,7 @@ export function useFirestoreAppData() {
         }
       },
       (err) => {
+        setListenerStatus('appData', 'error', err);
         setState(prev => ({ ...prev, error: err.message, loading: false }));
       }
     );
@@ -496,6 +520,7 @@ export function useFirestoreAppData() {
     const bindCollection = (field, collectionName) => onSnapshot(
       collection(db, collectionName),
       (snap) => {
+        setListenerStatus(collectionName, 'live');
         const currentList = dataRef.current[field] || [];
         if (snap.size === 0 && currentList.length > 0) return;
         const snapshotList = [];
@@ -516,6 +541,7 @@ export function useFirestoreAppData() {
       },
       (err) => {
         if (shouldIgnoreRealtimePermissionError(err)) return;
+        setListenerStatus(collectionName, 'error', err);
         console.error(`Realtime ${field} sync failed:`, err);
       }
     );
@@ -526,6 +552,7 @@ export function useFirestoreAppData() {
     const unsubLogs = onSnapshot(
       collection(db, LOG_COLLECTION),
       (snap) => {
+        setListenerStatus(LOG_COLLECTION, 'live');
         const currentList = dataRef.current.logs || [];
         if (snap.size === 0 && currentList.length > 0) return;
         const snapshotList = [];
@@ -546,12 +573,14 @@ export function useFirestoreAppData() {
       },
       (err) => {
         if (shouldIgnoreRealtimePermissionError(err)) return;
+        setListenerStatus(LOG_COLLECTION, 'error', err);
         console.error('Realtime logs sync failed:', err);
       }
     );
     const unsubPhones = onSnapshot(
       doc(db, PHONE_NUMBERS_DOC),
       (snap) => {
+        setListenerStatus('phoneNumbers', 'live');
         const currentNumbers = dataRef.current.phoneNumbers || DEFAULT_DATA.phoneNumbers;
         if (!snap.exists() && currentNumbers !== DEFAULT_DATA.phoneNumbers) return;
         const phoneNumbers = snap.exists()
@@ -570,12 +599,14 @@ export function useFirestoreAppData() {
       },
       (err) => {
         if (shouldIgnoreRealtimePermissionError(err)) return;
+        setListenerStatus('phoneNumbers', 'error', err);
         console.error('Realtime phone number sync failed:', err);
       }
     );
     const unsubTripProgress = onSnapshot(
       collection(db, DRIVER_TRIP_PROGRESS_COLLECTION),
       (snap) => {
+        setListenerStatus(DRIVER_TRIP_PROGRESS_COLLECTION, 'live');
         const progressByTrip = {};
         snap.forEach((progressDoc) => {
           progressByTrip[progressDoc.id] = {
@@ -600,12 +631,14 @@ export function useFirestoreAppData() {
       },
       (err) => {
         if (shouldIgnoreRealtimePermissionError(err)) return;
+        setListenerStatus(DRIVER_TRIP_PROGRESS_COLLECTION, 'error', err);
         console.error('Realtime driver workflow sync failed:', err);
       }
     );
     const unsubTripLedger = onSnapshot(
       collection(db, TRIP_LEDGER_COLLECTION),
       (snap) => {
+        setListenerStatus(TRIP_LEDGER_COLLECTION, 'live');
         const ledgerTrips = [];
         const ledgerArchived = [];
         snap.forEach((tripDoc) => {
@@ -648,11 +681,14 @@ export function useFirestoreAppData() {
             updatedAtLocal: new Date().toISOString(),
           }, { merge: true }).catch((err) => {
             console.error('Live ledger recovery patch failed:', err);
+          }).then(() => {
+            setState(prev => ({ ...prev, lastRecoveredAt: new Date().toISOString() }));
           });
         }
       },
       (err) => {
         if (shouldIgnoreRealtimePermissionError(err)) return;
+        setListenerStatus(TRIP_LEDGER_COLLECTION, 'error', err);
         console.error('Realtime trip ledger sync failed:', err);
       }
     );
@@ -666,7 +702,7 @@ export function useFirestoreAppData() {
       unsubTripProgress();
       unsubTripLedger();
     };
-  }, []);
+  }, [setListenerStatus]);
 
   const writeField = useCallback(async (field, value) => {
     const sanitized = sanitizeForFirestore(value);
@@ -860,6 +896,98 @@ export function useFirestoreAppData() {
     }
   }, []);
 
+  const repairCloudMirrors = useCallback(async () => {
+    setState(prev => ({ ...prev, saving: true, error: null }));
+    try {
+      const mirrorData = await buildDataFromMirrors();
+      const current = normalizeData(dataRef.current);
+      const merged = normalizeData({
+        ...current,
+        trips: mergeRecordsById(current.trips, mirrorData.trips, 'active'),
+        trashedTrips: mergeRecordsById(current.trashedTrips, mirrorData.trashedTrips, 'archived'),
+        drivers: mergeRecordsById(current.drivers, mirrorData.drivers, 'drivers'),
+        dispatchers: mergeRecordsById(current.dispatchers, mirrorData.dispatchers, 'dispatchers'),
+        vehicles: mergeRecordsById(current.vehicles, mirrorData.vehicles, 'vehicles'),
+        logs: sortNewestFirst(mergeRecordsById(current.logs, mirrorData.logs, 'logs')),
+        phoneNumbers: {
+          ...DEFAULT_DATA.phoneNumbers,
+          ...(mirrorData.phoneNumbers || {}),
+          ...(current.phoneNumbers || {}),
+        },
+      });
+
+      await setDoc(doc(db, DATA_DOC), {
+        ...sanitizeForFirestore(merged),
+        repairedAt: new Date().toISOString(),
+        updatedAt: serverTimestamp(),
+        updatedField: 'repair',
+        updatedAtLocal: new Date().toISOString(),
+      }, { merge: true });
+      await Promise.all([
+        mirrorTripsToLedger(merged.trips, merged.trashedTrips),
+        mirrorRecordsToCollection(DRIVER_PROFILE_COLLECTION, merged.drivers),
+        mirrorRecordsToCollection(DISPATCHER_PROFILE_COLLECTION, merged.dispatchers),
+        mirrorRecordsToCollection(VEHICLE_COLLECTION, merged.vehicles),
+        mirrorLogsToCollection(merged.logs),
+        setDoc(doc(db, PHONE_NUMBERS_DOC), sanitizeForFirestore(merged.phoneNumbers), { merge: true }),
+      ]);
+
+      dataRef.current = merged;
+      setState(prev => ({
+        ...prev,
+        ...merged,
+        saving: false,
+        error: null,
+        lastRepairAt: new Date().toISOString(),
+        lastSavedAt: new Date().toISOString(),
+      }));
+      return { ok: true, message: 'Cloud mirrors repaired successfully.' };
+    } catch (err) {
+      console.error('Cloud mirror repair failed:', err);
+      setState(prev => ({
+        ...prev,
+        saving: false,
+        error: err.message || 'Cloud mirror repair failed',
+      }));
+      return { ok: false, message: err.message || 'Cloud mirror repair failed.' };
+    }
+  }, []);
+
+  const createCloudBackup = useCallback(async (reason = 'manual') => {
+    const now = new Date();
+    const dayKey = now.toISOString().slice(0, 10);
+    const backupId = reason === 'automatic' ? `daily-${dayKey}` : `manual-${dayKey}-${now.getTime()}`;
+    const snapshot = sanitizeForFirestore({
+      ...normalizeData(dataRef.current),
+      backedUpAt: now.toISOString(),
+      reason,
+      counts: {
+        trips: dataRef.current.trips?.length || 0,
+        trashedTrips: dataRef.current.trashedTrips?.length || 0,
+        drivers: dataRef.current.drivers?.length || 0,
+        dispatchers: dataRef.current.dispatchers?.length || 0,
+        vehicles: dataRef.current.vehicles?.length || 0,
+        logs: dataRef.current.logs?.length || 0,
+      },
+    });
+
+    try {
+      await setDoc(doc(db, BACKUP_COLLECTION, backupId), {
+        ...snapshot,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      setState(prev => ({
+        ...prev,
+        lastBackupAt: now.toISOString(),
+      }));
+      return { ok: true, id: backupId, message: 'Cloud backup created.' };
+    } catch (err) {
+      console.error('Cloud backup failed:', err);
+      setState(prev => ({ ...prev, error: err.message || 'Cloud backup failed' }));
+      return { ok: false, id: backupId, message: err.message || 'Cloud backup failed.' };
+    }
+  }, []);
+
   const initializeAppData = useCallback(async () => {
     await runTransaction(db, async (transaction) => {
       const ref = doc(db, DATA_DOC);
@@ -887,6 +1015,20 @@ export function useFirestoreAppData() {
     initialized: state.initialized,
     docExists: state.docExists,
     lastSavedAt: state.lastSavedAt,
+    syncHealth: {
+      loading: state.loading,
+      saving: state.saving,
+      error: state.error,
+      initialized: state.initialized,
+      docExists: state.docExists,
+      lastSavedAt: state.lastSavedAt,
+      lastLoadedAt: state.lastLoadedAt,
+      lastRecoveredAt: state.lastRecoveredAt,
+      lastBackupAt: state.lastBackupAt,
+      lastRepairAt: state.lastRepairAt,
+      listenerStatus: state.listenerStatus,
+      pendingWrites: pendingWritesRef.current,
+    },
     setTrips,
     setDrivers,
     upsertDriverProfile,
@@ -898,6 +1040,8 @@ export function useFirestoreAppData() {
     setPhoneNumbers,
     addLog,
     initializeAppData,
+    repairCloudMirrors,
+    createCloudBackup,
   };
 }
 

@@ -95,6 +95,7 @@ const findTripLocations = (trip, trips, trashedTrips, logs) => {
 const EnterpriseDashboard = ({
   role, currentUser, trips, setTrips, drivers, setDrivers, dispatchers, setDispatchers, vehicles, setVehicles,
   trashedTrips, setTrashedTrips, restoreTrip, logs, setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
+  syncHealth, onRepairCloudMirrors, onCreateCloudBackup,
   selectedTasks, setSelectedTasks, searchQuery, setSearchQuery,
   smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
   smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing,
@@ -1160,7 +1161,7 @@ const EnterpriseDashboard = ({
         />
       );
       case 'settings': return (
-        <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} />
+        <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} syncHealth={syncHealth} onRepairCloudMirrors={onRepairCloudMirrors} onCreateCloudBackup={onCreateCloudBackup} />
       );
       case 'drive': return driverWorkDrivers.length > 0 ? (
         <DriverPage currentUser={currentUser} role={role} drivers={driverWorkDrivers} trips={driverWorkTrips} allDrivers={allDrivers} dispatchers={dispatchers} phoneNumbers={phoneNumbers} onUpdateTrip={onUpdateDriverTrip} onCompleteTrip={onCompleteTrip} onDriverStatusUpdate={onDriverStatusUpdate} onAddAuditLog={addAuditLog} onLogout={() => {}} requestAuthAction={requestAuthAction} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} onUpdateDriverLocation={handleUpdateDriverLocation} onOpenSettings={() => setActivePanel('settings')} onAddTrip={addTrip} showAddTripModal={showAddTripModal} setShowAddTripModal={setShowAddTripModal} />
