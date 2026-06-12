@@ -477,9 +477,29 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   );
   const tripsScrollRef = useRef(null);
   const workflowSyncRef = useRef({});
+  const preservedWorkflowTripIdRef = useRef(null);
+
+  const keepWorkflowTripOpen = useCallback((trip) => {
+    if (!trip?.id || isWorkflowTerminalTrip(trip)) return;
+    preservedWorkflowTripIdRef.current = trip.id;
+    setActiveNav('trips');
+    setExpandedTripId(trip.id);
+    setShowTripDetails((prev) => (prev?.id === trip.id ? { ...prev, ...trip } : prev));
+  }, [setExpandedTripId]);
+
+  const handleTripCardToggle = useCallback((id) => {
+    setExpandedTripId((prev) => {
+      const next = prev === id ? null : id;
+      preservedWorkflowTripIdRef.current = next;
+      return next;
+    });
+  }, [setExpandedTripId]);
 
   const advanceWorkflow = useCallback((trip, status, extraFields = {}, options = {}) => {
     if (!trip?.id || !status) return;
+    if (!WORKFLOW_TERMINAL_STATUSES.has(status)) {
+      keepWorkflowTripOpen({ ...trip, status, ...extraFields });
+    }
     const workflowUpdatedAt = new Date().toISOString();
     setWorkflowProgressData((prev) => {
       const previousProgress = prev[trip.id] || {};
@@ -517,7 +537,21 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }).catch((err) => {
       console.error('[DriverPage] Failed to persist workflow update:', err);
     });
-  }, [onUpdateTrip, setWorkflowProgressData]);
+  }, [keepWorkflowTripOpen, onUpdateTrip, setWorkflowProgressData]);
+
+  useEffect(() => {
+    const tripId = preservedWorkflowTripIdRef.current;
+    if (!tripId) return;
+    const refreshedTrip = driverScopedTrips.find((trip) => trip.id === tripId);
+    if (!refreshedTrip || isWorkflowTerminalTrip(refreshedTrip)) return;
+    if (activeNav !== 'trips') setActiveNav('trips');
+    if (expandedTripId !== tripId) setExpandedTripId(tripId);
+    setShowTripDetails((prev) => (prev?.id === tripId ? { ...prev, ...refreshedTrip } : prev));
+    setShowOdometerPrompt((prev) => (prev?.id === tripId ? { ...prev, ...refreshedTrip } : prev));
+    setShowArrivalConfirm((prev) => (prev?.id === tripId ? { ...prev, ...refreshedTrip } : prev));
+    setShowSignatureConfirm((prev) => (prev?.id === tripId ? { ...prev, ...refreshedTrip } : prev));
+    setShowCompleteModal((prev) => (prev?.id === tripId ? { ...prev, ...refreshedTrip } : prev));
+  }, [activeNav, driverScopedTrips, expandedTripId, setExpandedTripId]);
 
   useEffect(() => {
     Object.entries(workflowProgress).forEach(([tripId, progress]) => {
@@ -1710,6 +1744,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   };
 
   const handleArrivePickup = (trip) => {
+    keepWorkflowTripOpen(trip);
     const autoOdo = lastOdometer > 0 ? String(lastOdometer) : '';
     setOdometerValue(autoOdo);
     setShowOdometerPrompt(trip);
@@ -1935,6 +1970,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   };
 
   const openCompleteModal = (trip) => {
+    keepWorkflowTripOpen(trip);
     setShowCompleteModal(trip);
     const odometerSeed = trip.dropoffOdometer || (lastOdometer > 0 ? lastOdometer : trip.pickupOdometer) || '';
     setCompleteOdometer(odometerSeed ? String(odometerSeed) : '');
@@ -2756,7 +2792,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                 return renderPrimaryBtn('Arrive at Pickup', <MapPin size={14} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); handleArrivePickup(trip); });
                               }
                               if (trip.status === 'At Pickup') {
-                                return renderPrimaryBtn('Begin Transport', <Play size={14} />, 'bg-emerald-600 hover:bg-emerald-700', () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); });
+                                return renderPrimaryBtn('Begin Transport', <Play size={14} />, 'bg-emerald-600 hover:bg-emerald-700', () => { impact('heavy'); keepWorkflowTripOpen(trip); setSignatureConfirmed(false); setShowSignatureConfirm(trip); });
                               }
                             } else {
                               if (trip.status === 'In Transit') {
@@ -2813,7 +2849,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); } };
                   if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-teal-600 hover:bg-teal-700 shadow-teal-500/25', phase: 'pickup', onClick: () => handleNavigateToPickup(trip) };
                   if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
-                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
+                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); keepWorkflowTripOpen(trip); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
                   if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/25', phase: 'dropoff', onClick: () => handleNavigateToDropoff(trip) };
                   if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
                   if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-red-600 hover:bg-red-700 shadow-red-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
@@ -2866,7 +2902,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       workflowPhase,
                     }}
                     expandedId={expandedTripId}
-                    onToggle={(id) => setExpandedTripId(prev => prev === id ? null : id)}
+                    onToggle={handleTripCardToggle}
                     isSelected={isSelected}
                     onSelect={toggleTripSelect}
                     actions={{
