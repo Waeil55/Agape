@@ -2110,8 +2110,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     <div className="flex-1 flex flex-col bg-slate-100 text-slate-900" style={{ fontSize: '96%' }}>
       {activeNav === 'trips' && expandedTripId && (
         <div
-          className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
-          onClick={() => setExpandedTripId(null)}
+          className="pointer-events-none fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
+          aria-hidden="true"
         />
       )}
       <div
