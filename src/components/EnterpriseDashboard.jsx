@@ -7,7 +7,7 @@ import {
   PanelRight,
   Wifi, WifiOff,
   Eye, Hash, Route, Activity,
-  CalendarDays, ClipboardList, ShieldCheck, Receipt, Siren, CarFront, Plus,
+  CalendarDays, ClipboardList, ShieldCheck, Receipt, Siren, CarFront, Plus, Minus, Moon, Sun,
 } from 'lucide-react';
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 import { timeToMinutes, isTripLate } from '../utils/tripDate';
@@ -231,6 +231,27 @@ const EnterpriseDashboard = ({
   const dispatcherOnlineCount = dispatchers.filter((dispatcher) => dispatcher.clockedIn).length;
   const activeDriverCount = drivers.filter((driver) => driver.status && !['Offline', 'Unavailable'].includes(driver.status)).length;
   const aiAlertCount = lateTrips.length + unassignedTrips.length;
+  const fontScaleOrder = ['xs', 'sm', 'md', 'lg', 'xl', '2xl', 'driver'];
+  const activeFontScale = appSettings?.fontScale || 'md';
+  const activeFontScaleIndex = Math.max(0, fontScaleOrder.indexOf(activeFontScale));
+  const activeTheme = appSettings?.theme === 'dark' ? 'dark' : 'light';
+  const applyInterfaceSettings = (updates) => {
+    if (updates.theme) {
+      document.documentElement.dataset.theme = updates.theme;
+      document.documentElement.classList.toggle('dark', updates.theme === 'dark');
+    }
+    if (updates.fontScale) {
+      document.documentElement.dataset.fontScale = updates.fontScale;
+    }
+    updateAppSettings?.(updates);
+  };
+  const updateFontScale = (direction) => {
+    const nextIndex = Math.min(fontScaleOrder.length - 1, Math.max(0, activeFontScaleIndex + direction));
+    applyInterfaceSettings({ fontScale: fontScaleOrder[nextIndex] });
+  };
+  const toggleThemeMode = () => {
+    applyInterfaceSettings({ theme: activeTheme === 'dark' ? 'light' : 'dark' });
+  };
 
   const sortedScheduled = [...activeTrips]
     .filter(t => t.time !== 'Will Call')
@@ -519,8 +540,8 @@ const EnterpriseDashboard = ({
         </div>
       </div>
 
-      <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar">
-        <div className="flex min-w-max items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <div className="flex w-full min-w-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
           {topNavItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -528,15 +549,15 @@ const EnterpriseDashboard = ({
                 key={item.id}
                 type="button"
                 onClick={item.action}
-                className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-semibold transition ${
+                className={`inline-flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-[13px] font-semibold transition ${
                   item.active
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-500 hover:bg-white hover:text-slate-900'
                 }`}
                 title={item.label}
               >
-                <Icon size={15} />
-                <span>{item.label}</span>
+                <Icon size={15} className="shrink-0" />
+                <span className="truncate">{item.label}</span>
               </button>
             );
           })}
@@ -544,6 +565,35 @@ const EnterpriseDashboard = ({
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm lg:flex" title="Interface size">
+          <button
+            type="button"
+            onClick={() => updateFontScale(-1)}
+            disabled={activeFontScaleIndex <= 0}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-35"
+            title="Decrease interface size"
+          >
+            <Minus size={14} />
+          </button>
+          <span className="min-w-8 text-center text-[10px] font-black uppercase text-slate-500">{activeFontScale}</span>
+          <button
+            type="button"
+            onClick={() => updateFontScale(1)}
+            disabled={activeFontScaleIndex >= fontScaleOrder.length - 1}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-35"
+            title="Increase interface size"
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={toggleThemeMode}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
+          title={activeTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {activeTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
         <button
           type="button"
           onClick={() => {
@@ -588,6 +638,34 @@ const EnterpriseDashboard = ({
         <p className="text-[10px] font-medium text-slate-500 capitalize">{activeWorkspaceMeta.title}</p>
       </div>
       <div className="flex-1" />
+      <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm" title="Interface size">
+        <button
+          type="button"
+          onClick={() => updateFontScale(-1)}
+          disabled={activeFontScaleIndex <= 0}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 disabled:opacity-35"
+          title="Decrease interface size"
+        >
+          <Minus size={13} />
+        </button>
+        <button
+          type="button"
+          onClick={() => updateFontScale(1)}
+          disabled={activeFontScaleIndex >= fontScaleOrder.length - 1}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 disabled:opacity-35"
+          title="Increase interface size"
+        >
+          <Plus size={13} />
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={toggleThemeMode}
+        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm"
+        title={activeTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {activeTheme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+      </button>
       {/* Online status dot */}
       <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} title={isOnline ? 'Online' : 'Offline'} />
       {activePanel === 'operations' && (
