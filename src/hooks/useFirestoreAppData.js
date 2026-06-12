@@ -103,6 +103,64 @@ function getTripId(trip, fallbackPrefix, index) {
   return String(trip?.id || trip?.bookingId || `${fallbackPrefix}-${index}-${Date.now()}`);
 }
 
+function getStableRecordId(record, fallbackPrefix, index) {
+  return String(record?.id || record?.bookingId || `${fallbackPrefix}-${index}`);
+}
+
+function mergeRecordsById(primary = [], fallback = [], fallbackPrefix = 'record') {
+  const merged = new Map();
+
+  (fallback || []).forEach((record, index) => {
+    const id = getStableRecordId(record, fallbackPrefix, index);
+    merged.set(id, { ...record, id });
+  });
+
+  (primary || []).forEach((record, index) => {
+    const id = getStableRecordId(record, fallbackPrefix, index);
+    merged.set(id, { ...(merged.get(id) || {}), ...record, id });
+  });
+
+  return [...merged.values()];
+}
+
+function mergeDataWithLedger(data, ledgerData) {
+  if (!ledgerData) return normalizeData(data);
+
+  const activeApp = data.trips || [];
+  const archivedApp = data.trashedTrips || [];
+  const activeAppIds = new Set(activeApp.map((trip, index) => getStableRecordId(trip, 'active', index)));
+  const archivedAppIds = new Set(archivedApp.map((trip, index) => getStableRecordId(trip, 'archived', index)));
+
+  const ledgerActive = (ledgerData.trips || []).filter((trip, index) => {
+    const id = getStableRecordId(trip, 'active', index);
+    return !archivedAppIds.has(id);
+  });
+  const ledgerArchived = (ledgerData.trashedTrips || []).filter((trip, index) => {
+    const id = getStableRecordId(trip, 'archived', index);
+    return !activeAppIds.has(id);
+  });
+
+  return normalizeData({
+    ...data,
+    trips: mergeRecordsById(activeApp, ledgerActive, 'active'),
+    trashedTrips: mergeRecordsById(archivedApp, ledgerArchived, 'archived'),
+  });
+}
+
+function hasRecoveredLedgerRecords(baseData, mergedData) {
+  const baseActiveIds = new Set((baseData.trips || []).map((trip, index) => getStableRecordId(trip, 'active', index)));
+  const baseArchivedIds = new Set((baseData.trashedTrips || []).map((trip, index) => getStableRecordId(trip, 'archived', index)));
+  const hasNewActiveId = (mergedData.trips || []).some((trip, index) => !baseActiveIds.has(getStableRecordId(trip, 'active', index)));
+  const hasNewArchivedId = (mergedData.trashedTrips || []).some((trip, index) => !baseArchivedIds.has(getStableRecordId(trip, 'archived', index)));
+
+  return (
+    (mergedData.trips?.length || 0) > (baseData.trips?.length || 0) ||
+    (mergedData.trashedTrips?.length || 0) > (baseData.trashedTrips?.length || 0) ||
+    hasNewActiveId ||
+    hasNewArchivedId
+  );
+}
+
 async function loadCollectionRecords(collectionName) {
   const snap = await getDocs(collection(db, collectionName));
   const records = [];
@@ -287,12 +345,6 @@ export function useFirestoreAppData() {
             }));
           };
 
-          const hasTripData = (d.trips?.length || 0) > 0 || (d.trashedTrips?.length || 0) > 0;
-          if (hasTripData) {
-            applyData(d);
-            return;
-          }
-
           buildDataFromTripLedger()
             .then(async (recovered) => {
               if (!recovered || (!recovered.trips.length && !recovered.trashedTrips.length)) {
@@ -300,12 +352,10 @@ export function useFirestoreAppData() {
                 return;
               }
 
-              const hydrated = normalizeData({
-                ...d,
-                trips: recovered.trips,
-                trashedTrips: recovered.trashedTrips,
-              });
+              const hydrated = mergeDataWithLedger(d, recovered);
               applyData(hydrated);
+
+              if (!hasRecoveredLedgerRecords(d, hydrated)) return;
 
               try {
                 await setDoc(doc(db, DATA_DOC), {
@@ -398,10 +448,11 @@ export function useFirestoreAppData() {
       (snap) => {
         const currentList = dataRef.current[field] || [];
         if (snap.size === 0 && currentList.length > 0) return;
-        const nextList = [];
+        const snapshotList = [];
         snap.forEach((itemDoc) => {
-          nextList.push({ id: itemDoc.id, ...itemDoc.data() });
+          snapshotList.push({ id: itemDoc.id, ...itemDoc.data() });
         });
+        const nextList = mergeRecordsById(snapshotList, currentList, field);
         dataRef.current = {
           ...normalizeData(dataRef.current),
           [field]: nextList,
