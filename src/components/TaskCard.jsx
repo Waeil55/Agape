@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { resolveStatus } from '../constants/tripSeverity';
 
 import {
@@ -311,11 +310,15 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
         })();
         const steps = ['Scheduled', 'En Route', 'At Pickup', 'In Transit', 'Complete'];
         const timeUrg = getTimeUrgency(task.time, task.status);
-        if (typeof document === 'undefined') return null;
-
-        return createPortal(
+        return (
         <>
-          <div className="fixed inset-0 flex flex-col bg-gradient-to-b from-slate-50 to-slate-100" style={{ zIndex: 10000 }}>
+          <div
+            className="fixed left-0 right-0 top-0 flex flex-col bg-gradient-to-b from-slate-50 to-slate-100"
+            style={{
+              bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))',
+              zIndex: 45,
+            }}
+          >
 
             {/* === GLASS HEADER === */}
             <div
@@ -622,8 +625,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
               </div>
             )}
           </div>
-        </>,
-        document.body
+        </>
         );
       })()}
     </div>
