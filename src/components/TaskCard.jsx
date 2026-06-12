@@ -312,12 +312,19 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
         const timeUrg = getTimeUrgency(task.time, task.status);
         return (
         <>
-          <div className="fixed inset-0 flex flex-col bg-gradient-to-b from-slate-50 to-slate-100" style={{ zIndex: 50 }}>
+          <div className="fixed inset-0 flex flex-col bg-gradient-to-b from-slate-50 to-slate-100" style={{ zIndex: 220 }}>
 
             {/* === GLASS HEADER === */}
-            <div className="backdrop-blur-xl bg-white/80 border-b border-slate-200/50 px-4 py-3 flex items-center gap-3 shrink-0">
-              <button onClick={() => onToggle(task.id)}
-                className="w-11 h-11 rounded-2xl bg-white/80 border border-slate-200/60 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 shadow-sm hover:bg-white transition-colors">
+            <div
+              className="backdrop-blur-xl bg-white/90 border-b border-slate-200/50 px-4 pb-3 flex items-center gap-3 shrink-0"
+              style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+            >
+              <button
+                type="button"
+                onClick={() => onToggle(task.id)}
+                title="Back to trips"
+                className="relative z-10 w-12 h-12 min-h-[48px] min-w-[48px] rounded-2xl bg-white border border-slate-200 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 shadow-sm hover:bg-slate-50 transition-colors"
+              >
                 <ArrowLeft size={18} className="text-slate-600" />
               </button>
               <div className="flex-1 min-w-0">
