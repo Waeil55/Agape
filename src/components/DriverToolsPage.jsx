@@ -4,7 +4,7 @@ import {
   Copy, Check, Compass, Zap, Trash2, ArrowUp, ArrowDown,
   ExternalLink, RotateCcw, Sparkles, AlertTriangle, GripVertical
 } from 'lucide-react';
-import { GOOGLE_MAPS_API_KEY, GEMINI_API_CONFIG } from '../config/firebase';
+import { GOOGLE_MAPS_API_KEY, GEMINI_API_CONFIG, db, doc, onSnapshot, setDoc, serverTimestamp } from '../config/firebase';
 import { geocodeAddress, getDistanceMiles } from '../config/maps';
 
 const timeToMinutes = (t) => {
@@ -141,6 +141,7 @@ const RoutePlanSection = ({
   driverPosition = null,
 }) => {
   const storageKey = `agape_routePlan_${sanitizeStorageKey(currentUser)}`;
+  const cloudDocId = `driverRoutePlan_${sanitizeStorageKey(currentUser)}`;
   const [stops, setStops] = useState(() => readSavedRoutePlan(storageKey, driverPosition));
   const [routeResult, setRouteResult] = useState(null);
   const [legs, setLegs] = useState([]);
@@ -153,6 +154,8 @@ const RoutePlanSection = ({
   const [copiedRoute, setCopiedRoute] = useState(false);
   const [optimizationResult, setOptimizationResult] = useState(null);
   const inputRefs = useRef({});
+  const cloudReadyRef = useRef(false);
+  const saveTimerRef = useRef(null);
 
   const updateStops = (newStops) => {
     setStops(normalizeStopOrder(newStops, driverPosition));
@@ -319,13 +322,52 @@ const RoutePlanSection = ({
     return () => { cancelled = true; };
   }, [expanded, routeValidation.ready, routeValidation.labels.join('|')]);
 
-  // Save to localStorage
+  useEffect(() => {
+    cloudReadyRef.current = false;
+    const unsub = onSnapshot(
+      doc(db, 'routeData', cloudDocId),
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() || {};
+          if (Array.isArray(data.stops) && data.stops.length > 0) {
+            setStops(normalizeStopOrder(data.stops, driverPosition));
+          }
+          if (typeof data.expanded === 'boolean') {
+            setExpanded(data.expanded);
+          }
+        }
+        cloudReadyRef.current = true;
+      },
+      (err) => {
+        console.error('Driver route plan cloud sync failed:', err);
+        cloudReadyRef.current = true;
+      }
+    );
+    return () => {
+      unsub();
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [cloudDocId, driverPosition?.lat, driverPosition?.lng]);
+
+  // Save to localStorage and Firestore. Local storage is only a cache; Firestore is the source after clean browser.
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(stops));
       localStorage.setItem(`${storageKey}:expanded`, expanded ? '1' : '0');
     } catch {}
-  }, [storageKey, stops, expanded]);
+    if (!cloudReadyRef.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      setDoc(doc(db, 'routeData', cloudDocId), {
+        stops,
+        expanded,
+        updatedAt: serverTimestamp(),
+        updatedAtLocal: new Date().toISOString(),
+      }, { merge: true }).catch((err) => {
+        console.error('Driver route plan cloud save failed:', err);
+      });
+    }, 350);
+  }, [storageKey, cloudDocId, stops, expanded]);
 
   // Import from routePlanStops
   useEffect(() => {

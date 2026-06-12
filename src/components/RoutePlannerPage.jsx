@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   Route, MapPin, Clock, Users, AlertTriangle, ArrowDown, ArrowUp, X, CheckCircle2,
   GripVertical, ChevronRight, Search, Flag, Plus, Trash2,
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { timeToMinutes } from '../utils/tripDate';
 import { optimizeRoute as geminiOptimizeRoute } from '../config/ai';
+import { db, doc, onSnapshot, setDoc, serverTimestamp } from '../config/firebase';
 
 const to12hr = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return t || 'WC';
@@ -23,6 +24,7 @@ const getStopLetter = (i) => String.fromCharCode(65 + i);
 const isLate = (time) => { if (!time || time === 'Will Call') return false; const n = new Date(); const m = timeToMinutes(time); const s = new Date(); s.setHours(Math.floor(m / 60), m % 60, 0, 0); return n > s; };
 const makeStopId = (tripId, type) => `${tripId}_${type}`;
 const STORAGE_KEY = 'agape_routePlanner_v3';
+const sanitizePlannerKey = (value) => String(value || 'global').replace(/[^a-zA-Z0-9@._-]/g, '_');
 
 const statusColors = {
   Unassigned: 'bg-slate-100 text-slate-600',
@@ -53,11 +55,55 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
   const [filterStatus, setFilterStatus] = useState('all');
   const [aiMsg, setAiMsg] = useState('');
   const [dark, setDark] = useState(false);
+  const cloudReadyRef = useRef(false);
+  const saveTimerRef = useRef(null);
+  const plannerDocId = useMemo(() => `routePlanner_${sanitizePlannerKey(currentUser || role || 'global')}`, [currentUser, role]);
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(stops)); }, [stops]);
-  useEffect(() => { localStorage.setItem('agape_rp_completed_v3', JSON.stringify([...completed])); }, [completed]);
-  useEffect(() => { localStorage.setItem('agape_rp_driver', selectedDriver); }, [selectedDriver]);
-  useEffect(() => { localStorage.setItem('agape_rp_date', dateStr); }, [dateStr]);
+  useEffect(() => {
+    cloudReadyRef.current = false;
+    const unsub = onSnapshot(
+      doc(db, 'routeData', plannerDocId),
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() || {};
+          if (Array.isArray(data.stops)) setStops(data.stops);
+          if (Array.isArray(data.completed)) setCompleted(new Set(data.completed));
+          if (typeof data.selectedDriver === 'string') setSelectedDriver(data.selectedDriver);
+          if (typeof data.dateStr === 'string' && data.dateStr) setDateStr(data.dateStr);
+        }
+        cloudReadyRef.current = true;
+      },
+      (err) => {
+        console.error('Route planner cloud sync failed:', err);
+        cloudReadyRef.current = true;
+      }
+    );
+    return () => {
+      unsub();
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [plannerDocId]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stops));
+    localStorage.setItem('agape_rp_completed_v3', JSON.stringify([...completed]));
+    localStorage.setItem('agape_rp_driver', selectedDriver);
+    localStorage.setItem('agape_rp_date', dateStr);
+    if (!cloudReadyRef.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      setDoc(doc(db, 'routeData', plannerDocId), {
+        stops,
+        completed: [...completed],
+        selectedDriver,
+        dateStr,
+        updatedAt: serverTimestamp(),
+        updatedAtLocal: new Date().toISOString(),
+      }, { merge: true }).catch((err) => {
+        console.error('Route planner cloud save failed:', err);
+      });
+    }, 350);
+  }, [stops, completed, selectedDriver, dateStr, plannerDocId]);
 
   const tripStopTypes = useMemo(() => {
     const map = {};

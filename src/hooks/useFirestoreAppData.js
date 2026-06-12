@@ -19,6 +19,7 @@ const DRIVER_TRIP_PROGRESS_COLLECTION = 'driverTripProgress';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
 const DISPATCHER_PROFILE_COLLECTION = 'dispatcherProfiles';
 const VEHICLE_COLLECTION = 'fleetVehicles';
+const LOG_COLLECTION = 'logs';
 const PHONE_NUMBERS_DOC = 'systemConfig/phoneNumbers';
 const MIRRORED_TRIP_FIELDS = new Set(['trips', 'trashedTrips']);
 
@@ -123,6 +124,18 @@ function mergeRecordsById(primary = [], fallback = [], fallbackPrefix = 'record'
   return [...merged.values()];
 }
 
+function getRecordTime(record) {
+  const raw = record?.timestamp || record?.updatedAt || record?.updatedAtLocal || record?.createdAt || record?.t;
+  if (raw?.toMillis) return raw.toMillis();
+  if (raw?.seconds) return raw.seconds * 1000;
+  const parsed = Date.parse(raw || '');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sortNewestFirst(records = []) {
+  return [...records].sort((a, b) => getRecordTime(b) - getRecordTime(a));
+}
+
 function mergeDataWithLedger(data, ledgerData) {
   if (!ledgerData) return normalizeData(data);
 
@@ -204,6 +217,32 @@ async function mirrorRecordsToCollection(collectionName, records = []) {
   }
 }
 
+async function mirrorLogsToCollection(logs = []) {
+  const sanitizedLogs = (logs || [])
+    .filter(Boolean)
+    .map((log, index) => {
+      const base = String(log?.id || `${getRecordTime(log) || Date.now()}-${log?.t || log?.action || 'log'}-${index}`)
+        .replace(/[^a-zA-Z0-9_-]/g, '-')
+        .slice(0, 140);
+      return {
+        id: base || `log-${Date.now()}-${index}`,
+        data: sanitizeForFirestore({
+          ...log,
+          id: log?.id || base,
+          mirroredAtLocal: new Date().toISOString(),
+        }),
+      };
+    });
+
+  for (let i = 0; i < sanitizedLogs.length; i += 450) {
+    const batch = writeBatch(db);
+    sanitizedLogs.slice(i, i + 450).forEach(({ id, data }) => {
+      batch.set(doc(db, LOG_COLLECTION, id), data, { merge: true });
+    });
+    await batch.commit();
+  }
+}
+
 async function mirrorTripsToLedger(trips = [], trashedTrips = []) {
   const entries = [
     ...trips.map((trip, index) => ({ trip, index, archiveState: 'active' })),
@@ -262,11 +301,12 @@ async function buildDataFromTripLedger() {
 }
 
 async function buildDataFromMirrors() {
-  const [tripData, drivers, dispatchers, vehicles, phoneNumbersSnap] = await Promise.all([
+  const [tripData, drivers, dispatchers, vehicles, logs, phoneNumbersSnap] = await Promise.all([
     buildDataFromTripLedger(),
     loadCollectionRecords(DRIVER_PROFILE_COLLECTION),
     loadCollectionRecords(DISPATCHER_PROFILE_COLLECTION),
     loadCollectionRecords(VEHICLE_COLLECTION),
+    loadCollectionRecords(LOG_COLLECTION).catch(() => []),
     getDoc(doc(db, PHONE_NUMBERS_DOC)),
   ]);
 
@@ -275,6 +315,7 @@ async function buildDataFromMirrors() {
     drivers,
     dispatchers,
     vehicles,
+    logs: sortNewestFirst(logs),
     phoneNumbers: phoneNumbersSnap.exists()
       ? { ...DEFAULT_DATA.phoneNumbers, ...phoneNumbersSnap.data() }
       : DEFAULT_DATA.phoneNumbers,
@@ -305,6 +346,7 @@ export function useFirestoreAppData() {
     drivers: false,
     dispatchers: false,
     vehicles: false,
+    logs: false,
     phoneNumbers: false,
   });
 
@@ -432,6 +474,14 @@ export function useFirestoreAppData() {
       });
     }
 
+    if (!mirrorBackfillRef.current.logs && state.logs.length > 0) {
+      mirrorBackfillRef.current.logs = true;
+      mirrorLogsToCollection(state.logs).catch((err) => {
+        mirrorBackfillRef.current.logs = false;
+        console.error('Log backfill failed:', err);
+      });
+    }
+
     const hasCustomPhoneNumbers = JSON.stringify(state.phoneNumbers || {}) !== JSON.stringify(DEFAULT_DATA.phoneNumbers);
     if (!mirrorBackfillRef.current.phoneNumbers && hasCustomPhoneNumbers) {
       mirrorBackfillRef.current.phoneNumbers = true;
@@ -440,7 +490,7 @@ export function useFirestoreAppData() {
         console.error('Phone number backfill failed:', err);
       });
     }
-  }, [state.initialized, state.drivers, state.dispatchers, state.vehicles, state.phoneNumbers]);
+  }, [state.initialized, state.drivers, state.dispatchers, state.vehicles, state.logs, state.phoneNumbers]);
 
   useEffect(() => {
     const bindCollection = (field, collectionName) => onSnapshot(
@@ -473,6 +523,32 @@ export function useFirestoreAppData() {
     const unsubDrivers = bindCollection('drivers', DRIVER_PROFILE_COLLECTION);
     const unsubDispatchers = bindCollection('dispatchers', DISPATCHER_PROFILE_COLLECTION);
     const unsubVehicles = bindCollection('vehicles', VEHICLE_COLLECTION);
+    const unsubLogs = onSnapshot(
+      collection(db, LOG_COLLECTION),
+      (snap) => {
+        const currentList = dataRef.current.logs || [];
+        if (snap.size === 0 && currentList.length > 0) return;
+        const snapshotList = [];
+        snap.forEach((itemDoc) => {
+          snapshotList.push({ id: itemDoc.id, ...itemDoc.data() });
+        });
+        const logs = sortNewestFirst(mergeRecordsById(snapshotList, currentList, 'log'));
+        dataRef.current = {
+          ...normalizeData(dataRef.current),
+          logs,
+        };
+        setState(prev => ({
+          ...prev,
+          logs,
+          loading: false,
+          error: null,
+        }));
+      },
+      (err) => {
+        if (shouldIgnoreRealtimePermissionError(err)) return;
+        console.error('Realtime logs sync failed:', err);
+      }
+    );
     const unsubPhones = onSnapshot(
       doc(db, PHONE_NUMBERS_DOC),
       (snap) => {
@@ -527,13 +603,68 @@ export function useFirestoreAppData() {
         console.error('Realtime driver workflow sync failed:', err);
       }
     );
+    const unsubTripLedger = onSnapshot(
+      collection(db, TRIP_LEDGER_COLLECTION),
+      (snap) => {
+        const ledgerTrips = [];
+        const ledgerArchived = [];
+        snap.forEach((tripDoc) => {
+          const trip = { id: tripDoc.id, ...tripDoc.data() };
+          if (trip.archiveState === 'archived') {
+            ledgerArchived.push(trip);
+          } else {
+            ledgerTrips.push(trip);
+          }
+        });
+        if (ledgerTrips.length === 0 && ledgerArchived.length === 0) return;
+
+        const baseData = normalizeData(dataRef.current);
+        const mergedData = mergeDataWithLedger(baseData, {
+          ...DEFAULT_DATA,
+          trips: ledgerTrips,
+          trashedTrips: ledgerArchived,
+        });
+        const patched = {
+          ...mergedData,
+          trips: mergeTripProgress(mergedData.trips, tripProgressRef.current),
+        };
+        dataRef.current = patched;
+        setState(prev => ({
+          ...prev,
+          trips: patched.trips,
+          trashedTrips: patched.trashedTrips,
+          loading: false,
+          error: null,
+        }));
+
+        if (hasRecoveredLedgerRecords(baseData, patched)) {
+          setDoc(doc(db, DATA_DOC), {
+            trips: sanitizeForFirestore(patched.trips),
+            trashedTrips: sanitizeForFirestore(patched.trashedTrips),
+            recoveredFromLedger: true,
+            recoveredAt: new Date().toISOString(),
+            updatedAt: serverTimestamp(),
+            updatedField: 'trips',
+            updatedAtLocal: new Date().toISOString(),
+          }, { merge: true }).catch((err) => {
+            console.error('Live ledger recovery patch failed:', err);
+          });
+        }
+      },
+      (err) => {
+        if (shouldIgnoreRealtimePermissionError(err)) return;
+        console.error('Realtime trip ledger sync failed:', err);
+      }
+    );
 
     return () => {
       unsubDrivers();
       unsubDispatchers();
       unsubVehicles();
+      unsubLogs();
       unsubPhones();
       unsubTripProgress();
+      unsubTripLedger();
     };
   }, []);
 
@@ -568,6 +699,8 @@ export function useFirestoreAppData() {
         await mirrorRecordsToCollection(DISPATCHER_PROFILE_COLLECTION, dataRef.current.dispatchers || []);
       } else if (field === 'vehicles') {
         await mirrorRecordsToCollection(VEHICLE_COLLECTION, dataRef.current.vehicles || []);
+      } else if (field === 'logs') {
+        await mirrorLogsToCollection(sanitized);
       } else if (field === 'phoneNumbers') {
         await setDoc(doc(db, PHONE_NUMBERS_DOC), sanitized, { merge: true });
       }
@@ -710,7 +843,18 @@ export function useFirestoreAppData() {
   const addLog = useCallback(async (log) => {
     try {
       const logRef = collection(db, 'logs');
-      await addDoc(logRef, { ...log, timestamp: serverTimestamp() });
+      const logDoc = await addDoc(logRef, { ...log, timestamp: serverTimestamp(), createdAtLocal: new Date().toISOString() });
+      const localLog = { id: logDoc.id, ...log, createdAtLocal: new Date().toISOString() };
+      const nextLogs = sortNewestFirst([localLog, ...(dataRef.current.logs || [])]);
+      dataRef.current = {
+        ...normalizeData(dataRef.current),
+        logs: nextLogs,
+      };
+      setState(prev => ({
+        ...prev,
+        logs: nextLogs,
+        error: null,
+      }));
     } catch (err) {
       console.error('Log to cloud failed:', err);
     }
