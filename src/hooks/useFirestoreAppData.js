@@ -883,7 +883,10 @@ export function useFirestoreAppData() {
   }, [setListenerStatus]);
 
   const writeField = useCallback(async (field, value) => {
-    const sanitized = sanitizeForFirestore(value);
+    const raw = sanitizeForFirestore(value);
+    const sanitized = field === 'trips'
+      ? (raw || []).map(t => sanitizeTripFields(t))
+      : raw;
     const beforeData = dataRef.current[field];
 
     // Update local state optimistically FIRST
