@@ -249,11 +249,7 @@ export const firestoreWriteCircuit = new CircuitBreaker({
   successThreshold: 3,
   timeout: 30000,
   monitorWindow: 60000,
-  fallback: async () => {
-    // Queue for later when circuit is open
-    console.warn('[CircuitBreaker] Firestore write blocked — queuing for retry');
-    return { queued: true };
-  },
+  fallback: null,
 });
 
 export const firestoreReadCircuit = new CircuitBreaker({
