@@ -886,147 +886,81 @@ export function useFirestoreAppData() {
     const sanitized = sanitizeForFirestore(value);
     const beforeData = dataRef.current[field];
 
-    // Request deduplication: skip duplicate writes from rapid UI clicks
-    const dedupKey = requestDedup.generateKey(`write:${field}`, { value: JSON.stringify(sanitized).slice(0, 200) });
-    return requestDedup.execute(dedupKey, async () => {
-      // Rate limiting: check quota (advisory — doesn't block)
-      rateLimiter.check(`firestore.write`, auth.currentUser?.uid || 'anonymous', roleRef.current || 'driver');
+    // Update local state optimistically FIRST
+    dataRef.current = {
+      ...normalizeData(dataRef.current),
+      [field]: sanitized,
+    };
+    pendingWritesRef.current += 1;
+    adaptiveSync.setPendingWrites(pendingWritesRef.current);
+    setState(prev => ({
+      ...prev,
+      [field]: sanitized,
+      saving: true,
+      error: null,
+    }));
 
-      // Distributed lock: acquire lock on field before writing
-      let lockHandle = null;
-      try {
-        lockHandle = await distributedLock.acquire(`field:${field}`, { ttl: 15000 });
-      } catch (lockErr) {
-        console.warn(`[writeField] Lock acquisition failed for ${field}:`, lockErr.message);
-      }
-
-      // Start tracing span
-      const span = observability.startSpan(`write:${field}`);
-      span.setAttribute('field', field);
-      span.setAttribute('actor', auth.currentUser?.email || 'system');
-
-      dataRef.current = {
-        ...normalizeData(dataRef.current),
+    try {
+      // Write to Firestore directly — this is the core operation
+      await setDoc(doc(db, DATA_DOC), {
         [field]: sanitized,
-      };
+        updatedAt: serverTimestamp(),
+        updatedField: field,
+        updatedAtLocal: new Date().toISOString(),
+      }, { merge: true });
 
-      pendingWritesRef.current += 1;
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
       adaptiveSync.setPendingWrites(pendingWritesRef.current);
       setState(prev => ({
         ...prev,
-        [field]: sanitized,
-        saving: true,
-        error: null,
+        saving: pendingWritesRef.current > 0,
+        lastSavedAt: new Date().toISOString(),
       }));
 
-      // Performance: start timing
-      firestoreWriteMetrics.mark(`write-${field}`);
-      indexedDBMetrics.mark(`idb-${field}`);
-
-      // Event sourcing: emit event
+      // Non-blocking middleware — fire and forget, never block the save
+      firestoreWriteMetrics.mark(`write-${field}`).catch(() => {});
+      indexedDBMetrics.mark(`idb-${field}`).catch(() => {});
       eventSourcing.emit(
-        EventType.TRIP_UPDATED,
-        field,
-        'field',
+        EventType.TRIP_UPDATED, field, 'field',
         { before: beforeData, after: sanitized },
         { actor: auth.currentUser?.email || 'system', source: 'ui' }
-      );
+      ).catch(() => {});
+      dataLineage.track({
+        field, action: 'update', before: beforeData, after: sanitized,
+        actor: auth.currentUser?.email || 'system', actorRole: auth.currentUser?.role || 'system', source: 'ui',
+      }).catch(() => {});
+      crossTabSync.broadcastDataUpdate(field, sanitized, { action: 'update' }).catch(() => {});
+      saveFieldLocal(field, sanitized).catch(() => {});
 
-      try {
-        // Circuit breaker: execute write with protection
-        await firestoreWriteCircuit.execute(async () => {
-          await setDoc(doc(db, DATA_DOC), {
-            [field]: sanitized,
-            updatedAt: serverTimestamp(),
-            updatedField: field,
-            updatedAtLocal: new Date().toISOString(),
-          }, { merge: true });
-        });
-
-        // Performance: record write timing
-        firestoreWriteMetrics.measure(`write-${field}`, 'firestore-write');
-        indexedDBMetrics.measure(`idb-${field}`, 'indexeddb-write');
-
-        // Data lineage: track the change
-        dataLineage.track({
-          field,
-          action: 'update',
-          before: beforeData,
-          after: sanitized,
-          actor: auth.currentUser?.email || 'system',
-          actorRole: auth.currentUser?.role || 'system',
-          source: 'ui',
-        });
-
-        // Cross-tab sync: broadcast update
-        crossTabSync.broadcastDataUpdate(field, sanitized, { action: 'update' });
-
-        if (MIRRORED_TRIP_FIELDS.has(field)) {
-          await mirrorTripsToLedger(dataRef.current.trips || [], dataRef.current.trashedTrips || []);
-        } else if (field === 'drivers') {
-          await mirrorRecordsToCollection(DRIVER_PROFILE_COLLECTION, dataRef.current.drivers || []);
-        } else if (field === 'dispatchers') {
-          await mirrorRecordsToCollection(DISPATCHER_PROFILE_COLLECTION, dataRef.current.dispatchers || []);
-        } else if (field === 'vehicles') {
-          await mirrorRecordsToCollection(VEHICLE_COLLECTION, dataRef.current.vehicles || []);
-        } else if (field === 'logs') {
-          await mirrorLogsToCollection(sanitized);
-        } else if (field === 'phoneNumbers') {
-          await setDoc(doc(db, PHONE_NUMBERS_DOC), sanitized, { merge: true });
-        }
-
-        pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
-        adaptiveSync.setPendingWrites(pendingWritesRef.current);
-        syncMetrics.record('sync-complete', 1, { field });
-        setState(prev => ({
-          ...prev,
-          saving: pendingWritesRef.current > 0,
-          lastSavedAt: new Date().toISOString(),
-        }));
-        // Write-through to IndexedDB
-        saveFieldLocal(field, sanitized).catch(() => {});
-        return true;
-      } catch (err) {
-        pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
-        adaptiveSync.setPendingWrites(pendingWritesRef.current);
-        syncMetrics.recordError('sync-complete', err, { field });
-        console.error(`Failed to save ${field} to Firestore:`, err);
-        setState(prev => ({
-          ...prev,
-          saving: pendingWritesRef.current > 0,
-          error: err.message || `Failed to save ${field}`,
-        }));
-        // Queue for retry via retry queue (with dead letter)
-        retryQueue.enqueue({
-          type: 'setField',
-          field,
-          value: sanitized,
-          collection: DATA_DOC,
-        }, err).catch(() => {});
-        // Also queue via background sync
-        backgroundSync.queue({
-          type: 'setField',
-          field,
-          value: sanitized,
-          collection: DATA_DOC,
-        }).catch(() => {});
-        // Also queue via legacy path
-        queueSyncOperation({
-          type: 'setField',
-          field,
-          value: sanitized,
-          collection: DATA_DOC,
-        }).catch(() => {});
-        // Still save locally so user doesn't lose data
-        saveFieldLocal(field, sanitized).catch(() => {});
-        return false;
-      } finally {
-        // End tracing span
-        observability.endSpan(span.spanId, span.status || 'ok');
-        // Release distributed lock
-        lockHandle?.release?.();
+      if (MIRRORED_TRIP_FIELDS.has(field)) {
+        mirrorTripsToLedger(dataRef.current.trips || [], dataRef.current.trashedTrips || []).catch(() => {});
+      } else if (field === 'drivers') {
+        mirrorRecordsToCollection(DRIVER_PROFILE_COLLECTION, dataRef.current.drivers || []).catch(() => {});
+      } else if (field === 'dispatchers') {
+        mirrorRecordsToCollection(DISPATCHER_PROFILE_COLLECTION, dataRef.current.dispatchers || []).catch(() => {});
+      } else if (field === 'vehicles') {
+        mirrorRecordsToCollection(VEHICLE_COLLECTION, dataRef.current.vehicles || []).catch(() => {});
+      } else if (field === 'logs') {
+        mirrorLogsToCollection(sanitized).catch(() => {});
+      } else if (field === 'phoneNumbers') {
+        setDoc(doc(db, PHONE_NUMBERS_DOC), sanitized, { merge: true }).catch(() => {});
       }
-    }).then(result => result.executed);
+      return true;
+    } catch (err) {
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+      adaptiveSync.setPendingWrites(pendingWritesRef.current);
+      console.error(`Failed to save ${field} to Firestore:`, err);
+      setState(prev => ({
+        ...prev,
+        saving: pendingWritesRef.current > 0,
+        error: err.message || `Failed to save ${field}`,
+      }));
+      // Queue for retry
+      retryQueue.enqueue({ type: 'setField', field, value: sanitized, collection: DATA_DOC }, err).catch(() => {});
+      backgroundSync.queue({ type: 'setField', field, value: sanitized, collection: DATA_DOC }).catch(() => {});
+      saveFieldLocal(field, sanitized).catch(() => {});
+      return false;
+    }
   }, []);
 
   const setTrips = useCallback((updater) => {
