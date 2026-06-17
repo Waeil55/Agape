@@ -372,7 +372,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (workflowProgressState.storageKey !== workflowStorageKey) return;
     try {
       localStorage.setItem(workflowStorageKey, JSON.stringify(workflowProgress));
-    } catch {}
+    } catch (err) { console.warn('[DriverPage] workflow progress save failed:', err); }
   }, [workflowProgressState.storageKey, workflowStorageKey, workflowProgress]);
 
   const [activeNav, setActiveNav] = useState(() => {
@@ -429,7 +429,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const setExpandedTripId = useCallback((val) => {
     setExpandedTripIdRaw(prev => {
       const next = typeof val === 'function' ? val(prev) : val;
-      try { if (next) localStorage.setItem('expandedTripId', next); else localStorage.removeItem('expandedTripId'); } catch {}
+      try { if (next) localStorage.setItem('expandedTripId', next); else localStorage.removeItem('expandedTripId'); } catch (err) { console.warn('[DriverPage] expandTripId save failed:', err); }
       return next;
     });
   }, []);
@@ -840,7 +840,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     queueRef.current = [...queueRef.current, { action, data, timestamp: Date.now() }];
     setOfflineQueue(queueRef.current);
     if (navigator.onLine) syncOfflineQueue();
-  }, []);
+  }, [syncOfflineQueue]);
 
   const syncOfflineQueue = useCallback(async () => {
     if (queueRef.current.length === 0 || !navigator.onLine) return;
@@ -849,12 +849,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setOfflineQueue([]);
     for (const item of queue) {
       if (item.action === 'updateLocation' && meRef.current?.id) {
-        try { onUpdateDriverLocation && onUpdateDriverLocation(meRef.current.id, item.data.lat, item.data.lng, item.data.telemetry || {}); } catch {}
+        try { onUpdateDriverLocation?.(meRef.current.id, item.data.lat, item.data.lng, item.data.telemetry || {}); } catch (err) { console.warn('[DriverPage] offline location replay failed:', err); }
       } else if (item.action === 'completeTrip' && meRef.current?.id) {
-        try { onCompleteTrip && onCompleteTrip(item.data.tripId, meRef.current.id, item.data.odometer); } catch {}
+        try { onCompleteTrip?.(item.data.tripId, meRef.current.id, item.data.odometer); } catch (err) { console.warn('[DriverPage] offline completeTrip replay failed:', err); }
       }
     }
-  }, []);
+  }, [onUpdateDriverLocation, onCompleteTrip]);
 
   // Load last odometer — localStorage is always the source of truth
   // (it was set explicitly on every driver odometer entry).
@@ -1250,8 +1250,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         };
         if (driverId && navigator.onLine) {
           try {
-            onUpdateDriverLocation && onUpdateDriverLocation(driverId, latitude, longitude, nextTelemetry);
-          } catch {}
+            onUpdateDriverLocation?.(driverId, latitude, longitude, nextTelemetry);
+          } catch (err) { console.warn('[DriverPage] location update failed:', err); }
         } else if (driverId) {
           addToQueue('updateLocation', { lat: latitude, lng: longitude, telemetry: nextTelemetry });
         }
@@ -1365,7 +1365,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           void updateAssignedRouteRecord({
             assignmentStatus: ROUTE_ASSIGNMENT_STATUS.COMPLETED,
             completedAt: new Date().toISOString(),
-          }, 'Route Completed', `${currentUser} completed route "${assignedSequence.name || 'Assigned Route'}".`);
+          }, 'Route Completed', `${currentUser} completed route "${assignedSequence.name || 'Assigned Route'}".`).catch(err => console.warn('[DriverPage] operation failed:', err));
         }
         setGuidedMode(false);
         setGuidedSteps([]);
@@ -1437,7 +1437,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     void saveRoutePlanStopWorkflow(stop, {
       status: 'Started',
       startedAt: new Date().toISOString(),
-    }, 'Route Stop Started', `${currentUser} started stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'}.`);
+    }, 'Route Stop Started', `${currentUser} started stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'}.`).catch(err => console.warn('[DriverPage] operation failed:', err));
   }, [currentUser, saveRoutePlanStopWorkflow]);
 
   const handleNavigateRoutePlanStop = useCallback((stop) => {
@@ -1446,7 +1446,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     void saveRoutePlanStopWorkflow(stop, {
       status: 'Navigating',
       navigatingAt: new Date().toISOString(),
-    }, 'Route Stop Navigation', `${currentUser} started navigation to stop ${stop.sequenceIndex}.`);
+    }, 'Route Stop Navigation', `${currentUser} started navigation to stop ${stop.sequenceIndex}.`).catch(err => console.warn('[DriverPage] operation failed:', err));
     openInNavApp(stop.address, suggestNavApp(stop.address));
   }, [currentUser, openInNavApp, saveRoutePlanStopWorkflow, suggestNavApp]);
 
@@ -1468,7 +1468,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       odometer: odo,
       arrivedAt: nowIso,
       arrivalTime: nowIso,
-    }, 'Route Stop Arrived', `${currentUser} arrived at stop ${routeStopOdometerPrompt.sequenceIndex}.`);
+    }, 'Route Stop Arrived', `${currentUser} arrived at stop ${routeStopOdometerPrompt.sequenceIndex}.`).catch(err => console.warn('[DriverPage] operation failed:', err));
     setLastOdometer(odo);
     localStorage.setItem('agape_last_odometer', String(odo));
     setRouteStopOdometerPrompt(null);
@@ -1488,7 +1488,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       status: 'Signed',
       paperSignatureConfirmed: true,
       signatureConfirmedAt: new Date().toISOString(),
-    }, 'Route Stop Signed', `${currentUser} confirmed signature for stop ${routeStopSignaturePrompt.sequenceIndex}.`);
+    }, 'Route Stop Signed', `${currentUser} confirmed signature for stop ${routeStopSignaturePrompt.sequenceIndex}.`).catch(err => console.warn('[DriverPage] operation failed:', err));
     setRouteStopSignaturePrompt(null);
     setRouteStopSignatureConfirmed(false);
   }, [currentUser, routeStopSignatureConfirmed, routeStopSignaturePrompt, saveRoutePlanStopWorkflow]);
@@ -1522,7 +1522,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       ...(allStopsCompleted ? { completedAt } : {}),
     }, allStopsCompleted ? 'Route Completed' : 'Route Stop Completed', allStopsCompleted
       ? `${currentUser} completed route "${assignedSequence.name || 'Assigned Route'}".`
-      : `${currentUser} completed stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'}.`);
+      : `${currentUser} completed stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'}.`).catch(err => console.warn('[DriverPage] operation failed:', err));
     if (allStopsCompleted) {
       setGuidedMode(false);
       setGuidedSteps([]);
@@ -1554,7 +1554,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       driverWorkflow: workflow,
       assignmentStatus: allStopsTerminal ? ROUTE_ASSIGNMENT_STATUS.COMPLETED : ROUTE_ASSIGNMENT_STATUS.IN_PROGRESS,
       ...(allStopsTerminal ? { completedAt } : {}),
-    }, `Route Stop ${status}`, `${currentUser} marked stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'} as ${status}${reason ? ` (${reason})` : ''}.`);
+    }, `Route Stop ${status}`, `${currentUser} marked stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'} as ${status}${reason ? ` (${reason})` : ''}.`).catch(err => console.warn('[DriverPage] operation failed:', err));
     if (allStopsTerminal) {
       setGuidedMode(false);
       setGuidedSteps([]);
@@ -1600,7 +1600,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       driverWorkflow: nextWorkflow,
       assignmentStatus: ROUTE_ASSIGNMENT_STATUS.IN_PROGRESS,
       completedAt: null,
-    }, 'Route Stop Undo', `${currentUser} stepped back stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'}.`);
+    }, 'Route Stop Undo', `${currentUser} stepped back stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'}.`).catch(err => console.warn('[DriverPage] operation failed:', err));
   }, [assignedSequence?.driverWorkflow, assignedSequence?.id, currentUser, getRoutePlanStopKey, updateAssignedRouteRecord]);
 
   const handleNavigateToPickup = (trip) => {
@@ -1680,6 +1680,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         transferRequest: request,
         transferStatus: 'pending',
       });
+      setWorkflowProgressData((prev) => ({
+        ...prev,
+        [trip.id]: { ...(prev[trip.id] || {}), transferRequest: request, transferStatus: 'pending', workflowUpdatedAt: nowIso }
+      }));
       onAddAuditLog?.('Trip Transfer Requested', `${request.fromDriverName} requested transfer of ${trip.patient || trip.id} to ${request.toDriverName}.`, 'amber');
     } else if (transferPrompt.type === 'route' && assignedSequence?.id) {
       await updateAssignedRouteRecord({
@@ -1705,6 +1709,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (!timeEditModal) return;
     const trip = timeEditModal;
     let updates = {};
+    const persistWorkflow = (tid, upd) => {
+      setWorkflowProgressData((prev) => ({
+        ...prev,
+        [tid]: { ...(prev[tid] || {}), ...upd, workflowUpdatedAt: new Date().toISOString() }
+      }));
+    };
 
     if (timeEditType === 'in_out') {
       updates = {
@@ -1712,7 +1722,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         isInOut: true,
         time: 'IN/OUT',
       };
-      onUpdateTrip?.({ ...trip, ...updates });
+      onUpdateTrip?.(trip.id, trip.status, updates);
+      persistWorkflow(trip.id, updates);
       onAddAuditLog?.('Trip Time Updated', `${currentUser} marked ${trip.patient || trip.id} as IN/OUT.`, 'blue');
 
       // Find B-leg candidates: same patient, reversed addresses (A's dropoff = B's pickup)
@@ -1728,8 +1739,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         .sort((a, b) => getSequencePairScore(trip, b) - getSequencePairScore(trip, a));
 
       if (candidates.length === 1) {
-        // Auto-pair with the only candidate
-        onUpdateTrip?.({ ...candidates[0], pairedAfterTripId: trip.id, timingType: 'in_out_return', isInOut: true, legRelationship: 'in_out_return' });
+        const pairUpdates = { pairedAfterTripId: trip.id, timingType: 'in_out_return', isInOut: true, legRelationship: 'in_out_return' };
+        onUpdateTrip?.(candidates[0].id, candidates[0].status, pairUpdates);
+        persistWorkflow(candidates[0].id, pairUpdates);
         setShowToast({ type: 'success', message: `Paired with return trip: ${candidates[0].patient}` });
       } else if (candidates.length > 1) {
         // Show selection modal
@@ -1752,40 +1764,56 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       updates = { time: timeEditValue, timingType: 'scheduled' };
     }
 
-    onUpdateTrip?.({ ...trip, ...updates });
+    onUpdateTrip?.(trip.id, trip.status, updates);
+    persistWorkflow(trip.id, updates);
     onAddAuditLog?.('Trip Time Updated', `${currentUser} updated time for ${trip.patient || trip.id} to ${updates.time || 'Will Call'}.`, 'blue');
     setShowToast({ type: 'success', message: `Time updated to ${updates.time || 'Will Call'}` });
     setTimeEditModal(null);
     setTimeEditValue('');
     setTimeEditType('');
-  }, [timeEditModal, timeEditType, timeEditValue, currentUser, onUpdateTrip, onAddAuditLog, driverScopedTrips]);
+  }, [timeEditModal, timeEditType, timeEditValue, currentUser, onUpdateTrip, onAddAuditLog, driverScopedTrips, setWorkflowProgressData]);
 
   const selectBLeg = useCallback((aLegTrip, bLegTrip) => {
-    onUpdateTrip?.({ ...bLegTrip, pairedAfterTripId: aLegTrip.id, timingType: 'in_out_return', isInOut: true, legRelationship: 'in_out_return' });
+    const updates = { pairedAfterTripId: aLegTrip.id, timingType: 'in_out_return', isInOut: true, legRelationship: 'in_out_return' };
+    onUpdateTrip?.(bLegTrip.id, bLegTrip.status, updates);
+    setWorkflowProgressData((prev) => ({
+      ...prev,
+      [bLegTrip.id]: { ...(prev[bLegTrip.id] || {}), ...updates, workflowUpdatedAt: new Date().toISOString() }
+    }));
     onAddAuditLog?.('B-Leg Paired', `${currentUser} paired ${aLegTrip.patient} return trip with ${bLegTrip.id}.`, 'blue');
     setShowToast({ type: 'success', message: `Paired with return trip: ${bLegTrip.patient}` });
     setBLegSelectModal(null);
     setBLegCandidates([]);
-  }, [currentUser, onUpdateTrip, onAddAuditLog]);
+  }, [currentUser, onUpdateTrip, onAddAuditLog, setWorkflowProgressData]);
 
   const applyTripTransferDecision = (trip, accepted) => {
     const req = trip?.transferRequest;
     if (!trip?.id || !req) return;
     const nowIso = new Date().toISOString();
     if (accepted) {
-      onUpdateTrip?.(trip.id, 'Assigned', {
+      const updates = {
         driverId: me?.id || req.toDriverId || '',
         driverEmail: me?.email || req.toDriverEmail || '',
         driverName: me?.name || req.toDriverName || '',
         transferStatus: 'accepted',
         transferRequest: { ...req, status: 'accepted', decidedAt: nowIso, decidedBy: currentUser || '' },
-      });
+      };
+      onUpdateTrip?.(trip.id, 'Assigned', updates);
+      setWorkflowProgressData((prev) => ({
+        ...prev,
+        [trip.id]: { ...(prev[trip.id] || {}), ...updates, workflowUpdatedAt: nowIso }
+      }));
       onAddAuditLog?.('Trip Transfer Accepted', `${me?.name || currentUser} accepted transfer of ${trip.patient || trip.id}.`, 'emerald');
     } else {
-      onUpdateTrip?.(trip.id, trip.status, {
+      const updates = {
         transferStatus: 'declined',
         transferRequest: { ...req, status: 'declined', decidedAt: nowIso, decidedBy: currentUser || '' },
-      });
+      };
+      onUpdateTrip?.(trip.id, trip.status, updates);
+      setWorkflowProgressData((prev) => ({
+        ...prev,
+        [trip.id]: { ...(prev[trip.id] || {}), ...updates, workflowUpdatedAt: nowIso }
+      }));
       onAddAuditLog?.('Trip Transfer Declined', `${me?.name || currentUser} declined transfer of ${trip.patient || trip.id}.`, 'rose');
     }
   };
@@ -2020,7 +2048,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           setLastOdometer(odo);
           localStorage.setItem('agape_last_odometer', String(odo));
           setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
-          if (navigator.onLine) { saveOdometerReading(trip.id, odo).catch(() => {}); }
+          if (navigator.onLine) { saveOdometerReading(trip.id, odo).catch(err => console.warn('[DriverPage] odometer save failed:', err)); }
           else { addToQueue('completeTrip', { tripId: trip.id, odometer: odo }); }
           setExpandedTripId(null);
           setSelectedTrips(prev => prev.filter(id => id !== trip.id));
@@ -2112,7 +2140,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
     // Save odometer to Firestore directly
     if (navigator.onLine) {
-      saveOdometerReading(showCompleteModal.id, odo).catch(() => {});
+      saveOdometerReading(showCompleteModal.id, odo).catch(err => console.warn('[DriverPage] odometer save failed:', err));
     } else {
       addToQueue('completeTrip', { tripId: showCompleteModal.id, odometer: odo });
     }
