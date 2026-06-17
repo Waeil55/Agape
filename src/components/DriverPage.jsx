@@ -836,12 +836,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }, []);
 
 
-  const addToQueue = useCallback((action, data) => {
-    queueRef.current = [...queueRef.current, { action, data, timestamp: Date.now() }];
-    setOfflineQueue(queueRef.current);
-    if (navigator.onLine) syncOfflineQueue();
-  }, [syncOfflineQueue]);
-
   const syncOfflineQueue = useCallback(async () => {
     if (queueRef.current.length === 0 || !navigator.onLine) return;
     const queue = [...queueRef.current];
@@ -855,6 +849,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       }
     }
   }, [onUpdateDriverLocation, onCompleteTrip]);
+
+  const addToQueue = useCallback((action, data) => {
+    queueRef.current = [...queueRef.current, { action, data, timestamp: Date.now() }];
+    setOfflineQueue(queueRef.current);
+    if (navigator.onLine) syncOfflineQueue();
+  }, [syncOfflineQueue]);
 
   // Load last odometer — localStorage is always the source of truth
   // (it was set explicitly on every driver odometer entry).
