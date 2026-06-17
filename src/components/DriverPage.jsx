@@ -856,18 +856,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }
   }, []);
 
-  // Load last odometer from completed trips, fallback to localStorage
+  // Load last odometer — localStorage is always the source of truth
+  // (it was set explicitly on every driver odometer entry).
+  // Fall back to the most recent completed trip only if nothing is in localStorage.
   useEffect(() => {
     if (!me?.id) return;
+    const saved = parseInt(localStorage.getItem('agape_last_odometer') || '0', 10);
+    if (saved > 0) { setLastOdometer(saved); return; }
     const completed = driverScopedTrips
       .filter(t => isWorkflowTerminalTrip(t) && t.dropoffOdometer)
       .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
     if (completed.length > 0) {
       setLastOdometer(completed[0].dropoffOdometer);
       localStorage.setItem('agape_last_odometer', String(completed[0].dropoffOdometer));
-    } else {
-      const saved = parseInt(localStorage.getItem('agape_last_odometer') || '0', 10);
-      if (saved > 0) setLastOdometer(saved);
     }
   }, [driverScopedTrips, me?.id]);
 

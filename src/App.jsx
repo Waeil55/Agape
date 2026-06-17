@@ -1857,6 +1857,7 @@ const App = () => {
     });
     setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
     setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer } : d));
+    localStorage.setItem('agape_last_odometer', String(odometer));
     const diffs = [];
     Object.keys(nextTrip || {}).forEach((key) => {
       if (String(trip?.[key]) !== String(nextTrip?.[key])) {
