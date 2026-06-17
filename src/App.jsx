@@ -38,6 +38,21 @@ import {
 import './utils/clientExport';
 import { registerServiceWorker, requestPeriodicSync, setupSWMessageHandler, triggerSync, skipWaiting } from './utils/swManager';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
+import { useConnectionState, formatSyncAgo } from './hooks/useConnectionState';
+import { connectionMonitor } from './utils/dataStore';
+import { networkQuality } from './utils/networkQuality';
+import { backgroundSync } from './utils/backgroundSync';
+import { crossTabSync } from './utils/crossTabSync';
+import { adaptiveSync } from './utils/adaptiveSync';
+import { dataLineage } from './utils/dataLineage';
+import { eventSourcing } from './utils/eventSourcing';
+import { predictivePrefetch } from './utils/predictivePrefetch';
+import { retryQueue } from './utils/retryQueue';
+import { distributedLock } from './utils/distributedLock';
+import { sagaExecutor } from './utils/sagaPattern';
+import { observability } from './utils/observability';
+import { rateLimiter } from './utils/rateLimiter';
+import { requestDedup } from './utils/requestDedup';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
@@ -251,7 +266,7 @@ function mergeDriverLists(...lists) {
 }
 
 const FIRESTORE_BOOT_TIMEOUT_MS = 12000;
-const AUTH_WATCHDOG_TIMEOUT_MS = 18000;
+const AUTH_WATCHDOG_TIMEOUT_MS = 30000;
 
 const buildTravelDuration = (startTime, endTime) => {
   if (!startTime || !endTime) return '';
@@ -356,6 +371,7 @@ const App = () => {
   const currentUserRef = useRef(null);
   const driversRef = useRef([]);
   const tripsRef = useRef([]);
+  const trashedTripsRef = useRef([]);
   const driverProfileBootstrapRef = useRef('');
   const [driverTelemetry, setDriverTelemetry] = useState([]);
   const driverTelemetryRef = useRef([]);
@@ -367,6 +383,22 @@ const App = () => {
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
     initPlatform();
+
+    // Start enterprise monitors — Wave 1 (foundation)
+    connectionMonitor.start();
+    networkQuality.start();
+    backgroundSync.start();
+    crossTabSync.init();
+    adaptiveSync.start();
+    dataLineage.init();
+
+    // Start enterprise monitors — Wave 2 (advanced)
+    eventSourcing.init();
+    predictivePrefetch.start();
+    retryQueue.start();
+
+    // Start enterprise monitors — Wave 3 (enterprise-grade)
+    // observability, rateLimiter, requestDedup are singletons — auto-initialized
 
     // REMOVED: The 1-second refresh interval was causing constant re-renders and data flickering.
     // Real-time sync now comes from Firebase document listener on appData/agape.
@@ -469,9 +501,14 @@ const App = () => {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
     loading: dataLoading, saving: dataSaving, error: dataError, lastSavedAt, syncHealth,
     setTrips, setDrivers, upsertDriverProfile, setDispatchers, upsertDispatcherProfile, setVehicles,
-    setTrashedTrips, setLogs, setPhoneNumbers,
-    addLog, initializeAppData, repairCloudMirrors, createCloudBackup,
+    setTrashedTrips, setTripsAndTrashed, setLogs, setPhoneNumbers,
+    addLog, initializeAppData, repairCloudMirrors, createCloudBackup, lastFirestoreSync,
+    enterprise,
   } = useFirestoreAppData();
+
+  // Enterprise connection monitoring
+  const connectionInfo = useConnectionState();
+  const [lastSyncTimestamp, setLastSyncTimestamp] = useState(Date.now());
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
@@ -654,6 +691,7 @@ const App = () => {
   const updateAppSettings = useCallback((updates, isProfileUpdate = false) => {
     if (isProfileUpdate && role === 'driver' && updates.odometer !== undefined) {
       setDrivers(prev => prev.map(d => d.email === currentUser ? { ...d, odometer: updates.odometer } : d));
+      localStorage.setItem('agape_last_odometer', String(updates.odometer));
       addToast('Profile Updated', 'Your vehicle odometer has been synchronized.', 'success');
     } else {
       setAppSettings((prev) => ({ ...prev, ...updates }));
@@ -748,9 +786,17 @@ const App = () => {
   useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
   useEffect(() => { driversRef.current = drivers; }, [drivers]);
   useEffect(() => { tripsRef.current = trips; }, [trips]);
+  useEffect(() => { trashedTripsRef.current = trashedTrips; }, [trashedTrips]);
   useEffect(() => {
     driverTelemetryRef.current = driverTelemetry;
   }, [driverTelemetry]);
+
+  // Predictive prefetch: trigger prefetch when page changes
+  useEffect(() => {
+    if (activeTab && isAuthenticated) {
+      predictivePrefetch.onPageVisit(activeTab);
+    }
+  }, [activeTab, isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -798,6 +844,13 @@ const App = () => {
     }
   }, [isAuthenticated, dataLoading]);
 
+  // Track Firestore sync time for freshness indicator
+  useEffect(() => {
+    if (lastFirestoreSync) {
+      setLastSyncTimestamp(Date.now());
+    }
+  }, [lastFirestoreSync]);
+
   // Persist activeTab and appSettings to Firestore user document for authenticated users
   const persistUserSettings = async (overrides = {}) => {
     try {
@@ -836,7 +889,7 @@ const App = () => {
     }
   }, [appSettings]);
 
-  // Force fail-safe: if loading takes >15s, show login (allow time for offline cache)
+  // Force fail-safe: if loading takes >20s, show login (allow time for offline cache)
   useEffect(() => {
     const force = setTimeout(() => {
       if (!isLoading) return;
@@ -844,15 +897,14 @@ const App = () => {
         setStartupIssue('You are offline — showing cached data.');
         setIsLoading(false);
       } else {
-        setStartupIssue('Connection timed out. Retry or sign in again.');
-        setLoginError('Could not reach the cloud. Please check your connection and sign in.');
+        setStartupIssue('Connection is slow. Showing whatever data is available.');
         setIsLoading(false);
       }
-    }, 15000);
+    }, 20000);
     return () => clearTimeout(force);
   }, [isLoading]);
-  // Ultimate fallback — never stay on loading >18s
-  useEffect(() => { const t = setTimeout(() => { if (isLoading) setIsLoading(false); }, 18000); return () => clearTimeout(t); }, [isLoading]);
+  // Ultimate fallback — never stay on loading >25s
+  useEffect(() => { const t = setTimeout(() => { if (isLoading) setIsLoading(false); }, 25000); return () => clearTimeout(t); }, [isLoading]);
 
   useEffect(() => {
     let unsubData = null;
@@ -867,10 +919,8 @@ const App = () => {
         setStartupIssue('');
         return;
       }
-      setStartupIssue('Startup took too long. Use Retry or Return to Access Portal.');
-      skipNextSignedOutResetRef.current = true;
-      signOut(auth).catch(() => {});
-      resetSessionState({ loginErrorMessage: 'Could not verify your session quickly enough. Please sign in again.' });
+      setStartupIssue('Startup is taking longer than usual. You can retry or sign in again.');
+      setIsLoading(false);
     }, AUTH_WATCHDOG_TIMEOUT_MS);
 
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -1550,11 +1600,13 @@ const App = () => {
 
   const requestDeleteTrip = (tripId) => {
     if (!hasPermission(role, 'canDeleteTrip')) {
+      addToast('Permission Denied', 'You do not have permission to archive trips.', 'danger');
       addAuditLog('Permission Denied', `${currentUser} attempted to delete a trip without authorization.`, 'rose');
       return;
     }
     const trip = trips.find(t => t.id === tripId);
     if (trip && !canControlTrip(trip)) {
+      addToast('Scope Blocked', 'This trip is outside your assigned scope.', 'danger');
       addAuditLog('Scope Blocked', `${currentUser} attempted to archive an out-of-scope trip.`, 'rose');
       return;
     }
@@ -1671,83 +1723,87 @@ const App = () => {
   };
 
   const executeDeleteTrip = (tripId) => {
-    // CRITICAL FIX: Use refs instead of closures to avoid stale data from Firestore sync
-    const currentTrips = trips || [];
-    const currentTrashed = trashedTrips || [];
+    const currentTrips = tripsRef.current || [];
+    const currentTrashed = trashedTripsRef.current || [];
     
     const tripToDelete = currentTrips.find(t => t.id === tripId);
-    if (tripToDelete) {
-      const newTrashedTrips = [tripToDelete, ...currentTrashed];
-      const newTrips = currentTrips.filter(t => t.id !== tripId);
-      
-      setTrashedTrips(newTrashedTrips);
-      setTrips(newTrips);
-      setSelectedTasks(selectedTasks.filter(id => id !== tripId));
-      
-      // Writes directly to Firestore via setTrips/setTrashedTrips
-      const changed = Object.keys(tripToDelete).map(k => ({ field: k, before: tripToDelete[k], after: undefined }));
-      addAuditLog('Trip Archived', `${currentUser} archived trip ${tripId} (${tripToDelete.patient}).`, 'rose', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'active', after: 'archived' }] });
-    }
+    if (!tripToDelete) return;
+    
+    const newTrashed = [tripToDelete, ...currentTrashed];
+    const newTrips = currentTrips.filter(t => t.id !== tripId);
+    
+    setSelectedTasks(prev => prev.filter(id => id !== tripId));
+    addToast('Trip Archived', `${tripToDelete.patient} has been archived.`, 'success');
+    const changed = Object.keys(tripToDelete).map(k => ({ field: k, before: tripToDelete[k], after: undefined }));
+    addAuditLog('Trip Archived', `${currentUser} archived trip ${tripId} (${tripToDelete.patient}).`, 'rose', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'active', after: 'archived' }] });
+    
+    return setTripsAndTrashed(newTrips, newTrashed);
   };
 
   const requestBulkDelete = (tripIds, onSuccess) => {
     if (!hasPermission(role, 'canDeleteTrip')) {
+      addToast('Permission Denied', 'You do not have permission to archive trips.', 'danger');
       addAuditLog('Permission Denied', `${currentUser} attempted bulk archive without authorization.`, 'rose');
       return;
     }
+    const allowedIds = tripIds.filter(id => {
+      const trip = (tripsRef.current || []).find(t => t.id === id);
+      return trip && canControlTrip(trip);
+    });
+    const skippedCount = tripIds.length - allowedIds.length;
+    if (skippedCount > 0) {
+      addToast('Scope Warning', `${skippedCount} trip(s) skipped — outside your scope.`, 'warning');
+    }
+    if (allowedIds.length === 0) return;
     requestAuthAction('archive_trips', () => {
-      // CRITICAL FIX: Use refs instead of closures to get CURRENT state, not stale captured values
-      // This prevents Firestore sync from making the captured values outdated
-      const currentTrips = trips || [];
-      const currentTrashed = trashedTrips || [];
+      const currentTrips = tripsRef.current || [];
+      const currentTrashed = trashedTripsRef.current || [];
       
-      const tripsToDelete = currentTrips.filter(t => tripIds.includes(t.id));
-      if (tripsToDelete.length > 0) {
-        const newTrashedTrips = [...tripsToDelete, ...currentTrashed];
-        const newTrips = currentTrips.filter(t => !tripIds.includes(t.id));
-        
-        // Update state immediately with correct data
-        setTrashedTrips(newTrashedTrips);
-        setTrips(newTrips);
-        setSelectedTasks([]);
-        
-        // Writes directly to Firestore via setTrips/setTrashedTrips
-        
-        if (onSuccess) onSuccess();
-        addAuditLog('Bulk Trip Archived', `${currentUser} archived ${tripsToDelete.length} trips.`, 'rose');
-      }
+      const tripsToDelete = currentTrips.filter(t => allowedIds.includes(t.id));
+      if (tripsToDelete.length === 0) return;
+      
+      const newTrashed = [...tripsToDelete, ...currentTrashed];
+      const newTrips = currentTrips.filter(t => !allowedIds.includes(t.id));
+      
+      setSelectedTasks([]);
+      if (onSuccess) onSuccess();
+      addToast('Trips Archived', `${tripsToDelete.length} trip(s) archived successfully.`, 'success');
+      addAuditLog('Bulk Trip Archived', `${currentUser} archived ${tripsToDelete.length} trips.`, 'rose');
+      
+      return setTripsAndTrashed(newTrips, newTrashed);
     });
   };
 
   const restoreTrip = (tripId) => {
+    if (!hasPermission(role, 'canDeleteTrip')) {
+      addToast('Permission Denied', 'You do not have permission to restore trips.', 'danger');
+      addAuditLog('Permission Denied', `${currentUser} attempted to restore a trip without authorization.`, 'rose');
+      return;
+    }
     requestAuthAction('restore_trip', () => {
-      // CRITICAL FIX: Use refs instead of closures to avoid stale data from Firestore sync
-      const currentTrips = trips || [];
-      const currentTrashed = trashedTrips || [];
+      const currentTrips = tripsRef.current || [];
+      const currentTrashed = trashedTripsRef.current || [];
       
       const tripToRestore = currentTrashed.find(t => t.id === tripId);
-      if (tripToRestore) {
-        // Check if an equivalent trip already exists in active trips — skip restore if so
-        const restoreKey = getTripKey(tripToRestore);
-        const alreadyExists = currentTrips.some(et => getTripKey(et) === restoreKey);
-        if (alreadyExists) {
-          const newTrashed = currentTrashed.filter(t => t.id !== tripId);
-          setTrashedTrips(newTrashed);
-          // Firestore auto-syncs
-          addAuditLog('Trip Removed from Archive', `Duplicate of ${tripToRestore.patient} — removed from Archive.`, 'amber');
-          return;
-        }
-        
-        const newTrips = dedupTrips([...currentTrips, tripToRestore]);
+      if (!tripToRestore) return;
+      
+      const restoreKey = getTripKey(tripToRestore);
+      const alreadyExists = currentTrips.some(et => getTripKey(et) === restoreKey);
+      if (alreadyExists) {
         const newTrashed = currentTrashed.filter(t => t.id !== tripId);
-        
-        setTrips(newTrips);
         setTrashedTrips(newTrashed);
-        
-        // Writes directly to Firestore via setTrips/setTrashedTrips
-        
-        addAuditLog('Trip Restored', `${currentUser || 'Admin'} restored trip ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'archived', after: 'active' }] });
+        addToast('Duplicate Removed', `This trip already exists — removed from archive.`, 'info');
+        addAuditLog('Trip Removed from Archive', `Duplicate of ${tripToRestore.patient} — removed from Archive.`, 'amber');
+        return;
       }
+      
+      const newTrips = dedupTrips([...currentTrips, tripToRestore]);
+      const newTrashed = currentTrashed.filter(t => t.id !== tripId);
+      
+      addToast('Trip Restored', `${tripToRestore.patient} has been restored to active trips.`, 'success');
+      addAuditLog('Trip Restored', `${currentUser || 'Admin'} restored trip ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'archived', after: 'active' }] });
+      
+      return setTripsAndTrashed(newTrips, newTrashed);
     });
   };
 
@@ -2443,9 +2499,74 @@ const App = () => {
           <button onClick={() => setStartupIssue('')} className="text-amber-700 hover:text-amber-900 font-bold shrink-0">Dismiss</button>
         </div>
       )}
-      {isAuthenticated && (
-        // Status bar removed per UX request — connection indicator now next to company name in page headers
-        <></>
+      {isAuthenticated && !isLoading && !dataLoading && (
+        <div className="bg-white/80 backdrop-blur-md border-b border-slate-200/50 px-4 sm:px-6 py-1.5 flex items-center justify-between text-xs font-semibold z-40">
+          {/* Connection State Indicator */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5" title={`Connection: ${connectionInfo.stateLabel} | Quality: ${connectionInfo.qualityLabel} ${connectionInfo.latencyMs ? `(${connectionInfo.latencyMs}ms)` : ''}`}>
+              <div className={`w-2 h-2 rounded-full ${connectionInfo.stateDot}`} />
+              <span className={`text-${connectionInfo.stateColor}-600`}>{connectionInfo.stateLabel}</span>
+              {connectionInfo.isDegraded && connectionInfo.latencyMs && (
+                <span className="text-orange-500 font-bold ml-1">{connectionInfo.latencyMs}ms</span>
+              )}
+            </div>
+            {connectionInfo.effectiveType && connectionInfo.isOnline && (
+              <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 bg-slate-50 rounded-full border border-slate-100">
+                <span className="text-slate-400">{connectionInfo.effectiveType.toUpperCase()}</span>
+                {connectionInfo.downlinkMbps && (
+                  <span className="text-slate-500">&bull; {connectionInfo.downlinkMbps}Mbps</span>
+                )}
+              </div>
+            )}
+            {connectionInfo.isFlaky && connectionInfo.isOnline && (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full border border-amber-100 text-[10px] font-bold">
+                Flaky
+              </span>
+            )}
+            {/* Adaptive Sync Profile */}
+            <div className="hidden lg:flex items-center gap-1 px-2 py-0.5 bg-slate-50 rounded-full border border-slate-100" title={`Sync profile: ${enterprise?.adaptiveSync?.getProfile()?.name || 'normal'}`}>
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <span className="text-slate-500">{enterprise?.adaptiveSync?.getProfile()?.name || 'normal'}</span>
+            </div>
+          </div>
+
+          {/* Data Freshness + Enterprise Metrics */}
+          <div className="flex items-center gap-3">
+            {/* Pending writes indicator */}
+            {syncHealth?.pendingWrites > 0 && (
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100 text-[10px] font-bold">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                {syncHealth.pendingWrites} pending
+              </div>
+            )}
+            {/* Background sync stats */}
+            {enterprise?.backgroundSync && (
+              <div className="hidden md:flex items-center gap-1 px-2 py-0.5 bg-slate-50 rounded-full border border-slate-100" title={`Background sync: ${enterprise.backgroundSync.getStats().totalSynced} synced, ${enterprise.backgroundSync.getStats().totalFailed} failed`}>
+                <span className="text-slate-500">
+                  {enterprise.backgroundSync.getStats().totalSynced > 0 
+                    ? `${enterprise.backgroundSync.getStats().totalSynced} synced`
+                    : 'No pending ops'
+                  }
+                </span>
+              </div>
+            )}
+            {/* Cross-tab indicator */}
+            {enterprise?.crossTabSync && Object.keys(enterprise.crossTabSync.getActiveTabs()).length > 1 && (
+              <div className="hidden md:flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full border border-indigo-100 text-[10px] font-bold" title={`${Object.keys(enterprise.crossTabSync.getActiveTabs()).length} tabs open`}>
+                {Object.keys(enterprise.crossTabSync.getActiveTabs()).length} tabs
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 text-slate-500" title={`Last synced: ${formatSyncAgo(lastSyncTimestamp)}`}>
+              <div className={`w-1.5 h-1.5 rounded-full bg-slate-300 ${dataSaving ? 'animate-pulse bg-blue-500' : ''}`} />
+              <span>{dataSaving ? 'Syncing...' : `Synced ${formatSyncAgo(lastSyncTimestamp)}`}</span>
+            </div>
+            {role === 'admin' && (
+              <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full border border-indigo-100 text-[10px] font-bold uppercase">
+                {trips.length} trips &bull; {drivers.length} drivers
+              </span>
+            )}
+          </div>
+        </div>
       )}
 
       {/* LOADING SCREEN */}

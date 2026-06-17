@@ -10,6 +10,18 @@ import { timeToMinutes } from '../utils/tripDate';
 import { optimizeRoute as geminiOptimizeRoute } from '../config/ai';
 import { db, doc, onSnapshot, setDoc, serverTimestamp } from '../config/firebase';
 
+// Safely coerce any value (including legacy {address,phone,time} objects) to a string
+function safeStr(val) {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object') return val.address || val.name || val.label || val.text || val.value || '';
+  return String(val);
+}
+function sanitizeStop(s) {
+  if (!s || typeof s !== 'object') return s;
+  return { ...s, address: safeStr(s.address), time: safeStr(s.time), notes: safeStr(s.notes) };
+}
+
 const to12hr = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return t || 'WC';
   const m = String(t).match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
@@ -40,7 +52,10 @@ const statusColors = {
 
 const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendToSequencer }) => {
   const [stops, setStops] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+    try {
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      return Array.isArray(raw) ? raw.map(sanitizeStop) : [];
+    } catch { return []; }
   });
   const [routeName, setRouteName] = useState('');
   const [selectedDriver, setSelectedDriver] = useState(() => localStorage.getItem('agape_rp_driver') || '');
@@ -154,17 +169,17 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
 
   const addTrip = useCallback((trip) => {
     setStops(prev => [...prev,
-      { id: makeStopId(trip.id, 'pu'), tripId: trip.id, type: 'pickup', patient: trip.patient, time: trip.time, address: trip.pickup, phone: trip.pickupPhone || trip.patientPhone, wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId },
-      { id: makeStopId(trip.id, 'do'), tripId: trip.id, type: 'dropoff', patient: trip.patient, time: trip.time, address: trip.dropoff, phone: trip.dropoffPhone || trip.patientPhone, wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId },
+      { id: makeStopId(trip.id, 'pu'), tripId: trip.id, type: 'pickup', patient: trip.patient, time: safeStr(trip.time), address: safeStr(trip.pickup), phone: safeStr(trip.pickupPhone || trip.patientPhone), wheelchair: trip.wheelchair, notes: safeStr(trip.notes), bookingId: trip.bookingId },
+      { id: makeStopId(trip.id, 'do'), tripId: trip.id, type: 'dropoff', patient: trip.patient, time: safeStr(trip.time), address: safeStr(trip.dropoff), phone: safeStr(trip.dropoffPhone || trip.patientPhone), wheelchair: trip.wheelchair, notes: safeStr(trip.notes), bookingId: trip.bookingId },
     ]);
   }, []);
 
   const addPickupOnly = useCallback((trip) => {
-    setStops(prev => [...prev, { id: makeStopId(trip.id, 'pu'), tripId: trip.id, type: 'pickup', patient: trip.patient, time: trip.time, address: trip.pickup, phone: trip.pickupPhone || trip.patientPhone, wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId }]);
+    setStops(prev => [...prev, { id: makeStopId(trip.id, 'pu'), tripId: trip.id, type: 'pickup', patient: trip.patient, time: safeStr(trip.time), address: safeStr(trip.pickup), phone: safeStr(trip.pickupPhone || trip.patientPhone), wheelchair: trip.wheelchair, notes: safeStr(trip.notes), bookingId: trip.bookingId }]);
   }, []);
 
   const addDropoffOnly = useCallback((trip) => {
-    setStops(prev => [...prev, { id: makeStopId(trip.id, 'do'), tripId: trip.id, type: 'dropoff', patient: trip.patient, time: trip.time, address: trip.dropoff, phone: trip.dropoffPhone || trip.patientPhone, wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId }]);
+    setStops(prev => [...prev, { id: makeStopId(trip.id, 'do'), tripId: trip.id, type: 'dropoff', patient: trip.patient, time: safeStr(trip.time), address: safeStr(trip.dropoff), phone: safeStr(trip.dropoffPhone || trip.patientPhone), wheelchair: trip.wheelchair, notes: safeStr(trip.notes), bookingId: trip.bookingId }]);
   }, []);
 
   const removeStop = useCallback((stopId) => {
@@ -363,7 +378,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
               </div>
               <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
                 {isPu ? <LogIn size={9} className="text-blue-500 shrink-0" /> : <LogOut size={9} className="text-amber-600 shrink-0" />}
-                <span className="truncate">{stop.address}</span>
+                <span className="truncate">{safeStr(stop.address)}</span>
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">

@@ -9,12 +9,32 @@ const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 
-// Assets to precache on install
-const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-];
+// ── Install: precache shell + all built assets ────────────────────────────────
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(STATIC_CACHE).then(async (cache) => {
+      // Always cache the core shell
+      const coreUrls = ['/', '/index.html', '/agape.png', '/manifest.webmanifest'];
+      await Promise.allSettled(coreUrls.map(url => cache.add(url).catch(() => {})));
+      
+      // Try to load the Vite-generated precache manifest (all JS/CSS bundles)
+      try {
+        const resp = await fetch('/precache-manifest.json');
+        if (resp.ok) {
+          const urls = await resp.json();
+          await Promise.allSettled(urls.map(url => cache.add(url).catch(() => {})));
+          console.log(`[SW] Precached ${urls.length} assets from manifest`);
+        }
+      } catch {
+        // Manifest not available (first install while offline) — will retry on activate
+      }
+      
+      // Pre-create runtime caches
+      await caches.open(RUNTIME_CACHE);
+      await caches.open(DATA_CACHE);
+    })
+  );
+});
 
 // API endpoints to sync regularly
 const SYNC_ENDPOINTS = [
@@ -24,21 +44,7 @@ const SYNC_ENDPOINTS = [
   '/api/dispatchers'
 ];
 
-// ── Install: precache shell ──────────────────────────────────────────────────
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    Promise.all([
-      caches.open(STATIC_CACHE).then((cache) =>
-        cache.addAll(PRECACHE_URLS).catch(() => {
-          // Silently ignore precache errors (e.g. offline at install time)
-        })
-      ),
-      caches.open(DATA_CACHE) // Pre-create data cache
-    ])
-  );
-});
-
-// ── Activate: clean old caches, claim all clients ────────────────────────────
+// ── Activate: clean old caches, claim all clients, retry precache ─────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
@@ -51,6 +57,24 @@ self.addEventListener('activate', (event) => {
             .map((name) => caches.delete(name))
         )
       ),
+      // Retry precaching if install failed (e.g. offline at install time)
+      caches.open(STATIC_CACHE).then(async (cache) => {
+        try {
+          const resp = await fetch('/precache-manifest.json');
+          if (resp.ok) {
+            const urls = await resp.json();
+            const missing = [];
+            for (const url of urls) {
+              const cached = await cache.match(url);
+              if (!cached) missing.push(url);
+            }
+            if (missing.length > 0) {
+              await Promise.allSettled(missing.map(url => cache.add(url).catch(() => {})));
+              console.log(`[SW] Retry precached ${missing.length} missing assets`);
+            }
+          }
+        } catch { /* still offline */ }
+      }),
       // Claim all open clients immediately
       self.clients.claim(),
     ])
@@ -85,13 +109,31 @@ async function syncAllData() {
 
 // ── Message Handler: communicate with app ──────────────────────────────────────
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data?.type === 'RELOAD_ALL') {
+    self.clients.matchAll({ type: 'window' }).then((clients) => {
+      clients.forEach((client) => client.navigate(client.url));
+    });
+  }
   if (event.data?.type === 'SYNC_DATA') {
-    // Handle sync requests from app
     syncAllData();
   }
-  
+  if (event.data?.type === 'BACKGROUND_SYNC') {
+    // Trigger background sync from app
+    syncAllData();
+    // Also notify all clients to process their sync queues
+    self.clients.matchAll({ type: 'window' }).then((clients) => {
+      clients.forEach((client) => {
+        client.postMessage({
+          type: 'BACKGROUND_SYNC_COMPLETE',
+          timestamp: Date.now()
+        });
+      });
+    });
+  }
   if (event.data?.type === 'CHECK_UPDATES' && event.ports?.[0]) {
-    // Notify app of any pending updates
     event.ports[0].postMessage({
       type: 'UPDATE_STATUS',
       ready: true,
@@ -183,15 +225,4 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// ── Message handler: force reload on all clients when new SW is available ────
-// Also handles sync requests from the app
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-  if (event.data && event.data.type === 'RELOAD_ALL') {
-    self.clients.matchAll({ type: 'window' }).then((clients) => {
-      clients.forEach((client) => client.navigate(client.url));
-    });
-  }
-});
+

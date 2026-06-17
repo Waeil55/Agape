@@ -188,6 +188,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
   }, [editingCell]);
 
   const canEdit = role === 'admin' || role === 'dispatcher';
+  const canRestore = canEdit;
 
   const startCellEdit = useCallback((tripId, field, currentVal) => {
     setEditingCell({ tripId, field });
@@ -505,7 +506,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                             );
                           })}
                           <td className="px-2 py-1.5">
-                            {restoreTrip && (
+                            {restoreTrip && canRestore && (
                               <button onClick={() => restoreTrip(trip.id)}
                                 className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-[10.5px] font-bold hover:bg-slate-200 transition-colors">
                                 <RefreshCcw size={12} /> Restore

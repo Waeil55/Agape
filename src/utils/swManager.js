@@ -17,6 +17,14 @@ export const registerServiceWorker = async () => {
   }
 
   try {
+    // Check if already registered by index.html inline script
+    if (swRegistration) return swRegistration;
+    const existingReg = await navigator.serviceWorker.getRegistration('/');
+    if (existingReg) {
+      swRegistration = existingReg;
+      return swRegistration;
+    }
+    
     swRegistration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
     });

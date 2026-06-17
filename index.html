@@ -10,15 +10,18 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Agape Care" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#1E3A8A" />
     <meta name="description" content="Agape Care - Professional Fleet Management System for Enterprise" />
     <meta name="keywords" content="fleet management, dispatch system, vehicle tracking, logistics, NEMT" />
     <meta name="author" content="Agape Care" />
-    <!-- iOS Safari: full-screen launch images (optional but improves PWA feel) -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Preconnect: save 100-300ms on Firebase/Google API DNS+TLS -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin />
     <!-- Reload on chunk/TDZ errors (catches stale cached JS from old deploys) -->
     <script>
       var agapeCacheError = /ChunkLoadError|Loading chunk|dynamically imported|Failed to fetch dynamically|Cannot access.*before initialization/;

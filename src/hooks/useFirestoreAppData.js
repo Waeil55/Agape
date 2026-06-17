@@ -12,6 +12,35 @@ import {
   writeBatch,
 } from '../config/firebase';
 import { db, auth } from '../config/firebase';
+import {
+  readAppData,
+  saveAppData,
+  saveField as saveFieldLocal,
+  queueSyncOperation,
+  getPendingSyncOperations,
+  completeSyncOperation,
+  failSyncOperation,
+} from '../utils/localDB';
+
+// Enterprise modules — Wave 1 (foundation)
+import { backgroundSync } from '../utils/backgroundSync';
+import { crossTabSync, MessageType } from '../utils/crossTabSync';
+import { firestoreWriteMetrics, syncMetrics, indexedDBMetrics } from '../utils/performanceMonitor';
+import { dataLineage } from '../utils/dataLineage';
+import { adaptiveSync } from '../utils/adaptiveSync';
+
+// Enterprise modules — Wave 2 (advanced)
+import { eventSourcing, EventType } from '../utils/eventSourcing';
+import { firestoreWriteCircuit, CircuitState } from '../utils/circuitBreaker';
+import { predictivePrefetch } from '../utils/predictivePrefetch';
+import { retryQueue } from '../utils/retryQueue';
+import { distributedLock } from '../utils/distributedLock';
+
+// Enterprise modules — Wave 3 (enterprise-grade)
+import { sagaExecutor, SagaState } from '../utils/sagaPattern';
+import { observability } from '../utils/observability';
+import { rateLimiter } from '../utils/rateLimiter';
+import { requestDedup } from '../utils/requestDedup';
 
 const DATA_DOC = 'appData/agape';
 const TRIP_LEDGER_COLLECTION = 'tripLedger';
@@ -50,9 +79,37 @@ function normalizeTrip(trip) {
   return trip;
 }
 
+// Safely convert any value to a plain string.
+// Handles the legacy {address, phone, time} shape stored in old CSV-imported trips.
+// React error #31 is thrown when an object is rendered as a JSX child.
+function safeStr(val) {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (typeof val === 'object') {
+    return val.address || val.name || val.label || val.text || val.value || '';
+  }
+  return String(val);
+}
+
+function sanitizeTripFields(trip) {
+  if (!trip || typeof trip !== 'object') return trip;
+  return {
+    ...trip,
+    pickup:  safeStr(trip.pickup),
+    dropoff: safeStr(trip.dropoff),
+    time:    typeof trip.time === 'string' ? trip.time : safeStr(trip.time),
+    notes:   safeStr(trip.notes),
+    status:  typeof trip.status === 'string' ? trip.status : safeStr(trip.status),
+    date:    typeof trip.date === 'string' ? trip.date : safeStr(trip.date),
+  };
+}
+
 function normalizeData(data = {}) {
   const drivers = data.drivers || [];
-  const safeTrips = (data.trips || []).map(trip => {
+  const buildSafeTrips = (tripArr) => (tripArr || []).map(trip => {
+    if (!trip) return trip;
+
     let safePatient = trip?.patient;
     if (safePatient && typeof safePatient === 'object') {
       safePatient = 'Unknown Client';
@@ -74,17 +131,17 @@ function normalizeData(data = {}) {
       }
     }
 
-    return { ...trip, driverName: dName || '', patient: safePatient };
+    return sanitizeTripFields({ ...trip, driverName: dName || '', patient: safePatient });
   });
 
   return {
     ...DEFAULT_DATA,
     ...data,
-    trips: safeTrips,
+    trips: buildSafeTrips(data.trips),
     drivers: data.drivers || [],
     dispatchers: data.dispatchers || [],
     vehicles: data.vehicles || [],
-    trashedTrips: data.trashedTrips || [],
+    trashedTrips: buildSafeTrips(data.trashedTrips),
     logs: data.logs || [],
     phoneNumbers: data.phoneNumbers || DEFAULT_DATA.phoneNumbers,
   };
@@ -348,6 +405,9 @@ export function useFirestoreAppData() {
   const dataRef = useRef(DEFAULT_DATA);
   const tripProgressRef = useRef({});
   const pendingWritesRef = useRef(0);
+  const recoveringRef = useRef(false);
+  const indexedDBLoadedRef = useRef(false);
+  const lastFirestoreSyncRef = useRef(null);
   const mirrorBackfillRef = useRef({
     drivers: false,
     dispatchers: false,
@@ -355,6 +415,105 @@ export function useFirestoreAppData() {
     logs: false,
     phoneNumbers: false,
   });
+
+  // ── IndexedDB: Load from local DB on mount for instant startup ────────────
+  useEffect(() => {
+    if (indexedDBLoadedRef.current) return;
+    indexedDBLoadedRef.current = true;
+
+    // Initialize enterprise modules — Wave 1 (foundation)
+    crossTabSync.init();
+    dataLineage.init();
+    backgroundSync.start();
+    adaptiveSync.start();
+
+    // Initialize enterprise modules — Wave 2 (advanced)
+    eventSourcing.init();
+    predictivePrefetch.start();
+    retryQueue.start();
+
+    // Initialize enterprise modules — Wave 3 (enterprise-grade)
+    // observability and rateLimiter are singletons — auto-initialized on import
+    // requestDedup is a singleton — auto-initialized on import
+
+    readAppData().then((localData) => {
+      if (!localData) return;
+      // Apply local data immediately — user sees data in <10ms
+      const normalized = normalizeData(localData);
+      dataRef.current = normalized;
+      setState(prev => ({
+        ...prev,
+        trips: normalized.trips || [],
+        drivers: normalized.drivers || [],
+        dispatchers: normalized.dispatchers || [],
+        vehicles: normalized.vehicles || [],
+        trashedTrips: normalized.trashedTrips || [],
+        logs: normalized.logs || [],
+        phoneNumbers: normalized.phoneNumbers || DEFAULT_DATA.phoneNumbers,
+        loading: false,
+        initialized: true,
+        docExists: true,
+        lastLoadedAt: localData._lastLocalSync || new Date().toISOString(),
+      }));
+    }).catch(() => {});
+
+    // Process any pending sync operations from previous offline sessions
+    processSyncQueue().catch(() => {});
+  }, []);
+
+  // ── Background sync queue processor ────────────────────────────────────────
+  const processSyncQueue = useCallback(async () => {
+    if (!navigator.onLine) return;
+    const pending = await getPendingSyncOperations();
+    if (pending.length === 0) return;
+
+    for (const op of pending) {
+      // Check if next retry time has passed
+      if (op.nextRetryAt && new Date(op.nextRetryAt) > new Date()) continue;
+
+      try {
+        if (op.type === 'setDoc') {
+          await setDoc(doc(db, op.collection, op.docId), op.data, { merge: true });
+        } else if (op.type === 'setField') {
+          await setDoc(doc(db, DATA_DOC), {
+            [op.field]: op.value,
+            updatedAt: serverTimestamp(),
+            updatedField: op.field,
+            updatedAtLocal: new Date().toISOString(),
+          }, { merge: true });
+        }
+        await completeSyncOperation(op.id);
+      } catch (err) {
+        await failSyncOperation(op.id, err);
+      }
+    }
+  }, []);
+
+  // Re-process sync queue when connection comes back online
+  useEffect(() => {
+    const handleOnline = () => processSyncQueue();
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [processSyncQueue]);
+
+  // Cross-tab sync: listen for updates from other tabs
+  useEffect(() => {
+    const unsub = crossTabSync.on(MessageType.DATA_UPDATE, (data, senderTabId) => {
+      const { field, value } = data;
+      if (!field || value === undefined) return;
+
+      // Apply the update from the other tab
+      dataRef.current = {
+        ...normalizeData(dataRef.current),
+        [field]: value,
+      };
+      setState(prev => ({
+        ...prev,
+        [field]: value,
+      }));
+    });
+    return unsub;
+  }, []);
 
   const setListenerStatus = useCallback((name, status, err = null) => {
     setState(prev => ({
@@ -392,6 +551,7 @@ export function useFirestoreAppData() {
               trips: mergeTripProgress(nextData.trips, tripProgressRef.current),
             };
             dataRef.current = mergedData;
+            lastFirestoreSyncRef.current = new Date().toISOString();
             setState(prev => ({
               ...prev,
               trips: mergedData.trips,
@@ -406,7 +566,19 @@ export function useFirestoreAppData() {
               initialized: true,
               docExists: true,
               lastLoadedAt: new Date().toISOString(),
+              lastFirestoreSync: lastFirestoreSyncRef.current,
             }));
+            // Write-through to IndexedDB for instant startup next time
+            saveAppData({
+              trips: mergedData.trips,
+              drivers: mergedData.drivers,
+              dispatchers: mergedData.dispatchers,
+              vehicles: mergedData.vehicles,
+              trashedTrips: mergedData.trashedTrips,
+              logs: mergedData.logs,
+              phoneNumbers: mergedData.phoneNumbers,
+              _lastLocalSync: new Date().toISOString(),
+            }).catch(() => {});
           };
 
           buildDataFromTripLedger()
@@ -419,8 +591,10 @@ export function useFirestoreAppData() {
               const hydrated = mergeDataWithLedger(d, recovered);
               applyData(hydrated);
 
+              if (recoveringRef.current) return;
               if (!hasRecoveredLedgerRecords(d, hydrated)) return;
 
+              recoveringRef.current = true;
               try {
                 await setDoc(doc(db, DATA_DOC), {
                   trips: sanitizeForFirestore(hydrated.trips),
@@ -434,6 +608,8 @@ export function useFirestoreAppData() {
                 setState(prev => ({ ...prev, lastRecoveredAt: new Date().toISOString() }));
               } catch (recoveryErr) {
                 console.error('Ledger recovery patch failed:', recoveryErr);
+              } finally {
+                recoveringRef.current = false;
               }
             })
             .catch((recoveryErr) => {
@@ -670,7 +846,8 @@ export function useFirestoreAppData() {
           error: null,
         }));
 
-        if (hasRecoveredLedgerRecords(baseData, patched)) {
+        if (!recoveringRef.current && hasRecoveredLedgerRecords(baseData, patched)) {
+          recoveringRef.current = true;
           setDoc(doc(db, DATA_DOC), {
             trips: sanitizeForFirestore(patched.trips),
             trashedTrips: sanitizeForFirestore(patched.trashedTrips),
@@ -682,6 +859,7 @@ export function useFirestoreAppData() {
           }, { merge: true }).catch((err) => {
             console.error('Live ledger recovery patch failed:', err);
           }).then(() => {
+            recoveringRef.current = false;
             setState(prev => ({ ...prev, lastRecoveredAt: new Date().toISOString() }));
           });
         }
@@ -706,58 +884,149 @@ export function useFirestoreAppData() {
 
   const writeField = useCallback(async (field, value) => {
     const sanitized = sanitizeForFirestore(value);
-    dataRef.current = {
-      ...normalizeData(dataRef.current),
-      [field]: sanitized,
-    };
+    const beforeData = dataRef.current[field];
 
-    pendingWritesRef.current += 1;
-    setState(prev => ({
-      ...prev,
-      [field]: sanitized,
-      saving: true,
-      error: null,
-    }));
+    // Request deduplication: skip duplicate writes from rapid UI clicks
+    const dedupKey = requestDedup.generateKey(`write:${field}`, { value: JSON.stringify(sanitized).slice(0, 200) });
+    return requestDedup.execute(dedupKey, async () => {
+      // Rate limiting: check quota (advisory — doesn't block)
+      rateLimiter.check(`firestore.write`, auth.currentUser?.uid || 'anonymous', roleRef.current || 'driver');
 
-    try {
-      await setDoc(doc(db, DATA_DOC), {
-        [field]: sanitized,
-        updatedAt: serverTimestamp(),
-        updatedField: field,
-        updatedAtLocal: new Date().toISOString(),
-      }, { merge: true });
-
-      if (MIRRORED_TRIP_FIELDS.has(field)) {
-        await mirrorTripsToLedger(dataRef.current.trips || [], dataRef.current.trashedTrips || []);
-      } else if (field === 'drivers') {
-        await mirrorRecordsToCollection(DRIVER_PROFILE_COLLECTION, dataRef.current.drivers || []);
-      } else if (field === 'dispatchers') {
-        await mirrorRecordsToCollection(DISPATCHER_PROFILE_COLLECTION, dataRef.current.dispatchers || []);
-      } else if (field === 'vehicles') {
-        await mirrorRecordsToCollection(VEHICLE_COLLECTION, dataRef.current.vehicles || []);
-      } else if (field === 'logs') {
-        await mirrorLogsToCollection(sanitized);
-      } else if (field === 'phoneNumbers') {
-        await setDoc(doc(db, PHONE_NUMBERS_DOC), sanitized, { merge: true });
+      // Distributed lock: acquire lock on field before writing
+      let lockHandle = null;
+      try {
+        lockHandle = await distributedLock.acquire(`field:${field}`, { ttl: 15000 });
+      } catch (lockErr) {
+        console.warn(`[writeField] Lock acquisition failed for ${field}:`, lockErr.message);
       }
 
-      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+      // Start tracing span
+      const span = observability.startSpan(`write:${field}`);
+      span.setAttribute('field', field);
+      span.setAttribute('actor', auth.currentUser?.email || 'system');
+
+      dataRef.current = {
+        ...normalizeData(dataRef.current),
+        [field]: sanitized,
+      };
+
+      pendingWritesRef.current += 1;
+      adaptiveSync.setPendingWrites(pendingWritesRef.current);
       setState(prev => ({
         ...prev,
-        saving: pendingWritesRef.current > 0,
-        lastSavedAt: new Date().toISOString(),
+        [field]: sanitized,
+        saving: true,
+        error: null,
       }));
-      return true;
-    } catch (err) {
-      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
-      console.error(`Failed to save ${field} to Firestore:`, err);
-      setState(prev => ({
-        ...prev,
-        saving: pendingWritesRef.current > 0,
-        error: err.message || `Failed to save ${field}`,
-      }));
-      return false;
-    }
+
+      // Performance: start timing
+      firestoreWriteMetrics.mark(`write-${field}`);
+      indexedDBMetrics.mark(`idb-${field}`);
+
+      // Event sourcing: emit event
+      eventSourcing.emit(
+        EventType.TRIP_UPDATED,
+        field,
+        'field',
+        { before: beforeData, after: sanitized },
+        { actor: auth.currentUser?.email || 'system', source: 'ui' }
+      );
+
+      try {
+        // Circuit breaker: execute write with protection
+        await firestoreWriteCircuit.execute(async () => {
+          await setDoc(doc(db, DATA_DOC), {
+            [field]: sanitized,
+            updatedAt: serverTimestamp(),
+            updatedField: field,
+            updatedAtLocal: new Date().toISOString(),
+          }, { merge: true });
+        });
+
+        // Performance: record write timing
+        firestoreWriteMetrics.measure(`write-${field}`, 'firestore-write');
+        indexedDBMetrics.measure(`idb-${field}`, 'indexeddb-write');
+
+        // Data lineage: track the change
+        dataLineage.track({
+          field,
+          action: 'update',
+          before: beforeData,
+          after: sanitized,
+          actor: auth.currentUser?.email || 'system',
+          actorRole: auth.currentUser?.role || 'system',
+          source: 'ui',
+        });
+
+        // Cross-tab sync: broadcast update
+        crossTabSync.broadcastDataUpdate(field, sanitized, { action: 'update' });
+
+        if (MIRRORED_TRIP_FIELDS.has(field)) {
+          await mirrorTripsToLedger(dataRef.current.trips || [], dataRef.current.trashedTrips || []);
+        } else if (field === 'drivers') {
+          await mirrorRecordsToCollection(DRIVER_PROFILE_COLLECTION, dataRef.current.drivers || []);
+        } else if (field === 'dispatchers') {
+          await mirrorRecordsToCollection(DISPATCHER_PROFILE_COLLECTION, dataRef.current.dispatchers || []);
+        } else if (field === 'vehicles') {
+          await mirrorRecordsToCollection(VEHICLE_COLLECTION, dataRef.current.vehicles || []);
+        } else if (field === 'logs') {
+          await mirrorLogsToCollection(sanitized);
+        } else if (field === 'phoneNumbers') {
+          await setDoc(doc(db, PHONE_NUMBERS_DOC), sanitized, { merge: true });
+        }
+
+        pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+        adaptiveSync.setPendingWrites(pendingWritesRef.current);
+        syncMetrics.record('sync-complete', 1, { field });
+        setState(prev => ({
+          ...prev,
+          saving: pendingWritesRef.current > 0,
+          lastSavedAt: new Date().toISOString(),
+        }));
+        // Write-through to IndexedDB
+        saveFieldLocal(field, sanitized).catch(() => {});
+        return true;
+      } catch (err) {
+        pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+        adaptiveSync.setPendingWrites(pendingWritesRef.current);
+        syncMetrics.recordError('sync-complete', err, { field });
+        console.error(`Failed to save ${field} to Firestore:`, err);
+        setState(prev => ({
+          ...prev,
+          saving: pendingWritesRef.current > 0,
+          error: err.message || `Failed to save ${field}`,
+        }));
+        // Queue for retry via retry queue (with dead letter)
+        retryQueue.enqueue({
+          type: 'setField',
+          field,
+          value: sanitized,
+          collection: DATA_DOC,
+        }, err).catch(() => {});
+        // Also queue via background sync
+        backgroundSync.queue({
+          type: 'setField',
+          field,
+          value: sanitized,
+          collection: DATA_DOC,
+        }).catch(() => {});
+        // Also queue via legacy path
+        queueSyncOperation({
+          type: 'setField',
+          field,
+          value: sanitized,
+          collection: DATA_DOC,
+        }).catch(() => {});
+        // Still save locally so user doesn't lose data
+        saveFieldLocal(field, sanitized).catch(() => {});
+        return false;
+      } finally {
+        // End tracing span
+        observability.endSpan(span.spanId, span.status || 'ok');
+        // Release distributed lock
+        lockHandle?.release?.();
+      }
+    }).then(result => result.executed);
   }, []);
 
   const setTrips = useCallback((updater) => {
@@ -863,6 +1132,87 @@ export function useFirestoreAppData() {
     const next = typeof updater === 'function' ? updater(current) : updater;
     return writeField('trashedTrips', next);
   }, [writeField]);
+
+  const writeTripsBatch = useCallback(async (nextTrips, nextTrashed) => {
+    const sanitizedTrips = sanitizeForFirestore(nextTrips);
+    const sanitizedTrashed = sanitizeForFirestore(nextTrashed);
+    const beforeTrips = dataRef.current.trips;
+    const beforeTrashed = dataRef.current.trashedTrips;
+    dataRef.current = {
+      ...normalizeData(dataRef.current),
+      trips: sanitizedTrips,
+      trashedTrips: sanitizedTrashed,
+    };
+    pendingWritesRef.current += 1;
+    adaptiveSync.setPendingWrites(pendingWritesRef.current);
+    setState(prev => ({
+      ...prev,
+      trips: sanitizedTrips,
+      trashedTrips: sanitizedTrashed,
+      saving: true,
+      error: null,
+    }));
+
+    // Performance timing
+    firestoreWriteMetrics.mark('write-trips-batch');
+
+    try {
+      await setDoc(doc(db, DATA_DOC), {
+        trips: sanitizedTrips,
+        trashedTrips: sanitizedTrashed,
+        updatedAt: serverTimestamp(),
+        updatedField: 'trips+trashed',
+        updatedAtLocal: new Date().toISOString(),
+      }, { merge: true });
+
+      firestoreWriteMetrics.measure('write-trips-batch', 'firestore-write');
+
+      // Data lineage: track batch change
+      dataLineage.track({
+        field: 'trips',
+        action: 'batch-update',
+        before: { tripsCount: beforeTrips?.length, trashedCount: beforeTrashed?.length },
+        after: { tripsCount: sanitizedTrips?.length, trashedCount: sanitizedTrashed?.length },
+        actor: auth.currentUser?.email || 'system',
+        actorRole: auth.currentUser?.role || 'system',
+        source: 'ui',
+      });
+
+      // Cross-tab sync
+      crossTabSync.broadcastDataUpdate('trips', sanitizedTrips, { action: 'batch' });
+      crossTabSync.broadcastDataUpdate('trashedTrips', sanitizedTrashed, { action: 'batch' });
+
+      await mirrorTripsToLedger(sanitizedTrips || [], sanitizedTrashed || []);
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+      adaptiveSync.setPendingWrites(pendingWritesRef.current);
+      syncMetrics.record('sync-complete', 1, { field: 'trips+trashed' });
+      setState(prev => ({
+        ...prev,
+        saving: pendingWritesRef.current > 0,
+        lastSavedAt: new Date().toISOString(),
+      }));
+      return true;
+    } catch (err) {
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+      adaptiveSync.setPendingWrites(pendingWritesRef.current);
+      syncMetrics.recordError('sync-complete', err, { field: 'trips+trashed' });
+      console.error('Failed to save trips+trashed to Firestore:', err);
+      setState(prev => ({
+        ...prev,
+        saving: pendingWritesRef.current > 0,
+        error: err.message || 'Failed to save trips',
+      }));
+      return false;
+    }
+  }, []);
+
+  const setTripsAndTrashed = useCallback((tripsUpdater, trashedUpdater) => {
+    const currentTrips = dataRef.current.trips || [];
+    const currentTrashed = dataRef.current.trashedTrips || [];
+    const nextTrips = typeof tripsUpdater === 'function' ? tripsUpdater(currentTrips) : tripsUpdater;
+    const nextTrashed = typeof trashedUpdater === 'function' ? trashedUpdater(currentTrashed) : trashedUpdater;
+    return writeTripsBatch(nextTrips, nextTrashed);
+  }, [writeTripsBatch]);
 
   const setLogs = useCallback((updater) => {
     const current = dataRef.current.logs || [];
@@ -1015,6 +1365,7 @@ export function useFirestoreAppData() {
     initialized: state.initialized,
     docExists: state.docExists,
     lastSavedAt: state.lastSavedAt,
+    lastFirestoreSync: state.lastFirestoreSync,
     syncHealth: {
       loading: state.loading,
       saving: state.saving,
@@ -1023,11 +1374,37 @@ export function useFirestoreAppData() {
       docExists: state.docExists,
       lastSavedAt: state.lastSavedAt,
       lastLoadedAt: state.lastLoadedAt,
+      lastFirestoreSync: state.lastFirestoreSync,
       lastRecoveredAt: state.lastRecoveredAt,
       lastBackupAt: state.lastBackupAt,
       lastRepairAt: state.lastRepairAt,
       listenerStatus: state.listenerStatus,
       pendingWrites: pendingWritesRef.current,
+    },
+    // Enterprise modules exposed for UI
+    enterprise: {
+      // Wave 1 (foundation)
+      backgroundSync,
+      crossTabSync,
+      dataLineage,
+      adaptiveSync,
+      performance: {
+        writes: firestoreWriteMetrics,
+        sync: syncMetrics,
+        indexedDB: indexedDBMetrics,
+      },
+      // Wave 2 (advanced)
+      eventSourcing,
+      circuitBreaker: firestoreWriteCircuit,
+      predictivePrefetch,
+      retryQueue,
+      distributedLock,
+      // Wave 3 (enterprise-grade)
+      sagaExecutor,
+      SagaState,
+      observability,
+      rateLimiter,
+      requestDedup,
     },
     setTrips,
     setDrivers,
@@ -1036,9 +1413,11 @@ export function useFirestoreAppData() {
     upsertDispatcherProfile,
     setVehicles,
     setTrashedTrips,
+    setTripsAndTrashed,
     setLogs,
     setPhoneNumbers,
     addLog,
+    processSyncQueue,
     initializeAppData,
     repairCloudMirrors,
     createCloudBackup,

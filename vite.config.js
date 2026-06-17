@@ -1,8 +1,33 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { readdirSync, writeFileSync } from 'fs';
+import { join, resolve } from 'path';
+
+// Vite plugin: after build, write a precache manifest for the service worker
+function swPrecacheManifest() {
+  return {
+    name: 'sw-precache-manifest',
+    closeBundle() {
+      try {
+        const distDir = resolve(__dirname, 'dist');
+        const assetsDir = join(distDir, 'assets');
+        const files = readdirSync(assetsDir);
+        const manifest = files.map(f => `/assets/${f}`);
+        manifest.push('/');
+        manifest.push('/index.html');
+        manifest.push('/agape.png');
+        manifest.push('/manifest.webmanifest');
+        writeFileSync(join(distDir, 'precache-manifest.json'), JSON.stringify(manifest));
+        console.log(`[SW] Precache manifest written: ${manifest.length} URLs`);
+      } catch (err) {
+        console.warn('[SW] Failed to write precache manifest:', err.message);
+      }
+    },
+  };
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), swPrecacheManifest()],
   server: {
     port: 3000,
     open: true,

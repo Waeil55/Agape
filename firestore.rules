@@ -12,57 +12,112 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
+    // ── User accounts ──
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && (isAdmin() || request.resource.data.role == 'driver');
-      allow update: if request.auth != null && (isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role));
+      allow update: if request.auth != null && (isAdmin() || isOwner(userId));
       allow delete: if request.auth != null && isAdmin();
     }
-    match /routeData/{document} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
+
+    // ── Master data document ──
     match /appData/agape {
       allow read: if request.auth != null;
       allow write: if request.auth != null && isDispatcher();
     }
-    match /logs/{logId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && isAdmin();
-    }
+
+    // ── Trips ──
     match /trips/{tripId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && isDispatcher();
     }
-    match /tripLedger/{tripId} {
-      allow read: if request.auth != null && isDispatcher();
+    match /trashedTrips/{tripId} {
+      allow read: if request.auth != null;
       allow write: if request.auth != null && isDispatcher();
     }
+    match /tripLedger/{tripId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isDispatcher();
+    }
+
+    // ── Driver workflow ──
     match /driverTripProgress/{tripId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
     }
+    match /driverTelemetry/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── Profiles ──
     match /driverProfiles/{driverId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && (isOwner(driverId) || isDispatcher());
     }
     match /dispatcherProfiles/{dispatcherId} {
-      allow read: if request.auth != null && isDispatcher();
-      allow write: if request.auth != null && isAdmin();
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isOwner(dispatcherId) || isDispatcher());
     }
     match /fleetVehicles/{vehicleId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && isDispatcher();
     }
-    match /systemConfig/{document} {
-      allow read: if request.auth != null && isDispatcher();
-      allow write: if request.auth != null && isAdmin();
-    }
+
+    // ── Legacy driver location (firebase.js) ──
     match /drivers/{driverId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && isOwner(driverId);
     }
+
+    // ── Config ──
+    match /systemConfig/{document} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isDispatcher();
+    }
+    match /routeData/{document} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── Logs ──
+    match /logs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && isAdmin();
+    }
+    match /analyticsLogs/{logId} {
+      allow read: if request.auth != null && isDispatcher();
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && isAdmin();
+    }
+    match /systemBackups/{docId} {
+      allow read: if request.auth != null && isDispatcher();
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // ── Chat (new system) ──
+    match /chat_conversations/{convId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      match /messages/{msgId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow update: if request.auth != null;
+        allow delete: if request.auth != null && isAdmin();
+      }
+      match /typing/{docId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null;
+      }
+    }
+    match /chat_presence/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── Chat (legacy) ──
     match /global_chat/{msgId} {
       allow read, write: if request.auth != null && isDispatcher();
     }
@@ -76,19 +131,23 @@ service cloud.firestore {
       allow update: if request.auth != null;
       allow delete: if request.auth != null && isAdmin();
     }
+    match /chat_typing/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── SMS ──
     match /smsLogs/{logId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update: if request.auth != null;
       allow delete: if request.auth != null && isAdmin();
     }
+
+    // ── Presence ──
     match /presence/{email} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.token.email == email;
-    }
-    match /chat_typing/{docId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.resource.data.email == request.auth.token.email;
+      allow write: if request.auth != null;
     }
   }
 }

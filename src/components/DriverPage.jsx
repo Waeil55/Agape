@@ -851,13 +851,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }
   }, []);
 
-  // Load last odometer from completed trips
+  // Load last odometer from completed trips, fallback to localStorage
   useEffect(() => {
     if (!me?.id) return;
     const completed = driverScopedTrips
       .filter(t => isWorkflowTerminalTrip(t) && t.dropoffOdometer)
       .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
-    if (completed.length > 0) setLastOdometer(completed[0].dropoffOdometer);
+    if (completed.length > 0) {
+      setLastOdometer(completed[0].dropoffOdometer);
+      localStorage.setItem('agape_last_odometer', String(completed[0].dropoffOdometer));
+    } else {
+      const saved = parseInt(localStorage.getItem('agape_last_odometer') || '0', 10);
+      if (saved > 0) setLastOdometer(saved);
+    }
   }, [driverScopedTrips, me?.id]);
 
   // GPS is mandatory — always active on mount. Also auto-clock-in on mount.
@@ -1458,6 +1464,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       arrivalTime: nowIso,
     }, 'Route Stop Arrived', `${currentUser} arrived at stop ${routeStopOdometerPrompt.sequenceIndex}.`);
     setLastOdometer(odo);
+    localStorage.setItem('agape_last_odometer', String(odo));
     setRouteStopOdometerPrompt(null);
     setRouteStopOdometerValue('');
   }, [currentUser, lastOdometer, routeStopOdometerPrompt, routeStopOdometerValue, saveRoutePlanStopWorkflow]);
@@ -1763,6 +1770,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       startTime: nowIso,
     });
     setLastOdometer(odo);
+    localStorage.setItem('agape_last_odometer', String(odo));
     setShowOdometerPrompt(null);
     setOdometerValue('');
   };
@@ -1796,6 +1804,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       startTime: nowIso,
     });
     setLastOdometer(odo);
+    localStorage.setItem('agape_last_odometer', String(odo));
     setShowArrivalConfirm(null);
     setArrivalOdometer('');
   };
@@ -1928,6 +1937,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             onAddAuditLog('Trip Completed via Edit', `${currentUser} completed trip for ${trip.patient} (odo: ${odo.toLocaleString()} mi).`, 'emerald');
           }
           setLastOdometer(odo);
+          localStorage.setItem('agape_last_odometer', String(odo));
           setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
           if (navigator.onLine) { saveOdometerReading(trip.id, odo).catch(() => {}); }
           else { addToQueue('completeTrip', { tripId: trip.id, odometer: odo }); }
@@ -2013,6 +2023,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       completedVehicle: me?.vehicle || '',
     });
     setLastOdometer(odo);
+    localStorage.setItem('agape_last_odometer', String(odo));
     setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
     setShowCompleteModal(null);
     setCompleteOdometer('');
@@ -3265,8 +3276,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
       )}
 
-      {/* ===== FULL-SCREEN TRIP DETAILS ===== */}
-      {showTripDetails && (() => {
+      {/* ===== TRIP DETAILS (Inline page) ===== */}
+      {showTripDetails && activeNav === 'trips' && !expandedTripId && (() => {
         const sev = resolveStatus(showTripDetails);
         const stepIdx = (() => {
           const s = String(showTripDetails.status || '').toLowerCase();
@@ -3278,7 +3289,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         })();
         const steps = ['Scheduled', 'En Route', 'At Pickup', 'In Transit', 'Complete'];
         return (
-        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 130 }}>
+        <div className="flex-1 flex flex-col bg-white animate-slide-up" style={{ paddingBottom: 'calc(88px + env(safe-area-inset-bottom, 0px))' }}>
           <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3 shrink-0">
             <button type="button" onClick={() => setShowTripDetails(null)} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
               <ArrowLeft size={20} className="text-slate-700" />
