@@ -471,6 +471,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [routeTemplates, setRouteTemplates] = useState([]);
   const [assignedSequence, setAssignedSequence] = useState(null);
   const [showAssignedRouteDetails, setShowAssignedRouteDetails] = useState(false);
+  const [timeEditModal, setTimeEditModal] = useState(null);
+  const [timeEditValue, setTimeEditValue] = useState('');
+  const [timeEditType, setTimeEditType] = useState('');
+  const [bLegSelectModal, setBLegSelectModal] = useState(null);
+  const [bLegCandidates, setBLegCandidates] = useState([]);
   const displayLoginId = useMemo(
     () => String(me?.email || currentUser || '').replace(/@auth\.agapecare\.local$/i, ''),
     [me?.email, currentUser]
@@ -1686,6 +1691,81 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setTransferReason('');
     setShowToast({ type: 'success', message: `Transfer request sent to ${request.toDriverName}.` });
   };
+
+  const handleTimeClick = useCallback((trip) => {
+    if (!trip?.id) return;
+    const rawTime = trip.time || '';
+    setTimeEditModal(trip);
+    setTimeEditType(isWillCall(trip) ? 'will_call' : isInOutTrip(trip) ? 'in_out' : 'scheduled');
+    setTimeEditValue(rawTime === 'Will Call' || rawTime === 'WC' ? '' : rawTime);
+  }, []);
+
+  const saveTimeEdit = useCallback(() => {
+    if (!timeEditModal) return;
+    const trip = timeEditModal;
+    let updates = {};
+
+    if (timeEditType === 'in_out') {
+      updates = {
+        timingType: 'in_out',
+        isInOut: true,
+        time: 'IN/OUT',
+      };
+      onUpdateTrip?.({ ...trip, ...updates });
+      onAddAuditLog?.('Trip Time Updated', `${currentUser} marked ${trip.patient || trip.id} as IN/OUT.`, 'blue');
+
+      // Find B-leg candidates: same patient, reversed addresses (A's dropoff = B's pickup)
+      const patientKey = (trip.patient || '').trim().toLowerCase();
+      const aDropoff = (trip.dropoff || '').trim().toLowerCase();
+      const candidates = (tripsRef.current || [])
+        .filter(t => t.id !== trip.id && (t.patient || '').trim().toLowerCase() === patientKey)
+        .filter(t => !isInOutTrip(t) && !isWillCall(t))
+        .filter(t => {
+          const tPickup = (t.pickup || '').trim().toLowerCase();
+          return tPickup === aDropoff || getSequencePairScore(trip, t) > 0;
+        })
+        .sort((a, b) => getSequencePairScore(trip, b) - getSequencePairScore(trip, a));
+
+      if (candidates.length === 1) {
+        // Auto-pair with the only candidate
+        onUpdateTrip?.({ ...candidates[0], pairedAfterTripId: trip.id, timingType: 'in_out_return', isInOut: true, legRelationship: 'in_out_return' });
+        setShowToast({ type: 'success', message: `Paired with return trip: ${candidates[0].patient}` });
+      } else if (candidates.length > 1) {
+        // Show selection modal
+        setBLegCandidates(candidates);
+        setBLegSelectModal(trip);
+      } else {
+        setShowToast({ type: 'info', message: 'No matching return trip found for this patient.' });
+      }
+      setTimeEditModal(null);
+      setTimeEditValue('');
+      setTimeEditType('');
+      return;
+    } else if (timeEditType === 'will_call') {
+      if (!timeEditValue) {
+        updates = { time: 'Will Call', timingType: 'will_call', isWillCallTrip: true };
+      } else {
+        updates = { time: timeEditValue, timingType: 'scheduled', isWillCallTrip: false };
+      }
+    } else {
+      updates = { time: timeEditValue, timingType: 'scheduled' };
+    }
+
+    onUpdateTrip?.({ ...trip, ...updates });
+    onAddAuditLog?.('Trip Time Updated', `${currentUser} updated time for ${trip.patient || trip.id} to ${updates.time || 'Will Call'}.`, 'blue');
+    setShowToast({ type: 'success', message: `Time updated to ${updates.time || 'Will Call'}` });
+    setTimeEditModal(null);
+    setTimeEditValue('');
+    setTimeEditType('');
+  }, [timeEditModal, timeEditType, timeEditValue, currentUser, onUpdateTrip, onAddAuditLog, tripsRef]);
+
+  const selectBLeg = useCallback((aLegTrip, bLegTrip) => {
+    onUpdateTrip?.({ ...bLegTrip, pairedAfterTripId: aLegTrip.id, timingType: 'in_out_return', isInOut: true, legRelationship: 'in_out_return' });
+    onAddAuditLog?.('B-Leg Paired', `${currentUser} paired ${aLegTrip.patient} return trip with ${bLegTrip.id}.`, 'blue');
+    setShowToast({ type: 'success', message: `Paired with return trip: ${bLegTrip.patient}` });
+    setBLegSelectModal(null);
+    setBLegCandidates([]);
+  }, [currentUser, onUpdateTrip, onAddAuditLog]);
 
   const applyTripTransferDecision = (trip, accepted) => {
     const req = trip?.transferRequest;
@@ -2964,6 +3044,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         );
                       } : null,
                     }}
+                    onTimeClick={handleTimeClick}
                   />
                 </React.Fragment>
               );
@@ -2971,6 +3052,115 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
           )}
 
+        </div>
+      )}
+
+      {/* ===== B-LEG SELECTION MODAL ===== */}
+      {bLegSelectModal && (
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 125 }} onClick={() => { setBLegSelectModal(null); setBLegCandidates([]); }}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="relative w-[94%] max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-slate-100 shrink-0">
+              <h2 className="font-bold text-base text-slate-900">Select Return Trip (B Leg)</h2>
+              <p className="text-xs text-slate-500 mt-0.5">{bLegSelectModal.patient} — Choose the matching return trip</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {bLegCandidates.map((candidate) => (
+                <button key={candidate.id} onClick={() => selectBLeg(bLegSelectModal, candidate)}
+                  className="w-full text-left p-4 bg-white border border-slate-200 rounded-2xl hover:border-blue-400 hover:bg-blue-50 transition-all active:scale-[0.98]">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-900 truncate">{candidate.patient}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">#{candidate.bookingId || candidate.id}</p>
+                      <p className="text-xs text-slate-400 mt-0.5 truncate">{candidate.pickup} → {candidate.dropoff}</p>
+                    </div>
+                    <div className="text-right shrink-0 ml-2">
+                      <p className="text-xs font-bold text-slate-600">{to12hr(candidate.time) || 'No time'}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{candidate.distance ? `${candidate.distance} mi` : ''}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
+              <button onClick={() => { setBLegSelectModal(null); setBLegCandidates([]); }}
+                className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== TIME EDIT MODAL ===== */}
+      {timeEditModal && (
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 120 }} onClick={() => { setTimeEditModal(null); setTimeEditValue(''); setTimeEditType(''); }}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="relative w-[94%] max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="font-bold text-base text-slate-900">Edit Trip Time</h2>
+                <p className="text-xs text-slate-500 mt-0.5">{timeEditModal.patient || timeEditModal.id}</p>
+              </div>
+              <button onClick={() => { setTimeEditModal(null); setTimeEditValue(''); setTimeEditType(''); }} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                <XCircle size={16} className="text-slate-400" />
+              </button>
+            </div>
+
+            <div className="px-4 py-4 space-y-3 flex-1 overflow-y-auto">
+              {/* Time type selector */}
+              <div className="flex gap-2">
+                <button onClick={() => setTimeEditType('scheduled')}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${timeEditType === 'scheduled' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  Scheduled
+                </button>
+                <button onClick={() => { setTimeEditType('in_out'); setTimeEditValue('IN/OUT'); }}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${timeEditType === 'in_out' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  IN/OUT
+                </button>
+                <button onClick={() => { setTimeEditType('will_call'); setTimeEditValue(''); }}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${timeEditType === 'will_call' ? 'bg-slate-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  Will Call
+                </button>
+              </div>
+
+              {/* Time input for scheduled / will_call with time */}
+              {(timeEditType === 'scheduled' || (timeEditType === 'will_call' && timeEditValue)) && (
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Time</label>
+                  <input type="time" value={timeEditValue} onChange={(e) => setTimeEditValue(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-blue-500 outline-none" />
+                </div>
+              )}
+
+              {/* IN/OUT info */}
+              {timeEditType === 'in_out' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                  <p className="text-sm font-bold text-amber-800">In/Out Trip</p>
+                  <p className="text-xs text-amber-600 mt-1">Client goes to appointment and returns shortly. The return (B) leg will be shown on the card.</p>
+                </div>
+              )}
+
+              {/* Will Call info */}
+              {timeEditType === 'will_call' && !timeEditValue && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                  <p className="text-sm font-bold text-slate-700">Will Call</p>
+                  <p className="text-xs text-slate-500 mt-1">No scheduled time. Trip will move to bottom of list until client calls.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-3">
+              <button onClick={() => { setTimeEditModal(null); setTimeEditValue(''); setTimeEditType(''); }}
+                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">
+                Cancel
+              </button>
+              <button onClick={saveTimeEdit}
+                className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all cursor-pointer shadow-sm">
+                Save
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

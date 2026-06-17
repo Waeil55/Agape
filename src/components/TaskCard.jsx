@@ -63,7 +63,7 @@ const getSiteIcon = (name) => {
   return <Building size={14} />;
 };
 
-const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions }) => {
+const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, onTimeClick }) => {
   const isExpanded = expandedId === task.id;
   const isAnotherExpanded = expandedId !== null && expandedId !== task.id;
   const [copiedId, setCopiedId] = useState('');
@@ -152,13 +152,14 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 timeUrgency.type === 'warning' ? 'text-orange-500' :
                 isExpanded ? 'text-blue-600' : 'text-slate-400'
               }`} strokeWidth={timeUrgency.type === 'normal' ? 2.5 : 3} />
-              <span className={`text-[19px] font-black tracking-tight whitespace-nowrap ${
-                timeUrgency.type === 'critical' ? 'text-rose-600' :
-                timeUrgency.type === 'warning' ? 'text-orange-500' :
-                'text-slate-900'
-              }`}>
+              <button onClick={(e) => { e.stopPropagation(); onTimeClick?.(task); }}
+                className={`text-[19px] font-black tracking-tight whitespace-nowrap cursor-pointer active:scale-95 transition-transform ${
+                  timeUrgency.type === 'critical' ? 'text-rose-600' :
+                  timeUrgency.type === 'warning' ? 'text-orange-500' :
+                  'text-slate-900'
+                }`}>
                 {task.time || 'TBD'}
-              </span>
+              </button>
               {timeUrgency.type !== 'normal' && (
                 <span className={`px-2 py-0.5 rounded-md text-xs font-bold whitespace-nowrap ${
                   timeUrgency.type === 'critical' ? 'bg-rose-50 text-rose-600' :
