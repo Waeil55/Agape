@@ -105,6 +105,10 @@ export const triggerSync = async () => {
 export const setupSWMessageHandler = (callback) => {
   if ('serviceWorker' in navigator) {
     const handler = (event) => {
+      if (event.data?.type === 'SW_UPDATED') {
+        window.location.reload();
+        return;
+      }
       if (event.data?.type === 'SYNC_REQUEST' || event.data?.type === 'appVisible') {
         callback(event.data);
       }

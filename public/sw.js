@@ -4,7 +4,7 @@
    Updates triggered every second on visible apps, and periodically in background.
 */
 
-const CACHE_VERSION = 'agape-v5-stable';
+const CACHE_VERSION = 'agape-v5.0.1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
@@ -75,8 +75,10 @@ self.addEventListener('activate', (event) => {
           }
         } catch { /* still offline */ }
       }),
-      // Claim all open clients immediately
-      self.clients.claim(),
+      // Claim all open clients immediately and force reload new version
+      self.clients.claim().then(() => self.clients.matchAll()).then((clients) => {
+        clients.forEach((client) => client.postMessage({ type: 'SW_UPDATED', version: CACHE_VERSION }));
+      }),
     ])
   );
 });
