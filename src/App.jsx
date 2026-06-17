@@ -2663,12 +2663,23 @@ const App = () => {
                 // Firestore auto-syncs via useFirestoreAppData
               }}
               onUpdateDriverLocation={handleUpdateDriverLocation}
-              onUpdateTrip={(tripId, status, extraData = {}) => {
-                const prevTrip = trips.find(t => t.id === tripId);
-                const newTrip = prevTrip ? { ...prevTrip, status, ...extraData } : null;
-                if (newTrip) {
+              onUpdateTrip={(tripOrId, statusOrUpdates, extraData = {}) => {
+                let prevTrip, newTrip, tripId;
+                if (typeof tripOrId === 'string') {
+                  tripId = tripOrId;
+                  prevTrip = trips.find(t => t.id === tripId);
+                  newTrip = prevTrip ? { ...prevTrip, status: statusOrUpdates, ...extraData } : null;
+                } else {
+                  prevTrip = trips.find(t => t.id === tripOrId.id);
+                  tripId = tripOrId.id;
+                  newTrip = prevTrip ? { ...prevTrip, ...tripOrId, ...(statusOrUpdates || {}) } : { ...tripOrId, ...(statusOrUpdates || {}) };
+                }
+                if (newTrip && tripId) {
                   // Apply update
-                  setTrips(prev => prev.map(t => t.id === tripId ? newTrip : t));
+                  setTrips(prev => {
+                    const exists = prev.some(t => t.id === tripId);
+                    return exists ? prev.map(t => t.id === tripId ? newTrip : t) : prev;
+                  });
                   // Compute field-level diffs for audit
                   const changed = [];
                   Object.keys(newTrip).forEach((k) => {
