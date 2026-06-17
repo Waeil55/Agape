@@ -3291,7 +3291,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         })();
         const steps = ['Scheduled', 'En Route', 'At Pickup', 'In Transit', 'Complete'];
         return (
-        <div className="flex-1 flex flex-col bg-white animate-slide-up" style={{ minHeight: '100dvh', paddingBottom: 'calc(88px + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 45, paddingTop: 'env(safe-area-inset-top)' }}>
           <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3 shrink-0">
             <button type="button" onClick={() => setShowTripDetails(null)} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0">
               <ArrowLeft size={20} className="text-slate-700" />
