@@ -1717,7 +1717,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       // Find B-leg candidates: same patient, reversed addresses (A's dropoff = B's pickup)
       const patientKey = (trip.patient || '').trim().toLowerCase();
       const aDropoff = (trip.dropoff || '').trim().toLowerCase();
-      const candidates = (tripsRef.current || [])
+      const candidates = (driverScopedTrips || [])
         .filter(t => t.id !== trip.id && (t.patient || '').trim().toLowerCase() === patientKey)
         .filter(t => !isInOutTrip(t) && !isWillCall(t))
         .filter(t => {
@@ -1757,7 +1757,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setTimeEditModal(null);
     setTimeEditValue('');
     setTimeEditType('');
-  }, [timeEditModal, timeEditType, timeEditValue, currentUser, onUpdateTrip, onAddAuditLog, tripsRef]);
+  }, [timeEditModal, timeEditType, timeEditValue, currentUser, onUpdateTrip, onAddAuditLog, driverScopedTrips]);
 
   const selectBLeg = useCallback((aLegTrip, bLegTrip) => {
     onUpdateTrip?.({ ...bLegTrip, pairedAfterTripId: aLegTrip.id, timingType: 'in_out_return', isInOut: true, legRelationship: 'in_out_return' });
