@@ -1,15 +1,15 @@
-/* Agape Care PWA Service Worker — Real-Time Auto-Update Edition
+/* Agape Care PWA Service Worker - Real-Time Auto-Update Edition
    Ensures all platforms (iOS Safari, Android Chrome, Desktop) always run
    the latest version and receive real-time data updates without manual refresh.
    Updates triggered every second on visible apps, and periodically in background.
 */
 
-const CACHE_VERSION = 'agape-v5.0.5';
+const CACHE_VERSION = 'agape-v5.0.6';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 
-// ── Install: precache shell + all built assets ────────────────────────────────
+// Install: precache shell and all built assets.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then(async (cache) => {
@@ -26,12 +26,13 @@ self.addEventListener('install', (event) => {
           console.log(`[SW] Precached ${urls.length} assets from manifest`);
         }
       } catch {
-        // Manifest not available (first install while offline) — will retry on activate
+        // Manifest not available on first install while offline; retry on activate.
       }
       
       // Pre-create runtime caches
       await caches.open(RUNTIME_CACHE);
       await caches.open(DATA_CACHE);
+      await self.skipWaiting();
     })
   );
 });
@@ -44,7 +45,7 @@ const SYNC_ENDPOINTS = [
   '/api/dispatchers'
 ];
 
-// ── Activate: clean old caches, claim all clients, retry precache ─────────────
+// Activate: clean old caches, claim all clients, retry precache.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
@@ -83,7 +84,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// ── Periodic Background Sync: triggered every 1 minute ────────────────────────
+// Periodic Background Sync: triggered every 1 minute.
 self.addEventListener('periodicsync', (event) => {
   if (event.tag === 'sync-data') {
     event.waitUntil(syncAllData());
@@ -109,9 +110,9 @@ async function syncAllData() {
   }
 }
 
-// ── Message Handler: communicate with app ──────────────────────────────────────
+// Message handler: communicate with the app.
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') {
+  if (event.data?.type === 'SKIP_WAITING' || event.data?.action === 'skipWaiting') {
     self.skipWaiting();
   }
   if (event.data?.type === 'RELOAD_ALL') {
@@ -144,7 +145,7 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// ── Fetch: Network-first for HTML, Cache-first for assets ────────────────────
+// Fetch: Network-first for HTML, cache-first for assets.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -155,7 +156,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // For navigation requests (HTML pages): Network-first
-  // This ensures users always get fresh app HTML — critical for auto-refresh
+  // This ensures users always get fresh app HTML, critical for auto-refresh.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)

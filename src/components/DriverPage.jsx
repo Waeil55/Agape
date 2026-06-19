@@ -317,6 +317,39 @@ const pruneWorkflowFieldsAfterStep = (fields = {}, stepIndex = -1) => {
   return nextFields;
 };
 
+const buildWorkflowRepairFields = (trip = {}, rawTrip = {}) => {
+  const repairFields = {};
+  WORKFLOW_PROGRESS_FIELDS.forEach((field) => {
+    const value = trip[field];
+    if (!hasWorkflowValue(value)) return;
+    const rawValue = rawTrip[field];
+    if (!hasWorkflowValue(rawValue) || String(rawValue) !== String(value)) {
+      repairFields[field] = value;
+    }
+  });
+
+  if (hasWorkflowValue(trip.status) && normalizeWorkflowStatus(trip.status) !== normalizeWorkflowStatus(rawTrip.status)) {
+    repairFields.status = trip.status;
+  }
+
+  const distanceFromOdometer = hasWorkflowValue(trip.pickupOdometer) && hasWorkflowValue(trip.dropoffOdometer)
+    ? Math.max(0, Number(trip.dropoffOdometer) - Number(trip.pickupOdometer))
+    : '';
+  const distance = hasWorkflowValue(trip.distance) ? trip.distance : distanceFromOdometer;
+  if (hasWorkflowValue(distance) && (!hasWorkflowValue(rawTrip.distance) || String(rawTrip.distance) !== String(distance))) {
+    repairFields.distance = distance;
+  }
+
+  const travelTime = hasWorkflowValue(trip.travelTime)
+    ? trip.travelTime
+    : calcTravelDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
+  if (hasWorkflowValue(travelTime) && (!hasWorkflowValue(rawTrip.travelTime) || String(rawTrip.travelTime) !== String(travelTime))) {
+    repairFields.travelTime = travelTime;
+  }
+
+  return repairFields;
+};
+
 const applyWorkflowProgress = (trip, progress) => {
   if (!trip || !progress) return trip;
   const merged = { ...trip };
@@ -518,6 +551,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   );
   const tripsScrollRef = useRef(null);
   const workflowSyncRef = useRef({});
+  const historyRepairSyncRef = useRef({});
   const preservedWorkflowTripIdRef = useRef(null);
 
   const keepWorkflowTripOpen = useCallback((trip) => {
@@ -639,6 +673,43 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       });
     });
   }, [rawDriverScopedTrips, workflowProgress, onUpdateTrip]);
+
+  useEffect(() => {
+    if (!navigator.onLine) return;
+    driverScopedTrips.forEach((trip) => {
+      if (!trip?.id || !isWorkflowTerminalTrip(trip)) return;
+      const rawTrip = rawDriverScopedTrips.find((candidate) => candidate.id === trip.id);
+      if (!rawTrip) return;
+      const repairFields = buildWorkflowRepairFields(trip, rawTrip);
+      if (Object.keys(repairFields).length === 0) return;
+      const repairPayload = {
+        status: trip.status,
+        ...repairFields,
+        workflowUpdatedAt: new Date().toISOString(),
+      };
+      const signature = JSON.stringify(repairPayload);
+      if (historyRepairSyncRef.current[trip.id] === signature) return;
+      historyRepairSyncRef.current[trip.id] = signature;
+
+      onUpdateTrip?.(trip.id, trip.status, repairFields);
+      saveTripWorkflowUpdate(trip.id, repairPayload).catch((err) => {
+        console.error('[DriverPage] Failed to repair history workflow fields:', err);
+        ['driverTripProgress', 'trips', 'tripLedger'].forEach((collectionName) => {
+          Promise.resolve(backgroundSync.queue({
+            type: 'setDoc',
+            collection: collectionName,
+            docId: trip.id,
+            data: {
+              ...repairPayload,
+              tripId: trip.id,
+              bookingId: trip.bookingId || '',
+              syncQueuedAt: new Date().toISOString(),
+            },
+          })).catch(() => {});
+        });
+      });
+    });
+  }, [driverScopedTrips, rawDriverScopedTrips, onUpdateTrip]);
 
   useEffect(() => {
     if (!me?.id) return;
