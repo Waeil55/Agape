@@ -139,7 +139,7 @@ const SmsConversationModal = ({ trip, onClose }) => {
                     <p className="text-xs leading-relaxed whitespace-pre-wrap">{m.text}</p>
                     <p className={`text-[9px] mt-1 ${m.direction === 'outbound' ? 'text-blue-200' : 'text-slate-400'}`}>
                       {formatTime(m.timestamp)}
-                      {m.direction === 'outbound' && (m.status === 'queued' ? ' • queued' : m.status === 'sent' ? ' • sent' : '')}
+                      {m.direction === 'outbound' && (m.status === 'queued' ? ' | queued' : m.status === 'sent' ? ' | sent' : '')}
                     </p>
                   </div>
                 </div>

@@ -164,7 +164,7 @@ const UnifiedRoutePlanner = ({
           <div className="flex items-center justify-between mb-3">
             <div>
               <h1 className="text-lg font-black text-slate-900 tracking-tight">Route Planner</h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Plan · Saved · Build · Navigate</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Plan | Saved | Build | Navigate</p>
             </div>
             {guidedMode && (
               <button onClick={() => { onSetGuidedMode(false); onSetAiSequence(null); onSetAiSuggestions([]); }}
@@ -251,7 +251,7 @@ const UnifiedRoutePlanner = ({
                       const t = trips.find(t => t.id === id);
                       return (
                         <React.Fragment key={id}>
-                          {i > 0 && <span className="text-white/20 text-[10px]">→</span>}
+                          {i > 0 && <span className="text-white/20 text-[10px]">to</span>}
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/15 text-white/90">{t?.patient || id}</span>
                         </React.Fragment>
                       );
@@ -415,7 +415,7 @@ const UnifiedRoutePlanner = ({
                                     <span className={`font-bold px-1 rounded ${stop.type === 'PU' ? 'text-emerald-600' : 'text-rose-600'} shrink-0`}>
                                       {stop.type}
                                     </span>
-                                    <span className="font-semibold text-slate-700 truncate">{stop.name || 'Unknown'}</span>
+                                    <span className="font-semibold text-slate-700 truncate">{stop.name || 'No stop name'}</span>
                                     {stop.time && <span className="font-semibold text-slate-400 ml-auto shrink-0">{stop.time}</span>}
                                   </div>
                                 ))}

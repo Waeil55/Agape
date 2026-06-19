@@ -3,8 +3,20 @@ import { Archive, Calendar, RefreshCcw, Search, X, ArrowUpDown, ArrowUp, ArrowDo
 
 const today = new Date().toISOString().split('T')[0];
 
+const NO_TIME = 'No time';
+const NO_DRIVER = 'No driver';
+const NO_VEHICLE = 'No vehicle';
+const NO_BOOKING = 'No booking';
+const NO_PASSENGER = 'No passenger';
+const NO_PICKUP = 'No pickup address';
+const NO_DROPOFF = 'No dropoff address';
+const NO_ODOMETER = 'No odometer';
+const NO_DURATION = 'No duration';
+const NO_MILEAGE = 'No mileage';
+const NOT_RECORDED = 'Not recorded';
+
 const formatClock24 = (value) => {
-  if (!value) return '—';
+  if (!value) return NO_TIME;
   const s = String(value).trim();
   if (s.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(s)) {
     const d = new Date(s);
@@ -21,7 +33,7 @@ const formatClock24 = (value) => {
     if (p === 'AM' && h === 12) h = 0;
     return `${String(h).padStart(2, '0')}:${min}`;
   }
-  return '—';
+  return NO_TIME;
 };
 
 const timeToMinutes = (value) => {
@@ -59,18 +71,18 @@ const parseDateOrClock = (value) => {
 };
 
 const calcMiles = (pickupOdo, dropoffOdo) => {
-  if (!pickupOdo || !dropoffOdo) return '—';
+  if (!pickupOdo || !dropoffOdo) return NO_MILEAGE;
   const diff = Number(dropoffOdo) - Number(pickupOdo);
-  return diff > 0 ? diff.toFixed(1) : '—';
+  return diff > 0 ? diff.toFixed(1) : NO_MILEAGE;
 };
 
 const calcDuration = (start, end) => {
-  if (!start || !end) return '—';
+  if (!start || !end) return NO_DURATION;
   const s = parseDateOrClock(start);
   const e = parseDateOrClock(end);
-  if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return '—';
+  if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return NO_DURATION;
   const diff = Math.round((e - s) / 60000);
-  if (diff < 0) return '—';
+  if (diff < 0) return NO_DURATION;
   const h = Math.floor(diff / 60);
   const m = diff % 60;
   return h > 0 ? `${h}h${m > 0 ? m : ''}` : `${m}m`;
@@ -84,9 +96,9 @@ const formatDateLabel = (dateStr) => {
 };
 
 const getDriverLabel = (trip, drivers) => {
-  if (!drivers || !trip) return '—';
+  if (!drivers || !trip) return NO_DRIVER;
   const driver = drivers.find(d => d.id === trip.driverId || d.email === trip.driverEmail);
-  return driver?.name || trip.driverName || '—';
+  return driver?.name || trip.driverName || NO_DRIVER;
 };
 
 const Columns = [
@@ -244,24 +256,24 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
     switch (col.key) {
       case 'date': return formatDateLabel(trip.date || 'No Date');
       case 'driver': return getDriverLabel(trip, drivers);
-      case 'time': return formatClock24(trip.time) !== '—' ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
-      case 'bookingId': return trip.bookingId || trip.id || '—';
-      case 'patient': return trip.patient || '—';
-      case 'pickup': return trip.pickup || '—';
-      case 'dropoff': return trip.dropoff || '—';
+      case 'time': return formatClock24(trip.time) !== NO_TIME ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
+      case 'bookingId': return trip.bookingId || trip.id || NO_BOOKING;
+      case 'patient': return trip.patient || NO_PASSENGER;
+      case 'pickup': return trip.pickup || NO_PICKUP;
+      case 'dropoff': return trip.dropoff || NO_DROPOFF;
       case 'arrivalTime': return formatClock24(trip.arrivalTime);
       case 'departedPickupTime': return formatClock24(trip.departedPickupTime);
       case 'arrivalDropoffTime': return formatClock24(trip.arrivalDropoffTime || trip.completedAt);
-      case 'pickupOdometer': return trip.pickupOdometer || '';
-      case 'dropoffOdometer': return trip.dropoffOdometer || '';
+      case 'pickupOdometer': return trip.pickupOdometer || NO_ODOMETER;
+      case 'dropoffOdometer': return trip.dropoffOdometer || NO_ODOMETER;
       case 'travelTime': return calcDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
-      case 'distance': { const m = calcMiles(trip.pickupOdometer, trip.dropoffOdometer); return m !== '—' ? m : '—'; }
+      case 'distance': { const m = calcMiles(trip.pickupOdometer, trip.dropoffOdometer); return m !== NO_MILEAGE ? m : NO_MILEAGE; }
       case 'signature': {
-        if (!('paperSignatureConfirmed' in trip)) return '—';
+        if (!('paperSignatureConfirmed' in trip)) return NOT_RECORDED;
         return trip.paperSignatureConfirmed ? 'Yes' : 'No';
       }
-      case 'vehicle': { const v = trip.completedVehicle || ''; return v && v !== 'Pending Assignment' ? v : '—'; }
-      default: return '—';
+      case 'vehicle': { const v = trip.completedVehicle || ''; return v && v !== 'Pending Assignment' ? v : NO_VEHICLE; }
+      default: return NOT_RECORDED;
     }
   };
 
@@ -295,7 +307,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
           onBlur={() => cancelEdit()}
           autoFocus
         >
-          <option value="">—</option>
+          <option value="">Not selected</option>
           {drivers.map(d => (
             <option key={d.id} value={d.id}>{d.name}</option>
           ))}
@@ -480,7 +492,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                             const isEditing = isEditingCell(trip.id, cellKey);
 
                             return (
-                              <td key={cellKey} className={`px-2 py-1.5 ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== '—' ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 font-mono tracking-wider uppercase' : ''}`}
+                              <td key={cellKey} className={`px-2 py-1.5 ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== NO_MILEAGE ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 font-mono tracking-wider uppercase' : ''}`}
                                 title={cellKey === 'pickup' || cellKey === 'dropoff' ? displayValue : undefined}
                               >
                                 {isEditing ? (

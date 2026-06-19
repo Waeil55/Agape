@@ -43,6 +43,8 @@ import { rateLimiter } from '../utils/rateLimiter';
 import { requestDedup } from '../utils/requestDedup';
 
 const DATA_DOC = 'appData/agape';
+const TRIPS_COLLECTION = 'trips';
+const TRASHED_TRIPS_COLLECTION = 'trashedTrips';
 const TRIP_LEDGER_COLLECTION = 'tripLedger';
 const DRIVER_TRIP_PROGRESS_COLLECTION = 'driverTripProgress';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
@@ -52,6 +54,11 @@ const LOG_COLLECTION = 'logs';
 const PHONE_NUMBERS_DOC = 'systemConfig/phoneNumbers';
 const BACKUP_COLLECTION = 'systemBackups';
 const MIRRORED_TRIP_FIELDS = new Set(['trips', 'trashedTrips']);
+
+// Firestore single-document size limit is 1 MiB. We stop embedding the full
+// trips/trashedTrips arrays in appData/agape once we cross this threshold and
+// instead use the root collections as the source of truth.
+const APP_DATA_SIZE_THRESHOLD_BYTES = 800 * 1024;
 
 const DEFAULT_DATA = {
   trips: [],
@@ -67,6 +74,25 @@ const DEFAULT_DATA = {
 
 function sanitizeForFirestore(obj) {
   return JSON.parse(JSON.stringify(obj, (_key, value) => value === undefined ? null : value));
+}
+
+// Convert Firestore Timestamp objects ({seconds, nanoseconds}) to ISO strings.
+// Prevents React error #31 when Timestamps are rendered as JSX children.
+function convertFirestoreTimestamps(obj) {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') return obj;
+  if (typeof obj.toDate === 'function') {
+    try { return obj.toDate().toISOString(); } catch { return null; }
+  }
+  if (obj.seconds !== undefined && obj.nanoseconds !== undefined) {
+    try { return new Date(obj.seconds * 1000 + obj.nanoseconds / 1000000).toISOString(); } catch { return null; }
+  }
+  if (Array.isArray(obj)) return obj.map(convertFirestoreTimestamps);
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[key] = convertFirestoreTimestamps(value);
+  }
+  return result;
 }
 
 function normalizeTrip(trip) {
@@ -120,7 +146,7 @@ function normalizeData(data = {}) {
       dName = '';
     }
     
-    // Auto-resolve missing driver name from the admin users/drivers list
+    // Auto-resolve missing driver name and email from the admin users/drivers list
     if (!dName) {
       const matchedDriver = 
         (trip.driverId && drivers.find(d => d.id === trip.driverId)) ||
@@ -128,6 +154,27 @@ function normalizeData(data = {}) {
       
       if (matchedDriver && matchedDriver.name) {
         dName = matchedDriver.name;
+      }
+    } else if (!trip.driverId) {
+      // Auto-resolve missing driverId from driverName
+      const exactMatch = drivers.find(d => d.name && d.name.trim().toLowerCase() === dName.trim().toLowerCase());
+      if (exactMatch) {
+        trip.driverId = exactMatch.id;
+        if (exactMatch.email) trip.driverEmail = exactMatch.email;
+      } else {
+        const partialMatch = drivers.find(d => d.name && d.name.trim().toLowerCase().startsWith(dName.trim().toLowerCase()));
+        if (partialMatch) {
+          trip.driverId = partialMatch.id;
+          if (partialMatch.email) trip.driverEmail = partialMatch.email;
+        }
+      }
+    }
+
+    // Auto-resolve missing driverEmail from driverId
+    if ((!trip.driverEmail || trip.driverEmail === '') && trip.driverId) {
+      const matchedById = drivers.find(d => d.id === trip.driverId);
+      if (matchedById && matchedById.email) {
+        trip.driverEmail = matchedById.email;
       }
     }
 
@@ -147,6 +194,126 @@ function normalizeData(data = {}) {
   };
 }
 
+// Merge multiple trip arrays by stable ID. Prefers the trip that was updated most
+// recently (by `updatedAtLocal` or `updatedAt`). If timestamps are equal or missing,
+// the trip with the more advanced workflow status wins (Completed > At Pickup > …).
+// This prevents a slow root-collection snapshot from overwriting a driver's
+// just-finished trip with its stale cloud state.
+function mergeTripsById(...arrays) {
+  const merged = new Map();
+  arrays.forEach((arr) => {
+    (arr || []).forEach((trip, index) => {
+      if (!trip) return;
+      const id = getStableRecordId(trip, 'trip', index);
+      const existing = merged.get(id);
+      if (!existing) {
+        merged.set(id, { ...trip, id });
+        return;
+      }
+      const timeExisting = tripRecordTime(existing);
+      const timeNew = tripRecordTime(trip);
+      if (timeNew > timeExisting) {
+        merged.set(id, { ...trip, id });
+        return;
+      }
+      if (timeNew < timeExisting) return;
+      // Timestamps equal (or both zero) — prefer the more advanced workflow status
+      const spExisting = STATUS_PRIORITY[existing?.status] || 0;
+      const spNew = STATUS_PRIORITY[trip?.status] || 0;
+      if (spNew > spExisting) merged.set(id, { ...trip, id });
+    });
+  });
+  return [...merged.values()];
+}
+
+const STATUS_PRIORITY = {
+  'Completed': 10,
+  'At Pickup': 9,
+  'In Mission': 9,
+  'Assigned': 8,
+  'No Show': 7,
+  'Cancelled': 7,
+  'Rerouted': 7,
+  'Unassigned': 1,
+};
+
+function tripContentKey(trip) {
+  if (!trip) return '';
+  const bk = String(trip.bookingId || '').trim();
+  if (bk && !/^BK-\d+-\d+$/i.test(bk) && !/^TRP-\d+$/i.test(bk) && !/^TRIP-\d{10,}-\d+$/i.test(bk)) {
+    return `bk::${bk.toLowerCase()}`;
+  }
+  const parts = [
+    String(trip.patient || '').trim().toLowerCase(),
+    String(trip.date || '').trim(),
+    String(trip.time || '').trim(),
+    String(trip.pickup || '').trim().toLowerCase().replace(/\s+/g, ' '),
+    String(trip.dropoff || '').trim().toLowerCase().replace(/\s+/g, ' '),
+  ];
+  if (parts.some(Boolean)) return `cmp::${parts.join('|')}`;
+  const id = String(trip.id || '').trim();
+  return id ? `id::${id}` : '';
+}
+
+function tripRecordTime(trip) {
+  const raw = trip?.updatedAtLocal || trip?.updatedAt || trip?.createdAt || trip?.completedAt;
+  if (raw?.toMillis) return raw.toMillis();
+  if (raw?.seconds) return raw.seconds * 1000;
+  const parsed = Date.parse(raw || '');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+// Remove duplicate trips that represent the same logical ride. Keeps the most
+// "advanced" record (Completed > active statuses > Unassigned) and prefers one
+// with a driver assignment or the most recent update.
+function dedupTripsByContent(trips = []) {
+  const groups = new Map();
+  (trips || []).forEach((trip) => {
+    if (!trip) return;
+    const key = tripContentKey(trip);
+    if (!key) return;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(trip);
+  });
+
+  const result = [];
+  groups.forEach((group) => {
+    if (group.length === 1) {
+      result.push(group[0]);
+      return;
+    }
+    const sorted = group.sort((a, b) => {
+      const pa = STATUS_PRIORITY[a?.status] || 0;
+      const pb = STATUS_PRIORITY[b?.status] || 0;
+      if (pa !== pb) return pb - pa;
+      const da = a?.driverId ? 1 : 0;
+      const db = b?.driverId ? 1 : 0;
+      if (da !== db) return db - da;
+      return tripRecordTime(b) - tripRecordTime(a);
+    });
+    result.push(sorted[0]);
+  });
+  return result;
+}
+
+async function loadCollectionTrips(collectionName) {
+  const snap = await getDocs(collection(db, collectionName));
+  const trips = [];
+  snap.forEach((tripDoc) => {
+    trips.push(convertFirestoreTimestamps({ id: tripDoc.id, ...tripDoc.data() }));
+  });
+  return trips;
+}
+
+// Estimate the byte size a JSON payload would have once written to Firestore.
+function estimateJsonBytes(value) {
+  try {
+    return new Blob([JSON.stringify(value)]).size;
+  } catch {
+    return 0;
+  }
+}
+
 function mergeTripProgress(trips = [], progressByTrip = {}) {
   return (trips || []).map((trip) => {
     const progress = progressByTrip?.[trip?.id];
@@ -159,7 +326,11 @@ function shouldIgnoreRealtimePermissionError(err) {
 }
 
 function getTripId(trip, fallbackPrefix, index) {
-  return String(trip?.id || trip?.bookingId || `${fallbackPrefix}-${index}-${Date.now()}`);
+  // Always prefer the trip's own stable ID (from Firestore document).
+  // Fall back to bookingId (from CSV import). Never use array position or Date.now().
+  if (trip?.id) return String(trip.id);
+  if (trip?.bookingId) return `BK-${trip.bookingId}`;
+  return `${fallbackPrefix}-${index}`;
 }
 
 function getStableRecordId(record, fallbackPrefix, index) {
@@ -213,8 +384,8 @@ function mergeDataWithLedger(data, ledgerData) {
 
   return normalizeData({
     ...data,
-    trips: mergeRecordsById(activeApp, ledgerActive, 'active'),
-    trashedTrips: mergeRecordsById(archivedApp, ledgerArchived, 'archived'),
+    trips: dedupTripsByContent(mergeRecordsById(activeApp, ledgerActive, 'active')),
+    trashedTrips: dedupTripsByContent(mergeRecordsById(archivedApp, ledgerArchived, 'archived')),
   });
 }
 
@@ -236,7 +407,7 @@ async function loadCollectionRecords(collectionName) {
   const snap = await getDocs(collection(db, collectionName));
   const records = [];
   snap.forEach((itemDoc) => {
-    records.push({ id: itemDoc.id, ...itemDoc.data() });
+    records.push(convertFirestoreTimestamps({ id: itemDoc.id, ...itemDoc.data() }));
   });
   return records;
 }
@@ -302,9 +473,11 @@ async function mirrorLogsToCollection(logs = []) {
 }
 
 async function mirrorTripsToLedger(trips = [], trashedTrips = []) {
+  const activeTrips = dedupTripsByContent(trips);
+  const archivedTrips = dedupTripsByContent(trashedTrips);
   const entries = [
-    ...trips.map((trip, index) => ({ trip, index, archiveState: 'active' })),
-    ...trashedTrips.map((trip, index) => ({ trip, index, archiveState: 'archived' })),
+    ...activeTrips.map((trip, index) => ({ trip, index, archiveState: 'active' })),
+    ...archivedTrips.map((trip, index) => ({ trip, index, archiveState: 'archived' })),
   ];
 
   const sanitizedEntries = entries
@@ -317,12 +490,6 @@ async function mirrorTripsToLedger(trips = [], trashedTrips = []) {
         mirroredAt: new Date().toISOString(),
       }),
     }));
-  const existingIds = new Set();
-  const existingSnap = await getDocs(collection(db, TRIP_LEDGER_COLLECTION));
-  existingSnap.forEach((tripDoc) => existingIds.add(tripDoc.id));
-  const nextIds = new Set(sanitizedEntries.map(({ id }) => id));
-  const staleIds = [...existingIds].filter((id) => !nextIds.has(id));
-
   for (let i = 0; i < sanitizedEntries.length; i += 450) {
     const batch = writeBatch(db);
     sanitizedEntries.slice(i, i + 450).forEach(({ id, data }) => {
@@ -330,32 +497,37 @@ async function mirrorTripsToLedger(trips = [], trashedTrips = []) {
     });
     await batch.commit();
   }
-
-  for (let i = 0; i < staleIds.length; i += 450) {
-    const batch = writeBatch(db);
-    staleIds.slice(i, i + 450).forEach((id) => {
-      batch.delete(doc(db, TRIP_LEDGER_COLLECTION, id));
-    });
-    await batch.commit();
-  }
 }
 
 async function buildDataFromTripLedger() {
-  const snap = await getDocs(collection(db, TRIP_LEDGER_COLLECTION));
-  const trips = [];
-  const trashedTrips = [];
+  // Prefer the root trips/trashedTrips collections as the primary source of truth.
+  // Fall back to the legacy tripLedger only if the collections are empty.
+  const [activeTrips, archivedTrips, ledgerSnap] = await Promise.all([
+    loadCollectionTrips(TRIPS_COLLECTION),
+    loadCollectionTrips(TRASHED_TRIPS_COLLECTION),
+    getDocs(collection(db, TRIP_LEDGER_COLLECTION)),
+  ]);
 
-  snap.forEach((tripDoc) => {
-    const trip = { id: tripDoc.id, ...tripDoc.data() };
-    if (trip.archiveState === 'archived') {
-      trashedTrips.push(trip);
-    } else {
-      trips.push(trip);
-    }
-  });
+  let trips = activeTrips || [];
+  let trashedTrips = archivedTrips || [];
+
+  if (trips.length === 0 || trashedTrips.length === 0) {
+    const ledgerTrips = [];
+    const ledgerArchived = [];
+    ledgerSnap.forEach((tripDoc) => {
+      const trip = convertFirestoreTimestamps({ id: tripDoc.id, ...tripDoc.data() });
+      if (trip.archiveState === 'archived') {
+        ledgerArchived.push(trip);
+      } else {
+        ledgerTrips.push(trip);
+      }
+    });
+    if (trips.length === 0) trips = ledgerTrips;
+    if (trashedTrips.length === 0) trashedTrips = ledgerArchived;
+  }
 
   if (trips.length === 0 && trashedTrips.length === 0) return null;
-  return { ...DEFAULT_DATA, trips, trashedTrips };
+  return { ...DEFAULT_DATA, trips: dedupTripsByContent(trips), trashedTrips: dedupTripsByContent(trashedTrips) };
 }
 
 async function buildDataFromMirrors() {
@@ -375,7 +547,7 @@ async function buildDataFromMirrors() {
     vehicles,
     logs: sortNewestFirst(logs),
     phoneNumbers: phoneNumbersSnap.exists()
-      ? { ...DEFAULT_DATA.phoneNumbers, ...phoneNumbersSnap.data() }
+      ? convertFirestoreTimestamps({ ...DEFAULT_DATA.phoneNumbers, ...phoneNumbersSnap.data() })
       : DEFAULT_DATA.phoneNumbers,
   });
 }
@@ -415,6 +587,24 @@ export function useFirestoreAppData() {
     logs: false,
     phoneNumbers: false,
   });
+
+  // Root trips/trashedTrips collections are the primary source of truth once loaded.
+  // appData/agape.trips is kept as a legacy fallback for old clients and for metadata.
+  const tripsCollectionRef = useRef([]);
+  const trashedCollectionRef = useRef([]);
+  const tripsCollectionLoadedRef = useRef(false);
+  const trashedCollectionLoadedRef = useRef(false);
+
+  // Small helper: wait up to ~5s for a collection listener to deliver its first snapshot.
+  // This prevents stale IndexedDB data from overwriting cloud data on initial load.
+  const waitForCollectionSync = useCallback(async (loadedRef) => {
+    if (loadedRef.current) return;
+    let attempts = 0;
+    while (!loadedRef.current && attempts < 50) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      attempts += 1;
+    }
+  }, []);
 
   // ── IndexedDB: Load from local DB on mount for instant startup ────────────
   useEffect(() => {
@@ -536,19 +726,46 @@ export function useFirestoreAppData() {
         setListenerStatus('appData', 'live');
         if (snap.exists()) {
           const currentData = normalizeData(dataRef.current);
+          const snapData = convertFirestoreTimestamps(snap.data());
+
+          // Root trips/trashedTrips collections are the primary source of truth.
+          // appData/agape trips are kept only as a legacy fallback.
+          const tripsFromCollection = tripsCollectionLoadedRef.current ? tripsCollectionRef.current : null;
+          const trashedFromCollection = trashedCollectionLoadedRef.current ? trashedCollectionRef.current : null;
+
           const d = normalizeData({
-            ...snap.data(),
-            drivers: (snap.data()?.drivers?.length || 0) > 0 ? snap.data().drivers : currentData.drivers,
-            dispatchers: (snap.data()?.dispatchers?.length || 0) > 0 ? snap.data().dispatchers : currentData.dispatchers,
-            vehicles: (snap.data()?.vehicles?.length || 0) > 0 ? snap.data().vehicles : currentData.vehicles,
-            phoneNumbers: snap.data()?.phoneNumbers && Object.keys(snap.data().phoneNumbers || {}).length > 0
-              ? snap.data().phoneNumbers
+            ...snapData,
+            trips: Array.isArray(tripsFromCollection) && tripsFromCollection.length > 0
+              ? tripsFromCollection
+              : (snapData?.trips?.length || 0) > 0 ? snapData.trips : currentData.trips,
+            trashedTrips: Array.isArray(trashedFromCollection) && trashedFromCollection.length > 0
+              ? trashedFromCollection
+              : (snapData?.trashedTrips?.length || 0) > 0 ? snapData.trashedTrips : currentData.trashedTrips,
+            drivers: (snapData?.drivers?.length || 0) > 0 ? snapData.drivers : currentData.drivers,
+            dispatchers: (snapData?.dispatchers?.length || 0) > 0 ? snapData.dispatchers : currentData.dispatchers,
+            vehicles: (snapData?.vehicles?.length || 0) > 0 ? snapData.vehicles : currentData.vehicles,
+            phoneNumbers: snapData?.phoneNumbers && Object.keys(snapData.phoneNumbers || {}).length > 0
+              ? snapData.phoneNumbers
               : currentData.phoneNumbers,
           });
+
           const applyData = (nextData) => {
+            // Always prefer the live root collections for trips/trashedTrips.
+            const effectiveTrips = dedupTripsByContent(
+              tripsCollectionLoadedRef.current && tripsCollectionRef.current.length > 0
+                ? tripsCollectionRef.current
+                : nextData.trips
+            );
+            const effectiveTrashed = dedupTripsByContent(
+              trashedCollectionLoadedRef.current && trashedCollectionRef.current.length > 0
+                ? trashedCollectionRef.current
+                : nextData.trashedTrips
+            );
+
             const mergedData = {
               ...nextData,
-              trips: mergeTripProgress(nextData.trips, tripProgressRef.current),
+              trips: mergeTripProgress(effectiveTrips, tripProgressRef.current),
+              trashedTrips: effectiveTrashed,
             };
             dataRef.current = mergedData;
             lastFirestoreSyncRef.current = new Date().toISOString();
@@ -569,7 +786,7 @@ export function useFirestoreAppData() {
               lastFirestoreSync: lastFirestoreSyncRef.current,
             }));
             // Write-through to IndexedDB for instant startup next time
-            saveAppData({
+            Promise.resolve(saveAppData({
               trips: mergedData.trips,
               drivers: mergedData.drivers,
               dispatchers: mergedData.dispatchers,
@@ -578,7 +795,7 @@ export function useFirestoreAppData() {
               logs: mergedData.logs,
               phoneNumbers: mergedData.phoneNumbers,
               _lastLocalSync: new Date().toISOString(),
-            }).catch(() => {});
+            })).catch(() => {});
           };
 
           buildDataFromTripLedger()
@@ -596,18 +813,40 @@ export function useFirestoreAppData() {
 
               recoveringRef.current = true;
               try {
-                await setDoc(doc(db, DATA_DOC), {
-                  trips: sanitizeForFirestore(hydrated.trips),
-                  trashedTrips: sanitizeForFirestore(hydrated.trashedTrips),
-                  recoveredFromLedger: true,
-                  recoveredAt: new Date().toISOString(),
-                  updatedAt: serverTimestamp(),
-                  updatedField: 'trips',
-                  updatedAtLocal: new Date().toISOString(),
-                }, { merge: true });
+                // First ensure the root collections contain the recovered trips.
+                await Promise.all([
+                  ...(hydrated.trips || []).map(trip => trip?.id
+                    ? setDoc(doc(db, TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))
+                    : Promise.resolve()),
+                  ...(hydrated.trashedTrips || []).map(trip => trip?.id
+                    ? setDoc(doc(db, TRASHED_TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))
+                    : Promise.resolve()),
+                ]);
+
+                // Try to patch appData/agape; if too large, metadata-only.
+                try {
+                  await setDoc(doc(db, DATA_DOC), {
+                    trips: sanitizeForFirestore(hydrated.trips),
+                    trashedTrips: sanitizeForFirestore(hydrated.trashedTrips),
+                    recoveredFromLedger: true,
+                    recoveredAt: new Date().toISOString(),
+                    updatedAt: serverTimestamp(),
+                    updatedField: 'trips',
+                    updatedAtLocal: new Date().toISOString(),
+                  }, { merge: true });
+                } catch (patchErr) {
+                  console.warn('Ledger recovery patch to appData failed (likely size limit). Root collections are now authoritative.', patchErr);
+                  await setDoc(doc(db, DATA_DOC), {
+                    recoveredFromLedger: true,
+                    recoveredAt: new Date().toISOString(),
+                    updatedAt: serverTimestamp(),
+                    updatedField: 'trips-recovery-metadata',
+                    updatedAtLocal: new Date().toISOString(),
+                  }, { merge: true });
+                }
                 setState(prev => ({ ...prev, lastRecoveredAt: new Date().toISOString() }));
               } catch (recoveryErr) {
-                console.error('Ledger recovery patch failed:', recoveryErr);
+                console.warn('Ledger recovery patch failed, but data is loaded locally.', recoveryErr);
               } finally {
                 recoveringRef.current = false;
               }
@@ -701,7 +940,7 @@ export function useFirestoreAppData() {
         if (snap.size === 0 && currentList.length > 0) return;
         const snapshotList = [];
         snap.forEach((itemDoc) => {
-          snapshotList.push({ id: itemDoc.id, ...itemDoc.data() });
+          snapshotList.push(convertFirestoreTimestamps({ id: itemDoc.id, ...itemDoc.data() }));
         });
         const nextList = mergeRecordsById(snapshotList, currentList, field);
         dataRef.current = {
@@ -733,7 +972,7 @@ export function useFirestoreAppData() {
         if (snap.size === 0 && currentList.length > 0) return;
         const snapshotList = [];
         snap.forEach((itemDoc) => {
-          snapshotList.push({ id: itemDoc.id, ...itemDoc.data() });
+          snapshotList.push(convertFirestoreTimestamps({ id: itemDoc.id, ...itemDoc.data() }));
         });
         const logs = sortNewestFirst(mergeRecordsById(snapshotList, currentList, 'log'));
         dataRef.current = {
@@ -760,7 +999,7 @@ export function useFirestoreAppData() {
         const currentNumbers = dataRef.current.phoneNumbers || DEFAULT_DATA.phoneNumbers;
         if (!snap.exists() && currentNumbers !== DEFAULT_DATA.phoneNumbers) return;
         const phoneNumbers = snap.exists()
-          ? { ...DEFAULT_DATA.phoneNumbers, ...snap.data() }
+          ? convertFirestoreTimestamps({ ...DEFAULT_DATA.phoneNumbers, ...snap.data() })
           : DEFAULT_DATA.phoneNumbers;
         dataRef.current = {
           ...normalizeData(dataRef.current),
@@ -785,10 +1024,10 @@ export function useFirestoreAppData() {
         setListenerStatus(DRIVER_TRIP_PROGRESS_COLLECTION, 'live');
         const progressByTrip = {};
         snap.forEach((progressDoc) => {
-          progressByTrip[progressDoc.id] = {
+          progressByTrip[progressDoc.id] = convertFirestoreTimestamps({
             id: progressDoc.id,
             ...progressDoc.data(),
-          };
+          });
           delete progressByTrip[progressDoc.id].tripId;
         });
         tripProgressRef.current = progressByTrip;
@@ -818,7 +1057,7 @@ export function useFirestoreAppData() {
         const ledgerTrips = [];
         const ledgerArchived = [];
         snap.forEach((tripDoc) => {
-          const trip = { id: tripDoc.id, ...tripDoc.data() };
+          const trip = convertFirestoreTimestamps({ id: tripDoc.id, ...tripDoc.data() });
           if (trip.archiveState === 'archived') {
             ledgerArchived.push(trip);
           } else {
@@ -828,10 +1067,14 @@ export function useFirestoreAppData() {
         if (ledgerTrips.length === 0 && ledgerArchived.length === 0) return;
 
         const baseData = normalizeData(dataRef.current);
+        const useLedgerTrips = !(tripsCollectionLoadedRef.current && tripsCollectionRef.current.length > 0);
+        const useLedgerArchived = !(trashedCollectionLoadedRef.current && trashedCollectionRef.current.length > 0);
+        if (!useLedgerTrips && !useLedgerArchived) return;
+
         const mergedData = mergeDataWithLedger(baseData, {
           ...DEFAULT_DATA,
-          trips: ledgerTrips,
-          trashedTrips: ledgerArchived,
+          trips: useLedgerTrips ? ledgerTrips : [],
+          trashedTrips: useLedgerArchived ? ledgerArchived : [],
         });
         const patched = {
           ...mergedData,
@@ -846,28 +1089,111 @@ export function useFirestoreAppData() {
           error: null,
         }));
 
-        if (!recoveringRef.current && hasRecoveredLedgerRecords(baseData, patched)) {
-          recoveringRef.current = true;
-          setDoc(doc(db, DATA_DOC), {
-            trips: sanitizeForFirestore(patched.trips),
-            trashedTrips: sanitizeForFirestore(patched.trashedTrips),
-            recoveredFromLedger: true,
-            recoveredAt: new Date().toISOString(),
-            updatedAt: serverTimestamp(),
-            updatedField: 'trips',
-            updatedAtLocal: new Date().toISOString(),
-          }, { merge: true }).catch((err) => {
-            console.error('Live ledger recovery patch failed:', err);
-          }).then(() => {
-            recoveringRef.current = false;
-            setState(prev => ({ ...prev, lastRecoveredAt: new Date().toISOString() }));
-          });
-        }
+          if (!recoveringRef.current && hasRecoveredLedgerRecords(baseData, patched)) {
+            recoveringRef.current = true;
+
+            // Push recovered trips into the root collections first.
+            Promise.all([
+              ...(patched.trips || []).map(trip => trip?.id
+                ? setDoc(doc(db, TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))
+                : Promise.resolve()),
+              ...(patched.trashedTrips || []).map(trip => trip?.id
+                ? setDoc(doc(db, TRASHED_TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))
+                : Promise.resolve()),
+            ]).then(() => setDoc(doc(db, DATA_DOC), {
+              trips: sanitizeForFirestore(patched.trips),
+              trashedTrips: sanitizeForFirestore(patched.trashedTrips),
+              recoveredFromLedger: true,
+              recoveredAt: new Date().toISOString(),
+              updatedAt: serverTimestamp(),
+              updatedField: 'trips',
+              updatedAtLocal: new Date().toISOString(),
+            }, { merge: true })).catch((err) => {
+              console.warn('Live ledger recovery patch failed (likely size limit). Root collections are authoritative.', err);
+              return setDoc(doc(db, DATA_DOC), {
+                recoveredFromLedger: true,
+                recoveredAt: new Date().toISOString(),
+                updatedAt: serverTimestamp(),
+                updatedField: 'trips-recovery-metadata',
+                updatedAtLocal: new Date().toISOString(),
+              }, { merge: true });
+            }).then(() => {
+              recoveringRef.current = false;
+              setState(prev => ({ ...prev, lastRecoveredAt: new Date().toISOString() }));
+            });
+          }
       },
       (err) => {
         if (shouldIgnoreRealtimePermissionError(err)) return;
         setListenerStatus(TRIP_LEDGER_COLLECTION, 'error', err);
         console.error('Realtime trip ledger sync failed:', err);
+      }
+    );
+
+    // Primary real-time source of truth for trips
+    const unsubTripsCollection = onSnapshot(
+      collection(db, TRIPS_COLLECTION),
+      (snap) => {
+        setListenerStatus(TRIPS_COLLECTION, 'live');
+        const snapshotList = [];
+        snap.forEach((tripDoc) => {
+          snapshotList.push(convertFirestoreTimestamps({ id: tripDoc.id, ...tripDoc.data() }));
+        });
+        const dedupedSnapshot = dedupTripsByContent(snapshotList);
+        tripsCollectionRef.current = dedupedSnapshot;
+        tripsCollectionLoadedRef.current = true;
+
+        const baseData = normalizeData(dataRef.current);
+        const mergedTrips = dedupedSnapshot.length > 0 ? dedupedSnapshot : baseData.trips;
+        const patched = {
+          ...baseData,
+          trips: mergeTripProgress(mergedTrips, tripProgressRef.current),
+        };
+        dataRef.current = patched;
+        setState(prev => ({
+          ...prev,
+          trips: patched.trips,
+          loading: false,
+          error: null,
+        }));
+      },
+      (err) => {
+        if (shouldIgnoreRealtimePermissionError(err)) return;
+        setListenerStatus(TRIPS_COLLECTION, 'error', err);
+        console.error('Realtime trips collection sync failed:', err);
+      }
+    );
+
+    // Primary real-time source of truth for trashed trips
+    const unsubTrashedCollection = onSnapshot(
+      collection(db, TRASHED_TRIPS_COLLECTION),
+      (snap) => {
+        setListenerStatus(TRASHED_TRIPS_COLLECTION, 'live');
+        const snapshotList = [];
+        snap.forEach((tripDoc) => {
+          snapshotList.push(convertFirestoreTimestamps({ id: tripDoc.id, ...tripDoc.data() }));
+        });
+        const dedupedSnapshot = dedupTripsByContent(snapshotList);
+        trashedCollectionRef.current = dedupedSnapshot;
+        trashedCollectionLoadedRef.current = true;
+
+        const baseData = normalizeData(dataRef.current);
+        const mergedTrashed = dedupedSnapshot.length > 0 ? dedupedSnapshot : baseData.trashedTrips;
+        dataRef.current = {
+          ...baseData,
+          trashedTrips: mergedTrashed,
+        };
+        setState(prev => ({
+          ...prev,
+          trashedTrips: mergedTrashed,
+          loading: false,
+          error: null,
+        }));
+      },
+      (err) => {
+        if (shouldIgnoreRealtimePermissionError(err)) return;
+        setListenerStatus(TRASHED_TRIPS_COLLECTION, 'error', err);
+        console.error('Realtime trashedTrips collection sync failed:', err);
       }
     );
 
@@ -879,6 +1205,8 @@ export function useFirestoreAppData() {
       unsubPhones();
       unsubTripProgress();
       unsubTripLedger();
+      unsubTripsCollection();
+      unsubTrashedCollection();
     };
   }, [setListenerStatus]);
 
@@ -895,7 +1223,7 @@ export function useFirestoreAppData() {
       [field]: sanitized,
     };
     pendingWritesRef.current += 1;
-    adaptiveSync.setPendingWrites(pendingWritesRef.current);
+    try { adaptiveSync.setPendingWrites(pendingWritesRef.current); } catch (_) {}
     setState(prev => ({
       ...prev,
       [field]: sanitized,
@@ -904,73 +1232,118 @@ export function useFirestoreAppData() {
     }));
 
     try {
-      // Write to Firestore directly — this is the core operation
-      await setDoc(doc(db, DATA_DOC), {
-        [field]: sanitized,
-        updatedAt: serverTimestamp(),
-        updatedField: field,
-        updatedAtLocal: new Date().toISOString(),
-      }, { merge: true });
+      if (MIRRORED_TRIP_FIELDS.has(field)) {
+        const isTripsField = field === 'trips';
+        const tripList = sanitized || [];
+        const companionTrips = isTripsField ? (dataRef.current.trashedTrips || []) : (dataRef.current.trips || []);
+        const rootCollection = isTripsField ? TRIPS_COLLECTION : TRASHED_TRIPS_COLLECTION;
+
+        // 1. Write each trip to the root collection (primary source of truth).
+        for (const trip of tripList) {
+          if (trip?.id) {
+            setDoc(doc(db, rootCollection, String(trip.id)), sanitizeForFirestore(trip)).catch((tripErr) => {
+              console.warn(`Root ${rootCollection}/${trip.id} mirror failed; continuing.`, tripErr);
+            });
+          }
+        }
+
+        // 2. Legacy tripLedger mirror (non-blocking).
+        try {
+          if (isTripsField) await mirrorTripsToLedger(tripList, companionTrips);
+          else await mirrorTripsToLedger(companionTrips, tripList);
+        } catch (mirrorErr) {
+          console.warn(`Trip ledger mirror failed for ${field}; continuing with core save.`, mirrorErr);
+        }
+
+        // 3. Try to keep appData/agape in sync for backwards-compatible clients.
+        // If the document is too large (near Firestore's 1 MiB limit), fall back to
+        // a metadata-only write so the onSnapshot still fires and new clients reload
+        // from the root collections.
+        try {
+          await setDoc(doc(db, DATA_DOC), {
+            [field]: sanitized,
+            updatedAt: serverTimestamp(),
+            updatedField: field,
+            updatedAtLocal: new Date().toISOString(),
+          }, { merge: true });
+        } catch (docErr) {
+          console.warn(`DATA_DOC full ${field} save failed (likely size limit). Writing metadata-only.`, docErr);
+          await setDoc(doc(db, DATA_DOC), {
+            updatedAt: serverTimestamp(),
+            updatedField: `${field}-metadata`,
+            updatedAtLocal: new Date().toISOString(),
+          }, { merge: true });
+        }
+      } else {
+        // Non-trip fields: write directly to appData/agape as before.
+        await setDoc(doc(db, DATA_DOC), {
+          [field]: sanitized,
+          updatedAt: serverTimestamp(),
+          updatedField: field,
+          updatedAtLocal: new Date().toISOString(),
+        }, { merge: true });
+      }
 
       pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
-      adaptiveSync.setPendingWrites(pendingWritesRef.current);
+      try { adaptiveSync.setPendingWrites(pendingWritesRef.current); } catch (_) {}
       setState(prev => ({
         ...prev,
         saving: pendingWritesRef.current > 0,
         lastSavedAt: new Date().toISOString(),
       }));
 
-      // Non-blocking middleware — fire and forget, never block the save
-      firestoreWriteMetrics.mark(`write-${field}`).catch(() => {});
-      indexedDBMetrics.mark(`idb-${field}`).catch(() => {});
-      eventSourcing.emit(
+      // Non-blocking middleware — fire and forget, never block the save.
+      // Each call is individually wrapped in try-catch so a middleware failure
+      // cannot propagate and incorrectly set state.error.
+      try { firestoreWriteMetrics.mark(`write-${field}`); } catch (_) { /* non-critical */ }
+      try { indexedDBMetrics.mark(`idb-${field}`); } catch (_) { /* non-critical */ }
+      try { eventSourcing.emit(
         EventType.TRIP_UPDATED, field, 'field',
         { before: beforeData, after: sanitized },
         { actor: auth.currentUser?.email || 'system', source: 'ui' }
-      ).catch(() => {});
-      dataLineage.track({
+      ); } catch (_) { /* non-critical */ }
+      try { dataLineage.track({
         field, action: 'update', before: beforeData, after: sanitized,
         actor: auth.currentUser?.email || 'system', actorRole: auth.currentUser?.role || 'system', source: 'ui',
-      }).catch(() => {});
-      crossTabSync.broadcastDataUpdate(field, sanitized, { action: 'update' }).catch(() => {});
-      saveFieldLocal(field, sanitized).catch(() => {});
+      }); } catch (_) { /* non-critical */ }
+      try { crossTabSync.broadcastDataUpdate(field, sanitized, { action: 'update' }); } catch (_) { /* non-critical */ }
+      try { Promise.resolve(saveFieldLocal(field, sanitized)).catch(() => {}); } catch (_) { /* non-critical */ }
 
-      if (MIRRORED_TRIP_FIELDS.has(field)) {
-        mirrorTripsToLedger(dataRef.current.trips || [], dataRef.current.trashedTrips || []).catch(() => {});
-      } else if (field === 'drivers') {
-        mirrorRecordsToCollection(DRIVER_PROFILE_COLLECTION, dataRef.current.drivers || []).catch(() => {});
+      if (field === 'drivers') {
+        try { Promise.resolve(mirrorRecordsToCollection(DRIVER_PROFILE_COLLECTION, dataRef.current.drivers || [])).catch(() => {}); } catch (_) { /* non-critical */ }
       } else if (field === 'dispatchers') {
-        mirrorRecordsToCollection(DISPATCHER_PROFILE_COLLECTION, dataRef.current.dispatchers || []).catch(() => {});
+        try { Promise.resolve(mirrorRecordsToCollection(DISPATCHER_PROFILE_COLLECTION, dataRef.current.dispatchers || [])).catch(() => {}); } catch (_) { /* non-critical */ }
       } else if (field === 'vehicles') {
-        mirrorRecordsToCollection(VEHICLE_COLLECTION, dataRef.current.vehicles || []).catch(() => {});
+        try { Promise.resolve(mirrorRecordsToCollection(VEHICLE_COLLECTION, dataRef.current.vehicles || [])).catch(() => {}); } catch (_) { /* non-critical */ }
       } else if (field === 'logs') {
-        mirrorLogsToCollection(sanitized).catch(() => {});
+        try { Promise.resolve(mirrorLogsToCollection(sanitized)).catch(() => {}); } catch (_) { /* non-critical */ }
       } else if (field === 'phoneNumbers') {
-        setDoc(doc(db, PHONE_NUMBERS_DOC), sanitized, { merge: true }).catch(() => {});
+        try { Promise.resolve(setDoc(doc(db, PHONE_NUMBERS_DOC), sanitized, { merge: true })).catch(() => {}); } catch (_) { /* non-critical */ }
       }
       return true;
     } catch (err) {
       pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
-      adaptiveSync.setPendingWrites(pendingWritesRef.current);
+      try { adaptiveSync.setPendingWrites(pendingWritesRef.current); } catch (_) {}
       console.error(`Failed to save ${field} to Firestore:`, err);
       setState(prev => ({
         ...prev,
         saving: pendingWritesRef.current > 0,
         error: err.message || `Failed to save ${field}`,
       }));
-      // Queue for retry
-      retryQueue.enqueue({ type: 'setField', field, value: sanitized, collection: DATA_DOC }, err).catch(() => {});
-      backgroundSync.queue({ type: 'setField', field, value: sanitized, collection: DATA_DOC }).catch(() => {});
-      saveFieldLocal(field, sanitized).catch(() => {});
+      // Queue for retry (wrapped for safety)
+      try { Promise.resolve(retryQueue.enqueue({ type: 'setField', field, value: sanitized, collection: DATA_DOC }, err)).catch(() => {}); } catch (_) {}
+      try { Promise.resolve(backgroundSync.queue({ type: 'setField', field, value: sanitized, collection: DATA_DOC })).catch(() => {}); } catch (_) {}
+      try { Promise.resolve(saveFieldLocal(field, sanitized)).catch(() => {}); } catch (_) {}
       return false;
     }
   }, []);
 
-  const setTrips = useCallback((updater) => {
+  const setTrips = useCallback(async (updater) => {
+    await waitForCollectionSync(tripsCollectionLoadedRef);
     const current = dataRef.current.trips || [];
-    const next = typeof updater === 'function' ? updater(current) : updater;
+    const next = dedupTripsByContent(typeof updater === 'function' ? updater(current) : updater);
     return writeField('trips', next.map(normalizeTrip));
-  }, [writeField]);
+  }, [writeField, waitForCollectionSync]);
 
   const setDrivers = useCallback((updater) => {
     const current = dataRef.current.drivers || [];
@@ -1064,15 +1437,16 @@ export function useFirestoreAppData() {
     return writeField('vehicles', next);
   }, [writeField]);
 
-  const setTrashedTrips = useCallback((updater) => {
+  const setTrashedTrips = useCallback(async (updater) => {
+    await waitForCollectionSync(trashedCollectionLoadedRef);
     const current = dataRef.current.trashedTrips || [];
-    const next = typeof updater === 'function' ? updater(current) : updater;
+    const next = dedupTripsByContent(typeof updater === 'function' ? updater(current) : updater);
     return writeField('trashedTrips', next);
-  }, [writeField]);
+  }, [writeField, waitForCollectionSync]);
 
   const writeTripsBatch = useCallback(async (nextTrips, nextTrashed) => {
-    const sanitizedTrips = sanitizeForFirestore(nextTrips);
-    const sanitizedTrashed = sanitizeForFirestore(nextTrashed);
+    const sanitizedTrips = sanitizeForFirestore(dedupTripsByContent(nextTrips));
+    const sanitizedTrashed = sanitizeForFirestore(dedupTripsByContent(nextTrashed));
     const beforeTrips = dataRef.current.trips;
     const beforeTrashed = dataRef.current.trashedTrips;
     dataRef.current = {
@@ -1081,7 +1455,7 @@ export function useFirestoreAppData() {
       trashedTrips: sanitizedTrashed,
     };
     pendingWritesRef.current += 1;
-    adaptiveSync.setPendingWrites(pendingWritesRef.current);
+    try { adaptiveSync.setPendingWrites(pendingWritesRef.current); } catch (_) {}
     setState(prev => ({
       ...prev,
       trips: sanitizedTrips,
@@ -1090,22 +1464,55 @@ export function useFirestoreAppData() {
       error: null,
     }));
 
-    // Performance timing
-    firestoreWriteMetrics.mark('write-trips-batch');
+    // Performance timing (wrapped for safety)
+    try { firestoreWriteMetrics.mark('write-trips-batch'); } catch (_) {}
 
     try {
-      await setDoc(doc(db, DATA_DOC), {
-        trips: sanitizedTrips,
-        trashedTrips: sanitizedTrashed,
-        updatedAt: serverTimestamp(),
-        updatedField: 'trips+trashed',
-        updatedAtLocal: new Date().toISOString(),
-      }, { merge: true });
+      // 1. Root collections are the primary source of truth.
+      for (const trip of (sanitizedTrips || [])) {
+        if (trip?.id) {
+          setDoc(doc(db, TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip)).catch((tripErr) => {
+            console.warn(`Root ${TRIPS_COLLECTION}/${trip.id} mirror failed; continuing.`, tripErr);
+          });
+        }
+      }
+      for (const trip of (sanitizedTrashed || [])) {
+        if (trip?.id) {
+          setDoc(doc(db, TRASHED_TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip)).catch((tripErr) => {
+            console.warn(`Root ${TRASHED_TRIPS_COLLECTION}/${trip.id} mirror failed; continuing.`, tripErr);
+          });
+        }
+      }
 
-      firestoreWriteMetrics.measure('write-trips-batch', 'firestore-write');
+      // 2. Legacy tripLedger mirror (non-blocking).
+      try {
+        await mirrorTripsToLedger(sanitizedTrips || [], sanitizedTrashed || []);
+      } catch (mirrorErr) {
+        console.warn('Trip ledger mirror failed for writeTripsBatch; continuing with core save.', mirrorErr);
+      }
 
-      // Data lineage: track batch change
-      dataLineage.track({
+      // 3. Backwards-compatible appData/agape write with size guard.
+      try {
+        await setDoc(doc(db, DATA_DOC), {
+          trips: sanitizedTrips,
+          trashedTrips: sanitizedTrashed,
+          updatedAt: serverTimestamp(),
+          updatedField: 'trips+trashed',
+          updatedAtLocal: new Date().toISOString(),
+        }, { merge: true });
+      } catch (docErr) {
+        console.warn('DATA_DOC write-trips-batch failed (likely size limit). Writing metadata-only.', docErr);
+        await setDoc(doc(db, DATA_DOC), {
+          updatedAt: serverTimestamp(),
+          updatedField: 'trips+trashed-metadata',
+          updatedAtLocal: new Date().toISOString(),
+        }, { merge: true });
+      }
+
+      try { firestoreWriteMetrics.measure('write-trips-batch', 'firestore-write'); } catch (_) {}
+
+      // Data lineage: track batch change (wrapped for safety)
+      try { dataLineage.track({
         field: 'trips',
         action: 'batch-update',
         before: { tripsCount: beforeTrips?.length, trashedCount: beforeTrashed?.length },
@@ -1113,16 +1520,15 @@ export function useFirestoreAppData() {
         actor: auth.currentUser?.email || 'system',
         actorRole: auth.currentUser?.role || 'system',
         source: 'ui',
-      });
+      }); } catch (_) {}
 
-      // Cross-tab sync
-      crossTabSync.broadcastDataUpdate('trips', sanitizedTrips, { action: 'batch' });
-      crossTabSync.broadcastDataUpdate('trashedTrips', sanitizedTrashed, { action: 'batch' });
+      // Cross-tab sync (wrapped for safety)
+      try { crossTabSync.broadcastDataUpdate('trips', sanitizedTrips, { action: 'batch' }); } catch (_) {}
+      try { crossTabSync.broadcastDataUpdate('trashedTrips', sanitizedTrashed, { action: 'batch' }); } catch (_) {}
 
-      await mirrorTripsToLedger(sanitizedTrips || [], sanitizedTrashed || []);
       pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
-      adaptiveSync.setPendingWrites(pendingWritesRef.current);
-      syncMetrics.record('sync-complete', 1, { field: 'trips+trashed' });
+      try { adaptiveSync.setPendingWrites(pendingWritesRef.current); } catch (_) {}
+      try { syncMetrics.record('sync-complete', 1, { field: 'trips+trashed' }); } catch (_) {}
       setState(prev => ({
         ...prev,
         saving: pendingWritesRef.current > 0,
@@ -1131,8 +1537,8 @@ export function useFirestoreAppData() {
       return true;
     } catch (err) {
       pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
-      adaptiveSync.setPendingWrites(pendingWritesRef.current);
-      syncMetrics.recordError('sync-complete', err, { field: 'trips+trashed' });
+      try { adaptiveSync.setPendingWrites(pendingWritesRef.current); } catch (_) {}
+      try { syncMetrics.recordError('sync-complete', err, { field: 'trips+trashed' }); } catch (_) {}
       console.error('Failed to save trips+trashed to Firestore:', err);
       setState(prev => ({
         ...prev,
@@ -1143,13 +1549,15 @@ export function useFirestoreAppData() {
     }
   }, []);
 
-  const setTripsAndTrashed = useCallback((tripsUpdater, trashedUpdater) => {
+  const setTripsAndTrashed = useCallback(async (tripsUpdater, trashedUpdater) => {
+    await waitForCollectionSync(tripsCollectionLoadedRef);
+    await waitForCollectionSync(trashedCollectionLoadedRef);
     const currentTrips = dataRef.current.trips || [];
     const currentTrashed = dataRef.current.trashedTrips || [];
     const nextTrips = typeof tripsUpdater === 'function' ? tripsUpdater(currentTrips) : tripsUpdater;
     const nextTrashed = typeof trashedUpdater === 'function' ? trashedUpdater(currentTrashed) : trashedUpdater;
     return writeTripsBatch(nextTrips, nextTrashed);
-  }, [writeTripsBatch]);
+  }, [writeTripsBatch, waitForCollectionSync]);
 
   const setLogs = useCallback((updater) => {
     const current = dataRef.current.logs || [];
@@ -1190,8 +1598,8 @@ export function useFirestoreAppData() {
       const current = normalizeData(dataRef.current);
       const merged = normalizeData({
         ...current,
-        trips: mergeRecordsById(current.trips, mirrorData.trips, 'active'),
-        trashedTrips: mergeRecordsById(current.trashedTrips, mirrorData.trashedTrips, 'archived'),
+        trips: dedupTripsByContent(mergeRecordsById(current.trips, mirrorData.trips, 'active')),
+        trashedTrips: dedupTripsByContent(mergeRecordsById(current.trashedTrips, mirrorData.trashedTrips, 'archived')),
         drivers: mergeRecordsById(current.drivers, mirrorData.drivers, 'drivers'),
         dispatchers: mergeRecordsById(current.dispatchers, mirrorData.dispatchers, 'dispatchers'),
         vehicles: mergeRecordsById(current.vehicles, mirrorData.vehicles, 'vehicles'),
@@ -1203,13 +1611,38 @@ export function useFirestoreAppData() {
         },
       });
 
-      await setDoc(doc(db, DATA_DOC), {
-        ...sanitizeForFirestore(merged),
-        repairedAt: new Date().toISOString(),
-        updatedAt: serverTimestamp(),
-        updatedField: 'repair',
-        updatedAtLocal: new Date().toISOString(),
-      }, { merge: true });
+      // Write trips/trashedTrips to their root collections first (primary source).
+      await Promise.all([
+        ...(merged.trips || []).map(trip => trip?.id
+          ? setDoc(doc(db, TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))
+          : Promise.resolve()),
+        ...(merged.trashedTrips || []).map(trip => trip?.id
+          ? setDoc(doc(db, TRASHED_TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))
+          : Promise.resolve()),
+      ]);
+
+      // Write the core document. If it's too large because of trips, strip the
+      // trip arrays and only write metadata + other collections.
+      try {
+        await setDoc(doc(db, DATA_DOC), {
+          ...sanitizeForFirestore(merged),
+          repairedAt: new Date().toISOString(),
+          updatedAt: serverTimestamp(),
+          updatedField: 'repair',
+          updatedAtLocal: new Date().toISOString(),
+        }, { merge: true });
+      } catch (docErr) {
+        console.warn('DATA_DOC repair failed (likely size limit). Writing metadata-only repair.', docErr);
+        const { trips, trashedTrips, ...metadata } = sanitizeForFirestore(merged);
+        await setDoc(doc(db, DATA_DOC), {
+          ...metadata,
+          repairedAt: new Date().toISOString(),
+          updatedAt: serverTimestamp(),
+          updatedField: 'repair-metadata',
+          updatedAtLocal: new Date().toISOString(),
+        }, { merge: true });
+      }
+
       await Promise.all([
         mirrorTripsToLedger(merged.trips, merged.trashedTrips),
         mirrorRecordsToCollection(DRIVER_PROFILE_COLLECTION, merged.drivers),

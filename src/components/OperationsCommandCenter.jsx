@@ -974,7 +974,7 @@ const OperationsCommandCenter = ({
     const sections = new Map();
     const buildGroup = (trip) => {
       if (manifestGroupBy === 'status') {
-        return { key: trip.status || 'Unknown', label: trip.status || 'Unknown', order: trip.status === 'Unassigned' ? 0 : trip.status === 'Assigned' ? 1 : ACTIVE_PROGRESS_STATUSES.includes(trip.status) ? 2 : 3 };
+        return { key: trip.status || 'No status', label: trip.status || 'No status', order: trip.status === 'Unassigned' ? 0 : trip.status === 'Assigned' ? 1 : ACTIVE_PROGRESS_STATUSES.includes(trip.status) ? 2 : 3 };
       }
       if (manifestGroupBy === 'service') {
         const label = trip.type || trip.serviceType || 'Unclassified';
@@ -1234,7 +1234,7 @@ const OperationsCommandCenter = ({
     const pickupFacilityName = getPickupFacilityName(trip);
     const dropoffFacilityName = getDropoffFacilityName(trip);
     const serviceLabel = trip.type || trip.serviceType;
-    const clientSummary = [bookingReference, clientIdentifier && `ID ${clientIdentifier}`, serviceLabel].filter(Boolean).join(' • ');
+    const clientSummary = [bookingReference, clientIdentifier && `ID ${clientIdentifier}`, serviceLabel].filter(Boolean).join(' | ');
     const visibleRouteAssignments = routeAssignments.slice(0, densityProfile.routeChipLimit);
 
     const cardClasses = `rounded-2xl border bg-white transition-all duration-150 ${densityProfile.cardPadding} shadow-sm ${
@@ -1266,7 +1266,7 @@ const OperationsCommandCenter = ({
               </span>
             )}
             <span className="hidden md:inline truncate text-[10px] text-slate-500 font-medium">{trip.pickup || ''}</span>
-            <span className="hidden md:inline text-[10px] text-slate-300">→</span>
+            <span className="hidden md:inline text-[10px] text-slate-300">to</span>
             <span className="hidden md:inline truncate text-[10px] text-slate-500 font-medium">{trip.dropoff || ''}</span>
             {clientPhone && <span className="shrink-0 text-[9px] font-semibold text-emerald-700">{clientPhone}</span>}
             {driver && <span className="hidden lg:inline truncate text-[10px] text-slate-500">{driver.name}</span>}
@@ -1346,7 +1346,7 @@ const OperationsCommandCenter = ({
               <span className="font-medium text-emerald-700">P:</span>
               <span className="truncate text-slate-700">{trip.pickup || 'Missing pickup address'}</span>
             </div>
-            <span className="text-slate-300">→</span>
+            <span className="text-slate-300">to</span>
             <div className="flex min-w-0 items-center gap-1.5 text-[10px]">
               <span className="font-medium text-rose-700">D:</span>
               <span className="truncate text-slate-700">{trip.dropoff || 'Missing dropoff address'}</span>
@@ -1719,12 +1719,12 @@ const OperationsCommandCenter = ({
                   const pickupFacilityName = getPickupFacilityName(trip);
                   const dropoffFacilityName = getDropoffFacilityName(trip);
                   const serviceLabel = trip.type || trip.serviceType;
-                  const clientSummary = [bookingReference, clientIdentifier && `ID ${clientIdentifier}`, serviceLabel].filter(Boolean).join(' • ');
+                  const clientSummary = [bookingReference, clientIdentifier && `ID ${clientIdentifier}`, serviceLabel].filter(Boolean).join(' | ');
                   const contactSummary = [
                     clientPhone && `Client ${clientPhone}`,
                     densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && `Pickup ${pickupPhone}`,
                     densityProfile.showSecondaryPhones && dropoffPhone && `Hospital ${dropoffPhone}`,
-                  ].filter(Boolean).join(' • ');
+                  ].filter(Boolean).join(' | ');
                   const visibleRouteAssignments = routeAssignments.slice(0, densityProfile.routeChipLimit);
                   const rowBg = isSelected
                     ? 'bg-blue-50'
@@ -1752,7 +1752,7 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-center`}>
-                          <span className="text-[10px] font-mono font-bold text-slate-500">{trip.bookingId || trip.id || '—'}</span>
+                          <span className="text-[10px] font-mono font-bold text-slate-500">{trip.bookingId || trip.id || 'No booking'}</span>
                         </div>
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
@@ -1823,7 +1823,7 @@ const OperationsCommandCenter = ({
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] font-semibold text-slate-700 truncate`}>
-                            {trip.pickup || '—'}
+                            {trip.pickup || 'No pickup address'}
                           </div>
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-blue-100 bg-blue-50/70 rounded-lg px-2 py-1' : 'border border-blue-100 bg-blue-50/70 rounded-2xl px-3 py-2'}`}>
@@ -1846,7 +1846,7 @@ const OperationsCommandCenter = ({
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] font-semibold text-slate-700 truncate`}>
-                            {trip.dropoff || '—'}
+                            {trip.dropoff || 'No dropoff address'}
                           </div>
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-emerald-100 bg-emerald-50/70 rounded-lg px-2 py-1' : 'border border-emerald-100 bg-emerald-50/70 rounded-2xl px-3 py-2'}`}>
@@ -1869,7 +1869,7 @@ const OperationsCommandCenter = ({
                             {driver ? (
                               <span className="text-slate-800">{driver.name}</span>
                             ) : (
-                              <span className="text-rose-600">—</span>
+                              <span className="text-rose-600">No route</span>
                             )}
                           </div>
                         ) : densityProfile.lineCount === 2 ? (
@@ -1943,7 +1943,7 @@ const OperationsCommandCenter = ({
                                   ? `${bookingReference}`
                                   : clientIdentifier
                                     ? `ID ${clientIdentifier}`
-                                    : '—'}
+                                    : 'No reference'}
                               </div>
                             )}
                           </div>
@@ -2069,8 +2069,8 @@ const OperationsCommandCenter = ({
                       {String(d?.name || '?').charAt(0)}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{d.name || 'Unknown Driver'}</p>
-                      <p className="text-micro text-slate-400">{d.vehicle}</p>
+                      <p className="text-sm font-semibold text-slate-900">{d.name || 'Unnamed driver'}</p>
+                      <p className="text-micro text-slate-400">{d.vehicle || 'No vehicle'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2125,7 +2125,7 @@ const OperationsCommandCenter = ({
                               <p className="text-xs font-medium text-slate-900 truncate">{t.patient}</p>
                               {densityProfile.lineCount <= 2 ? (
                                 <div className="mt-0.5 text-[10px] font-semibold text-slate-500" style={getClampStyle(densityProfile.lineCount)}>
-                                  {[bookingReference, clientIdentifier && `ID ${clientIdentifier}`, (t.type || t.serviceType)].filter(Boolean).join(' • ')}
+                                  {[bookingReference, clientIdentifier && `ID ${clientIdentifier}`, (t.type || t.serviceType)].filter(Boolean).join(' | ')}
                                 </div>
                               ) : (
                               <div className="mt-1 flex flex-wrap gap-1">
@@ -2256,7 +2256,7 @@ const OperationsCommandCenter = ({
                   <div className="flex-1 min-w-0">
                     {densityProfile.lineCount <= 2 ? (
                       <div className="text-[10px] font-semibold text-slate-500" style={getClampStyle(densityProfile.lineCount)}>
-                        {['Will Call', bookingReference, clientIdentifier && `ID ${clientIdentifier}`, (t.type || t.serviceType)].filter(Boolean).join(' • ')}
+                        {['Will Call', bookingReference, clientIdentifier && `ID ${clientIdentifier}`, (t.type || t.serviceType)].filter(Boolean).join(' | ')}
                       </div>
                     ) : (
                     <div className="flex items-center gap-2 flex-wrap mb-1.5">

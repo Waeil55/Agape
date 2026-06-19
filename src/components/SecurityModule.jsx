@@ -210,7 +210,7 @@ export const AuditLogViewer = ({ logs = [] }) => {
                   <p className="text-xs text-slate-600 mt-1">{log.description}</p>
                   <p className="text-xs text-slate-500 mt-1">
                     <User size={12} className="inline mr-1" />
-                    {log.user} • {log.timestamp}
+                    {log.user} | {log.timestamp}
                   </p>
                 </div>
                 <span className={`text-xs font-bold px-2 py-1 rounded ${getActionColor(log.action)}`}>

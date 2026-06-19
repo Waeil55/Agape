@@ -63,7 +63,7 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <p className="font-bold text-slate-900 truncate">{driver.name}</p>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor(driver.status)}`}>{driver.status || 'Unknown'}</span>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor(driver.status)}`}>{driver.status || 'No status'}</span>
             </div>
             <p className="text-[11px] text-slate-500">{driver.vehicle || 'No vehicle'} {driver.phone ? `- ${driver.phone}` : ''}</p>
           </div>

@@ -423,7 +423,7 @@ const ReportingModule = ({ trips = [], drivers = [] }) => {
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-6">
               <p className="font-bold text-slate-900">📊 Analytics Ready</p>
               <p className="text-sm text-slate-600 mt-2">Access AI-powered insights and trends in your dashboard</p>
-              <button onClick={() => document.getElementById('custom-dashboard-builder')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="mt-3 text-sm font-bold text-blue-600 hover:underline">View Analytics →</button>
+              <button onClick={() => document.getElementById('custom-dashboard-builder')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="mt-3 text-sm font-bold text-blue-600 hover:underline">View Analytics</button>
             </div>
           </div>
         </div>

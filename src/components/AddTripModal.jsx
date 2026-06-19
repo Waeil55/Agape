@@ -174,7 +174,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
             </div>
             <div>
               <h2 className="text-base font-black text-white">Add New Trip</h2>
-              <p className="text-xs text-white/70 font-medium capitalize">{role} • Manual Entry</p>
+              <p className="text-xs text-white/70 font-medium capitalize">{role} | Manual Entry</p>
             </div>
           </div>
           <button
@@ -423,7 +423,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
                       onChange={e => update('driverId', e.target.value)}
                       className={inputClass('driverId')}
                     >
-                      <option value="">— Unassigned —</option>
+                      <option value="">Unassigned</option>
                       {selectableDrivers.map(d => (
                         <option key={d.id} value={d.id}>
                           {d.name} {d.status ? `(${d.status})` : ''}

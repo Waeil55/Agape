@@ -260,6 +260,15 @@ function normalizeDateValue(value) {
   return `${year}-${month}-${day}`;
 }
 
+const DATE_HINT_RE = /\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}\/\d{1,2}\/\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}/i;
+const MISSING_DATE_ISSUE = 'Missing service date';
+
+function inferDateFromDateTimeValue(value) {
+  const raw = String(value || '').trim();
+  if (!raw || !DATE_HINT_RE.test(raw)) return '';
+  return normalizeDateValue(raw);
+}
+
 function findColumn(headers, aliases) {
   const lower = headers.map(h => h.toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
   for (const alias of aliases) {
@@ -626,12 +635,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
       setProgressPct(12);
 
-      const getTodayStr = () => {
-        const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      };
-      const today = getTodayStr();
-
       // First pass: group by patient and phone to identify facility numbers and determine the "Earliest Leg" phone
       const patientData = {};
       const phoneToPatients = {}; // phone -> Set of patient names
@@ -811,10 +814,23 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         const startTime = extract(m.startTime, row['Start Time'], row['startTime'], row['Started At']);
         const departedPickupTime = extract(m.departedPickupTime, row['Departed Pickup'], row['departedPickupTime']);
 
-        // Date: use mapped value, or try raw keys
+        // Date: use explicit service-date fields, then dated timestamps. Never
+        // default missing historical rows to the upload day.
         let date = normalizeDateValue(m.date);
         if (!date) date = normalizeDateValue(row['Date'] || row['date'] || row['Trip Date'] || row['Service Date'] || '');
-        if (!date) date = today;
+        if (!date) {
+          date = [
+            completedAt,
+            startTime,
+            departedPickupTime,
+            arrivalTime,
+            arrivalDropoffTime,
+            row['Date Completed'],
+            row['Completed Date'],
+            row['Service Date'],
+          ].map(inferDateFromDateTimeValue).find(Boolean) || '';
+        }
+        const dateIssues = date ? [] : [MISSING_DATE_ISSUE];
 
         const pickupAddr = extract(m.pickup, row['Pickup Address'], row['pickup'], row['Pickup']);
         const dropoffAddr = extract(m.dropoff, row['Dropoff Address'], row['dropoff'], row['Dropoff']);
@@ -830,7 +846,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           // --- IDENTIFIERS ---
           id: row['Trip ID'] || row['TripID'] || row['tripid'] || row['ID'] || row['id'] || `TRIP-${Date.now()}-${idx}`,
           bookingId: extract(m.bookingId, row['Booking Id'], row['Booking ID'], row['bookingId'], row['Booking'], row['Confirmation #']),
-          patient: extract(m.patient, row['Client Name'], row['Client'], row['Patient'], row['patient'], 'Unknown'),
+          patient: extract(m.patient, row['Client Name'], row['Client'], row['Patient'], row['patient'], 'No client name'),
           patientPhone: patientPhone || extract(m.patientPhone, row['Patient Phone'], row['patientPhone']),
 
           // --- DATES & TIMES ---
@@ -904,8 +920,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
           // --- RAW DATA (always preserved) ---
           _originalRow: row,
-          _hasIssues: false,
-          _issues: [],
+          _hasIssues: dateIssues.length > 0,
+          _issues: dateIssues,
           _confidence: 100,
         };
       });
@@ -926,10 +942,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
         const updated = pairedMapped.map((trip, idx) => {
           const ai = aiResults[idx];
-          if (ai && ai.issues?.length > 0) {
-            return { ...trip, _hasIssues: true, _issues: ai.issues, _confidence: ai.confidence || 100 };
-          }
-          return { ...trip, _confidence: ai?.confidence || 100 };
+          const issues = [...(trip._issues || []), ...(ai?.issues || [])];
+          return { ...trip, _hasIssues: issues.length > 0, _issues: issues, _confidence: ai?.confidence || 100 };
         });
 
         setMappedTrips(updated);
@@ -949,6 +963,11 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   };
 
   const confirmImport = () => {
+    const missingDateCount = mappedTrips.filter((trip) => !trip.date).length;
+    if (missingDateCount > 0) {
+      setError(`Add a service date for ${missingDateCount} trip${missingDateCount !== 1 ? 's' : ''} before importing.`);
+      return;
+    }
     const cleanTrips = mappedTrips.map(({ _originalRow, _hasIssues, _issues, _confidence, _travelTime, ...trip }) => {
       const finalDriverId = trip.driverId || assignToDriver || _originalRow['Driver ID'] || null;
       let newStatus = trip.status;
@@ -972,6 +991,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
   const totalSelected = mappedTrips.length;
   const withIssues = mappedTrips.filter(t => t._hasIssues).length;
+  const missingDateCount = mappedTrips.filter(t => !t.date).length;
   const avgConfidence = mappedTrips.length > 0
     ? Math.round(mappedTrips.reduce((s, t) => s + (t._confidence || 100), 0) / mappedTrips.length)
     : 100;
@@ -1069,7 +1089,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900">Import Review</h3>
                 <p className="text-xs sm:text-sm text-slate-500 truncate">
                   {mappedTrips.length} trip{ mappedTrips.length !== 1 ? 's' : '' } extracted
-                  {withIssues > 0 ? ` — ${withIssues} with warnings` : ' — all clean' }
+                  {withIssues > 0 ? ` - ${withIssues} with warnings` : ' - all clean' }
                 </p>
               </div>
             </div>
@@ -1121,6 +1141,12 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               </div>
             )}
 
+            {missingDateCount > 0 && (
+              <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-700">
+                {missingDateCount} trip{missingDateCount !== 1 ? 's are' : ' is'} missing a service date. Add dates below before importing so old trips are not assigned to the upload day.
+              </div>
+            )}
+
             <div className="overflow-x-auto border border-slate-200 rounded-xl">
               <table className="w-full text-xs sm:text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200">
@@ -1129,6 +1155,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Client</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Pickup</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Dropoff</th>
+                    <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Date</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600 hidden sm:table-cell">Time</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Assign To</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Issues</th>
@@ -1142,6 +1169,27 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs font-semibold text-slate-900 whitespace-nowrap">{trip.patient}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.pickup}>{trip.pickup || <span className="text-rose-400 italic">missing</span>}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.dropoff}>{trip.dropoff || <span className="text-rose-400 italic">missing</span>}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
+                        <input
+                          type="date"
+                          value={trip.date || ''}
+                          onChange={(e) => {
+                            const nextDate = e.target.value;
+                            const newTrips = [...mappedTrips];
+                            const nextIssues = (newTrips[idx]._issues || []).filter(issue => issue !== MISSING_DATE_ISSUE);
+                            if (!nextDate) nextIssues.unshift(MISSING_DATE_ISSUE);
+                            newTrips[idx] = {
+                              ...newTrips[idx],
+                              date: nextDate,
+                              _issues: nextIssues,
+                              _hasIssues: nextIssues.length > 0,
+                            };
+                            setMappedTrips(newTrips);
+                            if (nextDate) setError('');
+                          }}
+                          className={`w-[132px] bg-white border rounded px-1.5 py-1 text-xs font-bold outline-none focus:border-blue-500 ${trip.date ? 'border-slate-200 text-slate-700' : 'border-rose-300 text-rose-700 bg-rose-50'}`}
+                        />
+                      </td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 hidden sm:table-cell">{trip.time}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
                         <select 
@@ -1194,9 +1242,9 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                   <p className="text-xs text-blue-600 font-bold uppercase tracking-widest opacity-70">Bulk Assign All Uploaded Trips:</p>
                   <div className="flex gap-2">
                     <select value={assignToDriver} onChange={(e) => setAssignToDriver(e.target.value)} className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-white font-bold shadow-sm">
-                      <option value="">Leave Most as {forceCompleted ? 'Unassigned (Driver Unknown)' : 'Unassigned'} (Or use per-trip selector below)</option>
+                      <option value="">Leave Most as {forceCompleted ? 'Unassigned (No driver selected)' : 'Unassigned'} (Or use per-trip selector below)</option>
                       {drivers.map(d => (
-                        <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
+                        <option key={d.id} value={d.id}>{d.name} - {d.vehicle || 'No vehicle'} ({d.status})</option>
                       ))}
                     </select>
                     {assignToDriver && (
@@ -1228,7 +1276,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               <button onClick={() => { setStep('upload'); setFile(null); setMappedTrips([]); setParsedRows([]); setError(''); }} className="w-full sm:flex-1 py-3 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition text-sm">
                 Cancel
               </button>
-              <button onClick={confirmImport} className="w-full sm:flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm text-sm">
+              <button onClick={confirmImport} disabled={missingDateCount > 0} className="w-full sm:flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                 <CheckCircle2 size={18} />
                 Import {totalSelected} {forceCompleted ? 'Completed ' : ''}Trips
               </button>

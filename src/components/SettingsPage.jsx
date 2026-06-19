@@ -26,8 +26,8 @@ const ActivityRow = ({ index, log }) => {
                   <div key={idx} className="flex items-start gap-3">
                     <div className="w-32 text-slate-500">{dd.field}</div>
                     <div className="flex-1">
-                      <div className="text-[13px] text-slate-600"><span className="font-semibold">Before:</span> <span className="font-mono text-slate-700">{dd.before ?? '—'}</span></div>
-                      <div className="text-[13px] text-slate-600 mt-0.5"><span className="font-semibold">After:</span> <span className="font-mono text-slate-700">{dd.after ?? '—'}</span></div>
+                      <div className="text-[13px] text-slate-600"><span className="font-semibold">Before:</span> <span className="font-mono text-slate-700">{dd.before ?? 'Not set'}</span></div>
+                      <div className="text-[13px] text-slate-600 mt-0.5"><span className="font-semibold">After:</span> <span className="font-mono text-slate-700">{dd.after ?? 'Not set'}</span></div>
                     </div>
                   </div>
                 ))}
@@ -42,11 +42,11 @@ const ActivityRow = ({ index, log }) => {
 };
 
 const FONT_SCALE_OPTIONS = [
-  { value: 'sm', label: 'Small', desc: 'Compact view — more content on screen', icon: Minus },
-  { value: 'md', label: 'Default', desc: 'Standard readability — recommended', icon: TextSelect },
-  { value: 'lg', label: 'Large', desc: 'Larger text — easier to read', icon: Plus },
-  { value: 'xl', label: 'Extra Large', desc: 'Maximum readability — reduced eye strain', icon: Maximize2 },
-  { value: 'driver', label: 'Driver Mode', desc: 'Ultra-readable — optimized for in-vehicle use', icon: Smartphone },
+  { value: 'sm', label: 'Small', desc: 'Compact view - more content on screen', icon: Minus },
+  { value: 'md', label: 'Default', desc: 'Standard readability - recommended', icon: TextSelect },
+  { value: 'lg', label: 'Large', desc: 'Larger text - easier to read', icon: Plus },
+  { value: 'xl', label: 'Extra Large', desc: 'Maximum readability - reduced eye strain', icon: Maximize2 },
+  { value: 'driver', label: 'Driver Mode', desc: 'Ultra-readable - optimized for in-vehicle use', icon: Smartphone },
 ];
 
 const THEME_OPTIONS = [
@@ -248,16 +248,16 @@ const SettingsPage = ({
                   <tbody>
                     {dispatchers.map((d, i) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-2 py-1.5 font-bold text-slate-900">{d.name || '—'}</td>
-                        <td className="px-2 py-1.5 text-slate-600 font-mono">{d.email || '—'}</td>
+                        <td className="px-2 py-1.5 font-bold text-slate-900">{d.name || 'No name'}</td>
+                        <td className="px-2 py-1.5 text-slate-600 font-mono">{d.email || 'No email'}</td>
                         <td className="px-2 py-1.5"><span className={`inline-block px-2 py-0.5 rounded-full font-bold ${ROLE_COLORS[d.role] || 'bg-slate-100 text-slate-600'}`}>{ROLE_LABELS[d.role] || d.role}</span></td>
                         <td className="px-2 py-1.5"><span className={`inline-flex items-center gap-1 font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
                       </tr>
                     ))}
                     {drivers.map((d, i) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-2 py-1.5 font-bold text-slate-900">{d.name || '—'}</td>
-                        <td className="px-2 py-1.5 text-slate-600 font-mono">{d.email || '—'}</td>
+                        <td className="px-2 py-1.5 font-bold text-slate-900">{d.name || 'No name'}</td>
+                        <td className="px-2 py-1.5 text-slate-600 font-mono">{d.email || 'No email'}</td>
                         <td className="px-2 py-1.5"><span className="inline-block px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800">Driver</span></td>
                         <td className="px-2 py-1.5"><span className={`inline-flex items-center gap-1 font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
                       </tr>
@@ -370,7 +370,7 @@ const SettingsPage = ({
                         ) : (
                           trashedTrips.map((trip) => (
                             <tr key={trip.id} className="border-b border-slate-100 hover:bg-slate-50">
-                              <td className="px-2 py-1.5 font-mono text-[10.5px] text-slate-600">{trip.bookingId || '—'}</td>
+                              <td className="px-2 py-1.5 font-mono text-[10.5px] text-slate-600">{trip.bookingId || 'No booking'}</td>
                               <td className="px-2 py-1.5 text-[10.5px] font-bold text-slate-900">{trip.patient}</td>
                               <td className="px-2 py-1.5 text-[10.5px] text-emerald-600 hidden sm:table-cell">{trip.pickup}</td>
                               <td className="px-2 py-1.5 text-[10.5px] text-rose-600 hidden sm:table-cell">{trip.dropoff}</td>
@@ -451,7 +451,7 @@ const SettingsPage = ({
                         <div key={name} className="flex items-center justify-between gap-2 text-[11px]">
                           <span className="font-bold text-slate-600">{name}</span>
                           <span className={`font-black ${info?.status === 'live' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {info?.status || 'unknown'} · {formatSyncTime(info?.at)}
+                            {info?.status || 'not available'} | {formatSyncTime(info?.at)}
                           </span>
                         </div>
                       ))}
@@ -463,7 +463,7 @@ const SettingsPage = ({
             <div className="card-premium p-5 shadow-sm border-rose-200 bg-rose-50">
               <h4 className="font-bold text-rose-900 mb-2 flex items-center gap-2 text-base"><AlertCircle size={20} /> Master Reset</h4>
               <p className="text-sm text-rose-700 mb-4">Warning: This will permanently delete all trips, drivers, and fleet data. This action cannot be undone.</p>
-              <button onClick={() => { requestAuthAction?.('Master System Reset — This will permanently delete ALL trips, drivers, and fleet data. This action cannot be undone.', () => onResetSystem?.()); }} className="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition text-sm shadow-lg shadow-rose-600/20">
+              <button onClick={() => { requestAuthAction?.('Master System Reset - This will permanently delete ALL trips, drivers, and fleet data. This action cannot be undone.', () => onResetSystem?.()); }} className="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition text-sm shadow-lg shadow-rose-600/20">
                 Wipe System Data
               </button>
             </div>
@@ -691,13 +691,13 @@ const SettingsPage = ({
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2">New Password</label>
                       <div className="relative">
-                        <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
+                        <input type={showPassword ? 'text' : 'password'} placeholder="New password" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
                         <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-600 min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Toggle password visibility">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2">Confirm Password</label>
-                      <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
+                      <input type={showPassword ? 'text' : 'password'} placeholder="Confirm password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
                     </div>
                     {pwMsg && <p className={`text-sm font-bold ${pwMsg.includes('successfully') ? 'text-emerald-600' : 'text-rose-600'}`}>{pwMsg}</p>}
                     <button onClick={handlePasswordChange} className="px-6 py-3 btn-gradient-primary font-bold transition-all flex items-center justify-center gap-2 text-base"><Save size={18} /> Update Password</button>

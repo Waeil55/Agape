@@ -169,7 +169,7 @@ const APIConfiguration = ({ integrationKey, integration, onConnect }) => {
       <div className="mt-4 p-3 bg-slate-50 rounded-lg text-xs text-slate-600">
         <p className="font-bold mb-1">📚 Documentation</p>
         <a href={INTEGRATION_DOCS[integrationKey]} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-          View {integration.name} API docs →
+          View {integration.name} API docs
         </a>
       </div>
     </div>

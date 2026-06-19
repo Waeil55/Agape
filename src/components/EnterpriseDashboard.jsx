@@ -443,7 +443,7 @@ const EnterpriseDashboard = ({
 
       <div className="w-px h-4 bg-slate-200 shrink-0" />
 
-      {/* Main Navigation â€” icon + label, no overflow */}
+      {/* Main Navigation - icon + label, no overflow */}
       <nav className="flex items-center gap-0.5">
         {sidebarItems.map(item => {
           const Icon = item.icon;
@@ -779,7 +779,7 @@ const EnterpriseDashboard = ({
                   <Bell size={18} className="opacity-40" />
                 </div>
                 <p className="text-xs font-medium">No alerts</p>
-                <p className="text-micro text-slate-500 mt-1">All clear â€” no issues detected</p>
+                <p className="text-micro text-slate-500 mt-1">All clear - no issues detected</p>
               </div>
             )}
           </div>
@@ -810,7 +810,7 @@ const EnterpriseDashboard = ({
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Time</p>
-                  <p className="text-sm font-bold text-slate-900">{tripDetails.time || 'â€”'}</p>
+                  <p className="text-sm font-bold text-slate-900">{tripDetails.time || 'No time'}</p>
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Route</p>
@@ -818,14 +818,14 @@ const EnterpriseDashboard = ({
                     <div className="flex items-start gap-2.5">
                       <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0 ring-1 ring-emerald-500/20" />
                       <div>
-                        <p className="text-xs text-slate-700">{tripDetails.pickup || 'â€”'}</p>
+                        <p className="text-xs text-slate-700">{tripDetails.pickup || 'No pickup address'}</p>
                         {tripDetails.pickupSiteName && <p className="text-[11px] text-emerald-700 mt-0.5">{tripDetails.pickupSiteName}</p>}
                       </div>
                     </div>
                     <div className="flex items-start gap-2.5">
                       <div className="w-2 h-2 rounded-full bg-rose-500 mt-1.5 shrink-0 ring-1 ring-rose-500/20" />
                       <div>
-                        <p className="text-xs text-slate-700">{tripDetails.dropoff || 'â€”'}</p>
+                        <p className="text-xs text-slate-700">{tripDetails.dropoff || 'No dropoff address'}</p>
                         {tripDetails.dropoffSiteName && <p className="text-[11px] text-rose-700 mt-0.5">{tripDetails.dropoffSiteName}</p>}
                       </div>
                     </div>
@@ -837,7 +837,7 @@ const EnterpriseDashboard = ({
                     <div className="flex flex-wrap gap-1.5">
                       {tripDetails.routeAssignments.map((route, index) => (
                         <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 border border-blue-100">
-                          {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` â€¢ ${route.statusLabel}` : ''}
+                          {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` | ${route.statusLabel}` : ''}
                         </span>
                       ))}
                     </div>
@@ -846,7 +846,7 @@ const EnterpriseDashboard = ({
                 {(tripDetails.driverName || tripDetails.driverId) && (
                   <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                     <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Driver</p>
-                    <p className="text-sm font-medium text-slate-900">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || 'â€”'}</p>
+                    <p className="text-sm font-medium text-slate-900">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || 'No driver'}</p>
                     <p className="text-xs text-slate-400 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
                   </div>
                 )}
@@ -1010,7 +1010,7 @@ const EnterpriseDashboard = ({
               autoFocus
             />
             <div className="flex items-center gap-1.5">
-              <kbd className="text-micro bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-400">âŒ˜K</kbd>
+              <kbd className="text-micro bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-400">Ctrl+K</kbd>
               <kbd className="text-micro bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-400">ESC</kbd>
             </div>
           </div>
@@ -1025,7 +1025,7 @@ const EnterpriseDashboard = ({
                   <cmd.icon size={13} className="text-slate-500" />
                 </div>
                 <span className="text-sm text-slate-700 flex-1">{cmd.label}</span>
-                <span className="text-micro text-slate-500 font-mono">âŒ˜{idx + 1}</span>
+                <span className="text-micro text-slate-500 font-mono">Ctrl+{idx + 1}</span>
               </button>
             ))}
             {filteredCommands.length === 0 && (
@@ -1212,7 +1212,7 @@ const EnterpriseDashboard = ({
         )}
       </div>
 
-      {/* Bottom Navigation â€” mobile only */}
+      {/* Bottom Navigation - mobile only */}
       {renderBottomNav()}
 
       {/* Command Palette */}
@@ -1303,10 +1303,10 @@ const EnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs ring-1 ring-blue-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400">{d.vehicle} â€¢ {d.status}</p>
+                      <p className="text-xs text-slate-400">{d.vehicle || 'No vehicle'} | {d.status || 'No status'}</p>
                     </div>
                   </div>
-                  <span className="text-blue-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign â†’</span>
+                  <span className="text-blue-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign</span>
                 </button>
               ))}
             </div>
@@ -1336,10 +1336,10 @@ const EnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs ring-1 ring-emerald-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400">{d.vehicle} â€¢ Available</p>
+                      <p className="text-xs text-slate-400">{d.vehicle || 'No vehicle'} | Available</p>
                     </div>
                   </div>
-                  <span className="text-emerald-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign â†’</span>
+                  <span className="text-emerald-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign</span>
                 </button>
               ))}
               {drivers.filter(d => d.status !== 'Available').length > 0 && (
@@ -1358,10 +1358,10 @@ const EnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs ring-1 ring-slate-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400">{d.status} â€¢ {d.vehicle}</p>
+                      <p className="text-xs text-slate-400">{d.status || 'No status'} | {d.vehicle || 'No vehicle'}</p>
                     </div>
                   </div>
-                  <span className="text-slate-400 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign â†’</span>
+                  <span className="text-slate-400 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign</span>
                 </button>
               ))}
             </div>
@@ -1496,11 +1496,11 @@ const EnterpriseDashboard = ({
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Time</p>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.time || 'â€”'}</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.time || 'No time'}</p>
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Date</p>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.date || 'â€”'}</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.date || 'No date'}</p>
                 </div>
               </div>
 
@@ -1511,7 +1511,7 @@ const EnterpriseDashboard = ({
                   </div>
                   <div className="flex-1">
                     <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Pickup</p>
-                    <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.pickup || 'â€”'}</p>
+                    <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.pickup || 'No pickup address'}</p>
                     {tripDetails.pickupSiteName && <p className="text-xs text-emerald-700 mt-1">{tripDetails.pickupSiteName}</p>}
                     {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone)}</p>}
                     {formatPhoneDisplay(tripDetails.pickupPhone) && formatPhoneDisplay(tripDetails.pickupPhone) !== formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700">Pickup phone: {formatPhoneDisplay(tripDetails.pickupPhone)}</p>}
@@ -1523,7 +1523,7 @@ const EnterpriseDashboard = ({
                   </div>
                   <div className="flex-1">
                     <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Dropoff</p>
-                    <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.dropoff || 'â€”'}</p>
+                    <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.dropoff || 'No dropoff address'}</p>
                     {tripDetails.dropoffSiteName && <p className="text-xs text-rose-700 mt-1">{tripDetails.dropoffSiteName}</p>}
                     {formatPhoneDisplay(tripDetails.dropoffPhone) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.dropoffPhone)}</p>}
                   </div>
@@ -1536,7 +1536,7 @@ const EnterpriseDashboard = ({
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {tripDetails.routeAssignments.map((route, index) => (
                       <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700">
-                        {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` â€¢ ${route.statusLabel}` : ''}
+                        {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` | ${route.statusLabel}` : ''}
                       </span>
                     ))}
                   </div>
@@ -1546,7 +1546,7 @@ const EnterpriseDashboard = ({
               {(tripDetails.driverName || tripDetails.driverId) && (
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Driver</p>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || 'â€”'}</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || 'No driver'}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
                 </div>
               )}

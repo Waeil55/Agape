@@ -138,7 +138,7 @@ const DriverCoachingPanel = ({ driver, performanceData }) => {
               <ul className="space-y-1">
                 {coaching.improvements.map((imp, i) => (
                   <li key={i} className="text-sm text-amber-800 flex items-start gap-2">
-                    <span className="text-amber-600 mt-0.5">•</span>
+                    <span className="text-amber-600 mt-0.5">-</span>
                     <span>{imp}</span>
                   </li>
                 ))}

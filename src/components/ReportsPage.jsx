@@ -18,8 +18,20 @@ const STATUS_VARIANT = {
   Cancelled: 'bg-amber-100 text-amber-700 border-amber-200',
 };
 
+const NO_TIME = 'No time';
+const NO_DRIVER = 'No driver';
+const NO_VEHICLE = 'No vehicle';
+const NO_BOOKING = 'No booking';
+const NO_PASSENGER = 'No passenger';
+const NO_PICKUP = 'No pickup address';
+const NO_DROPOFF = 'No dropoff address';
+const NO_ODOMETER = 'No odometer';
+const NO_DURATION = 'No duration';
+const NO_MILEAGE = 'No mileage';
+const NOT_RECORDED = 'Not recorded';
+
 const formatClock24 = (value) => {
-  if (!value) return 'â€”';
+  if (!value) return NO_TIME;
   const s = String(value).trim();
   if (s.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(s)) {
     const d = new Date(s);
@@ -38,7 +50,7 @@ const formatClock24 = (value) => {
     if (meridiem === 'AM' && hour === 12) hour = 0;
     return `${String(hour).padStart(2, '0')}:${min}`;
   }
-  return 'â€”';
+  return NO_TIME;
 };
 
 const parseDateOrClock = (value) => {
@@ -99,26 +111,26 @@ const timeToMinutes = (value) => {
 const getDriverRecord = (trip, drivers) =>
   drivers.find((driver) => driver.id === trip.driverId || driver.email === trip.driverEmail);
 
-const getDriverLabel = (trip, drivers) => getDriverRecord(trip, drivers)?.name || trip.driverName || 'â€”';
+const getDriverLabel = (trip, drivers) => getDriverRecord(trip, drivers)?.name || trip.driverName || NO_DRIVER;
 
-const buildCsvValue = (value) => `"${String(value ?? '').replace(/"/g, '""').replace(/â€”/g, '')}"`;
+const buildCsvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 const calcDuration = (start, end) => {
-  if (!start || !end) return 'â€”';
+  if (!start || !end) return NO_DURATION;
   const s = parseDateOrClock(start);
   const e = parseDateOrClock(end);
-  if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return 'â€”';
+  if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return NO_DURATION;
   const diff = Math.round((e - s) / 60000);
-  if (diff < 0) return 'â€”';
+  if (diff < 0) return NO_DURATION;
   const h = Math.floor(diff / 60);
   const m = diff % 60;
   return h > 0 ? `${h}h${m > 0 ? m : ''}` : `${m}m`;
 };
 
 const calcMiles = (pickupOdo, dropoffOdo) => {
-  if (!pickupOdo || !dropoffOdo) return 'â€”';
+  if (!pickupOdo || !dropoffOdo) return NO_MILEAGE;
   const diff = Number(dropoffOdo) - Number(pickupOdo);
-  return diff > 0 ? diff.toFixed(1) : 'â€”';
+  return diff > 0 ? diff.toFixed(1) : NO_MILEAGE;
 };
 
 const formatDateLabel = (dateStr) => {
@@ -311,25 +323,25 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     switch (col.key) {
       case 'date': return formatDateLabel(trip.date || 'No Date');
       case 'driver': return getDriverLabel(trip, drivers);
-      case 'vehicle': { const v = trip.completedVehicle || ''; return v && v !== 'Pending Assignment' ? v : 'â€”'; }
-      case 'time': return formatClock24(trip.time) !== 'â€”' ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
-      case 'bookingId': return trip.bookingId || trip.id || 'â€”';
-      case 'patient': return trip.patient || 'â€”';
-      case 'pickup': return trip.pickup || 'â€”';
-      case 'dropoff': return trip.dropoff || 'â€”';
+      case 'vehicle': { const v = trip.completedVehicle || ''; return v && v !== 'Pending Assignment' ? v : NO_VEHICLE; }
+      case 'time': return formatClock24(trip.time) !== NO_TIME ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
+      case 'bookingId': return trip.bookingId || trip.id || NO_BOOKING;
+      case 'patient': return trip.patient || NO_PASSENGER;
+      case 'pickup': return trip.pickup || NO_PICKUP;
+      case 'dropoff': return trip.dropoff || NO_DROPOFF;
       case 'arrivalTime': return formatClock24(trip.arrivalTime);
       case 'departedPickupTime': return formatClock24(trip.departedPickupTime);
       case 'arrivalDropoffTime': return formatClock24(trip.arrivalDropoffTime || trip.completedAt);
-      case 'pickupOdometer': return trip.pickupOdometer || '—';
-      case 'dropoffOdometer': return trip.dropoffOdometer || '—';
+      case 'pickupOdometer': return trip.pickupOdometer || NO_ODOMETER;
+      case 'dropoffOdometer': return trip.dropoffOdometer || NO_ODOMETER;
       case 'travelTime': return trip.travelTime || calcDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
-      case 'distance': { const m = calcMiles(trip.pickupOdometer, trip.dropoffOdometer); return m !== 'â€”' ? m : 'â€”'; }
+      case 'distance': { const m = calcMiles(trip.pickupOdometer, trip.dropoffOdometer); return m !== NO_MILEAGE ? m : NO_MILEAGE; }
       case 'signature': {
-        if (!('paperSignatureConfirmed' in trip)) return 'â€”';
+        if (!('paperSignatureConfirmed' in trip)) return NOT_RECORDED;
         return trip.paperSignatureConfirmed ? 'Yes' : 'No';
       }
       case 'reviewed': return trip.reviewed ? 'Done' : 'Pending';
-      default: return 'â€”';
+      default: return NOT_RECORDED;
     }
   };
 
@@ -374,7 +386,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           onBlur={() => cancelEdit()}
           autoFocus
         >
-          <option value="">â€”</option>
+          <option value="">Not selected</option>
           {drivers.map(d => (
             <option key={d.id} value={d.id}>{d.name}</option>
           ))}
@@ -392,7 +404,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           onBlur={() => cancelEdit()}
           autoFocus
         >
-          <option value="">â€”</option>
+          <option value="">Not selected</option>
           {vehicles.map(v => (
             <option key={v.id || v.name || v} value={v.name || v}>{v.name || v}</option>
           ))}
@@ -507,7 +519,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     groupedTrips.forEach(([date, dayTrips]) => {
       const passengerGroups = {};
       dayTrips.forEach(trip => {
-        const passengerKey = trip.patient || 'Unknown';
+        const passengerKey = trip.patient || NO_PASSENGER;
         if (!passengerGroups[passengerKey]) {
           passengerGroups[passengerKey] = [];
         }
@@ -630,10 +642,10 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     const rows = [];
     reportTrips.forEach((trip) => {
       const driver = getDriverRecord(trip, drivers);
-      const driverName = driver?.name || trip.driverName || 'â€”';
-      const vehicle = trip.completedVehicle || (driver?.vehicle && driver.vehicle !== 'Pending Assignment' ? driver.vehicle : '') || 'â€”';
+      const driverName = driver?.name || trip.driverName || NO_DRIVER;
+      const vehicle = trip.completedVehicle || (driver?.vehicle && driver.vehicle !== 'Pending Assignment' ? driver.vehicle : '') || NO_VEHICLE;
       const duration = trip.travelTime || calcDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
-      const scheduledTime = formatClock24(trip.time) !== 'â€”' ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
+      const scheduledTime = formatClock24(trip.time) !== NO_TIME ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
       const pickupTime = formatClock24(trip.arrivalTime);
       const departedPickup = formatClock24(trip.departedPickupTime);
       const pickupAddr = trip.pickup || '';
@@ -662,7 +674,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         buildCsvValue(dropoffTime),
         buildCsvValue(dropoffOdo),
         buildCsvValue(duration),
-        buildCsvValue(miles !== 'â€”' ? miles : ''),
+        buildCsvValue(miles !== NO_MILEAGE ? miles : ''),
         buildCsvValue(signed),
         buildCsvValue(reviewed),
         buildCsvValue(trip.status || '')
@@ -700,7 +712,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         <div className="flex items-center gap-0.5 bg-slate-100 rounded px-1.5 py-0.5">
           <Calendar size={10} className="text-slate-400 shrink-0" />
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-1 py-1 border border-slate-200 rounded text-xs outline-none focus:border-blue-500 w-[85px] bg-white min-h-[36px]" />
-          <span className="text-[8px] text-slate-400">â†’</span>
+          <span className="text-[8px] text-slate-400">to</span>
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-1 py-1 border border-slate-200 rounded text-xs outline-none focus:border-blue-500 w-[85px] bg-white min-h-[36px]" />
         </div>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-1 py-0.5 border border-slate-200 rounded text-xs outline-none bg-white min-h-[36px]">
@@ -861,7 +873,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
 
                 {!isCollapsed && (
                   <>
-                    {/* Table â€” hidden on mobile */}
+                    {/* Table - hidden on mobile */}
                     <div className="w-full hidden lg:block">
                     <table className="resizable-table text-[10.5px]" style={{ width: '100%' }}>
                     <thead className="bg-slate-800 text-slate-100 border-b border-slate-200">
@@ -982,7 +994,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                               const displayValue = renderCellValue(trip, col);
                               const isEditing = isEditingCell(trip.id, cellKey);
                               return (
-                                <td key={cellKey} className={`px-2 py-1.5 ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== 'â€”' ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 text-[10.5px] font-mono tracking-wider uppercase' : ''}`}
+                                <td key={cellKey} className={`px-2 py-1.5 ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== NO_MILEAGE ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 text-[10.5px] font-mono tracking-wider uppercase' : ''}`}
                                   title={cellKey === 'pickup' || cellKey === 'dropoff' ? displayValue : undefined}
                                 >
                                   {isEditing ? (
@@ -1014,12 +1026,12 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                   </table>
                 </div>
 
-                {/* Mobile Card View â€” visible below lg */}
+                {/* Mobile Card View - visible below lg */}
                 <div className="lg:hidden divide-y divide-slate-100">
                   {dayTrips.map((trip) => {
                     const statusClass = STATUS_VARIANT[trip.status] || 'bg-slate-100 text-slate-600 border-slate-200';
                     const driverLabel = getDriverLabel(trip, drivers);
-                    const scheduledTime = formatClock24(trip.time) !== 'â€”' ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
+                    const scheduledTime = formatClock24(trip.time) !== NO_TIME ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
                     return (
                       <div
                         key={trip.id}
@@ -1041,21 +1053,21 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                                 {selectedTasks.includes(trip.id) ? <CheckSquare size={14} /> : <Square size={14} />}
                               </button>
                             )}
-                            <span className="font-bold text-sm text-slate-900 truncate">{trip.patient || 'â€”'}</span>
+                            <span className="font-bold text-sm text-slate-900 truncate">{trip.patient || NO_PASSENGER}</span>
                           </div>
                           <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${statusClass}`}>
-                            {trip.status || 'â€”'}
+                            {trip.status || 'No status'}
                           </span>
                         </div>
 
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                           <div>
                             <span className="text-slate-400 text-[10.5px] uppercase tracking-wide">Pickup</span>
-                            <p className="text-emerald-600 truncate" title={trip.pickup}>{trip.pickup || 'â€”'}</p>
+                            <p className="text-emerald-600 truncate" title={trip.pickup}>{trip.pickup || NO_PICKUP}</p>
                           </div>
                           <div>
                             <span className="text-slate-400 text-[10.5px] uppercase tracking-wide">Dropoff</span>
-                            <p className="text-rose-600 truncate" title={trip.dropoff}>{trip.dropoff || 'â€”'}</p>
+                            <p className="text-rose-600 truncate" title={trip.dropoff}>{trip.dropoff || NO_DROPOFF}</p>
                           </div>
                           <div>
                             <span className="text-slate-400 text-[10.5px] uppercase tracking-wide">Time</span>
@@ -1091,7 +1103,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                     if (!byDriver[driverName]) byDriver[driverName] = { trips: 0, totalDistance: 0, passengers: new Set() };
                     byDriver[driverName].trips++;
                     const d = calcMiles(trip.pickupOdometer, trip.dropoffOdometer);
-                    if (d !== 'â€”') byDriver[driverName].totalDistance += parseFloat(d);
+                    if (d !== NO_MILEAGE) byDriver[driverName].totalDistance += parseFloat(d);
                     if (trip.patient) byDriver[driverName].passengers.add(trip.patient);
                   });
                   return Object.entries(byDriver).map(([driverName, info]) => (

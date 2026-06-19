@@ -106,7 +106,7 @@ const CommandIntelligencePanel = ({
               ? `Active: ${activeCount} trips, ${lateCount} late, ${unassignedCount} unassigned. ${summary.summary}`
               : 'No active trips to analyze.',
             aiRecommendedAction: lateCount > 3
-              ? 'Prioritize late trips — consider reassigning to available drivers.'
+              ? 'Prioritize late trips - consider reassigning to available drivers.'
               : unassignedCount > 5
               ? 'Focus on assigning unassigned trips for the next hour.'
               : 'Operations are stable. Monitor driver loads.',
@@ -167,7 +167,7 @@ const CommandIntelligencePanel = ({
     const utilization = clamp(Math.round((assigned.length / expectedLoad) * 70) + (d.status !== 'Available' ? 15 : 0), 0, 100);
     const tone = assigned.length > expectedLoad + 1 ? 'rose' : d.status === 'Available' ? 'emerald' : 'blue';
     return {
-      id: d.id, name: d.name || d.email || 'Driver', status: d.status || 'Unknown',
+      id: d.id, name: d.name || d.email || 'Driver', status: d.status || 'No status',
       vehicle: d.vehicle || 'No vehicle', assignedCount: assigned.length, utilization, tone, nextTrip,
     };
   }).sort((a, b) => b.assignedCount - a.assignedCount || b.utilization - a.utilization).slice(0, 5);
@@ -176,7 +176,7 @@ const CommandIntelligencePanel = ({
   const zones = new Map();
   heuristic.active.forEach(t => {
     const raw = String(t.pickup || t.dropoff || '').trim();
-    const zone = raw.split(',').map(p => p.trim()).filter(Boolean)[0]?.replace(/\b\d{1,6}\b/g, '').trim().slice(0, 28) || 'Unknown';
+    const zone = raw.split(',').map(p => p.trim()).filter(Boolean)[0]?.replace(/\b\d{1,6}\b/g, '').trim().slice(0, 28) || 'No zone';
     const cur = zones.get(zone) || { zone, count: 0, late: 0, unassigned: 0 };
     cur.count += 1;
     if (heuristic.late.includes(t)) cur.late += 1;
@@ -293,8 +293,8 @@ const CommandIntelligencePanel = ({
                       <div className="min-w-0">
                         <p className="text-xs font-black text-slate-900 truncate">{d.name}</p>
                         <p className="text-[10px] font-semibold text-slate-500 truncate">
-                          {d.assignedCount} active — {d.vehicle}
-                          {proximity != null ? ` — ${Math.round(proximity)} mi` : ''}
+                          {d.assignedCount} active - {d.vehicle}
+                          {proximity != null ? ` - ${Math.round(proximity)} mi` : ''}
                         </p>
                       </div>
                       <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black ${tone.bg} ${tone.border} ${tone.text}`}>
@@ -326,7 +326,7 @@ const CommandIntelligencePanel = ({
                 <span className="text-[10px] font-black text-slate-400">{zone.count}</span>
               </div>
               <p className="mt-1 text-xs font-black text-slate-800 truncate">{zone.zone}</p>
-              <p className="text-[10px] font-semibold text-slate-500 mt-0.5">{zone.unassigned} unassigned — {zone.late} late</p>
+              <p className="text-[10px] font-semibold text-slate-500 mt-0.5">{zone.unassigned} unassigned - {zone.late} late</p>
             </button>
           )) : (
             <div className="md:col-span-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 flex items-center gap-2 text-xs font-bold text-slate-500">

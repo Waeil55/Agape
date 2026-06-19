@@ -79,7 +79,7 @@ const tripsToClients = (trips, selectedDay) => {
     })
     .map(t => ({
       id: t.id,
-      name: t.patient || 'Unknown',
+      name: t.patient || 'No client name',
       req: t.serviceType || t.type || t.req || 'AMB',
       pu: t.pickup || '',
       do: t.dropoff || '',
@@ -865,7 +865,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
           </div>
           <div className="min-w-0">
             <h2 className="text-[15px] font-extrabold text-slate-900 leading-tight truncate tracking-tight">Route Sequencer</h2>
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-400 truncate">Multi-load Engine · Live Data</p>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-400 truncate">Multi-load Engine | Live Data</p>
           </div>
         </div>
 
@@ -1011,7 +1011,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                   <div className="w-8 h-8 rounded-2xl bg-blue-50 flex items-center justify-center">
                     <CalendarDays className="w-4 h-4 text-blue-600" />
                   </div>
-                  {currentDay} · {availableToday.length} trip{availableToday.length !== 1 ? 's' : ''}
+                  {currentDay} | {availableToday.length} trip{availableToday.length !== 1 ? 's' : ''}
                 </h3>
                 <div className="flex bg-slate-100 rounded-2xl p-0.5 gap-0.5">
                   <button onClick={() => setActiveLeg('A')} className={`px-2.5 py-1 text-[10px] font-extrabold rounded-xl transition-all ${activeLeg === 'A' ? 'bg-white text-blue-700 shadow-sm border border-blue-100' : 'text-slate-400 hover:text-slate-600'}`}><Flag className="w-3 h-3 inline mr-0.5" />A</button>
@@ -1497,7 +1497,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                     >
                       <option value="">No Default Driver</option>
                       {drivers.map(d => (
-                        <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
+                        <option key={d.id} value={d.id}>{d.name} - {d.vehicle || 'No vehicle'} ({d.status})</option>
                       ))}
                     </select>
                   </div>
@@ -1519,7 +1519,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                     >
                       <option value="">Leave Unassigned</option>
                       {drivers.map(d => (
-                        <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
+                        <option key={d.id} value={d.id}>{d.name} - {d.vehicle || 'No vehicle'} ({d.status})</option>
                       ))}
                     </select>
                   )}

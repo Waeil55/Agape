@@ -106,6 +106,13 @@ export const setupSWMessageHandler = (callback) => {
   if ('serviceWorker' in navigator) {
     const handler = (event) => {
       if (event.data?.type === 'SW_UPDATED') {
+        const version = event.data.version || 'unknown';
+        const lastReload = sessionStorage.getItem('sw_last_reload_version');
+        if (lastReload === version) {
+          console.log('[SW] Already reloaded for version', version, '- skipping');
+          return;
+        }
+        sessionStorage.setItem('sw_last_reload_version', version);
         window.location.reload();
         return;
       }

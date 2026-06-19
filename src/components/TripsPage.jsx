@@ -169,8 +169,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         label = driver?.name || 'Unassigned Pool';
         order = driver ? 1 : 0;
       } else if (groupBy === 'status') {
-        key = trip.status || 'Unknown';
-        label = trip.status || 'Unknown';
+        key = trip.status || 'No status';
+        label = trip.status || 'No status';
       } else if (groupBy === 'service') {
         key = trip.type || trip.serviceType || 'Unclassified';
         label = key;
@@ -283,7 +283,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                 <>
                   <div className="flex-1 min-w-[150px]">
                     <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-100 px-2.5 py-1.5 rounded-lg">
-                      <UserCheck size={12} /> {driver.name} {driver.vehicle ? `• ${driver.vehicle}` : ''}
+                      <UserCheck size={12} /> {driver.name} {driver.vehicle ? `| ${driver.vehicle}` : ''}
                     </span>
                   </div>
                   <button onClick={handleReassignClick} className="px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold text-xs uppercase hover:bg-amber-600 transition whitespace-nowrap">Reassign</button>
@@ -691,10 +691,10 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                     <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-emerald-600 font-bold text-sm shadow-sm group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left min-w-0">
                       <p className="text-xs font-bold text-slate-900 truncate">{d.name}</p>
-                      <p className="text-[10px] font-bold text-slate-400 truncate">{d.vehicle || '—'}</p>
+                      <p className="text-[10px] font-bold text-slate-400 truncate">{d.vehicle || 'No vehicle'}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-600 uppercase shrink-0 ml-1">→</span>
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase shrink-0 ml-1">to</span>
                 </button>
               ))}
             </div>
@@ -731,10 +731,10 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                     <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-amber-600 font-bold text-sm shadow-sm group-hover:bg-amber-600 group-hover:text-white transition-colors shrink-0">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left min-w-0">
                       <p className="text-xs font-bold text-slate-900 truncate">{d.name}</p>
-                      <p className="text-[10px] font-bold text-slate-400 truncate">{d.vehicle || '—'}</p>
+                      <p className="text-[10px] font-bold text-slate-400 truncate">{d.vehicle || 'No vehicle'}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold text-amber-600 uppercase shrink-0 ml-1">→</span>
+                  <span className="text-[10px] font-bold text-amber-600 uppercase shrink-0 ml-1">to</span>
                 </button>
               ))}
             </div>
@@ -762,26 +762,26 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                       <span className="text-xs font-bold text-slate-400 uppercase">Leg {idx + 1}</span>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-400 mb-1">Booking: {leg.bookingId || '—'}</p>
+                    <p className="text-sm font-bold text-slate-400 mb-1">Booking: {leg.bookingId || 'No booking'}</p>
                     <div className="space-y-1.5">
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-blue-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-500">Pickup</p>
-                          <p className="text-sm text-slate-500 truncate">{leg.pickup}</p>
+                          <p className="text-sm text-slate-500 truncate">{leg.pickup || 'No pickup address'}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-500">Dropoff</p>
-                          <p className="text-sm text-slate-500 truncate">{leg.dropoff}</p>
+                          <p className="text-sm text-slate-500 truncate">{leg.dropoff || 'No dropoff address'}</p>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
-                      <span>Time: {leg.time || '—'}</span>
-                      <span>Type: {leg.type || '—'}</span>
+                      <span>Time: {leg.time || 'No time'}</span>
+                      <span>Type: {leg.type || 'No type'}</span>
                     </div>
                     {leg.notes && <p className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{leg.notes}</p>}
                     {leg.pickupPhone && <p className="mt-1.5 text-xs text-slate-400">Phone: {leg.pickupPhone}</p>}

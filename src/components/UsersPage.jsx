@@ -600,7 +600,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Target</p>
                   <p className="text-sm font-semibold text-slate-800">
-                    {selectedLog.meta?.entity ? `${selectedLog.meta.entity}${selectedLog.meta?.id ? ` · ${selectedLog.meta.id}` : ''}` : 'General'}
+                    {selectedLog.meta?.entity ? `${selectedLog.meta.entity}${selectedLog.meta?.id ? ` | ${selectedLog.meta.id}` : ''}` : 'General'}
                   </p>
                 </div>
               </div>
@@ -615,11 +615,11 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
                           <div className="bg-rose-50 rounded-lg p-2 border border-rose-100">
                             <span className="text-[9px] font-bold uppercase tracking-wider text-rose-500 block mb-0.5">Before</span>
-                            <span className="font-mono text-slate-700 break-all">{dd.before ?? '—'}</span>
+                            <span className="font-mono text-slate-700 break-all">{dd.before ?? 'Not set'}</span>
                           </div>
                           <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-100">
                             <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500 block mb-0.5">After</span>
-                            <span className="font-mono text-slate-700 break-all">{dd.after ?? '—'}</span>
+                            <span className="font-mono text-slate-700 break-all">{dd.after ?? 'Not set'}</span>
                           </div>
                         </div>
                       </div>

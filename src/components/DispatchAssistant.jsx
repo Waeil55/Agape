@@ -272,7 +272,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                       </div>
                     </div>
                     <Badge variant={d.liveStatus?.status === 'free' ? 'success' : d.liveStatus?.status === 'busy' ? 'warning' : 'danger'}>
-                      {d.liveStatus?.label || 'Unknown'}
+                      {d.liveStatus?.label || 'Status unavailable'}
                     </Badge>
                   </div>
 
@@ -287,7 +287,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                       const isActive = isNowInRange(sl.startMin, sl.endMin);
                       return (
                         <span key={idx} className={`px-2 py-0.5 rounded font-medium ${isActive ? (sl.isFree ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700') : 'bg-slate-50 text-slate-400'}`}>
-                          {slot.start}-{slot.end} {sl.isFree ? 'âœ“' : 'ðŸš'}
+                          {slot.start}-{slot.end} {sl.isFree ? 'Free' : 'Busy'}
                         </span>
                       );
                     })}
@@ -323,7 +323,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm text-slate-900 break-words">{t.patient}</p>
                           {t.bookingId ? <p className="text-xs text-blue-600 font-bold break-words">{t.bookingId}</p> : null}
-                          <p className="text-xs text-slate-500 break-words"><span className="text-emerald-600">{t.pickup}</span> â†’ <span className="text-rose-600">{t.dropoff}</span></p>
+                          <p className="text-xs text-slate-500 break-words"><span className="text-emerald-600">{t.pickup || 'No pickup address'}</span> to <span className="text-rose-600">{t.dropoff || 'No dropoff address'}</span></p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-xs font-bold text-slate-700">{t.time}</p>

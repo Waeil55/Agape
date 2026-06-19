@@ -231,7 +231,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
     } catch (err) {
       console.error('[RoutePlanner] handleOptimize error:', err);
       setStops(prev => [...prev].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)));
-      setAiMsg('AI optimization failed — sorted by time.');
+      setAiMsg('AI optimization failed - sorted by time.');
     }
     setOptimizing(false);
   };
@@ -430,7 +430,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
               {isPuNav ? 'PU' : 'DO'}
             </div>
             <p className={`text-lg font-bold ${dark ? 'text-slate-200' : 'text-slate-800'}`}>{current.patient}</p>
-            <p className={`text-sm ${muted} mt-0.5`}>Stop {navStep + 1} — {isPuNav ? 'Pickup' : 'Dropoff'}</p>
+            <p className={`text-sm ${muted} mt-0.5`}>Stop {navStep + 1} - {isPuNav ? 'Pickup' : 'Dropoff'}</p>
           </div>
           <div className={`${cardBg} rounded-2xl border p-4 mb-4 space-y-3 shadow-sm`}>
             <div className="flex items-start gap-3">
@@ -439,7 +439,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
               </div>
               <div className="min-w-0">
                 <p className={`text-[10px] font-bold ${muted} uppercase tracking-wider`}>{isPuNav ? 'Pickup' : 'Dropoff'} Address</p>
-                <p className={`text-sm font-medium ${dark ? 'text-slate-200' : 'text-slate-800'} mt-0.5`}>{current.address || '—'}</p>
+                <p className={`text-sm font-medium ${dark ? 'text-slate-200' : 'text-slate-800'} mt-0.5`}>{current.address || 'No address'}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">

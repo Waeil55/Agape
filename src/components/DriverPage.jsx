@@ -146,12 +146,12 @@ const parseDateOrClock = (value) => {
 };
 
 const calcTravelDuration = (start, end) => {
-  if (!start || !end) return '—';
+  if (!start || !end) return 'No duration';
   const s = parseDateOrClock(start);
   const e = parseDateOrClock(end);
-  if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return '—';
+  if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return 'No duration';
   const diff = Math.round((e - s) / 60000);
-  if (diff < 0) return '—';
+  if (diff < 0) return 'No duration';
   const h = Math.floor(diff / 60);
   const m = diff % 60;
   return h > 0 ? `${h}h${m > 0 ? m : ''}` : `${m}m`;
@@ -564,17 +564,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       const rawTrip = rawDriverScopedTrips.find((trip) => trip.id === tripId);
       if (!rawTrip) return;
       const mergedTrip = applyWorkflowProgress(rawTrip, progress);
-      const rawIndex = getWorkflowStepIndex(rawTrip);
-      const mergedIndex = getWorkflowStepIndex(mergedTrip);
-      const shouldSync = mergedIndex > rawIndex || rawTrip.status !== mergedTrip.status;
-      if (!shouldSync) return;
-      const signature = JSON.stringify({ status: mergedTrip.status, ...getWorkflowExtraFields(progress) });
+      // Build a full signature of the workflow state so metadata-only changes
+      // (time edits, transfers, pairing) also trigger a save.
+      const extraFields = getWorkflowExtraFields(progress);
+      const signature = JSON.stringify({ status: mergedTrip.status, ...extraFields });
       if (workflowSyncRef.current[tripId] === signature) return;
       workflowSyncRef.current[tripId] = signature;
-      onUpdateTrip?.(tripId, mergedTrip.status, getWorkflowExtraFields(progress));
+      onUpdateTrip?.(tripId, mergedTrip.status, extraFields);
       saveTripWorkflowUpdate(tripId, {
         status: mergedTrip.status,
-        ...getWorkflowExtraFields(progress),
+        ...extraFields,
         workflowUpdatedAt: progress.workflowUpdatedAt || new Date().toISOString(),
       }).catch((err) => {
         console.error('[DriverPage] Failed to replay workflow progress:', err);
@@ -774,7 +773,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       notifiedTripsRef.current.add(t.id);
       const level = getUrgency(t) === 2 ? 'Overdue' : 'Due Soon';
       playNotificationSound();
-      showLocalNotification(`🚨 ${level}: ${t.patient}`, `${t.time} — ${t.pickup} → ${t.dropoff}`);
+      showLocalNotification(`🚨 ${level}: ${t.patient}`, `${t.time} - ${t.pickup} to ${t.dropoff}`);
     });
   }, [trips]);
 
@@ -813,7 +812,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }
   };
 
-  // Online/offline detection — debounced to prevent rapid flickering on mobile
+  // Online/offline detection - debounced to prevent rapid flickering on mobile
   useEffect(() => {
     let onlineTimer = null;
     let offlineTimer = null;
@@ -856,7 +855,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (navigator.onLine) syncOfflineQueue();
   }, [syncOfflineQueue]);
 
-  // Load last odometer — localStorage is always the source of truth
+  // Load last odometer - localStorage is always the source of truth
   // (it was set explicitly on every driver odometer entry).
   // Fall back to the most recent completed trip only if nothing is in localStorage.
   useEffect(() => {
@@ -872,7 +871,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }
   }, [driverScopedTrips, me?.id]);
 
-  // GPS is mandatory — always active on mount. Also auto-clock-in on mount.
+  // GPS is mandatory - always active on mount. Also auto-clock-in on mount.
   useEffect(() => {
     if (navigator.geolocation) startGpsTracking();
     if (me?.id && !me?.clockedIn) {
@@ -975,7 +974,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (urgencyDiff !== 0) return urgencyDiff;
     return compareTripsBySchedule(a, b);
   }).reduce((acc, trip) => {
-    // Smart pairing: B leg (no time, IN/OUT) → match to its A leg by sequential booking ID + reversed addresses
+    // Smart pairing: B leg (no time, IN/OUT) to match to its A leg by sequential booking ID + reversed addresses
     if (!isWillCall(trip) && isInOutTrip(trip) && (!trip.time || trip.timingType === 'in_out' || trip.legRelationship === 'in_out_return')) {
       const patientKey = (trip.patient || '').trim().toLowerCase();
       const tripPickup = (trip.pickup || '').trim().toLowerCase();
@@ -1101,7 +1100,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }
   }, [trips, driverPosition?.lat, driverPosition?.lng]);
 
-  // Detect ride-sharing opportunities — deduplicated, max 3
+  // Detect ride-sharing opportunities - deduplicated, max 3
   useEffect(() => {
     if (activeTrips.length < 2) { setAiRideShare([]); return; }
     const seen = new Set();
@@ -1125,7 +1124,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setAiRideShare(nearby);
   }, [activeTrips]);
 
-  // Detect time conflicts — deduplicated summary, max 5
+  // Detect time conflicts - deduplicated summary, max 5
   useEffect(() => {
     const flagged = new Set();
     const detected = [];
@@ -1180,7 +1179,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     return () => clearInterval(timer);
   }, [driverPosition, activeTrips.length]);
 
-  // Geofence proximity detection — check every 15s if near pickup/dropoff
+  // Geofence proximity detection - check every 15s if near pickup/dropoff
   useEffect(() => {
     if (!driverPosition || activeTrips.length === 0) return;
     const timer = setInterval(() => {
@@ -1325,7 +1324,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       if (result && Array.isArray(result)) {
         setAiSequence(result);
         if (!silent) {
-          const orderedNames = result.map(id => tripsToOptimize.find(t => t.id === id)?.patient || id).join(' → ');
+          const orderedNames = result.map(id => tripsToOptimize.find(t => t.id === id)?.patient || id).join(' to ');
           setAiSuggestions([`AI-optimized sequence: ${orderedNames}`, `Estimated time savings based on proximity and schedule.`]);
         }
       }
@@ -1861,8 +1860,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const handleArrivePickup = (trip) => {
     keepWorkflowTripOpen(trip);
-    const autoOdo = lastOdometer > 0 ? String(lastOdometer) : '';
-    setOdometerValue(autoOdo);
+    const autoOdo = lastOdometer > 0 ? parseInt(lastOdometer, 10) : 0;
+    setOdometerValue(autoOdo > 0 ? String(autoOdo) : '');
+    // Save the "At Pickup" status IMMEDIATELY so the dispatcher sees it
+    // even if the odometer prompt is dismissed or the app is closed.
+    const nowIso = new Date().toISOString();
+    advanceWorkflow(trip, 'At Pickup', {
+      pickupOdometer: autoOdo || 0,
+      arrivalTime: nowIso,
+      startTime: nowIso,
+    });
+    // Still show the odometer prompt so the driver can correct the reading
     setShowOdometerPrompt(trip);
   };
 
@@ -2192,7 +2200,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         t.status || '',
       ]);
     });
-    const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""').replace(/—/g, '')}"`).join(',')).join('\n');
+    const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""').replace(/\u2014/g, '')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2297,7 +2305,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               {incomingTransferTrips.map((trip) => (
                 <div key={`incoming-${trip.id}`} className="rounded-xl bg-white border border-amber-100 p-3">
-                  <p className="text-sm font-black text-slate-900">{trip.patient || 'Trip'} · {to12hr(trip.time)}</p>
+                  <p className="text-sm font-black text-slate-900">{trip.patient || 'Trip'} | {to12hr(trip.time)}</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {trip.transferRequest?.fromDriverName || 'Driver'}: {trip.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
                     <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} className="flex-1 h-9 rounded-xl bg-emerald-600 text-white text-xs font-black">Accept</button>
@@ -2307,7 +2315,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               ))}
               {incomingTransferRoutes.map((route) => (
                 <div key={`incoming-route-${route.id}`} className="rounded-xl bg-white border border-amber-100 p-3">
-                  <p className="text-sm font-black text-slate-900">{route.name || 'Route Plan'} · {(route.sequence || []).length} stops</p>
+                  <p className="text-sm font-black text-slate-900">{route.name || 'Route Plan'} | {(route.sequence || []).length} stops</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {route.transferRequest?.fromDriverName || 'Driver'}: {route.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
                     <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} className="flex-1 h-9 rounded-xl bg-emerald-600 text-white text-xs font-black">Accept</button>
@@ -2450,7 +2458,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-xs font-bold text-white truncate flex-1 min-w-0 flex items-center gap-1.5">
                     <span className="px-1.5 py-0.5 rounded bg-white/20 text-[10px] uppercase tracking-wider">{(headerRouteStop?.type || currentStep.type) === 'PU' ? 'Pickup' : 'Dropoff'}</span>
                     <span className="truncate">{headerRouteStop?.name || currentTrip?.patient || 'Route stop'}</span>
-                    <span className="text-white/60 font-medium ml-1 text-xs shrink-0">· {headerRouteWorkflow?.status || (currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : 'In route')}</span>
+                    <span className="text-white/60 font-medium ml-1 text-xs shrink-0">| {headerRouteWorkflow?.status || (currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : 'In route')}</span>
                   </p>
                   {hasRoutePlanGuidedStops && currentRoutePlanStopIndex + 1 < assignedRoutePlanStops.length ? (
                     <span className="text-[10px] text-white/50 font-bold ml-2 shrink-0 uppercase tracking-wider">
@@ -2475,7 +2483,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-xs font-bold text-rose-800">{conflicts.length} time conflict{conflicts.length > 1 ? 's' : ''}</p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {conflicts.map((c, i) => (
-                      <span key={i} className="text-xs text-rose-700 bg-white/60 rounded-lg px-2 py-0.5">{c.aName} · {c.bName}</span>
+                      <span key={i} className="text-xs text-rose-700 bg-white/60 rounded-lg px-2 py-0.5">{c.aName} | {c.bName}</span>
                     ))}
                   </div>
                 </div>
@@ -3091,7 +3099,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="relative w-[94%] max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-slate-100 shrink-0">
               <h2 className="font-bold text-base text-slate-900">Select Return Trip (B Leg)</h2>
-              <p className="text-xs text-slate-500 mt-0.5">{bLegSelectModal.patient} — Choose the matching return trip</p>
+              <p className="text-xs text-slate-500 mt-0.5">{bLegSelectModal.patient} - Choose the matching return trip</p>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {bLegCandidates.map((candidate) => (
@@ -3101,7 +3109,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-slate-900 truncate">{candidate.patient}</p>
                       <p className="text-xs text-slate-500 mt-0.5">#{candidate.bookingId || candidate.id}</p>
-                      <p className="text-xs text-slate-400 mt-0.5 truncate">{candidate.pickup} → {candidate.dropoff}</p>
+                      <p className="text-xs text-slate-400 mt-0.5 truncate">{candidate.pickup} to {candidate.dropoff}</p>
                     </div>
                     <div className="text-right shrink-0 ml-2">
                       <p className="text-xs font-bold text-slate-600">{to12hr(candidate.time) || 'No time'}</p>
@@ -3201,7 +3209,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-bold text-base text-slate-900">Arrived at Pickup</h2>
-                  <p className="text-xs text-slate-500">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
+                  <p className="text-xs text-slate-500">{showOdometerPrompt.patient} - {to12hr(showOdometerPrompt.time)}</p>
                 </div>
                 <button type="button" onClick={() => setShowOdometerPrompt(null)} className="min-h-[44px] min-w-[44px] rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]">
                   <X size={16} className="text-slate-500" />
@@ -3433,7 +3441,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-bold text-base text-slate-900">Complete Trip</h2>
-                <p className="text-xs text-slate-500">{showCompleteModal.patient} — {showCompleteModal.bookingId || ''}</p>
+                <p className="text-xs text-slate-500">{showCompleteModal.patient} - {showCompleteModal.bookingId || ''}</p>
               </div>
               <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="min-h-[44px] min-w-[44px] rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]">
                 <X size={16} className="text-slate-500" />
@@ -3443,11 +3451,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="bg-slate-50 rounded-2xl p-4 space-y-3 border border-slate-200">
                 <div className="flex justify-between">
                   <span className="text-xs text-emerald-600 font-bold uppercase">Pickup Odometer</span>
-                  <span className="text-sm font-bold text-emerald-700">{showCompleteModal.pickupOdometer?.toLocaleString() || '—'} mi</span>
+                  <span className="text-sm font-bold text-emerald-700">{showCompleteModal.pickupOdometer ? `${Number(showCompleteModal.pickupOdometer).toLocaleString()} mi` : 'No odometer'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-400 font-bold uppercase">Started At</span>
-                  <span className="text-sm font-bold text-slate-800">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '—'}</span>
+                  <span className="text-sm font-bold text-slate-800">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : 'No start time'}</span>
                 </div>
               </div>
               <div>
@@ -3517,7 +3525,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </button>
             <div className="flex-1 text-center">
               <h2 className="font-bold text-sm text-slate-900 leading-tight">{showTripDetails.patient}</h2>
-              <p className="text-xs text-slate-400">{showTripDetails.bookingId || '—'}</p>
+              <p className="text-xs text-slate-400">{showTripDetails.bookingId || 'No booking'}</p>
             </div>
             <div className="w-10 shrink-0" />
           </div>
@@ -3557,7 +3565,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     {showTripDetails.pickupPhone && (() => {
                       const contactType = getContactsForTrip(showTripDetails).find(c => cleanPhone(c.phone) === cleanPhone(showTripDetails.pickupPhone));
                       const label = contactType ? contactType.label : 'Pickup';
-                      return <button type="button" onClick={() => handleCall(showTripDetails.pickupPhone, `${label}: ${showTripDetails.patient}`)} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5 cursor-pointer min-h-[44px] px-2 py-2"><Phone size={10} /> {label} · {formatPhoneDisplay(showTripDetails.pickupPhone)}</button>;
+                      return <button type="button" onClick={() => handleCall(showTripDetails.pickupPhone, `${label}: ${showTripDetails.patient}`)} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5 cursor-pointer min-h-[44px] px-2 py-2"><Phone size={10} /> {label} | {formatPhoneDisplay(showTripDetails.pickupPhone)}</button>;
                     })()}
                   </div>
                 </div>
@@ -3569,7 +3577,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     {showTripDetails.dropoffPhone && (() => {
                       const contactType = getContactsForTrip(showTripDetails).find(c => cleanPhone(c.phone) === cleanPhone(showTripDetails.dropoffPhone));
                       const label = contactType ? contactType.label : 'Dropoff';
-                      return <button type="button" onClick={() => handleCall(showTripDetails.dropoffPhone, `${label}: ${showTripDetails.patient}`)} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5 cursor-pointer min-h-[44px] px-2 py-2"><Phone size={10} /> {label} · {formatPhoneDisplay(showTripDetails.dropoffPhone)}</button>;
+                      return <button type="button" onClick={() => handleCall(showTripDetails.dropoffPhone, `${label}: ${showTripDetails.patient}`)} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5 cursor-pointer min-h-[44px] px-2 py-2"><Phone size={10} /> {label} | {formatPhoneDisplay(showTripDetails.dropoffPhone)}</button>;
                     })()}
                   </div>
                 </div>
@@ -3586,19 +3594,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Booking ID</p>
-                  <p className="text-sm font-bold text-slate-800">{showTripDetails.bookingId || '—'}</p>
+                  <p className="text-sm font-bold text-slate-800">{showTripDetails.bookingId || 'No booking'}</p>
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Service Type</p>
-                  <p className="text-sm font-bold text-slate-800">{showTripDetails.type || '—'}</p>
+                  <p className="text-sm font-bold text-slate-800">{showTripDetails.type || 'No type'}</p>
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Distance</p>
-                  <p className="text-sm font-bold text-slate-800">{showTripDetails.distance ? `${showTripDetails.distance} mi` : '—'}</p>
+                  <p className="text-sm font-bold text-slate-800">{showTripDetails.distance ? `${showTripDetails.distance} mi` : 'No distance'}</p>
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Driver</p>
-                  <p className="text-sm font-bold text-slate-800">{showTripDetails.driverId || '—'}</p>
+                  <p className="text-sm font-bold text-slate-800">{showTripDetails.driverName || showTripDetails.driverId || 'No driver'}</p>
                 </div>
               </div>
             </div>
@@ -3622,7 +3630,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <button type="button"
                         onClick={() => { const p = getPrimaryContactForTrip(showTripDetails); if (p) handleCall(p.phone, `${p.label}: ${p.name}`); }}
                         className="w-full h-10 bg-emerald-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-sm">
-                        <Phone size={14} /> Call {contacts.find(c => c.isPrimary)?.label || 'Primary Contact'} — {formatPhoneDisplay(contacts.find(c => c.isPrimary)?.phone || contacts[0]?.phone)}
+                        <Phone size={14} /> Call {contacts.find(c => c.isPrimary)?.label || 'Primary Contact'} - {formatPhoneDisplay(contacts.find(c => c.isPrimary)?.phone || contacts[0]?.phone)}
                       </button>
                     )}
                     <div className="space-y-2">
@@ -3643,7 +3651,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                   <p className="text-sm font-bold text-slate-900 truncate">{contact.name}</p>
                                   {contact.isPrimary && <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">PRIMARY</span>}
                                 </div>
-                                <p className="text-xs text-slate-500">{contact.label} · {formatPhoneDisplay(contact.phone)}</p>
+                                <p className="text-xs text-slate-500">{contact.label} | {formatPhoneDisplay(contact.phone)}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0 ml-2">
@@ -3936,47 +3944,47 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <tbody className="text-xs">
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Trip ID</td>
-                              <td className="px-4 py-2.5 font-bold text-blue-600 text-xs">{trip.bookingId || trip.id || '—'}</td>
+                              <td className="px-4 py-2.5 font-bold text-blue-600 text-xs">{trip.bookingId || trip.id || 'No booking'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Date</td>
-                              <td className="px-4 py-2.5 font-bold text-slate-700">{trip.date || (trip.completedAt ? new Date(trip.completedAt).toLocaleDateString() : '—')}</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-700">{trip.date || (trip.completedAt ? new Date(trip.completedAt).toLocaleDateString() : 'No date')}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Driver</td>
-                              <td className="px-4 py-2.5 font-bold text-slate-700">{trip.driverName || '—'}</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-700">{trip.driverName || 'No driver'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Vehicle</td>
-                              <td className="px-4 py-2.5 font-bold text-slate-700 font-mono text-[10px] uppercase tracking-wider">{trip.completedVehicle || trip.vehicle || '—'}</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-700 font-mono text-[10px] uppercase tracking-wider">{trip.completedVehicle || trip.vehicle || 'No vehicle'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Pickup Arrival</td>
-                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.arrivalTime ? formatIsoTo24hr(trip.arrivalTime) : '—'}</td>
+                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.arrivalTime ? formatIsoTo24hr(trip.arrivalTime) : 'No pickup time'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 w-2/5">Dropoff Arrival</td>
-                              <td className="px-4 py-2.5 font-bold text-rose-600">{trip.arrivalDropoffTime ? formatIsoTo24hr(trip.arrivalDropoffTime) : (trip.completedAt ? formatIsoTo24hr(trip.completedAt) : '—')}</td>
+                              <td className="px-4 py-2.5 font-bold text-rose-600">{trip.arrivalDropoffTime ? formatIsoTo24hr(trip.arrivalDropoffTime) : (trip.completedAt ? formatIsoTo24hr(trip.completedAt) : 'No dropoff time')}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Start Odometer</td>
-                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.pickupOdometer ? `${Number(trip.pickupOdometer).toLocaleString()} mi` : '—'}</td>
+                              <td className="px-4 py-2.5 font-bold text-emerald-600">{trip.pickupOdometer ? `${Number(trip.pickupOdometer).toLocaleString()} mi` : 'No odometer'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">End Odometer</td>
-                              <td className="px-4 py-2.5 font-bold text-rose-600">{trip.dropoffOdometer ? `${Number(trip.dropoffOdometer).toLocaleString()} mi` : '—'}</td>
+                              <td className="px-4 py-2.5 font-bold text-rose-600">{trip.dropoffOdometer ? `${Number(trip.dropoffOdometer).toLocaleString()} mi` : 'No odometer'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Distance</td>
-                              <td className="px-4 py-2.5 font-bold text-slate-800">{trip.distance ? `${trip.distance} mi` : (trip.pickupOdometer && trip.dropoffOdometer ? `${Math.max(0, Number(trip.dropoffOdometer) - Number(trip.pickupOdometer)).toLocaleString()} mi` : '—')}</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-800">{trip.distance ? `${trip.distance} mi` : (trip.pickupOdometer && trip.dropoffOdometer ? `${Math.max(0, Number(trip.dropoffOdometer) - Number(trip.pickupOdometer)).toLocaleString()} mi` : 'No distance')}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 align-top">Pickup Address</td>
-                              <td className="px-4 py-2.5 font-semibold text-emerald-700 leading-relaxed break-words">{trip.pickup || '—'}</td>
+                              <td className="px-4 py-2.5 font-semibold text-emerald-700 leading-relaxed break-words">{trip.pickup || 'No pickup address'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 align-top">Dropoff Address</td>
-                              <td className="px-4 py-2.5 font-semibold text-rose-700 leading-relaxed break-words">{trip.dropoff || '—'}</td>
+                              <td className="px-4 py-2.5 font-semibold text-rose-700 leading-relaxed break-words">{trip.dropoff || 'No dropoff address'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Signature</td>
@@ -4028,7 +4036,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <div className="flex-1 min-w-0">
                     <h2 className="text-xl font-bold text-white truncate">{me?.name}</h2>
                     <p className="text-sm text-white/70 truncate">{displayLoginId}</p>
-                    <p className="text-xs text-white/50 mt-0.5">{me?.vehicle || 'No vehicle'} • {me?.currentZone || '—'}</p>
+                    <p className="text-xs text-white/50 mt-0.5">{me?.vehicle || 'No vehicle'} | {me?.currentZone || 'No zone'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-4">
@@ -4172,8 +4180,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-3">Vehicle Info</p>
               <div className="space-y-2.5 text-sm">
                 {[
-                  ['Vehicle', me?.vehicle || 'N/A'],
-                  ['Zone', me?.currentZone || 'N/A'],
+                  ['Vehicle', me?.vehicle || 'No vehicle'],
+                  ['Zone', me?.currentZone || 'No zone'],
                   ['Status', isClockedIn ? 'Online' : 'Offline'],
                   ['GPS', 'Active'],
                   ['Background Tracking', backgroundLocation ? 'Enabled' : 'Not Available'],
@@ -4326,7 +4334,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <div>
                   <h2 className="font-bold text-base text-slate-900">{actionLabel} Trip Legs</h2>
-                  <p className="text-xs text-slate-500">{cancelPrompt.trip.patient} — {cancelPrompt.legs.length} leg{cancelPrompt.legs.length !== 1 ? 's' : ''}</p>
+                  <p className="text-xs text-slate-500">{cancelPrompt.trip.patient} - {cancelPrompt.legs.length} leg{cancelPrompt.legs.length !== 1 ? 's' : ''}</p>
                 </div>
                 <button type="button" onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }} className="min-h-[44px] min-w-[44px] rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]">
                   <X size={16} className="text-slate-500" />
@@ -4356,7 +4364,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       </div>
                       <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
                         <span className="truncate">{leg.pickup}</span>
-                        <span className="shrink-0">→</span>
+                        <span className="shrink-0">to</span>
                         <span className="truncate">{leg.dropoff}</span>
                       </div>
                     </div>
@@ -4403,7 +4411,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <div>
                   <h2 className="font-bold text-base text-slate-900">Restore Trip Legs</h2>
-                  <p className="text-xs text-slate-500">{restorePrompt.trip.patient} — {restorePrompt.legs.length} leg{restorePrompt.legs.length !== 1 ? 's' : ''}</p>
+                  <p className="text-xs text-slate-500">{restorePrompt.trip.patient} - {restorePrompt.legs.length} leg{restorePrompt.legs.length !== 1 ? 's' : ''}</p>
                 </div>
                 <button type="button" onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }} className="min-h-[44px] min-w-[44px] rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]">
                   <X size={16} className="text-slate-500" />
@@ -4433,7 +4441,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       </div>
                       <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
                         <span className="truncate">{leg.pickup}</span>
-                        <span className="shrink-0">→</span>
+                        <span className="shrink-0">to</span>
                         <span className="truncate">{leg.dropoff}</span>
                       </div>
                     </div>
@@ -4606,7 +4614,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <div>
                   <h2 className="font-bold text-base text-slate-900">Contacts</h2>
-                  <p className="text-xs text-slate-500">{showContactSelector.patient} · {to12hr(showContactSelector.time)}</p>
+                  <p className="text-xs text-slate-500">{showContactSelector.patient} | {to12hr(showContactSelector.time)}</p>
                 </div>
                 <button type="button" onClick={() => setShowContactSelector(null)} className="min-h-[44px] min-w-[44px] rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]">
                   <X size={16} className="text-slate-500" />
@@ -4632,7 +4640,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       type="button"
                       onClick={() => { handleCall(primary.phone, `${primary.label}: ${primary.name}`); setShowContactSelector(null); }}
                       className={`w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer shadow-sm ${ps.bg} ${ps.color} border ${ps.border}`}>
-                      <IconComp size={18} /> Call {primary.label} — {formatPhoneDisplay(primary.phone)}
+                      <IconComp size={18} /> Call {primary.label} - {formatPhoneDisplay(primary.phone)}
                     </button>
                   </div>
                 );
@@ -4655,7 +4663,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <span className="text-sm font-bold text-slate-900 truncate">{contact.name}</span>
                             {contact.isPrimary && <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">PRIMARY</span>}
                           </div>
-                          <p className="text-xs text-slate-500">{contact.label} · {formatPhoneDisplay(contact.phone)}</p>
+                          <p className="text-xs text-slate-500">{contact.label} | {formatPhoneDisplay(contact.phone)}</p>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -4749,7 +4757,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <span className="text-micro font-bold uppercase tracking-wider text-slate-500">Leg {idx + 1}</span>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${leg.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : leg.status === 'In Transit' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{leg.status}</span>
                     </div>
-                    <p className="text-slate-500 text-xs font-semibold mb-1">Booking: {leg.bookingId || '—'}</p>
+                    <p className="text-slate-500 text-xs font-semibold mb-1">Booking: {leg.bookingId || 'No booking'}</p>
                     <div className="space-y-1.5">
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
@@ -4840,7 +4848,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     </div>
                     <div className="flex items-center gap-2 mt-1.5 text-[9px] text-slate-400">
                       {leg.time && <span>{leg.time}</span>}
-                      {leg.distance && <><span>•</span><span>{leg.distance} mi</span></>}
+                      {leg.distance && <><span>|</span><span>{leg.distance} mi</span></>}
                     </div>
                   </div>
                 ))}

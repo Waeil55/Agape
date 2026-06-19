@@ -190,10 +190,10 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, o
                 {task.bookingId && <span className="ml-1.5 text-xs font-bold text-blue-600">#{task.bookingId}</span>}
               </h3>
               {task.isInOut && !isExpanded && (
-                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-0.5">In/Out — Client returns shortly</p>
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-0.5">In/Out - Client returns shortly</p>
               )}
               {task.isWillCallTrip && !isExpanded && (
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Will Call — Awaiting client call</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Will Call - Awaiting client call</p>
               )}
             </div>
             {!isExpanded && task.details?.distance && (
@@ -349,10 +349,10 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, o
                   </span>
                 </div>
                 {task.isInOut && (
-                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-1">In/Out — Client returns shortly</p>
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-1">In/Out - Client returns shortly</p>
                 )}
                 {task.isWillCallTrip && (
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Will Call — Awaiting client call</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Will Call - Awaiting client call</p>
                 )}
               </div>
               <StatusBadge status={task.status} />

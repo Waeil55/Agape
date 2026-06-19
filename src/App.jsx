@@ -265,8 +265,8 @@ function mergeDriverLists(...lists) {
   return [...records.values()];
 }
 
-const FIRESTORE_BOOT_TIMEOUT_MS = 12000;
-const AUTH_WATCHDOG_TIMEOUT_MS = 30000;
+const FIRESTORE_BOOT_TIMEOUT_MS = 20000;
+const AUTH_WATCHDOG_TIMEOUT_MS = 45000;
 
 const buildTravelDuration = (startTime, endTime) => {
   if (!startTime || !endTime) return '';
@@ -688,6 +688,13 @@ const App = () => {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
   };
 
+  // Show toast when data save fails
+  useEffect(() => {
+    if (dataError) {
+      addToast('Save Failed', dataError, 'danger');
+    }
+  }, [dataError, addToast]);
+
   const updateAppSettings = useCallback((updates, isProfileUpdate = false) => {
     if (isProfileUpdate && role === 'driver' && updates.odometer !== undefined) {
       setDrivers(prev => prev.map(d => d.email === currentUser ? { ...d, odometer: updates.odometer } : d));
@@ -749,6 +756,7 @@ const App = () => {
 
     setIsAuthenticated(false);
     setRole(null);
+    sessionStorage.removeItem('agape_cached_role');
     setCurrentUser(null);
     setDataLoaded(false);
     setActiveTab('dashboard');
@@ -894,7 +902,7 @@ const App = () => {
     const force = setTimeout(() => {
       if (!isLoading) return;
       if (navigator.onLine === false) {
-        setStartupIssue('You are offline — showing cached data.');
+        setStartupIssue('You are offline - showing cached data.');
         setIsLoading(false);
       } else {
         setStartupIssue('Connection is slow. Showing whatever data is available.');
@@ -926,23 +934,34 @@ const App = () => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       try {
       if (user) {
-        // Load user role — ensure doc exists for Firestore security rules
-        const [userDocResult, dataSnapResult] = await Promise.all([
-          withTimeout(getDoc(doc(db, 'users', user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'user profile'),
-          withTimeout(getDoc(doc(db, 'appData/agape')), FIRESTORE_BOOT_TIMEOUT_MS, 'operations data'),
-        ]);
+        // Load user role — retry once on timeout before giving up.
+        const requestedPortalRole = loginPortalRoleRef.current;
+        let userDocResult = await withTimeout(getDoc(doc(db, 'users', user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'user profile');
+        if (!userDocResult.ok) {
+          userDocResult = await withTimeout(getDoc(doc(db, 'users', user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'user profile retry');
+        }
         if (cancelled) return;
 
-        const requestedPortalRole = loginPortalRoleRef.current;
         let userDoc = userDocResult.ok ? userDocResult.value : null;
-        const dataSnap = dataSnapResult.ok ? dataSnapResult.value : null;
         let userRole = '';
+        let roleFromCloud = false;
         if (userDoc?.exists()) {
           userRole = String(userDoc.data()?.role || '').toLowerCase();
+          roleFromCloud = true;
+        } else if (!userDocResult.ok) {
+          // Firestore is unreachable — do NOT sign the user out on transient failures.
+          // Let them use the app with a default role and retry cloud sync in the background.
+          const cachedRole = sessionStorage.getItem('agape_cached_role');
+          userRole = cachedRole || 'driver';
+          setStartupIssue('Unable to reach Firestore. Using cached role - data sync will retry automatically.');
+          console.warn('Auth boot: user doc fetch timed out after retry, using cached/default role:', userRole);
         } else {
+          // User doc truly does not exist — check if this is a first admin bootstrap.
           const usersSnap = await withTimeout(getDocs(collection(db, 'users')), FIRESTORE_BOOT_TIMEOUT_MS, 'user directory');
-          const hasExistingUsers = usersSnap.ok ? !usersSnap.value.empty : true;
-          const canBootstrapFirstAdmin = !hasExistingUsers && requestedPortalRole === 'admin';
+          // If the collection query also timed out, err on the side of letting the user in
+          // rather than signing them out. We don't know if the system is empty.
+          const hasExistingUsers = usersSnap.ok && !usersSnap.value.empty;
+          const canBootstrapFirstAdmin = !hasExistingUsers && requestedPortalRole === 'admin' && usersSnap.ok;
 
           if (canBootstrapFirstAdmin) {
             const normalizedAuthEmail = String(user.email || '').trim().toLowerCase();
@@ -963,7 +982,14 @@ const App = () => {
               { merge: true }
             );
             userRole = 'admin';
+            roleFromCloud = true;
             userDoc = await getDoc(doc(db, 'users', user.uid));
+          } else if (!usersSnap.ok) {
+            // Collection query also timed out — give the user the benefit of the doubt.
+            const cachedRole = sessionStorage.getItem('agape_cached_role');
+            userRole = cachedRole || 'driver';
+            setStartupIssue('Firestore is slow to respond. Using fallback role - sync will catch up.');
+            console.warn('Auth boot: collection query timed out, using cached/default role:', userRole);
           } else {
             skipNextSignedOutResetRef.current = true;
             await signOut(auth).catch(() => {});
@@ -976,7 +1002,7 @@ const App = () => {
           }
         }
 
-        if (requestedPortalRole && requestedPortalRole !== userRole) {
+        if (roleFromCloud && requestedPortalRole && requestedPortalRole !== userRole) {
           const preferredLoginId = String(userDoc?.data()?.username || authEmailToUsername(user.email || '') || user.email || '').trim();
           skipNextSignedOutResetRef.current = true;
           await signOut(auth).catch(() => {});
@@ -999,6 +1025,7 @@ const App = () => {
         setRole(userRole);
         setCurrentUser(userEmail);
         setIsAuthenticated(true);
+        sessionStorage.setItem('agape_cached_role', userRole);
         setLoginStep('role_selection');
         setPendingRole(null);
         setPassword('');
@@ -1043,13 +1070,14 @@ const App = () => {
         try {
           const r = roleRef.current;
           if (r === 'admin' || r === 'dispatcher') {
-            const [usersResult, driverProfilesResult] = await Promise.all([
+            const [usersResult, driverProfilesResult, appDataSnap] = await Promise.all([
               getDocs(collection(db, 'users')),
               getDocs(collection(db, 'driverProfiles')).catch(() => null),
+              withTimeout(getDoc(doc(db, 'appData/agape')), 15000, 'appData drivers preload').catch(() => ({ ok: false })),
             ]);
             const allUsers = usersResult.docs.map(u => ({ id: u.id, ...u.data() }));
-            const appDataDrivers = dataSnap?.exists() && Array.isArray(dataSnap.data()?.drivers)
-              ? dataSnap.data().drivers
+            const appDataDrivers = appDataSnap?.ok && appDataSnap.value?.exists() && Array.isArray(appDataSnap.value.data()?.drivers)
+              ? appDataSnap.value.data().drivers
               : [];
             const profileDrivers = driverProfilesResult
               ? driverProfilesResult.docs.map(profileDoc => ({ id: profileDoc.id, ...profileDoc.data() }))
@@ -1369,7 +1397,8 @@ const App = () => {
     const selectedTrips = trips.filter(t => selectedTasks.includes(t.id) && canControlTrip(t));
     if (selectedTrips.length < 2) return;
     const sharedGroupId = `SR-${Date.now().toString().slice(-6)}`;
-    setTrips(prev => prev.map(t => selectedTasks.includes(t.id) && canControlTrip(t) ? { ...t, sharedRideGroup: sharedGroupId, status: t.status === 'Unassigned' ? 'Unassigned' : t.status } : t));
+    const nowIso = new Date().toISOString();
+    setTrips(prev => prev.map(t => selectedTasks.includes(t.id) && canControlTrip(t) ? { ...t, sharedRideGroup: sharedGroupId, status: t.status === 'Unassigned' ? 'Unassigned' : t.status, updatedAtLocal: nowIso } : t));
     addAuditLog('Shared Ride Created', `${currentUser} grouped ${selectedTrips.length} trips as shared ride ${sharedGroupId}.`, 'blue');
     setSelectedTasks([]);
     setBulkAssignModal(false);
@@ -1385,7 +1414,7 @@ const App = () => {
     const selectedTrips = trips.filter(t => selectedTasks.includes(t.id) && canControlTrip(t));
     if (selectedTrips.length === 0) return;
     
-    // Build map of patient → best client phone (detect home address as one that appears in both pickup and dropoff)
+    // Build map of patient to best client phone (detect home address as one that appears in both pickup and dropoff)
     const patientPhoneMap = {};
     const patientAddresses = {};
     const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute', 'skills', 'senior', 'living', 'manor', 'village'];
@@ -1461,15 +1490,19 @@ const App = () => {
       legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'DROPOFF', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.dropoff, notes: t.notes, phone: clientPhone });
     });
     
-    // Update trips status and assign to driver
-    const updatedTrips = trips.map(t => selectedTasks.includes(t.id) && canControlTrip(t) ? {
+    // Update trips status and assign to driver — use updater callback so we don't
+    // lose updates that landed between the .filter() call and setTrips execution.
+    const nowIso = new Date().toISOString();
+    const driverEmail = driver?.email || null;
+    const driverName = driver?.name || null;
+    setTrips(prev => prev.map(t => selectedTasks.includes(t.id) && canControlTrip(t) ? {
       ...t,
       status: 'In Mission',
       driverId,
-      driverEmail: driver?.email || null,
-      driverName: driver?.name || null,
-    } : t);
-    setTrips(updatedTrips);
+      driverEmail,
+      driverName,
+      updatedAtLocal: nowIso,
+    } : t));
     
     // Save mission to driver document or a separate missions collection (using a special field for now)
     if (driver) {
@@ -1492,12 +1525,14 @@ const App = () => {
       return;
     }
     const prevTrip = { ...tripToAssign };
+    const nowIso = new Date().toISOString();
     setTrips(prev => prev.map(t => t.id === tripId ? {
       ...t,
       status: 'Assigned',
       driverId,
       driverEmail: driver?.email || null,
       driverName: driver?.name || null,
+      updatedAtLocal: nowIso,
     } : t));
     setSmartAssignTrip(null);
     setSmartAssignResult(null);
@@ -1512,7 +1547,7 @@ const App = () => {
       playNotificationSound();
       showLocalNotification(
         '🚗 New Trip Assigned',
-        `${tripToAssign.patient} — ${tripToAssign.pickup} → ${tripToAssign.dropoff}`
+        `${tripToAssign.patient} - ${tripToAssign.pickup} to ${tripToAssign.dropoff}`
       );
     }
     // Specific alert for the driver if they are online
@@ -1533,14 +1568,16 @@ const App = () => {
       const trip = trips.find(t => t.id === id);
       return trip && canControlTrip(trip);
     });
+    const nowIso = new Date().toISOString();
     setTrips(prev => prev.map(t => allowedSelection.includes(t.id) ? {
       ...t,
       status: 'Assigned',
       driverId,
       driverEmail: driver?.email || null,
       driverName: driver?.name || null,
+      updatedAtLocal: nowIso,
     } : t));
-    addAuditLog('Bulk Assignment', `${currentUser} assigned ${allowedSelection.length} trips to ${driver?.name || 'Unknown'}`, 'emerald');
+    addAuditLog('Bulk Assignment', `${currentUser} assigned ${allowedSelection.length} trips to ${driver?.name || 'No driver'}`, 'emerald');
     setSelectedTasks([]);
     setBulkAssignModal(false);
   };
@@ -1566,6 +1603,7 @@ const App = () => {
       if (unassigned.length > 0 && available.length > 0) {
         const assignments = await suggestBatchAssignment(unassigned, available, scopedTrips);
         if (assignments && Object.keys(assignments).length > 0) {
+          const nowIso = new Date().toISOString();
           setTrips(prev => prev.map(t => {
             const assignedDriverId = assignments[t.id];
             if (!assignedDriverId) return t;
@@ -1577,6 +1615,7 @@ const App = () => {
               driverId: assignedDriverId,
               driverEmail: assignedDriver?.email || null,
               driverName: assignedDriver?.name || null,
+              updatedAtLocal: nowIso,
             };
           }));
           const count = Object.keys(assignments).length;
@@ -1585,7 +1624,7 @@ const App = () => {
             const trip = trips.find(t => t.id === tripId);
             if (trip && notificationsEnabled) {
               playNotificationSound();
-              showLocalNotification('🚗 Trip Assigned', `${trip.patient} — ${trip.pickup} → ${trip.dropoff}`);
+              showLocalNotification('🚗 Trip Assigned', `${trip.patient} - ${trip.pickup} to ${trip.dropoff}`);
             }
           });
         }
@@ -1631,7 +1670,7 @@ const App = () => {
       return;
     }
     const prevTrip = trips.find(t => t.id === updatedTrip.id) || null;
-    const enrichedTrip = enrichTripMetrics(updatedTrip);
+    const enrichedTrip = enrichTripMetrics({ ...updatedTrip, updatedAtLocal: new Date().toISOString() });
     setTrips(prev => prev.map(t => t.id === enrichedTrip.id ? enrichedTrip : t));
     // Log detailed before/after changes
     if (prevTrip) {
@@ -1642,7 +1681,7 @@ const App = () => {
         if (String(a) !== String(b)) changed.push({ field: k, before: a, after: b });
       });
       if (changed.length > 0) {
-        const details = changed.map(c => `${c.field}: ${c.before ?? '—'} → ${c.after ?? '—'}`).join('; ');
+        const details = changed.map(c => `${c.field}: ${c.before ?? 'blank'} to ${c.after ?? 'blank'}`).join('; ');
         addAuditLog(
           'Trip Updated',
           `${currentUser} modified trip ${enrichedTrip.id} (${enrichedTrip.patient}): ${details}`,
@@ -1671,7 +1710,7 @@ const App = () => {
         'Archived Trip Updated',
         `${currentUser} modified archived trip ${updatedTrip.id} (${updatedTrip.patient})`,
         'blue',
-        { entity: 'trip', id: updatedTrip.id, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; ') }
+        { entity: 'trip', id: updatedTrip.id, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? 'blank'} to ${diff.after ?? 'blank'}`).join('; ') }
       );
       return;
     }
@@ -1704,6 +1743,7 @@ const App = () => {
         return;
       }
     }
+    tripToAdd = { ...tripToAdd, updatedAtLocal: new Date().toISOString() };
     setTrips(prev => {
       const all = dedupTrips([tripToAdd, ...prev]);
       return all;
@@ -1752,7 +1792,7 @@ const App = () => {
     });
     const skippedCount = tripIds.length - allowedIds.length;
     if (skippedCount > 0) {
-      addToast('Scope Warning', `${skippedCount} trip(s) skipped — outside your scope.`, 'warning');
+      addToast('Scope Warning', `${skippedCount} trip(s) skipped - outside your scope.`, 'warning');
     }
     if (allowedIds.length === 0) return;
     requestAuthAction('archive_trips', () => {
@@ -1792,12 +1832,13 @@ const App = () => {
       if (alreadyExists) {
         const newTrashed = currentTrashed.filter(t => t.id !== tripId);
         setTrashedTrips(newTrashed);
-        addToast('Duplicate Removed', `This trip already exists — removed from archive.`, 'info');
-        addAuditLog('Trip Removed from Archive', `Duplicate of ${tripToRestore.patient} — removed from Archive.`, 'amber');
+        addToast('Duplicate Removed', `This trip already exists - removed from archive.`, 'info');
+        addAuditLog('Trip Removed from Archive', `Duplicate of ${tripToRestore.patient} - removed from Archive.`, 'amber');
         return;
       }
       
-      const newTrips = dedupTrips([...currentTrips, tripToRestore]);
+      const restoredTrip = { ...tripToRestore, status: tripToRestore.status || 'Unassigned', updatedAtLocal: new Date().toISOString() };
+      const newTrips = dedupTrips([...currentTrips, restoredTrip]);
       const newTrashed = currentTrashed.filter(t => t.id !== tripId);
       
       addToast('Trip Restored', `${tripToRestore.patient} has been restored to active trips.`, 'success');
@@ -1854,6 +1895,7 @@ const App = () => {
       status: 'Completed',
       dropoffOdometer: odometer,
       completedAt,
+      updatedAtLocal: completedAt,
     });
     setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
     setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer } : d));
@@ -1869,7 +1911,7 @@ const App = () => {
       'Trip Completed',
       `${driver?.name || 'Driver'} completed trip ${tripId} (${trip?.patient}). Odometer: ${odometer?.toLocaleString()} mi.`,
       'emerald',
-      { entity: 'trip', id: tripId, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; ') }
+      { entity: 'trip', id: tripId, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? 'blank'} to ${diff.after ?? 'blank'}`).join('; ') }
     );
     // Maintenance check
     if (driver) {
@@ -2184,7 +2226,7 @@ const App = () => {
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
                 <div className="relative">
-                  <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} 
+                  <input type="password" required placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-3 py-2.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
@@ -2401,7 +2443,7 @@ const App = () => {
                         <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">{String(d?.name || '?').charAt(0)}</div>
                         <div className="text-left">
                           <p className="text-sm font-bold text-slate-900">{d.name}</p>
-                          <p className="text-xs font-medium text-slate-500">{d.vehicle} • {d.currentZone}</p>
+                          <p className="text-xs font-medium text-slate-500">{d.vehicle} | {d.currentZone}</p>
                         </div>
                       </div>
                       <ArrowRight size={16} className="text-emerald-400 group-hover:translate-x-1 transition-transform" />
@@ -2422,7 +2464,7 @@ const App = () => {
                         <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold">{String(d?.name || '?').charAt(0)}</div>
                         <div className="text-left">
                           <p className="text-sm font-bold text-slate-900">{d.name}</p>
-                          <p className="text-xs font-medium text-slate-500">{d.status} • {d.vehicle}</p>
+                          <p className="text-xs font-medium text-slate-500">{d.status} | {d.vehicle}</p>
                         </div>
                       </div>
                       <ArrowRight size={16} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
@@ -2490,7 +2532,7 @@ const App = () => {
       />
       {/* Offline Banner */}
       <div className={`offline-banner${isOffline ? ' visible' : ''}`}>
-        You are offline — changes will sync when connection returns
+        You are offline - changes will sync when connection returns
       </div>
       <div className="min-h-screen flex-1 flex flex-col bg-slate-100 overflow-visible w-full pt-[env(safe-area-inset-top,0px)]">
       {/* Header removed: DriverPage handles its own UI */}
@@ -2665,40 +2707,34 @@ const App = () => {
               }}
               onUpdateDriverLocation={handleUpdateDriverLocation}
               onUpdateTrip={(tripOrId, statusOrUpdates, extraData = {}) => {
-                let prevTrip, newTrip, tripId;
-                if (typeof tripOrId === 'string') {
-                  tripId = tripOrId;
-                  prevTrip = trips.find(t => t.id === tripId);
-                  newTrip = prevTrip ? { ...prevTrip, status: statusOrUpdates, ...extraData } : null;
-                } else {
-                  prevTrip = trips.find(t => t.id === tripOrId.id);
-                  tripId = tripOrId.id;
-                  newTrip = prevTrip ? { ...prevTrip, ...tripOrId, ...(statusOrUpdates || {}) } : { ...tripOrId, ...(statusOrUpdates || {}) };
-                }
-                if (newTrip && tripId) {
-                  // Apply update
-                  setTrips(prev => {
-                    const exists = prev.some(t => t.id === tripId);
-                    return exists ? prev.map(t => t.id === tripId ? newTrip : t) : prev;
-                  });
-                  // Compute field-level diffs for audit
-                  const changed = [];
-                  Object.keys(newTrip).forEach((k) => {
-                    const a = prevTrip[k];
-                    const b = newTrip[k];
-                    if (String(a) !== String(b)) changed.push({ field: k, before: a, after: b });
-                  });
-                  if (changed.length > 0) {
-                    const details = changed.map(c => `${c.field}: ${c.before ?? '—'} → ${c.after ?? '—'}`).join('; ');
-                    addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${tripId} (${prevTrip?.patient || 'Unknown'})`, 'blue', { entity: 'trip', id: tripId, diffs: changed, summary: details });
+                const nowIso = new Date().toISOString();
+                setTrips(prev => {
+                  let tripId, prevTrip, newTrip;
+                  if (typeof tripOrId === 'string') {
+                    tripId = tripOrId;
+                    prevTrip = prev.find(t => t.id === tripId);
+                    newTrip = prevTrip ? { ...prevTrip, status: statusOrUpdates, ...extraData, updatedAtLocal: nowIso } : null;
+                  } else {
+                    prevTrip = prev.find(t => t.id === tripOrId.id);
+                    tripId = tripOrId?.id;
+                    newTrip = prevTrip ? { ...prevTrip, ...tripOrId, ...(statusOrUpdates || {}), updatedAtLocal: nowIso } : { ...tripOrId, ...(statusOrUpdates || {}), updatedAtLocal: nowIso };
                   }
+                  if (newTrip && tripId) {
+                    return prev.some(t => t.id === tripId) ? prev.map(t => t.id === tripId ? newTrip : t) : prev;
+                  }
+                  return prev;
+                });
+                // Audit outside setTrips so it fires regardless
+                const foundTrip = trips.find(t => t.id === (typeof tripOrId === 'string' ? tripOrId : tripOrId?.id));
+                if (foundTrip) {
+                  addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${foundTrip.id} (${foundTrip.patient || 'No client name'})`, 'blue', { entity: 'trip', id: foundTrip.id });
                 }
               }}
               onDriverStatusUpdate={handleDriverStatusUpdate}
               onCompleteTrip={(tripId, driverId, odometer) => {
                 handleCompleteTrip(tripId, driverId, odometer);
                 const trip = trips.find(t => t.id === tripId);
-                addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'Unknown'}). Odo: ${odometer}`, 'emerald');
+                addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'No client name'}). Odo: ${odometer}`, 'emerald');
               }}
               onAddAuditLog={addAuditLog}
               onAddTrip={addTrip}
@@ -2783,21 +2819,18 @@ const App = () => {
                 setDrivers(prev => prev.map(d => normalizeEmail(d.email) === normalizeEmail(currentUser) ? { ...d, activeMission: updatedMission } : d));
               }}
               onUpdateDriverTrip={(tripId, status, extraData = {}) => {
-                const prevTrip = trips.find(t => t.id === tripId);
-                const nextTrip = prevTrip ? { ...prevTrip, status, ...extraData } : null;
-                if (!nextTrip) return;
-                setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
-                const diffs = [];
-                Object.keys(nextTrip).forEach((key) => {
-                  if (String(prevTrip?.[key]) !== String(nextTrip?.[key])) {
-                    diffs.push({ field: key, before: prevTrip?.[key], after: nextTrip?.[key] });
-                  }
+                const nowIso = new Date().toISOString();
+                setTrips(prev => {
+                  const prevTrip = prev.find(t => t.id === tripId);
+                  if (!prevTrip) return prev;
+                  const nextTrip = { ...prevTrip, status, ...extraData, updatedAtLocal: nowIso };
+                  return prev.map(t => t.id === tripId ? nextTrip : t);
                 });
                 addAuditLog(
                   'Worker Driver Update',
-                  `${currentUser} updated trip ${tripId} (${prevTrip?.patient || 'Unknown'}) to ${status}`,
+                  `${currentUser} updated trip ${tripId} (${trips.find(t => t.id === tripId)?.patient || 'No client name'}) to ${status}`,
                   'blue',
-                  { entity: 'trip', id: tripId, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; ') }
+                  { entity: 'trip', id: tripId }
                 );
               }}
               onDriverStatusUpdate={handleDriverStatusUpdate}

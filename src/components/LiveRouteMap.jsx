@@ -152,7 +152,7 @@ const LiveRouteMap = React.memo(({
         }, 2000);
       }
     } catch (e) {
-      setInitError('Google Maps initialization failed — check API key and billing.');
+      setInitError('Google Maps initialization failed - check API key and billing.');
     }
 
     // ResizeObserver for container resizing
@@ -353,10 +353,10 @@ const LiveRouteMap = React.memo(({
     const totalSec = legs.reduce((s, l) => s + (l.duration?.value || 0), 0);
     const totalMi = legs.reduce((s, l) => s + (l.distance?.value || 0), 0) / 1609.344;
     const mins = Math.round(totalSec / 60);
-    if (mins < 60) return `${mins} min • ${totalMi.toFixed(1)} mi`;
+    if (mins < 60) return `${mins} min | ${totalMi.toFixed(1)} mi`;
     const h = Math.floor(mins / 60);
     const m = mins % 60;
-    return `${h}h ${m}m • ${totalMi.toFixed(1)} mi`;
+    return `${h}h ${m}m | ${totalMi.toFixed(1)} mi`;
   }, [route]);
 
   const showFallback = mapsError || initError || (!ready && typeof window.google?.maps === 'undefined' && !document.querySelector('script[src*="maps.googleapis.com"]'));

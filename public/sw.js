@@ -4,7 +4,7 @@
    Updates triggered every second on visible apps, and periodically in background.
 */
 
-const CACHE_VERSION = 'agape-v5.0.1';
+const CACHE_VERSION = 'agape-v5.0.5';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;

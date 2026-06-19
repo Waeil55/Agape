@@ -50,7 +50,7 @@ const AIInsightsBanner = ({ insights, loading, error, onClose, compact }) => {
             <div>
               <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Lightbulb size={10} /> Recommendations</p>
               {insights.recommendations.map((r, i) => (
-                <p key={i} className="text-[10px] text-emerald-800 ml-3 leading-relaxed">• {r}</p>
+                <p key={i} className="text-[10px] text-emerald-800 ml-3 leading-relaxed">- {r}</p>
               ))}
             </div>
           )}
@@ -58,7 +58,7 @@ const AIInsightsBanner = ({ insights, loading, error, onClose, compact }) => {
             <div>
               <p className="text-[9px] font-bold text-rose-500 uppercase tracking-wider mb-0.5 flex items-center gap-1"><AlertTriangle size={10} /> Flags</p>
               {insights.anomalies.map((a, i) => (
-                <p key={i} className="text-[10px] text-rose-700 ml-3 leading-relaxed">• {a}</p>
+                <p key={i} className="text-[10px] text-rose-700 ml-3 leading-relaxed">- {a}</p>
               ))}
             </div>
           )}

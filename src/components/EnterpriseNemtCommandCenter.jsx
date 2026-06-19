@@ -229,7 +229,7 @@ export default function EnterpriseNemtCommandCenter({
         severity: 'critical',
         title: 'Late trip risk',
         trip,
-        detail: `${getTripTimeLabel(trip)} · ${trip.patient || 'Unknown client'} · ${getDriverName(trip, drivers)}`,
+        detail: `${getTripTimeLabel(trip)} | ${trip.patient || 'No client name'} | ${getDriverName(trip, drivers)}`,
         action: 'Focus trip',
       })),
       ...unassigned.filter(trip => {
@@ -240,7 +240,7 @@ export default function EnterpriseNemtCommandCenter({
         severity: minutesUntil(trip) !== null && minutesUntil(trip) <= 30 ? 'critical' : 'warning',
         title: 'Unassigned trip',
         trip,
-        detail: `${getTripTimeLabel(trip)} · ${trip.patient || 'Unknown client'} · pickup ${trip.pickup || 'missing'}`,
+        detail: `${getTripTimeLabel(trip)} | ${trip.patient || 'No client name'} | pickup ${trip.pickup || 'missing'}`,
         action: 'Assign',
       })),
       ...inOut.filter(trip => trip.legRelationship === 'in_out_return' || timeToMinutes(trip.time) === UNSCHEDULED_SORT_MINUTES).map(trip => ({
@@ -256,7 +256,7 @@ export default function EnterpriseNemtCommandCenter({
         severity: 'info',
         title: 'Will Call pending',
         trip,
-        detail: `${trip.patient || 'Client'} · keep below timed manifest until call arrives`,
+        detail: `${trip.patient || 'Client'} | keep below timed manifest until call arrives`,
         action: 'Monitor',
       })),
     ].slice(0, 40);
@@ -304,9 +304,9 @@ export default function EnterpriseNemtCommandCenter({
 
     const clients = new Map();
     todayTrips.forEach(trip => {
-      const key = lower(trip.patient || trip.clientName || 'Unknown client');
+      const key = lower(trip.patient || trip.clientName || 'No client name');
       const record = clients.get(key) || {
-        name: trip.patient || trip.clientName || 'Unknown client',
+        name: trip.patient || trip.clientName || 'No client name',
         phone: trip.patientPhone || trip.pickupPhone || trip.dropoffPhone || '',
         trips: [],
         inOut: 0,
@@ -412,283 +412,12 @@ export default function EnterpriseNemtCommandCenter({
     addToast?.('Focused trip', `${trip.patient || 'Trip'} is now in the dispatch search.`, 'success');
   };
 
-  const nav = [
-    { id: 'command', label: 'Command', icon: Gauge },
-    { id: 'dispatch', label: 'Dispatch', icon: Route },
-    { id: 'exceptions', label: 'Exceptions', icon: AlertTriangle },
-    { id: 'timeline', label: 'Timeline', icon: CalendarClock },
-    { id: 'predictive', label: 'Predictive', icon: Sparkles },
-    { id: 'billing', label: 'Billing', icon: Receipt },
-    { id: 'compliance', label: 'Compliance', icon: ShieldCheck },
-    { id: 'clients', label: 'Clients', icon: UserRound },
-    { id: 'facilities', label: 'Facilities', icon: Building2 },
-    { id: 'import', label: 'Import QA', icon: UploadCloud },
-  ];
+  const nav = [];
 
-  const renderExceptionList = (items = model.exceptions) => (
-    <div className="space-y-2">
-      {items.length === 0 ? <EmptyState title="No critical exceptions" body="The live board has no urgent operational exceptions right now." /> : items.map(item => (
-        <button key={item.id} type="button" onClick={() => focusTrip(item.trip)} className="flex w-full items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm hover:border-blue-200 hover:bg-blue-50/40">
-          <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${statusClass(item.severity)}`}>
-            {item.severity === 'critical' ? <AlertTriangle size={16} /> : item.severity === 'wait' ? <Clock size={16} /> : <BellRing size={16} />}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-black text-slate-950">{item.title}</p>
-              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${statusClass(item.severity)}`}>{urgency(item.trip)}</span>
-            </div>
-            <p className="mt-1 text-xs font-semibold text-slate-500">{item.detail}</p>
-          </div>
-          <ArrowRight size={16} className="mt-2 text-slate-300" />
-        </button>
-      ))}
-    </div>
-  );
-
-  const renderCommand = () => (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={Route} label="Today Trips" value={model.todayTrips.length} detail={`${model.activeTrips.length} active · ${model.completedTrips.length} completed`} tone="info" />
-        <Metric icon={AlertTriangle} label="Exceptions" value={model.exceptions.length} detail={`${model.late.length} late · ${model.unassigned.length} unassigned`} tone={model.exceptions.length ? 'critical' : 'good'} />
-        <Metric icon={Truck} label="Driver Coverage" value={`${model.activeDrivers.length}/${drivers.length}`} detail={`${model.availableDrivers.length} available or clocked in`} tone="ready" />
-        <Metric icon={Receipt} label="Billing Ready" value={`${model.billing.filter(item => item.score >= 85).length}/${model.billing.length}`} detail="Completed proof and required fields" tone="good" />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
-        <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <SectionHeader icon={AlertTriangle} title="Exception Command Board" subtitle="Late risk, assignment gaps, IN/OUT waits, and will-call aging." />
-          <div className="mt-3">{renderExceptionList(model.exceptions.slice(0, 10))}</div>
-        </section>
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <SectionHeader icon={Sparkles} title="Predictive Dispatch" subtitle="System-generated next best actions from current operations." action={<button type="button" onClick={onOpenSequencer} className="rounded-lg bg-slate-950 px-3 py-2 text-xs font-black text-white">Route</button>} />
-          <div className="mt-3 space-y-2">
-            {model.predictions.length === 0 ? <EmptyState title="No predictions" body="Once trips are active, predictive actions appear here." /> : model.predictions.slice(0, 8).map((item, index) => (
-              <button key={`${item.title}-${index}`} type="button" onClick={() => focusTrip(item.trip)} className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-left hover:bg-white">
-                <div className="flex items-center gap-2">
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${statusClass(item.tone)}`}>{item.tone}</span>
-                  <p className="text-xs font-black text-slate-900">{item.title}</p>
-                </div>
-                <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-500">{item.body}</p>
-              </button>
-            ))}
-          </div>
-        </section>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <SectionHeader icon={MessageSquare} title="Communication Readiness" subtitle="Client/facility contact quality." />
-          <div className="mt-3 space-y-2 text-xs font-semibold text-slate-600">
-            <p>{model.todayTrips.filter(trip => hasAny(trip.patientPhone) || hasAny(trip.pickupPhone) || hasAny(trip.dropoffPhone)).length} trips have at least one phone number.</p>
-            <p>{model.todayTrips.filter(trip => !hasAny(trip.patientPhone) && !hasAny(trip.pickupPhone) && !hasAny(trip.dropoffPhone)).length} trips need contact cleanup.</p>
-            <p>{model.willCall.length} will-call conversations should be monitored.</p>
-          </div>
-        </section>
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <SectionHeader icon={ClipboardCheck} title="Import Reconciliation" subtitle="Potential upload/data quality problems." />
-          <div className="mt-3 text-2xl font-black text-slate-950">{model.importIssues.length}</div>
-          <p className="text-xs font-semibold text-slate-500">missing fields, possible duplicates, or malformed rows</p>
-        </section>
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <SectionHeader icon={HeartPulse} title="Service Quality" subtitle="What leadership cares about today." />
-          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-            <div><p className="text-lg font-black text-slate-950">{model.late.length}</p><p className="text-[10px] font-bold uppercase text-slate-400">Late</p></div>
-            <div><p className="text-lg font-black text-slate-950">{model.inOut.length}</p><p className="text-[10px] font-bold uppercase text-slate-400">IN/OUT</p></div>
-            <div><p className="text-lg font-black text-slate-950">{model.willCall.length}</p><p className="text-[10px] font-bold uppercase text-slate-400">Will Call</p></div>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-
-  const renderTimeline = () => (
-    <div className="space-y-3">
-      {model.driverLines.length === 0 ? <EmptyState title="No drivers configured" body="Add drivers to see the live operational timeline." /> : model.driverLines.map(line => (
-        <section key={line.driver.id || line.driver.email || line.driver.name} className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-black text-slate-950">{line.driver.name || 'Driver'}</p>
-              <p className="text-xs font-semibold text-slate-500">{line.driver.vehicle || 'No vehicle'} · {line.driver.status || 'No status'} · readiness {line.readiness}%</p>
-            </div>
-            <div className="flex gap-2">
-              <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${line.lateCount ? statusClass('critical') : statusClass('good')}`}>{line.lateCount} late</span>
-              <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${line.waitCount ? statusClass('wait') : statusClass('info')}`}>{line.waitCount} waits</span>
-            </div>
-          </div>
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {line.assigned.length === 0 ? (
-              <div className="min-w-[220px] rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-400">No active trips assigned.</div>
-            ) : line.assigned.slice(0, 12).map(trip => (
-              <button key={trip.id} type="button" onClick={() => focusTrip(trip)} className={`min-w-[220px] rounded-lg border p-3 text-left ${isLateTrip(trip) ? 'border-rose-200 bg-rose-50' : isInOutTrip(trip) ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
-                <p className="text-xs font-black text-slate-950">{getTripTimeLabel(trip)} · {trip.patient || 'Client'}</p>
-                <p className="mt-1 truncate text-[11px] font-semibold text-slate-500">{trip.pickup || 'Pickup missing'}</p>
-                <p className="mt-1 text-[10px] font-black uppercase text-slate-400">{trip.status || 'No status'}</p>
-              </button>
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
-
-  const renderBilling = () => (
-    <div className="space-y-3">
-      <div className="grid gap-3 md:grid-cols-3">
-        <Metric icon={Receipt} label="Ready Packets" value={model.billing.filter(item => item.score >= 85).length} tone="good" />
-        <Metric icon={FileWarning} label="Needs Review" value={model.billing.filter(item => item.score < 85).length} tone="warning" />
-        <Metric icon={CheckCircle2} label="Completed Today" value={model.completedTrips.length} tone="info" />
-      </div>
-      {model.billing.slice(0, 40).map(item => (
-        <button key={item.trip.id} type="button" onClick={() => focusTrip(item.trip)} className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left hover:bg-slate-50">
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${item.score >= 85 ? statusClass('good') : item.score >= 60 ? statusClass('warning') : statusClass('critical')}`}>
-            {item.score}%
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-black text-slate-950">{item.trip.patient || 'Client'} · {item.trip.bookingId || item.trip.id}</p>
-            <p className="truncate text-xs font-semibold text-slate-500">{item.trip.status || 'No status'} · {getDriverName(item.trip, drivers)} · {item.trip.distance || 'mileage pending'}</p>
-          </div>
-          <Receipt size={16} className="text-slate-300" />
-        </button>
-      ))}
-    </div>
-  );
-
-  const renderCompliance = () => (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <SectionHeader icon={ShieldCheck} title="Driver Compliance Readiness" subtitle="Assignment blockers and missing profile fields." />
-        <div className="mt-3 space-y-2">
-          {model.complianceDrivers.map(item => (
-            <div key={item.driver.id || item.driver.email || item.driver.name} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-black text-slate-950">{item.driver.name}</p>
-                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${item.score >= 80 ? statusClass('good') : statusClass('warning')}`}>{item.score}%</span>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {item.checks.map(check => (
-                  <span key={check.label} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${check.ok ? statusClass('good') : statusClass('warning')}`}>{check.label}</span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <SectionHeader icon={Truck} title="Vehicle Readiness" subtitle="Vehicle assignment and service signals from driver profiles." />
-        <div className="mt-3 space-y-2">
-          {drivers.map(driver => (
-            <div key={`${driver.id || driver.email}-vehicle`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-black text-slate-950">{driver.vehicle || 'No vehicle assigned'}</p>
-                <p className="truncate text-xs font-semibold text-slate-500">{driver.name} · odo {driver.odometer || 0} · next oil {driver.nextOilChange || 'n/a'}</p>
-              </div>
-              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${driver.vehicle ? statusClass('good') : statusClass('warning')}`}>{driver.vehicle ? 'Ready' : 'Missing'}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-
-  const renderClients = () => (
-    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-      {model.clients.slice(0, 60).map(client => (
-        <button key={client.name} type="button" onClick={() => focusTrip(client.trips[0])} className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-blue-200 hover:bg-blue-50/30">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-black text-slate-950">{client.name}</p>
-              <p className="mt-1 text-xs font-semibold text-slate-500">{formatPhone(client.phone)}</p>
-            </div>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-600">{client.trips.length} legs</span>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {client.inOut > 0 && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusClass('wait')}`}>{client.inOut} IN/OUT</span>}
-            {client.willCall > 0 && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusClass('info')}`}>{client.willCall} Will Call</span>}
-            {client.noShow > 0 && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusClass('critical')}`}>{client.noShow} No Show</span>}
-          </div>
-        </button>
-      ))}
-    </div>
-  );
-
-  const renderFacilities = () => (
-    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-      {model.facilities.length === 0 ? <EmptyState title="No facility patterns found" body="Facility cards appear when site names or medical/facility addresses are present." /> : model.facilities.slice(0, 60).map(facility => (
-        <button key={facility.name} type="button" onClick={() => focusTrip(facility.trips[0])} className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-blue-200 hover:bg-blue-50/30">
-          <p className="truncate text-sm font-black text-slate-950">{facility.name}</p>
-          <p className="mt-1 truncate text-xs font-semibold text-slate-500">{facility.address}</p>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-            <div><p className="text-lg font-black text-slate-950">{facility.pickups}</p><p className="text-[10px] font-bold uppercase text-slate-400">PU</p></div>
-            <div><p className="text-lg font-black text-slate-950">{facility.dropoffs}</p><p className="text-[10px] font-bold uppercase text-slate-400">DO</p></div>
-            <div><p className="text-lg font-black text-slate-950">{facility.waitRisk}</p><p className="text-[10px] font-bold uppercase text-slate-400">Wait</p></div>
-          </div>
-        </button>
-      ))}
-    </div>
-  );
-
-  const renderImportQa = () => (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-4">
-        <SectionHeader icon={UploadCloud} title="Broker Import Quality Center" subtitle="Diff-style review for missing IDs, duplicates, addresses, and client data." />
-        <button type="button" onClick={() => setShowUploadModal?.(true)} className="rounded-lg bg-slate-950 px-3 py-2 text-xs font-black text-white">Upload trips</button>
-      </div>
-      {model.importIssues.length === 0 ? <EmptyState title="Import data looks clean" body="No missing critical fields or likely duplicates found in today’s manifest." /> : model.importIssues.slice(0, 80).map((issue, index) => (
-        <button key={`${issue.type}-${issue.trip.id}-${index}`} type="button" onClick={() => focusTrip(issue.trip)} className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left hover:bg-slate-50">
-          <FileWarning size={18} className="shrink-0 text-amber-600" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-black text-slate-950">{issue.type}</p>
-            <p className="truncate text-xs font-semibold text-slate-500">{issue.trip.patient || 'Unknown client'} · {issue.trip.bookingId || issue.trip.id || 'No ID'} · {getTripTimeLabel(issue.trip)}</p>
-          </div>
-        </button>
-      ))}
-    </div>
-  );
-
-  const content = {
-    command: renderCommand,
-    dispatch: () => operationsBoard,
-    exceptions: () => <section className="rounded-xl border border-slate-200 bg-slate-50 p-4"><SectionHeader icon={AlertTriangle} title="Exception Command Board" subtitle="Prioritized operational failures and near-failures." /><div className="mt-3">{renderExceptionList()}</div></section>,
-    timeline: renderTimeline,
-    predictive: () => <section className="rounded-xl border border-slate-200 bg-white p-4"><SectionHeader icon={Sparkles} title="Predictive Dispatch Queue" subtitle="Next best actions before trips fail." /><div className="mt-3 space-y-2">{model.predictions.map((item, index) => <button key={`${item.title}-${index}`} type="button" onClick={() => focusTrip(item.trip)} className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-left hover:bg-white"><span className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${statusClass(item.tone)}`}>{item.tone}</span><p className="mt-2 text-sm font-black text-slate-950">{item.title}</p><p className="mt-1 text-xs font-semibold text-slate-500">{item.body}</p></button>)}</div></section>,
-    billing: renderBilling,
-    compliance: renderCompliance,
-    clients: renderClients,
-    facilities: renderFacilities,
-    import: renderImportQa,
-  }[module] || renderCommand;
+  const content = () => operationsBoard;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-slate-100">
-      <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg font-black text-slate-950">NEMT Enterprise Command OS</h1>
-              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${isOnline ? statusClass('good') : statusClass('critical')}`}>{isOnline ? 'Live' : 'Offline'}</span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black uppercase text-slate-500">{role}</span>
-            </div>
-            <p className="mt-1 text-xs font-semibold text-slate-500">Dispatch, routing, billing readiness, compliance, client/facility intelligence, and predictive exceptions in one operating surface.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={onOpenLiveMap} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700"><MapPin size={14} /> Map</button>
-            <button type="button" onClick={onOpenSequencer} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700"><Navigation size={14} /> Route</button>
-            <button type="button" onClick={() => setShowUploadModal?.(true)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700"><UploadCloud size={14} /> Import</button>
-            <button type="button" onClick={onTogglePanel} className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-950 px-3 text-xs font-black text-white"><PanelRight size={14} /> Panel</button>
-          </div>
-        </div>
-        <div className="mt-3 flex gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1">
-          {nav.map(item => {
-            const Icon = item.icon;
-            const active = module === item.id;
-            return (
-              <button key={item.id} type="button" onClick={() => setModule(item.id)} className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-xs font-black ${active ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
-                <Icon size={14} /> {item.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
         {content()}
       </div>
