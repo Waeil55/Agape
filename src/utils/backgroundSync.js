@@ -50,6 +50,17 @@ async function syncRootTripCollection(collectionName, nextRecords = [], previous
   ]);
 }
 
+async function touchTripCollectionMetadata(updatedField, extra = {}) {
+  await setDoc(doc(db, DATA_DOC), {
+    ...extra,
+    tripStorageMode: 'rootCollections',
+    tripStorageVersion: 2,
+    updatedAt: serverTimestamp(),
+    updatedField,
+    updatedAtLocal: new Date().toISOString(),
+  }, { merge: true });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // VERSION VECTORS — Conflict detection between tabs/sessions
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -344,12 +355,7 @@ class BackgroundSyncManager {
       const rootCollection = field === 'trashedTrips' ? TRASHED_TRIPS_COLLECTION : TRIPS_COLLECTION;
       const value = op.value || [];
       await syncRootTripCollection(rootCollection, value, op.previous || []);
-      await setDoc(doc(db, DATA_DOC), {
-        [field]: sanitizeForFirestore(value),
-        updatedAt: serverTimestamp(),
-        updatedField: field,
-        updatedAtLocal: new Date().toISOString(),
-      }, { merge: true });
+      await touchTripCollectionMetadata(field, { [`${field}Count`]: value.length });
     } else if (op.type === 'setTripsBatch') {
       const trips = op.trips || [];
       const trashedTrips = op.trashedTrips || [];
@@ -357,13 +363,10 @@ class BackgroundSyncManager {
         syncRootTripCollection(TRIPS_COLLECTION, trips, op.previousTrips || []),
         syncRootTripCollection(TRASHED_TRIPS_COLLECTION, trashedTrips, op.previousTrashedTrips || []),
       ]);
-      await setDoc(doc(db, DATA_DOC), {
-        trips: sanitizeForFirestore(trips),
-        trashedTrips: sanitizeForFirestore(trashedTrips),
-        updatedAt: serverTimestamp(),
-        updatedField: 'trips+trashed',
-        updatedAtLocal: new Date().toISOString(),
-      }, { merge: true });
+      await touchTripCollectionMetadata('trips+trashed', {
+        tripsCount: trips.length,
+        trashedTripsCount: trashedTrips.length,
+      });
     } else if (op.type === 'setDoc') {
       await setDoc(doc(db, op.collection, op.docId), {
         ...op.data,

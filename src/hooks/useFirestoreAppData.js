@@ -56,11 +56,6 @@ const PHONE_NUMBERS_DOC = 'systemConfig/phoneNumbers';
 const BACKUP_COLLECTION = 'systemBackups';
 const MIRRORED_TRIP_FIELDS = new Set(['trips', 'trashedTrips']);
 
-// Firestore single-document size limit is 1 MiB. We stop embedding the full
-// trips/trashedTrips arrays in appData/agape once we cross this threshold and
-// instead use the root collections as the source of truth.
-const APP_DATA_SIZE_THRESHOLD_BYTES = 800 * 1024;
-
 const DEFAULT_DATA = {
   trips: [],
   drivers: [],
@@ -306,15 +301,6 @@ async function loadCollectionTrips(collectionName) {
   return trips;
 }
 
-// Estimate the byte size a JSON payload would have once written to Firestore.
-function estimateJsonBytes(value) {
-  try {
-    return new Blob([JSON.stringify(value)]).size;
-  } catch {
-    return 0;
-  }
-}
-
 function mergeTripProgress(trips = [], progressByTrip = {}) {
   return (trips || []).map((trip) => {
     const progress = progressByTrip?.[trip?.id];
@@ -352,6 +338,26 @@ function mergeRecordsById(primary = [], fallback = [], fallbackPrefix = 'record'
   });
 
   return [...merged.values()];
+}
+
+function applyCollectionDocChanges(currentList = [], snap, fallbackPrefix = 'record') {
+  const byId = new Map(
+    (currentList || []).map((record, index) => {
+      const id = getStableRecordId(record, fallbackPrefix, index);
+      return [id, { ...record, id }];
+    })
+  );
+
+  snap.docChanges().forEach((change) => {
+    const id = change.doc.id;
+    if (change.type === 'removed') {
+      byId.delete(id);
+      return;
+    }
+    byId.set(id, convertFirestoreTimestamps({ id, ...change.doc.data() }));
+  });
+
+  return [...byId.values()];
 }
 
 function getRecordTime(record) {
@@ -508,18 +514,24 @@ async function syncRootTripCollection(collectionName, nextRecords = [], previous
   ]);
 }
 
+async function touchTripCollectionMetadata(updatedField, extra = {}) {
+  await setDoc(doc(db, DATA_DOC), {
+    ...extra,
+    tripStorageMode: 'rootCollections',
+    tripStorageVersion: 2,
+    updatedAt: serverTimestamp(),
+    updatedField,
+    updatedAtLocal: new Date().toISOString(),
+  }, { merge: true });
+}
+
 async function replayQueuedTripWrite(operation = {}) {
   if (operation.type === 'setMirroredTrips') {
     const field = operation.field === 'trashedTrips' ? 'trashedTrips' : 'trips';
     const rootCollection = field === 'trashedTrips' ? TRASHED_TRIPS_COLLECTION : TRIPS_COLLECTION;
     const value = operation.value || [];
     await syncRootTripCollection(rootCollection, value, operation.previous || []);
-    await setDoc(doc(db, DATA_DOC), {
-      [field]: sanitizeForFirestore(value),
-      updatedAt: serverTimestamp(),
-      updatedField: field,
-      updatedAtLocal: new Date().toISOString(),
-    }, { merge: true });
+    await touchTripCollectionMetadata(field, { [`${field}Count`]: value.length });
     return true;
   }
 
@@ -530,13 +542,10 @@ async function replayQueuedTripWrite(operation = {}) {
       syncRootTripCollection(TRIPS_COLLECTION, trips, operation.previousTrips || []),
       syncRootTripCollection(TRASHED_TRIPS_COLLECTION, trashedTrips, operation.previousTrashedTrips || []),
     ]);
-    await setDoc(doc(db, DATA_DOC), {
-      trips: sanitizeForFirestore(trips),
-      trashedTrips: sanitizeForFirestore(trashedTrips),
-      updatedAt: serverTimestamp(),
-      updatedField: 'trips+trashed',
-      updatedAtLocal: new Date().toISOString(),
-    }, { merge: true });
+    await touchTripCollectionMetadata('trips+trashed', {
+      tripsCount: trips.length,
+      trashedTripsCount: trashedTrips.length,
+    });
     return true;
   }
 
@@ -570,19 +579,41 @@ async function mirrorTripsToLedger(trips = [], trashedTrips = []) {
   }
 }
 
+async function mirrorChangedTripsToLedger(nextRecords = [], previousRecords = [], archiveState = 'active') {
+  const changedRecords = filterChangedRecords(nextRecords || [], previousRecords || []);
+  const sanitizedEntries = changedRecords
+    .filter(Boolean)
+    .map((trip, index) => ({
+      id: getTripId(trip, archiveState, index),
+      data: sanitizeForFirestore({
+        ...trip,
+        archiveState,
+        mirroredAt: new Date().toISOString(),
+      }),
+    }));
+
+  for (let i = 0; i < sanitizedEntries.length; i += 450) {
+    const batch = writeBatch(db);
+    sanitizedEntries.slice(i, i + 450).forEach(({ id, data }) => {
+      batch.set(doc(db, TRIP_LEDGER_COLLECTION, id), data, { merge: true });
+    });
+    await batch.commit();
+  }
+}
+
 async function buildDataFromTripLedger() {
   // Prefer the root trips/trashedTrips collections as the primary source of truth.
   // Fall back to the legacy tripLedger only if the collections are empty.
-  const [activeTrips, archivedTrips, ledgerSnap] = await Promise.all([
+  const [activeTrips, archivedTrips] = await Promise.all([
     loadCollectionTrips(TRIPS_COLLECTION),
     loadCollectionTrips(TRASHED_TRIPS_COLLECTION),
-    getDocs(collection(db, TRIP_LEDGER_COLLECTION)),
   ]);
 
   let trips = activeTrips || [];
   let trashedTrips = archivedTrips || [];
 
   if (trips.length === 0 || trashedTrips.length === 0) {
+    const ledgerSnap = await getDocs(collection(db, TRIP_LEDGER_COLLECTION));
     const ledgerTrips = [];
     const ledgerArchived = [];
     ledgerSnap.forEach((tripDoc) => {
@@ -658,6 +689,7 @@ export function useFirestoreAppData() {
     logs: false,
     phoneNumbers: false,
   });
+  const ledgerRecoveryAttemptedRef = useRef(false);
 
   // Root trips/trashedTrips collections are the primary source of truth once loaded.
   // appData/agape.trips is kept as a legacy fallback for old clients and for metadata.
@@ -800,6 +832,26 @@ export function useFirestoreAppData() {
         if (snap.exists()) {
           const currentData = normalizeData(dataRef.current);
           const snapData = convertFirestoreTimestamps(snap.data());
+          const updatedField = String(snapData?.updatedField || '');
+          const isTripMetadataOnlyUpdate = (
+            tripsCollectionLoadedRef.current &&
+            trashedCollectionLoadedRef.current &&
+            updatedField.toLowerCase().includes('trip')
+          );
+
+          if (isTripMetadataOnlyUpdate) {
+            lastFirestoreSyncRef.current = new Date().toISOString();
+            setState(prev => ({
+              ...prev,
+              loading: false,
+              error: null,
+              initialized: true,
+              docExists: true,
+              lastLoadedAt: new Date().toISOString(),
+              lastFirestoreSync: lastFirestoreSyncRef.current,
+            }));
+            return;
+          }
 
           // Root trips/trashedTrips collections are the primary source of truth.
           // appData/agape trips are kept only as a legacy fallback.
@@ -871,6 +923,17 @@ export function useFirestoreAppData() {
             })).catch(() => {});
           };
 
+          const needsLegacyLedgerRecovery = !ledgerRecoveryAttemptedRef.current && (
+            (!tripsCollectionLoadedRef.current && (d.trips?.length || 0) === 0) ||
+            (!trashedCollectionLoadedRef.current && (d.trashedTrips?.length || 0) === 0)
+          );
+
+          if (!needsLegacyLedgerRecovery) {
+            applyData(d);
+            return;
+          }
+
+          ledgerRecoveryAttemptedRef.current = true;
           buildDataFromTripLedger()
             .then(async (recovered) => {
               if (!recovered || (!recovered.trips.length && !recovered.trashedTrips.length)) {
@@ -896,27 +959,12 @@ export function useFirestoreAppData() {
                     : Promise.resolve()),
                 ]);
 
-                // Try to patch appData/agape; if too large, metadata-only.
-                try {
-                  await setDoc(doc(db, DATA_DOC), {
-                    trips: sanitizeForFirestore(hydrated.trips),
-                    trashedTrips: sanitizeForFirestore(hydrated.trashedTrips),
-                    recoveredFromLedger: true,
-                    recoveredAt: new Date().toISOString(),
-                    updatedAt: serverTimestamp(),
-                    updatedField: 'trips',
-                    updatedAtLocal: new Date().toISOString(),
-                  }, { merge: true });
-                } catch (patchErr) {
-                  console.warn('Ledger recovery patch to appData failed (likely size limit). Root collections are now authoritative.', patchErr);
-                  await setDoc(doc(db, DATA_DOC), {
-                    recoveredFromLedger: true,
-                    recoveredAt: new Date().toISOString(),
-                    updatedAt: serverTimestamp(),
-                    updatedField: 'trips-recovery-metadata',
-                    updatedAtLocal: new Date().toISOString(),
-                  }, { merge: true });
-                }
+                await touchTripCollectionMetadata('trips-recovery', {
+                  recoveredFromLedger: true,
+                  recoveredAt: new Date().toISOString(),
+                  tripsCount: hydrated.trips?.length || 0,
+                  trashedTripsCount: hydrated.trashedTrips?.length || 0,
+                });
                 setState(prev => ({ ...prev, lastRecoveredAt: new Date().toISOString() }));
               } catch (recoveryErr) {
                 console.warn('Ledger recovery patch failed, but data is loaded locally.', recoveryErr);
@@ -936,8 +984,13 @@ export function useFirestoreAppData() {
                 const ref = doc(db, DATA_DOC);
                 const freshSnap = await transaction.get(ref);
                 if (!freshSnap.exists()) {
+                  const { trips: seedTrips = [], trashedTrips: seedTrashedTrips = [], ...seedMetadata } = seed;
                   transaction.set(ref, sanitizeForFirestore({
-                    ...seed,
+                    ...seedMetadata,
+                    tripStorageMode: 'rootCollections',
+                    tripStorageVersion: 2,
+                    tripsCount: seedTrips.length,
+                    trashedTripsCount: seedTrashedTrips.length,
                     initializedAt: new Date().toISOString(),
                     recoveredFromLedger: Boolean(recovered),
                   }));
@@ -1010,10 +1063,7 @@ export function useFirestoreAppData() {
       (snap) => {
         setListenerStatus(collectionName, 'live');
         const currentList = dataRef.current[field] || [];
-        const snapshotList = [];
-        snap.forEach((itemDoc) => {
-          snapshotList.push(convertFirestoreTimestamps({ id: itemDoc.id, ...itemDoc.data() }));
-        });
+        const snapshotList = applyCollectionDocChanges(currentList, snap, field);
         const nextList = mergeRecordsById(snapshotList, currentList, field);
         dataRef.current = {
           ...normalizeData(dataRef.current),
@@ -1042,10 +1092,7 @@ export function useFirestoreAppData() {
         setListenerStatus(LOG_COLLECTION, 'live');
         const currentList = dataRef.current.logs || [];
         if (snap.size === 0 && currentList.length > 0) return;
-        const snapshotList = [];
-        snap.forEach((itemDoc) => {
-          snapshotList.push(convertFirestoreTimestamps({ id: itemDoc.id, ...itemDoc.data() }));
-        });
+        const snapshotList = applyCollectionDocChanges(currentList, snap, 'log');
         const logs = sortNewestFirst(mergeRecordsById(snapshotList, currentList, 'log'));
         dataRef.current = {
           ...normalizeData(dataRef.current),
@@ -1094,13 +1141,17 @@ export function useFirestoreAppData() {
       collection(db, DRIVER_TRIP_PROGRESS_COLLECTION),
       (snap) => {
         setListenerStatus(DRIVER_TRIP_PROGRESS_COLLECTION, 'live');
-        const progressByTrip = {};
-        snap.forEach((progressDoc) => {
-          progressByTrip[progressDoc.id] = convertFirestoreTimestamps({
-            id: progressDoc.id,
-            ...progressDoc.data(),
+        const progressByTrip = { ...tripProgressRef.current };
+        snap.docChanges().forEach((change) => {
+          if (change.type === 'removed') {
+            delete progressByTrip[change.doc.id];
+            return;
+          }
+          progressByTrip[change.doc.id] = convertFirestoreTimestamps({
+            id: change.doc.id,
+            ...change.doc.data(),
           });
-          delete progressByTrip[progressDoc.id].tripId;
+          delete progressByTrip[change.doc.id].tripId;
         });
         tripProgressRef.current = progressByTrip;
         const baseData = normalizeData(dataRef.current);
@@ -1122,95 +1173,19 @@ export function useFirestoreAppData() {
         console.error('Realtime driver workflow sync failed:', err);
       }
     );
-    const unsubTripLedger = onSnapshot(
-      collection(db, TRIP_LEDGER_COLLECTION),
-      (snap) => {
-        setListenerStatus(TRIP_LEDGER_COLLECTION, 'live');
-        const ledgerTrips = [];
-        const ledgerArchived = [];
-        snap.forEach((tripDoc) => {
-          const trip = convertFirestoreTimestamps({ id: tripDoc.id, ...tripDoc.data() });
-          if (trip.archiveState === 'archived') {
-            ledgerArchived.push(trip);
-          } else {
-            ledgerTrips.push(trip);
-          }
-        });
-        if (ledgerTrips.length === 0 && ledgerArchived.length === 0) return;
-
-        const baseData = normalizeData(dataRef.current);
-        const useLedgerTrips = !tripsCollectionLoadedRef.current;
-        const useLedgerArchived = !trashedCollectionLoadedRef.current;
-        if (!useLedgerTrips && !useLedgerArchived) return;
-
-        const mergedData = mergeDataWithLedger(baseData, {
-          ...DEFAULT_DATA,
-          trips: useLedgerTrips ? ledgerTrips : [],
-          trashedTrips: useLedgerArchived ? ledgerArchived : [],
-        });
-        const patched = {
-          ...mergedData,
-          trips: mergeTripProgress(mergedData.trips, tripProgressRef.current),
-        };
-        dataRef.current = patched;
-        setState(prev => ({
-          ...prev,
-          trips: patched.trips,
-          trashedTrips: patched.trashedTrips,
-          loading: false,
-          error: null,
-        }));
-
-          if (!recoveringRef.current && hasRecoveredLedgerRecords(baseData, patched)) {
-            recoveringRef.current = true;
-
-            // Push recovered trips into the root collections first.
-            Promise.all([
-              ...(patched.trips || []).map(trip => trip?.id
-                ? setDoc(doc(db, TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))
-                : Promise.resolve()),
-              ...(patched.trashedTrips || []).map(trip => trip?.id
-                ? setDoc(doc(db, TRASHED_TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))
-                : Promise.resolve()),
-            ]).then(() => setDoc(doc(db, DATA_DOC), {
-              trips: sanitizeForFirestore(patched.trips),
-              trashedTrips: sanitizeForFirestore(patched.trashedTrips),
-              recoveredFromLedger: true,
-              recoveredAt: new Date().toISOString(),
-              updatedAt: serverTimestamp(),
-              updatedField: 'trips',
-              updatedAtLocal: new Date().toISOString(),
-            }, { merge: true })).catch((err) => {
-              console.warn('Live ledger recovery patch failed (likely size limit). Root collections are authoritative.', err);
-              return setDoc(doc(db, DATA_DOC), {
-                recoveredFromLedger: true,
-                recoveredAt: new Date().toISOString(),
-                updatedAt: serverTimestamp(),
-                updatedField: 'trips-recovery-metadata',
-                updatedAtLocal: new Date().toISOString(),
-              }, { merge: true });
-            }).then(() => {
-              recoveringRef.current = false;
-              setState(prev => ({ ...prev, lastRecoveredAt: new Date().toISOString() }));
-            });
-          }
-      },
-      (err) => {
-        if (shouldIgnoreRealtimePermissionError(err)) return;
-        setListenerStatus(TRIP_LEDGER_COLLECTION, 'error', err);
-        console.error('Realtime trip ledger sync failed:', err);
-      }
-    );
+    // tripLedger is a disaster-recovery mirror, not a live primary feed. Avoid
+    // subscribing to the whole ledger on every app open; the appData bootstrap
+    // performs one fallback recovery only if root collections are empty.
+    const unsubTripLedger = () => {};
+    setListenerStatus(TRIP_LEDGER_COLLECTION, 'standby');
 
     // Primary real-time source of truth for trips
     const unsubTripsCollection = onSnapshot(
       collection(db, TRIPS_COLLECTION),
       (snap) => {
         setListenerStatus(TRIPS_COLLECTION, 'live');
-        const snapshotList = [];
-        snap.forEach((tripDoc) => {
-          snapshotList.push(convertFirestoreTimestamps({ id: tripDoc.id, ...tripDoc.data() }));
-        });
+        const baseList = tripsCollectionLoadedRef.current ? tripsCollectionRef.current : [];
+        const snapshotList = applyCollectionDocChanges(baseList, snap, 'active');
         const dedupedSnapshot = dedupTripsByContent(snapshotList);
         tripsCollectionRef.current = dedupedSnapshot;
         tripsCollectionLoadedRef.current = true;
@@ -1241,10 +1216,8 @@ export function useFirestoreAppData() {
       collection(db, TRASHED_TRIPS_COLLECTION),
       (snap) => {
         setListenerStatus(TRASHED_TRIPS_COLLECTION, 'live');
-        const snapshotList = [];
-        snap.forEach((tripDoc) => {
-          snapshotList.push(convertFirestoreTimestamps({ id: tripDoc.id, ...tripDoc.data() }));
-        });
+        const baseList = trashedCollectionLoadedRef.current ? trashedCollectionRef.current : [];
+        const snapshotList = applyCollectionDocChanges(baseList, snap, 'archived');
         const dedupedSnapshot = dedupTripsByContent(snapshotList);
         trashedCollectionRef.current = dedupedSnapshot;
         trashedCollectionLoadedRef.current = true;
@@ -1307,39 +1280,25 @@ export function useFirestoreAppData() {
       if (MIRRORED_TRIP_FIELDS.has(field)) {
         const isTripsField = field === 'trips';
         const tripList = sanitized || [];
-        const companionTrips = isTripsField ? (dataRef.current.trashedTrips || []) : (dataRef.current.trips || []);
         const rootCollection = isTripsField ? TRIPS_COLLECTION : TRASHED_TRIPS_COLLECTION;
 
         // 1. Write changed trips and remove deleted trips from the root collection.
         await syncRootTripCollection(rootCollection, tripList, Array.isArray(beforeData) ? beforeData : []);
 
-        // 2. Legacy tripLedger mirror (non-blocking).
+        // 2. Legacy tripLedger mirror (non-blocking, changed rows only).
         try {
-          if (isTripsField) await mirrorTripsToLedger(tripList, companionTrips);
-          else await mirrorTripsToLedger(companionTrips, tripList);
+          await mirrorChangedTripsToLedger(
+            tripList,
+            Array.isArray(beforeData) ? beforeData : [],
+            isTripsField ? 'active' : 'archived'
+          );
         } catch (mirrorErr) {
           console.warn(`Trip ledger mirror failed for ${field}; continuing with core save.`, mirrorErr);
         }
 
-        // 3. Try to keep appData/agape in sync for backwards-compatible clients.
-        // If the document is too large (near Firestore's 1 MiB limit), fall back to
-        // a metadata-only write so the onSnapshot still fires and new clients reload
-        // from the root collections.
-        try {
-          await setDoc(doc(db, DATA_DOC), {
-            [field]: sanitized,
-            updatedAt: serverTimestamp(),
-            updatedField: field,
-            updatedAtLocal: new Date().toISOString(),
-          }, { merge: true });
-        } catch (docErr) {
-          console.warn(`DATA_DOC full ${field} save failed (likely size limit). Writing metadata-only.`, docErr);
-          await setDoc(doc(db, DATA_DOC), {
-            updatedAt: serverTimestamp(),
-            updatedField: `${field}-metadata`,
-            updatedAtLocal: new Date().toISOString(),
-          }, { merge: true });
-        }
+        // 3. Root collections are authoritative. Keep appData/agape small so
+        // every trip edit does not rewrite a giant array document.
+        await touchTripCollectionMetadata(field, { [`${field}Count`]: tripList.length });
       } else {
         // Non-trip fields: write directly to appData/agape as before.
         await setDoc(doc(db, DATA_DOC), {
@@ -1543,30 +1502,22 @@ export function useFirestoreAppData() {
         syncRootTripCollection(TRASHED_TRIPS_COLLECTION, sanitizedTrashed || [], beforeTrashed || []),
       ]);
 
-      // 2. Legacy tripLedger mirror (non-blocking).
+      // 2. Legacy tripLedger mirror (non-blocking, changed rows only).
       try {
-        await mirrorTripsToLedger(sanitizedTrips || [], sanitizedTrashed || []);
+        await Promise.all([
+          mirrorChangedTripsToLedger(sanitizedTrips || [], beforeTrips || [], 'active'),
+          mirrorChangedTripsToLedger(sanitizedTrashed || [], beforeTrashed || [], 'archived'),
+        ]);
       } catch (mirrorErr) {
         console.warn('Trip ledger mirror failed for writeTripsBatch; continuing with core save.', mirrorErr);
       }
 
-      // 3. Backwards-compatible appData/agape write with size guard.
-      try {
-        await setDoc(doc(db, DATA_DOC), {
-          trips: sanitizedTrips,
-          trashedTrips: sanitizedTrashed,
-          updatedAt: serverTimestamp(),
-          updatedField: 'trips+trashed',
-          updatedAtLocal: new Date().toISOString(),
-        }, { merge: true });
-      } catch (docErr) {
-        console.warn('DATA_DOC write-trips-batch failed (likely size limit). Writing metadata-only.', docErr);
-        await setDoc(doc(db, DATA_DOC), {
-          updatedAt: serverTimestamp(),
-          updatedField: 'trips+trashed-metadata',
-          updatedAtLocal: new Date().toISOString(),
-        }, { merge: true });
-      }
+      // 3. Root collections are authoritative. The appData document only carries
+      // small metadata so batch operations stay fast at fleet scale.
+      await touchTripCollectionMetadata('trips+trashed', {
+        tripsCount: sanitizedTrips.length,
+        trashedTripsCount: sanitizedTrashed.length,
+      });
 
       try { firestoreWriteMetrics.measure('write-trips-batch', 'firestore-write'); } catch (_) {}
 
@@ -1697,27 +1648,18 @@ export function useFirestoreAppData() {
           : Promise.resolve()),
       ]);
 
-      // Write the core document. If it's too large because of trips, strip the
-      // trip arrays and only write metadata + other collections.
-      try {
-        await setDoc(doc(db, DATA_DOC), {
-          ...sanitizeForFirestore(merged),
-          repairedAt: new Date().toISOString(),
-          updatedAt: serverTimestamp(),
-          updatedField: 'repair',
-          updatedAtLocal: new Date().toISOString(),
-        }, { merge: true });
-      } catch (docErr) {
-        console.warn('DATA_DOC repair failed (likely size limit). Writing metadata-only repair.', docErr);
-        const { trips, trashedTrips, ...metadata } = sanitizeForFirestore(merged);
-        await setDoc(doc(db, DATA_DOC), {
-          ...metadata,
-          repairedAt: new Date().toISOString(),
-          updatedAt: serverTimestamp(),
-          updatedField: 'repair-metadata',
-          updatedAtLocal: new Date().toISOString(),
-        }, { merge: true });
-      }
+      const { trips: _trips, trashedTrips: _trashedTrips, ...metadata } = sanitizeForFirestore(merged);
+      await setDoc(doc(db, DATA_DOC), {
+        ...metadata,
+        tripStorageMode: 'rootCollections',
+        tripStorageVersion: 2,
+        tripsCount: merged.trips?.length || 0,
+        trashedTripsCount: merged.trashedTrips?.length || 0,
+        repairedAt: new Date().toISOString(),
+        updatedAt: serverTimestamp(),
+        updatedField: 'repair-metadata',
+        updatedAtLocal: new Date().toISOString(),
+      }, { merge: true });
 
       await Promise.all([
         mirrorTripsToLedger(merged.trips, merged.trashedTrips),

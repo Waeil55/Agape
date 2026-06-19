@@ -46,6 +46,17 @@ async function syncRootTripCollection(collectionName, nextRecords = [], previous
   ]);
 }
 
+async function touchTripCollectionMetadata(updatedField, extra = {}) {
+  await setDoc(doc(db, DATA_DOC), {
+    ...extra,
+    tripStorageMode: 'rootCollections',
+    tripStorageVersion: 2,
+    updatedAt: serverTimestamp(),
+    updatedField,
+    updatedAtLocal: new Date().toISOString(),
+  }, { merge: true });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // RETRY QUEUE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -203,12 +214,7 @@ class RetryQueue {
       const rootCollection = field === 'trashedTrips' ? TRASHED_TRIPS_COLLECTION : TRIPS_COLLECTION;
       const value = operation.value || [];
       await syncRootTripCollection(rootCollection, value, operation.previous || []);
-      await setDoc(doc(db, DATA_DOC), {
-        [field]: sanitizeForFirestore(value),
-        updatedAt: serverTimestamp(),
-        updatedField: field,
-        updatedAtLocal: new Date().toISOString(),
-      }, { merge: true });
+      await touchTripCollectionMetadata(field, { [`${field}Count`]: value.length });
     } else if (operation.type === 'setTripsBatch') {
       const trips = operation.trips || [];
       const trashedTrips = operation.trashedTrips || [];
@@ -216,13 +222,10 @@ class RetryQueue {
         syncRootTripCollection(TRIPS_COLLECTION, trips, operation.previousTrips || []),
         syncRootTripCollection(TRASHED_TRIPS_COLLECTION, trashedTrips, operation.previousTrashedTrips || []),
       ]);
-      await setDoc(doc(db, DATA_DOC), {
-        trips: sanitizeForFirestore(trips),
-        trashedTrips: sanitizeForFirestore(trashedTrips),
-        updatedAt: serverTimestamp(),
-        updatedField: 'trips+trashed',
-        updatedAtLocal: new Date().toISOString(),
-      }, { merge: true });
+      await touchTripCollectionMetadata('trips+trashed', {
+        tripsCount: trips.length,
+        trashedTripsCount: trashedTrips.length,
+      });
     }
   }
 

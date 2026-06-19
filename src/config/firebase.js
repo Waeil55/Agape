@@ -133,24 +133,15 @@ export async function saveTripWorkflowUpdate(tripId, updates = {}) {
     updatedAt: serverTimestamp(),
   }, { merge: true });
 
-  runTransaction(db, async (transaction) => {
-    const appSnap = await transaction.get(appDataRef);
-    if (!appSnap.exists()) return;
-    const data = appSnap.data() || {};
-    const trips = Array.isArray(data.trips) ? data.trips : [];
-    const nextTrips = trips.map((trip) => (
-      String(trip?.id || '') === String(tripId)
-        ? { ...trip, ...cleanUpdates }
-        : trip
-    ));
-    transaction.set(appDataRef, {
-      trips: nextTrips,
-      updatedAt: serverTimestamp(),
-      updatedField: 'trips',
-      updatedAtLocal: new Date().toISOString(),
-    }, { merge: true });
-  }).catch((err) => {
-    console.warn('Workflow appData mirror skipped:', err);
+  setDoc(appDataRef, {
+    tripStorageMode: 'rootCollections',
+    tripStorageVersion: 2,
+    updatedAt: serverTimestamp(),
+    updatedField: 'trip-workflow',
+    updatedTripId: tripId,
+    updatedAtLocal: new Date().toISOString(),
+  }, { merge: true }).catch((err) => {
+    console.warn('Workflow appData metadata skipped:', err);
   });
 
   setDoc(ledgerRef, cleanUpdates, { merge: true }).catch((err) => {
