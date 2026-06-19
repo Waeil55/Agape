@@ -6,6 +6,50 @@
 
 let swRegistration = null;
 let updateCheckTimer = null;
+let controllerChangeListenerRegistered = false;
+let registrationListenersAttached = false;
+
+const SW_RELOAD_VERSION_KEY = 'agape_sw_reloaded_version';
+const SW_RELOAD_AT_KEY = 'agape_sw_reloaded_at';
+const SW_RELOAD_COOLDOWN_MS = 60 * 1000;
+
+const reloadOnceForVersion = (version = 'unknown') => {
+  try {
+    const now = Date.now();
+    const lastVersion = localStorage.getItem(SW_RELOAD_VERSION_KEY);
+    const lastAt = Number(localStorage.getItem(SW_RELOAD_AT_KEY) || 0);
+    if (lastVersion === version) return false;
+    if (lastAt && now - lastAt < SW_RELOAD_COOLDOWN_MS) return false;
+    localStorage.setItem(SW_RELOAD_VERSION_KEY, version);
+    localStorage.setItem(SW_RELOAD_AT_KEY, String(now));
+  } catch {
+    // Storage can fail in private mode; still avoid throwing during app startup.
+  }
+  window.location.reload();
+  return true;
+};
+
+const attachRegistrationListeners = (registration) => {
+  if (!registration || registrationListenersAttached) return;
+  registrationListenersAttached = true;
+
+  registration.addEventListener('updatefound', () => {
+    const newWorker = registration.installing;
+    if (!newWorker) return;
+    newWorker.addEventListener('statechange', () => {
+      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+        notifyUpdateAvailable();
+      }
+    });
+  });
+
+  if (!controllerChangeListenerRegistered) {
+    controllerChangeListenerRegistered = true;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.dispatchEvent(new CustomEvent('swControllerChanged'));
+    });
+  }
+};
 
 /**
  * Register the service worker and set up update listeners
@@ -17,11 +61,19 @@ export const registerServiceWorker = async () => {
   }
 
   try {
-    // Check if already registered by index.html inline script
     if (swRegistration) return swRegistration;
     const existingReg = await navigator.serviceWorker.getRegistration('/');
     if (existingReg) {
       swRegistration = existingReg;
+      attachRegistrationListeners(swRegistration);
+      if (swRegistration.waiting && navigator.serviceWorker.controller) {
+        notifyUpdateAvailable();
+      }
+      swRegistration.update().catch(() => {});
+      if (updateCheckTimer) clearInterval(updateCheckTimer);
+      updateCheckTimer = setInterval(() => {
+        swRegistration.update().catch(() => {});
+      }, 5 * 60 * 1000);
       return swRegistration;
     }
     
@@ -31,27 +83,13 @@ export const registerServiceWorker = async () => {
     
     console.log('Service Worker registered successfully');
 
-    // Listen for updates
-    swRegistration.addEventListener('updatefound', () => {
-      const newWorker = swRegistration.installing;
-      
-      newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          // New SW ready, notify user
-          notifyUpdateAvailable();
-        }
-      });
-    });
+    attachRegistrationListeners(swRegistration);
 
     // Check for updates periodically without forcing a page reload.
     if (updateCheckTimer) clearInterval(updateCheckTimer);
     updateCheckTimer = setInterval(() => {
-      swRegistration.update();
+      swRegistration.update().catch(() => {});
     }, 5 * 60 * 1000);
-
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.dispatchEvent(new CustomEvent('swControllerChanged'));
-    });
 
     return swRegistration;
   } catch (error) {
@@ -65,7 +103,6 @@ export const registerServiceWorker = async () => {
  */
 export const requestPeriodicSync = async () => {
   if (!('serviceWorker' in navigator) || !('PeriodicSyncManager' in window)) {
-    console.log('Periodic Sync not supported');
     return false;
   }
 
@@ -79,7 +116,8 @@ export const requestPeriodicSync = async () => {
       return true;
     }
   } catch (error) {
-    console.log('Periodic sync error:', error);
+    // Periodic background sync is not consistently available across mobile browsers.
+    // The app still uses Firestore snapshots, visibility refresh, and manual SW sync.
   }
   return false;
 };
@@ -107,13 +145,10 @@ export const setupSWMessageHandler = (callback) => {
     const handler = (event) => {
       if (event.data?.type === 'SW_UPDATED') {
         const version = event.data.version || 'unknown';
-        const lastReload = sessionStorage.getItem('sw_last_reload_version');
-        if (lastReload === version) {
-          console.log('[SW] Already reloaded for version', version, '- skipping');
+        if (!reloadOnceForVersion(version)) {
+          console.log('[SW] Reload already handled for version', version);
           return;
         }
-        sessionStorage.setItem('sw_last_reload_version', version);
-        window.location.reload();
         return;
       }
       if (event.data?.type === 'SYNC_REQUEST' || event.data?.type === 'appVisible') {

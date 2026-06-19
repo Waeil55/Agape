@@ -56,6 +56,20 @@ import { requestDedup } from './utils/requestDedup';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
+const guardedReload = (reason = 'app', cooldownMs = 60 * 1000) => {
+  try {
+    const key = `agape_reload_guard_${reason}`;
+    const now = Date.now();
+    const lastReloadAt = Number(window.sessionStorage.getItem(key) || 0);
+    if (lastReloadAt && now - lastReloadAt < cooldownMs) return false;
+    window.sessionStorage.setItem(key, String(now));
+  } catch {
+    // Storage can be unavailable; keep the app from crashing while recovering.
+  }
+  window.location.reload();
+  return true;
+};
+
 // Lazy-loaded heavy components
 const lazyWithRetry = (componentImport) =>
   lazy(async () => {
@@ -69,7 +83,8 @@ const lazyWithRetry = (componentImport) =>
     } catch (error) {
       if (!pageHasAlreadyBeenForceRefreshed) {
         window.sessionStorage.setItem('page-has-been-force-refreshed', 'true');
-        return window.location.reload();
+        guardedReload('lazy_import');
+        return new Promise(() => {});
       }
       throw error;
     }
@@ -442,19 +457,19 @@ const App = () => {
     const onError = (event) => {
       if (event.target?.tagName === 'LINK' && event.target?.rel === 'modulepreload') {
         event.preventDefault();
-        window.location.reload();
+        guardedReload('modulepreload_error');
         return;
       }
       if (event.target?.tagName === 'SCRIPT' && event.target?.type === 'module' && event.target?.src) {
         if (!event.target.src.includes(location.origin)) return;
         event.preventDefault();
-        window.location.reload();
+        guardedReload('module_script_error');
       }
     };
     const onRejection = (event) => {
       if (event.reason && typeof event.reason === 'object' && event.reason?.message?.includes('dynamically imported module')) {
         event.preventDefault();
-        window.location.reload();
+        guardedReload('dynamic_import_rejection');
       }
     };
     window.addEventListener('error', onError, true);

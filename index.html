@@ -43,38 +43,5 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- ===== PWA AUTO-REFRESH SERVICE WORKER ===== -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
-          console.log('[SW] Registered:', registration.scope);
-
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            if (!newWorker) return;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[SW] New version available - activating immediately.');
-                newWorker.postMessage({ type: 'SKIP_WAITING', action: 'skipWaiting' });
-              }
-            });
-          });
-
-          let refreshing = false;
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (refreshing) return;
-            refreshing = true;
-            console.log('[SW] Controller changed. Reloading with fresh assets.');
-            location.reload(true);
-          });
-
-        }).catch(err => {
-          console.warn('[SW] Registration failed:', err);
-        });
-
-        // Also register the Firebase Messaging SW for push notifications
-        navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(() => {});
-      }
-    </script>
   </body>
 </html>
