@@ -203,14 +203,17 @@ export async function syncOfflineQueue(queue) {
     } else if (item.action === 'completeTrip') {
       const tripId = item.data?.tripId;
       if (!tripId) continue;
-      const completionFields = {
-        ...(item.data?.completedTrip || {}),
-        ...(item.data?.completionFields || {}),
+      const completedTrip = item.data?.completedTrip || {};
+      const queuedCompletion = item.data?.completionFields || {};
+      const dropoffOdometer = item.data?.odometer ?? queuedCompletion.dropoffOdometer ?? completedTrip.dropoffOdometer;
+      const completionFields = cleanFirestoreUpdates({
+        ...completedTrip,
+        ...queuedCompletion,
         status: 'Completed',
-        dropoffOdometer: item.data?.odometer ?? item.data?.completionFields?.dropoffOdometer,
-        completedAt: item.data?.completionFields?.completedAt || new Date().toISOString(),
+        dropoffOdometer,
+        completedAt: queuedCompletion.completedAt || completedTrip.completedAt || new Date().toISOString(),
         workflowUpdatedAt: new Date().toISOString(),
-      };
+      });
       batch.set(doc(db, 'trips', tripId), completionFields, { merge: true });
       batch.set(doc(db, 'driverTripProgress', tripId), { tripId, ...completionFields }, { merge: true });
       batch.set(doc(db, 'tripLedger', tripId), completionFields, { merge: true });

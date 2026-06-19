@@ -249,6 +249,7 @@ const WORKFLOW_PROGRESS_FIELDS = [
   'completedAt',
   'completedVehicle',
 ];
+const WORKFLOW_PROGRESS_FIELD_SET = new Set(WORKFLOW_PROGRESS_FIELDS);
 
 const WORKFLOW_FIELD_MIN_STEP = {
   startedAt: 0,
@@ -265,6 +266,21 @@ const WORKFLOW_FIELD_MIN_STEP = {
 };
 
 const hasWorkflowValue = (value) => value !== undefined && value !== null && value !== '';
+
+const mergeWorkflowPayload = (...sources) => {
+  const merged = {};
+  sources.forEach((source) => {
+    if (!source) return;
+    Object.entries(source).forEach(([key, value]) => {
+      if (WORKFLOW_PROGRESS_FIELD_SET.has(key)) {
+        if (hasWorkflowValue(value) || !hasWorkflowValue(merged[key])) merged[key] = value;
+      } else if (value !== undefined) {
+        merged[key] = value;
+      }
+    });
+  });
+  return merged;
+};
 
 const readWorkflowProgress = (storageKey) => {
   try {
@@ -291,6 +307,14 @@ const getWorkflowExtraFields = (progress = {}) => {
     if (hasWorkflowValue(progress[field])) extraFields[field] = progress[field];
   });
   return extraFields;
+};
+
+const pruneWorkflowFieldsAfterStep = (fields = {}, stepIndex = -1) => {
+  const nextFields = { ...fields };
+  Object.entries(WORKFLOW_FIELD_MIN_STEP).forEach(([field, minStep]) => {
+    if (minStep > stepIndex) delete nextFields[field];
+  });
+  return nextFields;
 };
 
 const applyWorkflowProgress = (trip, progress) => {
@@ -514,14 +538,28 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const advanceWorkflow = useCallback((trip, status, extraFields = {}, options = {}) => {
     if (!trip?.id || !status) return;
+    const previousProgressForPersist = workflowProgress[trip.id] || {};
+    const currentTripForPersist = applyWorkflowProgress(trip, previousProgressForPersist);
+    const incomingTripForPersist = mergeWorkflowPayload(currentTripForPersist, { status }, extraFields);
+    const currentIndexForPersist = getWorkflowStepIndex(currentTripForPersist);
+    const incomingIndexForPersist = getWorkflowStepIndex(incomingTripForPersist);
+
+    if (!options.allowRegression && incomingIndexForPersist < currentIndexForPersist) {
+      return;
+    }
+
+    const persistedExtraFields = options.allowRegression
+      ? pruneWorkflowFieldsAfterStep(getWorkflowExtraFields(incomingTripForPersist), incomingIndexForPersist)
+      : getWorkflowExtraFields(incomingTripForPersist);
+
     if (!WORKFLOW_TERMINAL_STATUSES.has(status)) {
-      keepWorkflowTripOpen({ ...trip, status, ...extraFields });
+      keepWorkflowTripOpen({ ...trip, status, ...persistedExtraFields });
     }
     const workflowUpdatedAt = new Date().toISOString();
     setWorkflowProgressData((prev) => {
       const previousProgress = prev[trip.id] || {};
       const currentTrip = applyWorkflowProgress(trip, previousProgress);
-      const incomingTrip = { ...currentTrip, status, ...extraFields };
+      const incomingTrip = mergeWorkflowPayload(currentTrip, { status }, extraFields);
       const currentIndex = getWorkflowStepIndex(currentTrip);
       const incomingIndex = getWorkflowStepIndex(incomingTrip);
 
@@ -533,15 +571,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         ...previousProgress,
         tripId: trip.id,
         status,
-        ...extraFields,
+        ...persistedExtraFields,
         workflowRegression: !!options.allowRegression,
         workflowUpdatedAt,
       };
 
       if (options.allowRegression) {
-        Object.entries(WORKFLOW_FIELD_MIN_STEP).forEach(([field, minStep]) => {
-          if (minStep > incomingIndex) delete nextProgress[field];
-        });
+        return { ...prev, [trip.id]: pruneWorkflowFieldsAfterStep(nextProgress, incomingIndex) };
       }
 
       return { ...prev, [trip.id]: nextProgress };
@@ -552,20 +588,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       persistFailureReported = true;
       if (typeof options.onPersistFailure === 'function') options.onPersistFailure(err);
     };
-    Promise.resolve(onUpdateTrip?.(trip.id, status, extraFields))
+    Promise.resolve(onUpdateTrip?.(trip.id, status, persistedExtraFields))
       .then((result) => {
         if (result === false) reportPersistFailure(new Error('Trip update was rejected.'));
       })
       .catch(reportPersistFailure);
     saveTripWorkflowUpdate(trip.id, {
       status,
-      ...extraFields,
+      ...persistedExtraFields,
       workflowUpdatedAt,
     }).catch((err) => {
       console.error('[DriverPage] Failed to persist workflow update:', err);
       reportPersistFailure(err);
     });
-  }, [keepWorkflowTripOpen, onUpdateTrip, setWorkflowProgressData]);
+  }, [keepWorkflowTripOpen, onUpdateTrip, setWorkflowProgressData, workflowProgress]);
 
   useEffect(() => {
     const tripId = preservedWorkflowTripIdRef.current;
@@ -589,7 +625,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       const mergedTrip = applyWorkflowProgress(rawTrip, progress);
       // Build a full signature of the workflow state so metadata-only changes
       // (time edits, transfers, pairing) also trigger a save.
-      const extraFields = getWorkflowExtraFields(progress);
+      const extraFields = getWorkflowExtraFields(mergedTrip);
       const signature = JSON.stringify({ status: mergedTrip.status, ...extraFields });
       if (workflowSyncRef.current[tripId] === signature) return;
       workflowSyncRef.current[tripId] = signature;
@@ -689,15 +725,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const buildCompletionQueueData = useCallback((trip, completionFields = {}, odometer) => {
     const currentTrip = applyWorkflowProgress(trip, workflowProgress[trip?.id]);
     const dropoffOdometer = odometer ?? completionFields.dropoffOdometer ?? currentTrip?.dropoffOdometer;
-    const completedTrip = {
-      ...currentTrip,
-      ...completionFields,
+    const completedTrip = mergeWorkflowPayload(currentTrip, completionFields, {
       status: 'Completed',
       dropoffOdometer,
       driverId: currentTrip?.driverId || me?.id || '',
       driverName: currentTrip?.driverName || me?.name || '',
       driverEmail: currentTrip?.driverEmail || me?.email || '',
-    };
+    });
     return {
       tripId: trip?.id,
       driverId: me?.id || currentTrip?.driverId || '',
@@ -908,8 +942,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           await Promise.resolve(onUpdateDriverLocation?.(meRef.current.id, item.data.lat, item.data.lng, item.data.telemetry || {}));
         } else if (item.action === 'completeTrip') {
           if (!meRef.current?.id) throw new Error('Driver profile is not ready.');
-          const localTrip = driverScopedTrips.find((trip) => trip.id === item.data?.tripId) || item.data?.completedTrip || {};
-          const localCompletionFields = getWorkflowExtraFields(localTrip);
+          const localTrip = driverScopedTrips.find((trip) => trip.id === item.data?.tripId) || {};
+          const queuedTrip = item.data?.completedTrip || {};
+          const localCompletionFields = getWorkflowExtraFields(mergeWorkflowPayload(localTrip, queuedTrip));
           const completionFields = {
             ...localCompletionFields,
             ...(item.data?.completionFields || {}),
@@ -938,11 +973,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const addToQueue = useCallback((action, data) => {
     updateOfflineQueue([...queueRef.current, { action, data, timestamp: Date.now() }]);
     if (action === 'completeTrip' && data?.tripId) {
+      const completedTripFields = getWorkflowExtraFields(data.completedTrip || {});
       const completionFields = {
+        ...completedTripFields,
         ...(data.completionFields || {}),
         status: 'Completed',
-        dropoffOdometer: data.odometer ?? data.completionFields?.dropoffOdometer,
-        completedAt: data.completionFields?.completedAt || new Date().toISOString(),
+        dropoffOdometer: data.odometer ?? data.completionFields?.dropoffOdometer ?? completedTripFields.dropoffOdometer,
+        completedAt: data.completionFields?.completedAt || completedTripFields.completedAt || new Date().toISOString(),
       };
       ['driverTripProgress', 'trips', 'tripLedger'].forEach((collectionName) => {
         Promise.resolve(backgroundSync.queue({
