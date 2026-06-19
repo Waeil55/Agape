@@ -1883,23 +1883,30 @@ const App = () => {
     );
   };
 
-  const handleCompleteTrip = (tripId, driverId, odometer) => {
+  const handleCompleteTrip = async (tripId, driverId, odometer, completionFields = {}) => {
     const trip = trips.find(t => t.id === tripId);
-    if (!trip?.pickupOdometer || !trip?.arrivalTime || !trip?.departedPickupTime || !trip?.arrivalDropoffTime || (!trip?.paperSignatureConfirmed && !trip?.unableToSign)) {
-      addAuditLog('Trip Completion Blocked', `${currentUser || 'Driver'} attempted to complete ${trip?.patient || tripId} before all required steps were finished.`, 'rose');
-      return;
+    if (!trip) {
+      addAuditLog('Trip Completion Blocked', `${currentUser || 'Driver'} attempted to complete ${tripId}, but the trip is not loaded in dispatch.`, 'rose');
+      return false;
     }
-    const completedAt = new Date().toISOString();
+    const sourceTrip = { ...trip, ...completionFields };
+    const hasCompletionValue = (value) => value !== undefined && value !== null && value !== '';
+    if (!hasCompletionValue(sourceTrip.pickupOdometer) || !hasCompletionValue(sourceTrip.arrivalTime) || !hasCompletionValue(sourceTrip.departedPickupTime) || !hasCompletionValue(sourceTrip.arrivalDropoffTime) || (!sourceTrip.paperSignatureConfirmed && !sourceTrip.unableToSign)) {
+      addAuditLog('Trip Completion Blocked', `${currentUser || 'Driver'} attempted to complete ${trip?.patient || tripId} before all required steps were finished.`, 'rose');
+      return false;
+    }
+    const completedAt = sourceTrip.completedAt || new Date().toISOString();
+    const dropoffOdometer = odometer ?? sourceTrip.dropoffOdometer;
     const nextTrip = enrichTripMetrics({
-      ...trip,
+      ...sourceTrip,
       status: 'Completed',
-      dropoffOdometer: odometer,
+      dropoffOdometer,
       completedAt,
-      updatedAtLocal: completedAt,
+      updatedAtLocal: new Date().toISOString(),
     });
-    setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
-    setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer } : d));
-    localStorage.setItem('agape_last_odometer', String(odometer));
+    const savedTrips = await setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
+    await Promise.resolve(setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer: dropoffOdometer } : d)));
+    localStorage.setItem('agape_last_odometer', String(dropoffOdometer));
     const diffs = [];
     Object.keys(nextTrip || {}).forEach((key) => {
       if (String(trip?.[key]) !== String(nextTrip?.[key])) {
@@ -1909,21 +1916,22 @@ const App = () => {
     const driver = drivers.find(d => d.id === driverId);
     addAuditLog(
       'Trip Completed',
-      `${driver?.name || 'Driver'} completed trip ${tripId} (${trip?.patient}). Odometer: ${odometer?.toLocaleString()} mi.`,
+      `${driver?.name || 'Driver'} completed trip ${tripId} (${trip?.patient}). Odometer: ${dropoffOdometer?.toLocaleString()} mi.`,
       'emerald',
       { entity: 'trip', id: tripId, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? 'blank'} to ${diff.after ?? 'blank'}`).join('; ') }
     );
     // Maintenance check
     if (driver) {
-      const dueIn = (driver.nextOilChange || 50000) - odometer;
+      const dueIn = (driver.nextOilChange || 50000) - dropoffOdometer;
       if (dueIn <= 200) {
-        addAuditLog('⚠️ Maintenance Alert', `${driver.name}'s vehicle needs oil change at ${driver.nextOilChange?.toLocaleString()} mi (current: ${odometer?.toLocaleString()} mi).`, 'amber');
+        addAuditLog('Maintenance Alert', `${driver.name}'s vehicle needs oil change at ${driver.nextOilChange?.toLocaleString()} mi (current: ${dropoffOdometer?.toLocaleString()} mi).`, 'amber');
       }
     }
     if (notificationsEnabled) {
       playNotificationSound();
-      showLocalNotification('✅ Trip Completed', `${trip?.patient || 'Trip'} marked as completed. Odometer: ${odometer?.toLocaleString()} mi.`);
+      showLocalNotification('Trip Completed', `${trip?.patient || 'Trip'} marked as completed. Odometer: ${dropoffOdometer?.toLocaleString()} mi.`);
     }
+    return savedTrips !== false;
   };
 
   const handleUpdateDriverLocation = useCallback(async (driverId, latitude, longitude, telemetry = {}) => {
@@ -2708,7 +2716,7 @@ const App = () => {
               onUpdateDriverLocation={handleUpdateDriverLocation}
               onUpdateTrip={(tripOrId, statusOrUpdates, extraData = {}) => {
                 const nowIso = new Date().toISOString();
-                setTrips(prev => {
+                const savePromise = setTrips(prev => {
                   let tripId, prevTrip, newTrip;
                   if (typeof tripOrId === 'string') {
                     tripId = tripOrId;
@@ -2729,12 +2737,16 @@ const App = () => {
                 if (foundTrip) {
                   addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${foundTrip.id} (${foundTrip.patient || 'No client name'})`, 'blue', { entity: 'trip', id: foundTrip.id });
                 }
+                return savePromise;
               }}
               onDriverStatusUpdate={handleDriverStatusUpdate}
-              onCompleteTrip={(tripId, driverId, odometer) => {
-                handleCompleteTrip(tripId, driverId, odometer);
+              onCompleteTrip={async (tripId, driverId, odometer, completionFields = {}) => {
+                const completed = await handleCompleteTrip(tripId, driverId, odometer, completionFields);
                 const trip = trips.find(t => t.id === tripId);
-                addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'No client name'}). Odo: ${odometer}`, 'emerald');
+                if (completed) {
+                  addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'No client name'}). Odo: ${odometer}`, 'emerald');
+                }
+                return completed;
               }}
               onAddAuditLog={addAuditLog}
               onAddTrip={addTrip}
@@ -2820,7 +2832,7 @@ const App = () => {
               }}
               onUpdateDriverTrip={(tripId, status, extraData = {}) => {
                 const nowIso = new Date().toISOString();
-                setTrips(prev => {
+                const savePromise = setTrips(prev => {
                   const prevTrip = prev.find(t => t.id === tripId);
                   if (!prevTrip) return prev;
                   const nextTrip = { ...prevTrip, status, ...extraData, updatedAtLocal: nowIso };
@@ -2832,6 +2844,7 @@ const App = () => {
                   'blue',
                   { entity: 'trip', id: tripId }
                 );
+                return savePromise;
               }}
               onDriverStatusUpdate={handleDriverStatusUpdate}
               onCompleteTrip={handleCompleteTrip}

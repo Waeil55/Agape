@@ -12,7 +12,7 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
-    // ── User accounts ──
+    // User accounts
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && (isAdmin() || request.resource.data.role == 'driver');
@@ -20,27 +20,29 @@ service cloud.firestore {
       allow delete: if request.auth != null && isAdmin();
     }
 
-    // ── Master data document ──
+    // Master data document
     match /appData/agape {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
     }
 
-    // ── Trips ──
+    // Trips
+    // Any authenticated user may mirror trip data; appData/agape already allows
+    // all auth writes, so this keeps the recovery mirrors at the same trust level.
     match /trips/{tripId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && isDispatcher();
+      allow write: if request.auth != null;
     }
     match /trashedTrips/{tripId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && isDispatcher();
+      allow write: if request.auth != null;
     }
     match /tripLedger/{tripId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && isDispatcher();
+      allow write: if request.auth != null;
     }
 
-    // ── Driver workflow ──
+    // Driver workflow
     match /driverTripProgress/{tripId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
@@ -50,7 +52,7 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
-    // ── Profiles ──
+    // Profiles
     match /driverProfiles/{driverId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && (isOwner(driverId) || isDispatcher());
@@ -64,13 +66,13 @@ service cloud.firestore {
       allow write: if request.auth != null && isDispatcher();
     }
 
-    // ── Legacy driver location (firebase.js) ──
+    // Legacy driver location (firebase.js)
     match /drivers/{driverId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && isOwner(driverId);
     }
 
-    // ── Config ──
+    // Config
     match /systemConfig/{document} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && isDispatcher();
@@ -80,7 +82,7 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
-    // ── Logs ──
+    // Logs
     match /logs/{logId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
@@ -96,7 +98,7 @@ service cloud.firestore {
       allow write: if request.auth != null && isAdmin();
     }
 
-    // ── Chat (new system) ──
+    // Chat (new system)
     match /chat_conversations/{convId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
@@ -117,7 +119,7 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
-    // ── Chat (legacy) ──
+    // Chat (legacy)
     match /global_chat/{msgId} {
       allow read, write: if request.auth != null && isDispatcher();
     }
@@ -136,7 +138,7 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
-    // ── SMS ──
+    // SMS
     match /smsLogs/{logId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
@@ -144,7 +146,7 @@ service cloud.firestore {
       allow delete: if request.auth != null && isAdmin();
     }
 
-    // ── Presence ──
+    // Presence
     match /presence/{email} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;

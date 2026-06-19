@@ -156,9 +156,7 @@ export async function saveTripWorkflowUpdate(tripId, updates = {}) {
   setDoc(ledgerRef, cleanUpdates, { merge: true }).catch((err) => {
     console.warn('Workflow tripLedger mirror skipped:', err);
   });
-  setDoc(tripsRef, cleanUpdates, { merge: true }).catch((err) => {
-    console.warn('Workflow trips mirror skipped:', err);
-  });
+  await setDoc(tripsRef, cleanUpdates, { merge: true });
   return true;
 }
 

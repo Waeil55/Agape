@@ -274,6 +274,16 @@ const readWorkflowProgress = (storageKey) => {
   }
 };
 
+const readOfflineQueue = (storageKey) => {
+  try {
+    const stored = localStorage.getItem(storageKey);
+    const parsed = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 const getWorkflowExtraFields = (progress = {}) => {
   const extraFields = {};
   WORKFLOW_PROGRESS_FIELDS.forEach((field) => {
@@ -342,6 +352,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   );
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9@._-]/g, '_');
   const workflowStorageKey = `agape_drvWorkflow_${userKey}`;
+  const offlineQueueStorageKey = `agape_drvOfflineQueue_${userKey}`;
   const [workflowProgressState, setWorkflowProgressState] = useState(() => ({
     storageKey: workflowStorageKey,
     data: readWorkflowProgress(workflowStorageKey),
@@ -436,7 +447,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [selectedLegsForAction, setSelectedLegsForAction] = useState(new Set());
   const [isGpsTracking, setIsGpsTracking] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [offlineQueue, setOfflineQueue] = useState([]);
+  const [offlineQueue, setOfflineQueue] = useState(() => readOfflineQueue(offlineQueueStorageKey));
   const [sequencerTripFilter, setSequencerTripFilter] = useState(null);
   const [routePlanSequencerStops, setRoutePlanSequencerStops] = useState(null);
   const [routePlanSequencerSequence, setRoutePlanSequencerSequence] = useState(null);
@@ -541,6 +552,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       workflowUpdatedAt,
     }).catch((err) => {
       console.error('[DriverPage] Failed to persist workflow update:', err);
+      if (typeof options.onPersistFailure === 'function') options.onPersistFailure(err);
     });
   }, [keepWorkflowTripOpen, onUpdateTrip, setWorkflowProgressData]);
 
@@ -647,6 +659,45 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const geofenceAlerted = useRef(new Set());
   meRef.current = me;
   positionRef.current = driverPosition;
+
+  const updateOfflineQueue = useCallback((nextQueue) => {
+    const safeQueue = Array.isArray(nextQueue) ? nextQueue : [];
+    queueRef.current = safeQueue;
+    setOfflineQueue(safeQueue);
+    try {
+      localStorage.setItem(offlineQueueStorageKey, JSON.stringify(safeQueue));
+    } catch (err) {
+      console.warn('[DriverPage] offline queue save failed:', err);
+    }
+  }, [offlineQueueStorageKey]);
+
+  useEffect(() => {
+    updateOfflineQueue(readOfflineQueue(offlineQueueStorageKey));
+  }, [offlineQueueStorageKey, updateOfflineQueue]);
+
+  const buildCompletionQueueData = useCallback((trip, completionFields = {}, odometer) => {
+    const currentTrip = applyWorkflowProgress(trip, workflowProgress[trip?.id]);
+    const dropoffOdometer = odometer ?? completionFields.dropoffOdometer ?? currentTrip?.dropoffOdometer;
+    const completedTrip = {
+      ...currentTrip,
+      ...completionFields,
+      status: 'Completed',
+      dropoffOdometer,
+      driverId: currentTrip?.driverId || me?.id || '',
+      driverName: currentTrip?.driverName || me?.name || '',
+      driverEmail: currentTrip?.driverEmail || me?.email || '',
+    };
+    return {
+      tripId: trip?.id,
+      driverId: me?.id || currentTrip?.driverId || '',
+      odometer: dropoffOdometer,
+      completionFields: {
+        ...getWorkflowExtraFields(completedTrip),
+        status: 'Completed',
+      },
+      completedTrip,
+    };
+  }, [me?.email, me?.id, me?.name, workflowProgress]);
 
   const geofenceProximityNotified = useRef(new Set());
 
@@ -838,22 +889,51 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const syncOfflineQueue = useCallback(async () => {
     if (queueRef.current.length === 0 || !navigator.onLine) return;
     const queue = [...queueRef.current];
-    queueRef.current = [];
-    setOfflineQueue([]);
+    const remaining = [];
     for (const item of queue) {
-      if (item.action === 'updateLocation' && meRef.current?.id) {
-        try { onUpdateDriverLocation?.(meRef.current.id, item.data.lat, item.data.lng, item.data.telemetry || {}); } catch (err) { console.warn('[DriverPage] offline location replay failed:', err); }
-      } else if (item.action === 'completeTrip' && meRef.current?.id) {
-        try { onCompleteTrip?.(item.data.tripId, meRef.current.id, item.data.odometer); } catch (err) { console.warn('[DriverPage] offline completeTrip replay failed:', err); }
+      try {
+        if (item.action === 'updateLocation') {
+          if (!meRef.current?.id) throw new Error('Driver profile is not ready.');
+          await Promise.resolve(onUpdateDriverLocation?.(meRef.current.id, item.data.lat, item.data.lng, item.data.telemetry || {}));
+        } else if (item.action === 'completeTrip') {
+          if (!meRef.current?.id) throw new Error('Driver profile is not ready.');
+          const localTrip = driverScopedTrips.find((trip) => trip.id === item.data?.tripId) || item.data?.completedTrip || {};
+          const localCompletionFields = getWorkflowExtraFields(localTrip);
+          const completionFields = {
+            ...localCompletionFields,
+            ...(item.data?.completionFields || {}),
+            status: 'Completed',
+            dropoffOdometer: item.data?.odometer ?? item.data?.completionFields?.dropoffOdometer ?? localCompletionFields.dropoffOdometer,
+            completedAt: item.data?.completionFields?.completedAt || localCompletionFields.completedAt || new Date(item.timestamp || Date.now()).toISOString(),
+          };
+          await saveTripWorkflowUpdate(item.data.tripId, completionFields);
+          await Promise.resolve(onUpdateTrip?.(item.data.tripId, 'Completed', completionFields));
+          const completed = await Promise.resolve(onCompleteTrip?.(
+            item.data.tripId,
+            item.data.driverId || meRef.current.id,
+            completionFields.dropoffOdometer,
+            completionFields
+          ));
+          if (completed === false) throw new Error('Trip completion was rejected.');
+        }
+      } catch (err) {
+        remaining.push(item);
+        console.warn(`[DriverPage] offline ${item.action} replay failed:`, err);
       }
     }
-  }, [onUpdateDriverLocation, onCompleteTrip]);
+    updateOfflineQueue(remaining);
+  }, [driverScopedTrips, onUpdateDriverLocation, onUpdateTrip, onCompleteTrip, updateOfflineQueue]);
 
   const addToQueue = useCallback((action, data) => {
-    queueRef.current = [...queueRef.current, { action, data, timestamp: Date.now() }];
-    setOfflineQueue(queueRef.current);
+    updateOfflineQueue([...queueRef.current, { action, data, timestamp: Date.now() }]);
     if (navigator.onLine) syncOfflineQueue();
-  }, [syncOfflineQueue]);
+  }, [syncOfflineQueue, updateOfflineQueue]);
+
+  useEffect(() => {
+    if (offlineQueue.length === 0 || !navigator.onLine) return undefined;
+    const timer = setTimeout(() => { syncOfflineQueue(); }, 500);
+    return () => clearTimeout(timer);
+  }, [offlineQueue.length, syncOfflineQueue]);
 
   // Load last odometer - localStorage is always the source of truth
   // (it was set explicitly on every driver odometer entry).
@@ -2049,7 +2129,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       } else if (type === 'edittripcomplete') {
         if (editedData) {
           const odo = parseInt(editedData.dropoffOdometer, 10) || 0;
-          advanceWorkflow(trip, 'Completed', { ...editedData, completedVehicle: me?.vehicle || '' });
+          const completionFields = { ...editedData, completedVehicle: me?.vehicle || '' };
+          const queuedCompletion = buildCompletionQueueData(trip, completionFields, odo);
+          advanceWorkflow(trip, 'Completed', completionFields, {
+            onPersistFailure: () => {
+              if (navigator.onLine) addToQueue('completeTrip', queuedCompletion);
+            },
+          });
           if (onAddAuditLog) {
             onAddAuditLog('Trip Completed via Edit', `${currentUser} completed trip for ${trip.patient} (odo: ${odo.toLocaleString()} mi).`, 'emerald');
           }
@@ -2057,7 +2143,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           localStorage.setItem('agape_last_odometer', String(odo));
           setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
           if (navigator.onLine) { saveOdometerReading(trip.id, odo).catch(err => console.warn('[DriverPage] odometer save failed:', err)); }
-          else { addToQueue('completeTrip', { tripId: trip.id, odometer: odo }); }
+          else { addToQueue('completeTrip', queuedCompletion); }
           setExpandedTripId(null);
           setSelectedTrips(prev => prev.filter(id => id !== trip.id));
         }
@@ -2132,12 +2218,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       d.setHours(parseInt(parts[1], 10), parseInt(parts[2], 10), 0, 0);
       return d.toISOString();
     };
-    advanceWorkflow(showCompleteModal, 'Completed', {
+    const completionFields = {
       dropoffOdometer: odo,
       completedAt: now,
       departedPickupTime: toIso(departedTime),
       arrivalDropoffTime: showCompleteModal.arrivalDropoffTime ? showCompleteModal.arrivalDropoffTime : toIso(arrivalDropoffTime),
       completedVehicle: me?.vehicle || '',
+    };
+    const queuedCompletion = buildCompletionQueueData(showCompleteModal, completionFields, odo);
+    advanceWorkflow(showCompleteModal, 'Completed', completionFields, {
+      onPersistFailure: () => {
+        if (navigator.onLine) addToQueue('completeTrip', queuedCompletion);
+      },
     });
     setLastOdometer(odo);
     localStorage.setItem('agape_last_odometer', String(odo));
@@ -2150,7 +2242,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (navigator.onLine) {
       saveOdometerReading(showCompleteModal.id, odo).catch(err => console.warn('[DriverPage] odometer save failed:', err));
     } else {
-      addToQueue('completeTrip', { tripId: showCompleteModal.id, odometer: odo });
+      addToQueue('completeTrip', queuedCompletion);
     }
 
     // Reset trip selection and expanded state after completion

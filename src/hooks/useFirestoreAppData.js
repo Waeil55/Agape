@@ -472,6 +472,25 @@ async function mirrorLogsToCollection(logs = []) {
   }
 }
 
+function stableRecordJson(record) {
+  try {
+    return JSON.stringify(sanitizeForFirestore(record || {}));
+  } catch {
+    return '';
+  }
+}
+
+function filterChangedRecords(nextRecords = [], previousRecords = []) {
+  const previousById = new Map(
+    (previousRecords || [])
+      .filter((record) => record?.id)
+      .map((record) => [String(record.id), stableRecordJson(record)])
+  );
+  return (nextRecords || []).filter((record) => (
+    record?.id && previousById.get(String(record.id)) !== stableRecordJson(record)
+  ));
+}
+
 async function mirrorTripsToLedger(trips = [], trashedTrips = []) {
   const activeTrips = dedupTripsByContent(trips);
   const archivedTrips = dedupTripsByContent(trashedTrips);
@@ -1238,14 +1257,11 @@ export function useFirestoreAppData() {
         const companionTrips = isTripsField ? (dataRef.current.trashedTrips || []) : (dataRef.current.trips || []);
         const rootCollection = isTripsField ? TRIPS_COLLECTION : TRASHED_TRIPS_COLLECTION;
 
-        // 1. Write each trip to the root collection (primary source of truth).
-        for (const trip of tripList) {
-          if (trip?.id) {
-            setDoc(doc(db, rootCollection, String(trip.id)), sanitizeForFirestore(trip)).catch((tripErr) => {
-              console.warn(`Root ${rootCollection}/${trip.id} mirror failed; continuing.`, tripErr);
-            });
-          }
-        }
+        // 1. Write changed trips to the root collection (primary source of truth).
+        const changedTrips = filterChangedRecords(tripList, Array.isArray(beforeData) ? beforeData : []);
+        await Promise.all(changedTrips.map((trip) => (
+          setDoc(doc(db, rootCollection, String(trip.id)), sanitizeForFirestore(trip))
+        )));
 
         // 2. Legacy tripLedger mirror (non-blocking).
         try {
@@ -1469,20 +1485,12 @@ export function useFirestoreAppData() {
 
     try {
       // 1. Root collections are the primary source of truth.
-      for (const trip of (sanitizedTrips || [])) {
-        if (trip?.id) {
-          setDoc(doc(db, TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip)).catch((tripErr) => {
-            console.warn(`Root ${TRIPS_COLLECTION}/${trip.id} mirror failed; continuing.`, tripErr);
-          });
-        }
-      }
-      for (const trip of (sanitizedTrashed || [])) {
-        if (trip?.id) {
-          setDoc(doc(db, TRASHED_TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip)).catch((tripErr) => {
-            console.warn(`Root ${TRASHED_TRIPS_COLLECTION}/${trip.id} mirror failed; continuing.`, tripErr);
-          });
-        }
-      }
+      const changedTrips = filterChangedRecords(sanitizedTrips || [], beforeTrips || []);
+      const changedTrashed = filterChangedRecords(sanitizedTrashed || [], beforeTrashed || []);
+      await Promise.all([
+        ...changedTrips.map((trip) => setDoc(doc(db, TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))),
+        ...changedTrashed.map((trip) => setDoc(doc(db, TRASHED_TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))),
+      ]);
 
       // 2. Legacy tripLedger mirror (non-blocking).
       try {
