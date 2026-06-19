@@ -398,13 +398,6 @@ export async function failSyncOperation(id, error) {
     const backoffMs = Math.min(5000 * Math.pow(3, attempts - 1), 15 * 60 * 1000);
     const nextRetry = new Date(Date.now() + backoffMs).toISOString();
 
-    // Max 20 attempts, then discard
-    if (attempts >= 20) {
-      await db.delete(STORES.SYNC_QUEUE, id);
-      console.warn(`[localDB] Sync operation ${id} discarded after ${attempts} attempts`);
-      return;
-    }
-
     await db.put(STORES.SYNC_QUEUE, {
       ...op,
       status: 'pending',

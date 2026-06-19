@@ -78,7 +78,7 @@ export async function getTrips() {
 
 export async function updateTripStatus(tripId, updates) {
   const tripRef = doc(db, 'trips', tripId);
-  await updateDoc(tripRef, updates);
+  await setDoc(tripRef, updates, { merge: true });
 }
 
 export function getTripsStream(callback) {
@@ -94,14 +94,14 @@ export async function updateDriverLocation(location) {
   if (!driverId) return;
 
   const driverRef = doc(db, 'drivers', driverId);
-  await updateDoc(driverRef, {
+  await setDoc(driverRef, {
     currentLocation: {
       lat: location.lat,
       lng: location.lng,
       timestamp: serverTimestamp()
     },
     lastUpdated: serverTimestamp()
-  });
+  }, { merge: true });
 }
 
 export async function saveOdometerReading(tripId, odometerValue) {
@@ -198,15 +198,27 @@ export async function syncOfflineQueue(queue) {
   for (const item of queue) {
     if (item.action === 'startTrip') {
       const tripRef = doc(db, 'trips', item.data.tripId);
-      batch.update(tripRef, item.data);
+      const { tripId, ...updates } = item.data || {};
+      batch.set(tripRef, updates, { merge: true });
     } else if (item.action === 'completeTrip') {
-      const tripRef = doc(db, 'trips', item.data.tripId);
-      batch.update(tripRef, item.data);
+      const tripId = item.data?.tripId;
+      if (!tripId) continue;
+      const completionFields = {
+        ...(item.data?.completedTrip || {}),
+        ...(item.data?.completionFields || {}),
+        status: 'Completed',
+        dropoffOdometer: item.data?.odometer ?? item.data?.completionFields?.dropoffOdometer,
+        completedAt: item.data?.completionFields?.completedAt || new Date().toISOString(),
+        workflowUpdatedAt: new Date().toISOString(),
+      };
+      batch.set(doc(db, 'trips', tripId), completionFields, { merge: true });
+      batch.set(doc(db, 'driverTripProgress', tripId), { tripId, ...completionFields }, { merge: true });
+      batch.set(doc(db, 'tripLedger', tripId), completionFields, { merge: true });
     } else if (item.action === 'updateLocation') {
       const driverId = auth.currentUser?.uid;
       if (driverId) {
         const driverRef = doc(db, 'drivers', driverId);
-        batch.update(driverRef, { currentLocation: item.data });
+        batch.set(driverRef, { currentLocation: item.data }, { merge: true });
       }
     }
   }

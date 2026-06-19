@@ -5,6 +5,7 @@ import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
 import { playNotificationSound } from '../utils/notificationSound';
+import { backgroundSync } from '../utils/backgroundSync';
 import ChatPage from './ChatPage';
 import DriverToolsPage from './DriverToolsPage';
 import UnifiedRoutePlanner from './UnifiedRoutePlanner';
@@ -545,14 +546,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       return { ...prev, [trip.id]: nextProgress };
     });
-    onUpdateTrip?.(trip.id, status, extraFields);
+    let persistFailureReported = false;
+    const reportPersistFailure = (err) => {
+      if (persistFailureReported) return;
+      persistFailureReported = true;
+      if (typeof options.onPersistFailure === 'function') options.onPersistFailure(err);
+    };
+    Promise.resolve(onUpdateTrip?.(trip.id, status, extraFields))
+      .then((result) => {
+        if (result === false) reportPersistFailure(new Error('Trip update was rejected.'));
+      })
+      .catch(reportPersistFailure);
     saveTripWorkflowUpdate(trip.id, {
       status,
       ...extraFields,
       workflowUpdatedAt,
     }).catch((err) => {
       console.error('[DriverPage] Failed to persist workflow update:', err);
-      if (typeof options.onPersistFailure === 'function') options.onPersistFailure(err);
+      reportPersistFailure(err);
     });
   }, [keepWorkflowTripOpen, onUpdateTrip, setWorkflowProgressData]);
 
@@ -926,6 +937,27 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const addToQueue = useCallback((action, data) => {
     updateOfflineQueue([...queueRef.current, { action, data, timestamp: Date.now() }]);
+    if (action === 'completeTrip' && data?.tripId) {
+      const completionFields = {
+        ...(data.completionFields || {}),
+        status: 'Completed',
+        dropoffOdometer: data.odometer ?? data.completionFields?.dropoffOdometer,
+        completedAt: data.completionFields?.completedAt || new Date().toISOString(),
+      };
+      ['driverTripProgress', 'trips', 'tripLedger'].forEach((collectionName) => {
+        Promise.resolve(backgroundSync.queue({
+          type: 'setDoc',
+          collection: collectionName,
+          docId: data.tripId,
+          data: {
+            ...completionFields,
+            tripId: data.tripId,
+            bookingId: data.completedTrip?.bookingId || '',
+            syncQueuedAt: new Date().toISOString(),
+          },
+        })).catch(() => {});
+      });
+    }
     if (navigator.onLine) syncOfflineQueue();
   }, [syncOfflineQueue, updateOfflineQueue]);
 

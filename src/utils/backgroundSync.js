@@ -18,6 +18,7 @@ import {
   setDoc,
   serverTimestamp,
   getDoc,
+  deleteDoc,
 } from '../config/firebase';
 import { db } from '../config/firebase';
 import {
@@ -25,9 +26,29 @@ import {
   getPendingSyncOperations,
   completeSyncOperation,
   failSyncOperation,
-  getDB,
-  STORES,
 } from './localDB';
+
+const TRIPS_COLLECTION = 'trips';
+const TRASHED_TRIPS_COLLECTION = 'trashedTrips';
+const DATA_DOC = 'appData/agape';
+
+const sanitizeForFirestore = (value) => JSON.parse(JSON.stringify(value, (_key, item) => item === undefined ? null : item));
+
+const removedIds = (nextRecords = [], previousRecords = []) => {
+  const nextIds = new Set((nextRecords || []).filter((record) => record?.id).map((record) => String(record.id)));
+  return (previousRecords || [])
+    .filter((record) => record?.id && !nextIds.has(String(record.id)))
+    .map((record) => String(record.id));
+};
+
+async function syncRootTripCollection(collectionName, nextRecords = [], previousRecords = []) {
+  await Promise.all([
+    ...(nextRecords || [])
+      .filter((trip) => trip?.id)
+      .map((trip) => setDoc(doc(db, collectionName, String(trip.id)), sanitizeForFirestore(trip), { merge: true })),
+    ...removedIds(nextRecords, previousRecords).map((id) => deleteDoc(doc(db, collectionName, id))),
+  ]);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VERSION VECTORS — Conflict detection between tabs/sessions
@@ -93,6 +114,7 @@ class BackgroundSyncManager {
     this._versionVector = new VersionVector();
     this._listeners = new Set();
     this._processing = false;
+    this._started = false;
     this._retryTimer = null;
     this._conflictLog = []; // Recent conflicts for debugging
     this._stats = {
@@ -111,6 +133,8 @@ class BackgroundSyncManager {
    * Start the background sync manager.
    */
   start() {
+    if (this._started) return;
+    this._started = true;
     // Process pending ops on startup
     this._processQueue();
 
@@ -141,6 +165,7 @@ class BackgroundSyncManager {
   }
 
   stop() {
+    this._started = false;
     if (this._retryTimer) {
       clearInterval(this._retryTimer);
       this._retryTimer = null;
@@ -313,6 +338,31 @@ class BackgroundSyncManager {
         _version: op.version,
         _fieldVersions: { [op.field]: op.version },
         _tabId: op.tabId,
+      }, { merge: true });
+    } else if (op.type === 'setMirroredTrips') {
+      const field = op.field === 'trashedTrips' ? 'trashedTrips' : 'trips';
+      const rootCollection = field === 'trashedTrips' ? TRASHED_TRIPS_COLLECTION : TRIPS_COLLECTION;
+      const value = op.value || [];
+      await syncRootTripCollection(rootCollection, value, op.previous || []);
+      await setDoc(doc(db, DATA_DOC), {
+        [field]: sanitizeForFirestore(value),
+        updatedAt: serverTimestamp(),
+        updatedField: field,
+        updatedAtLocal: new Date().toISOString(),
+      }, { merge: true });
+    } else if (op.type === 'setTripsBatch') {
+      const trips = op.trips || [];
+      const trashedTrips = op.trashedTrips || [];
+      await Promise.all([
+        syncRootTripCollection(TRIPS_COLLECTION, trips, op.previousTrips || []),
+        syncRootTripCollection(TRASHED_TRIPS_COLLECTION, trashedTrips, op.previousTrashedTrips || []),
+      ]);
+      await setDoc(doc(db, DATA_DOC), {
+        trips: sanitizeForFirestore(trips),
+        trashedTrips: sanitizeForFirestore(trashedTrips),
+        updatedAt: serverTimestamp(),
+        updatedField: 'trips+trashed',
+        updatedAtLocal: new Date().toISOString(),
       }, { merge: true });
     } else if (op.type === 'setDoc') {
       await setDoc(doc(db, op.collection, op.docId), {

@@ -15,8 +15,8 @@
  */
 
 import { db } from '../config/firebase';
-import { doc, setDoc, serverTimestamp, deleteDoc, getDocs, collection } from '../config/firebase';
-import { getDB, STORES } from './localDB';
+import { doc, setDoc, serverTimestamp, deleteDoc } from '../config/firebase';
+import { getDB } from './localDB';
 
 const RETRY_STORE = 'retryQueue';
 const DLQ_STORE = 'deadLetterQueue';
@@ -24,6 +24,27 @@ const MAX_RETRIES = 3;
 const BACKOFF_BASE = 5000;
 const BACKOFF_MULTIPLIER = 3;
 const MAX_BACKOFF = 45000;
+const TRIPS_COLLECTION = 'trips';
+const TRASHED_TRIPS_COLLECTION = 'trashedTrips';
+const DATA_DOC = 'appData/agape';
+
+const sanitizeForFirestore = (value) => JSON.parse(JSON.stringify(value, (_key, item) => item === undefined ? null : item));
+
+const removedIds = (nextRecords = [], previousRecords = []) => {
+  const nextIds = new Set((nextRecords || []).filter((record) => record?.id).map((record) => String(record.id)));
+  return (previousRecords || [])
+    .filter((record) => record?.id && !nextIds.has(String(record.id)))
+    .map((record) => String(record.id));
+};
+
+async function syncRootTripCollection(collectionName, nextRecords = [], previousRecords = []) {
+  await Promise.all([
+    ...(nextRecords || [])
+      .filter((trip) => trip?.id)
+      .map((trip) => setDoc(doc(db, collectionName, String(trip.id)), sanitizeForFirestore(trip), { merge: true })),
+    ...removedIds(nextRecords, previousRecords).map((id) => deleteDoc(doc(db, collectionName, id))),
+  ]);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RETRY QUEUE
@@ -33,6 +54,7 @@ class RetryQueue {
   constructor() {
     this._listeners = new Set();
     this._processing = false;
+    this._started = false;
     this._retryTimer = null;
     this._stats = {
       totalQueued: 0,
@@ -47,6 +69,8 @@ class RetryQueue {
    * Start the retry queue processor.
    */
   start() {
+    if (this._started) return;
+    this._started = true;
     // Process on startup
     this._processQueue();
 
@@ -62,6 +86,7 @@ class RetryQueue {
   }
 
   stop() {
+    this._started = false;
     if (this._retryTimer) {
       clearInterval(this._retryTimer);
       this._retryTimer = null;
@@ -171,6 +196,31 @@ class RetryQueue {
       await setDoc(doc(db, operation.collection || 'appData/agape'), {
         [operation.field]: operation.value,
         updatedAt: serverTimestamp(),
+        updatedAtLocal: new Date().toISOString(),
+      }, { merge: true });
+    } else if (operation.type === 'setMirroredTrips') {
+      const field = operation.field === 'trashedTrips' ? 'trashedTrips' : 'trips';
+      const rootCollection = field === 'trashedTrips' ? TRASHED_TRIPS_COLLECTION : TRIPS_COLLECTION;
+      const value = operation.value || [];
+      await syncRootTripCollection(rootCollection, value, operation.previous || []);
+      await setDoc(doc(db, DATA_DOC), {
+        [field]: sanitizeForFirestore(value),
+        updatedAt: serverTimestamp(),
+        updatedField: field,
+        updatedAtLocal: new Date().toISOString(),
+      }, { merge: true });
+    } else if (operation.type === 'setTripsBatch') {
+      const trips = operation.trips || [];
+      const trashedTrips = operation.trashedTrips || [];
+      await Promise.all([
+        syncRootTripCollection(TRIPS_COLLECTION, trips, operation.previousTrips || []),
+        syncRootTripCollection(TRASHED_TRIPS_COLLECTION, trashedTrips, operation.previousTrashedTrips || []),
+      ]);
+      await setDoc(doc(db, DATA_DOC), {
+        trips: sanitizeForFirestore(trips),
+        trashedTrips: sanitizeForFirestore(trashedTrips),
+        updatedAt: serverTimestamp(),
+        updatedField: 'trips+trashed',
         updatedAtLocal: new Date().toISOString(),
       }, { merge: true });
     }

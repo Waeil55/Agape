@@ -9,6 +9,7 @@ import {
 import { timeToMinutes } from '../utils/tripDate';
 import { optimizeRoute as geminiOptimizeRoute } from '../config/ai';
 import { db, doc, onSnapshot, setDoc, serverTimestamp } from '../config/firebase';
+import { backgroundSync } from '../utils/backgroundSync';
 
 // Safely coerce any value (including legacy {address,phone,time} objects) to a string
 function safeStr(val) {
@@ -107,15 +108,27 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
     if (!cloudReadyRef.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      setDoc(doc(db, 'routeData', plannerDocId), {
+      const routePayload = {
         stops,
         completed: [...completed],
         selectedDriver,
         dateStr,
         updatedAt: serverTimestamp(),
         updatedAtLocal: new Date().toISOString(),
-      }, { merge: true }).catch((err) => {
+      };
+      setDoc(doc(db, 'routeData', plannerDocId), routePayload, { merge: true }).catch((err) => {
         console.error('Route planner cloud save failed:', err);
+        Promise.resolve(backgroundSync.queue({
+          type: 'setDoc',
+          collection: 'routeData',
+          docId: plannerDocId,
+          data: {
+            stops,
+            completed: [...completed],
+            selectedDriver,
+            dateStr,
+          },
+        })).catch(() => {});
       });
     }, 350);
   }, [stops, completed, selectedDriver, dateStr, plannerDocId]);

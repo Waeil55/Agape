@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { GOOGLE_MAPS_API_KEY, GEMINI_API_CONFIG, db, doc, onSnapshot, setDoc, serverTimestamp } from '../config/firebase';
 import { geocodeAddress, getDistanceMiles } from '../config/maps';
+import { backgroundSync } from '../utils/backgroundSync';
 
 const timeToMinutes = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return 1440;
@@ -358,13 +359,20 @@ const RoutePlanSection = ({
     if (!cloudReadyRef.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      setDoc(doc(db, 'routeData', cloudDocId), {
+      const routePlanPayload = {
         stops,
         expanded,
         updatedAt: serverTimestamp(),
         updatedAtLocal: new Date().toISOString(),
-      }, { merge: true }).catch((err) => {
+      };
+      setDoc(doc(db, 'routeData', cloudDocId), routePlanPayload, { merge: true }).catch((err) => {
         console.error('Driver route plan cloud save failed:', err);
+        Promise.resolve(backgroundSync.queue({
+          type: 'setDoc',
+          collection: 'routeData',
+          docId: cloudDocId,
+          data: { stops, expanded },
+        })).catch(() => {});
       });
     }, 350);
   }, [storageKey, cloudDocId, stops, expanded]);
