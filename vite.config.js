@@ -60,7 +60,7 @@ export default defineConfig({
           if (id.includes('@firebase') || id.includes('firebase')) return 'firebase-core';
           if (id.includes('lucide-react')) return 'icons-vendor';
           if (id.includes('@capacitor')) return 'native-vendor';
-          if (id.includes('xlsx') || id.includes('jspdf')) return 'document-vendor';
+          if (id.includes('xlsx')) return 'document-vendor';
           return 'vendor';
         },
       },
