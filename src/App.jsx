@@ -516,7 +516,7 @@ const App = () => {
   const {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
     loading: dataLoading, saving: dataSaving, error: dataError, lastSavedAt, syncHealth,
-    setTrips, setDrivers, upsertDriverProfile, setDispatchers, upsertDispatcherProfile, setVehicles,
+    setTrips, updateTripFields, setDrivers, upsertDriverProfile, setDispatchers, upsertDispatcherProfile, setVehicles,
     setTrashedTrips, setTripsAndTrashed, setLogs, setPhoneNumbers,
     addLog, initializeAppData, repairCloudMirrors, createCloudBackup, lastFirestoreSync,
     enterprise,
@@ -1920,7 +1920,10 @@ const App = () => {
       completedAt,
       updatedAtLocal: new Date().toISOString(),
     });
-    const savedTrips = await setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
+    const savedTrips = await updateTripFields(tripId, nextTrip, {
+      updatedField: 'driver-trip-completed',
+      insertIfMissing: false,
+    });
     await Promise.resolve(setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer: dropoffOdometer } : d)));
     localStorage.setItem('agape_last_odometer', String(dropoffOdometer));
     const diffs = [];
@@ -2744,24 +2747,21 @@ const App = () => {
               onUpdateDriverLocation={handleUpdateDriverLocation}
               onUpdateTrip={(tripOrId, statusOrUpdates, extraData = {}) => {
                 const nowIso = new Date().toISOString();
-                const savePromise = setTrips(prev => {
-                  let tripId, prevTrip, newTrip;
-                  if (typeof tripOrId === 'string') {
-                    tripId = tripOrId;
-                    prevTrip = prev.find(t => t.id === tripId);
-                    newTrip = prevTrip ? { ...prevTrip, status: statusOrUpdates, ...extraData, updatedAtLocal: nowIso } : null;
-                  } else {
-                    prevTrip = prev.find(t => t.id === tripOrId.id);
-                    tripId = tripOrId?.id;
-                    newTrip = prevTrip ? { ...prevTrip, ...tripOrId, ...(statusOrUpdates || {}), updatedAtLocal: nowIso } : { ...tripOrId, ...(statusOrUpdates || {}), updatedAtLocal: nowIso };
-                  }
-                  if (newTrip && tripId) {
-                    return prev.some(t => t.id === tripId) ? prev.map(t => t.id === tripId ? newTrip : t) : prev;
-                  }
-                  return prev;
+                const tripId = typeof tripOrId === 'string' ? tripOrId : tripOrId?.id;
+                if (!tripId) return false;
+                const updates = typeof tripOrId === 'string'
+                  ? { status: statusOrUpdates, ...extraData, updatedAtLocal: nowIso }
+                  : {
+                      ...tripOrId,
+                      ...(typeof statusOrUpdates === 'object' && statusOrUpdates ? statusOrUpdates : {}),
+                      updatedAtLocal: nowIso,
+                    };
+                const savePromise = updateTripFields(tripId, updates, {
+                  updatedField: 'driver-trip-progress',
+                  insertIfMissing: false,
                 });
                 // Audit outside setTrips so it fires regardless
-                const foundTrip = trips.find(t => t.id === (typeof tripOrId === 'string' ? tripOrId : tripOrId?.id));
+                const foundTrip = trips.find(t => t.id === tripId);
                 if (foundTrip) {
                   addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${foundTrip.id} (${foundTrip.patient || 'No client name'})`, 'blue', { entity: 'trip', id: foundTrip.id });
                 }
@@ -2860,11 +2860,13 @@ const App = () => {
               }}
               onUpdateDriverTrip={(tripId, status, extraData = {}) => {
                 const nowIso = new Date().toISOString();
-                const savePromise = setTrips(prev => {
-                  const prevTrip = prev.find(t => t.id === tripId);
-                  if (!prevTrip) return prev;
-                  const nextTrip = { ...prevTrip, status, ...extraData, updatedAtLocal: nowIso };
-                  return prev.map(t => t.id === tripId ? nextTrip : t);
+                const savePromise = updateTripFields(tripId, {
+                  status,
+                  ...extraData,
+                  updatedAtLocal: nowIso,
+                }, {
+                  updatedField: 'driver-trip-progress',
+                  insertIfMissing: false,
                 });
                 addAuditLog(
                   'Worker Driver Update',

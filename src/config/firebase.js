@@ -105,11 +105,19 @@ export async function updateDriverLocation(location) {
 }
 
 export async function saveOdometerReading(tripId, odometerValue) {
-  const tripRef = doc(db, 'tripLedger', tripId);
-  await setDoc(tripRef, {
+  if (!tripId) return false;
+  const payload = {
     dropoffOdometer: odometerValue,
-    odometerRecordedAt: serverTimestamp()
-  }, { merge: true });
+    odometerRecordedAt: serverTimestamp(),
+    workflowUpdatedAt: new Date().toISOString(),
+    updatedAtLocal: new Date().toISOString(),
+  };
+  await Promise.all([
+    setDoc(doc(db, 'trips', tripId), payload, { merge: true }),
+    setDoc(doc(db, 'driverTripProgress', tripId), { tripId, ...payload }, { merge: true }),
+    setDoc(doc(db, 'tripLedger', tripId), payload, { merge: true }),
+  ]);
+  return true;
 }
 
 const cleanFirestoreUpdates = (updates = {}) => Object.fromEntries(
@@ -177,6 +185,7 @@ export async function saveTripWorkflowUpdate(tripId, updates = {}) {
   const cleanUpdates = cleanFirestoreUpdates({
     ...updates,
     workflowUpdatedAt: updates.workflowUpdatedAt || new Date().toISOString(),
+    updatedAtLocal: updates.updatedAtLocal || new Date().toISOString(),
   });
   const progressRef = doc(db, 'driverTripProgress', tripId);
   const appDataRef = doc(db, 'appData', 'agape');

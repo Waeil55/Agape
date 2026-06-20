@@ -58,6 +58,28 @@ const MIRRORED_TRIP_FIELDS = new Set(['trips', 'trashedTrips']);
 const FIRESTORE_COMMIT_MAX_WRITES = 400;
 const FIRESTORE_COMMIT_SOFT_LIMIT_BYTES = 7 * 1024 * 1024;
 const FIRESTORE_WRITE_OVERHEAD_BYTES = 1024;
+const TRIP_PROGRESS_MIRROR_FIELDS = [
+  'status',
+  'pickupOdometer',
+  'dropoffOdometer',
+  'arrivalTime',
+  'departedPickupTime',
+  'arrivalDropoffTime',
+  'completedAt',
+  'workflowUpdatedAt',
+  'updatedAtLocal',
+  'startedAt',
+  'startTime',
+  'paperSignatureConfirmed',
+  'unableToSign',
+  'completedVehicle',
+  'cancellationReason',
+  'cancelledBy',
+  'cancelledAt',
+  'driverId',
+  'driverName',
+  'driverEmail',
+];
 
 const DEFAULT_DATA = {
   trips: [],
@@ -384,6 +406,57 @@ function mergeTripProgress(trips = [], progressByTrip = {}) {
     const progress = progressByTrip?.[trip?.id];
     return progress ? { ...trip, ...progress } : trip;
   });
+}
+
+function pickTripProgressMirrorFields(progress = {}) {
+  const payload = {};
+  TRIP_PROGRESS_MIRROR_FIELDS.forEach((field) => {
+    if (progress[field] !== undefined) payload[field] = progress[field];
+  });
+  return payload;
+}
+
+function shouldMirrorProgressToTrip(trip = {}, payload = {}) {
+  const keys = Object.keys(payload || {});
+  if (keys.length === 0) return false;
+  return keys.some((key) => JSON.stringify(trip?.[key] ?? null) !== JSON.stringify(payload[key] ?? null));
+}
+
+function summarizeArrayChange(before = [], after = []) {
+  const beforeList = Array.isArray(before) ? before : [];
+  const afterList = Array.isArray(after) ? after : [];
+  const beforeIds = new Set(beforeList.filter((record) => record?.id).map((record) => String(record.id)));
+  const afterIds = new Set(afterList.filter((record) => record?.id).map((record) => String(record.id)));
+  const changedIds = filterChangedRecords(afterList, beforeList).map((record) => String(record.id)).slice(0, 100);
+  const removedIds = filterRemovedRecordIds(afterList, beforeList).slice(0, 100);
+  const addedIds = [...afterIds].filter((id) => !beforeIds.has(id)).slice(0, 100);
+
+  return {
+    before: { count: beforeList.length },
+    after: { count: afterList.length },
+    metadata: {
+      beforeCount: beforeList.length,
+      afterCount: afterList.length,
+      changedCount: changedIds.length,
+      removedCount: removedIds.length,
+      addedCount: addedIds.length,
+      changedIds,
+      removedIds,
+      addedIds,
+    },
+  };
+}
+
+function summarizeFieldChange(field, beforeData, afterData) {
+  if (Array.isArray(beforeData) || Array.isArray(afterData)) {
+    return summarizeArrayChange(beforeData, afterData);
+  }
+
+  return {
+    before: beforeData ?? null,
+    after: afterData ?? null,
+    metadata: { field },
+  };
 }
 
 function shouldIgnoreRealtimePermissionError(err) {
@@ -725,6 +798,7 @@ export function useFirestoreAppData() {
 
   const dataRef = useRef(DEFAULT_DATA);
   const tripProgressRef = useRef({});
+  const progressMirrorSyncRef = useRef({});
   const pendingWritesRef = useRef(0);
   const recoveringRef = useRef(false);
   const indexedDBLoadedRef = useRef(false);
@@ -843,6 +917,14 @@ export function useFirestoreAppData() {
     const unsub = crossTabSync.on(MessageType.DATA_UPDATE, (data, senderTabId) => {
       const { field, value } = data;
       if (!field || value === undefined) return;
+      const arrayFields = new Set(['trips', 'trashedTrips', 'drivers', 'dispatchers', 'vehicles', 'logs']);
+      if (arrayFields.has(field) && !Array.isArray(value)) {
+        setState(prev => ({
+          ...prev,
+          lastFirestoreSync: lastFirestoreSyncRef.current || prev.lastFirestoreSync,
+        }));
+        return;
+      }
 
       // Apply the update from the other tab
       dataRef.current = {
@@ -1189,19 +1271,51 @@ export function useFirestoreAppData() {
       (snap) => {
         setListenerStatus(DRIVER_TRIP_PROGRESS_COLLECTION, 'live');
         const progressByTrip = { ...tripProgressRef.current };
+        const changedProgress = [];
         snap.docChanges().forEach((change) => {
           if (change.type === 'removed') {
             delete progressByTrip[change.doc.id];
             return;
           }
-          progressByTrip[change.doc.id] = convertFirestoreTimestamps({
+          const progress = convertFirestoreTimestamps({
             id: change.doc.id,
             ...change.doc.data(),
           });
-          delete progressByTrip[change.doc.id].tripId;
+          delete progress.tripId;
+          progressByTrip[change.doc.id] = progress;
+          changedProgress.push({ id: change.doc.id, progress });
         });
         tripProgressRef.current = progressByTrip;
         const baseData = normalizeData(dataRef.current);
+        const progressMirrorWrites = changedProgress
+          .map(({ id, progress }) => {
+            const payload = sanitizeForFirestore(pickTripProgressMirrorFields(progress));
+            const trip = (baseData.trips || []).find((item) => String(item?.id) === String(id)) || {};
+            const signature = JSON.stringify(payload);
+            if (!shouldMirrorProgressToTrip(trip, payload)) return null;
+            if (progressMirrorSyncRef.current[id] === signature) return null;
+            progressMirrorSyncRef.current[id] = signature;
+            return { id, payload };
+          })
+          .filter(Boolean);
+
+        if (progressMirrorWrites.length > 0) {
+          const mirrorEntries = progressMirrorWrites.map(({ id, payload }) => ({
+            id,
+            data: payload,
+          }));
+          Promise.all([
+            commitCollectionWrites(TRIPS_COLLECTION, mirrorEntries),
+            commitCollectionWrites(TRIP_LEDGER_COLLECTION, mirrorEntries).catch(() => {}),
+            touchTripCollectionMetadata('driver-progress-repair', {
+              repairedTripProgressCount: progressMirrorWrites.length,
+              repairedTripProgressAt: new Date().toISOString(),
+            }).catch(() => {}),
+          ]).catch((err) => {
+            console.warn('Driver progress root mirror skipped:', err);
+          });
+        }
+
         const mergedTrips = mergeTripProgress(baseData.trips, progressByTrip);
         dataRef.current = {
           ...baseData,
@@ -1377,16 +1491,29 @@ export function useFirestoreAppData() {
       // cannot propagate and incorrectly set state.error.
       try { firestoreWriteMetrics.mark(`write-${field}`); } catch (_) { /* non-critical */ }
       try { indexedDBMetrics.mark(`idb-${field}`); } catch (_) { /* non-critical */ }
+      const changeSummary = summarizeFieldChange(field, beforeData, sanitized);
       try { eventSourcing.emit(
         EventType.TRIP_UPDATED, field, 'field',
-        { before: beforeData, after: sanitized },
+        { field, ...changeSummary.metadata },
         { actor: auth.currentUser?.email || 'system', source: 'ui' }
       ); } catch (_) { /* non-critical */ }
       try { dataLineage.track({
-        field, action: 'update', before: beforeData, after: sanitized,
-        actor: auth.currentUser?.email || 'system', actorRole: auth.currentUser?.role || 'system', source: 'ui',
+        field,
+        action: 'update',
+        before: changeSummary.before,
+        after: changeSummary.after,
+        actor: auth.currentUser?.email || 'system',
+        actorRole: auth.currentUser?.role || 'system',
+        source: 'ui',
+        metadata: changeSummary.metadata,
       }); } catch (_) { /* non-critical */ }
-      try { crossTabSync.broadcastDataUpdate(field, sanitized, { action: 'update' }); } catch (_) { /* non-critical */ }
+      try {
+        crossTabSync.broadcastDataUpdate(
+          field,
+          Array.isArray(sanitized) ? changeSummary.after : sanitized,
+          { action: 'update', ...changeSummary.metadata }
+        );
+      } catch (_) { /* non-critical */ }
       try { Promise.resolve(saveFieldLocal(field, sanitized)).catch(() => {}); } catch (_) { /* non-critical */ }
 
       if (field === 'drivers') {
@@ -1417,6 +1544,127 @@ export function useFirestoreAppData() {
       try { Promise.resolve(retryQueue.enqueue(retryOperation, err)).catch(() => {}); } catch (_) {}
       try { Promise.resolve(backgroundSync.queue(retryOperation)).catch(() => {}); } catch (_) {}
       try { Promise.resolve(saveFieldLocal(field, sanitized)).catch(() => {}); } catch (_) {}
+      return false;
+    }
+  }, []);
+
+  const updateTripFields = useCallback(async (tripId, updates = {}, options = {}) => {
+    const id = String(tripId || '').trim();
+    if (!id) return false;
+
+    const nowIso = new Date().toISOString();
+    const cleanUpdates = sanitizeForFirestore({
+      ...updates,
+      id,
+      updatedAtLocal: updates.updatedAtLocal || nowIso,
+    });
+    const currentTrips = dataRef.current.trips || [];
+    const existingTrip = currentTrips.find((trip) => String(trip?.id) === id)
+      || tripsCollectionRef.current.find((trip) => String(trip?.id) === id)
+      || { id };
+    const nextTrip = sanitizeTripFields(sanitizeForFirestore({
+      ...existingTrip,
+      ...cleanUpdates,
+      id,
+    }));
+
+    const mergeTripIntoList = (list = []) => {
+      let found = false;
+      const next = (list || []).map((trip) => {
+        if (String(trip?.id) !== id) return trip;
+        found = true;
+        return { ...trip, ...nextTrip };
+      });
+      if (!found && options.insertIfMissing !== false) next.unshift(nextTrip);
+      return dedupTripsByContent(next);
+    };
+
+    const nextCollectionTrips = mergeTripIntoList(tripsCollectionRef.current || []);
+    tripsCollectionRef.current = nextCollectionTrips;
+    const nextTrips = mergeTripProgress(mergeTripIntoList(currentTrips), tripProgressRef.current);
+    dataRef.current = {
+      ...normalizeData(dataRef.current),
+      trips: nextTrips,
+    };
+
+    pendingWritesRef.current += 1;
+    try { adaptiveSync.setPendingWrites(pendingWritesRef.current); } catch (_) {}
+    setState(prev => ({
+      ...prev,
+      trips: nextTrips,
+      saving: true,
+      error: null,
+    }));
+
+    try {
+      const progressPayload = sanitizeForFirestore({
+        tripId: id,
+        ...cleanUpdates,
+        workflowUpdatedAt: cleanUpdates.workflowUpdatedAt || nowIso,
+        updatedAtLocal: cleanUpdates.updatedAtLocal || nowIso,
+      });
+      await Promise.all([
+        setDoc(doc(db, TRIPS_COLLECTION, id), nextTrip, { merge: true }),
+        options.mirrorProgress === false
+          ? Promise.resolve()
+          : setDoc(doc(db, DRIVER_TRIP_PROGRESS_COLLECTION, id), {
+              ...progressPayload,
+              updatedAt: serverTimestamp(),
+            }, { merge: true }),
+        touchTripCollectionMetadata(options.updatedField || 'trip-patch', {
+          updatedTripId: id,
+          tripsCount: nextTrips.length,
+        }),
+      ]);
+
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+      try { adaptiveSync.setPendingWrites(pendingWritesRef.current); } catch (_) {}
+      setState(prev => ({
+        ...prev,
+        saving: pendingWritesRef.current > 0,
+        lastSavedAt: new Date().toISOString(),
+        error: null,
+      }));
+      try {
+        crossTabSync.broadcastDataUpdate('trips', { count: nextTrips.length }, {
+          action: 'trip-patch',
+          tripId: id,
+          updatedFields: Object.keys(cleanUpdates).filter((key) => key !== 'id'),
+        });
+      } catch (_) {}
+      return true;
+    } catch (err) {
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+      try { adaptiveSync.setPendingWrites(pendingWritesRef.current); } catch (_) {}
+      console.error(`Failed to patch trip ${id} in Firestore:`, err);
+      setState(prev => ({
+        ...prev,
+        saving: pendingWritesRef.current > 0,
+        error: err.message || `Failed to save trip ${id}`,
+      }));
+      const retryDoc = {
+        type: 'setDoc',
+        collection: TRIPS_COLLECTION,
+        docId: id,
+        data: nextTrip,
+      };
+      const retryProgress = {
+        type: 'setDoc',
+        collection: DRIVER_TRIP_PROGRESS_COLLECTION,
+        docId: id,
+        data: {
+          tripId: id,
+          ...cleanUpdates,
+          workflowUpdatedAt: cleanUpdates.workflowUpdatedAt || nowIso,
+        },
+      };
+      try { Promise.resolve(retryQueue.enqueue(retryDoc, err)).catch(() => {}); } catch (_) {}
+      try { Promise.resolve(backgroundSync.queue(retryDoc)).catch(() => {}); } catch (_) {}
+      if (options.mirrorProgress !== false) {
+        try { Promise.resolve(retryQueue.enqueue(retryProgress, err)).catch(() => {}); } catch (_) {}
+        try { Promise.resolve(backgroundSync.queue(retryProgress)).catch(() => {}); } catch (_) {}
+      }
+      try { Promise.resolve(saveFieldLocal('trips', nextTrips)).catch(() => {}); } catch (_) {}
       return false;
     }
   }, []);
@@ -1587,9 +1835,16 @@ export function useFirestoreAppData() {
         source: 'ui',
       }); } catch (_) {}
 
-      // Cross-tab sync (wrapped for safety)
-      try { crossTabSync.broadcastDataUpdate('trips', sanitizedTrips, { action: 'batch' }); } catch (_) {}
-      try { crossTabSync.broadcastDataUpdate('trashedTrips', sanitizedTrashed, { action: 'batch' }); } catch (_) {}
+      // Cross-tab sync (wrapped for safety). Keep broadcast payloads small; Firestore
+      // listeners carry the actual records across tabs and devices.
+      try {
+        const tripSummary = summarizeArrayChange(beforeTrips || [], sanitizedTrips || []);
+        crossTabSync.broadcastDataUpdate('trips', tripSummary.after, { action: 'batch', ...tripSummary.metadata });
+      } catch (_) {}
+      try {
+        const trashSummary = summarizeArrayChange(beforeTrashed || [], sanitizedTrashed || []);
+        crossTabSync.broadcastDataUpdate('trashedTrips', trashSummary.after, { action: 'batch', ...trashSummary.metadata });
+      } catch (_) {}
 
       pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
       try { adaptiveSync.setPendingWrites(pendingWritesRef.current); } catch (_) {}
@@ -1693,14 +1948,23 @@ export function useFirestoreAppData() {
         },
       });
 
-      // Write trips/trashedTrips to their root collections first (primary source).
+      // Write trips/trashedTrips to their root collections first (primary source),
+      // chunked by estimated request size to avoid Firestore commit limits.
       await Promise.all([
-        ...(merged.trips || []).map(trip => trip?.id
-          ? setDoc(doc(db, TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))
-          : Promise.resolve()),
-        ...(merged.trashedTrips || []).map(trip => trip?.id
-          ? setDoc(doc(db, TRASHED_TRIPS_COLLECTION, String(trip.id)), sanitizeForFirestore(trip))
-          : Promise.resolve()),
+        commitCollectionWrites(
+          TRIPS_COLLECTION,
+          (merged.trips || []).filter((trip) => trip?.id).map((trip) => ({
+            id: String(trip.id),
+            data: sanitizeForFirestore(trip),
+          }))
+        ),
+        commitCollectionWrites(
+          TRASHED_TRIPS_COLLECTION,
+          (merged.trashedTrips || []).filter((trip) => trip?.id).map((trip) => ({
+            id: String(trip.id),
+            data: sanitizeForFirestore(trip),
+          }))
+        ),
       ]);
 
       const { trips: _trips, trashedTrips: _trashedTrips, ...metadata } = sanitizeForFirestore(merged);
@@ -1750,25 +2014,49 @@ export function useFirestoreAppData() {
     const now = new Date();
     const dayKey = now.toISOString().slice(0, 10);
     const backupId = reason === 'automatic' ? `daily-${dayKey}` : `manual-${dayKey}-${now.getTime()}`;
-    const snapshot = sanitizeForFirestore({
-      ...normalizeData(dataRef.current),
-      backedUpAt: now.toISOString(),
-      reason,
-      counts: {
-        trips: dataRef.current.trips?.length || 0,
-        trashedTrips: dataRef.current.trashedTrips?.length || 0,
-        drivers: dataRef.current.drivers?.length || 0,
-        dispatchers: dataRef.current.dispatchers?.length || 0,
-        vehicles: dataRef.current.vehicles?.length || 0,
-        logs: dataRef.current.logs?.length || 0,
-      },
-    });
+    const snapshot = normalizeData(dataRef.current);
+    const counts = {
+      trips: snapshot.trips?.length || 0,
+      trashedTrips: snapshot.trashedTrips?.length || 0,
+      drivers: snapshot.drivers?.length || 0,
+      dispatchers: snapshot.dispatchers?.length || 0,
+      vehicles: snapshot.vehicles?.length || 0,
+      logs: snapshot.logs?.length || 0,
+    };
+    const backupEntries = (records = [], fallbackPrefix = 'record') => (records || [])
+      .filter(Boolean)
+      .map((record, index) => {
+        const rawId = getStableRecordId(record, fallbackPrefix, index);
+        const id = String(rawId || `${fallbackPrefix}-${index}`)
+          .replace(/[^a-zA-Z0-9_-]/g, '-')
+          .slice(0, 140);
+        return {
+          id: id || `${fallbackPrefix}-${index}`,
+          data: sanitizeForFirestore({
+            ...record,
+            backupIndex: index,
+            backedUpAt: now.toISOString(),
+          }),
+        };
+      });
 
     try {
       await setDoc(doc(db, BACKUP_COLLECTION, backupId), {
-        ...snapshot,
+        backedUpAt: now.toISOString(),
+        reason,
+        counts,
+        splitBackup: true,
+        tripStorageMode: 'rootCollections',
         updatedAt: serverTimestamp(),
       }, { merge: true });
+      await Promise.all([
+        commitCollectionWrites(`${BACKUP_COLLECTION}/${backupId}/trips`, backupEntries(snapshot.trips, 'trip')),
+        commitCollectionWrites(`${BACKUP_COLLECTION}/${backupId}/trashedTrips`, backupEntries(snapshot.trashedTrips, 'trashed')),
+        commitCollectionWrites(`${BACKUP_COLLECTION}/${backupId}/drivers`, backupEntries(snapshot.drivers, 'driver')),
+        commitCollectionWrites(`${BACKUP_COLLECTION}/${backupId}/dispatchers`, backupEntries(snapshot.dispatchers, 'dispatcher')),
+        commitCollectionWrites(`${BACKUP_COLLECTION}/${backupId}/vehicles`, backupEntries(snapshot.vehicles, 'vehicle')),
+        commitCollectionWrites(`${BACKUP_COLLECTION}/${backupId}/logs`, backupEntries(snapshot.logs, 'log')),
+      ]);
       setState(prev => ({
         ...prev,
         lastBackupAt: now.toISOString(),
@@ -1850,6 +2138,7 @@ export function useFirestoreAppData() {
       requestDedup,
     },
     setTrips,
+    updateTripFields,
     setDrivers,
     upsertDriverProfile,
     setDispatchers,
