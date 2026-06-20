@@ -36,7 +36,7 @@ import {
   trimTelemetryCollections,
 } from './utils/driverTelemetry';
 import './utils/clientExport';
-import { registerServiceWorker, requestPeriodicSync, setupSWMessageHandler, triggerSync, skipWaiting } from './utils/swManager';
+import { registerServiceWorker, requestPeriodicSync, setupSWMessageHandler, triggerSync } from './utils/swManager';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
 import { useConnectionState, formatSyncAgo } from './hooks/useConnectionState';
 import { connectionMonitor } from './utils/dataStore';
@@ -56,18 +56,19 @@ import { requestDedup } from './utils/requestDedup';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
-const guardedReload = (reason = 'app', cooldownMs = 60 * 1000) => {
+const guardedReload = (reason = 'app') => {
   try {
-    const key = `agape_reload_guard_${reason}`;
-    const now = Date.now();
-    const lastReloadAt = Number(window.sessionStorage.getItem(key) || 0);
-    if (lastReloadAt && now - lastReloadAt < cooldownMs) return false;
-    window.sessionStorage.setItem(key, String(now));
+    window.sessionStorage.setItem('agape_refresh_needed', reason);
   } catch {
-    // Storage can be unavailable; keep the app from crashing while recovering.
+    // Storage can be unavailable; keep the app from crashing while reporting.
   }
-  window.location.reload();
-  return true;
+  window.dispatchEvent(new CustomEvent('agapeRefreshNeeded', {
+    detail: {
+      reason,
+      message: 'A fresh app version is available. Refresh when you are ready.',
+    },
+  }));
+  return false;
 };
 
 // Lazy-loaded heavy components
@@ -84,7 +85,6 @@ const lazyWithRetry = (componentImport) =>
       if (!pageHasAlreadyBeenForceRefreshed) {
         window.sessionStorage.setItem('page-has-been-force-refreshed', 'true');
         guardedReload('lazy_import');
-        return new Promise(() => {});
       }
       throw error;
     }
@@ -380,6 +380,14 @@ const App = () => {
   const skipNextSignedOutResetRef = useRef(false);
   
   const [refreshTick, setRefreshTick] = useState(0);
+  const [refreshNotice, setRefreshNotice] = useState(() => {
+    try {
+      const reason = window.sessionStorage.getItem('agape_refresh_needed');
+      return reason ? { reason, message: 'A fresh app version is available. Refresh when you are ready.' } : null;
+    } catch {
+      return null;
+    }
+  });
   const [role, setRole] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const roleRef = useRef(null);
@@ -390,6 +398,42 @@ const App = () => {
   const driverProfileBootstrapRef = useRef('');
   const [driverTelemetry, setDriverTelemetry] = useState([]);
   const driverTelemetryRef = useRef([]);
+
+  const refreshAppManually = useCallback(async () => {
+    try {
+      window.sessionStorage.removeItem('agape_refresh_needed');
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+    } catch (err) {
+      console.warn('Manual refresh preparation failed:', err);
+    }
+    window.location.reload();
+  }, []);
+
+  useEffect(() => {
+    const handleRefreshNeeded = (event) => {
+      const detail = event.detail || {};
+      const reason = detail.reason || 'app_update';
+      try { window.sessionStorage.setItem('agape_refresh_needed', reason); } catch (_) {}
+      setRefreshNotice({
+        reason,
+        message: detail.message || 'A fresh app version is available. Refresh when you are ready.',
+      });
+    };
+    window.addEventListener('agapeRefreshNeeded', handleRefreshNeeded);
+    window.addEventListener('swUpdateAvailable', handleRefreshNeeded);
+    window.addEventListener('swUpdatedReady', handleRefreshNeeded);
+    return () => {
+      window.removeEventListener('agapeRefreshNeeded', handleRefreshNeeded);
+      window.removeEventListener('swUpdateAvailable', handleRefreshNeeded);
+      window.removeEventListener('swUpdatedReady', handleRefreshNeeded);
+    };
+  }, []);
 
   // Online/offline listener + Real-time auto-refresh (1 second)
   useEffect(() => {
@@ -484,9 +528,6 @@ const App = () => {
   useEffect(() => {
     let cleanupSWMessages = () => {};
 
-    const onSWUpdate = () => { skipWaiting(); };
-    window.addEventListener('swUpdateAvailable', onSWUpdate);
-
     (async () => {
       try {
         // Register service worker
@@ -500,14 +541,13 @@ const App = () => {
           setRefreshTick(t => t + 1);
         });
 
-        console.log('PWA auto-update enabled');
+        console.log('PWA background sync enabled');
       } catch (error) {
         console.error('PWA setup error:', error);
       }
     })();
     return () => {
       cleanupSWMessages();
-      window.removeEventListener('swUpdateAvailable', onSWUpdate);
     };
   }, []);
 
@@ -2557,6 +2597,18 @@ const App = () => {
       <div className={`offline-banner${isOffline ? ' visible' : ''}`}>
         You are offline - changes will sync when connection returns
       </div>
+      {refreshNotice && (
+        <div className="bg-blue-50 border-b border-blue-200 px-4 sm:px-6 py-2 text-xs sm:text-sm font-semibold text-blue-800 flex items-center justify-between gap-3">
+          <span className="min-w-0 truncate">{refreshNotice.message}</span>
+          <button
+            type="button"
+            onClick={refreshAppManually}
+            className="h-8 px-3 rounded-lg bg-blue-600 text-white font-bold shrink-0 active:scale-95 transition"
+          >
+            Refresh
+          </button>
+        </div>
+      )}
       <div className="min-h-screen flex-1 flex flex-col bg-slate-100 overflow-visible w-full pt-[env(safe-area-inset-top,0px)]">
       {/* Header removed: DriverPage handles its own UI */}
       {startupIssue && !isLoading && (

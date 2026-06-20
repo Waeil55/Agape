@@ -9,26 +9,6 @@ let updateCheckTimer = null;
 let controllerChangeListenerRegistered = false;
 let registrationListenersAttached = false;
 
-const SW_RELOAD_VERSION_KEY = 'agape_sw_reloaded_version';
-const SW_RELOAD_AT_KEY = 'agape_sw_reloaded_at';
-const SW_RELOAD_COOLDOWN_MS = 60 * 1000;
-
-const reloadOnceForVersion = (version = 'unknown') => {
-  try {
-    const now = Date.now();
-    const lastVersion = localStorage.getItem(SW_RELOAD_VERSION_KEY);
-    const lastAt = Number(localStorage.getItem(SW_RELOAD_AT_KEY) || 0);
-    if (lastVersion === version) return false;
-    if (lastAt && now - lastAt < SW_RELOAD_COOLDOWN_MS) return false;
-    localStorage.setItem(SW_RELOAD_VERSION_KEY, version);
-    localStorage.setItem(SW_RELOAD_AT_KEY, String(now));
-  } catch {
-    // Storage can fail in private mode; still avoid throwing during app startup.
-  }
-  window.location.reload();
-  return true;
-};
-
 const attachRegistrationListeners = (registration) => {
   if (!registration || registrationListenersAttached) return;
   registrationListenersAttached = true;
@@ -145,10 +125,13 @@ export const setupSWMessageHandler = (callback) => {
     const handler = (event) => {
       if (event.data?.type === 'SW_UPDATED') {
         const version = event.data.version || 'unknown';
-        if (!reloadOnceForVersion(version)) {
-          console.log('[SW] Reload already handled for version', version);
-          return;
-        }
+        window.dispatchEvent(new CustomEvent('swUpdatedReady', {
+          detail: {
+            reason: 'service_worker_update',
+            version,
+            message: 'A fresh app version is ready. Refresh when you are not in the middle of a trip.',
+          },
+        }));
         return;
       }
       if (event.data?.type === 'SYNC_REQUEST' || event.data?.type === 'appVisible') {
@@ -167,7 +150,10 @@ export const setupSWMessageHandler = (callback) => {
 const notifyUpdateAvailable = () => {
   // Trigger custom event for the app to handle
   window.dispatchEvent(new CustomEvent('swUpdateAvailable', {
-    detail: { message: 'A new version is available. Please refresh.' }
+    detail: {
+      reason: 'service_worker_waiting',
+      message: 'A fresh app version is available. Refresh when you are not in the middle of a trip.',
+    }
   }));
 };
 

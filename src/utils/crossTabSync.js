@@ -247,7 +247,12 @@ class CrossTabSync {
         this._handlePresence(data, senderTabId);
         break;
       case MessageType.FORCE_RELOAD:
-        window.location.reload();
+        window.dispatchEvent(new CustomEvent('agapeRefreshNeeded', {
+          detail: {
+            reason: 'cross_tab_reload_request',
+            message: 'Another tab requested a refresh. Refresh when you are ready.',
+          },
+        }));
         break;
     }
   }

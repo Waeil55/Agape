@@ -1181,6 +1181,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const noShowTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'no show');
   const cancelledTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'cancelled');
   const allHistory = [...reroutedTrips, ...completedTrips, ...noShowTrips, ...cancelledTrips].sort((a,b) => { const da = a.completedAt || a.date || ''; const db = b.completedAt || b.date || ''; return da.localeCompare(db); });
+  const historyMatchesDate = useCallback((trip, date) => {
+    if (!date) return true;
+    const tripDates = getHistoryDateCandidates(trip);
+    return tripDates.length === 0 || tripDates.includes(date);
+  }, []);
+  const dateScopedHistory = allHistory.filter((trip) => historyMatchesDate(trip, historyDate));
+  const historyCounts = {
+    all: dateScopedHistory.length,
+    completed: dateScopedHistory.filter((trip) => normalizeWorkflowStatus(trip.status) === 'completed').length,
+    noshow: dateScopedHistory.filter((trip) => normalizeWorkflowStatus(trip.status) === 'no show').length,
+    cancelled: dateScopedHistory.filter((trip) => normalizeWorkflowStatus(trip.status) === 'cancelled').length,
+    rerouted: dateScopedHistory.filter((trip) => normalizeWorkflowStatus(trip.status) === 'rerouted').length,
+  };
 
   const activeTrips = myTrips.filter(t => !isWorkflowTerminalTrip(t));
 
@@ -1534,17 +1547,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     onDriverStatusUpdate(driverId, newStatus);
   };
 
-  const filteredHistory = allHistory.filter(t => {
+  const filteredHistory = dateScopedHistory.filter(t => {
     const matchFilter = historyFilter === 'all' ? true :
       historyFilter === 'completed' ? normalizeWorkflowStatus(t.status) === 'completed' :
       historyFilter === 'noshow' ? normalizeWorkflowStatus(t.status) === 'no show' :
       historyFilter === 'cancelled' ? normalizeWorkflowStatus(t.status) === 'cancelled' :
       normalizeWorkflowStatus(t.status) === 'rerouted';
     if (!matchFilter) return false;
-    if (historyDate) {
-      const tripDates = getHistoryDateCandidates(t);
-      if (tripDates.length > 0 && !tripDates.includes(historyDate)) return false;
-    }
     if (!historySearch) return true;
     const q = historySearch.toLowerCase();
     return (t.patient || '').toLowerCase().includes(q) ||
@@ -2444,9 +2453,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const exportDailyLog = () => {
     const headers = ['Date', 'Driver', 'Vehicle', 'Scheduled Time', 'Trip ID', 'Passenger', 'Pickup Address', 'Pickup Arrival', 'Departed Pickup', 'Start Odometer', 'Dropoff Address', 'Dropoff Arrival', 'End Odometer', 'Travel Time', 'Distance (mi)', 'Signature', 'Status'];
     const rows = [headers];
-    const today = new Date().toISOString().split('T')[0];
-    const todayTrips = allHistory.filter(t => (t.date || '').startsWith(today) || (t.completedAt || '').startsWith(today));
-    todayTrips.forEach(t => {
+    const exportDate = historyDate || new Date().toISOString().split('T')[0];
+    dateScopedHistory.forEach(t => {
       const travelTime = t.travelTime || calcTravelDuration(t.departedPickupTime || t.arrivalTime, t.arrivalDropoffTime || t.completedAt);
       const distDriven = (t.pickupOdometer && t.dropoffOdometer) ? `${Math.max(0, Number(t.dropoffOdometer) - Number(t.pickupOdometer))}` : (t.distance || '');
       rows.push([
@@ -2474,7 +2482,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `agape-history-${today}.csv`;
+    a.download = `agape-history-${exportDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -4091,7 +4099,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900">History</h2>
                 <p className="text-slate-500 text-xs font-semibold mt-0.5">Review past trips and activity</p>
               </div>
-              {allHistory.length > 0 && (
+              {dateScopedHistory.length > 0 && (
                 <button onClick={exportDailyLog} className="px-4 h-10 btn-gradient-primary font-bold transition-all flex items-center gap-1.5 text-xs">
                   <Download size={12} /> Export
                 </button>
@@ -4147,7 +4155,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             ].map(f => (
               <button key={f.id} onClick={() => setHistoryFilter(f.id)}
                 className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${historyFilter === f.id ? f.id === 'rerouted' ? 'bg-purple-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 font-semibold'}`}>
-                {f.label} ({f.id === 'all' ? allHistory.length : f.id === 'rerouted' ? reroutedTrips.length : f.id === 'completed' ? completedTrips.length : f.id === 'noshow' ? noShowTrips.length : cancelledTrips.length})
+                {f.label} ({historyCounts[f.id] || 0})
               </button>
             ))}
           </div>
