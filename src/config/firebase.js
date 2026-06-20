@@ -116,6 +116,62 @@ const cleanFirestoreUpdates = (updates = {}) => Object.fromEntries(
   Object.entries(updates).filter(([, value]) => value !== undefined)
 );
 
+const FIRESTORE_QUEUE_COMMIT_MAX_WRITES = 400;
+const FIRESTORE_QUEUE_COMMIT_SOFT_LIMIT_BYTES = 7 * 1024 * 1024;
+const FIRESTORE_QUEUE_WRITE_OVERHEAD_BYTES = 1024;
+
+function estimateJsonBytes(value) {
+  let json = '';
+  try {
+    json = JSON.stringify(value) || '';
+  } catch {
+    json = String(value ?? '');
+  }
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(json).length;
+  }
+  return json.length * 2;
+}
+
+function estimateQueuedWriteBytes(path, data) {
+  return estimateJsonBytes(data)
+    + String(path || '').length
+    + FIRESTORE_QUEUE_WRITE_OVERHEAD_BYTES;
+}
+
+async function commitQueuedFirestoreWrites(writes = []) {
+  let batch = writeBatch(db);
+  let writeCount = 0;
+  let estimatedBytes = 0;
+
+  const flush = async () => {
+    if (writeCount === 0) return;
+    await batch.commit();
+    batch = writeBatch(db);
+    writeCount = 0;
+    estimatedBytes = 0;
+  };
+
+  for (const write of writes || []) {
+    const nextBytes = estimateQueuedWriteBytes(write.path, write.data);
+    if (
+      writeCount > 0
+      && (
+        writeCount >= FIRESTORE_QUEUE_COMMIT_MAX_WRITES
+        || estimatedBytes + nextBytes > FIRESTORE_QUEUE_COMMIT_SOFT_LIMIT_BYTES
+      )
+    ) {
+      await flush();
+    }
+
+    batch.set(write.ref, write.data, { merge: true });
+    writeCount += 1;
+    estimatedBytes += nextBytes;
+  }
+
+  await flush();
+}
+
 export async function saveTripWorkflowUpdate(tripId, updates = {}) {
   if (!tripId) return false;
   const cleanUpdates = cleanFirestoreUpdates({
@@ -184,13 +240,18 @@ export async function updateDriverProfile(driverId, updates) {
 }
 
 export async function syncOfflineQueue(queue) {
-  const batch = writeBatch(db);
+  const writes = [];
+  const queueSet = (path, ref, data) => {
+    writes.push({ path, ref, data: cleanFirestoreUpdates(data || {}) });
+  };
 
   for (const item of queue) {
     if (item.action === 'startTrip') {
-      const tripRef = doc(db, 'trips', item.data.tripId);
-      const { tripId, ...updates } = item.data || {};
-      batch.set(tripRef, updates, { merge: true });
+      const tripId = item.data?.tripId;
+      if (!tripId) continue;
+      const tripRef = doc(db, 'trips', tripId);
+      const { tripId: _tripId, ...updates } = item.data || {};
+      queueSet(`trips/${tripId}`, tripRef, updates);
     } else if (item.action === 'completeTrip') {
       const tripId = item.data?.tripId;
       if (!tripId) continue;
@@ -205,17 +266,17 @@ export async function syncOfflineQueue(queue) {
         completedAt: queuedCompletion.completedAt || completedTrip.completedAt || new Date().toISOString(),
         workflowUpdatedAt: new Date().toISOString(),
       });
-      batch.set(doc(db, 'trips', tripId), completionFields, { merge: true });
-      batch.set(doc(db, 'driverTripProgress', tripId), { tripId, ...completionFields }, { merge: true });
-      batch.set(doc(db, 'tripLedger', tripId), completionFields, { merge: true });
+      queueSet(`trips/${tripId}`, doc(db, 'trips', tripId), completionFields);
+      queueSet(`driverTripProgress/${tripId}`, doc(db, 'driverTripProgress', tripId), { tripId, ...completionFields });
+      queueSet(`tripLedger/${tripId}`, doc(db, 'tripLedger', tripId), completionFields);
     } else if (item.action === 'updateLocation') {
       const driverId = auth.currentUser?.uid;
       if (driverId) {
         const driverRef = doc(db, 'drivers', driverId);
-        batch.set(driverRef, { currentLocation: item.data }, { merge: true });
+        queueSet(`drivers/${driverId}`, driverRef, { currentLocation: item.data });
       }
     }
   }
 
-  await batch.commit();
+  await commitQueuedFirestoreWrites(writes);
 }

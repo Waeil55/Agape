@@ -55,6 +55,9 @@ const LOG_COLLECTION = 'logs';
 const PHONE_NUMBERS_DOC = 'systemConfig/phoneNumbers';
 const BACKUP_COLLECTION = 'systemBackups';
 const MIRRORED_TRIP_FIELDS = new Set(['trips', 'trashedTrips']);
+const FIRESTORE_COMMIT_MAX_WRITES = 400;
+const FIRESTORE_COMMIT_SOFT_LIMIT_BYTES = 7 * 1024 * 1024;
+const FIRESTORE_WRITE_OVERHEAD_BYTES = 1024;
 
 const DEFAULT_DATA = {
   trips: [],
@@ -70,6 +73,81 @@ const DEFAULT_DATA = {
 
 function sanitizeForFirestore(obj) {
   return JSON.parse(JSON.stringify(obj, (_key, value) => value === undefined ? null : value));
+}
+
+function estimateJsonBytes(value) {
+  let json = '';
+  try {
+    json = JSON.stringify(value) || '';
+  } catch {
+    json = String(value ?? '');
+  }
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(json).length;
+  }
+  return json.length * 2;
+}
+
+function estimateFirestoreWriteBytes(collectionName, id, data) {
+  return estimateJsonBytes(data)
+    + String(collectionName || '').length
+    + String(id || '').length
+    + FIRESTORE_WRITE_OVERHEAD_BYTES;
+}
+
+async function commitCollectionWrites(collectionName, entries = []) {
+  let batch = writeBatch(db);
+  let writeCount = 0;
+  let estimatedBytes = 0;
+
+  const flush = async () => {
+    if (writeCount === 0) return;
+    await batch.commit();
+    batch = writeBatch(db);
+    writeCount = 0;
+    estimatedBytes = 0;
+  };
+
+  for (const { id, data } of entries || []) {
+    const nextBytes = estimateFirestoreWriteBytes(collectionName, id, data);
+    if (
+      writeCount > 0
+      && (
+        writeCount >= FIRESTORE_COMMIT_MAX_WRITES
+        || estimatedBytes + nextBytes > FIRESTORE_COMMIT_SOFT_LIMIT_BYTES
+      )
+    ) {
+      await flush();
+    }
+
+    batch.set(doc(db, collectionName, id), data, { merge: true });
+    writeCount += 1;
+    estimatedBytes += nextBytes;
+  }
+
+  await flush();
+}
+
+async function commitCollectionDeletes(collectionName, ids = []) {
+  let batch = writeBatch(db);
+  let writeCount = 0;
+
+  const flush = async () => {
+    if (writeCount === 0) return;
+    await batch.commit();
+    batch = writeBatch(db);
+    writeCount = 0;
+  };
+
+  for (const id of ids || []) {
+    if (writeCount >= FIRESTORE_COMMIT_MAX_WRITES) {
+      await flush();
+    }
+    batch.delete(doc(db, collectionName, id));
+    writeCount += 1;
+  }
+
+  await flush();
 }
 
 // Convert Firestore Timestamp objects ({seconds, nanoseconds}) to ISO strings.
@@ -436,21 +514,8 @@ async function mirrorRecordsToCollection(collectionName, records = []) {
   const nextIds = new Set(sanitizedRecords.map(({ id }) => id));
   const staleIds = [...existingIds].filter((id) => !nextIds.has(id));
 
-  for (let i = 0; i < sanitizedRecords.length; i += 450) {
-    const batch = writeBatch(db);
-    sanitizedRecords.slice(i, i + 450).forEach(({ id, data }) => {
-      batch.set(doc(db, collectionName, id), data, { merge: true });
-    });
-    await batch.commit();
-  }
-
-  for (let i = 0; i < staleIds.length; i += 450) {
-    const batch = writeBatch(db);
-    staleIds.slice(i, i + 450).forEach((id) => {
-      batch.delete(doc(db, collectionName, id));
-    });
-    await batch.commit();
-  }
+  await commitCollectionWrites(collectionName, sanitizedRecords);
+  await commitCollectionDeletes(collectionName, staleIds);
 }
 
 async function mirrorLogsToCollection(logs = []) {
@@ -470,13 +535,7 @@ async function mirrorLogsToCollection(logs = []) {
       };
     });
 
-  for (let i = 0; i < sanitizedLogs.length; i += 450) {
-    const batch = writeBatch(db);
-    sanitizedLogs.slice(i, i + 450).forEach(({ id, data }) => {
-      batch.set(doc(db, LOG_COLLECTION, id), data, { merge: true });
-    });
-    await batch.commit();
-  }
+  await commitCollectionWrites(LOG_COLLECTION, sanitizedLogs);
 }
 
 function stableRecordJson(record) {
@@ -570,13 +629,7 @@ async function mirrorTripsToLedger(trips = [], trashedTrips = []) {
         mirroredAt: new Date().toISOString(),
       }),
     }));
-  for (let i = 0; i < sanitizedEntries.length; i += 450) {
-    const batch = writeBatch(db);
-    sanitizedEntries.slice(i, i + 450).forEach(({ id, data }) => {
-      batch.set(doc(db, TRIP_LEDGER_COLLECTION, id), data, { merge: true });
-    });
-    await batch.commit();
-  }
+  await commitCollectionWrites(TRIP_LEDGER_COLLECTION, sanitizedEntries);
 }
 
 async function mirrorChangedTripsToLedger(nextRecords = [], previousRecords = [], archiveState = 'active') {
@@ -592,13 +645,7 @@ async function mirrorChangedTripsToLedger(nextRecords = [], previousRecords = []
       }),
     }));
 
-  for (let i = 0; i < sanitizedEntries.length; i += 450) {
-    const batch = writeBatch(db);
-    sanitizedEntries.slice(i, i + 450).forEach(({ id, data }) => {
-      batch.set(doc(db, TRIP_LEDGER_COLLECTION, id), data, { merge: true });
-    });
-    await batch.commit();
-  }
+  await commitCollectionWrites(TRIP_LEDGER_COLLECTION, sanitizedEntries);
 }
 
 async function buildDataFromTripLedger() {
@@ -1300,13 +1347,21 @@ export function useFirestoreAppData() {
         // every trip edit does not rewrite a giant array document.
         await touchTripCollectionMetadata(field, { [`${field}Count`]: tripList.length });
       } else {
-        // Non-trip fields: write directly to appData/agape as before.
-        await setDoc(doc(db, DATA_DOC), {
-          [field]: sanitized,
-          updatedAt: serverTimestamp(),
-          updatedField: field,
-          updatedAtLocal: new Date().toISOString(),
-        }, { merge: true });
+        const payload = field === 'logs'
+          ? {
+              logsCount: Array.isArray(sanitized) ? sanitized.length : 0,
+              rootStorageMode: 'rootCollections',
+              updatedAt: serverTimestamp(),
+              updatedField: field,
+              updatedAtLocal: new Date().toISOString(),
+            }
+          : {
+              [field]: sanitized,
+              updatedAt: serverTimestamp(),
+              updatedField: field,
+              updatedAtLocal: new Date().toISOString(),
+            };
+        await setDoc(doc(db, DATA_DOC), payload, { merge: true });
       }
 
       pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);

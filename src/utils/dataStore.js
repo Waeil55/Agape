@@ -13,9 +13,7 @@
 import {
   doc,
   setDoc,
-  onSnapshot,
   serverTimestamp,
-  writeBatch,
 } from '../config/firebase';
 import { db } from '../config/firebase';
 import {
@@ -26,6 +24,38 @@ import {
   completeSyncOperation,
   failSyncOperation,
 } from './localDB';
+
+const ROOT_COLLECTION_FIELDS = new Set(['trips', 'trashedTrips', 'logs']);
+
+function cleanUndefinedFields(payload = {}) {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined)
+  );
+}
+
+function buildAppDataFieldPayload(field, value, extra = {}) {
+  const base = {
+    ...extra,
+    updatedAt: serverTimestamp(),
+    updatedField: field,
+    updatedAtLocal: new Date().toISOString(),
+  };
+
+  if (!ROOT_COLLECTION_FIELDS.has(field)) {
+    return cleanUndefinedFields({
+      [field]: value,
+      ...base,
+    });
+  }
+
+  return cleanUndefinedFields({
+    ...base,
+    rootStorageMode: 'rootCollections',
+    tripStorageMode: field === 'trips' || field === 'trashedTrips' ? 'rootCollections' : undefined,
+    tripStorageVersion: field === 'trips' || field === 'trashedTrips' ? 2 : undefined,
+    [`${field}Count`]: Array.isArray(value) ? value.length : undefined,
+  });
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONNECTION STATE MACHINE
@@ -111,7 +141,7 @@ class ConnectionMonitor {
   }
 
   async _pingLoop() {
-    while (true) {
+    for (;;) {
       await new Promise(r => setTimeout(r, 15000));
       if (!navigator.onLine) continue;
 
@@ -191,15 +221,25 @@ class WriteBatcher {
     this._pending.clear();
 
     const data = {};
+    const fields = [...batch.keys()];
     for (const [field, { value }] of batch) {
-      data[field] = value;
+      if (ROOT_COLLECTION_FIELDS.has(field)) {
+        if (Array.isArray(value)) data[`${field}Count`] = value.length;
+        data.rootStorageMode = 'rootCollections';
+        if (field === 'trips' || field === 'trashedTrips') {
+          data.tripStorageMode = 'rootCollections';
+          data.tripStorageVersion = 2;
+        }
+      } else {
+        data[field] = value;
+      }
     }
 
     try {
       await setDoc(doc(db, 'appData/agape'), {
         ...data,
         updatedAt: serverTimestamp(),
-        updatedField: 'batch:' + Object.keys(data).join(','),
+        updatedField: 'batch:' + fields.join(','),
         updatedAtLocal: new Date().toISOString(),
       }, { merge: true });
 
@@ -208,13 +248,13 @@ class WriteBatcher {
         resolve(true);
       }
 
-      this._notify({ type: 'flush', fields: Object.keys(data), success: true });
+      this._notify({ type: 'flush', fields, success: true });
     } catch (err) {
       // Reject all promises
       for (const [, { reject }] of batch) {
         reject(err);
       }
-      this._notify({ type: 'flush', fields: Object.keys(data), success: false, error: err });
+      this._notify({ type: 'flush', fields, success: false, error: err });
     } finally {
       this._flushing = false;
     }
@@ -318,7 +358,6 @@ export const optimisticManager = new OptimisticManager();
 export function compressData(data) {
   if (!data) return data;
   try {
-    const json = JSON.stringify(data);
     // Use built-in CompressionStream if available (modern browsers)
     if (typeof CompressionStream !== 'undefined') {
       // For now, use a simple de-duplication strategy
@@ -504,14 +543,15 @@ class EnterpriseDataStore {
     versionTracker.bump(field);
 
     try {
-      // Write to Firestore
-      await setDoc(doc(db, 'appData/agape'), {
-        [field]: after,
-        updatedAt: serverTimestamp(),
-        updatedField: field,
-        updatedAtLocal: new Date().toISOString(),
-        _version: versionTracker.getVersion(field).version,
-      }, { merge: true });
+      // Write to Firestore. Large root collections stay in their own
+      // collections; appData/agape only keeps lightweight metadata.
+      await setDoc(
+        doc(db, 'appData/agape'),
+        buildAppDataFieldPayload(field, after, {
+          _version: versionTracker.getVersion(field).version,
+        }),
+        { merge: true }
+      );
 
       // Write-through to IndexedDB
       const compressed = compressData(after);
@@ -553,7 +593,7 @@ class EnterpriseDataStore {
 
     // Queue for batched Firestore write
     const promises = [];
-    for (const [field, value] of Object.entries(updates)) {
+    for (const [field] of Object.entries(updates)) {
       promises.push(writeBatcher.queue(field, this._data[field]));
     }
 
@@ -581,12 +621,11 @@ class EnterpriseDataStore {
 
       try {
         if (op.type === 'setField') {
-          await setDoc(doc(db, 'appData/agape'), {
-            [op.field]: op.value,
-            updatedAt: serverTimestamp(),
-            updatedField: op.field,
-            updatedAtLocal: new Date().toISOString(),
-          }, { merge: true });
+          await setDoc(
+            doc(db, 'appData/agape'),
+            buildAppDataFieldPayload(op.field, op.value),
+            { merge: true }
+          );
         }
         await completeSyncOperation(op.id);
       } catch (err) {
