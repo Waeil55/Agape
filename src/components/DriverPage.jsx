@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
-import { compareTripsBySchedule, tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate } from '../utils/tripDate';
+import { compareTripsBySchedule, tripMatchesTodayOrTomorrow, tripCalendarDateKey, timeToMinutes, isTripLate } from '../utils/tripDate';
 import { auth, db, doc, onSnapshot, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles } from '../config/maps';
@@ -159,6 +159,7 @@ const calcTravelDuration = (start, end) => {
 };
 
 const getLocalDateFromValue = (value) => {
+  if (value && typeof value === 'object') return tripCalendarDateKey(value) || '';
   const raw = String(value || '').trim();
   if (!raw) return '';
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
@@ -179,6 +180,12 @@ const getHistoryDateCandidates = (trip) => {
   const dates = [
     trip?.completedAt,
     trip?.date,
+    trip?.serviceDate,
+    trip?.scheduledDate,
+    trip?.tripDate,
+    trip?.pickupDate,
+    trip?.routeDate,
+    trip?.assignmentDate,
     trip?.workflowUpdatedAt,
     trip?.updatedAtLocal,
     trip?.arrivalDropoffTime,
@@ -186,6 +193,7 @@ const getHistoryDateCandidates = (trip) => {
     trip?.arrivalTime,
     trip?.startTime,
     trip?.startedAt,
+    trip?.createdAt,
   ]
     .map(getLocalDateFromValue)
     .filter(Boolean);
@@ -1181,12 +1189,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const noShowTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'no show');
   const cancelledTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'cancelled');
   const allHistory = [...reroutedTrips, ...completedTrips, ...noShowTrips, ...cancelledTrips].sort((a,b) => { const da = a.completedAt || a.date || ''; const db = b.completedAt || b.date || ''; return da.localeCompare(db); });
+  const selectedHistoryDate = historyDate || todayStr();
   const historyMatchesDate = useCallback((trip, date) => {
     if (!date) return true;
     const tripDates = getHistoryDateCandidates(trip);
-    return tripDates.length === 0 || tripDates.includes(date);
+    return tripDates.includes(date);
   }, []);
-  const dateScopedHistory = allHistory.filter((trip) => historyMatchesDate(trip, historyDate));
+  const dateScopedHistory = allHistory.filter((trip) => historyMatchesDate(trip, selectedHistoryDate));
   const historyCounts = {
     all: dateScopedHistory.length,
     completed: dateScopedHistory.filter((trip) => normalizeWorkflowStatus(trip.status) === 'completed').length,
@@ -2453,7 +2462,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const exportDailyLog = () => {
     const headers = ['Date', 'Driver', 'Vehicle', 'Scheduled Time', 'Trip ID', 'Passenger', 'Pickup Address', 'Pickup Arrival', 'Departed Pickup', 'Start Odometer', 'Dropoff Address', 'Dropoff Arrival', 'End Odometer', 'Travel Time', 'Distance (mi)', 'Signature', 'Status'];
     const rows = [headers];
-    const exportDate = historyDate || new Date().toISOString().split('T')[0];
+    const exportDate = selectedHistoryDate;
     dateScopedHistory.forEach(t => {
       const travelTime = t.travelTime || calcTravelDuration(t.departedPickupTime || t.arrivalTime, t.arrivalDropoffTime || t.completedAt);
       const distDriven = (t.pickupOdometer && t.dropoffOdometer) ? `${Math.max(0, Number(t.dropoffOdometer) - Number(t.pickupOdometer))}` : (t.distance || '');
@@ -4111,24 +4120,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="flex-1 relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input type="text" placeholder="Search patient, booking ID, driver, vehicle..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 card-premiumtext-xs font-medium outline-none focus:border-blue-400" />
+                className="w-full pl-9 pr-8 py-2 card-premium text-xs font-medium outline-none focus:border-blue-400" />
               {historySearch && <button onClick={() => setHistorySearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 min-h-[44px] min-w-[44px] flex items-center justify-center"><X size={14} /></button>}
             </div>
-            <div className="flex items-center gap-0.5 card-premiumshrink-0">
-              <button onClick={() => { const d = new Date(historyDate + 'T12:00:00'); d.setDate(d.getDate() - 1); setHistoryDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); }}
+            <div className="flex items-center gap-0.5 card-premium shrink-0">
+              <button onClick={() => { const d = new Date(selectedHistoryDate + 'T12:00:00'); d.setDate(d.getDate() - 1); setHistoryDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); }}
                 className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-l-xl hover:bg-slate-50 transition">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
               </button>
-              <input type="date" value={historyDate} max={todayStr()}
-                onChange={(e) => setHistoryDate(e.target.value)}
+              <input type="date" value={selectedHistoryDate} max={todayStr()}
+                onChange={(e) => setHistoryDate(e.target.value || todayStr())}
                 className="w-0 h-8 opacity-0 absolute pointer-events-none"
                 id="historyDatePick" />
               <label htmlFor="historyDatePick"
                 className="px-3 min-h-[44px] flex items-center justify-center text-[11px] font-bold text-slate-700 cursor-pointer hover:bg-slate-50 transition whitespace-nowrap select-none">
-                {historyDate ? new Date(historyDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : 'All'}
+                {new Date(selectedHistoryDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
               </label>
               <button onClick={() => {
-                const d = new Date(historyDate + 'T12:00:00'); d.setDate(d.getDate() + 1);
+                const d = new Date(selectedHistoryDate + 'T12:00:00'); d.setDate(d.getDate() + 1);
                 const tomorrow = todayStr();
                 const next = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                 if (next <= tomorrow) setHistoryDate(next);
@@ -4137,7 +4146,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             </div>
-            {historyDate !== todayStr() && (
+            {selectedHistoryDate !== todayStr() && (
               <button onClick={() => setHistoryDate(todayStr())}
                 className="px-3 h-10 bg-blue-50 text-blue-600 rounded-xl text-[10px] font-bold hover:bg-blue-100 transition shrink-0">
                 Today

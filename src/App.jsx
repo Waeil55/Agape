@@ -36,7 +36,6 @@ import {
   trimTelemetryCollections,
 } from './utils/driverTelemetry';
 import './utils/clientExport';
-import { registerServiceWorker, requestPeriodicSync, setupSWMessageHandler, triggerSync } from './utils/swManager';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
 import { useConnectionState, formatSyncAgo } from './hooks/useConnectionState';
 import { connectionMonitor } from './utils/dataStore';
@@ -379,7 +378,6 @@ const App = () => {
   const loginPortalRoleRef = useRef(null);
   const skipNextSignedOutResetRef = useRef(false);
   
-  const [refreshTick, setRefreshTick] = useState(0);
   const [refreshNotice, setRefreshNotice] = useState(() => {
     try {
       const reason = window.sessionStorage.getItem('agape_refresh_needed');
@@ -462,37 +460,9 @@ const App = () => {
     // REMOVED: The 1-second refresh interval was causing constant re-renders and data flickering.
     // Real-time sync now comes from Firebase document listener on appData/agape.
 
-    // Force re-render when app comes back to foreground (iOS PWA fix)
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        setRefreshTick(t => t + 1);
-        triggerSync();
-        localStorage.setItem('agape-sync-trigger', String(Date.now()));
-      }
-    };
-
-    // Listen for periodic sync from Service Worker
-    const handlePeriodicSync = (event) => {
-      setRefreshTick(t => t + 1);
-    };
-
-    // Listen for sync requests from other tabs
-    const handleStorageChange = (event) => {
-      if (event.key === 'agape-sync-trigger') {
-        setRefreshTick(t => t + 1);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('periodicSync', handlePeriodicSync);
-    window.addEventListener('storage', handleStorageChange);
-
     return () => {
       window.removeEventListener('online', goOnline);
       window.removeEventListener('offline', goOffline);
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('periodicSync', handlePeriodicSync);
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -524,31 +494,22 @@ const App = () => {
     };
   }, []);
 
-  // Initialize Service Worker for PWA auto-update across all platforms
+  // Retire older service workers. Firestore listeners are the live data source,
+  // and stale cached app shells caused driver History to flicker between builds.
   useEffect(() => {
-    let cleanupSWMessages = () => {};
-
     (async () => {
       try {
-        // Register service worker
-        await registerServiceWorker();
-        
-        // Request periodic background sync
-        await requestPeriodicSync();
-
-        // Setup message handler for sync requests from SW
-        cleanupSWMessages = setupSWMessageHandler((data) => {
-          setRefreshTick(t => t + 1);
-        });
-
-        console.log('PWA background sync enabled');
+        if (!('serviceWorker' in navigator)) return;
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.filter((key) => key.startsWith('agape-')).map((key) => caches.delete(key)));
+        }
       } catch (error) {
-        console.error('PWA setup error:', error);
+        console.warn('Service worker cleanup skipped:', error);
       }
     })();
-    return () => {
-      cleanupSWMessages();
-    };
   }, []);
 
   // ALL DATA COMES FROM FIRESTORE VIA onSnapshot — single source of truth
