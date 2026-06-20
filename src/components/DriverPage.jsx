@@ -158,15 +158,43 @@ const calcTravelDuration = (start, end) => {
   return h > 0 ? `${h}h${m > 0 ? m : ''}` : `${m}m`;
 };
 
-const getLocalDateStr = (trip) => {
-  const raw = trip.completedAt || trip.date || '';
+const getLocalDateFromValue = (value) => {
+  const raw = String(value || '').trim();
   if (!raw) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   if (raw.includes('T')) {
     const d = new Date(raw);
     if (isNaN(d.getTime())) return raw.slice(0, 10);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
-  return raw.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const parsed = new Date(raw);
+  if (!isNaN(parsed.getTime())) {
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  }
+  return '';
+};
+
+const getHistoryDateCandidates = (trip) => {
+  const dates = [
+    trip?.completedAt,
+    trip?.date,
+    trip?.workflowUpdatedAt,
+    trip?.updatedAtLocal,
+    trip?.arrivalDropoffTime,
+    trip?.departedPickupTime,
+    trip?.arrivalTime,
+    trip?.startTime,
+    trip?.startedAt,
+  ]
+    .map(getLocalDateFromValue)
+    .filter(Boolean);
+  return [...new Set(dates)];
+};
+
+const getLocalDateStr = (trip) => {
+  const candidates = getHistoryDateCandidates(trip);
+  return candidates[0] || '';
 };
 
 const formatTimeInput = (v) => {
@@ -202,7 +230,14 @@ const buildFallbackDriverProfile = (email = '') => ({
 });
 
 const WORKFLOW_TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
-const normalizeWorkflowStatus = (status) => String(status || '').trim().toLowerCase();
+const normalizeWorkflowStatus = (status) => {
+  const clean = String(status || '').trim().toLowerCase();
+  if (['completed', 'complete', 'done', 'finished'].includes(clean)) return 'completed';
+  if (['no show', 'no-show', 'noshow'].includes(clean)) return 'no show';
+  if (['cancelled', 'canceled'].includes(clean)) return 'cancelled';
+  if (['reroute', 'rerouted'].includes(clean)) return 'rerouted';
+  return clean;
+};
 const isWorkflowTerminalTrip = (trip) => {
   if (!trip) return false;
   const status = normalizeWorkflowStatus(trip.status);
@@ -353,8 +388,10 @@ const buildWorkflowRepairFields = (trip = {}, rawTrip = {}) => {
 const applyWorkflowProgress = (trip, progress) => {
   if (!trip || !progress) return trip;
   const merged = { ...trip };
+  const progressIsTerminal = WORKFLOW_TERMINAL_STATUSES.has(progress.status)
+    || [...WORKFLOW_TERMINAL_STATUSES].some((terminal) => normalizeWorkflowStatus(terminal) === normalizeWorkflowStatus(progress.status));
   WORKFLOW_PROGRESS_FIELDS.forEach((field) => {
-    if (hasWorkflowValue(progress[field]) && !hasWorkflowValue(merged[field])) {
+    if (hasWorkflowValue(progress[field]) && (progressIsTerminal || !hasWorkflowValue(merged[field]))) {
       merged[field] = progress[field];
     }
   });
@@ -1505,8 +1542,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       normalizeWorkflowStatus(t.status) === 'rerouted';
     if (!matchFilter) return false;
     if (historyDate) {
-      const tripDate = getLocalDateStr(t);
-      if (tripDate && tripDate !== historyDate) return false;
+      const tripDates = getHistoryDateCandidates(t);
+      if (tripDates.length > 0 && !tripDates.includes(historyDate)) return false;
     }
     if (!historySearch) return true;
     const q = historySearch.toLowerCase();
