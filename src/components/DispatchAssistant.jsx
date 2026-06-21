@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { tripMatchesCalendarDay } from '../utils/tripDate';
 import { Clock, MapPin, Truck, BrainCircuit, X, Zap, AlertCircle, UserCheck } from 'lucide-react';
 import { suggestOptimalDriver, getDriverScheduleStatus, getScheduleBlocks } from '../config/ai';
@@ -15,7 +15,7 @@ const Badge = ({ children, variant = 'info' }) => {
     danger: "bg-rose-50 text-rose-700 border-rose-100",
     ai: "bg-indigo-50 text-indigo-700 border-indigo-100",
   };
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-bold border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
 };
 
 const ScheduleBar = ({ schedule, currentMinutes }) => {
@@ -185,7 +185,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
             <Zap size={20} />
           </div>
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Dispatch Assistant</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900">Dispatch Assistant</h2>
             <p className="text-xs text-slate-500 font-semibold flex items-center gap-1">
               <Clock size={10} /> Live: {nowStr} &bull; {drivers.length} drivers &bull; {unassignedTrips.length} unassigned
             </p>
@@ -211,7 +211,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
             <div className="p-2 bg-rose-50 text-rose-600 rounded-lg shrink-0"><AlertCircle size={18} /></div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase">Late Pickups</p>
-              <p className="text-lg font-bold text-slate-900">{insights.latePickups.length}</p>
+              <p className="text-lg font-black text-slate-900">{insights.latePickups.length}</p>
               {insights.latePickups.length > 0 && <p className="text-xs text-rose-600 font-medium leading-tight mt-0.5">Trips are &gt;15m past schedule</p>}
             </div>
           </div>
@@ -219,7 +219,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
             <div className="p-2 bg-amber-50 text-amber-600 rounded-lg shrink-0"><Clock size={18} /></div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase">Conflicts</p>
-              <p className="text-lg font-bold text-slate-900">{insights.conflicts.length}</p>
+              <p className="text-lg font-black text-slate-900">{insights.conflicts.length}</p>
               {insights.conflicts.length > 0 && <p className="text-xs text-amber-600 font-medium leading-tight mt-0.5">Assigned trips overlapping &lt;30m</p>}
             </div>
           </div>
@@ -227,7 +227,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg shrink-0"><Truck size={18} /></div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase">Idle Capacity</p>
-              <p className="text-lg font-bold text-slate-900">{insights.idleDrivers}</p>
+              <p className="text-lg font-black text-slate-900">{insights.idleDrivers}</p>
               <p className="text-xs text-emerald-600 font-medium leading-tight mt-0.5">Clocked in &amp; available now</p>
             </div>
           </div>
@@ -249,7 +249,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
               const isClockedIn = d.clockedIn || false;
 
               return (
-                <div key={d.id} className="bg-white rounded-xl border border-slate-200 p-3 hover:border-blue-200 transition">
+                <div key={d.id} className="bg-white rounded-xl border border-slate-200 p-3 hover:border-indigo-200 transition">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${isClockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -265,14 +265,14 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                           <MapPin size={10} className="shrink-0" /> {d.currentZone} &bull; {d.vehicle}
                           {d.assignedDispatcher && (
                             <>
-                              &bull; <span className="text-blue-600 font-bold">Disp: {d.assignedDispatcher.split('-')[0]}</span>
+                              &bull; <span className="text-indigo-600 font-bold">Disp: {d.assignedDispatcher.split('-')[0]}</span>
                             </>
                           )}
                         </p>
                       </div>
                     </div>
                     <Badge variant={d.liveStatus?.status === 'free' ? 'success' : d.liveStatus?.status === 'busy' ? 'warning' : 'danger'}>
-                      {d.liveStatus?.label || 'Status unavailable'}
+                      {d.liveStatus?.label || 'Unknown'}
                     </Badge>
                   </div>
 
@@ -287,7 +287,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                       const isActive = isNowInRange(sl.startMin, sl.endMin);
                       return (
                         <span key={idx} className={`px-2 py-0.5 rounded font-medium ${isActive ? (sl.isFree ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700') : 'bg-slate-50 text-slate-400'}`}>
-                          {slot.start}-{slot.end} {sl.isFree ? 'Free' : 'Busy'}
+                          {slot.start}-{slot.end} {sl.isFree ? '✓' : '🚐'}
                         </span>
                       );
                     })}
@@ -317,13 +317,13 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                 ) : (
                   unassignedTrips.map(t => (
                     <button key={t.id} onClick={() => handleTripSelect(t)}
-                      className={`w-full text-left p-3 hover:bg-slate-50 transition ${selectedTrip?.id === t.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}`}
+                      className={`w-full text-left p-3 hover:bg-slate-50 transition ${selectedTrip?.id === t.id ? 'bg-indigo-50 border-l-4 border-l-indigo-500' : ''}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm text-slate-900 break-words">{t.patient}</p>
-                          {t.bookingId ? <p className="text-xs text-blue-600 font-bold break-words">{t.bookingId}</p> : null}
-                          <p className="text-xs text-slate-500 break-words"><span className="text-emerald-600">{t.pickup || 'No pickup address'}</span> to <span className="text-rose-600">{t.dropoff || 'No dropoff address'}</span></p>
+                          {t.bookingId ? <p className="text-xs text-indigo-600 font-bold break-words">{t.bookingId}</p> : null}
+                          <p className="text-xs text-slate-500 break-words"><span className="text-emerald-600">{t.pickup}</span> → <span className="text-rose-600">{t.dropoff}</span></p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-xs font-bold text-slate-700">{t.time}</p>
@@ -387,7 +387,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                                   </div>
                                 </div>
                                 <div className="text-right">
-                                  <span className={`text-lg font-bold ${aiSuggestion.score >= 80 ? 'text-emerald-600' : aiSuggestion.score >= 50 ? 'text-amber-600' : 'text-slate-500'}`}>
+                                  <span className={`text-lg font-black ${aiSuggestion.score >= 80 ? 'text-emerald-600' : aiSuggestion.score >= 50 ? 'text-amber-600' : 'text-slate-500'}`}>
                                     {aiSuggestion.score}%
                                   </span>
                                   <p className="text-xs text-slate-400 uppercase">Match</p>

@@ -160,21 +160,21 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
   const labelClass = 'text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5';
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
-        className="relative w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col bg-white modal-premium z-10 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+        className="relative w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col bg-white sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden z-10 animate-in slide-in-from-bottom sm:zoom-in-95 duration-300"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-600 to-blue-700 rounded-3xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-3xl">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
               <Plus size={18} className="text-white" />
             </div>
             <div>
               <h2 className="text-base font-black text-white">Add New Trip</h2>
-              <p className="text-xs text-white/70 font-medium capitalize">{role} | Manual Entry</p>
+              <p className="text-xs text-white/70 font-medium capitalize">{role} • Manual Entry</p>
             </div>
           </div>
           <button
@@ -236,7 +236,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
             {/* Section: Schedule */}
             <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
               <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                <Calendar size={12} className="text-blue-600" /> Schedule
+                <Calendar size={12} className="text-indigo-600" /> Schedule
               </h3>
 
               <div className="grid grid-cols-2 gap-3">
@@ -285,8 +285,8 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
                     onClick={() => update('recurring', !form.recurring)}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
                       form.recurring
-? 'bg-blue-600 text-white border-blue-600'
-            : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'
                     }`}
                   >
                     <Repeat size={12} /> Recurring Trip
@@ -320,8 +320,8 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
                           onClick={() => toggleWeekday(day)}
                           className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
                             form.schedule.includes(day)
-? 'bg-blue-600 text-white border-blue-600'
-              : 'bg-white text-slate-500 border-slate-200 hover:border-blue-400'
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-400'
                           }`}
                         >
                           {WEEKDAY_SHORT[day]}
@@ -423,7 +423,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
                       onChange={e => update('driverId', e.target.value)}
                       className={inputClass('driverId')}
                     >
-                      <option value="">Unassigned</option>
+                      <option value="">— Unassigned —</option>
                       {selectableDrivers.map(d => (
                         <option key={d.id} value={d.id}>
                           {d.name} {d.status ? `(${d.status})` : ''}
@@ -468,7 +468,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
             type="submit"
             onClick={handleSubmit}
             disabled={submitting}
-            className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-black text-sm hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {submitting ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

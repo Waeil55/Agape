@@ -25,11 +25,11 @@ export const ROLE_LABELS = {
 export const ROLE_COLORS = {
   admin: '#2563eb',
   dispatcher: '#059669',
-  driver: '#2563eb',
+  driver: '#7c3aed',
   billing: '#dc2626',
   qa_auditor: '#f59e0b',
   fleet_manager: '#06b6d4',
-  supervisor: '#3b82f6',
+  supervisor: '#8b5cf6',
 };
 
 export const ROLE_BADGE_STYLES = {
@@ -39,7 +39,7 @@ export const ROLE_BADGE_STYLES = {
   billing: 'bg-red-100 text-red-800',
   qa_auditor: 'bg-amber-100 text-amber-800',
   fleet_manager: 'bg-cyan-100 text-cyan-800',
-  supervisor: 'bg-blue-100 text-blue-800',
+  supervisor: 'bg-indigo-100 text-indigo-800',
 };
 
 export const PERMISSIONS = {

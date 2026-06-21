@@ -1,103 +1,19 @@
-export const UNSCHEDULED_SORT_MINUTES = 1440;
-export const WILL_CALL_SORT_MINUTES = 2000;
-
-function normalizeTimingText(value) {
-  return String(value || '').toUpperCase().replace(/\s+/g, ' ').trim();
-}
-
-export function hasInOutText(value) {
-  const text = normalizeTimingText(value);
-  if (!text) return false;
-  return /\bIN\s*(?:\/|&|\+|-|AND)?\s*OUT\b/.test(text);
-}
-
-export function hasWillCallText(value) {
-  const text = normalizeTimingText(value);
-  if (!text) return false;
-  return /\bWILL\s*CALL\b/.test(text) || text === 'WC';
-}
-
-export function isInOutTrip(trip) {
-  if (!trip) return false;
-  if (typeof trip !== 'object') return hasInOutText(trip);
-  if (trip.timingType === 'in_out' || trip.isInOut === true) return true;
-  return hasInOutText([
-    trip.time,
-    trip.sourceTimingLabel,
-    trip.pickupComments,
-    trip.dropoffComments,
-    trip.notes,
-    trip.details?.generalComments,
-  ].filter(Boolean).join(' '));
-}
-
-export function isWillCallTrip(trip) {
-  if (!trip) return true;
-  if (typeof trip !== 'object') {
-    const text = normalizeTimingText(trip);
-    return text === '' || hasWillCallText(text);
-  }
-  if (isInOutTrip(trip)) return false;
-  if (trip.timingType === 'will_call' || trip.isWillCallTrip === true || trip.willCall === true) return true;
-  const text = normalizeTimingText(trip.time);
-  return text === '' || hasWillCallText(text);
-}
-
 /**
- * Convert time string to minutes since midnight.
- * Special labels such as Will Call and IN/OUT are intentionally unscheduled.
+ * Convert time string to minutes since midnight (0-1440)
+ * Handles formats: "2:30 PM", "14:30", "Will Call", etc.
  */
 export function timeToMinutes(t) {
-  if (!t) return UNSCHEDULED_SORT_MINUTES;
-  const cleanTime = normalizeTimingText(t);
-  if (hasWillCallText(cleanTime) || hasInOutText(cleanTime)) return UNSCHEDULED_SORT_MINUTES;
-  const m = cleanTime.match(/^(\d{1,2})(?::(\d{1,2}))?(?::\d{1,2})?\s*(AM|PM)?$/);
-  if (!m) return UNSCHEDULED_SORT_MINUTES;
+  if (!t) return 1440;
+  const cleanTime = String(t).toUpperCase().trim();
+  if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
+  const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+  if (!m) return 1440;
   let h = parseInt(m[1], 10);
   let min = parseInt(m[2] || '0', 10);
   const p = m[3];
-  if (h > 23 || min > 59) return UNSCHEDULED_SORT_MINUTES;
   if (p === 'PM' && h < 12) h += 12;
   if (p === 'AM' && h === 12) h = 0;
   return h * 60 + min;
-}
-
-export function getTripTimeLabel(trip) {
-  if (!trip) return 'Will Call';
-  const rawTime = trip.time || trip.requestedPickupTime || '';
-  if (timeToMinutes(rawTime) !== UNSCHEDULED_SORT_MINUTES) return rawTime;
-  if (isInOutTrip(trip)) return 'IN/OUT';
-  if (isWillCallTrip(trip)) return 'Will Call';
-  return rawTime;
-}
-
-export function getTripSortMinutes(trip) {
-  if (!trip) return WILL_CALL_SORT_MINUTES;
-  const explicit = Number(trip.inOutSortMinutes ?? trip.sortMinutes ?? trip.scheduleSortMinutes);
-  if (Number.isFinite(explicit)) return explicit;
-  const timeMinutes = timeToMinutes(trip.time || trip.requestedPickupTime);
-  if (timeMinutes !== UNSCHEDULED_SORT_MINUTES) return timeMinutes;
-  if (isInOutTrip(trip)) {
-    const paired = Number(trip.pairedAfterSortMinutes ?? trip.pairedTripSortMinutes);
-    if (Number.isFinite(paired)) return paired + 0.1;
-    return WILL_CALL_SORT_MINUTES - 1;
-  }
-  return WILL_CALL_SORT_MINUTES;
-}
-
-export function compareTripsBySchedule(a, b) {
-  const aMinutes = getTripSortMinutes(a);
-  const bMinutes = getTripSortMinutes(b);
-  if (aMinutes !== bMinutes) return aMinutes - bMinutes;
-
-  const aWillCall = isWillCallTrip(a);
-  const bWillCall = isWillCallTrip(b);
-  if (aWillCall !== bWillCall) return aWillCall ? 1 : -1;
-
-  const patientCompare = String(a?.patient || '').localeCompare(String(b?.patient || ''));
-  if (patientCompare !== 0) return patientCompare;
-
-  return String(a?.bookingId || a?.id || '').localeCompare(String(b?.bookingId || b?.id || ''));
 }
 
 /**

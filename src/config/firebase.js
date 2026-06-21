@@ -1,9 +1,11 @@
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy, runTransaction, limit } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork } from 'firebase/firestore';
 import { getAuth, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { buildOperationalTripRecord } from '../utils/tripLifecycle';
+import { buildLocationFraudSignals } from '../utils/locationFraud';
 const env = import.meta.env;
 
 const firebaseConfig = {
@@ -23,7 +25,6 @@ try {
   db = initializeFirestore(app, {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager(),
-      cacheSizeBytes: 100 * 1024 * 1024, // 100MB — enough for fleet data
     }),
   });
 } catch (err) {
@@ -47,7 +48,7 @@ const functions = getFunctions(app);
 export default app;
 export { app, db, auth, analytics, messaging, deleteApp, initializeApp, firebaseConfig,
   getFirestore, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp,
-  writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy, runTransaction, limit,
+  writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
   EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail, setPersistence,
   browserLocalPersistence, getAuth, getMessaging, getToken, onMessage, logEvent, functions, httpsCallable };
@@ -67,6 +68,25 @@ export function APP_CONFIG() {
   };
 }
 
+function getCurrentEventActor(role = 'system') {
+  const user = auth.currentUser;
+  return {
+    userId: user?.uid || user?.email || 'system',
+    email: user?.email || '',
+    role,
+  };
+}
+
+async function emitEventsSafely(buildEvents) {
+  try {
+    const eventEngine = await import('../services/firestoreEventEngine');
+    const events = buildEvents(eventEngine).filter(Boolean);
+    if (events.length > 0) await eventEngine.emitSystemEvents(events);
+  } catch (err) {
+    console.error('System event emission failed:', err);
+  }
+}
+
 export async function getTrips() {
   const tripRef = collection(db, 'trips');
   const tripSnapshot = await getDocs(tripRef);
@@ -78,7 +98,15 @@ export async function getTrips() {
 
 export async function updateTripStatus(tripId, updates) {
   const tripRef = doc(db, 'trips', tripId);
-  await setDoc(tripRef, updates, { merge: true });
+  const beforeSnap = await getDoc(tripRef).catch(() => null);
+  const beforeTrip = beforeSnap?.exists?.() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
+  const nextTrip = buildOperationalTripRecord({ ...(beforeTrip || { id: tripId }), ...updates, id: tripId });
+  await setDoc(tripRef, nextTrip, { merge: true });
+  await emitEventsSafely(({ buildTripEvents }) => buildTripEvents(
+    beforeTrip ? [beforeTrip] : [],
+    [nextTrip],
+    getCurrentEventActor()
+  ));
 }
 
 export function getTripsStream(callback) {
@@ -94,103 +122,93 @@ export async function updateDriverLocation(location) {
   if (!driverId) return;
 
   const driverRef = doc(db, 'drivers', driverId);
-  await setDoc(driverRef, {
+  const speedMph = Number.isFinite(Number(location.speedMph))
+    ? Number(location.speedMph)
+    : Number.isFinite(Number(location.speed))
+      ? Number(location.speed)
+      : null;
+  const fraudSignals = location.fraudSignals || buildLocationFraudSignals(null, {
+    lat: location.lat,
+    lng: location.lng,
+    accuracy: location.accuracy || null,
+    speedMph,
+    capturedAt: location.capturedAt || new Date().toISOString(),
+  });
+  const locationDoc = {
+    driverId,
+    userId: auth.currentUser?.uid || '',
+    sessionId: location.sessionId || null,
+    tripId: location.tripId || null,
+    assignmentId: location.assignmentId || null,
+    lat: location.lat,
+    lng: location.lng,
+    accuracy: location.accuracy || null,
+    speedMph,
+    heading: location.heading || null,
+    altitude: location.altitude || null,
+    geohash: location.geohash || '',
+    source: location.source || 'gps',
+    fraudFlags: fraudSignals.flags || [],
+    fraudSignals,
+    capturedAt: location.capturedAt || new Date().toISOString(),
+    receivedAt: serverTimestamp(),
+  };
+
+  await setDoc(doc(db, 'driver_locations', driverId), locationDoc, { merge: true });
+  await updateDoc(driverRef, {
     currentLocation: {
       lat: location.lat,
       lng: location.lng,
+      accuracy: location.accuracy || null,
+      speedMph,
+      heading: location.heading || null,
       timestamp: serverTimestamp()
     },
+    fraudFlags: fraudSignals.flags || [],
+    lastFraudSignals: fraudSignals,
     lastUpdated: serverTimestamp()
-  }, { merge: true });
+  });
+  await emitEventsSafely(({ buildLocationEvent }) => [
+    buildLocationEvent(driverId, locationDoc, getCurrentEventActor('driver')),
+  ]);
 }
 
 export async function saveOdometerReading(tripId, odometerValue) {
-  if (!tripId) return false;
-  const payload = {
+  const tripRef = doc(db, 'tripLedger', tripId);
+  await setDoc(tripRef, {
     dropoffOdometer: odometerValue,
-    odometerRecordedAt: serverTimestamp(),
-    workflowUpdatedAt: new Date().toISOString(),
-    updatedAtLocal: new Date().toISOString(),
-  };
-  await Promise.all([
-    setDoc(doc(db, 'trips', tripId), payload, { merge: true }),
-    setDoc(doc(db, 'driverTripProgress', tripId), { tripId, ...payload }, { merge: true }),
-    setDoc(doc(db, 'tripLedger', tripId), payload, { merge: true }),
-  ]);
-  return true;
+    odometerRecordedAt: serverTimestamp()
+  }, { merge: true });
+  await emitEventsSafely(({ SYSTEM_EVENT_TYPES }) => [{
+    type: SYSTEM_EVENT_TYPES.TRIP_UPDATED,
+    aggregateType: 'trip',
+    aggregateId: tripId,
+    tripId,
+    actor: getCurrentEventActor('driver'),
+    payload: {
+      changedFields: ['dropoffOdometer', 'odometerRecordedAt'],
+      after: { id: tripId, dropoffOdometer: odometerValue },
+    },
+  }]);
 }
 
 const cleanFirestoreUpdates = (updates = {}) => Object.fromEntries(
   Object.entries(updates).filter(([, value]) => value !== undefined)
 );
 
-const FIRESTORE_QUEUE_COMMIT_MAX_WRITES = 400;
-const FIRESTORE_QUEUE_COMMIT_SOFT_LIMIT_BYTES = 7 * 1024 * 1024;
-const FIRESTORE_QUEUE_WRITE_OVERHEAD_BYTES = 1024;
-
-function estimateJsonBytes(value) {
-  let json = '';
-  try {
-    json = JSON.stringify(value) || '';
-  } catch {
-    json = String(value ?? '');
-  }
-  if (typeof TextEncoder !== 'undefined') {
-    return new TextEncoder().encode(json).length;
-  }
-  return json.length * 2;
-}
-
-function estimateQueuedWriteBytes(path, data) {
-  return estimateJsonBytes(data)
-    + String(path || '').length
-    + FIRESTORE_QUEUE_WRITE_OVERHEAD_BYTES;
-}
-
-async function commitQueuedFirestoreWrites(writes = []) {
-  let batch = writeBatch(db);
-  let writeCount = 0;
-  let estimatedBytes = 0;
-
-  const flush = async () => {
-    if (writeCount === 0) return;
-    await batch.commit();
-    batch = writeBatch(db);
-    writeCount = 0;
-    estimatedBytes = 0;
-  };
-
-  for (const write of writes || []) {
-    const nextBytes = estimateQueuedWriteBytes(write.path, write.data);
-    if (
-      writeCount > 0
-      && (
-        writeCount >= FIRESTORE_QUEUE_COMMIT_MAX_WRITES
-        || estimatedBytes + nextBytes > FIRESTORE_QUEUE_COMMIT_SOFT_LIMIT_BYTES
-      )
-    ) {
-      await flush();
-    }
-
-    batch.set(write.ref, write.data, { merge: true });
-    writeCount += 1;
-    estimatedBytes += nextBytes;
-  }
-
-  await flush();
-}
-
 export async function saveTripWorkflowUpdate(tripId, updates = {}) {
   if (!tripId) return false;
+  const tripsRef = doc(db, 'trips', tripId);
+  const beforeSnap = await getDoc(tripsRef).catch(() => null);
+  const beforeTrip = beforeSnap?.exists?.() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
   const cleanUpdates = cleanFirestoreUpdates({
     ...updates,
     workflowUpdatedAt: updates.workflowUpdatedAt || new Date().toISOString(),
-    updatedAtLocal: updates.updatedAtLocal || new Date().toISOString(),
   });
+  const nextTripRecord = buildOperationalTripRecord({ ...(beforeTrip || { id: tripId }), ...cleanUpdates, id: tripId });
   const progressRef = doc(db, 'driverTripProgress', tripId);
   const appDataRef = doc(db, 'appData', 'agape');
   const ledgerRef = doc(db, 'tripLedger', tripId);
-  const tripsRef = doc(db, 'trips', tripId);
 
   await setDoc(progressRef, {
     tripId,
@@ -198,21 +216,37 @@ export async function saveTripWorkflowUpdate(tripId, updates = {}) {
     updatedAt: serverTimestamp(),
   }, { merge: true });
 
-  setDoc(appDataRef, {
-    tripStorageMode: 'rootCollections',
-    tripStorageVersion: 2,
-    updatedAt: serverTimestamp(),
-    updatedField: 'trip-workflow',
-    updatedTripId: tripId,
-    updatedAtLocal: new Date().toISOString(),
-  }, { merge: true }).catch((err) => {
-    console.warn('Workflow appData metadata skipped:', err);
+  runTransaction(db, async (transaction) => {
+    const appSnap = await transaction.get(appDataRef);
+    if (!appSnap.exists()) return;
+    const data = appSnap.data() || {};
+    const trips = Array.isArray(data.trips) ? data.trips : [];
+    const nextTrips = trips.map((trip) => (
+      String(trip?.id || '') === String(tripId)
+        ? { ...trip, ...cleanUpdates }
+        : trip
+    ));
+    transaction.set(appDataRef, {
+      trips: nextTrips,
+      updatedAt: serverTimestamp(),
+      updatedField: 'trips',
+      updatedAtLocal: new Date().toISOString(),
+    }, { merge: true });
+  }).catch((err) => {
+    console.warn('Workflow appData mirror skipped:', err);
   });
 
   setDoc(ledgerRef, cleanUpdates, { merge: true }).catch((err) => {
     console.warn('Workflow tripLedger mirror skipped:', err);
   });
-  await setDoc(tripsRef, cleanUpdates, { merge: true });
+  setDoc(tripsRef, nextTripRecord, { merge: true }).catch((err) => {
+    console.warn('Workflow trips mirror skipped:', err);
+  });
+  await emitEventsSafely(({ buildTripEvents }) => buildTripEvents(
+    beforeTrip ? [beforeTrip] : [],
+    [nextTripRecord],
+    getCurrentEventActor('driver')
+  ));
   return true;
 }
 
@@ -245,47 +279,34 @@ export async function getDriverProfile(driverId) {
 
 export async function updateDriverProfile(driverId, updates) {
   const driverRef = doc(db, 'driverProfiles', driverId);
+  const beforeSnap = await getDoc(driverRef).catch(() => null);
+  const beforeDriver = beforeSnap?.exists?.() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
   await setDoc(driverRef, updates, { merge: true });
+  await emitEventsSafely(({ buildDriverEvents }) => buildDriverEvents(
+    beforeDriver ? [beforeDriver] : [],
+    [{ ...(beforeDriver || { id: driverId }), ...updates, id: driverId }],
+    getCurrentEventActor()
+  ));
 }
 
 export async function syncOfflineQueue(queue) {
-  const writes = [];
-  const queueSet = (path, ref, data) => {
-    writes.push({ path, ref, data: cleanFirestoreUpdates(data || {}) });
-  };
+  const batch = writeBatch(db);
 
   for (const item of queue) {
     if (item.action === 'startTrip') {
-      const tripId = item.data?.tripId;
-      if (!tripId) continue;
-      const tripRef = doc(db, 'trips', tripId);
-      const { tripId: _tripId, ...updates } = item.data || {};
-      queueSet(`trips/${tripId}`, tripRef, updates);
+      const tripRef = doc(db, 'trips', item.data.tripId);
+      batch.update(tripRef, item.data);
     } else if (item.action === 'completeTrip') {
-      const tripId = item.data?.tripId;
-      if (!tripId) continue;
-      const completedTrip = item.data?.completedTrip || {};
-      const queuedCompletion = item.data?.completionFields || {};
-      const dropoffOdometer = item.data?.odometer ?? queuedCompletion.dropoffOdometer ?? completedTrip.dropoffOdometer;
-      const completionFields = cleanFirestoreUpdates({
-        ...completedTrip,
-        ...queuedCompletion,
-        status: 'Completed',
-        dropoffOdometer,
-        completedAt: queuedCompletion.completedAt || completedTrip.completedAt || new Date().toISOString(),
-        workflowUpdatedAt: new Date().toISOString(),
-      });
-      queueSet(`trips/${tripId}`, doc(db, 'trips', tripId), completionFields);
-      queueSet(`driverTripProgress/${tripId}`, doc(db, 'driverTripProgress', tripId), { tripId, ...completionFields });
-      queueSet(`tripLedger/${tripId}`, doc(db, 'tripLedger', tripId), completionFields);
+      const tripRef = doc(db, 'trips', item.data.tripId);
+      batch.update(tripRef, item.data);
     } else if (item.action === 'updateLocation') {
       const driverId = auth.currentUser?.uid;
       if (driverId) {
         const driverRef = doc(db, 'drivers', driverId);
-        queueSet(`drivers/${driverId}`, driverRef, { currentLocation: item.data });
+        batch.update(driverRef, { currentLocation: item.data });
       }
     }
   }
 
-  await commitQueuedFirestoreWrites(writes);
+  await batch.commit();
 }

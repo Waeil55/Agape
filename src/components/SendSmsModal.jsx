@@ -52,7 +52,7 @@ const SendSmsModal = ({ trips = [], onClose }) => {
   if (results) {
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={onClose}>
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
         <div className="bg-white w-full max-w-md rounded-3xl shadow-sm relative z-10 border border-slate-200 p-6 text-center" onClick={e => e.stopPropagation()}>
           {results.error ? <AlertCircle size={40} className="mx-auto text-rose-500 mb-3" /> : <CheckCircle size={40} className="mx-auto text-emerald-500 mb-3" />}
           <h3 className="text-lg font-bold text-slate-900 mb-1">{results.error ? 'Failed' : 'Messages Sent'}</h3>
@@ -66,11 +66,11 @@ const SendSmsModal = ({ trips = [], onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="bg-white w-full max-w-lg rounded-3xl shadow-sm relative z-10 border border-slate-200 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-3.5 flex items-center justify-between z-10 rounded-t-3xl">
           <div className="flex items-center gap-2"><MessageSquare size={16} className="text-blue-600" /><h3 className="text-sm font-bold text-slate-900">Send Confirmation</h3></div>
-          <button onClick={onClose} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
+          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
         </div>
         <div className="p-5 space-y-4">
           <div>

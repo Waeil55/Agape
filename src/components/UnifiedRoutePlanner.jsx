@@ -164,7 +164,7 @@ const UnifiedRoutePlanner = ({
           <div className="flex items-center justify-between mb-3">
             <div>
               <h1 className="text-lg font-black text-slate-900 tracking-tight">Route Planner</h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Plan | Saved | Build | Navigate</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Plan · Saved · Build · Navigate</p>
             </div>
             {guidedMode && (
               <button onClick={() => { onSetGuidedMode(false); onSetAiSequence(null); onSetAiSuggestions([]); }}
@@ -209,7 +209,7 @@ const UnifiedRoutePlanner = ({
 
         {/* PLAN TAB */}
         {activeTab === 'plan' && (
-          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 lg:px-6 pt-3">
+          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
             {/* AI Quick Actions */}
             {selectedTrips.length >= 1 && (
               <div className="mb-3 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl p-3 shadow-lg shadow-indigo-200/50">
@@ -251,7 +251,7 @@ const UnifiedRoutePlanner = ({
                       const t = trips.find(t => t.id === id);
                       return (
                         <React.Fragment key={id}>
-                          {i > 0 && <span className="text-white/20 text-[10px]">to</span>}
+                          {i > 0 && <span className="text-white/20 text-[10px]">→</span>}
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/15 text-white/90">{t?.patient || id}</span>
                         </React.Fragment>
                       );
@@ -295,7 +295,7 @@ const UnifiedRoutePlanner = ({
               <div className="mb-3 bg-emerald-50 border border-emerald-200/60 rounded-2xl p-3 flex items-start gap-2">
                 <Repeat size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  {aiRideShare.map((r, i) => <p key={i} className="text-[11px] font-semibold text-emerald-700">{typeof r.tripA?.patient === 'string' ? r.tripA.patient : 'A'} + {typeof r.tripB?.patient === 'string' ? r.tripB.patient : 'B'}</p>)}
+                  {aiRideShare.map((r, i) => <p key={i} className="text-[11px] font-semibold text-emerald-700">{r.text || r}</p>)}
                 </div>
               </div>
             )}
@@ -331,7 +331,7 @@ const UnifiedRoutePlanner = ({
 
         {/* SAVED TAB */}
         {activeTab === 'saved' && (
-          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 lg:px-6 pt-3">
+          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
             {sortedTemplates.length > 0 ? (
               <div className="space-y-2">
                 {sortedTemplates.map((tpl) => {
@@ -415,7 +415,7 @@ const UnifiedRoutePlanner = ({
                                     <span className={`font-bold px-1 rounded ${stop.type === 'PU' ? 'text-emerald-600' : 'text-rose-600'} shrink-0`}>
                                       {stop.type}
                                     </span>
-                                    <span className="font-semibold text-slate-700 truncate">{stop.name || 'No stop name'}</span>
+                                    <span className="font-semibold text-slate-700 truncate">{stop.name || 'Unknown'}</span>
                                     {stop.time && <span className="font-semibold text-slate-400 ml-auto shrink-0">{stop.time}</span>}
                                   </div>
                                 ))}
@@ -530,7 +530,7 @@ const UnifiedRoutePlanner = ({
 
         {/* NAVIGATE TAB */}
         {activeTab === 'navigate' && (
-          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 lg:px-6 pt-3">
+          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
             {activeTrips.length > 0 ? (
               <div className="space-y-2">
                 {Object.keys(etas).length > 0 && (

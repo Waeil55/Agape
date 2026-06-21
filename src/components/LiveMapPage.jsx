@@ -72,7 +72,7 @@ function getDriverPoint(driver) {
 }
 
 function formatMiles(value) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return 'Not available';
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'Unknown';
   if (value < 0.1) return '<0.1 mi';
   return `${value.toFixed(value < 10 ? 1 : 0)} mi`;
 }
@@ -84,7 +84,7 @@ function estimateMinutes(distanceMiles) {
 }
 
 function formatEta(minutes) {
-  if (typeof minutes !== 'number' || !Number.isFinite(minutes)) return 'Not available';
+  if (typeof minutes !== 'number' || !Number.isFinite(minutes)) return 'Unknown';
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
@@ -534,7 +534,7 @@ const LiveMapPage = ({
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-black text-slate-950">{driver.name || 'Unnamed driver'}</p>
-                          <p className="truncate text-xs font-medium text-slate-500">{driver.vehicle || 'No vehicle'} | {driver.status || 'No status'}</p>
+                          <p className="truncate text-xs font-medium text-slate-500">{driver.vehicle || 'No vehicle'} | {driver.status || 'Unknown'}</p>
                         </div>
                       </div>
                       <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${fresh ? 'bg-emerald-500' : point ? 'bg-amber-500' : 'bg-slate-300'}`} />
@@ -658,7 +658,7 @@ const LiveMapPage = ({
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-xs font-black text-white">{index + 1}</span>
-                                <p className="truncate text-sm font-black text-slate-950">{trip.patient || 'No client name'}</p>
+                                <p className="truncate text-sm font-black text-slate-950">{trip.patient || 'Unknown client'}</p>
                                 <StatusPill tone={trip.status === 'Unassigned' ? 'amber' : 'blue'}>{trip.status || 'Open'}</StatusPill>
                               </div>
                               <p className="mt-2 line-clamp-2 text-xs font-medium text-slate-600">{trip.pickup}</p>
@@ -733,7 +733,7 @@ const LiveMapPage = ({
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="rounded-md bg-white p-2">
                     <p className="text-[10px] font-black uppercase text-slate-400">Status</p>
-                    <p className="mt-1 text-xs font-black">{selectedDriver?.status || 'No status'}</p>
+                    <p className="mt-1 text-xs font-black">{selectedDriver?.status || 'Unknown'}</p>
                   </div>
                   <div className="rounded-md bg-white p-2">
                     <p className="text-[10px] font-black uppercase text-slate-400">GPS age</p>
@@ -757,7 +757,7 @@ const LiveMapPage = ({
                   </div>
                   <div className="rounded-md bg-white p-2">
                     <p className="text-[10px] font-black uppercase text-slate-400">Accuracy</p>
-                    <p className="mt-1 text-xs font-black">{selectedDriver?.locationAccuracy ? `${Math.round(selectedDriver.locationAccuracy)} m` : 'Not available'}</p>
+                    <p className="mt-1 text-xs font-black">{selectedDriver?.locationAccuracy ? `${Math.round(selectedDriver.locationAccuracy)} m` : 'Unknown'}</p>
                   </div>
                   <div className="rounded-md bg-white p-2">
                     <p className="text-[10px] font-black uppercase text-slate-400">Tracked miles</p>
@@ -817,7 +817,7 @@ const LiveMapPage = ({
                         <div key={trip.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-black text-slate-950">{trip.patient || 'No client name'}</p>
+                              <p className="truncate text-sm font-black text-slate-950">{trip.patient || 'Unknown client'}</p>
                               <p className="mt-1 text-[11px] font-bold text-slate-500">{trip.time || 'Will Call'} | {trip.status}</p>
                             </div>
                             <StatusPill tone={phase.color}>{phase.label}</StatusPill>
@@ -858,7 +858,7 @@ const LiveMapPage = ({
                 <div className="space-y-2">
                   {(selectedSummary?.upcoming || []).slice(0, 5).map(trip => (
                     <div key={trip.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <p className="truncate text-sm font-black text-slate-950">{trip.patient || 'No client name'}</p>
+                      <p className="truncate text-sm font-black text-slate-950">{trip.patient || 'Unknown client'}</p>
                       <p className="mt-1 text-[11px] font-bold text-slate-500">{trip.time || 'Will Call'} | {trip.status}</p>
                       <p className="mt-2 line-clamp-2 text-xs font-medium text-slate-600">{trip.pickup}</p>
                     </div>

@@ -8,7 +8,7 @@ import {
 import { formatTelemetryDuration } from '../utils/driverTelemetry';
 import { aiAnalyzeTrips } from '../config/ai';
 
-const STATUS_OPTIONS = ['Completed', 'No Show', 'Cancelled', 'Rerouted'];
+const STATUS_OPTIONS = ['Completed', 'No Show', 'Cancelled'];
 
 const today = new Date().toISOString().split('T')[0];
 
@@ -18,20 +18,8 @@ const STATUS_VARIANT = {
   Cancelled: 'bg-amber-100 text-amber-700 border-amber-200',
 };
 
-const NO_TIME = 'No time';
-const NO_DRIVER = 'No driver';
-const NO_VEHICLE = 'No vehicle';
-const NO_BOOKING = 'No booking';
-const NO_PASSENGER = 'No passenger';
-const NO_PICKUP = 'No pickup address';
-const NO_DROPOFF = 'No dropoff address';
-const NO_ODOMETER = 'No odometer';
-const NO_DURATION = 'No duration';
-const NO_MILEAGE = 'No mileage';
-const NOT_RECORDED = 'Not recorded';
-
 const formatClock24 = (value) => {
-  if (!value) return NO_TIME;
+  if (!value) return '—';
   const s = String(value).trim();
   if (s.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(s)) {
     const d = new Date(s);
@@ -50,7 +38,7 @@ const formatClock24 = (value) => {
     if (meridiem === 'AM' && hour === 12) hour = 0;
     return `${String(hour).padStart(2, '0')}:${min}`;
   }
-  return NO_TIME;
+  return '—';
 };
 
 const parseDateOrClock = (value) => {
@@ -111,26 +99,26 @@ const timeToMinutes = (value) => {
 const getDriverRecord = (trip, drivers) =>
   drivers.find((driver) => driver.id === trip.driverId || driver.email === trip.driverEmail);
 
-const getDriverLabel = (trip, drivers) => getDriverRecord(trip, drivers)?.name || trip.driverName || NO_DRIVER;
+const getDriverLabel = (trip, drivers) => getDriverRecord(trip, drivers)?.name || trip.driverName || '—';
 
-const buildCsvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+const buildCsvValue = (value) => `"${String(value ?? '').replace(/"/g, '""').replace(/—/g, '')}"`;
 
 const calcDuration = (start, end) => {
-  if (!start || !end) return NO_DURATION;
+  if (!start || !end) return '—';
   const s = parseDateOrClock(start);
   const e = parseDateOrClock(end);
-  if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return NO_DURATION;
+  if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return '—';
   const diff = Math.round((e - s) / 60000);
-  if (diff < 0) return NO_DURATION;
+  if (diff < 0) return '—';
   const h = Math.floor(diff / 60);
   const m = diff % 60;
   return h > 0 ? `${h}h${m > 0 ? m : ''}` : `${m}m`;
 };
 
 const calcMiles = (pickupOdo, dropoffOdo) => {
-  if (!pickupOdo || !dropoffOdo) return NO_MILEAGE;
+  if (!pickupOdo || !dropoffOdo) return '—';
   const diff = Number(dropoffOdo) - Number(pickupOdo);
-  return diff > 0 ? diff.toFixed(1) : NO_MILEAGE;
+  return diff > 0 ? diff.toFixed(1) : '—';
 };
 
 const formatDateLabel = (dateStr) => {
@@ -323,25 +311,25 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     switch (col.key) {
       case 'date': return formatDateLabel(trip.date || 'No Date');
       case 'driver': return getDriverLabel(trip, drivers);
-      case 'vehicle': { const v = trip.completedVehicle || ''; return v && v !== 'Pending Assignment' ? v : NO_VEHICLE; }
-      case 'time': return formatClock24(trip.time) !== NO_TIME ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
-      case 'bookingId': return trip.bookingId || trip.id || NO_BOOKING;
-      case 'patient': return trip.patient || NO_PASSENGER;
-      case 'pickup': return trip.pickup || NO_PICKUP;
-      case 'dropoff': return trip.dropoff || NO_DROPOFF;
+      case 'vehicle': { const v = trip.completedVehicle || ''; return v && v !== 'Pending Assignment' ? v : '—'; }
+      case 'time': return formatClock24(trip.time) !== '—' ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
+      case 'bookingId': return trip.bookingId || trip.id || '—';
+      case 'patient': return trip.patient || '—';
+      case 'pickup': return trip.pickup || '—';
+      case 'dropoff': return trip.dropoff || '—';
       case 'arrivalTime': return formatClock24(trip.arrivalTime);
       case 'departedPickupTime': return formatClock24(trip.departedPickupTime);
       case 'arrivalDropoffTime': return formatClock24(trip.arrivalDropoffTime || trip.completedAt);
-      case 'pickupOdometer': return trip.pickupOdometer || NO_ODOMETER;
-      case 'dropoffOdometer': return trip.dropoffOdometer || NO_ODOMETER;
+      case 'pickupOdometer': return trip.pickupOdometer || '';
+      case 'dropoffOdometer': return trip.dropoffOdometer || '';
       case 'travelTime': return trip.travelTime || calcDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
-      case 'distance': { const m = calcMiles(trip.pickupOdometer, trip.dropoffOdometer); return m !== NO_MILEAGE ? m : NO_MILEAGE; }
+      case 'distance': { const m = calcMiles(trip.pickupOdometer, trip.dropoffOdometer); return m !== '—' ? m : '—'; }
       case 'signature': {
-        if (!('paperSignatureConfirmed' in trip)) return NOT_RECORDED;
+        if (!('paperSignatureConfirmed' in trip)) return '—';
         return trip.paperSignatureConfirmed ? 'Yes' : 'No';
       }
       case 'reviewed': return trip.reviewed ? 'Done' : 'Pending';
-      default: return NOT_RECORDED;
+      default: return '—';
     }
   };
 
@@ -386,7 +374,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           onBlur={() => cancelEdit()}
           autoFocus
         >
-          <option value="">Not selected</option>
+          <option value="">—</option>
           {drivers.map(d => (
             <option key={d.id} value={d.id}>{d.name}</option>
           ))}
@@ -404,7 +392,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           onBlur={() => cancelEdit()}
           autoFocus
         >
-          <option value="">Not selected</option>
+          <option value="">—</option>
           {vehicles.map(v => (
             <option key={v.id || v.name || v} value={v.name || v}>{v.name || v}</option>
           ))}
@@ -519,7 +507,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     groupedTrips.forEach(([date, dayTrips]) => {
       const passengerGroups = {};
       dayTrips.forEach(trip => {
-        const passengerKey = trip.patient || NO_PASSENGER;
+        const passengerKey = trip.patient || 'Unknown';
         if (!passengerGroups[passengerKey]) {
           passengerGroups[passengerKey] = [];
         }
@@ -535,7 +523,6 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     completed: reportTrips.filter((t) => t.status === 'Completed').length,
     noShow: reportTrips.filter((t) => t.status === 'No Show').length,
     cancelled: reportTrips.filter((t) => t.status === 'Cancelled').length,
-    rerouted: reportTrips.filter((t) => t.status === 'Rerouted').length,
     reviewed: reportTrips.filter((t) => t.reviewed).length,
     totalRows: reportTrips.length,
   }), [reportTrips]);
@@ -609,10 +596,10 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
   const renderSortableHeader = (column, children, className = '') => (
     <th
       onClick={() => handleSort(column)}
-      className={`p-2 text-left whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors min-h-[44px] ${className}`}
+      className={`p-2 text-left whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors ${className}`}
     >
       <div className="flex items-center">
-        <span className="text-[10.5px]">{children}</span>
+        <span className="text-[10px]">{children}</span>
         {renderSortIcon(column)}
       </div>
     </th>
@@ -635,17 +622,17 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
   const exportCsv = () => {
     const headers = [
       'Date', 'Driver', 'Vehicle', 'Scheduled Time', 'Trip ID', 'Passenger',
-      'Pickup Address', 'Pickup Arrival', 'Departed Pickup', 'Start Odometer', 'Dropoff Address', 'Dropoff Arrival',
-      'End Odometer', 'Travel Time', 'Distance (mi)', 'Signature', 'Reviewed', 'Status'
+      'Pickup Address', 'Pickup Time', 'Departed Pickup', 'Start Odometer', 'Dropoff Address', 'Dropoff',
+      'End Odometer', 'Travel Time', 'Distance (mi)', 'Signature', 'Reviewed'
     ];
 
     const rows = [];
     reportTrips.forEach((trip) => {
       const driver = getDriverRecord(trip, drivers);
-      const driverName = driver?.name || trip.driverName || NO_DRIVER;
-      const vehicle = trip.completedVehicle || (driver?.vehicle && driver.vehicle !== 'Pending Assignment' ? driver.vehicle : '') || NO_VEHICLE;
+      const driverName = driver?.name || trip.driverName || '—';
+      const vehicle = trip.completedVehicle || (driver?.vehicle && driver.vehicle !== 'Pending Assignment' ? driver.vehicle : '') || '—';
       const duration = trip.travelTime || calcDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
-      const scheduledTime = formatClock24(trip.time) !== NO_TIME ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
+      const scheduledTime = formatClock24(trip.time) !== '—' ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
       const pickupTime = formatClock24(trip.arrivalTime);
       const departedPickup = formatClock24(trip.departedPickupTime);
       const pickupAddr = trip.pickup || '';
@@ -674,10 +661,9 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         buildCsvValue(dropoffTime),
         buildCsvValue(dropoffOdo),
         buildCsvValue(duration),
-        buildCsvValue(miles !== NO_MILEAGE ? miles : ''),
+        buildCsvValue(miles !== '—' ? miles : ''),
         buildCsvValue(signed),
-        buildCsvValue(reviewed),
-        buildCsvValue(trip.status || '')
+        buildCsvValue(reviewed)
       ]);
     });
 
@@ -703,47 +689,46 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-slate-100">
-      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-2 py-1 flex items-center gap-2 flex-wrap text-[10.5px]">
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-2 py-1 flex items-center gap-2 flex-wrap text-[10px]">
         <div className="flex items-center gap-1 bg-slate-100 rounded px-1.5 py-0.5 min-w-[90px]">
           <Search size={10} className="text-slate-400 shrink-0" />
           <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-transparent outline-none w-full min-w-0 placeholder:text-slate-400" />
-          {searchQuery && <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600 min-h-[44px] min-w-[44px] p-2 flex items-center justify-center"><X size={10} /></button>}
+          {searchQuery && <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600"><X size={10} /></button>}
         </div>
         <div className="flex items-center gap-0.5 bg-slate-100 rounded px-1.5 py-0.5">
           <Calendar size={10} className="text-slate-400 shrink-0" />
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-1 py-1 border border-slate-200 rounded text-xs outline-none focus:border-blue-500 w-[85px] bg-white min-h-[36px]" />
-          <span className="text-[8px] text-slate-400">to</span>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-1 py-1 border border-slate-200 rounded text-xs outline-none focus:border-blue-500 w-[85px] bg-white min-h-[36px]" />
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-0.5 py-0 border border-slate-200 rounded text-[9px] outline-none focus:border-blue-500 w-[85px] bg-white" />
+          <span className="text-[8px] text-slate-400">→</span>
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-0.5 py-0 border border-slate-200 rounded text-[9px] outline-none focus:border-blue-500 w-[85px] bg-white" />
         </div>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-1 py-0.5 border border-slate-200 rounded text-xs outline-none bg-white min-h-[36px]">
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-1 py-0.5 border border-slate-200 rounded text-[9px] outline-none bg-white">
           <option value="all">All</option>
           {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-1 py-0.5 border border-slate-200 rounded text-xs outline-none bg-white min-h-[36px]">
+        <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-1 py-0.5 border border-slate-200 rounded text-[9px] outline-none bg-white">
           <option value="all">Drivers</option>
           {drivers.map((d) => (<option key={d.id} value={d.id || d.email}>{d.name}</option>))}
         </select>
-        <button onClick={resetFilters} className="p-2 min-h-[44px] rounded bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center" title="Reset"><RefreshCw size={9} /></button>
+        <button onClick={resetFilters} className="p-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200" title="Reset"><RefreshCw size={9} /></button>
         {selectedTasks.length > 0 && (
-          <button onClick={() => requestBulkDelete(selectedTasks, () => setSelectedTasks([]))} className="flex items-center gap-0.5 px-2 py-1 min-h-[36px] bg-rose-50 text-rose-600 rounded font-semibold"><Archive size={9} /> Arch {selectedTasks.length}</button>
+          <button onClick={() => requestBulkDelete(selectedTasks, () => setSelectedTasks([]))} className="flex items-center gap-0.5 px-1 py-0.5 bg-rose-50 text-rose-600 rounded font-semibold"><Archive size={9} /> Arch {selectedTasks.length}</button>
         )}
-        <button onClick={() => setShowUploadModal(true)} className="px-2 py-1 min-h-[36px] bg-blue-600 hover:bg-blue-700 text-white rounded font-bold"><UploadCloud size={9} /> Upload</button>
-        <button onClick={exportCsv} disabled={reportTrips.length === 0} className="px-2 py-1 min-h-[36px] bg-blue-600 hover:bg-blue-700 text-white rounded font-bold disabled:opacity-40"><Download size={9} /> CSV</button>
-        <button onClick={generateAiReport} disabled={reportTrips.length === 0 || aiReportLoading} className="px-2 py-1 min-h-[36px] bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold disabled:opacity-40 flex items-center gap-1">
+        <button onClick={() => setShowUploadModal(true)} className="px-1 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold"><UploadCloud size={9} /> Upload</button>
+        <button onClick={exportCsv} disabled={reportTrips.length === 0} className="px-1 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold disabled:opacity-40"><Download size={9} /> CSV</button>
+        <button onClick={generateAiReport} disabled={reportTrips.length === 0 || aiReportLoading} className="px-1 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold disabled:opacity-40 flex items-center gap-1">
           {aiReportLoading ? <Loader2 size={9} className="animate-spin" /> : <BrainCircuit size={9} />} AI Report
         </button>
         <span className="w-px h-4 bg-slate-200" />
         {[
           { label: 'Total', value: stats.total, color: 'text-slate-700' },
           { label: 'Done', value: stats.completed, color: 'text-emerald-600' },
-          { label: 'Reviewed', value: stats.reviewed, color: 'text-blue-600' },
+          { label: 'Reviewed', value: stats.reviewed, color: 'text-indigo-600' },
           { label: 'NS', value: stats.noShow, color: 'text-rose-600' },
           { label: 'Canc.', value: stats.cancelled, color: 'text-amber-600' },
-          { label: 'Reroute', value: stats.rerouted, color: 'text-purple-600' },
         ].map((s) => (
           <span key={s.label} className="flex items-center gap-0.5">
             <span className="text-[9px] text-slate-400 font-medium">{s.label}</span>
-            <span className={`text-[10.5px] font-bold ${s.color}`}>{s.value}</span>
+            <span className={`text-[10px] font-bold ${s.color}`}>{s.value}</span>
           </span>
         ))}
         <span className="text-[9px] text-slate-400">{reportTrips.length > 0 && `${reportTrips.length}`}</span>
@@ -764,24 +749,24 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <BrainCircuit size={14} className="text-indigo-600" />
-              <span className="text-[10.5px] font-bold text-indigo-700 uppercase tracking-wider">AI Report Insights</span>
+              <span className="text-[10px] font-black text-indigo-700 uppercase tracking-wider">AI Report Insights</span>
             </div>
-            <button onClick={() => setAiReport(null)} className="text-slate-400 hover:text-slate-600 min-h-[44px] min-w-[44px] p-2 flex items-center justify-center"><X size={12} /></button>
+            <button onClick={() => setAiReport(null)} className="text-slate-400 hover:text-slate-600"><X size={12} /></button>
           </div>
           <p className="text-xs text-slate-700 leading-relaxed">{aiReport.summary}</p>
           {aiReport.trends?.length > 0 && (
             <div>
-              <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider mb-1">Trends</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Trends</p>
               <div className="flex flex-wrap gap-1.5">
                 {aiReport.trends.map((t, i) => (
-                  <span key={i} className="px-2 py-0.5 bg-white rounded-full border border-slate-200 text-[10.5px] font-semibold text-slate-700">{t}</span>
+                  <span key={i} className="px-2 py-0.5 bg-white rounded-full border border-slate-200 text-[10px] font-semibold text-slate-700">{t}</span>
                 ))}
               </div>
             </div>
           )}
           {aiReport.anomalies?.length > 0 && (
             <div>
-              <p className="text-[10.5px] font-bold text-rose-500 uppercase tracking-wider mb-1 flex items-center gap-1"><AlertTriangle size={10} /> Anomalies</p>
+              <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1 flex items-center gap-1"><AlertTriangle size={10} /> Anomalies</p>
               <div className="space-y-0.5">
                 {aiReport.anomalies.map((a, i) => (
                   <p key={i} className="text-xs text-rose-700">{a}</p>
@@ -791,7 +776,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           )}
           {aiReport.recommendations?.length > 0 && (
             <div>
-              <p className="text-[10.5px] font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Lightbulb size={10} /> Recommendations</p>
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Lightbulb size={10} /> Recommendations</p>
               <div className="space-y-0.5">
                 {aiReport.recommendations.map((r, i) => (
                   <p key={i} className="text-xs text-emerald-800">{r}</p>
@@ -828,6 +813,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                 {/* Date Group Header */}
                 <div
                   className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-2 cursor-pointer hover:bg-slate-200 transition-colors w-max min-w-full"
+                  style={{ minWidth: reportTableMinWidth }}
                   onClick={() => toggleDay(dateLabel)}
                 >
                   <div className="flex flex-wrap items-center gap-2">
@@ -856,13 +842,13 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                     <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => markTripsReviewed(dayTrips, true)}
-                        className="px-3 py-1.5 min-h-[36px] rounded-lg bg-emerald-100 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-200 transition-colors flex items-center"
+                        className="px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-200 transition-colors"
                       >
                         Mark Day Done
                       </button>
                       <button
                         onClick={() => markTripsReviewed(dayTrips, false)}
-                        className="px-3 py-1.5 min-h-[36px] rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold hover:bg-slate-200 transition-colors flex items-center"
+                        className="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold hover:bg-slate-200 transition-colors"
                       >
                         Reset Review
                       </button>
@@ -873,48 +859,59 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
 
                 {!isCollapsed && (
                   <>
-                    {/* Table - hidden on mobile */}
-                    <div className="w-full hidden lg:block">
-                    <table className="resizable-table text-[10.5px]" style={{ width: '100%' }}>
+                    {/* Table */}
+                    <div className="w-full overflow-x-auto">
+                  <table className="resizable-table text-xs" style={{ tableLayout: 'fixed', width: '100%', minWidth: reportTableMinWidth }}>
+                    <colgroup>
+                      <col style={{ width: ROW_CONTROL_COL_WIDTH }} />
+                      {Columns.map(col => (
+                        <col key={col.key} style={{ width: colWidths[col.key] || 100 }} />
+                      ))}
+                    </colgroup>
                     <thead className="bg-slate-800 text-slate-100 border-b border-slate-200">
                       <tr>
-                        <th className="px-2 py-1.5 text-center align-middle resizable-th">
+                        <th className="p-2 text-center align-middle resizable-th" style={{ width: ROW_CONTROL_COL_WIDTH }}>
                           <div className="flex items-center justify-center gap-2">
-                            <div className="flex items-center justify-center">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const dayTripIds = dayTrips.map(t => t.id);
-                                  const allSelected = dayTripIds.every(id => selectedTasks.includes(id));
-                                  if (allSelected) {
-                                    setSelectedTasks(selectedTasks.filter(id => !dayTripIds.includes(id)));
-                                  } else {
-                                    const newSelection = [...new Set([...selectedTasks, ...dayTripIds])];
-                                    setSelectedTasks(newSelection);
-                                  }
-                                }}
-                                className={`p-0.5 rounded transition-all duration-150 ${dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
-                                title="Select all trips for this day"
-                                aria-label="Select all trips for this day"
-                              >
-                                {dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? <CheckSquare size={12} /> : <Square size={12} />}
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const dayTripIds = dayTrips.map(t => t.id);
+                                const allSelected = dayTripIds.every(id => selectedTasks.includes(id));
+                                if (allSelected) {
+                                  setSelectedTasks(selectedTasks.filter(id => !dayTripIds.includes(id)));
+                                } else {
+                                  const newSelection = [...new Set([...selectedTasks, ...dayTripIds])];
+                                  setSelectedTasks(newSelection);
+                                }
+                              }}
+                              className={`p-0.5 rounded transition-all duration-150 ${dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
+                              title="Select all trips for this day"
+                              aria-label="Select all trips for this day"
+                            >
+                              {dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? <CheckSquare size={14} /> : <Square size={14} />}
+                            </button>
                             {canEdit && <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Edit</span>}
                           </div>
                         </th>
                         {Columns.map(col => (
                           <th
                             key={col.key}
-                            className="px-2 py-1.5 text-left select-none resizable-th"
+                            className="resizable-th p-0 text-left select-none"
+                            style={{ width: colWidths[col.key] || 100 }}
                           >
                             <div
-                              className="flex items-center justify-between cursor-pointer group hover:bg-slate-700 transition-colors"
+                              className="flex items-center justify-between cursor-pointer group hover:bg-slate-700 transition-colors px-2 py-2 h-full"
                               onClick={() => handleSort(col.key)}
                             >
-                              <span className="text-[10.5px] font-semibold truncate">{col.label}</span>
+                              <span className="text-[10px] font-semibold truncate">{col.label}</span>
                               <span className="ml-1 shrink-0">{renderSortIcon(col.key)}</span>
                             </div>
+                            {/* Resize handle */}
+                            <div
+                              className="col-resize-handle"
+                              onMouseDown={(e) => startColResize(e, col.key)}
+                              title="Drag to resize column"
+                            />
                           </th>
                         ))}
                       </tr>
@@ -932,34 +929,32 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                               setActiveRow(trip.id);
                             }}
                           >
-                            <td className="px-2 py-1.5 align-top">
-                              <div className="flex items-center gap-1">
-                                <div className="flex items-center justify-center">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const isSelected = selectedTasks.includes(trip.id);
-                                      if (isSelected) {
-                                        setSelectedTasks(selectedTasks.filter(id => id !== trip.id));
-                                      } else {
-                                        setSelectedTasks([...selectedTasks, trip.id]);
-                                      }
-                                    }}
-                                    className={`p-0.5 rounded transition-all duration-150 ${selectedTasks.includes(trip.id) ? 'text-blue-600' : 'text-slate-300 hover:text-slate-500'}`}
-                                    title={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
-                                    aria-label={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
-                                  >
-                                    {selectedTasks.includes(trip.id) ? <CheckSquare size={14} /> : <Square size={14} />}
-                                  </button>
-                                </div>
+                            <td className="p-2 align-middle">
+                              <div className="flex items-center gap-1 whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const isSelected = selectedTasks.includes(trip.id);
+                                    if (isSelected) {
+                                      setSelectedTasks(selectedTasks.filter(id => id !== trip.id));
+                                    } else {
+                                      setSelectedTasks([...selectedTasks, trip.id]);
+                                    }
+                                  }}
+                                  className={`p-0.5 rounded transition-all duration-150 ${selectedTasks.includes(trip.id) ? 'text-blue-600' : 'text-slate-300 hover:text-slate-500'}`}
+                                  title={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
+                                  aria-label={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
+                                >
+                                  {selectedTasks.includes(trip.id) ? <CheckSquare size={14} /> : <Square size={14} />}
+                                </button>
                                 {canEdit && (
                                   editingRow === trip.id ? (
                                     <div className="flex items-center gap-1">
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); finishRowEdit(); }}
-                                        className="p-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150 flex items-center justify-center"
+                                        className="p-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150"
                                         title="Keep changes"
                                         aria-label="Keep changes"
                                       >
@@ -968,7 +963,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); revertRowEdit(); }}
-                                        className="p-1 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150 flex items-center justify-center"
+                                        className="p-0.5 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150"
                                         title="Cancel and restore original row"
                                         aria-label="Cancel and restore original row"
                                       >
@@ -979,7 +974,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                                     <button
                                       type="button"
                                       onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
-                                      className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150 flex items-center justify-center"
+                                      className="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
                                       title="Edit row"
                                       aria-label="Edit row"
                                     >
@@ -994,27 +989,27 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                               const displayValue = renderCellValue(trip, col);
                               const isEditing = isEditingCell(trip.id, cellKey);
                               return (
-                                <td key={cellKey} className={`px-2 py-1.5 ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== NO_MILEAGE ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 text-[10.5px] font-mono tracking-wider uppercase' : ''}`}
+                                <td key={cellKey} className={`p-2 whitespace-nowrap ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== '—' ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 text-[10px] font-mono tracking-wider uppercase' : ''}`}
                                   title={cellKey === 'pickup' || cellKey === 'dropoff' ? displayValue : undefined}
                                 >
                                   {isEditing ? (
                                     renderCellEditor(trip, col)
                                   ) : canEdit && editingRow === trip.id && cellKey !== 'signature' ? (
                                     <span
-                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block"
+                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
                                       onClick={() => startCellEdit(trip.id, cellKey, (trip[FIELD_FOR_COL[cellKey]] ?? ''))}
                                     >
                                       {displayValue}
                                     </span>
                                   ) : cellKey === 'signature' && canEdit && editingRow === trip.id ? (
                                     <span
-                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block"
+                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
                                       onClick={() => saveCell(trip, 'paperSignatureConfirmed', !trip.paperSignatureConfirmed)}
                                     >
                                       {displayValue}
                                     </span>
                                   ) : (
-                                    <span className="block">{displayValue}</span>
+                                    <span className="block leading-5">{displayValue}</span>
                                   )}
                                 </td>
                               );
@@ -1026,75 +1021,6 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                   </table>
                 </div>
 
-                {/* Mobile Card View - visible below lg */}
-                <div className="lg:hidden divide-y divide-slate-100">
-                  {dayTrips.map((trip) => {
-                    const statusClass = STATUS_VARIANT[trip.status] || 'bg-slate-100 text-slate-600 border-slate-200';
-                    const driverLabel = getDriverLabel(trip, drivers);
-                    const scheduledTime = formatClock24(trip.time) !== NO_TIME ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
-                    return (
-                      <div
-                        key={trip.id}
-                        className={`px-4 py-3 ${activeRow === trip.id ? 'bg-blue-50' : 'bg-white'} hover:bg-blue-50/70 transition-colors`}
-                        onClick={() => setActiveRow(trip.id)}
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            {canEdit && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const isSelected = selectedTasks.includes(trip.id);
-                                  setSelectedTasks(isSelected ? selectedTasks.filter(id => id !== trip.id) : [...selectedTasks, trip.id]);
-                                }}
-                                className={`p-0.5 rounded transition-all duration-150 shrink-0 ${selectedTasks.includes(trip.id) ? 'text-blue-600' : 'text-slate-300'}`}
-                              >
-                                {selectedTasks.includes(trip.id) ? <CheckSquare size={14} /> : <Square size={14} />}
-                              </button>
-                            )}
-                            <span className="font-bold text-sm text-slate-900 truncate">{trip.patient || NO_PASSENGER}</span>
-                          </div>
-                          <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${statusClass}`}>
-                            {trip.status || 'No status'}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                          <div>
-                            <span className="text-slate-400 text-[10.5px] uppercase tracking-wide">Pickup</span>
-                            <p className="text-emerald-600 truncate" title={trip.pickup}>{trip.pickup || NO_PICKUP}</p>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 text-[10.5px] uppercase tracking-wide">Dropoff</span>
-                            <p className="text-rose-600 truncate" title={trip.dropoff}>{trip.dropoff || NO_DROPOFF}</p>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 text-[10.5px] uppercase tracking-wide">Time</span>
-                            <p className="font-mono text-slate-700">{scheduledTime}</p>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 text-[10.5px] uppercase tracking-wide">Driver</span>
-                            <p className="font-semibold text-slate-700 truncate">{driverLabel}</p>
-                          </div>
-                        </div>
-
-                        {canEdit && (
-                          <div className="mt-2 pt-2 border-t border-slate-100 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
-                              className="px-3 py-1.5 min-h-[36px] rounded-lg bg-blue-50 text-blue-600 text-[11px] font-semibold hover:bg-blue-100 transition-colors flex items-center gap-1"
-                            >
-                              <SquarePen size={11} /> Edit
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
                 {/* Daily Summary per Driver */}
                 {(() => {
                   const byDriver = {};
@@ -1103,11 +1029,11 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                     if (!byDriver[driverName]) byDriver[driverName] = { trips: 0, totalDistance: 0, passengers: new Set() };
                     byDriver[driverName].trips++;
                     const d = calcMiles(trip.pickupOdometer, trip.dropoffOdometer);
-                    if (d !== NO_MILEAGE) byDriver[driverName].totalDistance += parseFloat(d);
+                    if (d !== '—') byDriver[driverName].totalDistance += parseFloat(d);
                     if (trip.patient) byDriver[driverName].passengers.add(trip.patient);
                   });
                   return Object.entries(byDriver).map(([driverName, info]) => (
-                    <div key={driverName} className="px-4 py-2 bg-slate-50/80 border-t border-slate-200 flex flex-wrap items-center gap-2 sm:gap-4 text-xs">
+                    <div key={driverName} className="px-4 py-2 bg-slate-50/80 border-t border-slate-200 flex items-center gap-4 text-xs">
                       <span className="font-bold text-slate-700 min-w-[100px]">{driverName}</span>
                       <span className="text-slate-500">{info.trips} trips</span>
                       <span className="text-slate-500">{info.totalDistance.toFixed(1)} mi</span>

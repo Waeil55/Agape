@@ -2,7 +2,20 @@ import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, ArrowRight, Download, Truck, X } from 'lucide-react';
 import { GEMINI_API_CONFIG } from '../config/firebase';
-import { hasInOutText, hasWillCallText, timeToMinutes, UNSCHEDULED_SORT_MINUTES, WILL_CALL_SORT_MINUTES } from '../utils/tripDate';
+
+const timeToMinutes = (t) => {
+  if (!t) return 1440;
+  const cleanTime = String(t).toUpperCase().trim();
+  if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
+  const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+  if (!m) return 1440;
+  let h = parseInt(m[1], 10);
+  let min = parseInt(m[2] || '0', 10);
+  const p = m[3];
+  if (p === 'PM' && h < 12) h += 12;
+  if (p === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
+};
 
 const COLUMN_ALIASES = {
   bookingId: ['booking id', 'bookingid', 'reservation id', 'trip id', 'booking number', 'confirmation id', 'tripid', 'trip_id', 'trip number', 'order id', 'order number', 'booking', 'confirmation #', 'confirmation', 'reservation'],
@@ -15,10 +28,8 @@ const COLUMN_ALIASES = {
   dropoffTime: ['requested late dropoff', 'requested time dropoff', 'dropoff time', 'late dropoff', 'return time', 'do time', 'drop-off time', 'drop off time', 'appt end time', 'end time', 'dropoff', 'scheduled dropoff', 'return'],
   date: ['date', 'trip date', 'service date', 'requested date', 'scheduled date', 'appt date', 'appointment date', 'day', 'calendar date', 'schedule date'],
   type: ['type', 'trip type', 'am/pm', 'run', 'shift', 'route type', 'service type', 'schedule type', 'trip_type', 'mode', 'vehicle type', 'req', 'service', 'transport type', 'transportation type'],
-  pickupComments: ['pickup comments', 'pickup comment', 'pu comments', 'pu comment', 'origin comments', 'origin comment'],
-  dropoffComments: ['dropoff comments', 'dropoff comment', 'do comments', 'do comment', 'destination comments', 'destination comment'],
   notes: ['notes', 'special instructions', 'instructions', 'comment', 'comments', 'note', 'memo', 'remarks', 'additional info', 'info', 'pickup comments', 'dropoff comments', 'message', 'purpose', 'driver notes', 'trip notes', 'special', 'special needs', 'alert'],
-  driver: ['driver', 'driver name', 'assigned to', 'chauffeur', 'assigned driver', 'driver id', 'driverid'],
+  driver: ['driver', 'driver name', 'assigned to', 'chauffeur', 'provider', 'assigned driver', 'driver id', 'driverid'],
   driverEmail: ['driver email', 'driver_email', 'driver email address', 'email'],
   vehicle: ['vehicle', 'vehicle id', 'car', 'van', 'fleet', 'assigned vehicle', 'truck', 'vehicle number', 'unit #', 'unit number'],
   pickupOdometer: ['pickup odometer', 'pu odometer', 'start odometer', 'start mileage', 'pickup mileage', 'odometer start', 'pu odo', 'start odo', 'begin odo', 'begin odometer', 'start odo reading'],
@@ -41,210 +52,6 @@ const COLUMN_ALIASES = {
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 
-const normalizeKeyText = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-function normalizeAddressForPair(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/\b(street|st)\b/g, 'st')
-    .replace(/\b(avenue|ave)\b/g, 'ave')
-    .replace(/\b(road|rd)\b/g, 'rd')
-    .replace(/\b(drive|dr)\b/g, 'dr')
-    .replace(/\b(lane|ln)\b/g, 'ln')
-    .replace(/[^a-z0-9]/g, '');
-}
-
-function getRawValue(row, aliases) {
-  const keys = Object.keys(row || {});
-  const normalizedAliases = aliases.map(normalizeKeyText);
-  const exactKey = keys.find((key) => normalizedAliases.includes(normalizeKeyText(key)));
-  if (exactKey) return row[exactKey] || '';
-  const fuzzyKey = keys.find((key) => normalizedAliases.some((alias) => normalizeKeyText(key).includes(alias) || alias.includes(normalizeKeyText(key))));
-  return fuzzyKey ? row[fuzzyKey] || '' : '';
-}
-
-function buildTimingMetadata({ pickupTime, pickupComments, dropoffComments, notes }) {
-  const rawPickupTime = String(pickupTime || '').trim();
-  const commentsText = [pickupComments, dropoffComments, notes].filter(Boolean).join(' ');
-  const hasScheduledPickup = timeToMinutes(rawPickupTime) !== UNSCHEDULED_SORT_MINUTES;
-  const hasInOut = hasInOutText(commentsText) || hasInOutText(rawPickupTime);
-  const hasWillCall = hasWillCallText(rawPickupTime) || hasWillCallText(commentsText);
-
-  if (hasScheduledPickup) {
-    return {
-      time: rawPickupTime,
-      requestedPickupTime: rawPickupTime,
-      timingType: hasInOut ? 'scheduled_in_out' : 'scheduled',
-      isInOut: hasInOut,
-      isWillCallTrip: false,
-      willCall: false,
-      sourceTimingLabel: rawPickupTime,
-    };
-  }
-
-  if (hasInOut) {
-    return {
-      time: 'IN/OUT',
-      requestedPickupTime: rawPickupTime,
-      timingType: 'in_out',
-      isInOut: true,
-      isWillCallTrip: false,
-      willCall: false,
-      sourceTimingLabel: 'IN/OUT',
-    };
-  }
-
-  return {
-    time: 'Will Call',
-    requestedPickupTime: rawPickupTime,
-    timingType: hasWillCall ? 'will_call' : 'unscheduled',
-    isInOut: false,
-    isWillCallTrip: true,
-    willCall: true,
-    sourceTimingLabel: hasWillCall ? 'Will Call' : 'No Pickup Time',
-  };
-}
-
-function getIdentifierValues(trip) {
-  return [
-    trip?.bookingId,
-    trip?.id,
-    trip?.tripId,
-    trip?.tripNumber,
-    trip?._originalRow?.['Booking Id'],
-    trip?._originalRow?.['Booking ID'],
-    trip?._originalRow?.['Trip ID'],
-    trip?._originalRow?.['Trip Id'],
-  ].filter((value) => value !== undefined && value !== null && String(value).trim() !== '');
-}
-
-function getNumericIdentifierParts(value) {
-  const text = String(value || '').trim();
-  const groups = text.match(/\d+/g);
-  if (!groups?.length) return [];
-  const last = groups[groups.length - 1];
-  const parts = [{ value: Number.parseInt(last, 10), basis: 'number', width: last.length }];
-  [4, 3, 2].forEach((width) => {
-    if (last.length > width) {
-      parts.push({ value: Number.parseInt(last.slice(-width), 10), basis: `last${width}`, width });
-    }
-  });
-  return parts.filter((part) => Number.isFinite(part.value));
-}
-
-function getBestSequenceMatch(outbound, inbound) {
-  const outboundParts = getIdentifierValues(outbound).flatMap(getNumericIdentifierParts);
-  const inboundParts = getIdentifierValues(inbound).flatMap(getNumericIdentifierParts);
-  let best = { score: 0, gap: null, basis: '' };
-
-  outboundParts.forEach((outPart) => {
-    inboundParts.forEach((inPart) => {
-      const gap = inPart.value - outPart.value;
-      if (gap <= 0 || gap > 12) return;
-
-      let score = 0;
-      let basis = `${outPart.basis}->${inPart.basis}`;
-      if (outPart.basis === 'number' && inPart.basis === 'number') {
-        score = gap === 1 ? 30 : Math.max(0, 10 - gap);
-        basis = 'full-number';
-      } else if (outPart.basis === inPart.basis) {
-        const base = outPart.width === 4 ? 24 : outPart.width === 3 ? 22 : 18;
-        score = gap === 1 ? base : Math.max(0, base - 12 - gap);
-      } else if (gap === 1) {
-        score = 12;
-      }
-
-      if (score > best.score) {
-        best = { score, gap, basis };
-      }
-    });
-  });
-
-  return best;
-}
-
-function scoreInOutPair(outbound, inbound) {
-  const noMatch = { score: 0, sequenceMatch: { score: 0, gap: null, basis: '' } };
-  if (!outbound || !inbound) return noMatch;
-  if ((outbound.patient || '').trim().toLowerCase() !== (inbound.patient || '').trim().toLowerCase()) return noMatch;
-  if ((outbound.date || '') !== (inbound.date || '')) return noMatch;
-  if (timeToMinutes(outbound.time) === UNSCHEDULED_SORT_MINUTES) return noMatch;
-
-  let score = 0;
-  const sequenceMatch = getBestSequenceMatch(outbound, inbound);
-  score += sequenceMatch.score;
-
-  const outPickup = normalizeAddressForPair(outbound.pickup);
-  const outDropoff = normalizeAddressForPair(outbound.dropoff);
-  const inPickup = normalizeAddressForPair(inbound.pickup);
-  const inDropoff = normalizeAddressForPair(inbound.dropoff);
-
-  if (outDropoff && inPickup && outDropoff === inPickup) score += 8;
-  if (outPickup && inDropoff && outPickup === inDropoff) score += 8;
-
-  if (hasInOutText(outbound.dropoffComments) || hasInOutText(outbound.notes)) score += 3;
-  if (hasInOutText(inbound.pickupComments) || hasInOutText(inbound.notes)) score += 3;
-  return { score, sequenceMatch };
-}
-
-function applyInOutPairing(trips) {
-  const paired = trips.map((trip) => ({ ...trip }));
-  const returnCounts = new Map();
-
-  paired.forEach((trip, index) => {
-    if (trip.timingType !== 'in_out') return;
-
-    let bestIndex = -1;
-    let bestScore = 0;
-    let bestSequenceMatch = { score: 0, gap: null, basis: '' };
-    paired.forEach((candidate, candidateIndex) => {
-      if (candidateIndex === index) return;
-      const result = scoreInOutPair(candidate, trip);
-      if (result.score > bestScore) {
-        bestScore = result.score;
-        bestIndex = candidateIndex;
-        bestSequenceMatch = result.sequenceMatch;
-      }
-    });
-
-    if (bestIndex === -1 || bestScore < 8) {
-      paired[index] = {
-        ...trip,
-        inOutSortMinutes: WILL_CALL_SORT_MINUTES - 1,
-        pairConfidence: bestScore,
-      };
-      return;
-    }
-
-    const outbound = paired[bestIndex];
-    const baseMinutes = timeToMinutes(outbound.time);
-    const pairKey = outbound.id || outbound.bookingId || `${outbound.patient}-${outbound.date}-${baseMinutes}`;
-    const sequence = (returnCounts.get(pairKey) || 0) + 1;
-    returnCounts.set(pairKey, sequence);
-
-    paired[index] = {
-      ...trip,
-      pairedAfterTripId: outbound.id,
-      pairedAfterBookingId: outbound.bookingId || '',
-      pairedAfterSortMinutes: baseMinutes,
-      inOutSortMinutes: baseMinutes + sequence / 10,
-      legRelationship: 'in_out_return',
-      pairConfidence: bestScore,
-      pairSequenceGap: bestSequenceMatch.gap,
-      pairSequenceBasis: bestSequenceMatch.basis,
-    };
-
-    paired[bestIndex] = {
-      ...outbound,
-      hasInOutReturn: true,
-      inOutReturnTripId: trip.id,
-      inOutReturnBookingId: trip.bookingId || '',
-    };
-  });
-
-  return paired;
-}
-
 function normalizeDateValue(value) {
   if (!value) return '';
   const raw = String(value).trim();
@@ -258,15 +65,6 @@ function normalizeDateValue(value) {
   const day = String(simple[2]).padStart(2, '0');
   const year = simple[3].length === 2 ? `20${simple[3]}` : simple[3];
   return `${year}-${month}-${day}`;
-}
-
-const DATE_HINT_RE = /\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}\/\d{1,2}\/\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}/i;
-const MISSING_DATE_ISSUE = 'Missing service date';
-
-function inferDateFromDateTimeValue(value) {
-  const raw = String(value || '').trim();
-  if (!raw || !DATE_HINT_RE.test(raw)) return '';
-  return normalizeDateValue(raw);
 }
 
 function findColumn(headers, aliases) {
@@ -460,8 +258,6 @@ function mapColumns(row) {
     dropoffTime: find(COLUMN_ALIASES.dropoffTime),
     date: find(COLUMN_ALIASES.date),
     type: find(COLUMN_ALIASES.type),
-    pickupComments: find(COLUMN_ALIASES.pickupComments),
-    dropoffComments: find(COLUMN_ALIASES.dropoffComments),
     notes: find(COLUMN_ALIASES.notes),
     driver: find(COLUMN_ALIASES.driver),
     driverEmail: find(COLUMN_ALIASES.driverEmail),
@@ -545,7 +341,7 @@ const Badge = ({ children, variant = 'info' }) => {
     info: "bg-blue-50 text-blue-700 border-blue-100",
     ai: "bg-indigo-50 text-indigo-700 border-indigo-100",
   };
-  return <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border uppercase whitespace-nowrap ${variants[variant]}`}>{children}</span>;
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
 };
 
 const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', uploadContext = 'operations' }) => {
@@ -635,6 +431,12 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
       setProgressPct(12);
 
+      const getTodayStr = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      };
+      const today = getTodayStr();
+
       // First pass: group by patient and phone to identify facility numbers and determine the "Earliest Leg" phone
       const patientData = {};
       const phoneToPatients = {}; // phone -> Set of patient names
@@ -719,6 +521,10 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           }
         }
 
+        const notes = [m.notes, row['Pickup Comments'], row['Dropoff Comments'], row['Comments'], row['Message']]
+          .filter(Boolean)
+          .join(' | ');
+
         // Extract from ANY possible source: column-mapped, _agape_* fields, common raw keys
         const extract = (...sources) => {
           for (const src of sources) {
@@ -726,23 +532,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           }
           return '';
         };
-
-        const pickupComments = extract(
-          m.pickupComments,
-          getRawValue(row, ['Pickup Comments', 'Pickup Comment', 'PU Comments', 'Origin Comments']),
-        );
-        const dropoffComments = extract(
-          m.dropoffComments,
-          getRawValue(row, ['Dropoff Comments', 'Dropoff Comment', 'DO Comments', 'Destination Comments']),
-        );
-        const generalComments = extract(
-          m.notes,
-          getRawValue(row, ['Comments', 'Comment', 'Message', 'Purpose', 'Booking Purpose', 'Notes']),
-        );
-
-        const notes = [generalComments, pickupComments, dropoffComments, row['Message']]
-          .filter(Boolean)
-          .join(' | ');
 
         // Parse signature from YES/NO text or boolean
         const parseSig = (val) => {
@@ -814,51 +603,25 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         const startTime = extract(m.startTime, row['Start Time'], row['startTime'], row['Started At']);
         const departedPickupTime = extract(m.departedPickupTime, row['Departed Pickup'], row['departedPickupTime']);
 
-        // Date: use explicit service-date fields, then dated timestamps. Never
-        // default missing historical rows to the upload day.
+        // Date: use mapped value, or try raw keys
         let date = normalizeDateValue(m.date);
         if (!date) date = normalizeDateValue(row['Date'] || row['date'] || row['Trip Date'] || row['Service Date'] || '');
-        if (!date) {
-          date = [
-            completedAt,
-            startTime,
-            departedPickupTime,
-            arrivalTime,
-            arrivalDropoffTime,
-            row['Date Completed'],
-            row['Completed Date'],
-            row['Service Date'],
-          ].map(inferDateFromDateTimeValue).find(Boolean) || '';
-        }
-        const dateIssues = date ? [] : [MISSING_DATE_ISSUE];
+        if (!date) date = today;
 
         const pickupAddr = extract(m.pickup, row['Pickup Address'], row['pickup'], row['Pickup']);
         const dropoffAddr = extract(m.dropoff, row['Dropoff Address'], row['dropoff'], row['Dropoff']);
-        const rawPickupTime = extract(m.time, row['Pickup Time'], row['Requested Time Pickup'], row['Schedule Time'], row['scheduled'], row['time'], row['Time']);
-        const timing = buildTimingMetadata({
-          pickupTime: rawPickupTime,
-          pickupComments,
-          dropoffComments,
-          notes,
-        });
 
         return {
           // --- IDENTIFIERS ---
           id: row['Trip ID'] || row['TripID'] || row['tripid'] || row['ID'] || row['id'] || `TRIP-${Date.now()}-${idx}`,
           bookingId: extract(m.bookingId, row['Booking Id'], row['Booking ID'], row['bookingId'], row['Booking'], row['Confirmation #']),
-          patient: extract(m.patient, row['Client Name'], row['Client'], row['Patient'], row['patient'], 'No client name'),
+          patient: extract(m.patient, row['Client Name'], row['Client'], row['Patient'], row['patient'], 'Unknown'),
           patientPhone: patientPhone || extract(m.patientPhone, row['Patient Phone'], row['patientPhone']),
 
           // --- DATES & TIMES ---
           date,
-          time: timing.time,
-          requestedPickupTime: timing.requestedPickupTime,
-          sourceTimingLabel: timing.sourceTimingLabel,
-          timingType: timing.timingType,
-          isInOut: timing.isInOut,
-          isWillCallTrip: timing.isWillCallTrip,
-          willCall: timing.willCall,
-          dropoffTime: extract(m.dropoffTime, row['Dropoff Time'], row['Requested Time Dropoff'], row['Requested Late Dropoff'], row['Dropoff Time (Return)'], row['return']),
+          time: extract(m.time, row['Pickup Time'], row['Schedule Time'], row['scheduled'], row['time'], row['Time']),
+          dropoffTime: extract(m.dropoffTime, row['Dropoff Time'], row['Dropoff Time (Return)'], row['return']),
 
           // --- ADDRESSES ---
           pickup: pickupAddr,
@@ -873,9 +636,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           purpose: extract(row['Purpose'], row['purpose']),
           providerName: extract(row['Provider Name'], row['providerName']),
           directDistance: extract(row['Direct Distance'], row['directDistance']),
-          pickupComments,
-          dropoffComments,
-          generalComments,
           notes,
 
           // --- STATUS ---
@@ -920,30 +680,30 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
           // --- RAW DATA (always preserved) ---
           _originalRow: row,
-          _hasIssues: dateIssues.length > 0,
-          _issues: dateIssues,
+          _hasIssues: false,
+          _issues: [],
           _confidence: 100,
         };
       });
 
-      const pairedMapped = applyInOutPairing(mapped);
-
-      setMappedTrips(pairedMapped);
+      setMappedTrips(mapped);
       setParsedRows(rows);
-      setSelectedCount(pairedMapped.length);
+      setSelectedCount(mapped.length);
 
       const geminiConfig = GEMINI_API_CONFIG();
 
       if (aiEnabled && geminiConfig.apiKey) {
-        const aiResults = await aiValidate(pairedMapped, (msg, pct) => {
+        const aiResults = await aiValidate(mapped, (msg, pct) => {
           setProgressMsg(msg);
           setProgressPct(pct);
         });
 
-        const updated = pairedMapped.map((trip, idx) => {
+        const updated = mapped.map((trip, idx) => {
           const ai = aiResults[idx];
-          const issues = [...(trip._issues || []), ...(ai?.issues || [])];
-          return { ...trip, _hasIssues: issues.length > 0, _issues: issues, _confidence: ai?.confidence || 100 };
+          if (ai && ai.issues?.length > 0) {
+            return { ...trip, _hasIssues: true, _issues: ai.issues, _confidence: ai.confidence || 100 };
+          }
+          return { ...trip, _confidence: ai?.confidence || 100 };
         });
 
         setMappedTrips(updated);
@@ -963,11 +723,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   };
 
   const confirmImport = () => {
-    const missingDateCount = mappedTrips.filter((trip) => !trip.date).length;
-    if (missingDateCount > 0) {
-      setError(`Add a service date for ${missingDateCount} trip${missingDateCount !== 1 ? 's' : ''} before importing.`);
-      return;
-    }
     const cleanTrips = mappedTrips.map(({ _originalRow, _hasIssues, _issues, _confidence, _travelTime, ...trip }) => {
       const finalDriverId = trip.driverId || assignToDriver || _originalRow['Driver ID'] || null;
       let newStatus = trip.status;
@@ -991,7 +746,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
   const totalSelected = mappedTrips.length;
   const withIssues = mappedTrips.filter(t => t._hasIssues).length;
-  const missingDateCount = mappedTrips.filter(t => !t.date).length;
   const avgConfidence = mappedTrips.length > 0
     ? Math.round(mappedTrips.reduce((s, t) => s + (t._confidence || 100), 0) / mappedTrips.length)
     : 100;
@@ -1089,7 +843,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900">Import Review</h3>
                 <p className="text-xs sm:text-sm text-slate-500 truncate">
                   {mappedTrips.length} trip{ mappedTrips.length !== 1 ? 's' : '' } extracted
-                  {withIssues > 0 ? ` - ${withIssues} with warnings` : ' - all clean' }
+                  {withIssues > 0 ? ` — ${withIssues} with warnings` : ' — all clean' }
                 </p>
               </div>
             </div>
@@ -1141,12 +895,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               </div>
             )}
 
-            {missingDateCount > 0 && (
-              <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-700">
-                {missingDateCount} trip{missingDateCount !== 1 ? 's are' : ' is'} missing a service date. Add dates below before importing so old trips are not assigned to the upload day.
-              </div>
-            )}
-
             <div className="overflow-x-auto border border-slate-200 rounded-xl">
               <table className="w-full text-xs sm:text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200">
@@ -1155,7 +903,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Client</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Pickup</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Dropoff</th>
-                    <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Date</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600 hidden sm:table-cell">Time</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Assign To</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Issues</th>
@@ -1169,27 +916,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs font-semibold text-slate-900 whitespace-nowrap">{trip.patient}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.pickup}>{trip.pickup || <span className="text-rose-400 italic">missing</span>}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.dropoff}>{trip.dropoff || <span className="text-rose-400 italic">missing</span>}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
-                        <input
-                          type="date"
-                          value={trip.date || ''}
-                          onChange={(e) => {
-                            const nextDate = e.target.value;
-                            const newTrips = [...mappedTrips];
-                            const nextIssues = (newTrips[idx]._issues || []).filter(issue => issue !== MISSING_DATE_ISSUE);
-                            if (!nextDate) nextIssues.unshift(MISSING_DATE_ISSUE);
-                            newTrips[idx] = {
-                              ...newTrips[idx],
-                              date: nextDate,
-                              _issues: nextIssues,
-                              _hasIssues: nextIssues.length > 0,
-                            };
-                            setMappedTrips(newTrips);
-                            if (nextDate) setError('');
-                          }}
-                          className={`w-[132px] bg-white border rounded px-1.5 py-1 text-xs font-bold outline-none focus:border-blue-500 ${trip.date ? 'border-slate-200 text-slate-700' : 'border-rose-300 text-rose-700 bg-rose-50'}`}
-                        />
-                      </td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 hidden sm:table-cell">{trip.time}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
                         <select 
@@ -1242,9 +968,9 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                   <p className="text-xs text-blue-600 font-bold uppercase tracking-widest opacity-70">Bulk Assign All Uploaded Trips:</p>
                   <div className="flex gap-2">
                     <select value={assignToDriver} onChange={(e) => setAssignToDriver(e.target.value)} className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-white font-bold shadow-sm">
-                      <option value="">Leave Most as {forceCompleted ? 'Unassigned (No driver selected)' : 'Unassigned'} (Or use per-trip selector below)</option>
+                      <option value="">Leave Most as {forceCompleted ? 'Unassigned (Driver Unknown)' : 'Unassigned'} (Or use per-trip selector below)</option>
                       {drivers.map(d => (
-                        <option key={d.id} value={d.id}>{d.name} - {d.vehicle || 'No vehicle'} ({d.status})</option>
+                        <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
                       ))}
                     </select>
                     {assignToDriver && (
@@ -1276,7 +1002,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               <button onClick={() => { setStep('upload'); setFile(null); setMappedTrips([]); setParsedRows([]); setError(''); }} className="w-full sm:flex-1 py-3 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition text-sm">
                 Cancel
               </button>
-              <button onClick={confirmImport} disabled={missingDateCount > 0} className="w-full sm:flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={confirmImport} className="w-full sm:flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm text-sm">
                 <CheckCircle2 size={18} />
                 Import {totalSelected} {forceCompleted ? 'Completed ' : ''}Trips
               </button>

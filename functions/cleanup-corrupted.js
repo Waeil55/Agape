@@ -1,0 +1,176 @@
+#!/usr/bin/env node
+const https = require('https');
+const PROJECT = 'agape-95c9f';
+const account = require('C:/Users/waeil/.config/configstore/firebase-tools.json');
+
+function refreshToken() {
+  return new Promise((resolve, reject) => {
+    const postData = `client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com&client_secret=j9iVZfS8kkCEFUPaAeJV0sAi&refresh_token=${account.tokens.refresh_token}&grant_type=refresh_token`;
+    const req = https.request({ hostname: 'oauth2.googleapis.com', path: '/token', method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(postData) } }, (res) => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => { try { resolve(JSON.parse(d).access_token); } catch (e) { reject(e); } });
+    });
+    req.on('error', reject); req.write(postData); req.end();
+  });
+}
+
+function apiRequest(method, path, token, body) {
+  return new Promise((resolve, reject) => {
+    const options = { hostname: 'firestore.googleapis.com', path: `/v1/projects/${PROJECT}/databases/(default)/documents${path}`, method, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } };
+    const req = https.request(options, (res) => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } });
+    });
+    req.on('error', reject);
+    if (body) req.write(JSON.stringify(body));
+    req.end();
+  });
+}
+
+function decodeValue(field) {
+  if (!field) return null;
+  if (field.nullValue !== undefined) return null;
+  if (field.stringValue !== undefined) return field.stringValue;
+  if (field.integerValue !== undefined) return Number(field.integerValue);
+  if (field.doubleValue !== undefined) return field.doubleValue;
+  if (field.booleanValue !== undefined) return field.booleanValue;
+  if (field.timestampValue) return field.timestampValue;
+  if (field.arrayValue) return (field.arrayValue.values || []).map(v => decodeValue(v));
+  if (field.mapValue) { const o = {}; for (const [k, v] of Object.entries(field.mapValue.fields || {})) o[k] = decodeValue(v); return o; }
+  return null;
+}
+
+function docToObj(doc) {
+  const obj = { id: doc.name.split('/').pop() };
+  for (const [k, v] of Object.entries(doc.fields || {})) obj[k] = decodeValue(v);
+  return obj;
+}
+
+async function listAllPages(path, token) {
+  let allDocs = [];
+  let pageToken = '';
+  do {
+    const sep = path.includes('?') ? '&' : '?';
+    const pageParam = pageToken ? `${sep}pageToken=${pageToken}` : '';
+    const result = await apiRequest('GET', `${path}${pageParam}`, token);
+    if (result.error) break;
+    if (result.documents) allDocs = allDocs.concat(result.documents.map(docToObj));
+    pageToken = result.nextPageToken || '';
+  } while (pageToken);
+  return allDocs;
+}
+
+function isCorrupted(trip) {
+  // Corrupted trips have "Unnamed Client" or no patient name, and no pickup/dropoff
+  const patient = String(trip.patient || trip.patientName || '').trim();
+  const pickup = String(trip.pickup || trip.pickupAddress || '').trim();
+  const dropoff = String(trip.dropoff || trip.dropoffAddress || '').trim();
+  
+  if (!patient || patient === 'Unnamed Client' || patient === 'WC') {
+    if (!pickup && !dropoff) return true;
+  }
+  return false;
+}
+
+async function main() {
+  const token = await refreshToken();
+  const DRY_RUN = process.argv.includes('--dry-run');
+
+  console.log(`=== Clean Corrupted Trips (${DRY_RUN ? 'DRY RUN' : 'LIVE'}) ===\n`);
+
+  // Check root trips
+  console.log('--- Root trips ---');
+  const rootTrips = await listAllPages('/trips', token);
+  console.log(`Total: ${rootTrips.length}`);
+
+  const corruptedRoot = rootTrips.filter(isCorrupted);
+  console.log(`Corrupted: ${corruptedRoot.length}`);
+  
+  if (corruptedRoot.length > 0) {
+    console.log('Sample corrupted:');
+    corruptedRoot.slice(0, 10).forEach(t => {
+      console.log(`  ${t.id} | patient=${t.patient} | pickup=${t.pickup || 'none'} | dropoff=${t.dropoff || 'none'} | status=${t.status}`);
+    });
+
+    if (!DRY_RUN) {
+      let deleted = 0;
+      for (let i = 0; i < corruptedRoot.length; i += 450) {
+        const chunk = corruptedRoot.slice(i, i + 450);
+        const writes = chunk.map(t => ({ delete: `projects/${PROJECT}/databases/(default)/documents/trips/${t.id}` }));
+        await apiRequest('POST', ':commit', token, { writes });
+        deleted += chunk.length;
+        console.log(`  Deleted ${deleted}/${corruptedRoot.length} from root trips`);
+      }
+    }
+  }
+
+  // Check tripLedger
+  console.log('\n--- tripLedger ---');
+  const ledgerTrips = await listAllPages('/tripLedger', token);
+  console.log(`Total: ${ledgerTrips.length}`);
+
+  const corruptedLedger = ledgerTrips.filter(isCorrupted);
+  console.log(`Corrupted: ${corruptedLedger.length}`);
+
+  if (corruptedLedger.length > 0 && !DRY_RUN) {
+    let deleted = 0;
+    for (let i = 0; i < corruptedLedger.length; i += 450) {
+      const chunk = corruptedLedger.slice(i, i + 450);
+      const writes = chunk.map(t => ({ delete: `projects/${PROJECT}/databases/(default)/documents/tripLedger/${t.id}` }));
+      await apiRequest('POST', ':commit', token, { writes });
+      deleted += chunk.length;
+      console.log(`  Deleted ${deleted}/${corruptedLedger.length} from tripLedger`);
+    }
+  }
+
+  // Check appData/agape
+  console.log('\n--- appData/agape ---');
+  const appDataResult = await apiRequest('GET', '/appData/agape', token);
+  const appData = docToObj(appDataResult);
+  const appTrips = Array.isArray(appData.trips) ? appData.trips : [];
+  const appTrashed = Array.isArray(appData.trashedTrips) ? appData.trashedTrips : [];
+
+  const corruptedApp = appTrips.filter(isCorrupted);
+  const corruptedTrashed = appTrashed.filter(isCorrupted);
+  console.log(`appData trips: ${appTrips.length}, corrupted: ${corruptedApp.length}`);
+  console.log(`appData trashed: ${appTrashed.length}, corrupted: ${corruptedTrashed.length}`);
+
+  if ((corruptedApp.length > 0 || corruptedTrashed.length > 0) && !DRY_RUN) {
+    const cleanTrips = appTrips.filter(t => !isCorrupted(t));
+    const cleanTrashed = appTrashed.filter(t => !isCorrupted(t));
+    
+    function encodeValue(value) {
+      if (value === null || value === undefined) return { nullValue: null };
+      if (typeof value === 'string') return { stringValue: value };
+      if (typeof value === 'number') return Number.isInteger(value) ? { integerValue: value } : { doubleValue: value };
+      if (typeof value === 'boolean') return { booleanValue: value };
+      if (Array.isArray(value)) return { arrayValue: { values: value.map(encodeValue) } };
+      if (typeof value === 'object') {
+        const fields = {};
+        for (const [k, v] of Object.entries(value)) {
+          if (v !== undefined) fields[k] = encodeValue(v);
+        }
+        return { mapValue: { fields } };
+      }
+      return { stringValue: String(value) };
+    }
+
+    await apiRequest('PATCH', '/appData/agape?updateMask.fieldPaths=trips&updateMask.fieldPaths=trashedTrips', token, {
+      fields: {
+        trips: encodeValue(cleanTrips),
+        trashedTrips: encodeValue(cleanTrashed),
+      }
+    });
+    console.log(`Cleaned appData: ${cleanTrips.length} trips, ${cleanTrashed.length} trashed`);
+  }
+
+  // Verify
+  console.log('\n=== Verification ===');
+  const verifyRoot = await listAllPages('/trips', token);
+  const verifyLedger = await listAllPages('/tripLedger', token);
+  console.log(`Root trips: ${rootTrips.length} → ${verifyRoot.length}`);
+  console.log(`tripLedger: ${ledgerTrips.length} → ${verifyLedger.length}`);
+  console.log(`\nDone. ${DRY_RUN ? '(DRY RUN)' : 'Corrupted trips removed.'}`);
+}
+
+main().catch(err => { console.error('Failed:', err); process.exit(1); });

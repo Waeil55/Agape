@@ -18,7 +18,7 @@ export const ROUTE_STATUS_LABELS = Object.freeze({
 });
 
 export const ROUTE_STATUS_BADGES = Object.freeze({
-  template: 'bg-blue-50 text-blue-700 border-blue-200',
+  template: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   [ROUTE_ASSIGNMENT_STATUS.ASSIGNED]: 'bg-amber-50 text-amber-700 border-amber-200',
   [ROUTE_ASSIGNMENT_STATUS.ACCEPTED]: 'bg-sky-50 text-sky-700 border-sky-200',
   [ROUTE_ASSIGNMENT_STATUS.IN_PROGRESS]: 'bg-emerald-50 text-emerald-700 border-emerald-200',

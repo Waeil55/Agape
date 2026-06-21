@@ -1,4 +1,4 @@
-﻿import React, { useState, lazy, Suspense, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, lazy, Suspense, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   LayoutDashboard, Users, MapPin, Settings, BarChart2,
   Archive, MessageCircle, Bell,
@@ -7,7 +7,7 @@ import {
   PanelRight,
   Wifi, WifiOff,
   Eye, Hash, Route, Activity,
-  CalendarDays, ClipboardList, ShieldCheck, Receipt, Siren, CarFront, Plus, Minus, Moon, Sun,
+  CalendarDays, ClipboardList, ShieldCheck, Receipt, Siren, CarFront, Plus,
 } from 'lucide-react';
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 import { timeToMinutes, isTripLate } from '../utils/tripDate';
@@ -17,7 +17,6 @@ import DriversVehiclesPage from './DriversVehiclesPage';
 import SettingsPage from './SettingsPage';
 import UsersPage from './UsersPage';
 import OperationsCommandCenter from './OperationsCommandCenter';
-import EnterpriseNemtCommandCenter from './EnterpriseNemtCommandCenter';
 import AdminPage from './AdminPage';
 import DriverPage from './DriverPage';
 import RoutePlannerPage from './RoutePlannerPage';
@@ -95,7 +94,6 @@ const findTripLocations = (trip, trips, trashedTrips, logs) => {
 const EnterpriseDashboard = ({
   role, currentUser, trips, setTrips, drivers, setDrivers, dispatchers, setDispatchers, vehicles, setVehicles,
   trashedTrips, setTrashedTrips, restoreTrip, logs, setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
-  syncHealth, onRepairCloudMirrors, onCreateCloudBackup,
   selectedTasks, setSelectedTasks, searchQuery, setSearchQuery,
   smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
   smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing,
@@ -232,27 +230,6 @@ const EnterpriseDashboard = ({
   const dispatcherOnlineCount = dispatchers.filter((dispatcher) => dispatcher.clockedIn).length;
   const activeDriverCount = drivers.filter((driver) => driver.status && !['Offline', 'Unavailable'].includes(driver.status)).length;
   const aiAlertCount = lateTrips.length + unassignedTrips.length;
-  const fontScaleOrder = ['xs', 'sm', 'md', 'lg', 'xl', '2xl', 'driver'];
-  const activeFontScale = appSettings?.fontScale || 'md';
-  const activeFontScaleIndex = Math.max(0, fontScaleOrder.indexOf(activeFontScale));
-  const activeTheme = appSettings?.theme === 'dark' ? 'dark' : 'light';
-  const applyInterfaceSettings = (updates) => {
-    if (updates.theme) {
-      document.documentElement.dataset.theme = updates.theme;
-      document.documentElement.classList.toggle('dark', updates.theme === 'dark');
-    }
-    if (updates.fontScale) {
-      document.documentElement.dataset.fontScale = updates.fontScale;
-    }
-    updateAppSettings?.(updates);
-  };
-  const updateFontScale = (direction) => {
-    const nextIndex = Math.min(fontScaleOrder.length - 1, Math.max(0, activeFontScaleIndex + direction));
-    applyInterfaceSettings({ fontScale: fontScaleOrder[nextIndex] });
-  };
-  const toggleThemeMode = () => {
-    applyInterfaceSettings({ theme: activeTheme === 'dark' ? 'light' : 'dark' });
-  };
 
   const sortedScheduled = [...activeTrips]
     .filter(t => t.time !== 'Will Call')
@@ -322,11 +299,6 @@ const EnterpriseDashboard = ({
   };
 
   const activeWorkspaceMeta = workspaceMeta[activePanel] || workspaceMeta.operations;
-  const activeMobileNavItem = sidebarItems.find(item => item.id === activePanel) || sidebarItems[0];
-  const mobilePrimaryItems = sidebarItems.filter((item) => (
-    ['operations', 'liveMap', 'chat', 'routePlanner', 'settings'].includes(item.id)
-    || (item.id === 'admin' && role === 'admin' && !sidebarItems.some((entry) => entry.id === 'routePlanner'))
-  )).slice(0, 5);
 
   const openOperationsWorkspace = useCallback((tab = 'manifest') => {
     setActivePanel('operations');
@@ -439,7 +411,7 @@ const EnterpriseDashboard = ({
         <img src="/agape.png" alt="Agape Care" className="w-6 h-6 rounded-md object-contain" />
         <div className="flex items-center gap-1.5">
           <div className="hidden lg:block">
-            <h1 className="text-caption font-bold text-slate-900 tracking-tight leading-none">Agape Care</h1>
+            <h1 className="text-caption font-black text-slate-900 tracking-tight leading-none">Agape Care</h1>
             <p className="text-[8px] font-bold text-blue-600 uppercase tracking-widest">Enterprise</p>
           </div>
           <span title={isOnline ? 'Realtime connected' : 'Offline / not realtime'} className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'} shrink-0 hidden lg:inline-block`} />
@@ -448,7 +420,7 @@ const EnterpriseDashboard = ({
 
       <div className="w-px h-4 bg-slate-200 shrink-0" />
 
-      {/* Main Navigation - icon + label, no overflow */}
+      {/* Main Navigation — icon + label, no overflow */}
       <nav className="flex items-center gap-0.5">
         {sidebarItems.map(item => {
           const Icon = item.icon;
@@ -527,7 +499,7 @@ const EnterpriseDashboard = ({
       <button
         onClick={() => setActivePanel('settings')}
         title={displayLoginId}
-        className="w-8 h-8 min-h-[36px] min-w-[36px] rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold hover:bg-slate-300 transition shrink-0 uppercase"
+        className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-black hover:bg-slate-300 transition shrink-0 uppercase"
       >
         {(displayLoginId || 'U')[0]}
       </button>
@@ -535,7 +507,7 @@ const EnterpriseDashboard = ({
   );
 
   const renderEnterpriseTopBar = () => (
-    <header className="sticky top-0 z-30 hidden h-[72px] items-center gap-4 border-b border-slate-200/80 bg-slate-100/95 px-6 backdrop-blur-[12px] md:flex">
+    <header className="sticky top-0 z-30 hidden h-[72px] items-center gap-4 border-b border-slate-200/80 bg-[#F3F4F6]/95 px-6 backdrop-blur-[12px] md:flex">
       <div className="flex min-w-[220px] items-center gap-3 shrink-0">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-300 bg-white">
           <img src="/agape.png" alt="Agape Care" className="h-8 w-8 object-contain" />
@@ -546,8 +518,8 @@ const EnterpriseDashboard = ({
         </div>
       </div>
 
-      <div className="min-w-0 flex-1 overflow-hidden">
-        <div className="flex w-full min-w-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+      <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar">
+        <div className="flex min-w-max items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
           {topNavItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -555,15 +527,15 @@ const EnterpriseDashboard = ({
                 key={item.id}
                 type="button"
                 onClick={item.action}
-                className={`inline-flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-[13px] font-semibold transition ${
+                className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-semibold transition ${
                   item.active
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-500 hover:bg-white hover:text-slate-900'
                 }`}
                 title={item.label}
               >
-                <Icon size={15} className="shrink-0" />
-                <span className="truncate">{item.label}</span>
+                <Icon size={15} />
+                <span>{item.label}</span>
               </button>
             );
           })}
@@ -571,35 +543,6 @@ const EnterpriseDashboard = ({
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        <div className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm lg:flex" title="Interface size">
-          <button
-            type="button"
-            onClick={() => updateFontScale(-1)}
-            disabled={activeFontScaleIndex <= 0}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-35"
-            title="Decrease interface size"
-          >
-            <Minus size={14} />
-          </button>
-          <span className="min-w-8 text-center text-[10px] font-black uppercase text-slate-500">{activeFontScale}</span>
-          <button
-            type="button"
-            onClick={() => updateFontScale(1)}
-            disabled={activeFontScaleIndex >= fontScaleOrder.length - 1}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-35"
-            title="Increase interface size"
-          >
-            <Plus size={14} />
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={toggleThemeMode}
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
-          title={activeTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {activeTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
         <button
           type="button"
           onClick={() => {
@@ -635,71 +578,31 @@ const EnterpriseDashboard = ({
 
   // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="bg-slate-100/95 backdrop-blur-xl border-b border-slate-200/80 px-3 py-2 flex md:hidden items-center gap-2 shrink-0 min-h-[56px] z-20 relative">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white">
+    <header className="bg-[#F3F4F6]/95 backdrop-blur-xl border-b border-slate-200/80 px-3 flex md:hidden items-center gap-2 shrink-0 h-[56px] z-20 relative">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300 bg-white">
         <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain" />
       </div>
-      <div className="min-w-0 flex-1">
-        <h1 className="truncate text-[13px] font-bold text-slate-900 tracking-tight leading-none">Agape Care</h1>
-        <div className="mt-1 flex items-center gap-1.5">
-          {activeMobileNavItem?.icon && <activeMobileNavItem.icon size={12} className="shrink-0 text-blue-600" />}
-          <select
-            value={activePanel}
-            onChange={(e) => setActivePanel(e.target.value)}
-            className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            aria-label="Switch workspace"
-          >
-            {sidebarItems.map(item => (
-              <option key={item.id} value={item.id}>{item.label}</option>
-            ))}
-          </select>
-        </div>
+      <div>
+        <h1 className="text-[13px] font-bold text-slate-900 tracking-tight leading-none">Agape Care</h1>
+        <p className="text-[10px] font-medium text-slate-500 capitalize">{activeWorkspaceMeta.title}</p>
       </div>
-      <div className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm min-[430px]:flex" title="Interface size">
-        <button
-          type="button"
-          onClick={() => updateFontScale(-1)}
-          disabled={activeFontScaleIndex <= 0}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 disabled:opacity-35"
-          title="Decrease interface size"
-        >
-          <Minus size={13} />
-        </button>
-        <button
-          type="button"
-          onClick={() => updateFontScale(1)}
-          disabled={activeFontScaleIndex >= fontScaleOrder.length - 1}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 disabled:opacity-35"
-          title="Increase interface size"
-        >
-          <Plus size={13} />
-        </button>
-      </div>
-      <button
-        type="button"
-        onClick={toggleThemeMode}
-        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm"
-        title={activeTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      >
-        {activeTheme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-      </button>
+      <div className="flex-1" />
       {/* Online status dot */}
-      <div className={`hidden h-2 w-2 rounded-full min-[430px]:block ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} title={isOnline ? 'Online' : 'Offline'} />
+      <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} title={isOnline ? 'Online' : 'Offline'} />
       {activePanel === 'operations' && (
         <button
           onClick={toggleRightPanel}
-          className={`flex shrink-0 items-center gap-1 px-2 py-1 rounded-md text-micro font-bold shadow-sm ${
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-bold shadow-sm ${
             showRightPanel ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
           }`}
         >
-          <PanelRight size={13} />
-          <span className="hidden min-[430px]:inline">Panel</span>
+          <PanelRight size={11} /> Panel
         </button>
       )}
       {/* User avatar -> settings */}
       <button
         onClick={() => setActivePanel('settings')}
-        className="w-8 h-8 min-h-[36px] min-w-[36px] rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold hover:bg-slate-300 transition uppercase shrink-0"
+        className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-black hover:bg-slate-300 transition uppercase"
       >
         {(currentUser || 'U')[0]}
       </button>
@@ -709,7 +612,7 @@ const EnterpriseDashboard = ({
   // ==================== BOTTOM NAVIGATION (Mobile only for dispatcher/admin) ====================
   const renderBottomNav = () => (
     <nav className="bottom-nav md:hidden flex items-stretch">
-      {mobilePrimaryItems.map(item => {
+      {sidebarItems.map(item => {
         const Icon = item.icon;
         const isActive = activePanel === item.id;
         const hasBadge = item.id === 'chat' && chatUnreadCount > 0;
@@ -742,7 +645,7 @@ const EnterpriseDashboard = ({
 
   // ==================== RIGHT PANEL ====================
   const renderRightPanel = () => (
-    <div className="w-full md:w-[320px] lg:w-[340px] md:min-w-[280px] bg-white border-l border-slate-200 flex flex-col shrink-0 overflow-hidden">
+    <div className="w-[320px] lg:w-[340px] min-w-[280px] bg-white border-l border-slate-200 flex flex-col shrink-0 overflow-hidden">
       {/* Tabs */}
       <div className="flex border-b border-slate-100">
         {[
@@ -773,7 +676,7 @@ const EnterpriseDashboard = ({
         {rightPanelTab === 'alerts' && (
           <div className="space-y-3">
             {logs.slice(0, 20).map((log, i) => (
-              <div key={i} className="p-2.5 card-premium mb-1.5 hover:shadow-md transition-all duration-200 group">
+              <div key={i} className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-sm mb-1.5 hover:shadow-md transition-all duration-200 group">
                 <div className="flex items-start gap-2.5">
                   <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ring-1 ring-slate-200 ${
                     log.c === 'rose' ? 'bg-rose-500 ring-rose-500/20' :
@@ -796,7 +699,7 @@ const EnterpriseDashboard = ({
                   <Bell size={18} className="opacity-40" />
                 </div>
                 <p className="text-xs font-medium">No alerts</p>
-                <p className="text-micro text-slate-500 mt-1">All clear - no issues detected</p>
+                <p className="text-micro text-slate-500 mt-1">All clear — no issues detected</p>
               </div>
             )}
           </div>
@@ -827,7 +730,7 @@ const EnterpriseDashboard = ({
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Time</p>
-                  <p className="text-sm font-bold text-slate-900">{tripDetails.time || 'No time'}</p>
+                  <p className="text-sm font-bold text-slate-900">{tripDetails.time || '—'}</p>
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Route</p>
@@ -835,26 +738,26 @@ const EnterpriseDashboard = ({
                     <div className="flex items-start gap-2.5">
                       <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0 ring-1 ring-emerald-500/20" />
                       <div>
-                        <p className="text-xs text-slate-700">{tripDetails.pickup || 'No pickup address'}</p>
+                        <p className="text-xs text-slate-700">{tripDetails.pickup || '—'}</p>
                         {tripDetails.pickupSiteName && <p className="text-[11px] text-emerald-700 mt-0.5">{tripDetails.pickupSiteName}</p>}
                       </div>
                     </div>
                     <div className="flex items-start gap-2.5">
                       <div className="w-2 h-2 rounded-full bg-rose-500 mt-1.5 shrink-0 ring-1 ring-rose-500/20" />
                       <div>
-                        <p className="text-xs text-slate-700">{tripDetails.dropoff || 'No dropoff address'}</p>
+                        <p className="text-xs text-slate-700">{tripDetails.dropoff || '—'}</p>
                         {tripDetails.dropoffSiteName && <p className="text-[11px] text-rose-700 mt-0.5">{tripDetails.dropoffSiteName}</p>}
                       </div>
                     </div>
                   </div>
                 </div>
                 {tripDetails.routeAssignments?.length > 0 && (
-                  <div className="bg-white rounded-xl border border-blue-100 p-2.5 shadow-sm">
-                    <p className="text-micro font-bold uppercase tracking-wider text-blue-500 mb-1">Route Plans</p>
+                  <div className="bg-white rounded-xl border border-indigo-100 p-2.5 shadow-sm">
+                    <p className="text-micro font-bold uppercase tracking-wider text-indigo-500 mb-1">Route Plans</p>
                     <div className="flex flex-wrap gap-1.5">
                       {tripDetails.routeAssignments.map((route, index) => (
-                        <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 border border-blue-100">
-                          {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` | ${route.statusLabel}` : ''}
+                        <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 border border-indigo-100">
+                          {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` • ${route.statusLabel}` : ''}
                         </span>
                       ))}
                     </div>
@@ -863,7 +766,7 @@ const EnterpriseDashboard = ({
                 {(tripDetails.driverName || tripDetails.driverId) && (
                   <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                     <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Driver</p>
-                    <p className="text-sm font-medium text-slate-900">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || 'No driver'}</p>
+                    <p className="text-sm font-medium text-slate-900">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || '—'}</p>
                     <p className="text-xs text-slate-400 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
                   </div>
                 )}
@@ -875,7 +778,7 @@ const EnterpriseDashboard = ({
                 )}
                 <button
                   onClick={() => setShowTripLocations(prev => !prev)}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 rounded-xl text-[10px] font-bold text-slate-600 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-[10px] font-bold text-slate-600 transition-colors"
                 >
                   <Search size={11} /> Find This Trip
                 </button>
@@ -888,13 +791,13 @@ const EnterpriseDashboard = ({
                         <button
                           key={i}
                           onClick={() => { setActivePanel(loc.panel); setTripDetails(null); setShowRightPanel(false); setShowTripLocations(false); }}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-100 transition-colors text-left"
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-colors text-left"
                         >
-                          {loc.icon === 'Zap' && <Zap size={12} className="text-blue-600" />}
-                          {loc.icon === 'Archive' && <Archive size={12} className="text-blue-600" />}
-                          {loc.icon === 'BarChart2' && <BarChart2 size={12} className="text-blue-600" />}
-                          {loc.icon === 'Route' && <Route size={12} className="text-blue-600" />}
-                          <span className="text-[10px] font-semibold text-blue-700">{loc.label}</span>
+                          {loc.icon === 'Zap' && <Zap size={12} className="text-indigo-600" />}
+                          {loc.icon === 'Archive' && <Archive size={12} className="text-indigo-600" />}
+                          {loc.icon === 'BarChart2' && <BarChart2 size={12} className="text-indigo-600" />}
+                          {loc.icon === 'Route' && <Route size={12} className="text-indigo-600" />}
+                          <span className="text-[10px] font-semibold text-indigo-700">{loc.label}</span>
                         </button>
                       ))}
                     </div>
@@ -921,19 +824,19 @@ const EnterpriseDashboard = ({
                   <div className="grid grid-cols-2 gap-2">
                     <div className="rounded-lg bg-slate-50 px-2.5 py-2">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Today</p>
-                      <p className="mt-1 text-sm font-bold text-slate-900">{todayTrips.length}</p>
+                      <p className="mt-1 text-sm font-black text-slate-900">{todayTrips.length}</p>
                     </div>
                     <div className="rounded-lg bg-rose-50 px-2.5 py-2">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-rose-600">Unassigned</p>
-                      <p className="mt-1 text-sm font-bold text-rose-700">{unassignedTrips.length}</p>
+                      <p className="mt-1 text-sm font-black text-rose-700">{unassignedTrips.length}</p>
                     </div>
                     <div className="rounded-lg bg-amber-50 px-2.5 py-2">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Late</p>
-                      <p className="mt-1 text-sm font-bold text-amber-700">{lateTrips.length}</p>
+                      <p className="mt-1 text-sm font-black text-amber-700">{lateTrips.length}</p>
                     </div>
                     <div className="rounded-lg bg-blue-50 px-2.5 py-2">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Will Call</p>
-                      <p className="mt-1 text-sm font-bold text-blue-700">{willCallTrips.length}</p>
+                      <p className="mt-1 text-sm font-black text-blue-700">{willCallTrips.length}</p>
                     </div>
                   </div>
                 </div>
@@ -969,7 +872,7 @@ const EnterpriseDashboard = ({
               {unassignedTrips.length > 0 && (
                 <button
                   onClick={() => setShowOptimizeModal(true)}
-                  className="mt-2.5 w-full py-1.5 btn-gradient-primary font-bold transition-all duration-200 flex items-center justify-center gap-1.5"
+                  className="mt-2.5 w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-1.5"
                 >
                   <Wand2 size={12} /> Run Optimization
                 </button>
@@ -1014,8 +917,8 @@ const EnterpriseDashboard = ({
     if (!commandPaletteOpen) return null;
     return (
       <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[20vh]" onClick={() => setCommandPaletteOpen(false)}>
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-        <div className="w-full max-w-lg bg-white backdrop-blur-xl border border-slate-200 rounded-3xl shadow-sm overflow-hidden relative z-10 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
+        <div className="w-full max-w-lg bg-white backdrop-blur-xl border border-slate-200 rounded-3xl shadow-sm overflow-hidden relative z-10 animate-in fade-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100">
             <Search size={16} className="text-slate-400" />
             <input
@@ -1027,7 +930,7 @@ const EnterpriseDashboard = ({
               autoFocus
             />
             <div className="flex items-center gap-1.5">
-              <kbd className="text-micro bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-400">Ctrl+K</kbd>
+              <kbd className="text-micro bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-400">⌘K</kbd>
               <kbd className="text-micro bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-400">ESC</kbd>
             </div>
           </div>
@@ -1042,7 +945,7 @@ const EnterpriseDashboard = ({
                   <cmd.icon size={13} className="text-slate-500" />
                 </div>
                 <span className="text-sm text-slate-700 flex-1">{cmd.label}</span>
-                <span className="text-micro text-slate-500 font-mono">Ctrl+{idx + 1}</span>
+                <span className="text-micro text-slate-500 font-mono">⌘{idx + 1}</span>
               </button>
             ))}
             {filteredCommands.length === 0 && (
@@ -1061,67 +964,49 @@ const EnterpriseDashboard = ({
 
   // ==================== OPERATIONS PAGE ====================
   const renderOperationsPage = () => (
-    <EnterpriseNemtCommandCenter
+    <OperationsCommandCenter
       role={role}
       currentUser={currentUser}
       trips={trips}
       drivers={drivers}
       dispatchers={dispatchers}
+      selectedTasks={selectedTasks}
+      setSelectedTasks={setSelectedTasks}
+      searchQuery={searchQuery}
+      setSearchQuery={setSearchQuery}
       operationsTab={operationsTab}
       setOperationsTab={setOperationsTab}
-      setSearchQuery={setSearchQuery}
+      smartAssignTrip={smartAssignTrip}
+      setSmartAssignTrip={setSmartAssignTrip}
+      manualAssignTrip={manualAssignTrip}
+      setManualAssignTrip={setManualAssignTrip}
+      smartAssignResult={smartAssignResult}
+      setSmartAssignResult={setSmartAssignResult}
+      aiAnalyzing={aiAnalyzing}
+      setAiAnalyzing={setAiAnalyzing}
+      addToast={addToast}
+      addAuditLog={addAuditLog}
+      persistState={persistState}
+      hasPermission={hasPermission}
+      requestAuthAction={requestAuthAction}
+      triggerSmartAssign={triggerSmartAssign}
+      triggerFleetOptimization={triggerFleetOptimization}
+      assignTripToDriver={assignTripToDriver}
+      bulkAssignTrips={bulkAssignTrips}
+      setBulkAssignModal={setBulkAssignModal}
+      requestDeleteTrip={requestDeleteTrip}
+      updateTrip={updateTrip}
+      makeCall={makeCall}
+      sendSMS={sendSMS}
+      setTripDetails={setTripDetails}
+      setShowAddTripModal={setShowAddTripModal}
       setShowUploadModal={setShowUploadModal}
       onOpenSequencer={() => setShowSequencerModal(true)}
       onOpenLiveMap={() => setActivePanel('liveMap')}
+      showRightPanel={showRightPanel}
       onTogglePanel={toggleRightPanel}
-      addToast={addToast}
       isOnline={isOnline}
-      operationsBoard={(
-        <OperationsCommandCenter
-          role={role}
-          currentUser={currentUser}
-          trips={trips}
-          drivers={drivers}
-          dispatchers={dispatchers}
-          selectedTasks={selectedTasks}
-          setSelectedTasks={setSelectedTasks}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          operationsTab={operationsTab}
-          setOperationsTab={setOperationsTab}
-          smartAssignTrip={smartAssignTrip}
-          setSmartAssignTrip={setSmartAssignTrip}
-          manualAssignTrip={manualAssignTrip}
-          setManualAssignTrip={setManualAssignTrip}
-          smartAssignResult={smartAssignResult}
-          setSmartAssignResult={setSmartAssignResult}
-          aiAnalyzing={aiAnalyzing}
-          setAiAnalyzing={setAiAnalyzing}
-          addToast={addToast}
-          addAuditLog={addAuditLog}
-          persistState={persistState}
-          hasPermission={hasPermission}
-          requestAuthAction={requestAuthAction}
-          triggerSmartAssign={triggerSmartAssign}
-          triggerFleetOptimization={triggerFleetOptimization}
-          assignTripToDriver={assignTripToDriver}
-          bulkAssignTrips={bulkAssignTrips}
-          setBulkAssignModal={setBulkAssignModal}
-          requestDeleteTrip={requestDeleteTrip}
-          updateTrip={updateTrip}
-          makeCall={makeCall}
-          sendSMS={sendSMS}
-          setTripDetails={setTripDetails}
-          setShowAddTripModal={setShowAddTripModal}
-          setShowUploadModal={setShowUploadModal}
-          onOpenSequencer={() => setShowSequencerModal(true)}
-          onOpenLiveMap={() => setActivePanel('liveMap')}
-          showRightPanel={showRightPanel}
-          onTogglePanel={toggleRightPanel}
-          isOnline={isOnline}
-          phoneNumbers={phoneNumbers}
-        />
-      )}
+      phoneNumbers={phoneNumbers}
     />
   );
 
@@ -1178,7 +1063,7 @@ const EnterpriseDashboard = ({
         />
       );
       case 'settings': return (
-        <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { if (role !== 'admin') { addToast?.('Permission Denied', 'Only administrators can reset system data.', 'danger'); return; } setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); addToast?.('System Reset', 'All operational data has been wiped.', 'success'); }} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} syncHealth={syncHealth} onRepairCloudMirrors={onRepairCloudMirrors} onCreateCloudBackup={onCreateCloudBackup} />
+        <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} />
       );
       case 'drive': return driverWorkDrivers.length > 0 ? (
         <DriverPage currentUser={currentUser} role={role} drivers={driverWorkDrivers} trips={driverWorkTrips} allDrivers={allDrivers} dispatchers={dispatchers} phoneNumbers={phoneNumbers} onUpdateTrip={onUpdateDriverTrip} onCompleteTrip={onCompleteTrip} onDriverStatusUpdate={onDriverStatusUpdate} onAddAuditLog={addAuditLog} onLogout={() => {}} requestAuthAction={requestAuthAction} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} onUpdateDriverLocation={handleUpdateDriverLocation} onOpenSettings={() => setActivePanel('settings')} onAddTrip={addTrip} showAddTripModal={showAddTripModal} setShowAddTripModal={setShowAddTripModal} />
@@ -1189,13 +1074,13 @@ const EnterpriseDashboard = ({
 
   // ==================== MAIN LAYOUT ====================
   return (
-    <div className="h-[100dvh] w-full overflow-hidden bg-slate-100 font-sans text-slate-900">
+    <div className="h-screen w-full overflow-hidden bg-[#F3F4F6] font-sans text-slate-900">
       <div className="flex h-full min-w-0 flex-col">
         {renderEnterpriseTopBar()}
         {renderMobileTopBar()}
 
         <div className="flex min-h-0 flex-1">
-          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'} bg-slate-100 ${['operations', 'chat'].includes(activePanel) ? '' : 'px-3 py-3 pb-28 sm:px-5 sm:py-4 md:px-6 md:py-5 md:pb-5'}`}>
+          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'} bg-[#F3F4F6] ${['operations', 'chat'].includes(activePanel) ? '' : 'px-3 py-3 pb-20 sm:px-5 sm:py-4 md:px-6 md:py-5 md:pb-5'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : (
@@ -1221,15 +1106,15 @@ const EnterpriseDashboard = ({
       <div className="block md:hidden">
         {showRightPanel && (
           <div className="fixed inset-0 z-[100] flex items-start justify-end">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRightPanel(false)} />
-            <div className="w-full max-w-[360px] bg-white border-l border-slate-200 flex flex-col h-full shadow-xl z-10 relative">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setShowRightPanel(false)} />
+            <div className="w-[320px] max-w-full bg-white border-l border-slate-200 flex flex-col h-full shadow-xl z-10 relative">
               {renderRightPanel()}
             </div>
           </div>
         )}
       </div>
 
-      {/* Bottom Navigation - mobile only */}
+      {/* Bottom Navigation — mobile only */}
       {renderBottomNav()}
 
       {/* Command Palette */}
@@ -1238,13 +1123,13 @@ const EnterpriseDashboard = ({
       {/* ==================== MODALS ==================== */}
       {showUploadModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowUploadModal(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowUploadModal(false)} />
           <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Upload size={16} className="text-blue-700" /> Upload Trips
               </h2>
-              <button onClick={() => setShowUploadModal(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setShowUploadModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="p-6">
               <Suspense fallback={<LazyFallback />}>
@@ -1301,13 +1186,13 @@ const EnterpriseDashboard = ({
 
       {bulkAssignModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setBulkAssignModal(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBulkAssignModal(false)} />
           <div className="bg-white w-full max-w-md max-h-[80vh] overflow-y-auto rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Users size={16} className="text-emerald-700" /> Assign {selectedTasks.length} Trips
               </h2>
-              <button onClick={() => setBulkAssignModal(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setBulkAssignModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="p-4 space-y-1.5">
               {drivers.map(d => (
@@ -1320,10 +1205,10 @@ const EnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs ring-1 ring-blue-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400">{d.vehicle || 'No vehicle'} | {d.status || 'No status'}</p>
+                      <p className="text-xs text-slate-400">{d.vehicle} • {d.status}</p>
                     </div>
                   </div>
-                  <span className="text-blue-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign</span>
+                  <span className="text-blue-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
                 </button>
               ))}
             </div>
@@ -1333,13 +1218,13 @@ const EnterpriseDashboard = ({
 
       {manualAssignTrip && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setManualAssignTrip(null)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setManualAssignTrip(null)} />
           <div className="bg-white w-full max-w-md max-h-[80vh] overflow-y-auto rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Users size={16} className="text-emerald-700" /> Assign: {manualAssignTrip.patient}
               </h2>
-              <button onClick={() => setManualAssignTrip(null)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setManualAssignTrip(null)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="p-4 space-y-1.5">
               <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">Available Drivers</p>
@@ -1353,10 +1238,10 @@ const EnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs ring-1 ring-emerald-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400">{d.vehicle || 'No vehicle'} | Available</p>
+                      <p className="text-xs text-slate-400">{d.vehicle} • Available</p>
                     </div>
                   </div>
-                  <span className="text-emerald-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign</span>
+                  <span className="text-emerald-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
                 </button>
               ))}
               {drivers.filter(d => d.status !== 'Available').length > 0 && (
@@ -1375,10 +1260,10 @@ const EnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs ring-1 ring-slate-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400">{d.status || 'No status'} | {d.vehicle || 'No vehicle'}</p>
+                      <p className="text-xs text-slate-400">{d.status} • {d.vehicle}</p>
                     </div>
                   </div>
-                  <span className="text-slate-400 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign</span>
+                  <span className="text-slate-400 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
                 </button>
               ))}
             </div>
@@ -1388,13 +1273,13 @@ const EnterpriseDashboard = ({
 
       {smartAssignTrip && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} />
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <BrainCircuit size={16} className="text-indigo-700" /> AI Assignment
               </h2>
-              <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="p-5">
               {aiAnalyzing ? (
@@ -1428,7 +1313,7 @@ const EnterpriseDashboard = ({
                       )}
                       <button
                         onClick={() => assignTripToDriver(smartAssignTrip.id, d.id)}
-                        className="mt-3 w-full py-2 btn-gradient-primary font-bold transition-all duration-200 flex items-center justify-center gap-2"
+                        className="mt-3 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2"
                       >
                         <CheckCircle2 size={14} /> Confirm Assignment
                       </button>
@@ -1450,13 +1335,13 @@ const EnterpriseDashboard = ({
 
       {showOptimizeModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !aiAnalyzing && setShowOptimizeModal(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !aiAnalyzing && setShowOptimizeModal(false)} />
           <div className="bg-white w-full max-w-md rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Wand2 size={16} className="text-indigo-700" /> Fleet Optimization
               </h2>
-              {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>}
+              {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>}
             </div>
             <div className="p-5">
               {aiAnalyzing ? (
@@ -1471,7 +1356,7 @@ const EnterpriseDashboard = ({
                   </div>
                   <button
                     onClick={() => { triggerFleetOptimization(); setTimeout(() => setShowOptimizeModal(false), 3000); }}
-                    className="w-full py-2.5 btn-gradient-primary font-bold transition-all duration-200 flex items-center justify-center gap-2"
+                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2"
                   >
                     <Zap size={16} /> Run Optimization
                   </button>
@@ -1485,14 +1370,14 @@ const EnterpriseDashboard = ({
       {/* Trip Details Modal */}
       {tripDetails && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" onClick={() => setTripDetails(null)}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-sm relative z-10 border border-slate-200 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white backdrop-blur-md border-b border-slate-100 px-5 py-3.5 flex items-center justify-between z-10">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-blue-500" />
                 <h3 className="text-sm font-bold text-slate-900">Trip Details</h3>
               </div>
-              <button onClick={() => setTripDetails(null)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setTripDetails(null)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="p-5 space-y-3">
               <div className="flex items-start justify-between">
@@ -1513,22 +1398,22 @@ const EnterpriseDashboard = ({
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Time</p>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.time || 'No time'}</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.time || '—'}</p>
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Date</p>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.date || 'No date'}</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.date || '—'}</p>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-emerald-500/20">
-                    <span className="text-[8px] font-bold text-white">P</span>
+                    <span className="text-[8px] font-black text-white">P</span>
                   </div>
                   <div className="flex-1">
                     <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Pickup</p>
-                    <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.pickup || 'No pickup address'}</p>
+                    <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.pickup || '—'}</p>
                     {tripDetails.pickupSiteName && <p className="text-xs text-emerald-700 mt-1">{tripDetails.pickupSiteName}</p>}
                     {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone)}</p>}
                     {formatPhoneDisplay(tripDetails.pickupPhone) && formatPhoneDisplay(tripDetails.pickupPhone) !== formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700">Pickup phone: {formatPhoneDisplay(tripDetails.pickupPhone)}</p>}
@@ -1536,11 +1421,11 @@ const EnterpriseDashboard = ({
                 </div>
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-rose-500/20">
-                    <span className="text-[8px] font-bold text-white">D</span>
+                    <span className="text-[8px] font-black text-white">D</span>
                   </div>
                   <div className="flex-1">
                     <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Dropoff</p>
-                    <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.dropoff || 'No dropoff address'}</p>
+                    <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.dropoff || '—'}</p>
                     {tripDetails.dropoffSiteName && <p className="text-xs text-rose-700 mt-1">{tripDetails.dropoffSiteName}</p>}
                     {formatPhoneDisplay(tripDetails.dropoffPhone) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.dropoffPhone)}</p>}
                   </div>
@@ -1548,12 +1433,12 @@ const EnterpriseDashboard = ({
               </div>
 
               {tripDetails.routeAssignments?.length > 0 && (
-                <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-blue-500">Route Plans</p>
+                <div className="bg-white rounded-xl border border-indigo-100 p-3 shadow-sm">
+                  <p className="text-micro font-bold uppercase tracking-wider text-indigo-500">Route Plans</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {tripDetails.routeAssignments.map((route, index) => (
-                      <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700">
-                        {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` | ${route.statusLabel}` : ''}
+                      <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700">
+                        {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` • ${route.statusLabel}` : ''}
                       </span>
                     ))}
                   </div>
@@ -1563,7 +1448,7 @@ const EnterpriseDashboard = ({
               {(tripDetails.driverName || tripDetails.driverId) && (
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Driver</p>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || 'No driver'}</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || '—'}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
                 </div>
               )}
@@ -1577,7 +1462,7 @@ const EnterpriseDashboard = ({
 
               <button
                 onClick={() => setShowTripLocations(prev => !prev)}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 rounded-xl text-xs font-bold text-slate-600 transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-600 transition-colors"
               >
                 <Search size={13} /> {showTripLocations ? 'Hide' : 'Find This Trip'}
               </button>
@@ -1591,13 +1476,13 @@ const EnterpriseDashboard = ({
                       <button
                         key={i}
                         onClick={() => { setActivePanel(loc.panel); setTripDetails(null); setShowTripLocations(false); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 transition-colors text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-colors text-left"
                       >
-                        {loc.icon === 'Zap' && <Zap size={14} className="text-blue-600" />}
-                        {loc.icon === 'Archive' && <Archive size={14} className="text-blue-600" />}
-                        {loc.icon === 'BarChart2' && <BarChart2 size={14} className="text-blue-600" />}
-                        {loc.icon === 'Route' && <Route size={14} className="text-blue-600" />}
-                        <span className="text-xs font-semibold text-blue-700">{loc.label}</span>
+                        {loc.icon === 'Zap' && <Zap size={14} className="text-indigo-600" />}
+                        {loc.icon === 'Archive' && <Archive size={14} className="text-indigo-600" />}
+                        {loc.icon === 'BarChart2' && <BarChart2 size={14} className="text-indigo-600" />}
+                        {loc.icon === 'Route' && <Route size={14} className="text-indigo-600" />}
+                        <span className="text-xs font-semibold text-indigo-700">{loc.label}</span>
                       </button>
                     ))}
                   </div>
@@ -1613,7 +1498,7 @@ const EnterpriseDashboard = ({
       {/* Auth Modal */}
       {showAuthModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="bg-white w-full max-w-sm rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="px-5 py-3.5 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -1634,8 +1519,8 @@ const EnterpriseDashboard = ({
               />
               {reAuthError && <p className="text-xs text-rose-700 mb-3">{reAuthError}</p>}
               <div className="flex gap-2">
-                <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition-all duration-200">Cancel</button>
-                <button type="submit" className="flex-1 py-2 btn-gradient-primary font-bold transition-all duration-200">Confirm</button>
+                <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all duration-200">Cancel</button>
+                <button type="submit" className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200">Confirm</button>
               </div>
             </form>
           </div>
@@ -1645,13 +1530,13 @@ const EnterpriseDashboard = ({
       {/* Route Sequencer Modal */}
       {showSequencerModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} />
           <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
             <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Route size={16} className="text-blue-700" /> Route Sequencer
+                <Route size={16} className="text-indigo-700" /> Route Sequencer
               </h2>
-              <button onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition min-h-[44px] min-w-[44px]"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="flex-1 overflow-hidden">
               <Suspense fallback={<LazyFallback />}>

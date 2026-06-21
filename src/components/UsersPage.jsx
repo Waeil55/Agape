@@ -28,7 +28,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showAssign, setShowAssign] = useState(null);
-  const [form, setForm] = useState({ username: '', fullName: '', password: '', role: 'driver', phone: '' });
+  const [form, setForm] = useState({ username: '', password: '', role: 'driver', phone: '' });
   const [formError, setFormError] = useState('');
   const [editingDispatcher, setEditingDispatcher] = useState(null);
   const [editName, setEditName] = useState('');
@@ -90,8 +90,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       
       const userCred = await createUserWithEmailAndPassword(secondaryAuth, authEmail, form.password);
       const profileId = buildStableProfileId(form.role, userCred.user.uid);
-      const actualName = form.fullName.trim() || username;
-      await setDoc(doc(db, 'users', userCred.user.uid), { email: authEmail, username, name: actualName, role: form.role, phone: form.phone, profileId, loginType: 'username' }, { merge: true });
+      await setDoc(doc(db, 'users', userCred.user.uid), { email: authEmail, username, name: username, role: form.role, phone: form.phone, profileId, loginType: 'username' }, { merge: true });
       
       // Cleanup: sign out and delete secondary app
       await authSignOut(secondaryAuth);
@@ -99,11 +98,11 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       
       if (form.role === 'dispatcher') {
         const id = profileId;
-        setDispatchers(prev => [...prev, { id, name: actualName, email: authEmail, username }]);
+        setDispatchers(prev => [...prev, { id, name: username, email: authEmail, username }]);
       } else if (form.role === 'driver') {
         const id = profileId;
         const newDriver = {
-          id, name: actualName, email: authEmail, username, phone: form.phone, status: 'Available', vehicle: 'Pending', dist: '--',
+          id, name: username, email: authEmail, username, phone: form.phone, status: 'Available', vehicle: 'Pending', dist: '--',
           currentZone: 'TBD', odometer: 0, nextOilChange: 5000,
           assignedTo: '', schedule: [], clockedIn: false
         };
@@ -113,7 +112,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       addAuditLog('User Created', `${currentUser} created ${form.role} account: ${username}`, 'emerald', { entity: 'user', id: username, diffs: [{ field: 'role', before: null, after: form.role }, { field: 'username', before: null, after: username }] });
       await loadUsers();
       setShowForm(false);
-      setForm({ username: '', fullName: '', password: '', role: 'driver', phone: '' });
+      setForm({ username: '', password: '', role: 'driver', phone: '' });
     } catch (err) {
       if (secondaryApp) await deleteApp(secondaryApp).catch(() => {});
       setFormError(err.message.replace('Firebase: ', ''));
@@ -196,7 +195,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       <>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">User Management</h2>
-        <button onClick={() => setShowForm(true)} className="w-full sm:w-auto px-4 py-2 btn-gradient-primary font-bold transition-all flex items-center justify-center gap-2 text-sm">
+        <button onClick={() => setShowForm(true)} className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm">
           <Plus size={18} /> Add User
         </button>
       </div>
@@ -210,16 +209,16 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       </>
       )}
 
-      <div className={`flex flex-col ${singleColumn && !activityFeedOnly ? '' : 'lg:flex-row'} gap-6 items-stretch ${activityFeedOnly ? 'h-full' : ''}`}>
+      <div className={`flex flex-col ${singleColumn && !activityFeedOnly ? '' : 'xl:flex-row'} gap-6 items-stretch ${activityFeedOnly ? 'h-full' : ''}`}>
         {!activityFeedOnly && (
         // Left Column: Management & Insights
-        <div className={`w-full ${singleColumn ? '' : 'lg:w-1/2'} space-y-6 min-w-0 flex flex-col`}>
+        <div className={`w-full ${singleColumn ? '' : 'xl:w-1/2'} space-y-6 min-w-0 flex flex-col`}>
 
       {/* Role Summary Cards */}
       {!hideRoleCards && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {[
-          { key: 'admin', bg: 'bg-blue-50', border: 'border-blue-200', iconBg: 'bg-blue-500', Icon: ShieldCheck, label: 'Admin' },
+          { key: 'admin', bg: 'bg-indigo-50', border: 'border-indigo-200', iconBg: 'bg-indigo-500', Icon: ShieldCheck, label: 'Admin' },
           { key: 'dispatcher', bg: 'bg-blue-50', border: 'border-blue-200', iconBg: 'bg-blue-500', Icon: Briefcase, label: 'Dispatcher' },
           { key: 'driver', bg: 'bg-emerald-50', border: 'border-emerald-200', iconBg: 'bg-emerald-500', Icon: Truck, label: 'Driver' },
         ].map(c => {
@@ -282,7 +281,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       )}
 
       {/* All Users Table */}
-      <div className="card-premium">
+      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
         <div className="p-4 sm:p-6 border-b border-slate-200">
           <h3 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> All Users ({users.length})</h3>
         </div>
@@ -295,9 +294,9 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Username</th>
-                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Role</th>
-                  <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Actions</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Username</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Role</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -306,17 +305,17 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                   const RoleIcon = user.role === 'admin' ? ShieldCheck : user.role === 'dispatcher' ? Briefcase : Truck;
                   return (
                     <tr key={user.uid} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="px-2 py-1.5 text-[10.5px] font-semibold text-slate-900 truncate max-w-[150px] sm:max-w-none">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900 truncate max-w-[150px] sm:max-w-none">
                         <div>{user.username || authEmailToUsername(user.email)}</div>
-                        <div className="text-[10.5px] font-medium text-slate-400 mt-0.5">{user.email}</div>
+                        <div className="text-[11px] font-medium text-slate-400 mt-0.5">{user.email}</div>
                       </td>
-                      <td className="px-2 py-1.5">
-                        <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold w-fit ${roleStyle}`}>
+                      <td className="px-3 sm:px-6 py-2 sm:py-4">
+                        <span className={`flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-xs font-bold w-fit ${roleStyle}`}>
                           <RoleIcon size={10} /> {String(user?.role || '').charAt(0).toUpperCase() + String(user?.role || '').slice(1)}
                         </span>
-                        {user.phone && <p className="text-[10.5px] text-slate-500 font-mono mt-1">{user.phone}</p>}
+                        {user.phone && <p className="text-xs text-slate-500 font-mono mt-1">{user.phone}</p>}
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4">
                         <div className="flex items-center gap-1">
                           {user.role === 'dispatcher' && role === 'admin' && (() => {
                             const disp = dispatchers.find(d => d.email === user.email);
@@ -325,23 +324,23 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                               return (
                                 <div className="flex items-center gap-1">
                                   <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
-                                    className="w-24 px-1.5 py-0.5 border border-blue-300 rounded text-[10.5px] font-semibold outline-none focus:border-blue-500"
+                                    className="w-24 px-1.5 py-0.5 border border-blue-300 rounded text-xs font-semibold outline-none focus:border-blue-500"
                                     onKeyDown={(e) => { if (e.key === 'Enter') saveDispatcherName(); if (e.key === 'Escape') setEditingDispatcher(null); }}
                                     autoFocus />
-                                   <button onClick={saveDispatcherName} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition" title="Save"><Check size={12} /></button>
-                                   <button onClick={() => setEditingDispatcher(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition" title="Cancel"><X size={12} /></button>
+                                  <button onClick={saveDispatcherName} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition" title="Save"><Check size={14} /></button>
+                                  <button onClick={() => setEditingDispatcher(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition" title="Cancel"><X size={14} /></button>
                                 </div>
                               );
                             }
                             return (
-                              <button onClick={() => startRenameDispatcher(disp)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Rename dispatcher" aria-label="Rename dispatcher">
-                                <Edit2 size={12} />
+                              <button onClick={() => startRenameDispatcher(disp)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Rename dispatcher" aria-label="Rename dispatcher">
+                                <Edit2 size={14} />
                               </button>
                             );
                           })()}
                           {role === 'admin' && user.email !== currentUser && (
-                            <button onClick={() => requestAuthAction ? requestAuthAction('Delete User', () => deleteUserAccount(user)) : deleteUserAccount(user)} className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition" title="Remove user" aria-label="Remove user">
-                              <Trash2 size={12} />
+                            <button onClick={() => requestAuthAction ? requestAuthAction('Delete User', () => deleteUserAccount(user)) : deleteUserAccount(user)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Remove user" aria-label="Remove user">
+                              <Trash2 size={14} />
                             </button>
                           )}
                         </div>
@@ -356,7 +355,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       </div>
 
       {/* Dispatcher Assignments */}
-      <div className="card-premium">
+      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
         <div className="p-4 sm:p-6 border-b border-slate-200">
           <h3 className="text-lg sm:text-xl font-bold text-slate-900">Driver Assignments</h3>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">Assign drivers to dispatchers</p>
@@ -365,46 +364,46 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Driver</th>
-                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Assigned To</th>
-                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Actions</th>
-                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Remove</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Driver</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Assigned To</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Actions</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-sm font-semibold text-slate-600">Remove</th>
               </tr>
             </thead>
             <tbody>
               {drivers.length === 0 ? (
-                <tr><td colSpan="4" className="px-2 py-1.5 text-center text-slate-500 text-[10.5px]">No drivers yet.</td></tr>
+                <tr><td colSpan="4" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-sm">No drivers yet.</td></tr>
               ) : (
                 drivers.map(d => {
                   const dispatcher = dispatchers.find(ds => ds.id === (d.assignedDispatcher || d.assignedTo));
                   return (
                     <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="px-2 py-1.5 text-[10.5px] font-semibold text-slate-900">{d.name}</td>
-                      <td className="px-2 py-1.5 text-[10.5px]">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900">{d.name}</td>
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm">
                         {showAssign === d.id ? (
                           <div className="flex gap-2">
                             <select
                               value={d.assignedDispatcher || d.assignedTo || ''}
                               onChange={(e) => assignDriver(d.id, e.target.value)}
-                              className="px-2 py-1 border border-slate-300 rounded-lg text-[10.5px] focus:outline-none focus:border-blue-500 max-w-[120px] sm:max-w-none"
+                              className="px-2 sm:px-3 py-1 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:border-blue-500 max-w-[120px] sm:max-w-none"
                             >
                               <option value="">Unassigned</option>
                               {dispatchers.map(ds => (
                                 <option key={ds.id} value={ds.id}>{ds.name}</option>
                               ))}
                             </select>
-                            <button onClick={() => setShowAssign(null)} className="p-1 text-slate-500 hover:text-slate-700 flex items-center justify-center" aria-label="Close"><X size={12} /></button>
+                            <button onClick={() => setShowAssign(null)} className="p-1 text-slate-500 hover:text-slate-700" aria-label="Close"><X size={14} /></button>
                           </div>
                         ) : (
                           <span className="text-slate-600">{dispatcher?.name || <span className="text-slate-400 italic">Unassigned</span>}</span>
                         )}
                       </td>
-                      <td className="px-2 py-1.5">
-                        <button onClick={() => setShowAssign(showAssign === d.id ? null : d.id)} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md text-[10.5px] font-bold hover:bg-blue-200">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4">
+                        <button onClick={() => setShowAssign(showAssign === d.id ? null : d.id)} className="px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs sm:text-xs font-bold hover:bg-blue-200">
                           {showAssign === d.id ? 'Cancel' : 'Assign'}
                         </button>
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4">
                         <button onClick={() => {
                           const user = users.find(u => u.email === d.email);
                           if (user) {
@@ -415,8 +414,8 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                             // If no user found, just remove from drivers list
                             setDrivers(prev => prev.filter(drv => drv.id !== d.id));
                           }
-                        }} className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition" aria-label="Delete driver">
-                          <Trash2 size={12} />
+                        }} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition" aria-label="Delete driver">
+                          <Trash2 size={14} />
                         </button>
                       </td>
                     </tr>
@@ -436,9 +435,9 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
 
       {/* Right Column: Activity Feed */}
       {!hideActivityFeed && (
-      <div className={`w-full ${singleColumn || activityFeedOnly ? '' : 'lg:w-1/2'} shrink-0 flex flex-col ${activityFeedOnly ? 'h-full' : ''}`}>
+      <div className={`w-full ${singleColumn || activityFeedOnly ? '' : 'xl:w-1/2'} shrink-0 flex flex-col ${activityFeedOnly ? 'h-full' : ''}`}>
       {/* System Activity Feed */}
-      <div className="card-premium flex flex-col flex-1 min-h-[500px]">
+      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-[500px]">
         <div className="p-4 sm:p-6 border-b border-slate-200 shrink-0">
           <h3 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
             <Activity size={18} /> System Activity Feed
@@ -449,21 +448,21 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
           <table className="w-full relative">
             <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
               <tr>
-                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Time</th>
-                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Action</th>
-                <th className="px-2 py-1.5 text-left text-[10.5px] font-semibold text-slate-600">Details</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm font-semibold text-slate-600">Time</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm font-semibold text-slate-600">Action</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-sm font-semibold text-slate-600">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {(() => {
-                if (visibleLogs.length === 0) return <tr><td colSpan="3" className="px-2 py-1.5 text-center text-slate-500 text-[10.5px]">No activity recorded yet.</td></tr>;
+                if (visibleLogs.length === 0) return <tr><td colSpan="3" className="px-3 sm:px-6 py-8 text-center text-slate-500 text-sm">No activity recorded yet.</td></tr>;
                 return visibleLogs.map((log, i) => (
                   <tr key={i} onClick={() => setSelectedLog(log)} className="hover:bg-slate-50 cursor-pointer transition-colors">
-                    <td className="px-2 py-1.5 text-[10.5px] text-slate-500 whitespace-nowrap">
+                    <td className="px-3 sm:px-6 py-2 sm:py-3 text-xs text-slate-500 whitespace-nowrap">
                       {log.time ? new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : log.timestamp}
                     </td>
-                    <td className="px-2 py-1.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-bold 
+                    <td className="px-3 sm:px-6 py-2 sm:py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold 
                         ${log.c === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
                           log.c === 'rose' ? 'bg-rose-100 text-rose-700' :
                           log.c === 'amber' ? 'bg-amber-100 text-amber-700' :
@@ -471,12 +470,12 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         {log.t}
                       </span>
                       {log.actorRole && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-bold uppercase bg-slate-100 text-slate-600">
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-slate-100 text-slate-600">
                           {log.actorRole}
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-1.5 text-[10.5px] text-slate-700 max-w-xs truncate">{log.meta?.summary || log.d}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-3 text-sm text-slate-700 max-w-xs truncate">{log.meta?.summary || log.d}</td>
                   </tr>
                 ));
               })()}
@@ -491,7 +490,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* Add User Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="card-premium max-w-md w-full mx-0 sm:mx-4">
+          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm max-w-md w-full mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900">Create User</h3>
@@ -499,14 +498,9 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               </div>
               <form onSubmit={(e) => { e.preventDefault(); createUser(); }} className="space-y-3 sm:space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Username (Login)</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Username</label>
                   <input type="text" required autoCapitalize="none" autoCorrect="off" spellCheck="false" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm" placeholder="driver.waeil" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Full Name (First & Last)</label>
-                  <input type="text" required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm" placeholder="John Doe" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Password</label>
@@ -522,7 +516,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Role</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { key: 'admin', Icon: ShieldCheck, label: 'Admin', activeBorder: 'border-blue-500', activeBg: 'bg-blue-50', text: 'text-blue-600', textBold: 'text-blue-700' },
+                      { key: 'admin', Icon: ShieldCheck, label: 'Admin', activeBorder: 'border-indigo-500', activeBg: 'bg-indigo-50', text: 'text-indigo-600', textBold: 'text-indigo-700' },
                       { key: 'dispatcher', Icon: Briefcase, label: 'Dispatcher', activeBorder: 'border-blue-500', activeBg: 'bg-blue-50', text: 'text-blue-600', textBold: 'text-blue-700' },
                       { key: 'driver', Icon: Truck, label: 'Driver', activeBorder: 'border-emerald-500', activeBg: 'bg-emerald-50', text: 'text-emerald-600', textBold: 'text-emerald-700' },
                     ].map(c => {
@@ -540,8 +534,8 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 </div>
               </form>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-6">
-                <button type="button" onClick={() => { setShowForm(false); setFormError(''); }} className="w-full sm:flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold text-sm">Cancel</button>
-                <button type="submit" onClick={createUser} className="w-full sm:flex-1 px-4 py-2 btn-gradient-primary font-bold transition-all flex items-center justify-center gap-2 text-sm"><Save size={16} /> Create</button>
+                <button type="button" onClick={() => { setShowForm(false); setFormError(''); }} className="w-full sm:flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm">Cancel</button>
+                <button type="submit" onClick={createUser} className="w-full sm:flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm"><Save size={16} /> Create</button>
               </div>
             </div>
           </div>
@@ -600,7 +594,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Target</p>
                   <p className="text-sm font-semibold text-slate-800">
-                    {selectedLog.meta?.entity ? `${selectedLog.meta.entity}${selectedLog.meta?.id ? ` | ${selectedLog.meta.id}` : ''}` : 'General'}
+                    {selectedLog.meta?.entity ? `${selectedLog.meta.entity}${selectedLog.meta?.id ? ` · ${selectedLog.meta.id}` : ''}` : 'General'}
                   </p>
                 </div>
               </div>
@@ -615,11 +609,11 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
                           <div className="bg-rose-50 rounded-lg p-2 border border-rose-100">
                             <span className="text-[9px] font-bold uppercase tracking-wider text-rose-500 block mb-0.5">Before</span>
-                            <span className="font-mono text-slate-700 break-all">{dd.before ?? 'Not set'}</span>
+                            <span className="font-mono text-slate-700 break-all">{dd.before ?? '—'}</span>
                           </div>
                           <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-100">
                             <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500 block mb-0.5">After</span>
-                            <span className="font-mono text-slate-700 break-all">{dd.after ?? 'Not set'}</span>
+                            <span className="font-mono text-slate-700 break-all">{dd.after ?? '—'}</span>
                           </div>
                         </div>
                       </div>

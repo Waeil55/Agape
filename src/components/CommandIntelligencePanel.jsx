@@ -18,14 +18,12 @@ const toneClasses = {
   blue: { text: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200', fill: 'bg-blue-500' },
   amber: { text: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', fill: 'bg-amber-500' },
   rose: { text: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200', fill: 'bg-rose-500' },
+  indigo: { text: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-200', fill: 'bg-indigo-500' },
   slate: { text: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200', fill: 'bg-slate-500' },
 };
 
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
-const isServiceDateTrip = (t, serviceDate = localCalendarYmd()) => {
-  const key = tripCalendarDateKey(t?.date);
-  return key === undefined || key === serviceDate;
-};
+const isTodayTrip = (t) => tripCalendarDateKey(t?.date) === undefined || tripCalendarDateKey(t?.date) === localCalendarYmd();
 const isWillCall = (t) => String(t?.time || '').trim().toUpperCase() === 'WILL CALL';
 const minutesUntil = (trip) => {
   if (!trip?.time || isWillCall(trip)) return null;
@@ -53,7 +51,6 @@ const MetricCard = ({ icon: Icon, label, value, detail, tone = 'slate' }) => {
 
 const CommandIntelligencePanel = ({
   trips, drivers, dispatchers, routeTemplates, logs = [],
-  serviceDate = localCalendarYmd(),
   onFocusLate, onFocusUpcoming, onFocusUnassigned, onFocusFleet, onFocusRoutes,
 }) => {
   const [aiInsights, setAiInsights] = useState(null);
@@ -63,7 +60,7 @@ const CommandIntelligencePanel = ({
 
   // Fallback heuristic intelligence (always computed)
   const heuristic = useMemo(() => {
-    const todayTrips = trips.filter((trip) => isServiceDateTrip(trip, serviceDate));
+    const todayTrips = trips.filter(isTodayTrip);
     const active = todayTrips.filter(t => !CLOSED_STATUSES.has(t.status));
     const scheduled = active.filter(t => !isWillCall(t));
     const completed = todayTrips.filter(t => t.status === 'Completed');
@@ -75,7 +72,7 @@ const CommandIntelligencePanel = ({
     const shortage = Math.max(0, unassigned.length - availDrivers.length);
     const score = clamp(100 - late.length * 16 - unassigned.length * 7 - upcomingUnassigned.length * 9 - shortage * 12, 0, 100);
     return { active, unassigned, late, upcoming, upcomingUnassigned, completed, availDrivers, shortage, score };
-  }, [trips, drivers, serviceDate]);
+  }, [trips, drivers]);
 
   // Real AI: periodic Gemini analysis
   useEffect(() => {
@@ -110,7 +107,7 @@ const CommandIntelligencePanel = ({
               ? `Active: ${activeCount} trips, ${lateCount} late, ${unassignedCount} unassigned. ${summary.summary}`
               : 'No active trips to analyze.',
             aiRecommendedAction: lateCount > 3
-              ? 'Prioritize late trips - consider reassigning to available drivers.'
+              ? 'Prioritize late trips — consider reassigning to available drivers.'
               : unassignedCount > 5
               ? 'Focus on assigning unassigned trips for the next hour.'
               : 'Operations are stable. Monitor driver loads.',
@@ -171,7 +168,7 @@ const CommandIntelligencePanel = ({
     const utilization = clamp(Math.round((assigned.length / expectedLoad) * 70) + (d.status !== 'Available' ? 15 : 0), 0, 100);
     const tone = assigned.length > expectedLoad + 1 ? 'rose' : d.status === 'Available' ? 'emerald' : 'blue';
     return {
-      id: d.id, name: d.name || d.email || 'Driver', status: d.status || 'No status',
+      id: d.id, name: d.name || d.email || 'Driver', status: d.status || 'Unknown',
       vehicle: d.vehicle || 'No vehicle', assignedCount: assigned.length, utilization, tone, nextTrip,
     };
   }).sort((a, b) => b.assignedCount - a.assignedCount || b.utilization - a.utilization).slice(0, 5);
@@ -180,7 +177,7 @@ const CommandIntelligencePanel = ({
   const zones = new Map();
   heuristic.active.forEach(t => {
     const raw = String(t.pickup || t.dropoff || '').trim();
-    const zone = raw.split(',').map(p => p.trim()).filter(Boolean)[0]?.replace(/\b\d{1,6}\b/g, '').trim().slice(0, 28) || 'No zone';
+    const zone = raw.split(',').map(p => p.trim()).filter(Boolean)[0]?.replace(/\b\d{1,6}\b/g, '').trim().slice(0, 28) || 'Unknown';
     const cur = zones.get(zone) || { zone, count: 0, late: 0, unassigned: 0 };
     cur.count += 1;
     if (heuristic.late.includes(t)) cur.late += 1;
@@ -200,10 +197,10 @@ const CommandIntelligencePanel = ({
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`px-2.5 py-0.5 rounded-full border text-xs font-semibold uppercase ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
+              <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
                 {aiInsights ? 'AI Intelligence' : 'Operations Monitor'}
               </span>
-              <span className={`px-2.5 py-0.5 rounded-full border text-xs font-semibold uppercase ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
+              <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
                 {riskLabel} {heuristic.score}
               </span>
             </div>
@@ -297,8 +294,8 @@ const CommandIntelligencePanel = ({
                       <div className="min-w-0">
                         <p className="text-xs font-black text-slate-900 truncate">{d.name}</p>
                         <p className="text-[10px] font-semibold text-slate-500 truncate">
-                          {d.assignedCount} active - {d.vehicle}
-                          {proximity != null ? ` - ${Math.round(proximity)} mi` : ''}
+                          {d.assignedCount} active — {d.vehicle}
+                          {proximity != null ? ` — ${Math.round(proximity)} mi` : ''}
                         </p>
                       </div>
                       <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black ${tone.bg} ${tone.border} ${tone.text}`}>
@@ -330,7 +327,7 @@ const CommandIntelligencePanel = ({
                 <span className="text-[10px] font-black text-slate-400">{zone.count}</span>
               </div>
               <p className="mt-1 text-xs font-black text-slate-800 truncate">{zone.zone}</p>
-              <p className="text-[10px] font-semibold text-slate-500 mt-0.5">{zone.unassigned} unassigned - {zone.late} late</p>
+              <p className="text-[10px] font-semibold text-slate-500 mt-0.5">{zone.unassigned} unassigned — {zone.late} late</p>
             </button>
           )) : (
             <div className="md:col-span-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 flex items-center gap-2 text-xs font-bold text-slate-500">

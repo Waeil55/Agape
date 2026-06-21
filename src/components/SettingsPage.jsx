@@ -26,8 +26,8 @@ const ActivityRow = ({ index, log }) => {
                   <div key={idx} className="flex items-start gap-3">
                     <div className="w-32 text-slate-500">{dd.field}</div>
                     <div className="flex-1">
-                      <div className="text-[13px] text-slate-600"><span className="font-semibold">Before:</span> <span className="font-mono text-slate-700">{dd.before ?? 'Not set'}</span></div>
-                      <div className="text-[13px] text-slate-600 mt-0.5"><span className="font-semibold">After:</span> <span className="font-mono text-slate-700">{dd.after ?? 'Not set'}</span></div>
+                      <div className="text-[13px] text-slate-600"><span className="font-semibold">Before:</span> <span className="font-mono text-slate-700">{dd.before ?? '—'}</span></div>
+                      <div className="text-[13px] text-slate-600 mt-0.5"><span className="font-semibold">After:</span> <span className="font-mono text-slate-700">{dd.after ?? '—'}</span></div>
                     </div>
                   </div>
                 ))}
@@ -35,18 +35,18 @@ const ActivityRow = ({ index, log }) => {
             </div>
           )}
         </div>
-        <span className="text-[10.5px] font-bold text-slate-400 flex-shrink-0">{log.timestamp}</span>
+        <span className="text-[10px] font-bold text-slate-400 flex-shrink-0">{log.timestamp}</span>
       </div>
     </div>
   );
 };
 
 const FONT_SCALE_OPTIONS = [
-  { value: 'sm', label: 'Small', desc: 'Compact view - more content on screen', icon: Minus },
-  { value: 'md', label: 'Default', desc: 'Standard readability - recommended', icon: TextSelect },
-  { value: 'lg', label: 'Large', desc: 'Larger text - easier to read', icon: Plus },
-  { value: 'xl', label: 'Extra Large', desc: 'Maximum readability - reduced eye strain', icon: Maximize2 },
-  { value: 'driver', label: 'Driver Mode', desc: 'Ultra-readable - optimized for in-vehicle use', icon: Smartphone },
+  { value: 'sm', label: 'Small', desc: 'Compact view — more content on screen', icon: Minus },
+  { value: 'md', label: 'Default', desc: 'Standard readability — recommended', icon: TextSelect },
+  { value: 'lg', label: 'Large', desc: 'Larger text — easier to read', icon: Plus },
+  { value: 'xl', label: 'Extra Large', desc: 'Maximum readability — reduced eye strain', icon: Maximize2 },
+  { value: 'driver', label: 'Driver Mode', desc: 'Ultra-readable — optimized for in-vehicle use', icon: Smartphone },
 ];
 
 const THEME_OPTIONS = [
@@ -89,7 +89,7 @@ const ROLE_COLORS = {
   billing: 'bg-purple-100 text-purple-800',
   qa_auditor: 'bg-amber-100 text-amber-800',
   fleet_manager: 'bg-cyan-100 text-cyan-800',
-  supervisor: 'bg-blue-100 text-blue-800',
+  supervisor: 'bg-indigo-100 text-indigo-800',
 };
 
 const SettingsPage = ({
@@ -110,9 +110,6 @@ const SettingsPage = ({
   dispatchers = [],
   vehicles = [],
   logs = [],
-  syncHealth = {},
-  onRepairCloudMirrors,
-  onCreateCloudBackup,
 }) => {
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
   const [activeSection, setActiveSection] = useState(() => localStorage.getItem(`agape_settingsSection_${userKey}`) || 'overview');
@@ -125,29 +122,6 @@ const SettingsPage = ({
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [pwMsg, setPwMsg] = useState('');
-  const [systemNotice, setSystemNotice] = useState('');
-  const [syncActionBusy, setSyncActionBusy] = useState('');
-
-  const formatSyncTime = (value) => {
-    if (!value) return 'Never';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return String(value);
-    return parsed.toLocaleString();
-  };
-
-  const runSyncAction = async (label, action) => {
-    if (!action) return;
-    setSystemNotice('');
-    setSyncActionBusy(label);
-    try {
-      const result = await action();
-      setSystemNotice(result?.message || `${label} completed.`);
-    } catch (err) {
-      setSystemNotice(err?.message || `${label} failed.`);
-    } finally {
-      setSyncActionBusy('');
-    }
-  };
 
   const handlePasswordChange = async () => {
     setPwMsg('');
@@ -207,13 +181,13 @@ const SettingsPage = ({
                 { label: 'Dispatchers', value: dispatchers.length, icon: User, color: 'bg-purple-600' },
                 { label: 'Archived', value: trashedTrips.length, icon: Archive, color: 'bg-amber-600' },
                 { label: 'Total Trips', value: trips.length, icon: Activity, color: 'bg-cyan-600' },
-                { label: 'Vehicles', value: vehicles.length, icon: Truck, color: 'bg-blue-600' },
+                { label: 'Vehicles', value: vehicles.length, icon: Truck, color: 'bg-indigo-600' },
                 { label: 'Cancelled / No Show', value: trips.filter(t => ['Cancelled', 'No Show'].includes(t.status)).length, icon: XCircle, color: 'bg-rose-600' },
                 { label: 'Completed Today', value: trips.filter(t => t.status === 'Completed').length, icon: CheckCircle2, color: 'bg-emerald-600' },
               ].map((stat, i) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={i} className="card-premium p-4 shadow-sm">
+                  <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
                     <div className={`w-9 h-9 rounded-xl ${stat.color} flex items-center justify-center mb-3`}>
                       <Icon size={16} className="text-white" />
                     </div>
@@ -234,36 +208,36 @@ const SettingsPage = ({
               <h3 className="text-heading text-slate-900 mb-1">User Management</h3>
               <p className="text-body text-slate-500">All registered drivers and dispatchers.</p>
             </div>
-            <div className="card-premium">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
-                <table className="w-full text-[10.5px]">
+                <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="px-2 py-1.5 text-left font-bold text-slate-600">Name</th>
-                      <th className="px-2 py-1.5 text-left font-bold text-slate-600">Email</th>
-                      <th className="px-2 py-1.5 text-left font-bold text-slate-600">Role</th>
-                      <th className="px-2 py-1.5 text-left font-bold text-slate-600">Status</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-600">Name</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-600">Email</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-600">Role</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-600">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {dispatchers.map((d, i) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-2 py-1.5 font-bold text-slate-900">{d.name || 'No name'}</td>
-                        <td className="px-2 py-1.5 text-slate-600 font-mono">{d.email || 'No email'}</td>
-                        <td className="px-2 py-1.5"><span className={`inline-block px-2 py-0.5 rounded-full font-bold ${ROLE_COLORS[d.role] || 'bg-slate-100 text-slate-600'}`}>{ROLE_LABELS[d.role] || d.role}</span></td>
-                        <td className="px-2 py-1.5"><span className={`inline-flex items-center gap-1 font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
+                        <td className="px-4 py-3 font-bold text-slate-900">{d.name || '—'}</td>
+                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
+                        <td className="px-4 py-3"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${ROLE_COLORS[d.role] || 'bg-slate-100 text-slate-600'}`}>{ROLE_LABELS[d.role] || d.role}</span></td>
+                        <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 text-xs font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
                       </tr>
                     ))}
                     {drivers.map((d, i) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-2 py-1.5 font-bold text-slate-900">{d.name || 'No name'}</td>
-                        <td className="px-2 py-1.5 text-slate-600 font-mono">{d.email || 'No email'}</td>
-                        <td className="px-2 py-1.5"><span className="inline-block px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800">Driver</span></td>
-                        <td className="px-2 py-1.5"><span className={`inline-flex items-center gap-1 font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
+                        <td className="px-4 py-3 font-bold text-slate-900">{d.name || '—'}</td>
+                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
+                        <td className="px-4 py-3"><span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Driver</span></td>
+                        <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 text-xs font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
                       </tr>
                     ))}
                     {(dispatchers.length + drivers.length) === 0 && (
-                      <tr><td colSpan="4" className="px-2 py-1.5 text-center text-slate-500">No users found.</td></tr>
+                      <tr><td colSpan="4" className="px-4 py-12 text-center text-slate-500">No users found.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -280,7 +254,7 @@ const SettingsPage = ({
               <h3 className="text-heading text-slate-900 mb-1">System Activity</h3>
               <p className="text-body text-slate-500">Audit log of all user actions and system events.</p>
             </div>
-            <div className="card-premium">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
               <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
                 {(() => {
                   const displayedLogs = role === 'dispatcher' ? (logs || []).filter(l => (l.actorRole || '') !== 'admin') : (logs || []);
@@ -305,26 +279,26 @@ const SettingsPage = ({
               <h3 className="text-heading text-slate-900 mb-1">Roles &amp; Permissions</h3>
               <p className="text-body text-slate-500">Capability matrix for every role in the system.</p>
             </div>
-            <div className="card-premium p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="overflow-x-auto">
-                <table className="w-full text-[10.5px]">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="px-2 py-1.5 text-left font-bold text-slate-700 whitespace-nowrap">Permission</th>
+                      <th className="px-3 py-3 text-left font-bold text-slate-700 whitespace-nowrap">Permission</th>
                       {Object.keys(ROLE_LABELS).map(r => (
-                        <th key={r} className="px-2 py-1.5 text-center font-bold text-slate-700 whitespace-nowrap">{ROLE_LABELS[r]}</th>
+                        <th key={r} className="px-3 py-3 text-center font-bold text-slate-700 whitespace-nowrap">{ROLE_LABELS[r]}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {Object.keys(PERMISSION_LABELS).map(pkey => (
                       <tr key={pkey} className="border-b border-slate-100 hover:bg-slate-50/50">
-                        <td className="px-2 py-1.5 font-bold text-slate-800 whitespace-nowrap">{PERMISSION_LABELS[pkey]}</td>
+                        <td className="px-3 py-3 font-bold text-slate-800 whitespace-nowrap">{PERMISSION_LABELS[pkey]}</td>
                         {Object.keys(ROLE_LABELS).map(r => {
                           const allowed = hasPermission ? hasPermission(r, pkey) : false;
                           return (
-                            <td key={r} className="px-2 py-1.5 text-center">
-                              {allowed ? <CheckCircle2 size={14} className="inline text-emerald-600" /> : <XCircle size={14} className="inline text-slate-300" />}
+                            <td key={r} className="px-3 py-3 text-center">
+                              {allowed ? <CheckCircle2 size={18} className="inline text-emerald-600" /> : <XCircle size={18} className="inline text-slate-300" />}
                             </td>
                           );
                         })}
@@ -345,9 +319,9 @@ const SettingsPage = ({
               <h3 className="text-heading text-slate-900 mb-1">Archived Trips</h3>
               <p className="text-body text-slate-500">Trips that have been archived from operations.</p>
             </div>
-            <div className="card-premium p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               {!showArchivedTrips ? (
-                <button onClick={() => setShowArchivedTrips(true)} className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition flex items-center justify-center gap-2 text-base">
+                <button onClick={() => setShowArchivedTrips(true)} className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition flex items-center justify-center gap-2 text-base">
                   <Eye size={20} /> View Archived ({trashedTrips.length})
                 </button>
               ) : (
@@ -357,24 +331,24 @@ const SettingsPage = ({
                     <table className="w-full">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
-                          <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600">Booking ID</th>
-                          <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600">Patient</th>
-                          <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 hidden sm:table-cell">Pickup</th>
-                          <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 hidden sm:table-cell">Dropoff</th>
-                          <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600">Time</th>
+                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600">Booking ID</th>
+                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600">Patient</th>
+                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600 hidden sm:table-cell">Pickup</th>
+                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600 hidden sm:table-cell">Dropoff</th>
+                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600">Time</th>
                         </tr>
                       </thead>
                       <tbody>
                         {trashedTrips.length === 0 ? (
-                          <tr><td colSpan="5" className="px-2 py-1.5 text-center text-slate-500 text-[10.5px]">No archived trips.</td></tr>
+                          <tr><td colSpan="5" className="px-4 sm:px-6 py-12 text-center text-slate-500 text-base">No archived trips.</td></tr>
                         ) : (
                           trashedTrips.map((trip) => (
                             <tr key={trip.id} className="border-b border-slate-100 hover:bg-slate-50">
-                              <td className="px-2 py-1.5 font-mono text-[10.5px] text-slate-600">{trip.bookingId || 'No booking'}</td>
-                              <td className="px-2 py-1.5 text-[10.5px] font-bold text-slate-900">{trip.patient}</td>
-                              <td className="px-2 py-1.5 text-[10.5px] text-emerald-600 hidden sm:table-cell">{trip.pickup}</td>
-                              <td className="px-2 py-1.5 text-[10.5px] text-rose-600 hidden sm:table-cell">{trip.dropoff}</td>
-                              <td className="px-2 py-1.5 text-[10.5px] text-slate-600">{trip.time}</td>
+                              <td className="px-4 sm:px-6 py-3 font-mono text-sm text-slate-600">{trip.bookingId || '—'}</td>
+                              <td className="px-4 sm:px-6 py-3 text-sm font-bold text-slate-900">{trip.patient}</td>
+                              <td className="px-4 sm:px-6 py-3 text-sm text-emerald-600 hidden sm:table-cell">{trip.pickup}</td>
+                              <td className="px-4 sm:px-6 py-3 text-sm text-rose-600 hidden sm:table-cell">{trip.dropoff}</td>
+                              <td className="px-4 sm:px-6 py-3 text-sm text-slate-600">{trip.time}</td>
                             </tr>
                           ))
                         )}
@@ -396,74 +370,21 @@ const SettingsPage = ({
               <p className="text-body text-slate-500">Global system controls and data management.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="card-premium p-5 shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-base mb-1"><Database size={18} /> System Logs</div>
                 <p className="text-sm text-slate-500 mb-4">View all system logs and user activities from the dashboard audit panel.</p>
-                <button type="button" onClick={() => setSystemNotice('System logs are available in the System Activity section.')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition text-sm">View Logs</button>
-                {systemNotice && (
-                  <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">
-                    {systemNotice}
-                  </div>
-                )}
+                <button onClick={() => alert('View system logs from the Dashboard → Audit panel.')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition text-sm">View Logs</button>
               </div>
-              <div className="card-premium p-5 shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-base mb-1"><RefreshCw size={18} /> Data Sync Status</div>
-                <p className="text-sm text-slate-500 mb-4">Firestore real-time sync, mirror recovery, and cloud backup status.</p>
-                <div className="grid grid-cols-1 gap-2 text-xs">
-                  {[
-                    ['Cloud listeners', syncHealth?.error ? 'Attention' : 'Live'],
-                    ['Last cloud read', formatSyncTime(syncHealth?.lastLoadedAt)],
-                    ['Last confirmed save', formatSyncTime(syncHealth?.lastSavedAt)],
-                    ['Last recovery', formatSyncTime(syncHealth?.lastRecoveredAt)],
-                    ['Last backup', formatSyncTime(syncHealth?.lastBackupAt)],
-                    ['Last repair', formatSyncTime(syncHealth?.lastRepairAt)],
-                    ['Pending writes', String(syncHealth?.pendingWrites || 0)],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-                      <span className="font-bold text-slate-500">{label}</span>
-                      <span className={`font-black ${value === 'Live' || value === '0' ? 'text-emerald-700' : value === 'Attention' ? 'text-rose-700' : 'text-slate-800'}`}>{value}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={!!syncActionBusy || !onCreateCloudBackup}
-                    onClick={() => runSyncAction('Cloud backup', () => onCreateCloudBackup?.('manual'))}
-                    className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black disabled:opacity-50"
-                  >
-                    {syncActionBusy === 'Cloud backup' ? 'Backing Up...' : 'Create Backup'}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!!syncActionBusy || !onRepairCloudMirrors}
-                    onClick={() => requestAuthAction?.('Repair cloud mirrors and rebuild app data from Firestore backups.', () => runSyncAction('Mirror repair', onRepairCloudMirrors))}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-black disabled:opacity-50"
-                  >
-                    {syncActionBusy === 'Mirror repair' ? 'Repairing...' : 'Repair Mirrors'}
-                  </button>
-                </div>
-                {Object.keys(syncHealth?.listenerStatus || {}).length > 0 && (
-                  <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Live listeners</p>
-                    <div className="grid grid-cols-1 gap-1.5">
-                      {Object.entries(syncHealth.listenerStatus).map(([name, info]) => (
-                        <div key={name} className="flex items-center justify-between gap-2 text-[11px]">
-                          <span className="font-bold text-slate-600">{name}</span>
-                          <span className={`font-black ${info?.status === 'live' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {info?.status || 'not available'} | {formatSyncTime(info?.at)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <p className="text-sm text-slate-500 mb-4">Firestore real-time sync is active. Data is synchronized across all connected clients.</p>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Live</div>
               </div>
             </div>
-            <div className="card-premium p-5 shadow-sm border-rose-200 bg-rose-50">
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm border-rose-200 bg-rose-50">
               <h4 className="font-bold text-rose-900 mb-2 flex items-center gap-2 text-base"><AlertCircle size={20} /> Master Reset</h4>
               <p className="text-sm text-rose-700 mb-4">Warning: This will permanently delete all trips, drivers, and fleet data. This action cannot be undone.</p>
-              <button onClick={() => { requestAuthAction?.('Master System Reset - This will permanently delete ALL trips, drivers, and fleet data. This action cannot be undone.', () => onResetSystem?.()); }} className="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition text-sm shadow-lg shadow-rose-600/20">
+              <button onClick={() => { requestAuthAction?.('Master System Reset — This will permanently delete ALL trips, drivers, and fleet data. This action cannot be undone.', () => onResetSystem?.()); }} className="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition text-sm shadow-lg shadow-rose-600/20">
                 Wipe System Data
               </button>
             </div>
@@ -475,7 +396,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Profile</h3><p className="text-body text-slate-500">Your account details and contact numbers.</p></div>
-            <div className="card-premium p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="space-y-5 max-w-3xl">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Username</label>
@@ -492,15 +413,15 @@ const SettingsPage = ({
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1.5">Dispatcher Phone</label>
                         <div className="flex gap-2">
-                          <input type="tel" value={phoneNumbers?.dispatcher || ''} onChange={(e) => onUpdatePhoneNumbers?.({ dispatcher: e.target.value })} className="flex-1 card-premium px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777707" />
+                          <input type="tel" value={phoneNumbers?.dispatcher || ''} onChange={(e) => onUpdatePhoneNumbers?.({ dispatcher: e.target.value })} className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777707" />
                           <button onClick={() => makeCall(phoneNumbers?.dispatcher || '', 'Dispatcher')} className="px-3 py-2.5 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition flex items-center" aria-label="Call dispatcher"><Phone size={16} /></button>
                         </div>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1.5">Routing Phone</label>
                         <div className="flex gap-2">
-                          <input type="tel" value={phoneNumbers?.routing || ''} onChange={(e) => onUpdatePhoneNumbers?.({ routing: e.target.value })} className="flex-1 card-premium px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777708" />
-                          <button onClick={() => makeCall(phoneNumbers?.routing || '', 'Routing')} className="px-3 py-2.5 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition flex items-center" aria-label="Call routing"><Phone size={16} /></button>
+                          <input type="tel" value={phoneNumbers?.routing || ''} onChange={(e) => onUpdatePhoneNumbers?.({ routing: e.target.value })} className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777708" />
+                          <button onClick={() => makeCall(phoneNumbers?.routing || '', 'Routing')} className="px-3 py-2.5 bg-indigo-100 text-indigo-700 rounded-xl hover:bg-indigo-200 transition flex items-center" aria-label="Call routing"><Phone size={16} /></button>
                         </div>
                       </div>
                     </div>
@@ -508,21 +429,21 @@ const SettingsPage = ({
                 )}
                 {role === 'driver' && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="card-premium p-4">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4">
                       <p className="text-micro">Vehicle</p>
                       <p className="text-lg font-bold text-slate-900 mt-2">{driverProfile?.vehicle || 'Not Assigned'}</p>
                     </div>
-                    <div className="card-premium p-4">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4">
                       <p className="text-micro">Current Odometer</p>
                       <div className="flex items-center gap-2 mt-2">
-                        <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) onUpdateAppSettings?.({ odometer: val }, true); }} className="w-full card-premium px-3 py-1.5 font-bold text-slate-900 focus:border-blue-500 outline-none text-base" />
+                        <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) onUpdateAppSettings?.({ odometer: val }, true); }} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-900 focus:border-blue-500 outline-none text-base" />
                         <span className="text-sm font-bold text-slate-400">mi</span>
                       </div>
                     </div>
                   </div>
                 )}
                 <div className="pt-6 border-t border-slate-200">
-                  <button onClick={() => onLogout?.()} className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 text-slate-700 rounded-xl font-semibold transition flex items-center justify-center gap-2 text-base">
+                  <button onClick={() => onLogout?.()} className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition flex items-center justify-center gap-2 text-base">
                     <LogOut size={20} /> Sign Out
                   </button>
                 </div>
@@ -536,7 +457,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Appearance</h3><p className="text-body text-slate-500">Choose the theme and reading size that work best for you.</p></div>
-            <div className="card-premium p-5 sm:p-8 space-y-8">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8 space-y-8">
               <div>
                 <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-base"><Palette size={20} /> Theme</div>
                 <div className="grid grid-cols-3 gap-3 max-w-lg">
@@ -544,7 +465,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.theme === option.value;
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ theme: option.value })} className={`card-premium p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ theme: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
@@ -562,7 +483,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Accessibility</h3><p className="text-body text-slate-500">Optimize readability for operational use, especially while driving.</p></div>
-            <div className="card-premium p-5 sm:p-8 space-y-8">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8 space-y-8">
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-base"><Type size={20} /> Font Size</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -571,7 +492,7 @@ const SettingsPage = ({
                     const active = appSettings?.fontScale === option.value;
                     const isDriverMode = option.value === 'driver';
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ fontScale: option.value })} className={`card-premium p-4 text-left transition-all ${active ? (isDriverMode ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'card-active bg-blue-50') : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ fontScale: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? (isDriverMode ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'card-active bg-blue-50') : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? (isDriverMode ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white') : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
@@ -584,13 +505,13 @@ const SettingsPage = ({
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-base"><Accessibility size={20} /> Readability Mode</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
-                  <button onClick={() => onUpdateAppSettings?.({ readability: 'normal' })} className={`card-premium p-4 text-left transition-all ${appSettings?.readability !== 'enhanced' ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                  <button onClick={() => onUpdateAppSettings?.({ readability: 'normal' })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${appSettings?.readability !== 'enhanced' ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability !== 'enhanced' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><TextSelect size={20} /></div>
                     <div className="font-bold text-sm text-slate-900">Standard</div>
                     <p className="text-xs text-slate-500 mt-0.5">Normal contrast and font weights</p>
                     {appSettings?.readability !== 'enhanced' && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
                   </button>
-                  <button onClick={() => onUpdateAppSettings?.({ readability: 'enhanced' })} className={`card-premium p-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
+                  <button onClick={() => onUpdateAppSettings?.({ readability: 'enhanced' })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability === 'enhanced' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Eye size={20} /></div>
                     <div className="font-bold text-sm text-slate-900">Enhanced</div>
                     <p className="text-xs text-slate-500 mt-0.5">Bolder text, stronger contrast, better spacing</p>
@@ -607,7 +528,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Navigation</h3><p className="text-body text-slate-500">Choose which GPS app opens for directions. Single-trip vs Route Plan can use different apps.</p></div>
-            <div className="card-premium p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="max-w-3xl">
                 <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-base"><Route size={20} /> Preferred Navigation App</div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -615,7 +536,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.navigationApp === option.value;
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ navigationApp: option.value })} className={`card-premium p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ navigationApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
@@ -625,7 +546,7 @@ const SettingsPage = ({
                 </div>
               </div>
             </div>
-            <div className="card-premium p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="max-w-3xl">
                 <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-base"><Route size={20} /> Route Plan Navigation</div>
                 <p className="text-sm text-slate-500 mb-3">GPS app for multi-stop Route Plan tool (Navigate All). Separate from single-trip navigation above.</p>
@@ -634,7 +555,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.routePlanNavApp === option.value;
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ routePlanNavApp: option.value })} className={`card-premium p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ routePlanNavApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
@@ -652,7 +573,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Notifications</h3><p className="text-body text-slate-500">Choose which alerts you receive while on duty.</p></div>
-            <div className="card-premium p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="space-y-4 max-w-lg">
                 {[
                   { key: 'tripUpdates', label: 'Trip Updates', desc: 'New assignments, status changes, and cancellations' },
@@ -683,7 +604,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Security</h3><p className="text-body text-slate-500">Manage your password and account security.</p></div>
-            <div className="card-premium p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="space-y-5 max-w-2xl">
                 <div>
                   <h4 className="font-bold text-slate-900 mb-4 text-base">Change Password</h4>
@@ -691,16 +612,16 @@ const SettingsPage = ({
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2">New Password</label>
                       <div className="relative">
-                        <input type={showPassword ? 'text' : 'password'} placeholder="New password" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
-                        <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-600 min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Toggle password visibility">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
+                        <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
+                        <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-600" aria-label="Toggle password visibility">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2">Confirm Password</label>
-                      <input type={showPassword ? 'text' : 'password'} placeholder="Confirm password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
+                      <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
                     </div>
                     {pwMsg && <p className={`text-sm font-bold ${pwMsg.includes('successfully') ? 'text-emerald-600' : 'text-rose-600'}`}>{pwMsg}</p>}
-                    <button onClick={handlePasswordChange} className="px-6 py-3 btn-gradient-primary font-bold transition-all flex items-center justify-center gap-2 text-base"><Save size={18} /> Update Password</button>
+                    <button onClick={handlePasswordChange} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-base"><Save size={18} /> Update Password</button>
                   </div>
                 </div>
               </div>
@@ -716,10 +637,10 @@ const SettingsPage = ({
     <div className="flex gap-6">
       {/* Sidebar */}
       <div className="w-56 flex-shrink-0 hidden lg:block">
-        <div className="card-premium sticky top-4">
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm sticky top-4">
           {navItems.map((group, gi) => (
             <div key={gi}>
-              <div className="px-4 pt-4 pb-1 text-[10.5px] font-black uppercase tracking-widest text-slate-400">{group.group}</div>
+              <div className="px-4 pt-4 pb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">{group.group}</div>
               {group.items.map(item => {
                 const Icon = item.icon;
                 const isActive = activeSection === item.id;

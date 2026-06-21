@@ -63,7 +63,7 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <p className="font-bold text-slate-900 truncate">{driver.name}</p>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor(driver.status)}`}>{driver.status || 'No status'}</span>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${statusColor(driver.status)}`}>{driver.status || 'Unknown'}</span>
             </div>
             <p className="text-[11px] text-slate-500">{driver.vehicle || 'No vehicle'} {driver.phone ? `- ${driver.phone}` : ''}</p>
           </div>
@@ -75,21 +75,21 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
             <div className="flex items-center gap-1.5 mb-2">
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-[10.5px] font-bold uppercase tracking-wider text-blue-700">Current Trip</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Current Trip</span>
               {onViewTrip && (
-                <button onClick={() => onViewTrip(currentTrip.id)} className="ml-auto flex items-center gap-1 px-3 py-1.5 min-h-[36px] btn-gradient-primary text-[9px] font-bold hover:bg-blue-700 transition-colors">
+                <button onClick={() => onViewTrip(currentTrip.id)} className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-blue-600 text-white rounded-lg text-[9px] font-bold hover:bg-blue-700 transition-colors">
                   <ExternalLink size={7} /> View
                 </button>
               )}
             </div>
             <p className="font-bold text-slate-900 text-sm">{currentTrip.patient}</p>
-            <p className="text-[10.5px] text-slate-500 mt-0.5">{currentTrip.time} - {displayRef(currentTrip)}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">{currentTrip.time} - {displayRef(currentTrip)}</p>
             <div className="mt-2 space-y-1">
-              <div className="flex items-start gap-2 text-[10.5px]">
+              <div className="flex items-start gap-2 text-[10px]">
                 <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-px"><span className="text-[6px] font-black text-white">P</span></div>
                 <span className="text-slate-600">{currentTrip.pickup || '-'}</span>
               </div>
-              <div className="flex items-start gap-2 text-[10.5px]">
+              <div className="flex items-start gap-2 text-[10px]">
                 <div className="w-4 h-4 rounded-full bg-rose-500 flex items-center justify-center shrink-0 mt-px"><span className="text-[6px] font-black text-white">D</span></div>
                 <span className="text-slate-600">{currentTrip.dropoff || '-'}</span>
               </div>
@@ -99,15 +99,15 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
 
         {nextTrip && !currentTrip && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-            <p className="text-[10.5px] font-bold uppercase tracking-wider text-blue-700 mb-1">Next Trip</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1">Next Trip</p>
             <p className="font-bold text-slate-900 text-sm">{nextTrip.patient}</p>
-            <p className="text-[10.5px] text-slate-500">{nextTrip.time} - {nextTrip.pickup} to {nextTrip.dropoff}</p>
+            <p className="text-[10px] text-slate-500">{nextTrip.time} - {nextTrip.pickup} to {nextTrip.dropoff}</p>
           </div>
         )}
 
         {completedTrips.length > 0 && (
           <div>
-            <p className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Recent Completed</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Recent Completed</p>
             <div className="space-y-1">
               {completedTrips.map((trip, i) => (
                 <div key={i} className="flex items-center gap-2 text-[11px] bg-emerald-50/50 rounded-lg px-2.5 py-1.5">
@@ -115,7 +115,7 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
                   <span className="font-semibold text-slate-700 min-w-[80px]">{trip.time}</span>
                   <span className="text-slate-600 truncate">{trip.patient}</span>
                   {onViewTrip && (
-                    <button onClick={() => onViewTrip(trip.id)} className="ml-auto text-blue-600 hover:text-blue-800 font-bold text-[9px] shrink-0 min-h-[36px] px-2 py-1">View</button>
+                    <button onClick={() => onViewTrip(trip.id)} className="ml-auto text-blue-600 hover:text-blue-800 font-bold text-[9px] shrink-0">View</button>
                   )}
                 </div>
               ))}
@@ -125,10 +125,10 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
 
         {driverLogs.length > 0 && (
           <div>
-            <p className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Activity</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Activity</p>
             <div className="space-y-1">
               {driverLogs.map((log, i) => (
-                <div key={i} className="flex items-center gap-2 text-[10.5px] text-slate-500">
+                <div key={i} className="flex items-center gap-2 text-[10px] text-slate-500">
                   <span className={`w-1 h-1 rounded-full shrink-0 ${log.c === 'emerald' ? 'bg-emerald-500' : log.c === 'rose' ? 'bg-rose-500' : log.c === 'amber' ? 'bg-amber-500' : 'bg-blue-500'}`} />
                   <span className="font-semibold text-slate-600 capitalize shrink-0">{log.t}</span>
                   <span className="truncate">{log.meta?.summary || log.d}</span>
@@ -158,7 +158,7 @@ const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
     <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
       <div className="p-3.5 border-b border-slate-100 bg-slate-50/70">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-sm font-black text-blue-700 uppercase shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-sm font-black text-indigo-700 uppercase shrink-0">
             {(dispatcher.name || '?')[0]}
           </div>
           <div className="flex-1 min-w-0">
@@ -171,7 +171,7 @@ const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
                 </span>
               )}
             </div>
-            <p className="text-[10.5px] text-slate-500">{dispatcher.email || ''}</p>
+            <p className="text-[10px] text-slate-500">{dispatcher.email || ''}</p>
           </div>
         </div>
       </div>
@@ -181,7 +181,7 @@ const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
             {dispLogs.map((log, i) => {
               const tripId = getTripIdFromLog(log);
               return (
-                <div key={i} className="flex items-start gap-2 text-[10.5px] group hover:bg-slate-50 rounded-lg px-2 py-1.5 -mx-2 transition-colors">
+                <div key={i} className="flex items-start gap-2 text-[10px] group hover:bg-slate-50 rounded-lg px-2 py-1.5 -mx-2 transition-colors">
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-0.5 ${log.c === 'emerald' ? 'bg-emerald-500' : log.c === 'rose' ? 'bg-rose-500' : log.c === 'amber' ? 'bg-amber-500' : 'bg-blue-500'}`} />
                   <div className="flex-1 min-w-0">
                     <span className="font-bold text-slate-700">{log.t}</span>
@@ -190,7 +190,7 @@ const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className="text-slate-400">{fmtTime(log.time)}</span>
                     {tripId && onViewTrip && (
-                      <button onClick={() => onViewTrip(tripId)} className="opacity-0 group-hover:opacity-100 px-2 py-1 min-h-[36px] bg-blue-600 text-white rounded text-[8px] font-bold transition-opacity"><ExternalLink size={7} /></button>
+                      <button onClick={() => onViewTrip(tripId)} className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 bg-blue-600 text-white rounded text-[8px] font-bold transition-opacity"><ExternalLink size={7} /></button>
                     )}
                   </div>
                 </div>
@@ -304,7 +304,7 @@ const AdminPage = ({
   const sections = [
     { id: 'dispatchers', title: 'Dispatcher Activity', icon: ClipboardList, count: dispatchers.length,
       content: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {dispatchers.filter(d => d.name).map((disp, i) => (
             <DispatcherActivityCard key={disp.id || i} dispatcher={disp} logs={entityLogs.dispatcher} onViewTrip={onViewTrip} />
           ))}
@@ -315,7 +315,7 @@ const AdminPage = ({
       ) },
     { id: 'drivers', title: 'Driver Activity', icon: Truck, count: drivers.length,
       content: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {activeDrivers.map((driver, i) => (
             <DriverActivityCard key={driver.id || i} driver={driver} trips={trips} logs={entityLogs.driver} onViewTrip={onViewTrip} />
           ))}
@@ -327,83 +327,28 @@ const AdminPage = ({
     { id: 'logins', title: 'Logins & Roles', icon: UserCog, count: allUsers.length,
       content: (
         <>
-          <div className="grid gap-2 sm:hidden">
-            {allUsers.map((user, i) => (
-              <div key={`${user._source}-mobile-${user.id || i}`} className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-xs font-black text-slate-700 uppercase shrink-0">{(user.name || '?')[0]}</div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-slate-900">{user.name || 'Unnamed user'}</p>
-                    <p className="truncate text-[11px] font-medium text-slate-500">{user.email || 'No email'}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <select
-                        value={user._role}
-                        onChange={(e) => {
-                          const newRole = e.target.value;
-                          if (newRole === user._role) return;
-                          if (requestAuthAction) {
-                            requestAuthAction(`Change ${user.name} from ${user._role} to ${newRole}`, () => handleRoleChange(user, newRole));
-                          } else {
-                            handleRoleChange(user, newRole);
-                          }
-                        }}
-                        className="min-h-[36px] rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      >
-                        <option value="admin">Admin</option>
-                        <option value="dispatcher">Dispatcher</option>
-                        <option value="driver">Driver</option>
-                      </select>
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold ${statusColor(user.clockedIn !== undefined ? (user.clockedIn ? 'online' : 'offline') : user.status)}`}>
-                        {user.clockedIn !== undefined ? (user.clockedIn ? <Wifi size={10} /> : <WifiOff size={10} />) : null}
-                        {user.clockedIn !== undefined ? (user.clockedIn ? 'Online' : 'Offline') : (user.status || 'No status')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {user.email && (
-                    <button
-                      onClick={() => handlePasswordReset(user.email)}
-                      className="min-h-[36px] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 shadow-sm"
-                    >
-                      Reset Password
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDeleteUser(user)}
-                    className="min-h-[36px] flex-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-600"
-                  >
-                    Delete
-                  </button>
-                </div>
-                {pwResetMsg[user.email] && (
-                  <p className={`mt-2 text-[10px] font-semibold ${pwResetMsg[user.email] === 'Email sent!' ? 'text-emerald-600' : 'text-rose-600'}`}>{pwResetMsg[user.email]}</p>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="hidden overflow-x-auto rounded-2xl border border-slate-100 shadow-sm sm:block">
+          <div className="overflow-x-auto rounded-2xl border border-slate-100 shadow-sm">
             <table className="w-full">
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
-                  <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">User</th>
-                  <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">Email</th>
-                  <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">Role</th>
-                  <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">Status</th>
-                  <th className="px-2 py-1.5 text-left text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">Actions</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">User</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Email</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Role</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Status</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {allUsers.map((user, i) => (
                   <tr key={`${user._source}-${user.id || i}`} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-2 py-1.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10.5px] font-black text-slate-700 uppercase shrink-0">{(user.name || '?')[0]}</div>
-                        <span className="font-semibold text-slate-900 text-[10.5px]">{user.name}</span>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-black text-slate-700 uppercase shrink-0">{(user.name || '?')[0]}</div>
+                        <span className="font-semibold text-slate-900 text-sm">{user.name}</span>
                       </div>
                     </td>
-                    <td className="px-2 py-1.5 text-[10.5px] text-slate-600">{user.email || '-'}</td>
-                    <td className="px-2 py-1.5">
+                    <td className="px-3 py-2.5 text-xs text-slate-600">{user.email || '-'}</td>
+                    <td className="px-3 py-2.5">
                       <select
                         value={user._role}
                         onChange={(e) => {
@@ -415,15 +360,15 @@ const AdminPage = ({
                             handleRoleChange(user, newRole);
                           }
                         }}
-                        className="px-2 py-1 rounded-lg border border-slate-200 text-[10.5px] font-bold bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className="px-2 py-1 rounded-lg border border-slate-200 text-[11px] font-bold bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       >
                         <option value="admin">Admin</option>
                         <option value="dispatcher">Dispatcher</option>
                         <option value="driver">Driver</option>
                       </select>
                     </td>
-                    <td className="px-2 py-1.5">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-bold ${statusColor(user.clockedIn !== undefined ? (user.clockedIn ? 'online' : 'offline') : user.status)}`}>
+                    <td className="px-3 py-2.5">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${statusColor(user.clockedIn !== undefined ? (user.clockedIn ? 'online' : 'offline') : user.status)}`}>
                         {user.clockedIn !== undefined ? (user.clockedIn ? <Wifi size={10} /> : <WifiOff size={10} />) : null}
                         {user.clockedIn !== undefined ? (user.clockedIn ? 'Online' : 'Offline') : (user.status || '-')}
                       </span>
@@ -435,12 +380,12 @@ const AdminPage = ({
                         </div>
                       )}
                     </td>
-                    <td className="px-2 py-1.5">
-                      <div className="flex items-center gap-1">
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
                         {user.email && (
                           <button
                             onClick={() => handlePasswordReset(user.email)}
-                            className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:bg-slate-100 shadow-sm transition-all active:scale-95 rounded-lg text-[10.5px] font-bold text-slate-600 transition-colors"
+                            className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-[10px] font-bold text-slate-600 transition-colors"
                             title="Send password reset email"
                           >
                             <KeyRound size={10} /> Reset PW
@@ -448,7 +393,7 @@ const AdminPage = ({
                         )}
                         <button
                           onClick={() => handleDeleteUser(user)}
-                          className="flex items-center gap-1 px-2 py-1 bg-white border border-rose-200 hover:bg-rose-50 rounded-lg text-[10.5px] font-bold text-rose-600 transition-colors"
+                          className="flex items-center gap-1 px-2 py-1 bg-white border border-rose-200 hover:bg-rose-50 rounded-lg text-[10px] font-bold text-rose-600 transition-colors"
                           title="Delete user"
                         >
                           <Trash2 size={10} /> Delete
@@ -501,13 +446,13 @@ const AdminPage = ({
           </div>
           <div className="flex flex-wrap gap-2">
             <span className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">{drivers?.length || 0} drivers</span>
-            <span className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">{dispatchers?.length || 0} dispatchers</span>
+            <span className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700">{dispatchers?.length || 0} dispatchers</span>
             <span className="rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">{vehicles?.length || 0} vehicles</span>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 pb-2 sticky top-0 z-10 bg-slate-100/95 backdrop-blur">
+      <div className="flex gap-2 overflow-x-auto pb-2 sticky top-0 z-10 bg-[#F3F4F6]/95 backdrop-blur">
         <button onClick={runSecurityAnalysis} disabled={aiSecLoading} className="px-3 py-2 rounded-xl text-[11px] font-bold transition-colors shrink-0 flex items-center gap-1.5 bg-slate-900 text-white hover:bg-slate-800 shadow-sm border border-slate-900 disabled:opacity-60">
           {aiSecLoading ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
           {aiSecLoading ? 'Scanning...' : 'Security Scan'}
