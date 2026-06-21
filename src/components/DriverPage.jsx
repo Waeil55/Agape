@@ -20,7 +20,7 @@ import {
   Repeat, Zap, X, Route,
   CheckSquare, Square, Map, BarChart3, Sun, Moon,
   Download, Trash2, FileText, AlertTriangle, Info,
-  Copy, PhoneForwarded, Shield, Headphones, Building, Edit2
+  Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, ChevronLeft, Calendar
 } from 'lucide-react';
 import { openNavigation, showNavActionSheet, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { impact } from '../utils/haptics';
@@ -266,6 +266,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   });
   const [historyFilter, setHistoryFilter] = useState(() => localStorage.getItem(`agape_drvHistFilter_${userKey}`) || 'all');
   const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
+  const [historyDate, setHistoryDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  });
 
   useEffect(() => {
     localStorage.setItem(`agape_drvNav_${userKey}`, activeNav);
@@ -1002,6 +1006,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   };
 
   const filteredHistory = allHistory.filter(t => {
+    const tripDate = t.date || (t.completedAt ? t.completedAt.split('T')[0] : '');
+    if (tripDate && !tripDate.startsWith(historyDate)) return false;
+
     const matchFilter = historyFilter === 'all' ? true :
       historyFilter === 'completed' ? normalizeWorkflowStatus(t.status) === 'completed' :
       historyFilter === 'noshow' ? normalizeWorkflowStatus(t.status) === 'no show' :
@@ -3307,11 +3314,59 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <h2 className="text-xl font-black text-slate-900">History</h2>
                 <p className="text-slate-500 text-xs font-semibold mt-0.5">Review past trips and activity</p>
               </div>
-              {allHistory.length > 0 && (
+              {filteredHistory.length > 0 && (
                 <button onClick={exportDailyLog} className="px-3 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 text-xs">
                   <Download size={12} /> Export
                 </button>
               )}
+            </div>
+            
+            {/* Date Navigator */}
+            <div className="bg-white border border-slate-200 rounded-xl p-1.5 flex items-center justify-between mt-3 shadow-sm">
+              <button 
+                onClick={() => {
+                  const d = new Date(historyDate + 'T12:00:00');
+                  d.setDate(d.getDate() - 1);
+                  setHistoryDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                }}
+                disabled={(() => {
+                  const d = new Date(historyDate + 'T12:00:00');
+                  const min = new Date();
+                  min.setDate(min.getDate() - 14);
+                  return d <= min;
+                })()}
+                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors text-slate-600"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              
+              <div className="relative flex items-center gap-2">
+                <Calendar size={16} className="text-blue-600" />
+                <input 
+                  type="date" 
+                  value={historyDate}
+                  min={(() => { const d = new Date(); d.setDate(d.getDate() - 14); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}
+                  max={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}
+                  onChange={(e) => setHistoryDate(e.target.value || historyDate)}
+                  className="bg-transparent font-bold text-slate-800 outline-none cursor-pointer"
+                />
+              </div>
+
+              <button 
+                onClick={() => {
+                  const d = new Date(historyDate + 'T12:00:00');
+                  d.setDate(d.getDate() + 1);
+                  setHistoryDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                }}
+                disabled={(() => {
+                  const d = new Date(historyDate + 'T12:00:00');
+                  const max = new Date();
+                  return d.toISOString().split('T')[0] >= max.toISOString().split('T')[0];
+                })()}
+                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors text-slate-600"
+              >
+                <ChevronRight size={20} />
+              </button>
             </div>
           </div>
 
