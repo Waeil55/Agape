@@ -187,8 +187,8 @@ const getLocalDateFromValue = (value) => {
 };
 
 const getHistoryDateCandidates = (trip) => {
-  const dates = [
-    trip?.completedAt,
+  const toUniqueDates = (values = []) => [...new Set(values.map(getLocalDateFromValue).filter(Boolean))];
+  const serviceDates = toUniqueDates([
     trip?.date,
     trip?.serviceDate,
     trip?.scheduledDate,
@@ -196,18 +196,24 @@ const getHistoryDateCandidates = (trip) => {
     trip?.pickupDate,
     trip?.routeDate,
     trip?.assignmentDate,
-    trip?.workflowUpdatedAt,
-    trip?.updatedAtLocal,
+  ]);
+  if (serviceDates.length > 0) return serviceDates;
+
+  const workflowDates = toUniqueDates([
+    trip?.completedAt,
     trip?.arrivalDropoffTime,
     trip?.departedPickupTime,
     trip?.arrivalTime,
     trip?.startTime,
     trip?.startedAt,
+  ]);
+  if (workflowDates.length > 0) return workflowDates;
+
+  return toUniqueDates([
+    trip?.workflowUpdatedAt,
+    trip?.updatedAtLocal,
     trip?.createdAt,
-  ]
-    .map(getLocalDateFromValue)
-    .filter(Boolean);
-  return [...new Set(dates)];
+  ]);
 };
 
 const getLocalDateStr = (trip) => {
@@ -4137,16 +4143,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
           </div>
 
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <div className="flex-1 relative">
+          <div className="flex flex-wrap items-center gap-2 mb-3 px-1">
+            <div className="w-full sm:flex-1 relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input type="text" placeholder="Search patient, booking ID, driver, vehicle..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
                 className="w-full pl-9 pr-8 py-2 card-premium text-xs font-medium outline-none focus:border-blue-400" />
               {historySearch && <button onClick={() => setHistorySearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 min-h-[44px] min-w-[44px] flex items-center justify-center"><X size={14} /></button>}
             </div>
-            <div className="flex items-center gap-0.5 card-premium shrink-0">
+            <div className="inline-flex items-center gap-0.5 card-premium shrink-0 w-[168px]">
               <button onClick={() => { const d = new Date(selectedHistoryDate + 'T12:00:00'); d.setDate(d.getDate() - 1); setHistoryDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); }}
-                className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-l-xl hover:bg-slate-50 transition">
+                className="w-10 min-w-[40px] h-10 shrink-0 flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-l-xl hover:bg-slate-50 transition">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
               </button>
               <input type="date" value={selectedHistoryDate} max={todayStr()}
@@ -4154,7 +4160,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 className="w-0 h-8 opacity-0 absolute pointer-events-none"
                 id="historyDatePick" />
               <label htmlFor="historyDatePick"
-                className="px-3 min-h-[44px] flex items-center justify-center text-[11px] font-bold text-slate-700 cursor-pointer hover:bg-slate-50 transition whitespace-nowrap select-none">
+                className="px-3 min-h-[44px] flex-1 shrink-0 flex items-center justify-center text-[11px] font-bold text-slate-700 cursor-pointer hover:bg-slate-50 transition whitespace-nowrap select-none">
                 {new Date(selectedHistoryDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
               </label>
               <button onClick={() => {
@@ -4163,7 +4169,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const next = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                 if (next <= tomorrow) setHistoryDate(next);
               }}
-                className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-r-xl hover:bg-slate-50 transition">
+                className="w-10 min-w-[40px] h-10 shrink-0 flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-r-xl hover:bg-slate-50 transition">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             </div>

@@ -1926,8 +1926,10 @@ export function useFirestoreAppData() {
   const addLog = useCallback(async (log) => {
     try {
       const logRef = collection(db, 'logs');
-      const logDoc = await addDoc(logRef, { ...log, timestamp: serverTimestamp(), createdAtLocal: new Date().toISOString() });
-      const localLog = { id: logDoc.id, ...log, createdAtLocal: new Date().toISOString() };
+      const createdAtLocal = new Date().toISOString();
+      const safeLog = sanitizeForFirestore(log || {});
+      const logDoc = await addDoc(logRef, { ...safeLog, timestamp: serverTimestamp(), createdAtLocal });
+      const localLog = { id: logDoc.id, ...safeLog, createdAtLocal };
       const nextLogs = sortNewestFirst([localLog, ...(dataRef.current.logs || [])]);
       dataRef.current = {
         ...normalizeData(dataRef.current),
