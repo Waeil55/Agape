@@ -22,7 +22,10 @@ const toneClasses = {
 };
 
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
-const isTodayTrip = (t) => tripCalendarDateKey(t?.date) === undefined || tripCalendarDateKey(t?.date) === localCalendarYmd();
+const isServiceDateTrip = (t, serviceDate = localCalendarYmd()) => {
+  const key = tripCalendarDateKey(t?.date);
+  return key === undefined || key === serviceDate;
+};
 const isWillCall = (t) => String(t?.time || '').trim().toUpperCase() === 'WILL CALL';
 const minutesUntil = (trip) => {
   if (!trip?.time || isWillCall(trip)) return null;
@@ -50,6 +53,7 @@ const MetricCard = ({ icon: Icon, label, value, detail, tone = 'slate' }) => {
 
 const CommandIntelligencePanel = ({
   trips, drivers, dispatchers, routeTemplates, logs = [],
+  serviceDate = localCalendarYmd(),
   onFocusLate, onFocusUpcoming, onFocusUnassigned, onFocusFleet, onFocusRoutes,
 }) => {
   const [aiInsights, setAiInsights] = useState(null);
@@ -59,7 +63,7 @@ const CommandIntelligencePanel = ({
 
   // Fallback heuristic intelligence (always computed)
   const heuristic = useMemo(() => {
-    const todayTrips = trips.filter(isTodayTrip);
+    const todayTrips = trips.filter((trip) => isServiceDateTrip(trip, serviceDate));
     const active = todayTrips.filter(t => !CLOSED_STATUSES.has(t.status));
     const scheduled = active.filter(t => !isWillCall(t));
     const completed = todayTrips.filter(t => t.status === 'Completed');
@@ -71,7 +75,7 @@ const CommandIntelligencePanel = ({
     const shortage = Math.max(0, unassigned.length - availDrivers.length);
     const score = clamp(100 - late.length * 16 - unassigned.length * 7 - upcomingUnassigned.length * 9 - shortage * 12, 0, 100);
     return { active, unassigned, late, upcoming, upcomingUnassigned, completed, availDrivers, shortage, score };
-  }, [trips, drivers]);
+  }, [trips, drivers, serviceDate]);
 
   // Real AI: periodic Gemini analysis
   useEffect(() => {

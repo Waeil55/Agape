@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
+  Activity,
   FileText, Users, AlertCircle, Clock, CheckCircle2, XCircle,
   Truck,
   BrainCircuit, Phone, MessageSquare,
   ChevronDown, ChevronUp, AlertTriangle, MapPin,
   Square, CheckSquare, X, ArrowRight, TrendingUp, TrendingDown,
-  Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2
+  Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2,
+  Wifi, WifiOff
 } from 'lucide-react';
 import { db, doc, onSnapshot } from '../config/firebase';
 import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
@@ -198,6 +200,62 @@ const getClampStyle = (lines = 1) => {
     WebkitBoxOrient: 'vertical',
     WebkitLineClamp: lines,
   };
+};
+
+const PULSE_TONES = {
+  emerald: {
+    card: 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100',
+    icon: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    value: 'text-emerald-800',
+  },
+  blue: {
+    card: 'border-blue-200 bg-blue-50 hover:bg-blue-100',
+    icon: 'bg-blue-100 text-blue-700 border-blue-200',
+    value: 'text-blue-800',
+  },
+  amber: {
+    card: 'border-amber-200 bg-amber-50 hover:bg-amber-100',
+    icon: 'bg-amber-100 text-amber-700 border-amber-200',
+    value: 'text-amber-800',
+  },
+  rose: {
+    card: 'border-rose-200 bg-rose-50 hover:bg-rose-100',
+    icon: 'bg-rose-100 text-rose-700 border-rose-200',
+    value: 'text-rose-800',
+  },
+  slate: {
+    card: 'border-slate-200 bg-white hover:bg-slate-50',
+    icon: 'bg-slate-100 text-slate-700 border-slate-200',
+    value: 'text-slate-900',
+  },
+};
+
+const PulseMetric = ({ icon: Icon, label, value, detail, tone = 'slate', pulse = false, onClick }) => {
+  const classes = PULSE_TONES[tone] || PULSE_TONES.slate;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative min-w-[138px] rounded-lg border px-3 py-2 text-left shadow-sm transition ${classes.card}`}
+    >
+      {pulse && (
+        <span className="absolute right-2 top-2 flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-30" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-current" />
+        </span>
+      )}
+      <div className="flex items-center gap-2">
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${classes.icon}`}>
+          <Icon size={15} />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-black uppercase tracking-wider text-slate-500">{label}</p>
+          <p className={`mt-0.5 text-xl font-black leading-none tabular-nums ${classes.value}`}>{value}</p>
+        </div>
+      </div>
+      {detail && <p className="mt-1 truncate text-[10px] font-semibold text-slate-500">{detail}</p>}
+    </button>
+  );
 };
 
 const getManifestDensityProfile = (density) => {
@@ -969,6 +1027,136 @@ const OperationsCommandCenter = ({
   }, [drivers, routeTemplates, visibleTrips]);
   const intelligenceTone = intelligenceScore >= 85 ? 'emerald' : intelligenceScore >= 65 ? 'amber' : 'rose';
   const intelligenceLabel = intelligenceScore >= 85 ? 'Stable' : intelligenceScore >= 65 ? 'Watch' : 'Critical';
+  const selectedDateLabel = useMemo(() => {
+    const parsed = new Date(`${selectedDate}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return selectedDate;
+    return parsed.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }, [selectedDate]);
+  const opsPulse = useMemo(() => {
+    const selectedIsToday = selectedDate === localCalendarYmd();
+    const activeForDay = todayTrips.filter((trip) => !TERMINAL_STATUSES.includes(trip.status));
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const dueSoon = selectedIsToday
+      ? activeForDay.filter((trip) => {
+          const mins = timeToMinutes(trip.time);
+          if (mins >= 1440) return false;
+          const diff = mins - nowMinutes;
+          return diff >= 0 && diff <= 60;
+        })
+      : [];
+    const onTimePct = activeForDay.length
+      ? Math.max(0, Math.round(((activeForDay.length - lateTrips.length) / activeForDay.length) * 100))
+      : 100;
+    const activeDrivers = drivers.filter((driver) => {
+      const status = String(driver.status || '').toLowerCase();
+      return status && !['offline', 'unavailable', 'inactive'].includes(status);
+    });
+    const readyPct = drivers.length ? Math.round((availableDrivers.length / drivers.length) * 100) : 0;
+    return {
+      activeForDay,
+      dueSoon,
+      onTimePct,
+      activeDrivers,
+      readyPct,
+      routeCount: routeTemplates.filter((route) => (route.sequence || []).length > 0).length,
+    };
+  }, [availableDrivers.length, drivers, lateTrips.length, routeTemplates, selectedDate, todayTrips]);
+
+  const handlePulseFocus = useCallback((target) => {
+    if (target === 'fleet') {
+      setOperationsTab('fleet');
+      setDriverFilter('all');
+      setFilterStatus('all');
+      setFilterUrgency('all');
+      return;
+    }
+    setOperationsTab('manifest');
+    if (target === 'active') {
+      setFilterStatus('in-progress');
+      setFilterUrgency('all');
+      return;
+    }
+    if (target === 'unassigned') {
+      setFilterStatus('Unassigned');
+      setFilterUrgency('all');
+      return;
+    }
+    if (target === 'late') {
+      setFilterStatus('all');
+      setFilterUrgency('late');
+      return;
+    }
+    setFilterStatus('all');
+    setFilterUrgency('all');
+    setDriverFilter('all');
+    setServiceFilter('all');
+    setShowOnlyAttention(false);
+  }, [setOperationsTab]);
+
+  const renderLiveOpsPulse = () => (
+    <div className="shrink-0 border-b border-slate-200 bg-slate-100/95 px-3 py-2">
+      <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+        <div className="flex min-w-max items-center gap-2">
+          <PulseMetric
+            icon={CheckCircle2}
+            label="Available"
+            value={availableDrivers.length}
+            detail={`${opsPulse.readyPct}% driver capacity`}
+            tone="emerald"
+            onClick={() => handlePulseFocus('fleet')}
+          />
+          <PulseMetric
+            icon={Activity}
+            label="Moving Work"
+            value={inProgressTrips.length}
+            detail={`${opsPulse.activeForDay.length} open for ${selectedDateLabel}`}
+            tone="blue"
+            onClick={() => handlePulseFocus('active')}
+          />
+          <PulseMetric
+            icon={AlertCircle}
+            label="Unassigned"
+            value={unassignedTrips.length}
+            detail={`${opsPulse.dueSoon.length} due next hour`}
+            tone={unassignedTrips.length ? 'amber' : 'slate'}
+            pulse={unassignedTrips.length > 0}
+            onClick={() => handlePulseFocus('unassigned')}
+          />
+          <PulseMetric
+            icon={Clock}
+            label="Late Risk"
+            value={lateTrips.length}
+            detail={`${completedToday.length} completed`}
+            tone={lateTrips.length ? 'rose' : 'slate'}
+            pulse={lateTrips.length > 0}
+            onClick={() => handlePulseFocus('late')}
+          />
+          <PulseMetric
+            icon={TrendingUp}
+            label="On Time"
+            value={`${opsPulse.onTimePct}%`}
+            detail={`${willCallTrips.length} will call | ${opsPulse.routeCount} routes`}
+            tone={opsPulse.onTimePct >= 90 ? 'emerald' : opsPulse.onTimePct >= 75 ? 'amber' : 'rose'}
+            onClick={() => handlePulseFocus('all')}
+          />
+        </div>
+        <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
+          <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
+            isOnline ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'
+          }`}>
+            {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+            {isOnline ? 'Live Firestore' : 'Offline Cache'}
+          </span>
+          <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
+            intelligenceTone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : intelligenceTone === 'amber' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-rose-200 bg-rose-50 text-rose-700'
+          }`}>
+            {intelligenceLabel} {Math.round(intelligenceScore)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 
   const manifestGroupedSections = useMemo(() => {
     const sections = new Map();
@@ -2352,6 +2540,7 @@ const OperationsCommandCenter = ({
     <div className="flex flex-col min-h-full">
       {/* Unified Control Bar */}
       {renderControlBar()}
+      {renderLiveOpsPulse()}
 
       {showIntelligence && (
         <CommandIntelligencePanel
@@ -2359,6 +2548,7 @@ const OperationsCommandCenter = ({
           drivers={drivers}
           dispatchers={dispatchers}
           routeTemplates={routeTemplates}
+          serviceDate={selectedDate}
           onFocusLate={() => { setOperationsTab('manifest'); setFilterStatus('all'); setFilterUrgency('late'); }}
           onFocusUpcoming={() => { setOperationsTab('manifest'); setFilterStatus('all'); setFilterUrgency('upcoming'); }}
           onFocusUnassigned={() => { setOperationsTab('manifest'); setFilterStatus('Unassigned'); setFilterUrgency('all'); }}
