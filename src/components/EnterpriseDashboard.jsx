@@ -322,6 +322,11 @@ const EnterpriseDashboard = ({
   };
 
   const activeWorkspaceMeta = workspaceMeta[activePanel] || workspaceMeta.operations;
+  const activeMobileNavItem = sidebarItems.find(item => item.id === activePanel) || sidebarItems[0];
+  const mobilePrimaryItems = sidebarItems.filter((item) => (
+    ['operations', 'liveMap', 'chat', 'routePlanner', 'settings'].includes(item.id)
+    || (item.id === 'admin' && role === 'admin' && !sidebarItems.some((entry) => entry.id === 'routePlanner'))
+  )).slice(0, 5);
 
   const openOperationsWorkspace = useCallback((tab = 'manifest') => {
     setActivePanel('operations');
@@ -630,16 +635,27 @@ const EnterpriseDashboard = ({
 
   // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="bg-slate-100/95 backdrop-blur-xl border-b border-slate-200/80 px-3 flex md:hidden items-center gap-2 shrink-0 h-[56px] z-20 relative">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300 bg-white">
+    <header className="bg-slate-100/95 backdrop-blur-xl border-b border-slate-200/80 px-3 py-2 flex md:hidden items-center gap-2 shrink-0 min-h-[56px] z-20 relative">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white">
         <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain" />
       </div>
-      <div>
-        <h1 className="text-[13px] font-bold text-slate-900 tracking-tight leading-none">Agape Care</h1>
-        <p className="text-[10px] font-medium text-slate-500 capitalize">{activeWorkspaceMeta.title}</p>
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate text-[13px] font-bold text-slate-900 tracking-tight leading-none">Agape Care</h1>
+        <div className="mt-1 flex items-center gap-1.5">
+          {activeMobileNavItem?.icon && <activeMobileNavItem.icon size={12} className="shrink-0 text-blue-600" />}
+          <select
+            value={activePanel}
+            onChange={(e) => setActivePanel(e.target.value)}
+            className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            aria-label="Switch workspace"
+          >
+            {sidebarItems.map(item => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
-      <div className="flex-1" />
-      <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm" title="Interface size">
+      <div className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm min-[430px]:flex" title="Interface size">
         <button
           type="button"
           onClick={() => updateFontScale(-1)}
@@ -668,21 +684,22 @@ const EnterpriseDashboard = ({
         {activeTheme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
       </button>
       {/* Online status dot */}
-      <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} title={isOnline ? 'Online' : 'Offline'} />
+      <div className={`hidden h-2 w-2 rounded-full min-[430px]:block ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} title={isOnline ? 'Online' : 'Offline'} />
       {activePanel === 'operations' && (
         <button
           onClick={toggleRightPanel}
-          className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-bold shadow-sm ${
+          className={`flex shrink-0 items-center gap-1 px-2 py-1 rounded-md text-micro font-bold shadow-sm ${
             showRightPanel ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
           }`}
         >
-          <PanelRight size={11} /> Panel
+          <PanelRight size={13} />
+          <span className="hidden min-[430px]:inline">Panel</span>
         </button>
       )}
       {/* User avatar -> settings */}
       <button
         onClick={() => setActivePanel('settings')}
-        className="w-8 h-8 min-h-[36px] min-w-[36px] rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold hover:bg-slate-300 transition uppercase"
+        className="w-8 h-8 min-h-[36px] min-w-[36px] rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold hover:bg-slate-300 transition uppercase shrink-0"
       >
         {(currentUser || 'U')[0]}
       </button>
@@ -692,7 +709,7 @@ const EnterpriseDashboard = ({
   // ==================== BOTTOM NAVIGATION (Mobile only for dispatcher/admin) ====================
   const renderBottomNav = () => (
     <nav className="bottom-nav md:hidden flex items-stretch">
-      {sidebarItems.map(item => {
+      {mobilePrimaryItems.map(item => {
         const Icon = item.icon;
         const isActive = activePanel === item.id;
         const hasBadge = item.id === 'chat' && chatUnreadCount > 0;
@@ -725,7 +742,7 @@ const EnterpriseDashboard = ({
 
   // ==================== RIGHT PANEL ====================
   const renderRightPanel = () => (
-    <div className="w-[320px] lg:w-[340px] min-w-[280px] bg-white border-l border-slate-200 flex flex-col shrink-0 overflow-hidden">
+    <div className="w-full md:w-[320px] lg:w-[340px] md:min-w-[280px] bg-white border-l border-slate-200 flex flex-col shrink-0 overflow-hidden">
       {/* Tabs */}
       <div className="flex border-b border-slate-100">
         {[
@@ -1172,13 +1189,13 @@ const EnterpriseDashboard = ({
 
   // ==================== MAIN LAYOUT ====================
   return (
-    <div className="h-screen w-full overflow-hidden bg-slate-100 font-sans text-slate-900">
+    <div className="h-[100dvh] w-full overflow-hidden bg-slate-100 font-sans text-slate-900">
       <div className="flex h-full min-w-0 flex-col">
         {renderEnterpriseTopBar()}
         {renderMobileTopBar()}
 
         <div className="flex min-h-0 flex-1">
-          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'} bg-slate-100 ${['operations', 'chat'].includes(activePanel) ? '' : 'px-3 py-3 pb-20 sm:px-5 sm:py-4 md:px-6 md:py-5 md:pb-5'}`}>
+          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'} bg-slate-100 ${['operations', 'chat'].includes(activePanel) ? '' : 'px-3 py-3 pb-28 sm:px-5 sm:py-4 md:px-6 md:py-5 md:pb-5'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : (
@@ -1205,7 +1222,7 @@ const EnterpriseDashboard = ({
         {showRightPanel && (
           <div className="fixed inset-0 z-[100] flex items-start justify-end">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRightPanel(false)} />
-            <div className="w-[320px] max-w-full bg-white border-l border-slate-200 flex flex-col h-full shadow-xl z-10 relative">
+            <div className="w-full max-w-[360px] bg-white border-l border-slate-200 flex flex-col h-full shadow-xl z-10 relative">
               {renderRightPanel()}
             </div>
           </div>

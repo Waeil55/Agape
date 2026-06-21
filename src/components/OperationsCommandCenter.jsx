@@ -247,7 +247,7 @@ const PulseMetric = ({ icon: Icon, label, value, detail, tone = 'slate', pulse =
     <button
       type="button"
       onClick={onClick}
-      className={`relative min-w-[138px] rounded-lg border px-3 py-2 text-left shadow-sm transition ${classes.card}`}
+      className={`relative min-w-[132px] flex-1 rounded-lg border px-3 py-2 text-left shadow-sm transition sm:flex-none ${classes.card}`}
     >
       {pulse && (
         <span className="absolute right-2 top-2 flex h-2.5 w-2.5">
@@ -1109,8 +1109,8 @@ const OperationsCommandCenter = ({
 
   const renderLiveOpsPulse = () => (
     <div className="shrink-0 border-b border-slate-200 bg-slate-100/95 px-3 py-2">
-      <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-        <div className="flex min-w-max items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex w-full flex-wrap items-stretch gap-2 lg:w-auto">
           <PulseMetric
             icon={CheckCircle2}
             label="Available"
@@ -1221,8 +1221,8 @@ const OperationsCommandCenter = ({
 
   // ==================== CONTROL BAR (DEDUPED COMMAND STRIP) ====================
   const renderControlBar = () => (
-    <div className="flex items-center justify-between gap-3 px-2 py-1.5 border-b border-slate-200 bg-white shrink-0 overflow-x-auto no-scrollbar sticky top-0 z-20 shadow-sm">
-      <div className="flex items-center gap-1.5 shrink-0">
+    <div className="flex flex-col gap-2 px-2 py-2 border-b border-slate-200 bg-white shrink-0 sticky top-0 z-20 shadow-sm md:flex-row md:items-center md:justify-between md:gap-3">
+      <div className="flex w-full flex-wrap items-center gap-1.5 md:w-auto md:shrink-0">
         <div className="flex items-center gap-0.5 shrink-0 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
           {['manifest', 'willcall', 'fleet'].map(tab => (
             <button
@@ -1239,7 +1239,7 @@ const OperationsCommandCenter = ({
           ))}
         </div>
 
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-2 py-1 text-[10px] card-premiumtext-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="min-w-[96px] flex-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer sm:flex-none">
           <option value="all">All</option>
           <option value="Unassigned">Unassigned</option>
           <option value="Assigned">Assigned</option>
@@ -1251,8 +1251,8 @@ const OperationsCommandCenter = ({
           <option value="Rerouted">Rerouted</option>
         </select>
 
-        <div className="flex items-center gap-1">
-          <select value={sortBy} onChange={(e) => handleSortSelect(e.target.value)} className="px-2 py-1 text-[10px] card-premiumtext-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+        <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto sm:flex-none">
+          <select value={sortBy} onChange={(e) => handleSortSelect(e.target.value)} className="min-w-[120px] flex-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer sm:flex-none">
             {SORT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -1285,7 +1285,7 @@ const OperationsCommandCenter = ({
           )}
           {sortBy === 'ai' && aiSortLoading && <Loader2 size={11} className="text-blue-600 animate-spin shrink-0" />}
         </div>
-        <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-2 py-1 text-[10px] card-premiumtext-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+        <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="min-w-[110px] flex-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer sm:flex-none">
           <option value="all">Drivers</option>
           <option value="unassigned">No Driver</option>
           {driverOptions.map((driver) => (
@@ -1295,7 +1295,7 @@ const OperationsCommandCenter = ({
 
       </div>
 
-      <div className="flex items-center gap-1 shrink-0 ml-auto">
+      <div className="flex w-full flex-wrap items-center gap-1 md:ml-auto md:w-auto md:shrink-0">
         <button
           type="button"
           onClick={() => setShowAddTripModal(true)}
@@ -1325,14 +1325,14 @@ const OperationsCommandCenter = ({
           <MapPin size={11} /> Map
         </button>
 
-        <div className="hidden lg:flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1">
+        <div className="order-first flex w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 sm:order-none sm:w-auto">
           <Search size={11} className="text-slate-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search"
-            className="w-28 bg-transparent text-[10px] font-medium text-slate-700 placeholder:text-slate-400 outline-none"
+            className="min-w-0 flex-1 bg-transparent text-[10px] font-medium text-slate-700 placeholder:text-slate-400 outline-none sm:w-28"
           />
           {searchQuery && (
             <button type="button" onClick={() => setSearchQuery('')} className="text-slate-400 transition hover:text-slate-600" title="Clear search">
@@ -1341,17 +1341,17 @@ const OperationsCommandCenter = ({
           )}
         </div>
         <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
-          className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer" />
+          className="min-w-[132px] flex-1 px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer sm:flex-none" />
 
         {operationsTab === 'manifest' && (
           <>
-            <select value={manifestView} onChange={(e) => setManifestView(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+            <select value={manifestView} onChange={(e) => setManifestView(e.target.value)} className="min-w-[86px] flex-1 px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer sm:flex-none">
               {MANIFEST_VIEW_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
             {manifestView === 'board' && (
-              <select value={manifestGroupBy} onChange={(e) => setManifestGroupBy(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+              <select value={manifestGroupBy} onChange={(e) => setManifestGroupBy(e.target.value)} className="min-w-[112px] flex-1 px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer sm:flex-none">
                 {MANIFEST_GROUP_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
@@ -1371,7 +1371,7 @@ const OperationsCommandCenter = ({
           </>
         )}
 
-        <select value={manifestDensity} onChange={(e) => setManifestDensity(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+        <select value={manifestDensity} onChange={(e) => setManifestDensity(e.target.value)} className="min-w-[86px] flex-1 px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer sm:flex-none">
           {DENSITY_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
@@ -1850,7 +1850,24 @@ const OperationsCommandCenter = ({
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="space-y-3 p-3 md:hidden">
+            {visibleTrips.map((trip) => renderManifestCard(trip))}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">
+              <span>Showing {visibleTrips.length} of {manifestFeedTrips.length} trip{manifestFeedTrips.length !== 1 ? 's' : ''}</span>
+              <span>{selectedTasks.length} selected</span>
+              {manifestFeedTrips.length > visibleTrips.length && (
+                <button
+                  type="button"
+                  onClick={() => setManifestLimit((prev) => prev + 150)}
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  Load 150 More
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full table-fixed text-xs">
               <colgroup>
                 <col className="w-8" />
@@ -2212,7 +2229,7 @@ const OperationsCommandCenter = ({
             </table>
           </div>
 
-          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-4 py-2 text-micro text-slate-400">
+          <div className="hidden items-center justify-between border-t border-slate-100 bg-slate-50 px-4 py-2 text-micro text-slate-400 md:flex">
             <div className="flex items-center gap-3">
               <span>Showing {visibleTrips.length} of {manifestFeedTrips.length} trip{manifestFeedTrips.length !== 1 ? 's' : ''}</span>
               {manifestFeedTrips.length > visibleTrips.length && (
