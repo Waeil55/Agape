@@ -55,6 +55,16 @@ const isWillCall = (trip) => {
   return s === '' || s === 'WILL CALL' || s === 'WC';
 };
 
+const safeTripText = (value) => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'object') {
+    return safeTripText(value.address || value.name || value.label || value.text || value.value || '');
+  }
+  return String(value);
+};
+
 const getTripIdNumberParts = (trip) => {
   const values = [trip?.bookingId, trip?.id, trip?.tripId, trip?.tripNumber].filter(Boolean);
   return values.flatMap((value) => {
@@ -865,8 +875,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   // Geocode addresses for active trips and cache results
   const preloadAddressCoords = useCallback(async (trip) => {
     const addressesToGeocode = [];
-    if (trip.pickup && !addressCoordsCache.current[trip.pickup]) addressesToGeocode.push({ addr: trip.pickup, type: 'pickup' });
-    if (trip.dropoff && !addressCoordsCache.current[trip.dropoff]) addressesToGeocode.push({ addr: trip.dropoff, type: 'dropoff' });
+    const pickupAddress = safeTripText(trip.pickup);
+    const dropoffAddress = safeTripText(trip.dropoff);
+    if (pickupAddress && !addressCoordsCache.current[pickupAddress]) addressesToGeocode.push({ addr: pickupAddress, type: 'pickup' });
+    if (dropoffAddress && !addressCoordsCache.current[dropoffAddress]) addressesToGeocode.push({ addr: dropoffAddress, type: 'dropoff' });
     for (const { addr, type } of addressesToGeocode) {
       try {
         const { geocodeAddress } = await import('../config/maps');
@@ -985,7 +997,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       notifiedTripsRef.current.add(t.id);
       const level = getUrgency(t) === 2 ? 'Overdue' : 'Due Soon';
       playNotificationSound();
-      showLocalNotification(`🚨 ${level}: ${t.patient}`, `${t.time} - ${t.pickup} to ${t.dropoff}`);
+      showLocalNotification(`🚨 ${level}: ${t.patient}`, `${t.time} - ${safeTripText(t.pickup)} to ${safeTripText(t.dropoff)}`);
     });
   }, [trips]);
 
@@ -1467,8 +1479,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       activeTrips.forEach(trip => {
         const tripKey = trip.id;
         const alreadyNotified = geofenceAlerted.current.has(tripKey);
-        const pickupCoords = trip.pickup ? addressCoordsCache.current[trip.pickup] : null;
-        const dropoffCoords = trip.dropoff ? addressCoordsCache.current[trip.dropoff] : null;
+        const pickupAddress = safeTripText(trip.pickup);
+        const dropoffAddress = safeTripText(trip.dropoff);
+        const pickupCoords = pickupAddress ? addressCoordsCache.current[pickupAddress] : null;
+        const dropoffCoords = dropoffAddress ? addressCoordsCache.current[dropoffAddress] : null;
 
         if (pickupCoords && !alreadyNotified && (trip.status === 'Navigating Pickup' || trip.status === 'In Progress')) {
           const dist = Math.sqrt(Math.pow(pos.lat - pickupCoords.lat, 2) + Math.pow(pos.lng - pickupCoords.lng, 2)) * 69;
@@ -1881,18 +1895,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     impact('heavy');
     advanceWorkflow(trip, 'Navigating Pickup', {});
     preloadGeofence(trip);
-    openInNavApp(trip.pickup, navApp);
+    openInNavApp(safeTripText(trip.pickup), navApp);
   };
 
   const handleNavigateToDropoff = (trip) => {
     impact('heavy');
     preloadGeofence(trip);
     advanceWorkflow(trip, 'Navigating Dropoff', {});
-    openInNavApp(trip.dropoff, navApp);
+    openInNavApp(safeTripText(trip.dropoff), navApp);
   };
 
   const handleStartTrip = (trip) => {
-    openInNavApp(trip.pickup, suggestNavApp(trip.pickup));
+    const address = safeTripText(trip.pickup);
+    openInNavApp(address, suggestNavApp(address));
   };
 
   const handleCall = async (phone, name) => {
@@ -3170,7 +3185,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                            {step.type === 'PU' ? 'Pickup Address' : 'Dropoff Address'}
                          </p>
                           <p className={`text-base font-bold leading-tight ${step.type === 'PU' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                            {step.type === 'PU' ? trip.pickup : trip.dropoff}
+                            {step.type === 'PU' ? safeTripText(trip.pickup) : safeTripText(trip.dropoff)}
                           </p>
 
                           {(() => {
@@ -3191,7 +3206,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           })()}
                           
                           <div className="flex items-center gap-2 mt-3 mb-4">
-                            <button type="button" onClick={(e) => { e.stopPropagation(); openInNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff, suggestNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff)); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"><Navigation size={12}/> Navigate</button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); const address = step.type === 'PU' ? safeTripText(trip.pickup) : safeTripText(trip.dropoff); openInNavApp(address, suggestNavApp(address)); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"><Navigation size={12}/> Navigate</button>
                            <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartCall(trip); }} className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-all"><Phone size={14}/></button>
                            <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all"><MessageCircle size={14}/></button>
                          </div>
@@ -3313,8 +3328,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         trip.date !== getTodayStr() ? 'Tomorrow' : null,
                         isSequenced ? 'Route Plan' : null,
                       ].filter(Boolean),
-                      pickup: { address: trip.pickup, phone: trip.pickupPhone },
-                      dropoff: { address: trip.dropoff, phone: trip.dropoffPhone, time: null },
+                      pickup: { address: safeTripText(trip.pickup), phone: trip.pickupPhone },
+                      dropoff: { address: safeTripText(trip.dropoff), phone: trip.dropoffPhone, time: null },
                       workflowPhase,
                     }}
                     expandedId={expandedTripId}
@@ -3322,8 +3337,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     isSelected={isSelected}
                     onSelect={toggleTripSelect}
                     actions={{
-                      onNavigatePickup: (t) => openInNavApp(t.pickup?.address || t.pickup, suggestNavApp(t.pickup?.address || t.pickup)),
-                      onNavigateDropoff: (t) => openInNavApp(t.dropoff?.address || t.dropoff, suggestNavApp(t.dropoff?.address || t.dropoff)),
+                      onNavigatePickup: (t) => {
+                        const address = safeTripText(t.pickup?.address || t.pickup);
+                        openInNavApp(address, suggestNavApp(address));
+                      },
+                      onNavigateDropoff: (t) => {
+                        const address = safeTripText(t.dropoff?.address || t.dropoff);
+                        openInNavApp(address, suggestNavApp(address));
+                      },
                       onCall: (t) => handleSmartCall(t),
                       onSms: (t) => handleSmartSMS(t),
                       onCallNumber: (phone, label) => handleCall(phone, label),
@@ -4266,11 +4287,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 align-top">Pickup Address</td>
-                              <td className="px-4 py-2.5 font-semibold text-emerald-700 leading-relaxed break-words">{trip.pickup || 'No pickup address'}</td>
+                              <td className="px-4 py-2.5 font-semibold text-emerald-700 leading-relaxed break-words">{safeTripText(trip.pickup) || 'No pickup address'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50 align-top">Dropoff Address</td>
-                              <td className="px-4 py-2.5 font-semibold text-rose-700 leading-relaxed break-words">{trip.dropoff || 'No dropoff address'}</td>
+                              <td className="px-4 py-2.5 font-semibold text-rose-700 leading-relaxed break-words">{safeTripText(trip.dropoff) || 'No dropoff address'}</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                               <td className="px-4 py-2.5 font-bold text-slate-500 uppercase tracking-wider text-[10px] bg-slate-50/50">Signature</td>
@@ -4649,9 +4670,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
-                        <span className="truncate">{leg.pickup}</span>
+                        <span className="truncate">{safeTripText(leg.pickup)}</span>
                         <span className="shrink-0">to</span>
-                        <span className="truncate">{leg.dropoff}</span>
+                        <span className="truncate">{safeTripText(leg.dropoff)}</span>
                       </div>
                     </div>
                   </button>
@@ -4726,9 +4747,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
-                        <span className="truncate">{leg.pickup}</span>
+                        <span className="truncate">{safeTripText(leg.pickup)}</span>
                         <span className="shrink-0">to</span>
-                        <span className="truncate">{leg.dropoff}</span>
+                        <span className="truncate">{safeTripText(leg.dropoff)}</span>
                       </div>
                     </div>
                   </button>
@@ -5049,7 +5070,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-600">Pickup</p>
-                          <p className="text-sm text-slate-500 truncate">{leg.pickup}</p>
+                          <p className="text-sm text-slate-500 truncate">{safeTripText(leg.pickup)}</p>
                           <p className="text-xs text-slate-400">{leg.time ? to12hr(leg.time) : ''}</p>
                         </div>
                       </div>
@@ -5057,7 +5078,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="w-3 h-3 rounded-full bg-rose-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-600">Dropoff</p>
-                          <p className="text-sm text-slate-500 truncate">{leg.dropoff}</p>
+                          <p className="text-sm text-slate-500 truncate">{safeTripText(leg.dropoff)}</p>
                         </div>
                       </div>
                     </div>
@@ -5119,7 +5140,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="w-1.5 h-1.5 rounded-full shrink-0 mt-1 bg-blue-500"></div>
                         <div className="flex-1 min-w-0">
                           <p className="text-slate-900 font-semibold leading-tight">{leg.pickupSite || 'Pickup'}</p>
-                          <p className="text-slate-500 truncate leading-tight">{leg.pickup}</p>
+                          <p className="text-slate-500 truncate leading-tight">{safeTripText(leg.pickup)}</p>
                           {leg.pickupPhone && <p className="text-slate-400 text-[9px] font-mono mt-0.5">{leg.pickupPhone}</p>}
                         </div>
                       </div>
@@ -5127,7 +5148,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="w-1.5 h-1.5 rounded-full shrink-0 mt-1 bg-emerald-500"></div>
                         <div className="flex-1 min-w-0">
                           <p className="text-slate-900 font-semibold leading-tight">{leg.dropoffSite || 'Dropoff'}</p>
-                          <p className="text-slate-500 truncate leading-tight">{leg.dropoff}</p>
+                          <p className="text-slate-500 truncate leading-tight">{safeTripText(leg.dropoff)}</p>
                           {leg.dropoffPhone && <p className="text-slate-400 text-[9px] font-mono mt-0.5">{leg.dropoffPhone}</p>}
                         </div>
                       </div>

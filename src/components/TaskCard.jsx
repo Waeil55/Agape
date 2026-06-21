@@ -63,6 +63,16 @@ const getSiteIcon = (name) => {
   return <Building size={14} />;
 };
 
+const safeText = (value) => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'object') {
+    return safeText(value.address || value.name || value.label || value.text || value.value || '');
+  }
+  return String(value);
+};
+
 const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, onTimeClick }) => {
   const isExpanded = expandedId === task.id;
   const isAnotherExpanded = expandedId !== null && expandedId !== task.id;
@@ -72,10 +82,10 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, o
 
   const timeUrgency = getTimeUrgency(task.time, task.status);
   const isTerminal = ['Completed', 'Cancelled', 'No Show'].includes(task.status);
-  const dropoffAddress = task.dropoff?.address || task.dropoff || '';
-  const dropoffSiteName = (task.dropoff?.site || task.dropoffSite || '').trim();
-  const pickupAddress = task.pickup?.address || task.pickup || '';
-  const pickupSiteName = (task.pickup?.site || task.pickupSite || '').trim();
+  const dropoffAddress = safeText(task.dropoff?.address || task.dropoff);
+  const dropoffSiteName = safeText(task.dropoff?.site || task.dropoffSite).trim();
+  const pickupAddress = safeText(task.pickup?.address || task.pickup);
+  const pickupSiteName = safeText(task.pickup?.site || task.pickupSite).trim();
 
   useEffect(() => {
     if (isExpanded) {
