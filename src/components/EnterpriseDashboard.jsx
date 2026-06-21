@@ -995,6 +995,7 @@ const EnterpriseDashboard = ({
       bulkAssignTrips={bulkAssignTrips}
       setBulkAssignModal={setBulkAssignModal}
       requestDeleteTrip={requestDeleteTrip}
+      requestBulkDelete={requestBulkDelete}
       updateTrip={updateTrip}
       makeCall={makeCall}
       sendSMS={sendSMS}

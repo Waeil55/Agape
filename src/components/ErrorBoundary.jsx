@@ -37,6 +37,22 @@ export default class ErrorBoundary extends React.Component {
         Promise.all(regs.map(r => r.unregister()))
       ));
     }
+    
+    // Attempt to clear IndexedDB (Firestore cache)
+    if (window.indexedDB && window.indexedDB.databases) {
+      promises.push(
+        window.indexedDB.databases().then(dbs => {
+          return Promise.all(dbs.map(db => new Promise((resolve) => {
+            if (!db.name) return resolve();
+            const req = window.indexedDB.deleteDatabase(db.name);
+            req.onsuccess = resolve;
+            req.onerror = resolve;
+            req.onblocked = resolve;
+          })));
+        }).catch(() => Promise.resolve())
+      );
+    }
+
     Promise.all(promises).then(doReload).catch(doReload);
   };
 
@@ -64,14 +80,12 @@ export default class ErrorBoundary extends React.Component {
               >
                 <RefreshCw size={18} /> Retry
               </button>
-              {isTDZ && (
-                <button
-                  onClick={this.handleClearCache}
-                  className="px-6 py-3 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 flex items-center gap-2 transition"
-                >
-                  Clear Cache & Reload
-                </button>
-              )}
+              <button
+                onClick={this.handleClearCache}
+                className="px-6 py-3 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 flex items-center gap-2 transition"
+              >
+                Clear Cache & Reload
+              </button>
             </div>
           </div>
         </div>

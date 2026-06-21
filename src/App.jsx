@@ -1588,22 +1588,24 @@ const App = () => {
 
   const executeDeleteTrip = (tripId) => {
     // CRITICAL FIX: Use refs instead of closures to avoid stale data from Firestore sync
-    const currentTrips = trips || [];
-    const currentTrashed = trashedTrips || [];
-    
-    const tripToDelete = currentTrips.find(t => t.id === tripId);
-    if (tripToDelete) {
-      const newTrashedTrips = [tripToDelete, ...currentTrashed];
-      const newTrips = currentTrips.filter(t => t.id !== tripId);
+    // Also use functional state updates
+    setTrips(currentTrips => {
+      const tripToDelete = currentTrips.find(t => t.id === tripId);
+      if (!tripToDelete) return currentTrips;
       
-      setTrashedTrips(newTrashedTrips);
-      setTrips(newTrips);
-      setSelectedTasks(selectedTasks.filter(id => id !== tripId));
+      setTrashedTrips(currentTrashed => {
+        if (currentTrashed.find(t => t.id === tripId)) return currentTrashed;
+        return [tripToDelete, ...currentTrashed];
+      });
       
       // Writes directly to Firestore via setTrips/setTrashedTrips
       const changed = Object.keys(tripToDelete).map(k => ({ field: k, before: tripToDelete[k], after: undefined }));
       addAuditLog('Trip Archived', `${currentUser} archived trip ${tripId} (${tripToDelete.patient}).`, 'rose', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'active', after: 'archived' }] });
-    }
+      
+      return currentTrips.filter(t => t.id !== tripId);
+    });
+    
+    setSelectedTasks(prev => prev.filter(id => id !== tripId));
   };
 
   const requestBulkDelete = (tripIds, onSuccess) => {
@@ -1614,56 +1616,41 @@ const App = () => {
     requestAuthAction('archive_trips', () => {
       // CRITICAL FIX: Use refs instead of closures to get CURRENT state, not stale captured values
       // This prevents Firestore sync from making the captured values outdated
-      const currentTrips = trips || [];
-      const currentTrashed = trashedTrips || [];
-      
-      const tripsToDelete = currentTrips.filter(t => tripIds.includes(t.id));
-      if (tripsToDelete.length > 0) {
-        const newTrashedTrips = [...tripsToDelete, ...currentTrashed];
-        const newTrips = currentTrips.filter(t => !tripIds.includes(t.id));
+      setTrips(currentTrips => {
+        const tripsToDelete = currentTrips.filter(t => tripIds.includes(t.id));
+        if (tripsToDelete.length === 0) return currentTrips;
         
-        // Update state immediately with correct data
-        setTrashedTrips(newTrashedTrips);
-        setTrips(newTrips);
+        setTrashedTrips(currentTrashed => {
+          const newTrashed = tripsToDelete.filter(td => !currentTrashed.some(ct => ct.id === td.id));
+          return [...newTrashed, ...currentTrashed];
+        });
+        
         setSelectedTasks([]);
-        
-        // Writes directly to Firestore via setTrips/setTrashedTrips
-        
         if (onSuccess) onSuccess();
         addAuditLog('Bulk Trip Archived', `${currentUser} archived ${tripsToDelete.length} trips.`, 'rose');
-      }
+        
+        return currentTrips.filter(t => !tripIds.includes(t.id));
+      });
     });
   };
 
   const restoreTrip = (tripId) => {
     requestAuthAction('restore_trip', () => {
-      // CRITICAL FIX: Use refs instead of closures to avoid stale data from Firestore sync
-      const currentTrips = trips || [];
-      const currentTrashed = trashedTrips || [];
-      
-      const tripToRestore = currentTrashed.find(t => t.id === tripId);
-      if (tripToRestore) {
-        // Check if an equivalent trip already exists in active trips — skip restore if so
-        const restoreKey = getTripKey(tripToRestore);
-        const alreadyExists = currentTrips.some(et => getTripKey(et) === restoreKey);
-        if (alreadyExists) {
-          const newTrashed = currentTrashed.filter(t => t.id !== tripId);
-          setTrashedTrips(newTrashed);
-          // Firestore auto-syncs
-          addAuditLog('Trip Removed from Archive', `Duplicate of ${tripToRestore.patient} — removed from Archive.`, 'amber');
-          return;
-        }
+      setTrashedTrips(currentTrashed => {
+        const tripToRestore = currentTrashed.find(t => t.id === tripId);
+        if (!tripToRestore) return currentTrashed;
         
-        const newTrips = dedupTrips([...currentTrips, tripToRestore]);
-        const newTrashed = currentTrashed.filter(t => t.id !== tripId);
-        
-        setTrips(newTrips);
-        setTrashedTrips(newTrashed);
-        
-        // Writes directly to Firestore via setTrips/setTrashedTrips
+        setTrips(currentTrips => {
+          const restoreKey = getTripKey(tripToRestore);
+          const alreadyExists = currentTrips.some(et => getTripKey(et) === restoreKey);
+          if (alreadyExists) return currentTrips;
+          
+          return dedupTrips([...currentTrips, tripToRestore]);
+        });
         
         addAuditLog('Trip Restored', `${currentUser || 'Admin'} restored trip ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'archived', after: 'active' }] });
-      }
+        return currentTrashed.filter(t => t.id !== tripId);
+      });
     });
   };
 
