@@ -164,6 +164,17 @@ const formatManifestValue = (value) => {
   }
   return stringValue;
 };
+const displayText = (value) => {
+  if (!hasDisplayValue(value)) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'object') {
+    return displayText(value.address || value.name || value.label || value.text || value.value || '');
+  }
+  return String(value);
+};
+const getPickupText = (trip) => displayText(trip?.pickup);
+const getDropoffText = (trip) => displayText(trip?.dropoff);
 
 const getTripUrgencyLevel = (trip) => {
   if (isTripLate(trip?.time) && !TERMINAL_STATUSES.includes(trip?.status)) return 'late';
@@ -569,8 +580,8 @@ const OperationsCommandCenter = ({
     ? todayTrips.filter(t =>
         t.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.bookingId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.pickup || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.dropoff || '').toLowerCase().includes(searchQuery.toLowerCase())
+        getPickupText(t).toLowerCase().includes(searchQuery.toLowerCase()) ||
+        getDropoffText(t).toLowerCase().includes(searchQuery.toLowerCase())
       )
     : todayTrips;
 
@@ -617,8 +628,8 @@ const OperationsCommandCenter = ({
     };
     const getSortValue = (trip) => {
       if (sortBy === 'patient') return `${trip.patient || ''} ${getClientIdentifier(trip) || ''} ${getBookingReference(trip) || ''}`;
-      if (sortBy === 'pickup') return `${trip.pickup || ''} ${getPickupFacilityName(trip) || ''}`;
-      if (sortBy === 'dropoff') return `${trip.dropoff || ''} ${getDropoffFacilityName(trip) || ''}`;
+      if (sortBy === 'pickup') return `${getPickupText(trip)} ${getPickupFacilityName(trip) || ''}`;
+      if (sortBy === 'dropoff') return `${getDropoffText(trip)} ${getDropoffFacilityName(trip) || ''}`;
       if (sortBy === 'assignment') return driverNameForTrip(trip);
       if (sortBy === 'status') return `${trip.status || ''}`;
       if (sortBy === 'tripId') return `${trip.bookingId || trip.id || ''}`;
@@ -741,6 +752,8 @@ const OperationsCommandCenter = ({
     const dropoffPhone = formatPhoneDisplay(trip.dropoffPhone);
     const pickupFacilityName = getPickupFacilityName(trip);
     const dropoffFacilityName = getDropoffFacilityName(trip);
+    const pickupAddress = getPickupText(trip);
+    const dropoffAddress = getDropoffText(trip);
     const serviceLabel = trip.type || trip.serviceType || trip.tripType || '';
     const insurer = String(trip.insurance || trip.insuranceProvider || trip.payor || '').trim();
     const medicaidId = String(trip.medicaidId || trip.memberId || '').trim();
@@ -804,7 +817,7 @@ const OperationsCommandCenter = ({
     ].filter(([, value]) => hasDisplayValue(value));
     const pickupItems = [
       ['Site', pickupFacilityName],
-      ['Address', trip.pickup || 'Missing pickup address'],
+      ['Address', pickupAddress || 'Missing pickup address'],
       ['City', pickupCity],
       ['Client phone', clientPhone],
       ['Pickup phone', pickupPhone && pickupPhone !== clientPhone ? pickupPhone : ''],
@@ -812,7 +825,7 @@ const OperationsCommandCenter = ({
     ].filter(([, value]) => hasDisplayValue(value));
     const dropoffItems = [
       ['Site', dropoffFacilityName],
-      ['Address', trip.dropoff || 'Missing dropoff address'],
+      ['Address', dropoffAddress || 'Missing dropoff address'],
       ['City', dropoffCity],
       ['Hospital phone', dropoffPhone],
       ['Hospital alt', hasDisplayValue(trip.hospitalPhone) && formatPhoneDisplay(trip.hospitalPhone) !== dropoffPhone ? formatPhoneDisplay(trip.hospitalPhone) : ''],
@@ -1421,6 +1434,8 @@ const OperationsCommandCenter = ({
     const dropoffPhone = formatPhoneDisplay(trip.dropoffPhone);
     const pickupFacilityName = getPickupFacilityName(trip);
     const dropoffFacilityName = getDropoffFacilityName(trip);
+    const pickupAddress = getPickupText(trip);
+    const dropoffAddress = getDropoffText(trip);
     const serviceLabel = trip.type || trip.serviceType;
     const clientSummary = [bookingReference, clientIdentifier && `ID ${clientIdentifier}`, serviceLabel].filter(Boolean).join(' | ');
     const visibleRouteAssignments = routeAssignments.slice(0, densityProfile.routeChipLimit);
@@ -1453,9 +1468,9 @@ const OperationsCommandCenter = ({
                 <Route size={9} /> {routeAssignments[0].routeName}
               </span>
             )}
-            <span className="hidden md:inline truncate text-[10px] text-slate-500 font-medium">{trip.pickup || ''}</span>
+            <span className="hidden md:inline truncate text-[10px] text-slate-500 font-medium">{pickupAddress}</span>
             <span className="hidden md:inline text-[10px] text-slate-300">to</span>
-            <span className="hidden md:inline truncate text-[10px] text-slate-500 font-medium">{trip.dropoff || ''}</span>
+            <span className="hidden md:inline truncate text-[10px] text-slate-500 font-medium">{dropoffAddress}</span>
             {clientPhone && <span className="shrink-0 text-[9px] font-semibold text-emerald-700">{clientPhone}</span>}
             {driver && <span className="hidden lg:inline truncate text-[10px] text-slate-500">{driver.name}</span>}
             <div className="ml-auto flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
@@ -1532,12 +1547,12 @@ const OperationsCommandCenter = ({
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
             <div className="flex min-w-0 items-center gap-1.5 text-[10px]">
               <span className="font-medium text-emerald-700">P:</span>
-              <span className="truncate text-slate-700">{trip.pickup || 'Missing pickup address'}</span>
+              <span className="truncate text-slate-700">{pickupAddress || 'Missing pickup address'}</span>
             </div>
             <span className="text-slate-300">to</span>
             <div className="flex min-w-0 items-center gap-1.5 text-[10px]">
               <span className="font-medium text-rose-700">D:</span>
-              <span className="truncate text-slate-700">{trip.dropoff || 'Missing dropoff address'}</span>
+              <span className="truncate text-slate-700">{dropoffAddress || 'Missing dropoff address'}</span>
             </div>
             {driver && (
               <span className="text-[10px] text-slate-500">{driver.name}</span>
@@ -1655,7 +1670,7 @@ const OperationsCommandCenter = ({
                       {pickupFacilityName}
                     </div>
                   )}
-                  <div className={`${isReportDensity ? 'mt-0.5 text-[11px]' : 'mt-0.5 text-xs'} font-semibold leading-snug text-slate-800 break-words`} style={getClampStyle(densityProfile.lineCount)}>{trip.pickup || 'Missing pickup address'}</div>
+                  <div className={`${isReportDensity ? 'mt-0.5 text-[11px]' : 'mt-0.5 text-xs'} font-semibold leading-snug text-slate-800 break-words`} style={getClampStyle(densityProfile.lineCount)}>{pickupAddress || 'Missing pickup address'}</div>
                   {clientPhone && <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-blue-700`}>Client {clientPhone}</div>}
                   {densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-blue-700`}>Pickup desk {pickupPhone}</div>}
                 </div>
@@ -1666,7 +1681,7 @@ const OperationsCommandCenter = ({
                       {dropoffFacilityName}
                     </div>
                   )}
-                  <div className={`${isReportDensity ? 'mt-0.5 text-[11px]' : 'mt-0.5 text-xs'} font-semibold leading-snug text-slate-800 break-words`} style={getClampStyle(densityProfile.lineCount)}>{trip.dropoff || 'Missing dropoff address'}</div>
+                  <div className={`${isReportDensity ? 'mt-0.5 text-[11px]' : 'mt-0.5 text-xs'} font-semibold leading-snug text-slate-800 break-words`} style={getClampStyle(densityProfile.lineCount)}>{dropoffAddress || 'Missing dropoff address'}</div>
                   {densityProfile.showSecondaryPhones && dropoffPhone && <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-emerald-700`}>Hospital {dropoffPhone}</div>}
                 </div>
               </div>
@@ -1906,6 +1921,8 @@ const OperationsCommandCenter = ({
                   const dropoffPhone = formatPhoneDisplay(trip.dropoffPhone);
                   const pickupFacilityName = getPickupFacilityName(trip);
                   const dropoffFacilityName = getDropoffFacilityName(trip);
+                  const pickupAddress = getPickupText(trip);
+                  const dropoffAddress = getDropoffText(trip);
                   const serviceLabel = trip.type || trip.serviceType;
                   const clientSummary = [bookingReference, clientIdentifier && `ID ${clientIdentifier}`, serviceLabel].filter(Boolean).join(' | ');
                   const contactSummary = [
@@ -2011,7 +2028,7 @@ const OperationsCommandCenter = ({
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] font-semibold text-slate-700 truncate`}>
-                            {trip.pickup || 'No pickup address'}
+                            {pickupAddress || 'No pickup address'}
                           </div>
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-blue-100 bg-blue-50/70 rounded-lg px-2 py-1' : 'border border-blue-100 bg-blue-50/70 rounded-2xl px-3 py-2'}`}>
@@ -2020,7 +2037,7 @@ const OperationsCommandCenter = ({
                               <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-800 truncate">{pickupFacilityName}</div>
                             )}
                             <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} font-semibold leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
-                              {trip.pickup || 'Missing pickup address'}
+                              {pickupAddress || 'Missing pickup address'}
                             </div>
                             {densityProfile.lineCount >= 3 && clientPhone && (
                               <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-blue-700`}>{clientPhone}</div>
@@ -2034,7 +2051,7 @@ const OperationsCommandCenter = ({
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] font-semibold text-slate-700 truncate`}>
-                            {trip.dropoff || 'No dropoff address'}
+                            {dropoffAddress || 'No dropoff address'}
                           </div>
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-emerald-100 bg-emerald-50/70 rounded-lg px-2 py-1' : 'border border-emerald-100 bg-emerald-50/70 rounded-2xl px-3 py-2'}`}>
@@ -2043,7 +2060,7 @@ const OperationsCommandCenter = ({
                               <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 truncate">{dropoffFacilityName}</div>
                             )}
                             <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} font-semibold leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
-                              {trip.dropoff || 'Missing dropoff address'}
+                              {dropoffAddress || 'Missing dropoff address'}
                             </div>
                             {densityProfile.lineCount >= 3 && densityProfile.showSecondaryPhones && dropoffPhone && (
                               <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-emerald-700`}>Hospital {dropoffPhone}</div>
@@ -2305,6 +2322,8 @@ const OperationsCommandCenter = ({
                         const dropoffPhone = formatPhoneDisplay(t.dropoffPhone);
                         const routeAssignments = routeTripMap[t.id] || [];
                         const visibleRouteAssignments = routeAssignments.slice(0, densityProfile.routeChipLimit);
+                        const pickupAddress = getPickupText(t);
+                        const dropoffAddress = getDropoffText(t);
                         return (
                         <div key={t.id} className={`${isLeanDensity ? 'p-2.5' : 'p-3'} rounded-xl bg-white border border-slate-200 transition-all duration-150`}>
                           <div className="cursor-pointer hover:bg-slate-50 rounded-lg transition-colors" onClick={() => openTripDetails(t)}>
@@ -2338,9 +2357,9 @@ const OperationsCommandCenter = ({
                             <span className="text-micro font-mono text-emerald-600 font-semibold">{to12hr(t.time)}</span>
                           </div>
                           <div className="flex items-center gap-1.5 mt-1.5 text-micro">
-                            <span className="truncate text-blue-600" style={getClampStyle(1)}>{t.pickup}</span>
+                            <span className="truncate text-blue-600" style={getClampStyle(1)}>{pickupAddress || 'No pickup address'}</span>
                             <ArrowRight size={8} className="shrink-0 text-slate-400 opacity-50" />
-                            <span className="truncate text-emerald-600" style={getClampStyle(1)}>{t.dropoff}</span>
+                            <span className="truncate text-emerald-600" style={getClampStyle(1)}>{dropoffAddress || 'No dropoff address'}</span>
                           </div>
                           {(clientPhone || pickupPhone || dropoffPhone || routeAssignments.length > 0 || t.notes) && (
                             <div className="mt-1.5 space-y-1">
@@ -2435,6 +2454,8 @@ const OperationsCommandCenter = ({
             const dropoffPhone = formatPhoneDisplay(t.dropoffPhone);
             const routeAssignments = routeTripMap[t.id] || [];
             const visibleRouteAssignments = routeAssignments.slice(0, densityProfile.routeChipLimit);
+            const pickupAddress = getPickupText(t);
+            const dropoffAddress = getDropoffText(t);
             return (
             <div key={t.id} className="group card-premium hover:shadow-xl transition-all duration-300 flex flex-col">
               {/* Top Status Indicator */}
@@ -2501,7 +2522,7 @@ const OperationsCommandCenter = ({
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
                       <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-0.5">Pickup</p>
-                      <p className="text-blue-600 font-bold text-sm" style={getClampStyle(densityProfile.lineCount)}>{t.pickup}</p>
+                      <p className="text-blue-600 font-bold text-sm" style={getClampStyle(densityProfile.lineCount)}>{pickupAddress || 'No pickup address'}</p>
                       {densityProfile.showFacilityNames && getPickupFacilityName(t) && <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-blue-700">{getPickupFacilityName(t)}</p>}
                     </div>
                   </div>
@@ -2511,7 +2532,7 @@ const OperationsCommandCenter = ({
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
                       <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-0.5">Dropoff</p>
-                      <p className="text-emerald-600 font-bold text-sm" style={getClampStyle(densityProfile.lineCount)}>{t.dropoff}</p>
+                      <p className="text-emerald-600 font-bold text-sm" style={getClampStyle(densityProfile.lineCount)}>{dropoffAddress || 'No dropoff address'}</p>
                       {densityProfile.showFacilityNames && getDropoffFacilityName(t) && <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">{getDropoffFacilityName(t)}</p>}
                     </div>
                   </div>

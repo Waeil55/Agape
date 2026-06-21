@@ -209,18 +209,26 @@ function safeStr(val) {
   if (typeof val === 'string') return val;
   if (typeof val === 'number' || typeof val === 'boolean') return String(val);
   if (typeof val === 'object') {
-    return val.address || val.name || val.label || val.text || val.value || '';
+    return safeStr(val.address || val.name || val.label || val.text || val.value || '');
   }
   return String(val);
 }
 
 function sanitizeTripFields(trip) {
   if (!trip || typeof trip !== 'object') return trip;
+  const pickupInfo = trip.pickup && typeof trip.pickup === 'object' ? trip.pickup : {};
+  const dropoffInfo = trip.dropoff && typeof trip.dropoff === 'object' ? trip.dropoff : {};
+  const pickupTime = safeStr(trip.pickupTime || trip.requestedPickupTime || pickupInfo.time);
+  const dropoffTime = safeStr(trip.dropoffTime || trip.requestedDropoffTime || dropoffInfo.time);
   return {
     ...trip,
     pickup:  safeStr(trip.pickup),
     dropoff: safeStr(trip.dropoff),
-    time:    typeof trip.time === 'string' ? trip.time : safeStr(trip.time),
+    time:    typeof trip.time === 'string' ? trip.time : (safeStr(trip.time) || pickupTime),
+    pickupPhone: safeStr(trip.pickupPhone || pickupInfo.phone),
+    dropoffPhone: safeStr(trip.dropoffPhone || dropoffInfo.phone),
+    pickupTime,
+    dropoffTime,
     notes:   safeStr(trip.notes),
     status:  typeof trip.status === 'string' ? trip.status : safeStr(trip.status),
     date:    typeof trip.date === 'string' ? trip.date : safeStr(trip.date),
@@ -300,23 +308,24 @@ function mergeTripsById(...arrays) {
   arrays.forEach((arr) => {
     (arr || []).forEach((trip, index) => {
       if (!trip) return;
-      const id = getStableRecordId(trip, 'trip', index);
+      const safeTrip = sanitizeTripFields(trip);
+      const id = getStableRecordId(safeTrip, 'trip', index);
       const existing = merged.get(id);
       if (!existing) {
-        merged.set(id, { ...trip, id });
+        merged.set(id, { ...safeTrip, id });
         return;
       }
       const timeExisting = tripRecordTime(existing);
-      const timeNew = tripRecordTime(trip);
+      const timeNew = tripRecordTime(safeTrip);
       if (timeNew > timeExisting) {
-        merged.set(id, { ...trip, id });
+        merged.set(id, { ...safeTrip, id });
         return;
       }
       if (timeNew < timeExisting) return;
       // Timestamps equal (or both zero) — prefer the more advanced workflow status
       const spExisting = STATUS_PRIORITY[existing?.status] || 0;
-      const spNew = STATUS_PRIORITY[trip?.status] || 0;
-      if (spNew > spExisting) merged.set(id, { ...trip, id });
+      const spNew = STATUS_PRIORITY[safeTrip?.status] || 0;
+      if (spNew > spExisting) merged.set(id, { ...safeTrip, id });
     });
   });
   return [...merged.values()];
@@ -396,7 +405,7 @@ async function loadCollectionTrips(collectionName) {
   const snap = await getDocs(collection(db, collectionName));
   const trips = [];
   snap.forEach((tripDoc) => {
-    trips.push(convertFirestoreTimestamps({ id: tripDoc.id, ...tripDoc.data() }));
+    trips.push(sanitizeTripFields(convertFirestoreTimestamps({ id: tripDoc.id, ...tripDoc.data() })));
   });
   return trips;
 }
@@ -404,7 +413,7 @@ async function loadCollectionTrips(collectionName) {
 function mergeTripProgress(trips = [], progressByTrip = {}) {
   return (trips || []).map((trip) => {
     const progress = progressByTrip?.[trip?.id];
-    return progress ? { ...trip, ...progress } : trip;
+    return sanitizeTripFields(progress ? { ...trip, ...progress } : trip);
   });
 }
 
@@ -477,25 +486,30 @@ function getStableRecordId(record, fallbackPrefix, index) {
 
 function mergeRecordsById(primary = [], fallback = [], fallbackPrefix = 'record') {
   const merged = new Map();
+  const isTripRecord = ['active', 'archived', 'trip'].includes(fallbackPrefix);
 
   (fallback || []).forEach((record, index) => {
     const id = getStableRecordId(record, fallbackPrefix, index);
-    merged.set(id, { ...record, id });
+    const safeRecord = isTripRecord ? sanitizeTripFields(record) : record;
+    merged.set(id, { ...safeRecord, id });
   });
 
   (primary || []).forEach((record, index) => {
     const id = getStableRecordId(record, fallbackPrefix, index);
-    merged.set(id, { ...(merged.get(id) || {}), ...record, id });
+    const safeRecord = isTripRecord ? sanitizeTripFields(record) : record;
+    merged.set(id, { ...(merged.get(id) || {}), ...safeRecord, id });
   });
 
   return [...merged.values()];
 }
 
 function applyCollectionDocChanges(currentList = [], snap, fallbackPrefix = 'record') {
+  const isTripRecord = ['active', 'archived', 'trip'].includes(fallbackPrefix);
   const byId = new Map(
     (currentList || []).map((record, index) => {
       const id = getStableRecordId(record, fallbackPrefix, index);
-      return [id, { ...record, id }];
+      const safeRecord = isTripRecord ? sanitizeTripFields(record) : record;
+      return [id, { ...safeRecord, id }];
     })
   );
 
@@ -505,7 +519,8 @@ function applyCollectionDocChanges(currentList = [], snap, fallbackPrefix = 'rec
       byId.delete(id);
       return;
     }
-    byId.set(id, convertFirestoreTimestamps({ id, ...change.doc.data() }));
+    const nextRecord = convertFirestoreTimestamps({ id, ...change.doc.data() });
+    byId.set(id, isTripRecord ? sanitizeTripFields(nextRecord) : nextRecord);
   });
 
   return [...byId.values()];
