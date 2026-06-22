@@ -1,3 +1,5 @@
+import { isCorruptedTripRecord } from './tripIntegrity';
+
 const ACTIVE_DRIVER_STATUSES = new Set([
   'assigned',
   'accepted',
@@ -48,6 +50,7 @@ export const getTripLifecycleStep = (trip = {}) => {
 };
 
 export const isOperationalTrip = (trip = {}) => {
+  if (isCorruptedTripRecord(trip)) return false;
   const status = normalizeTripStatus(trip.status);
   if (status === 'archived') return false;
   if (trip.archiveState === 'archived') return false;

@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   doc,
-  onSnapshot,
   setDoc,
   collection,
   addDoc,
   serverTimestamp,
   runTransaction,
-  getDocs,
-  getDoc,
+  getDocsFromServer,
+  getDocFromServer,
   writeBatch,
 } from '../config/firebase';
 import { db, auth } from '../config/firebase';
@@ -22,6 +21,10 @@ import {
   isOperationalTrip,
   mergeTripCollections,
 } from '../utils/tripLifecycle';
+import {
+  filterValidTripRecords,
+  isCorruptedTripRecord,
+} from '../utils/tripIntegrity';
 
 const DATA_DOC = 'appData/agape';
 const TRIPS_COLLECTION = 'trips';
@@ -60,6 +63,7 @@ const DISPATCHER_PROFILE_COLLECTION = 'dispatcherProfiles';
 const VEHICLE_COLLECTION = 'fleetVehicles';
 const PHONE_NUMBERS_DOC = 'systemConfig/phoneNumbers';
 const MIRRORED_TRIP_FIELDS = new Set(['trips', 'trashedTrips']);
+const DATA_REFRESH_MS = 12000;
 
 const DEFAULT_DATA = {
   trips: [],
@@ -87,15 +91,20 @@ function normalizeTrip(trip) {
   return trip;
 }
 
+function cleanTripCollection(trips = []) {
+  const list = Array.isArray(trips) ? trips : [];
+  return dedupTripsByBookingId(filterValidTripRecords(list.map(normalizeTrip)));
+}
+
 function normalizeData(data = {}) {
   return {
     ...DEFAULT_DATA,
     ...data,
-    trips: data.trips || [],
+    trips: cleanTripCollection(data.trips || []),
     drivers: data.drivers || [],
     dispatchers: data.dispatchers || [],
     vehicles: data.vehicles || [],
-    trashedTrips: data.trashedTrips || [],
+    trashedTrips: cleanTripCollection(data.trashedTrips || []),
     logs: data.logs || [],
     phoneNumbers: data.phoneNumbers || DEFAULT_DATA.phoneNumbers,
   };
@@ -106,7 +115,31 @@ function shouldIgnoreRealtimePermissionError(err) {
 }
 
 function getTripId(trip, fallbackPrefix, index) {
-  return String(trip?.id || trip?.bookingId || `${fallbackPrefix}-${index}-${Date.now()}`);
+  return String(trip?.id || trip?.bookingId || `${fallbackPrefix}-${index}`);
+}
+
+async function deleteDocsById(collectionName, ids = []) {
+  const cleanIds = [...new Set((ids || []).filter(Boolean).map(String))];
+  for (let i = 0; i < cleanIds.length; i += 450) {
+    const batch = writeBatch(db);
+    cleanIds.slice(i, i + 450).forEach((id) => {
+      batch.delete(doc(db, collectionName, id));
+    });
+    await batch.commit();
+  }
+}
+
+async function purgeCorruptedTripDocs(collectionName) {
+  const snap = await getDocsFromServer(collection(db, collectionName));
+  const corruptedIds = [];
+  snap.forEach((tripDoc) => {
+    const trip = { id: tripDoc.id, ...tripDoc.data() };
+    if (isCorruptedTripRecord(trip)) corruptedIds.push(tripDoc.id);
+  });
+  if (corruptedIds.length > 0) {
+    await deleteDocsById(collectionName, corruptedIds);
+  }
+  return corruptedIds.length;
 }
 
 function getCurrentEventActor() {
@@ -119,7 +152,7 @@ function getCurrentEventActor() {
 }
 
 async function loadCollectionRecords(collectionName) {
-  const snap = await getDocs(collection(db, collectionName));
+  const snap = await getDocsFromServer(collection(db, collectionName));
   const records = [];
   snap.forEach((itemDoc) => {
     records.push({ id: itemDoc.id, ...itemDoc.data() });
@@ -139,7 +172,7 @@ async function mirrorRecordsToCollection(collectionName, records = []) {
     }));
 
   const existingIds = new Set();
-  const existingSnap = await getDocs(collection(db, collectionName));
+  const existingSnap = await getDocsFromServer(collection(db, collectionName));
   existingSnap.forEach((recordDoc) => existingIds.add(recordDoc.id));
   const nextIds = new Set(sanitizedRecords.map(({ id }) => id));
   const staleIds = [...existingIds].filter((id) => !nextIds.has(id));
@@ -163,8 +196,8 @@ async function mirrorRecordsToCollection(collectionName, records = []) {
 
 async function mirrorTripsToLedger(trips = [], trashedTrips = []) {
   const entries = [
-    ...trips.map((trip, index) => ({ trip, index, archiveState: 'active' })),
-    ...trashedTrips.map((trip, index) => ({ trip, index, archiveState: 'archived' })),
+    ...cleanTripCollection(trips).map((trip, index) => ({ trip, index, archiveState: 'active' })),
+    ...cleanTripCollection(trashedTrips).map((trip, index) => ({ trip, index, archiveState: 'archived' })),
   ];
 
   const sanitizedEntries = entries
@@ -178,7 +211,7 @@ async function mirrorTripsToLedger(trips = [], trashedTrips = []) {
       }),
     }));
   const existingIds = new Set();
-  const existingSnap = await getDocs(collection(db, TRIP_LEDGER_COLLECTION));
+  const existingSnap = await getDocsFromServer(collection(db, TRIP_LEDGER_COLLECTION));
   existingSnap.forEach((tripDoc) => existingIds.add(tripDoc.id));
   const nextIds = new Set(sanitizedEntries.map(({ id }) => id));
   const staleIds = [...existingIds].filter((id) => !nextIds.has(id));
@@ -201,7 +234,7 @@ async function mirrorTripsToLedger(trips = [], trashedTrips = []) {
 }
 
 async function mirrorTripsToOperationalCollection(trips = []) {
-  const sanitizedTrips = (trips || [])
+  const sanitizedTrips = cleanTripCollection(trips)
     .filter((trip) => trip?.id && isOperationalTrip(trip))
     .map((trip) => ({
       id: String(trip.id),
@@ -215,10 +248,18 @@ async function mirrorTripsToOperationalCollection(trips = []) {
     });
     await batch.commit();
   }
+
+  await purgeCorruptedTripDocs(TRIPS_COLLECTION).catch((err) => {
+    if (err?.code === 'permission-denied') {
+      console.warn('Corrupted trip purge skipped for this user.', err);
+      return;
+    }
+    throw err;
+  });
 }
 
 async function markArchivedTripsInOperationalCollection(trashedTrips = []) {
-  const archivedTrips = (trashedTrips || [])
+  const archivedTrips = cleanTripCollection(trashedTrips)
     .filter((trip) => trip?.id)
     .map((trip) => ({
       id: String(trip.id),
@@ -246,7 +287,7 @@ const isTerminalTrip = (trip = {}) => ['completed', 'cancelled', 'canceled', 'no
 const safeIdPart = (value) => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_');
 
 async function mirrorTripAssignments(trips = []) {
-  const assignedTrips = (trips || [])
+  const assignedTrips = cleanTripCollection(trips)
     .filter((trip) => trip?.id && hasAssignedDriver(trip) && !isTerminalTrip(trip))
     .map((trip) => {
       const id = trip.assignmentId || `trip_${safeIdPart(trip.id)}_${safeIdPart(trip.driverId || trip.driverEmail)}`;
@@ -287,7 +328,7 @@ async function mirrorTripAssignments(trips = []) {
 }
 
 async function buildDataFromTripLedger() {
-  const snap = await getDocs(collection(db, TRIP_LEDGER_COLLECTION));
+  const snap = await getDocsFromServer(collection(db, TRIP_LEDGER_COLLECTION));
   const trips = [];
   const trashedTrips = [];
 
@@ -301,7 +342,7 @@ async function buildDataFromTripLedger() {
   });
 
   if (trips.length === 0 && trashedTrips.length === 0) return null;
-  return { ...DEFAULT_DATA, trips: dedupTripsByBookingId(trips), trashedTrips: dedupTripsByBookingId(trashedTrips) };
+  return { ...DEFAULT_DATA, trips: cleanTripCollection(trips), trashedTrips: cleanTripCollection(trashedTrips) };
 }
 
 async function buildDataFromMirrors() {
@@ -310,7 +351,7 @@ async function buildDataFromMirrors() {
     loadCollectionRecords(DRIVER_PROFILE_COLLECTION),
     loadCollectionRecords(DISPATCHER_PROFILE_COLLECTION),
     loadCollectionRecords(VEHICLE_COLLECTION),
-    getDoc(doc(db, PHONE_NUMBERS_DOC)),
+    getDocFromServer(doc(db, PHONE_NUMBERS_DOC)),
   ]);
 
   return normalizeData({
@@ -345,6 +386,7 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
   const tripProgressRef = useRef({});
   const liveTripsRef = useRef([]);
   const pendingWritesRef = useRef(0);
+  const tripIntegrityCleanupRef = useRef(false);
   const mirrorBackfillRef = useRef({
     drivers: false,
     dispatchers: false,
@@ -353,46 +395,74 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
   });
 
   useEffect(() => {
-    const unsub = onSnapshot(
-      doc(db, DATA_DOC),
-      (snap) => {
+    let cancelled = false;
+    let inFlight = null;
+
+    const applyData = (nextData) => {
+      if (cancelled) return;
+      const mergedTrips = mergeTripCollections(
+        nextData.trips,
+        liveTripsRef.current,
+        tripProgressRef.current
+      );
+      const mergedData = {
+        ...nextData,
+        trips: cleanTripCollection(mergedTrips),
+        trashedTrips: cleanTripCollection(nextData.trashedTrips),
+      };
+      dataRef.current = mergedData;
+      setState(prev => ({
+        ...prev,
+        trips: mergedData.trips,
+        drivers: mergedData.drivers,
+        dispatchers: mergedData.dispatchers,
+        vehicles: mergedData.vehicles,
+        trashedTrips: mergedData.trashedTrips,
+        logs: mergedData.logs,
+        phoneNumbers: mergedData.phoneNumbers,
+        loading: false,
+        error: null,
+        initialized: true,
+        docExists: true,
+      }));
+    };
+
+    const refreshAppData = async () => {
+      if (inFlight) return inFlight;
+      inFlight = (async () => {
+        try {
+          const snap = await getDocFromServer(doc(db, DATA_DOC));
+          if (cancelled) return;
         if (snap.exists()) {
+          const snapData = snap.data() || {};
+          const rawTrips = Array.isArray(snapData.trips) ? snapData.trips : [];
+          const rawTrashedTrips = Array.isArray(snapData.trashedTrips) ? snapData.trashedTrips : [];
           const currentData = normalizeData(dataRef.current);
           const d = normalizeData({
-            ...snap.data(),
-            drivers: (snap.data()?.drivers?.length || 0) > 0 ? snap.data().drivers : currentData.drivers,
-            dispatchers: (snap.data()?.dispatchers?.length || 0) > 0 ? snap.data().dispatchers : currentData.dispatchers,
-            vehicles: (snap.data()?.vehicles?.length || 0) > 0 ? snap.data().vehicles : currentData.vehicles,
-            phoneNumbers: snap.data()?.phoneNumbers && Object.keys(snap.data().phoneNumbers || {}).length > 0
-              ? snap.data().phoneNumbers
+            ...snapData,
+            drivers: (snapData?.drivers?.length || 0) > 0 ? snapData.drivers : currentData.drivers,
+            dispatchers: (snapData?.dispatchers?.length || 0) > 0 ? snapData.dispatchers : currentData.dispatchers,
+            vehicles: (snapData?.vehicles?.length || 0) > 0 ? snapData.vehicles : currentData.vehicles,
+            phoneNumbers: snapData?.phoneNumbers && Object.keys(snapData.phoneNumbers || {}).length > 0
+              ? snapData.phoneNumbers
               : currentData.phoneNumbers,
           });
-          const applyData = (nextData) => {
-            const mergedTrips = mergeTripCollections(
-              nextData.trips,
-              liveTripsRef.current,
-              tripProgressRef.current
-            );
-            const mergedData = {
-              ...nextData,
-              trips: mergedTrips,
-            };
-            dataRef.current = mergedData;
-            setState(prev => ({
-              ...prev,
-              trips: mergedData.trips,
-              drivers: mergedData.drivers,
-              dispatchers: mergedData.dispatchers,
-              vehicles: mergedData.vehicles,
-              trashedTrips: mergedData.trashedTrips,
-              logs: mergedData.logs,
-              phoneNumbers: mergedData.phoneNumbers,
-              loading: false,
-              error: null,
-              initialized: true,
-              docExists: true,
-            }));
-          };
+          const removedTripCount = rawTrips.length - d.trips.length;
+          const removedTrashedTripCount = rawTrashedTrips.length - d.trashedTrips.length;
+          if (removedTripCount > 0 || removedTrashedTripCount > 0) {
+            setDoc(doc(db, DATA_DOC), {
+              trips: sanitizeForFirestore(d.trips),
+              trashedTrips: sanitizeForFirestore(d.trashedTrips),
+              integrityCleanedAt: new Date().toISOString(),
+              integrityRemovedTripCount: removedTripCount,
+              integrityRemovedTrashedTripCount: removedTrashedTripCount,
+              updatedAt: serverTimestamp(),
+              updatedField: 'trips',
+              updatedAtLocal: new Date().toISOString(),
+            }, { merge: true }).catch((cleanupErr) => {
+              console.warn('appData trip integrity cleanup skipped:', cleanupErr);
+            });
+          }
 
           const hasTripData = (d.trips?.length || 0) > 0 || (d.trashedTrips?.length || 0) > 0;
           if (hasTripData) {
@@ -432,34 +502,53 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
               console.error('Trip ledger recovery failed:', recoveryErr);
               applyData(d);
             });
-        } else {
-          buildDataFromMirrors()
-            .then((recovered) => {
-              const seed = recovered || DEFAULT_DATA;
-              return runTransaction(db, async (transaction) => {
-                const ref = doc(db, DATA_DOC);
-                const freshSnap = await transaction.get(ref);
-                if (!freshSnap.exists()) {
-                  transaction.set(ref, sanitizeForFirestore({
-                    ...seed,
-                    initializedAt: new Date().toISOString(),
-                    recoveredFromLedger: Boolean(recovered),
-                  }));
-                }
-              });
-            })
-            .catch((err) => {
-              console.error('App data initialization failed:', err);
-              setState(prev => ({ ...prev, error: err.message || 'App data initialization failed' }));
-            });
-          setState(prev => ({ ...prev, loading: false, initialized: false, docExists: false }));
+          return;
         }
-      },
-      (err) => {
-        setState(prev => ({ ...prev, error: err.message, loading: false }));
-      }
-    );
-    return unsub;
+
+          const recovered = await buildDataFromMirrors();
+          const seed = recovered || DEFAULT_DATA;
+          await runTransaction(db, async (transaction) => {
+            const ref = doc(db, DATA_DOC);
+            const freshSnap = await transaction.get(ref);
+            if (!freshSnap.exists()) {
+              transaction.set(ref, sanitizeForFirestore({
+                ...seed,
+                initializedAt: new Date().toISOString(),
+                recoveredFromLedger: Boolean(recovered),
+              }));
+            }
+          });
+          if (!cancelled) {
+            setState(prev => ({ ...prev, loading: false, initialized: false, docExists: false }));
+          }
+        } catch (err) {
+          if (!cancelled) {
+            console.error('App data refresh failed:', err);
+            setState(prev => ({ ...prev, error: err.message || 'App data refresh failed', loading: false }));
+          }
+        } finally {
+          inFlight = null;
+        }
+      })();
+      return inFlight;
+    };
+
+    const refreshWhenVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      refreshAppData();
+    };
+
+    refreshAppData();
+    const timer = setInterval(refreshWhenVisible, DATA_REFRESH_MS);
+    window.addEventListener('online', refreshAppData);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('online', refreshAppData);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [resubscribeKey]);
 
   useEffect(() => {
@@ -500,9 +589,27 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
   }, [state.initialized, state.drivers, state.dispatchers, state.vehicles, state.phoneNumbers]);
 
   useEffect(() => {
-    const bindCollection = (field, collectionName) => onSnapshot(
-      collection(db, collectionName),
-      (snap) => {
+    if (!state.initialized || tripIntegrityCleanupRef.current) return;
+    tripIntegrityCleanupRef.current = true;
+    Promise.all([
+      purgeCorruptedTripDocs(TRIPS_COLLECTION),
+      purgeCorruptedTripDocs(TRIP_LEDGER_COLLECTION),
+    ]).catch((err) => {
+      if (shouldIgnoreRealtimePermissionError(err) || err?.code === 'permission-denied') {
+        console.warn('Trip integrity cleanup skipped for this user.', err);
+        return;
+      }
+      console.error('Trip integrity cleanup failed:', err);
+    });
+  }, [state.initialized]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let inFlight = null;
+
+    const refreshCollection = async (field, collectionName) => {
+      const snap = await getDocsFromServer(collection(db, collectionName));
+      if (cancelled) return;
         const currentList = dataRef.current[field] || [];
         if (snap.size === 0 && currentList.length > 0) return;
         const nextList = [];
@@ -519,111 +626,128 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
           loading: false,
           error: null,
         }));
-      },
-      (err) => {
-        if (shouldIgnoreRealtimePermissionError(err)) return;
-        console.error(`Realtime ${field} sync failed:`, err);
-      }
-    );
+    };
 
-    const unsubDrivers = bindCollection('drivers', DRIVER_PROFILE_COLLECTION);
-    const unsubDispatchers = bindCollection('dispatchers', DISPATCHER_PROFILE_COLLECTION);
-    const unsubVehicles = bindCollection('vehicles', VEHICLE_COLLECTION);
-    const unsubTrips = onSnapshot(
-      collection(db, TRIPS_COLLECTION),
-      (snap) => {
-        const liveTrips = [];
-        snap.forEach((tripDoc) => {
-          const trip = { id: tripDoc.id, ...tripDoc.data() };
-          if (isOperationalTrip(trip)) liveTrips.push(trip);
+    const refreshTrips = async () => {
+      const snap = await getDocsFromServer(collection(db, TRIPS_COLLECTION));
+      if (cancelled) return;
+      const liveTrips = [];
+      const corruptedIds = [];
+      snap.forEach((tripDoc) => {
+        const trip = { id: tripDoc.id, ...tripDoc.data() };
+        if (isCorruptedTripRecord(trip)) {
+          corruptedIds.push(tripDoc.id);
+          return;
+        }
+        if (isOperationalTrip(trip)) liveTrips.push(normalizeTrip(trip));
+      });
+      if (corruptedIds.length > 0) {
+        deleteDocsById(TRIPS_COLLECTION, corruptedIds).catch((err) => {
+          if (shouldIgnoreRealtimePermissionError(err) || err?.code === 'permission-denied') return;
+          console.error('Corrupted trip cleanup failed:', err);
         });
-        liveTripsRef.current = liveTrips;
-        const baseData = normalizeData(dataRef.current);
-        const mergedTrips = dedupTripsByBookingId(mergeTripCollections(baseData.trips, liveTrips, tripProgressRef.current));
-        dataRef.current = {
-          ...baseData,
-          trips: mergedTrips,
-        };
-        setState(prev => ({
-          ...prev,
-          trips: mergedTrips,
-          loading: false,
-          error: null,
-        }));
-      },
-      (err) => {
-        if (shouldIgnoreRealtimePermissionError(err)) return;
-        console.error('Realtime trips sync failed:', err);
       }
-    );
-    const unsubPhones = onSnapshot(
-      doc(db, PHONE_NUMBERS_DOC),
-      (snap) => {
-        const currentNumbers = dataRef.current.phoneNumbers || DEFAULT_DATA.phoneNumbers;
-        if (!snap.exists() && currentNumbers !== DEFAULT_DATA.phoneNumbers) return;
-        const phoneNumbers = snap.exists()
-          ? { ...DEFAULT_DATA.phoneNumbers, ...snap.data() }
-          : DEFAULT_DATA.phoneNumbers;
-        dataRef.current = {
-          ...normalizeData(dataRef.current),
-          phoneNumbers,
+      liveTripsRef.current = liveTrips;
+      const baseData = normalizeData(dataRef.current);
+      const mergedTrips = cleanTripCollection(mergeTripCollections(baseData.trips, liveTrips, tripProgressRef.current));
+      dataRef.current = {
+        ...baseData,
+        trips: mergedTrips,
+      };
+      setState(prev => ({
+        ...prev,
+        trips: mergedTrips,
+        loading: false,
+        error: null,
+      }));
+    };
+
+    const refreshPhones = async () => {
+      const snap = await getDocFromServer(doc(db, PHONE_NUMBERS_DOC));
+      if (cancelled) return;
+      const currentNumbers = dataRef.current.phoneNumbers || DEFAULT_DATA.phoneNumbers;
+      if (!snap.exists() && currentNumbers !== DEFAULT_DATA.phoneNumbers) return;
+      const phoneNumbers = snap.exists()
+        ? { ...DEFAULT_DATA.phoneNumbers, ...snap.data() }
+        : DEFAULT_DATA.phoneNumbers;
+      dataRef.current = {
+        ...normalizeData(dataRef.current),
+        phoneNumbers,
+      };
+      setState(prev => ({
+        ...prev,
+        phoneNumbers,
+        loading: false,
+        error: null,
+      }));
+    };
+
+    const refreshTripProgress = async () => {
+      const snap = await getDocsFromServer(collection(db, DRIVER_TRIP_PROGRESS_COLLECTION));
+      if (cancelled) return;
+      const progressByTrip = {};
+      snap.forEach((progressDoc) => {
+        progressByTrip[progressDoc.id] = {
+          id: progressDoc.id,
+          ...progressDoc.data(),
         };
-        setState(prev => ({
-          ...prev,
-          phoneNumbers,
-          loading: false,
-          error: null,
-        }));
-      },
-      (err) => {
-        if (shouldIgnoreRealtimePermissionError(err)) return;
-        console.error('Realtime phone number sync failed:', err);
-      }
-    );
-    const unsubTripProgress = onSnapshot(
-      collection(db, DRIVER_TRIP_PROGRESS_COLLECTION),
-      (snap) => {
-        const progressByTrip = {};
-        snap.forEach((progressDoc) => {
-          progressByTrip[progressDoc.id] = {
-            id: progressDoc.id,
-            ...progressDoc.data(),
-          };
-          delete progressByTrip[progressDoc.id].tripId;
-        });
-        tripProgressRef.current = progressByTrip;
-        const baseData = normalizeData(dataRef.current);
-        const mergedTrips = mergeTripCollections(baseData.trips, liveTripsRef.current, progressByTrip);
-        dataRef.current = {
-          ...baseData,
-          trips: mergedTrips,
-        };
-        setState(prev => ({
-          ...prev,
-          trips: mergedTrips,
-          loading: false,
-          error: null,
-        }));
-      },
-      (err) => {
-        if (shouldIgnoreRealtimePermissionError(err)) return;
-        console.error('Realtime driver workflow sync failed:', err);
-      }
-    );
+        delete progressByTrip[progressDoc.id].tripId;
+      });
+      tripProgressRef.current = progressByTrip;
+      const baseData = normalizeData(dataRef.current);
+      const mergedTrips = cleanTripCollection(mergeTripCollections(baseData.trips, liveTripsRef.current, progressByTrip));
+      dataRef.current = {
+        ...baseData,
+        trips: mergedTrips,
+      };
+      setState(prev => ({
+        ...prev,
+        trips: mergedTrips,
+        loading: false,
+        error: null,
+      }));
+    };
+
+    const refreshMirrors = async () => {
+      if (inFlight) return inFlight;
+      inFlight = Promise.all([
+        refreshCollection('drivers', DRIVER_PROFILE_COLLECTION),
+        refreshCollection('dispatchers', DISPATCHER_PROFILE_COLLECTION),
+        refreshCollection('vehicles', VEHICLE_COLLECTION),
+        refreshTrips(),
+        refreshPhones(),
+        refreshTripProgress(),
+      ]).catch((err) => {
+        if (cancelled || shouldIgnoreRealtimePermissionError(err)) return;
+        console.error('Firestore mirror refresh failed:', err);
+      }).finally(() => {
+        inFlight = null;
+      });
+      return inFlight;
+    };
+
+    const refreshWhenVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      refreshMirrors();
+    };
+
+    refreshMirrors();
+    const timer = setInterval(refreshWhenVisible, DATA_REFRESH_MS);
+    window.addEventListener('online', refreshMirrors);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
 
     return () => {
-      unsubDrivers();
-      unsubDispatchers();
-      unsubVehicles();
-      unsubTrips();
-      unsubPhones();
-      unsubTripProgress();
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('online', refreshMirrors);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
   }, []);
 
   const writeField = useCallback(async (field, value) => {
     const previousData = normalizeData(dataRef.current);
-    const sanitized = sanitizeForFirestore(value);
+    const preparedValue = MIRRORED_TRIP_FIELDS.has(field) ? cleanTripCollection(value) : value;
+    const sanitized = sanitizeForFirestore(preparedValue);
     dataRef.current = {
       ...previousData,
       [field]: sanitized,
@@ -713,7 +837,7 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
   const setTrips = useCallback((updater) => {
     const current = dataRef.current.trips || [];
     const next = typeof updater === 'function' ? updater(current) : updater;
-    return writeField('trips', next.map(normalizeTrip));
+    return writeField('trips', next);
   }, [writeField]);
 
   const setDrivers = useCallback((updater) => {

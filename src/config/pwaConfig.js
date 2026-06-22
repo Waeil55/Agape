@@ -1,7 +1,7 @@
 /**
  * PWA SUPPORT CONFIGURATION
  * Service worker registration and browser online/offline state only.
- * Operational data sync is Firestore onSnapshot only.
+ * Operational data sync is Firestore-backed and app-managed.
  */
 
 import React from 'react';

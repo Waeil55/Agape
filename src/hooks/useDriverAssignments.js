@@ -3,8 +3,8 @@ import {
   db,
   collection,
   doc,
+  getDocsFromServer,
   limit,
-  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -46,11 +46,11 @@ export function useDriverAssignments({ enabled, driver, currentUser, resubscribe
       return undefined;
     }
 
+    let cancelled = false;
+    let inFlight = null;
     setLoading(true);
-    const resultSets = new Map();
-    const unsubscribers = [];
 
-    const publish = () => {
+    const publish = (resultSets) => {
       const byId = new Map();
       resultSets.forEach((docs) => {
         docs.forEach((assignment) => {
@@ -62,8 +62,8 @@ export function useDriverAssignments({ enabled, driver, currentUser, resubscribe
       setError(null);
     };
 
-    const subscribe = (field, value) => {
-      if (!value) return;
+    const fetchFor = async (field, value) => {
+      if (!value) return [field, []];
       const assignmentQuery = query(
         collection(db, FIRESTORE_COLLECTIONS.ASSIGNMENTS),
         where(field, '==', value),
@@ -71,26 +71,36 @@ export function useDriverAssignments({ enabled, driver, currentUser, resubscribe
         orderBy('offeredAt', 'desc'),
         limit(25)
       );
-      const unsubscribe = onSnapshot(
-        assignmentQuery,
-        (snap) => {
-          const docs = snap.docs.map((assignmentDoc) => ({ id: assignmentDoc.id, ...assignmentDoc.data() }));
-          resultSets.set(field, docs);
-          publish();
-        },
-        (err) => {
-          setError(err.message || 'Driver assignment listener failed');
-          setLoading(false);
-        }
-      );
-      unsubscribers.push(unsubscribe);
+      const snap = await getDocsFromServer(assignmentQuery);
+      return [field, snap.docs.map((assignmentDoc) => ({ id: assignmentDoc.id, ...assignmentDoc.data() }))];
     };
 
-    subscribe('driverId', driverId);
-    subscribe('driverEmail', driverEmail);
+    const refreshAssignments = async () => {
+      if (inFlight) return inFlight;
+      inFlight = Promise.all([
+        fetchFor('driverId', driverId),
+        fetchFor('driverEmail', driverEmail),
+      ]).then((entries) => {
+        if (cancelled) return;
+        publish(new Map(entries));
+      }).catch((err) => {
+        if (cancelled) return;
+        setError(err.message || 'Driver assignment refresh failed');
+        setLoading(false);
+      }).finally(() => {
+        inFlight = null;
+      });
+      return inFlight;
+    };
+
+    refreshAssignments();
+    const timer = setInterval(refreshAssignments, 12000);
+    window.addEventListener('online', refreshAssignments);
 
     return () => {
-      unsubscribers.forEach((unsubscribe) => unsubscribe());
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('online', refreshAssignments);
     };
   }, [enabled, driverId, driverEmail, resubscribeKey]);
 

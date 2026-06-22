@@ -60,15 +60,46 @@ async function listAllPages(path, token) {
   return allDocs;
 }
 
-function isCorrupted(trip) {
-  // Corrupted trips have "Unnamed Client" or no patient name, and no pickup/dropoff
-  const patient = String(trip.patient || trip.patientName || '').trim();
-  const pickup = String(trip.pickup || trip.pickupAddress || '').trim();
-  const dropoff = String(trip.dropoff || trip.dropoffAddress || '').trim();
-  
-  if (!patient || patient === 'Unnamed Client' || patient === 'WC') {
-    if (!pickup && !dropoff) return true;
+const PLACEHOLDER_NAMES = new Set(['', '-', '--', '\u2014', 'n/a', 'na', 'none', 'null', 'undefined', 'unknown', 'unnamed', 'unnamed client', 'client', 'patient', 'wc', 'will call']);
+const PLACEHOLDER_ADDRESSES = new Set(['', '-', '--', '\u2014', 'n/a', 'na', 'none', 'null', 'undefined']);
+const ROUTE_KEY_PATTERNS = [/::leg:/i, /^id:bk[:]/i, /^bk[:]/i, /^(bk|id|cmp)::/i, /\|(?:scheduled|unscheduled|will\s*call)\|/i];
+
+function textValue(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
+  if (typeof value === 'object') {
+    return [
+      value.address,
+      value.formattedAddress,
+      value.label,
+      value.name,
+      value.street,
+      value.line1,
+    ].map(textValue).find(Boolean) || '';
   }
+  return String(value).trim();
+}
+
+function normalized(value) {
+  return textValue(value).toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function isRouteKey(value) {
+  const text = textValue(value);
+  return text && ROUTE_KEY_PATTERNS.some(pattern => pattern.test(text));
+}
+
+function isCorrupted(trip) {
+  const patient = normalized(trip.patient || trip.patientName || trip.clientName || trip.memberName);
+  const pickup = normalized(trip.pickup || trip.pickupAddress || trip.originAddress || trip.fromAddress || trip.origin);
+  const dropoff = normalized(trip.dropoff || trip.dropoffAddress || trip.destinationAddress || trip.toAddress || trip.destination);
+  const date = textValue(trip.date || trip.scheduleDate || trip.tripDate || trip.serviceDate || trip.appointmentDate);
+
+  if ([trip.id, trip.bookingId, trip.tripNumber, trip.tripId, trip.clientId].some(isRouteKey)) return true;
+  if (PLACEHOLDER_NAMES.has(patient)) return true;
+  if (PLACEHOLDER_ADDRESSES.has(pickup) && PLACEHOLDER_ADDRESSES.has(dropoff)) return true;
+  if (!date) return true;
   return false;
 }
 
@@ -120,6 +151,25 @@ async function main() {
       await apiRequest('POST', ':commit', token, { writes });
       deleted += chunk.length;
       console.log(`  Deleted ${deleted}/${corruptedLedger.length} from tripLedger`);
+    }
+  }
+
+  // Check root trashedTrips
+  console.log('\n--- Root trashedTrips ---');
+  const rootTrashedTrips = await listAllPages('/trashedTrips', token);
+  console.log(`Total: ${rootTrashedTrips.length}`);
+
+  const corruptedRootTrashed = rootTrashedTrips.filter(isCorrupted);
+  console.log(`Corrupted: ${corruptedRootTrashed.length}`);
+
+  if (corruptedRootTrashed.length > 0 && !DRY_RUN) {
+    let deleted = 0;
+    for (let i = 0; i < corruptedRootTrashed.length; i += 450) {
+      const chunk = corruptedRootTrashed.slice(i, i + 450);
+      const writes = chunk.map(t => ({ delete: `projects/${PROJECT}/databases/(default)/documents/trashedTrips/${t.id}` }));
+      await apiRequest('POST', ':commit', token, { writes });
+      deleted += chunk.length;
+      console.log(`  Deleted ${deleted}/${corruptedRootTrashed.length} from root trashedTrips`);
     }
   }
 

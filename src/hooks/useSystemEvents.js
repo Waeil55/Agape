@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import {
   db,
   collection,
+  getDocsFromServer,
   limit,
-  onSnapshot,
   orderBy,
   query,
   where,
@@ -25,21 +25,30 @@ export function useSystemEvents({ eventType = null, aggregateId = null, maxEvent
     constraints.push(orderBy('createdAt', 'desc'));
     constraints.push(limit(maxEvents));
 
+    let cancelled = false;
     const eventsQuery = query(collection(db, FIRESTORE_COLLECTIONS.SYSTEM_EVENTS), ...constraints);
-    const unsubscribe = onSnapshot(
-      eventsQuery,
-      (snap) => {
+    const refreshEvents = async () => {
+      try {
+        const snap = await getDocsFromServer(eventsQuery);
+        if (cancelled) return;
         setEvents(snap.docs.map((eventDoc) => ({ id: eventDoc.id, ...eventDoc.data() })));
         setLoading(false);
         setError(null);
-      },
-      (err) => {
+      } catch (err) {
+        if (cancelled) return;
         setError(err.message || 'System events listener failed');
         setLoading(false);
       }
-    );
+    };
 
-    return unsubscribe;
+    refreshEvents();
+    const timer = setInterval(refreshEvents, 15000);
+    window.addEventListener('online', refreshEvents);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('online', refreshEvents);
+    };
   }, [eventType, aggregateId, maxEvents]);
 
   return { events, loading, error };

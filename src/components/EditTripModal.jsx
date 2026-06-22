@@ -3,11 +3,40 @@ import { Edit2, X, Lock, Clock, Ruler, PenSquare, CheckCircle, CheckSquare } fro
 
 const isoToTimeInput = (iso) => {
   if (!iso) return '';
+  const raw = String(iso).trim();
+  const ampm = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const meridiem = ampm[3].toUpperCase();
+    if (meridiem === 'PM' && h < 12) h += 12;
+    if (meridiem === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${ampm[2]}`;
+  }
+  const hhmm = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (hhmm) return `${hhmm[1].padStart(2, '0')}:${hhmm[2]}`;
   try {
-    const d = new Date(iso);
+    const d = new Date(raw);
     if (isNaN(d.getTime())) return '';
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   } catch { return ''; }
+};
+
+const timeToIsoForTripDate = (timeStr, tripDate) => {
+  if (!timeStr) return '';
+  const parts = String(timeStr).match(/(\d{1,2}):(\d{2})/);
+  if (!parts) return '';
+  const base = tripDate ? new Date(`${tripDate}T12:00:00`) : new Date();
+  const d = Number.isNaN(base.getTime()) ? new Date() : base;
+  d.setHours(parseInt(parts[1], 10), parseInt(parts[2], 10), 0, 0);
+  return d.toISOString();
+};
+
+const parseOdometerInput = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const cleaned = String(value).replace(/,/g, '').trim();
+  if (!/^\d+$/.test(cleaned)) return null;
+  const n = parseInt(cleaned, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
 };
 
 const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode }) => {
@@ -17,10 +46,9 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
     if (trip) {
       setEditTrip({
         ...trip,
-        _pickupTime: isoToTimeInput(trip.arrivalTime || trip.startTime),
+        _pickupTime: isoToTimeInput(trip.arrivalTime || trip.startTime || trip.pickupArrival || trip.departedPickupTime),
         _pickupOdometer: trip.pickupOdometer || '',
-        _departPickupTime: isoToTimeInput(trip.departedPickupTime),
-        _dropoffArrivalTime: isoToTimeInput(trip.arrivalDropoffTime),
+        _dropoffTime: isoToTimeInput(trip.arrivalDropoffTime || trip.dropoffArrival || trip.dropoffTime),
         _dropoffOdometer: trip.dropoffOdometer || '',
         _clientSigned: trip.paperSignatureConfirmed || false,
         _markCompleted: false,
@@ -36,21 +64,27 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
 
   const handleUpdate = (e) => {
     e.preventDefault();
-    const timeToIso = (timeStr) => {
-      if (!timeStr) return '';
-      const parts = timeStr.match(/(\d{1,2}):(\d{2})/);
-      if (!parts) return '';
-      const d = new Date();
-      d.setHours(parseInt(parts[1], 10), parseInt(parts[2], 10), 0, 0);
-      return d.toISOString();
-    };
+    const serviceDate = editTrip.date || trip?.date;
+    const pickupIso = timeToIsoForTripDate(editTrip._pickupTime, serviceDate);
+    const dropoffIso = timeToIsoForTripDate(editTrip._dropoffTime, serviceDate);
     const payload = {
-      arrivalTime: timeToIso(editTrip._pickupTime) || editTrip.arrivalTime,
-      startTime: timeToIso(editTrip._pickupTime) || editTrip.startTime,
-      pickupOdometer: parseInt(editTrip._pickupOdometer, 10) || 0,
-      departedPickupTime: timeToIso(editTrip._departPickupTime) || editTrip.departedPickupTime,
-      arrivalDropoffTime: timeToIso(editTrip._dropoffArrivalTime) || editTrip.arrivalDropoffTime,
-      dropoffOdometer: parseInt(editTrip._dropoffOdometer, 10) || 0,
+      patient: editTrip.patient || '',
+      bookingId: editTrip.bookingId || '',
+      date: serviceDate || '',
+      time: editTrip.time || '',
+      type: editTrip.type || '',
+      status: editTrip.status || trip?.status || 'Assigned',
+      pickup: editTrip.pickup || '',
+      dropoff: editTrip.dropoff || '',
+      pickupPhone: editTrip.pickupPhone || '',
+      dropoffPhone: editTrip.dropoffPhone || '',
+      distance: editTrip.distance || '',
+      arrivalTime: pickupIso || editTrip.arrivalTime || null,
+      startTime: pickupIso || editTrip.startTime || null,
+      pickupOdometer: parseOdometerInput(editTrip._pickupOdometer),
+      departedPickupTime: pickupIso || editTrip.departedPickupTime || null,
+      arrivalDropoffTime: dropoffIso || editTrip.arrivalDropoffTime || null,
+      dropoffOdometer: parseOdometerInput(editTrip._dropoffOdometer),
       paperSignatureConfirmed: editTrip._clientSigned,
       notes: editTrip.notes || '',
     };
@@ -84,37 +118,84 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
               <p className="text-[0.6875em] text-slate-500 mt-0.5">{editTrip.time || ''} &middot; {editTrip.date || ''}</p>
             </div>
 
-            <div>
-              <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block flex items-center gap-1">
-                <Clock size={11} /> Pickup Time
-              </label>
-              <input type="time" value={editTrip._pickupTime} onChange={(e) => handleField('_pickupTime', e.target.value)} className={inputClass} />
-            </div>
-
             <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block flex items-center gap-1">
+                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Patient</label>
+                <input value={editTrip.patient || ''} onChange={(e) => handleField('patient', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Booking ID</label>
+                <input value={editTrip.bookingId || ''} onChange={(e) => handleField('bookingId', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Trip Date</label>
+                <input type="date" value={editTrip.date || ''} onChange={(e) => handleField('date', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Scheduled Time</label>
+                <input value={editTrip.time || ''} onChange={(e) => handleField('time', e.target.value)} className={inputClass} placeholder="8:30 AM" />
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Service Type</label>
+                <input value={editTrip.type || ''} onChange={(e) => handleField('type', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Status</label>
+                <select value={editTrip.status || ''} onChange={(e) => handleField('status', e.target.value)} className={inputClass}>
+                  {['Assigned', 'Navigating Pickup', 'At Pickup', 'In Transit', 'At Dropoff', 'Completed', 'No Show', 'Cancelled', 'Rerouted'].map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <div>
+                <label className="text-[0.6875em] font-bold text-blue-700 uppercase tracking-widest mb-1 block flex items-center gap-1">
+                  <Clock size={11} /> Pickup Time
+                </label>
+                <input type="time" value={editTrip._pickupTime} onChange={(e) => handleField('_pickupTime', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-bold text-blue-700 uppercase tracking-widest mb-1 block flex items-center gap-1">
                   <Ruler size={11} /> Pickup Odometer
                 </label>
                 <input type="number" min="0" step="1" placeholder="42500" value={editTrip._pickupOdometer} onChange={(e) => handleField('_pickupOdometer', e.target.value)} className={inputClass} />
               </div>
               <div>
-                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block flex items-center gap-1">
-                  <Clock size={11} /> Depart Pickup
+                <label className="text-[0.6875em] font-bold text-blue-700 uppercase tracking-widest mb-1 block flex items-center gap-1">
+                  <Clock size={11} /> Dropoff Time
                 </label>
-                <input type="time" value={editTrip._departPickupTime} onChange={(e) => handleField('_departPickupTime', e.target.value)} className={inputClass} />
+                <input type="time" value={editTrip._dropoffTime} onChange={(e) => handleField('_dropoffTime', e.target.value)} className={inputClass} />
               </div>
               <div>
-                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block flex items-center gap-1">
-                  <Clock size={11} /> Dropoff Arrival
-                </label>
-                <input type="time" value={editTrip._dropoffArrivalTime} onChange={(e) => handleField('_dropoffArrivalTime', e.target.value)} className={inputClass} />
-              </div>
-              <div>
-                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block flex items-center gap-1">
+                <label className="text-[0.6875em] font-bold text-blue-700 uppercase tracking-widest mb-1 block flex items-center gap-1">
                   <Ruler size={11} /> Dropoff Odometer
                 </label>
                 <input type="number" min="0" step="1" placeholder="42750" value={editTrip._dropoffOdometer} onChange={(e) => handleField('_dropoffOdometer', e.target.value)} className={inputClass} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[0.6875em] font-bold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Address</label>
+                <textarea value={editTrip.pickup || ''} onChange={(e) => handleField('pickup', e.target.value)} className={inputClass} rows="2" />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[0.6875em] font-bold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Address</label>
+                <textarea value={editTrip.dropoff || ''} onChange={(e) => handleField('dropoff', e.target.value)} className={inputClass} rows="2" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Pickup Phone</label>
+                <input value={editTrip.pickupPhone || ''} onChange={(e) => handleField('pickupPhone', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Dropoff Phone</label>
+                <input value={editTrip.dropoffPhone || ''} onChange={(e) => handleField('dropoffPhone', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Distance</label>
+                <input value={editTrip.distance || ''} onChange={(e) => handleField('distance', e.target.value)} className={inputClass} />
               </div>
             </div>
 

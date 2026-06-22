@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
-import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate, tripCalendarDateKey } from '../utils/tripDate';
-import { auth, db, doc, onSnapshot, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate } from '../config/firebase';
+import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd } from '../utils/tripDate';
+import { auth, db, doc, getDocFromServer, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
@@ -14,25 +14,28 @@ import EditTripModal from './EditTripModal';
 import {
   Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle,
   AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check,
-  ChevronUp, ChevronDown, RotateCcw, Lock, RefreshCw, Forward,
+  ChevronLeft, ChevronUp, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward,
   Home, Settings, LogOut,
   Wifi, WifiOff, ArrowRight, Search,
   Repeat, Zap, X, Route,
   CheckSquare, Square, Map, BarChart3, Sun, Moon,
   Download, Trash2, FileText, AlertTriangle, Info,
-  Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, ChevronLeft, Calendar
+  Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal
 } from 'lucide-react';
 import { openNavigation, showNavActionSheet, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
 import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
 import { normalizeEmail } from '../utils/accessControl';
+import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
 
 import ErrorBoundary from './ErrorBoundary';
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
 const isWillCall = (trip) => {
+  if (trip?.urgentTrip) return false;
+  if (isInOutTrip(trip)) return false;
   const t = (trip && typeof trip === 'object') ? trip.time : trip;
   if (t === undefined || t === null) return true;
   const s = String(t).toUpperCase().trim();
@@ -64,6 +67,44 @@ const formatTimeInput = (v) => {
   return m ? `${m[1].padStart(2, '0')}:${m[2]}` : v;
 };
 
+const timeInputOrBlank = (value) => {
+  const formatted = formatTimeInput(value);
+  return /^\d{2}:\d{2}$/.test(formatted) ? formatted : '';
+};
+
+const to12hrFromTimeInput = (value) => {
+  if (!value) return '';
+  const match = String(value).match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return value;
+  return to12hr(`${match[1].padStart(2, '0')}:${match[2]}`);
+};
+
+const getUrgentDeadlineMs = (trip) => {
+  if (!trip?.urgentDeadlineAt) return 0;
+  const ms = new Date(trip.urgentDeadlineAt).getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+};
+
+const getUrgentCountdownText = (trip) => {
+  const deadlineMs = getUrgentDeadlineMs(trip);
+  if (!deadlineMs) return '';
+  const diffMinutes = Math.ceil((deadlineMs - Date.now()) / 60000);
+  const abs = Math.abs(diffMinutes);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  const text = h > 0 ? `${h}h${m ? ` ${m}m` : ''}` : `${m}m`;
+  return diffMinutes < 0 ? `${text} late` : `${text} left`;
+};
+
+const getTripCardTimeLabel = (trip) => {
+  if (trip?.urgentTrip) {
+    const deadline = trip.urgentDeadlineTime || timeInputOrBlank(trip.urgentDeadlineAt);
+    return deadline ? `Due ${to12hrFromTimeInput(deadline)}` : 'URGENT';
+  }
+  if (isInOutTrip(trip) && !timeInputOrBlank(trip?.time)) return 'IN/OUT';
+  return to12hr(trip?.time);
+};
+
 const formatDuration = (minutes) => {
   if (!minutes || minutes < 0) return '--';
   if (minutes < 60) return `${Math.round(minutes)} min`;
@@ -87,6 +128,200 @@ const buildFallbackDriverProfile = (email = '') => ({
 
 const WORKFLOW_TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
 const normalizeWorkflowStatus = (status) => String(status || '').trim().toLowerCase();
+const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
+const getTripHistoryDateKey = (trip) => tripCalendarDateKey(trip?.date) || tripCalendarDateKey(trip?.completedAt);
+const addDaysToDateKey = (dateKey, days) => {
+  const d = new Date(`${dateKey}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateKey;
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const formatHistoryDayLabel = (dateKey) => {
+  if (!dateKey) return 'Date not set';
+  const d = new Date(`${dateKey}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateKey;
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+const formatHistoryCompactDayLabel = (dateKey) => {
+  if (!dateKey) return '--';
+  const d = new Date(`${dateKey}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateKey;
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+const HISTORY_STATUS_META = {
+  completed: { label: 'Completed', Icon: CheckCircle2, bg: 'bg-emerald-100 text-emerald-700', iconBg: 'bg-emerald-100 text-emerald-700', border: 'border-l-emerald-400' },
+  'no show': { label: 'No Show', Icon: AlertTriangle, bg: 'bg-amber-100 text-amber-700', iconBg: 'bg-amber-100 text-amber-700', border: 'border-l-amber-400' },
+  cancelled: { label: 'Cancelled', Icon: XCircle, bg: 'bg-rose-100 text-rose-700', iconBg: 'bg-rose-100 text-rose-700', border: 'border-l-rose-400' },
+  rerouted: { label: 'Rerouted', Icon: Repeat, bg: 'bg-purple-100 text-purple-700', iconBg: 'bg-purple-100 text-purple-700', border: 'border-l-purple-400' },
+};
+const getHistoryStatusMeta = (status) => HISTORY_STATUS_META[normalizeWorkflowStatus(status)] || HISTORY_STATUS_META.completed;
+const formatTripDetailClock = (value) => {
+  if (!value) return '--';
+  if (typeof value === 'object' && typeof value.toDate === 'function') {
+    const d = value.toDate();
+    return Number.isNaN(d.getTime()) ? '--' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+  if (typeof value === 'object' && typeof value.seconds === 'number') {
+    const d = new Date(value.seconds * 1000);
+    return Number.isNaN(d.getTime()) ? '--' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? '--' : `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
+  }
+  const s = String(value).trim();
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime()) && /[T/,-]/.test(s)) {
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+  const ampm = s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const meridiem = ampm[3].toUpperCase();
+    if (meridiem === 'PM' && h < 12) h += 12;
+    if (meridiem === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${ampm[2]}`;
+  }
+  const hourOnly = s.match(/^(\d{1,2})\s*(AM|PM)$/i);
+  if (hourOnly) {
+    let h = parseInt(hourOnly[1], 10);
+    const meridiem = hourOnly[2].toUpperCase();
+    if (meridiem === 'PM' && h < 12) h += 12;
+    if (meridiem === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:00`;
+  }
+  const hhmm = s.match(/^(\d{1,2}):(\d{2})/);
+  if (hhmm) return `${String(hhmm[1]).padStart(2, '0')}:${hhmm[2]}`;
+  return '--';
+};
+const formatTripDetailOdometer = (value) => {
+  if (value === undefined || value === null || value === '') return '--';
+  const s = String(value).trim();
+  if (!s || /^\d{1,2}:\d{2}/.test(s)) return '--';
+  const cleaned = s.replace(/,/g, '').replace(/\bmi(?:les)?\b/gi, '').trim();
+  if (!/^\d+(\.\d+)?$/.test(cleaned)) return '--';
+  const n = Number(cleaned);
+  return Number.isFinite(n) && n > 0 ? `${n.toLocaleString()} mi` : '--';
+};
+const formatTripDistance = (value) => {
+  if (value === undefined || value === null || value === '') return '--';
+  const s = String(value);
+  return /\bmi\b/i.test(s) ? s : `${s} mi`;
+};
+const formatTripDetailValue = (value) => {
+  if (value === undefined || value === null || value === '') return '--';
+  if (typeof value === 'object') {
+    return String(value.address || value.name || value.label || '--');
+  }
+  return String(value);
+};
+const getFirstTripValue = (trip, keys) => {
+  for (const key of keys) {
+    const value = trip?.[key];
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return '';
+};
+const getFirstTripClock = (trip, keys) => {
+  for (const key of keys) {
+    const value = trip?.[key];
+    if (value === undefined || value === null || value === '') continue;
+    const clock = formatTripDetailClock(value);
+    if (clock !== '--') return clock;
+  }
+  return '--';
+};
+const getFirstTripOdometer = (trip, keys) => {
+  for (const key of keys) {
+    const value = trip?.[key];
+    if (value === undefined || value === null || value === '') continue;
+    const odometer = formatTripDetailOdometer(value);
+    if (odometer !== '--') return odometer;
+  }
+  return '--';
+};
+const getSortTimestampMs = (value) => {
+  if (!value) return 0;
+  if (typeof value === 'object' && typeof value.toDate === 'function') {
+    const d = value.toDate();
+    return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? 0 : value.getTime();
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+};
+const getHistoryFinishedPriority = (trip) => {
+  const status = normalizeWorkflowStatus(trip?.status);
+  if (status === 'completed') return 0;
+  if (status === 'no show' || status === 'cancelled' || status === 'rerouted') return 1;
+  return 2;
+};
+const getHistoryFinishedSortMs = (trip) => {
+  const candidates = [
+    trip?.completedAt,
+    trip?.arrivalDropoffTime,
+    trip?.cancelledAt,
+    trip?.exceptionAt,
+    trip?.workflowUpdatedAt,
+    trip?.updatedAt,
+    trip?.createdAt,
+  ];
+  const best = Math.max(...candidates.map(getSortTimestampMs));
+  if (best > 0) return best;
+  const dateKey = getTripHistoryDateKey(trip) || trip?.date;
+  const scheduled = dateKey && trip?.time ? getSortTimestampMs(`${dateKey} ${trip.time}`) : 0;
+  return scheduled || timeToMinutes(trip?.time || '') * 60000;
+};
+const HistoryTripDetailTable = ({ trip, driver }) => {
+  if (!trip) return null;
+  const pickupClock = getFirstTripClock(trip, ['arrivalTime', 'pickupArrival', 'pickupArrivalTime', 'actualPickupTime', 'startTime']);
+  const dropoffClock = getFirstTripClock(trip, ['arrivalDropoffTime', 'dropoffArrival', 'dropoffArrivalTime', 'actualDropoffTime', 'dropoffTime']);
+  const pickupOdometer = getFirstTripOdometer(trip, ['pickupOdometer', 'startOdometer', 'startMileage', 'pickupMileage']);
+  const dropoffOdometer = getFirstTripOdometer(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'dropoffMileage']);
+  const vehicle = trip.completedVehicle || trip.vehicle || driver?.vehicle || 'PENDING ASSIGNMENT';
+  const rows = [
+    { label: 'TRIP ID', value: formatTripDetailValue(trip.bookingId || trip.id), tone: 'blue' },
+    { label: 'DATE', value: formatTripDetailValue(getTripHistoryDateKey(trip) || trip.date) },
+    { label: 'DRIVER', value: formatTripDetailValue(trip.driverName || driver?.name || trip.driverId) },
+    { label: 'VEHICLE', value: formatTripDetailValue(vehicle) },
+    { label: 'PICKUP ARRIVAL', value: pickupClock, tone: 'green' },
+    { label: 'DROPOFF ARRIVAL', value: dropoffClock, tone: 'red' },
+    { label: 'START ODOMETER', value: pickupOdometer, tone: 'green' },
+    { label: 'END ODOMETER', value: dropoffOdometer, tone: 'red' },
+    { label: 'DISTANCE', value: formatTripDistance(trip.distance) },
+    { label: 'PICKUP ADDRESS', value: formatTripDetailValue(getFirstTripValue(trip, ['pickup', 'pickupAddress'])), tone: 'green' },
+    { label: 'DROPOFF ADDRESS', value: formatTripDetailValue(getFirstTripValue(trip, ['dropoff', 'dropoffAddress'])), tone: 'red' },
+    { label: 'SIGNATURE', value: trip.paperSignatureConfirmed || trip.signature || trip.signatureUrl ? 'Yes' : 'No' },
+  ];
+  const valueToneClass = {
+    blue: 'text-blue-800',
+    green: 'text-emerald-800',
+    red: 'text-rose-800',
+  };
+  return (
+    <div className="overflow-hidden border-t border-slate-300 bg-white">
+      <table className="w-full table-fixed text-left">
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.label} className="align-top border-b border-slate-200 last:border-b-0">
+              <th className="w-[50%] bg-slate-100 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700">{row.label}</th>
+              <td className={`px-4 py-3 text-sm font-black break-words ${valueToneClass[row.tone] || 'text-slate-950'}`}>{row.value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 const isWorkflowTerminalTrip = (trip) => {
   if (!trip) return false;
   const status = normalizeWorkflowStatus(trip.status);
@@ -120,6 +355,29 @@ const getWorkflowSteps = (trip) => {
 
 const getCurrentWorkflowStep = (trip) => getWorkflowSteps(trip).findIndex(s => !s.done);
 
+const TRIP_WORK_STEPS = ['Scheduled', 'En Route', 'At Pickup', 'In Transit', 'Complete'];
+
+const getTripWorkStepIndex = (trip) => {
+  if (!trip) return 0;
+  const status = normalizeWorkflowStatus(trip.status);
+  if (status === 'completed') return 4;
+  if (status === 'in transit' || status === 'navigating dropoff' || status === 'at dropoff' || status === 'arrived') return 3;
+  if (status === 'at pickup' || trip.pickupOdometer || trip.arrivalTime || trip.startTime) return 2;
+  if (status === 'in progress' || status === 'in mission' || status === 'en route' || status === 'navigating pickup' || trip.startedAt) return 1;
+  return 0;
+};
+
+const getTripWorkStatusClass = (status) => {
+  const normalized = normalizeWorkflowStatus(status);
+  if (normalized === 'assigned' || normalized === 'unassigned') return 'bg-blue-100 text-blue-700 border-blue-200';
+  if (normalized === 'completed') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  if (normalized === 'cancelled' || normalized === 'no show') return 'bg-rose-100 text-rose-700 border-rose-200';
+  if (normalized === 'rerouted') return 'bg-purple-100 text-purple-700 border-purple-200';
+  if (normalized.includes('dropoff') || normalized === 'in transit' || normalized === 'arrived') return 'bg-orange-100 text-orange-700 border-orange-200';
+  if (normalized.includes('pickup') || normalized === 'in progress' || normalized === 'en route') return 'bg-cyan-100 text-cyan-700 border-cyan-200';
+  return 'bg-slate-100 text-slate-700 border-slate-200';
+};
+
 const WORKFLOW_PROGRESS_FIELDS = [
   'startedAt',
   'pickupOdometer',
@@ -148,6 +406,43 @@ const WORKFLOW_FIELD_MIN_STEP = {
   completedVehicle: 6,
 };
 
+const getRegressionFieldsForStep = (targetStepIndex) => Object.fromEntries(
+  Object.entries(WORKFLOW_FIELD_MIN_STEP)
+    .filter(([, minStep]) => minStep > targetStepIndex)
+    .map(([field]) => [field, null])
+);
+
+const getTripWorkStepBackTarget = (trip) => {
+  const stepIndex = getTripWorkStepIndex(trip);
+  if (stepIndex <= 0) return null;
+  if (stepIndex === 1) {
+    return {
+      label: 'Scheduled',
+      status: 'Assigned',
+      fields: getRegressionFieldsForStep(-1),
+    };
+  }
+  if (stepIndex === 2) {
+    return {
+      label: 'En Route',
+      status: 'Navigating Pickup',
+      fields: getRegressionFieldsForStep(1),
+    };
+  }
+  if (stepIndex === 3) {
+    return {
+      label: 'At Pickup',
+      status: 'At Pickup',
+      fields: getRegressionFieldsForStep(2),
+    };
+  }
+  return {
+    label: 'In Transit',
+    status: 'In Transit',
+    fields: getRegressionFieldsForStep(3),
+  };
+};
+
 const hasWorkflowValue = (value) => value !== undefined && value !== null && value !== '';
 
 const readWorkflowProgress = (storageKey) => {
@@ -171,7 +466,9 @@ const applyWorkflowProgress = (trip, progress) => {
   if (!trip || !progress) return trip;
   const merged = { ...trip };
   WORKFLOW_PROGRESS_FIELDS.forEach((field) => {
-    if (hasWorkflowValue(progress[field]) && !hasWorkflowValue(merged[field])) {
+    if (Object.prototype.hasOwnProperty.call(progress, field) && progress[field] === null) {
+      delete merged[field];
+    } else if (hasWorkflowValue(progress[field]) && !hasWorkflowValue(merged[field])) {
       merged[field] = progress[field];
     }
   });
@@ -240,7 +537,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     });
   }, [workflowStorageKey]);
   const driverScopedTrips = useMemo(
-    () => rawDriverScopedTrips.map((trip) => applyWorkflowProgress(trip, workflowProgress[trip.id])),
+    () => annotateInOutPairs(rawDriverScopedTrips.map((trip) => applyWorkflowProgress(trip, workflowProgress[trip.id]))),
     [rawDriverScopedTrips, workflowProgress]
   );
 
@@ -266,10 +563,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   });
   const [historyFilter, setHistoryFilter] = useState(() => localStorage.getItem(`agape_drvHistFilter_${userKey}`) || 'all');
   const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
-  const [historyDate, setHistoryDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  });
+  const [historyDate, setHistoryDate] = useState(() => localCalendarYmd());
 
   useEffect(() => {
     localStorage.setItem(`agape_drvNav_${userKey}`, activeNav);
@@ -302,6 +596,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [completeError, setCompleteError] = useState('');
   const [departedTime, setDepartedTime] = useState('');
   const [arrivalDropoffTime, setArrivalDropoffTime] = useState('');
+  const [scheduleEditorTrip, setScheduleEditorTrip] = useState(null);
+  const [scheduleEditDraft, setScheduleEditDraft] = useState(null);
+  const [scheduleEditError, setScheduleEditError] = useState('');
+  const [activeWorkTripId, setActiveWorkTripId] = useState(null);
+  const [workNotesOpen, setWorkNotesOpen] = useState(false);
   const [showTripDetails, setShowTripDetails] = useState(null);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
   const [showToast, setShowToast] = useState(null);
@@ -310,13 +609,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const t = setTimeout(() => setShowToast(null), 1000);
     return () => clearTimeout(t);
   }, [showToast]);
-  const [expandedTripId, setExpandedTripIdRaw] = useState(() => {
-    try { const v = localStorage.getItem('expandedTripId'); return v && v !== 'null' ? v : null; } catch { return null; }
-  });
+  const [expandedTripId, setExpandedTripIdRaw] = useState(null);
   const setExpandedTripId = useCallback((val) => {
     setExpandedTripIdRaw(prev => {
       const next = typeof val === 'function' ? val(prev) : val;
-      try { if (next) localStorage.setItem('expandedTripId', next); else localStorage.removeItem('expandedTripId'); } catch {}
       return next;
     });
   }, []);
@@ -389,7 +685,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       if (options.allowRegression) {
         Object.entries(WORKFLOW_FIELD_MIN_STEP).forEach(([field, minStep]) => {
-          if (minStep > incomingIndex) delete nextProgress[field];
+          if (minStep > incomingIndex) nextProgress[field] = null;
         });
       }
 
@@ -431,16 +727,30 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   useEffect(() => {
     if (!me?.id) return;
-    const unsub = onSnapshot(doc(db, 'routeData', 'sequences'), (snap) => {
+    let cancelled = false;
+    const refreshRoutes = async () => {
+      try {
+        const snap = await getDocFromServer(doc(db, 'routeData', 'sequences'));
+        if (cancelled) return;
       if (snap.exists()) {
         const templates = snap.data().templates || [];
         setRouteTemplates(templates);
       } else {
         setRouteTemplates([]);
       }
-    });
-    return () => unsub();
-  }, [me, trips]);
+      } catch (err) {
+        if (!cancelled) console.error('[DriverPage] Route sequence refresh failed:', err);
+      }
+    };
+    refreshRoutes();
+    const timer = setInterval(refreshRoutes, 15000);
+    window.addEventListener('online', refreshRoutes);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('online', refreshRoutes);
+    };
+  }, [me?.id]);
 
   // Re-compute assignedSequence whenever templates, me, or trips change
   useEffect(() => {
@@ -599,9 +909,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   };
 
   const revertTripStatus = (trip) => {
-    const prevStatus = trip.status === 'Navigating Dropoff' ? 'In Transit' : trip.status === 'At Dropoff' ? 'In Transit' : trip.status === 'In Transit' ? 'At Pickup' : trip.status === 'At Pickup' ? 'In Progress' : trip.status === 'Navigating Pickup' ? 'In Progress' : trip.status === 'In Progress' ? 'Assigned' : trip.status === 'Arrived' ? 'In Transit' : null;
-    if (!prevStatus) return;
-    advanceWorkflow(trip, prevStatus, {}, { allowRegression: true });
+    const stepBackTarget = getTripWorkStepBackTarget(trip);
+    if (!stepBackTarget) return;
+    advanceWorkflow(trip, stepBackTarget.status, stepBackTarget.fields, { allowRegression: true });
   };
 
   const restoreHistoryTrip = (trip) => {
@@ -706,13 +1016,58 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
 
-  const reroutedTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'rerouted');
-  const completedTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed');
-  const noShowTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'no show');
-  const cancelledTrips = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'cancelled');
-  const allHistory = [...reroutedTrips, ...completedTrips, ...noShowTrips, ...cancelledTrips].sort((a,b) => { const da = a.completedAt || a.date || ''; const db = b.completedAt || b.date || ''; return db.localeCompare(da); });
+  const historyWindowEnd = localCalendarYmd();
+  const historyWindowStart = calendarDateKeyDaysAgo(DRIVER_HISTORY_LOOKBACK_DAYS - 1);
+  const allHistory = driverScopedTrips
+    .filter(isWorkflowTerminalTrip)
+    .sort((a, b) => {
+      const dateCompare = String(getTripHistoryDateKey(b) || '').localeCompare(String(getTripHistoryDateKey(a) || ''));
+      if (dateCompare !== 0) return dateCompare;
+      return timeToMinutes(a.time) - timeToMinutes(b.time);
+    });
+  const historyWindowTrips = allHistory.filter((trip) => {
+    const dateKey = getTripHistoryDateKey(trip);
+    return Boolean(dateKey) && dateKey >= historyWindowStart && dateKey <= historyWindowEnd;
+  });
+  const selectedHistoryDate = historyDate < historyWindowStart
+    ? historyWindowStart
+    : historyDate > historyWindowEnd
+      ? historyWindowEnd
+      : historyDate;
+  const selectedHistoryDayTrips = historyWindowTrips.filter((trip) => getTripHistoryDateKey(trip) === selectedHistoryDate);
+  const historyStatusCounts = {
+    all: selectedHistoryDayTrips.length,
+    completed: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed').length,
+    noshow: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'no show').length,
+    cancelled: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'cancelled').length,
+    rerouted: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'rerouted').length,
+  };
+  useEffect(() => {
+    if (historyDate !== selectedHistoryDate) setHistoryDate(selectedHistoryDate);
+  }, [historyDate, selectedHistoryDate]);
+  const goToHistoryDay = (days) => {
+    const next = addDaysToDateKey(selectedHistoryDate, days);
+    if (next < historyWindowStart) setHistoryDate(historyWindowStart);
+    else if (next > historyWindowEnd) setHistoryDate(historyWindowEnd);
+    else setHistoryDate(next);
+  };
 
   const activeTrips = myTrips.filter(t => !isWorkflowTerminalTrip(t));
+  const activeWorkTrip = activeWorkTripId
+    ? driverScopedTrips.find((trip) => trip.id === activeWorkTripId) || null
+    : null;
+  useEffect(() => {
+    if (activeNav !== 'trips' && activeWorkTripId) {
+      setActiveWorkTripId(null);
+      setWorkNotesOpen(false);
+    }
+  }, [activeNav, activeWorkTripId]);
+  useEffect(() => {
+    if (activeWorkTripId && !driverScopedTrips.some((trip) => trip.id === activeWorkTripId)) {
+      setActiveWorkTripId(null);
+      setWorkNotesOpen(false);
+    }
+  }, [activeWorkTripId, driverScopedTrips]);
   const activeLocationTrip = activeTrips.find((trip) => [
     'In Mission',
     'En Route',
@@ -727,7 +1082,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     'Arrived DO',
   ].includes(trip.status)) || activeTrips[0] || null;
 
-  const orderedTrips = [...activeTrips].sort((a, b) => {
+  const orderedTrips = stackInOutPairs([...activeTrips].sort((a, b) => {
     // 1. If guided mode is active, the absolute top priority is the current step's trip
     if (guidedMode && guidedSteps && guidedSteps[guidedStepIndex]) {
       if (a.id === guidedSteps[guidedStepIndex].tripId && b.id !== guidedSteps[guidedStepIndex].tripId) return -1;
@@ -753,7 +1108,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (aInProgress && !bInProgress) return -1;
     if (bInProgress && !aInProgress) return 1;
 
-    // 3. Fall back to AI sequence if it exists
+    // 3. Urgent trips with deadlines stay above ordinary scheduled work.
+    if (!!a.urgentTrip !== !!b.urgentTrip) return a.urgentTrip ? -1 : 1;
+    if (a.urgentTrip && b.urgentTrip) {
+      const deadlineDiff = (getUrgentDeadlineMs(a) || Number.MAX_SAFE_INTEGER) - (getUrgentDeadlineMs(b) || Number.MAX_SAFE_INTEGER);
+      if (deadlineDiff !== 0) return deadlineDiff;
+    }
+
+    // 4. Fall back to AI sequence if it exists
     if (aiSequence && aiSequence.length > 0) {
       const aiA = aiSequence.indexOf(a.id);
       const aiB = aiSequence.indexOf(b.id);
@@ -764,16 +1126,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       }
     }
 
-    // 4. Will Call / no-time trips always go to the bottom
+    // 5. Will Call / no-time trips always go to the bottom
     const aWC = isWillCall(a);
     const bWC = isWillCall(b);
     if (aWC !== bWC) return aWC ? 1 : -1;
 
-    // 5. Otherwise fall back to urgency and then time.
+    // 6. Otherwise fall back to urgency and then time.
     const urgencyDiff = getUrgency(b) - getUrgency(a);
     if (urgencyDiff !== 0) return urgencyDiff;
     return timeToMinutes(a.time) - timeToMinutes(b.time);
-  });
+  }));
 
   const timedTrips = orderedTrips.filter(t => !isWillCall(t));
   const willCallTrips = orderedTrips.filter(t => isWillCall(t));
@@ -1005,23 +1367,28 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     onDriverStatusUpdate(driverId, newStatus);
   };
 
-  const filteredHistory = allHistory.filter(t => {
-    const tripDate = t.date || t.completedAt;
-    const normalizedDate = tripDate ? tripCalendarDateKey(tripDate) : null;
-    if (normalizedDate && normalizedDate !== historyDate) return false;
-
+  const filteredHistory = selectedHistoryDayTrips.filter(t => {
     const matchFilter = historyFilter === 'all' ? true :
       historyFilter === 'completed' ? normalizeWorkflowStatus(t.status) === 'completed' :
       historyFilter === 'noshow' ? normalizeWorkflowStatus(t.status) === 'no show' :
       historyFilter === 'cancelled' ? normalizeWorkflowStatus(t.status) === 'cancelled' :
       normalizeWorkflowStatus(t.status) === 'rerouted';
     if (!matchFilter) return false;
-    if (!historySearch) return true;
-    const q = historySearch.toLowerCase();
+    const q = historySearch.trim().toLowerCase();
+    if (!q) return true;
     return (t.patient || '').toLowerCase().includes(q) ||
       (t.bookingId || '').toLowerCase().includes(q) ||
       (t.pickup || '').toLowerCase().includes(q) ||
       (t.dropoff || '').toLowerCase().includes(q);
+  });
+  const sortedFilteredHistory = [...filteredHistory].sort((a, b) => {
+    const finishedPriority = getHistoryFinishedPriority(a) - getHistoryFinishedPriority(b);
+    if (finishedPriority !== 0) return finishedPriority;
+
+    const finishedTime = getHistoryFinishedSortMs(b) - getHistoryFinishedSortMs(a);
+    if (finishedTime !== 0) return finishedTime;
+
+    return timeToMinutes(b.time) - timeToMinutes(a.time);
   });
 
   const toggleTripSelect = (tripId) => {
@@ -1613,10 +1980,119 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setEditTripModal(original || task);
   };
 
+  const openScheduleEditor = (trip) => {
+    const original = trips.find(t => t.id === trip.id) || driverScopedTrips.find(t => t.id === trip.id) || trip;
+    const deadlineBase = original?.urgentDeadlineAt && !Number.isNaN(new Date(original.urgentDeadlineAt).getTime())
+      ? new Date(original.urgentDeadlineAt)
+      : new Date(Date.now() + 3 * 60 * 60000);
+    const mode = original?.urgentTrip
+      ? 'urgent'
+      : isInOutTrip(original)
+        ? 'inout'
+        : isWillCall(original)
+          ? 'willcall'
+          : 'time';
+    setScheduleEditorTrip(original);
+    setScheduleEditDraft({
+      mode,
+      time: timeInputOrBlank(original?.time),
+      deadlineDate: original?.urgentDeadlineDate || `${deadlineBase.getFullYear()}-${String(deadlineBase.getMonth() + 1).padStart(2, '0')}-${String(deadlineBase.getDate()).padStart(2, '0')}`,
+      deadlineTime: original?.urgentDeadlineTime || `${String(deadlineBase.getHours()).padStart(2, '0')}:${String(deadlineBase.getMinutes()).padStart(2, '0')}`,
+      requiredWithinHours: original?.urgentRequiredWithinHours || 3,
+    });
+    setScheduleEditError('');
+  };
+
+  const closeScheduleEditor = () => {
+    setScheduleEditorTrip(null);
+    setScheduleEditDraft(null);
+    setScheduleEditError('');
+  };
+
+  const updateScheduleDraft = (field, value) => {
+    setScheduleEditDraft(prev => ({ ...(prev || {}), [field]: value }));
+    setScheduleEditError('');
+  };
+
+  const applyWithinHoursToDeadline = () => {
+    const hours = Number(scheduleEditDraft?.requiredWithinHours || 0);
+    if (!Number.isFinite(hours) || hours <= 0) return;
+    const d = new Date(Date.now() + hours * 60 * 60000);
+    setScheduleEditDraft(prev => ({
+      ...(prev || {}),
+      deadlineDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+      deadlineTime: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+    }));
+    setScheduleEditError('');
+  };
+
+  const saveScheduleEdit = () => {
+    if (!scheduleEditorTrip || !scheduleEditDraft) return;
+    const mode = scheduleEditDraft.mode;
+    const basePayload = {
+      status: scheduleEditorTrip.status || 'Assigned',
+      urgentTrip: false,
+      urgentDeadlineAt: null,
+      urgentDeadlineDate: null,
+      urgentDeadlineTime: null,
+      urgentRequiredWithinHours: null,
+      priority: scheduleEditorTrip.priority === 'urgent' ? 'normal' : scheduleEditorTrip.priority || 'normal',
+      tripKind: '',
+      inOutTrip: false,
+      inOutStayWithClient: false,
+      inOutWaitMinutes: null,
+      inOutGroupId: null,
+      inOutGroupBookingId: null,
+      inOutLeg: null,
+      inOutPairBookingId: null,
+      inOutPairTripId: null,
+    };
+
+    let payload = { ...basePayload };
+    if (mode === 'time') {
+      if (!scheduleEditDraft.time) {
+        setScheduleEditError('Choose a time before saving.');
+        return;
+      }
+      payload.time = scheduleEditDraft.time;
+    } else if (mode === 'willcall') {
+      payload.time = 'Will Call';
+      payload.tripKind = 'WILL_CALL';
+    } else if (mode === 'inout') {
+      payload.time = scheduleEditDraft.time || '';
+      payload.tripKind = 'IN_OUT';
+      payload.inOutTrip = true;
+      payload.inOutStayWithClient = true;
+      payload.inOutWaitMinutes = IN_OUT_WAIT_MINUTES;
+    } else if (mode === 'urgent') {
+      if (!scheduleEditDraft.deadlineDate || !scheduleEditDraft.deadlineTime) {
+        setScheduleEditError('Choose an urgent deadline date and time.');
+        return;
+      }
+      const deadline = new Date(`${scheduleEditDraft.deadlineDate}T${scheduleEditDraft.deadlineTime}`);
+      if (Number.isNaN(deadline.getTime())) {
+        setScheduleEditError('Use a valid urgent deadline.');
+        return;
+      }
+      payload.time = scheduleEditDraft.time || scheduleEditorTrip.time || '';
+      payload.tripKind = 'URGENT';
+      payload.priority = 'urgent';
+      payload.urgentTrip = true;
+      payload.urgentDeadlineAt = deadline.toISOString();
+      payload.urgentDeadlineDate = scheduleEditDraft.deadlineDate;
+      payload.urgentDeadlineTime = scheduleEditDraft.deadlineTime;
+      payload.urgentRequiredWithinHours = Number(scheduleEditDraft.requiredWithinHours || 0) || null;
+    }
+
+    setPasswordPrompt({ type: 'edittrip', trip: scheduleEditorTrip, editedData: payload });
+    closeScheduleEditor();
+  };
+
   const handleSaveEditedTrip = (editedTrip) => {
     setEditTripModal(null);
-    const { _pickupTime, _pickupOdometer: _puOdo, _departPickupTime, _dropoffArrivalTime, _dropoffOdometer: _doOdo, _clientSigned, _markCompleted, ...cleanData } = editedTrip;
+    const { _pickupTime, _pickupOdometer: _puOdo, _departPickupTime, _dropoffArrivalTime, _dropoffTime, _dropoffOdometer: _doOdo, _clientSigned, _markCompleted, ...cleanData } = editedTrip;
     if (_markCompleted) {
+      cleanData.status = 'Completed';
       cleanData.completedAt = new Date().toISOString();
       setPasswordPrompt({ type: 'edittripcomplete', trip: editedTrip, editedData: cleanData });
     } else {
@@ -1650,7 +2126,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         }, 'Route Dismissed', `${currentUser} dismissed route "${dismissSequence.name || 'Assigned Route'}".`);
       } else if (type === 'edittrip') {
         if (editedData) {
-          advanceWorkflow(trip, trip.status, editedData);
+          advanceWorkflow(trip, editedData.status || trip.status, editedData);
+          setShowTripDetails(prev => (prev?.id === trip.id ? { ...prev, ...editedData } : prev));
           if (onAddAuditLog) {
             onAddAuditLog('Trip Updated', `${currentUser} updated trip details for ${trip.patient}.`, 'blue');
           }
@@ -1659,6 +2136,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         if (editedData) {
           const odo = parseInt(editedData.dropoffOdometer, 10) || 0;
           advanceWorkflow(trip, 'Completed', { ...editedData, completedVehicle: me?.vehicle || '' });
+          setShowTripDetails(prev => (prev?.id === trip.id ? { ...prev, ...editedData, status: 'Completed', completedVehicle: me?.vehicle || '' } : prev));
           if (onAddAuditLog) {
             onAddAuditLog('Trip Completed via Edit', `${currentUser} completed trip for ${trip.patient} (odo: ${odo.toLocaleString()} mi).`, 'emerald');
           }
@@ -1762,6 +2240,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     // Reset trip selection and expanded state after completion
     setSelectedTrips(prev => prev.filter(id => id !== showCompleteModal.id));
     setExpandedTripId(null);
+    setActiveWorkTripId(null);
+    setWorkNotesOpen(false);
   };
 
   // Swipe-to-complete gesture handler
@@ -1779,25 +2259,262 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   };
 
   const exportDailyLog = () => {
-    const rows = [['Patient', 'Booking ID', 'Time', 'Pickup', 'Dropoff', 'Status', 'Pickup Odo', 'Dropoff Odo', 'Distance', 'Completed At']];
-    const today = new Date().toISOString().split('T')[0];
-    const todayTrips = allHistory.filter(t => (t.date || '').startsWith(today) || (t.completedAt || '').startsWith(today));
-    todayTrips.forEach(t => {
-      rows.push([t.patient, t.bookingId || '', t.time, t.pickup, t.dropoff, t.status, t.pickupOdometer || '', t.dropoffOdometer || '', t.distance ? `${t.distance} mi` : '', t.completedAt ? new Date(t.completedAt).toLocaleString() : '']);
+    const rows = [['Date', 'Patient', 'Booking ID', 'Time', 'Pickup', 'Dropoff', 'Status', 'Pickup Odo', 'Dropoff Odo', 'Distance', 'Completed At']];
+    sortedFilteredHistory.forEach(t => {
+      rows.push([getTripHistoryDateKey(t) || '', t.patient, t.bookingId || '', t.time, t.pickup, t.dropoff, t.status, t.pickupOdometer || '', t.dropoffOdometer || '', t.distance ? `${t.distance} mi` : '', t.completedAt ? new Date(t.completedAt).toLocaleString() : '']);
     });
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `daily-log-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `driver-history-${historyWindowStart}-to-${historyWindowEnd}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
+  const openTripWorkPage = (tripId) => {
+    setExpandedTripId(null);
+    setWorkNotesOpen(false);
+    setActiveWorkTripId(tripId);
+    requestAnimationFrame(() => tripsScrollRef.current?.scrollTo?.({ top: 0, behavior: 'smooth' }));
+  };
+
+  const getPrimaryTripAction = (trip) => {
+    if (!trip) return null;
+    if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
+      return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); } };
+    }
+    if (trip.status === 'In Progress') {
+      return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', onClick: () => handleNavigateToPickup(trip) };
+    }
+    if (trip.status === 'Navigating Pickup') {
+      return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
+    }
+    if (trip.status === 'At Pickup') {
+      return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/25', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
+    }
+    if (trip.status === 'In Transit') {
+      return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/25', onClick: () => handleNavigateToDropoff(trip) };
+    }
+    if (trip.status === 'Navigating Dropoff') {
+      return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/25', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
+    }
+    if (trip.status === 'At Dropoff' || trip.status === 'Arrived') {
+      return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-red-600 hover:bg-red-700 shadow-red-500/25', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
+    }
+    return null;
+  };
+
+  const renderTripWorkPage = (trip) => {
+    const pickupAddress = typeof trip.pickup === 'object' ? trip.pickup?.address || '' : trip.pickup || '';
+    const dropoffAddress = typeof trip.dropoff === 'object' ? trip.dropoff?.address || '' : trip.dropoff || '';
+    const scheduledTime = getTripCardTimeLabel(trip) || 'Will Call';
+    const primary = getPrimaryTripAction(trip);
+    const workStepIndex = getTripWorkStepIndex(trip);
+    const stepBackTarget = getTripWorkStepBackTarget(trip);
+    const contacts = getContactsForTrip(trip);
+    const primaryContact = contacts.find(c => c.isPrimary) || contacts[0];
+    const workTripIsInOut = isInOutTrip(trip);
+    const notes = [
+      trip.urgentTrip && trip.urgentDeadlineAt ? `URGENT: deadline ${trip.urgentDeadlineTime ? to12hrFromTimeInput(trip.urgentDeadlineTime) : ''}, ${getUrgentCountdownText(trip)}.` : '',
+      workTripIsInOut ? `IN/OUT ${trip.inOutLeg ? `${trip.inOutLeg} leg` : 'trip'}: stay with the client about ${trip.inOutWaitMinutes || IN_OUT_WAIT_MINUTES} minutes between A and B legs.` : '',
+      trip.notes || trip.driverNotes || trip.specialInstructions || trip.instructions || '',
+    ].filter(Boolean).join(' ');
+    const attentionText = trip.urgentTrip ? 'URGENT' : workTripIsInOut ? 'IN/OUT STAY' : notes || trip.wheelchair || trip.mobility ? 'ATTENTION REQ.' : 'READY';
+    const copyText = (text, label) => {
+      if (!text) return;
+      navigator.clipboard?.writeText(text);
+      setShowToast({ message: `${label} copied` });
+    };
+    const bottomAction = primary || {
+      label: isWorkflowTerminalTrip(trip) ? String(trip.status || 'Completed') : 'No Action Required',
+      icon: isWorkflowTerminalTrip(trip) ? <Check size={16} /> : <Info size={16} />,
+      gradient: isWorkflowTerminalTrip(trip) ? 'bg-emerald-600' : 'bg-slate-500',
+      onClick: () => {},
+    };
+    const handleStepBack = () => {
+      if (!stepBackTarget) return;
+      impact('medium');
+      advanceWorkflow(trip, stepBackTarget.status, stepBackTarget.fields, { allowRegression: true });
+      setShowToast({ message: `Back to ${stepBackTarget.label}` });
+    };
+
+    return (
+      <div className="min-h-full bg-[#f4f7fb] pb-32">
+        <div className="sticky top-0 z-30 bg-white border-b-2 border-amber-400" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <div className="px-3 py-2.5 flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => { setActiveWorkTripId(null); setWorkNotesOpen(false); }}
+              className="w-11 h-11 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer"
+              aria-label="Back to trips"
+            >
+              <ChevronLeft size={22} strokeWidth={2.2} />
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h1 className="text-base font-black text-slate-950 leading-tight truncate">{trip.patient || 'Trip'}</h1>
+                <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700 border border-blue-100">
+                  #{trip.bookingId || trip.id || '--'}
+                </span>
+              </div>
+              <p className="mt-0.5 flex items-center gap-1.5 text-xs font-black text-rose-600">
+                <Clock size={13} /> {scheduledTime}
+              </p>
+            </div>
+            <span className={`shrink-0 max-w-[34%] truncate rounded-lg border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-center ${getTripWorkStatusClass(trip.status)}`}>
+              {trip.status || 'Assigned'}
+            </span>
+          </div>
+        </div>
+
+        <div className="px-3 pt-3 space-y-3">
+          <div className="rounded-2xl bg-slate-900 text-white shadow-lg overflow-hidden">
+            <div className="relative p-4">
+              <div className="absolute right-4 top-4 flex gap-1 opacity-10">
+                <span className="w-2 h-2 rounded-full bg-white" />
+                <span className="w-2 h-2 rounded-full bg-white" />
+                <span className="w-2 h-2 rounded-full bg-white" />
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Scheduled Time</p>
+                  <p className="mt-1 text-2xl font-black tracking-tight leading-none">{scheduledTime}</p>
+                </div>
+                <span className="mt-5 shrink-0 rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-amber-800 shadow-sm">
+                  {attentionText}
+                </span>
+              </div>
+
+              <div className="mt-5 grid grid-cols-[18px_1fr] gap-x-4">
+                <div className="row-span-2 flex flex-col items-center pt-2">
+                  <span className="w-3.5 h-3.5 rounded-full bg-blue-400 shadow-lg shadow-blue-400/30" />
+                  <span className="w-0.5 flex-1 min-h-[74px] my-1 rounded-full bg-gradient-to-b from-blue-400 to-emerald-400" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/30" />
+                </div>
+
+                <div className="pb-5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">From</p>
+                  <p className="mt-1.5 text-sm font-bold leading-snug text-white">{pickupAddress || '--'}</p>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-8 px-2 rounded-lg text-xs font-black text-slate-400 hover:text-white flex items-center gap-1.5 cursor-pointer">
+                      <Copy size={13} /> Copy
+                    </button>
+                    <span className="text-xs font-black text-slate-500">{trip.distance ? `${trip.distance} mi` : ''}</span>
+                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-10 px-3 rounded-xl bg-blue-700/70 hover:bg-blue-700 text-blue-100 text-xs font-black flex items-center gap-1.5 cursor-pointer">
+                      <Navigation size={14} /> Navigate
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">To</p>
+                  <p className="mt-1.5 text-sm font-bold leading-snug text-white">{dropoffAddress || '--'}</p>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-8 px-2 rounded-lg text-xs font-black text-slate-400 hover:text-white flex items-center gap-1.5 cursor-pointer">
+                      <Copy size={13} /> Copy
+                    </button>
+                    <span className="text-xs font-black text-slate-500" />
+                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-10 px-3 rounded-xl bg-emerald-700/60 hover:bg-emerald-700 text-emerald-100 text-xs font-black flex items-center gap-1.5 cursor-pointer">
+                      <Navigation size={14} /> Navigate
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 grid grid-cols-4 gap-2">
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-11 rounded-xl bg-white/12 hover:bg-white/18 disabled:opacity-40 text-white text-xs font-black flex items-center justify-center gap-1 cursor-pointer">
+                  <Phone size={15} /> Call
+                </button>
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-11 rounded-xl bg-white/12 hover:bg-white/18 disabled:opacity-40 text-white text-xs font-black flex items-center justify-center gap-1 cursor-pointer">
+                  <MessageCircle size={15} /> SMS
+                </button>
+                <button type="button" onClick={() => openContactSelector(trip)} className="h-11 rounded-xl bg-white/12 hover:bg-white/18 text-white text-xs font-black flex items-center justify-center gap-1 cursor-pointer">
+                  <PhoneForwarded size={15} /> Contacts
+                </button>
+                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-11 rounded-xl bg-white/12 hover:bg-white/18 text-white text-xs font-black flex items-center justify-center gap-1 cursor-pointer">
+                  <MoreHorizontal size={16} /> More
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white border border-slate-100 shadow-sm px-4 py-3.5">
+            <div className="flex items-start gap-2">
+              <div className="flex min-w-0 flex-1 items-start">
+                {TRIP_WORK_STEPS.map((label, idx) => {
+                  const isDone = idx < workStepIndex;
+                  const isActive = idx === workStepIndex;
+                  return (
+                    <div key={label} className="flex-1 min-w-0">
+                      <div className="flex items-center">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 font-black text-xs shadow-sm ${
+                          isActive ? 'bg-slate-950 text-white border-slate-200' : isDone ? 'bg-emerald-500 text-white border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        {idx < TRIP_WORK_STEPS.length - 1 && (
+                          <div className={`h-0.5 flex-1 rounded-full mx-1.5 ${idx < workStepIndex ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                        )}
+                      </div>
+                      <p className={`mt-2 text-center -ml-2 text-[10px] font-black leading-tight ${isActive ? 'text-slate-950' : isDone ? 'text-slate-700' : 'text-slate-500'}`}>{label}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={handleStepBack}
+                disabled={!stepBackTarget}
+                className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-700"
+                title={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
+                aria-label={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
+              >
+                <Undo2 size={15} strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+
+          <div className={`rounded-2xl border ${workNotesOpen ? 'border-amber-200 bg-amber-50' : 'border-amber-100 bg-amber-50/50'} overflow-hidden`}>
+            <button type="button" onClick={() => setWorkNotesOpen(prev => !prev)} className="w-full px-4 py-3 flex items-center justify-between gap-3 text-amber-600 cursor-pointer">
+              <span className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.1em]">
+                <AlertCircle size={15} /> Driver Notes
+              </span>
+              <ChevronDown size={16} className={`transition-transform ${workNotesOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {workNotesOpen && (
+              <div className="px-4 pb-4 text-xs font-semibold text-slate-700 leading-relaxed">
+                {notes || 'No driver notes for this trip.'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="fixed left-3 right-3 z-40 rounded-2xl border border-blue-100 bg-blue-50/95 p-2.5 shadow-lg backdrop-blur-xl" style={{ bottom: 'calc(78px + env(safe-area-inset-bottom, 0px))' }}>
+          <div className="mb-2 flex items-center gap-1">
+            {getWorkflowSteps(trip).map((step, idx) => {
+              const currentStep = getCurrentWorkflowStep(trip);
+              const isComplete = currentStep === -1;
+              return <div key={step.key} className={`h-1 flex-1 rounded-full ${isComplete || idx < currentStep ? 'bg-emerald-400' : idx === currentStep ? 'bg-blue-500' : 'bg-slate-200'}`} />;
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={bottomAction.onClick}
+            disabled={!primary}
+            className={`w-full h-12 ${bottomAction.gradient} text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
+          >
+            {bottomAction.icon} {bottomAction.label}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const navItems = [
     { id: 'trips', label: 'Trips', icon: Home },
-    { id: 'tools', label: 'Tools', icon: Zap },
+    { id: 'tools', label: 'Route', icon: Route },
     { id: 'history', label: 'History', icon: Clock },
     { id: 'chat', label: 'Chat', icon: MessageCircle },
     { id: 'settings', label: 'Settings', icon: Settings },
@@ -1821,55 +2538,63 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   return (
     <div className="flex-1 flex flex-col bg-[#F3F4F6] text-slate-900" style={{ fontSize: '96%' }}>
-      {activeNav === 'trips' && expandedTripId && (
+      {activeNav === 'trips' && expandedTripId && !activeWorkTrip && (
         <div
           className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
           onClick={() => setExpandedTripId(null)}
         />
       )}
-      <div
-        className="sticky top-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
-        <div className="px-3 py-3 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-            <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 min-w-0">
-              <p className="text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">Agape Care Driver</p>
-              <span title={isOnline ? 'Realtime connected' : 'Offline / not realtime'} className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'} inline-block`} />
+      {!(activeNav === 'trips' && activeWorkTrip) && (
+        <div
+          className="sticky top-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        >
+          <div className="px-3 py-3 flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+              <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
             </div>
-            <p className="mt-1 text-[11px] font-medium text-slate-500 truncate">{me?.name || currentUser}</p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => handleCall(phoneNumbers?.dispatcher || '', 'Dispatcher')}
-              disabled={!phoneNumbers?.dispatcher}
-              title="Call Dispatcher"
-              className="h-7 px-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 text-[10px] font-bold disabled:opacity-50"
-            >
-              <Phone size={11} />
-              <span className="inline">DISP</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleCall(phoneNumbers?.routing || '', 'Routing')}
-              disabled={!phoneNumbers?.routing}
-              title="Call Routing"
-              className="h-7 px-2 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1 text-[10px] font-bold disabled:opacity-50"
-            >
-              <Phone size={11} />
-              <span className="inline">ROUT</span>
-            </button>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">Agape Care Driver</p>
+                <span title={isOnline ? 'Realtime connected' : 'Offline / not realtime'} className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'} inline-block`} />
+              </div>
+              <p className="mt-1 text-[11px] font-medium text-slate-500 truncate">{me?.name || currentUser}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleCall(phoneNumbers?.dispatcher || '', 'Dispatcher')}
+                disabled={!phoneNumbers?.dispatcher}
+                title="Call Dispatcher"
+                className="h-7 px-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 text-[10px] font-bold disabled:opacity-50"
+              >
+                <Phone size={11} />
+                <span className="inline">DISP</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCall(phoneNumbers?.routing || '', 'Routing')}
+                disabled={!phoneNumbers?.routing}
+                title="Call Routing"
+                className="h-7 px-2 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1 text-[10px] font-bold disabled:opacity-50"
+              >
+                <Phone size={11} />
+                <span className="inline">ROUT</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ===== TRIPS PAGE ===== */}
       {activeNav === 'trips' && (
-        <div ref={tripsScrollRef} className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F3F4F6]" style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}>
+        <div
+          ref={tripsScrollRef}
+          className={activeWorkTrip ? "flex-1 overflow-y-auto bg-[#F3F4F6]" : "flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F3F4F6]"}
+          style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
+        >
+          {activeWorkTrip ? renderTripWorkPage(activeWorkTrip) : (
+            <>
 
 
           {/* Offline Banner */}
@@ -2602,6 +3327,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="space-y-1 pb-2">
               {orderedTrips.map((trip, idx) => {
                 const showWcHeader = isWillCall(trip) && (idx === 0 || !isWillCall(orderedTrips[idx - 1])) && willCallTrips.length > 0;
+                const tripIsInOut = isInOutTrip(trip);
+                const showInOutHeader = tripIsInOut && (idx === 0 || !isInOutTrip(orderedTrips[idx - 1]));
+                const urgentCountdown = getUrgentCountdownText(trip);
                 const isSelected = selectedTrips.includes(trip.id);
                 const isSequenced = assignedSequence?.sequence?.some(s => s.clientId === trip.id);
                 const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
@@ -2629,6 +3357,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 return (
                   <React.Fragment key={trip.id}>
+                    {showInOutHeader && (
+                      <div className="flex items-center gap-2 px-1 pt-4 pb-2">
+                        <div className="h-px flex-1 bg-emerald-200" />
+                        <span className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">IN/OUT - Stay with client about {IN_OUT_WAIT_MINUTES} min</span>
+                        <div className="h-px flex-1 bg-emerald-200" />
+                      </div>
+                    )}
                     {showWcHeader && (
                       <div className="flex items-center gap-2 px-1 pt-4 pb-2">
                         <div className="h-px flex-1 bg-slate-200" />
@@ -2639,12 +3374,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     <TaskCard
                     task={{
                       id: trip.id,
-                      time: to12hr(trip.time),
+                      time: getTripCardTimeLabel(trip),
                       patient: trip.patient,
                       patientName: trip.patient,
                       status: trip.status,
                       bookingId: trip.bookingId,
                       notes: trip.notes,
+                      urgentTrip: !!trip.urgentTrip,
+                      urgentDeadlineAt: trip.urgentDeadlineAt,
+                      urgentDeadlineTime: trip.urgentDeadlineTime,
                       legs: legsCount > 1 ? `${legsCount} LEGS` : '1 LEG',
                       patientPhone: trip.patientPhone,
                       patientMobile: trip.patientMobile,
@@ -2659,6 +3397,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         mobility: trip.wheelchair || trip.mobility,
                       },
                       tags: [
+                        trip.urgentTrip ? 'URGENT' : null,
+                        trip.urgentTrip && trip.urgentDeadlineTime ? `DEADLINE ${to12hrFromTimeInput(trip.urgentDeadlineTime)}` : null,
+                        trip.urgentTrip && urgentCountdown ? urgentCountdown.toUpperCase() : null,
+                        tripIsInOut ? 'IN/OUT' : null,
+                        tripIsInOut && trip.inOutLeg ? `${trip.inOutLeg} LEG` : null,
+                        tripIsInOut ? `STAY ${trip.inOutWaitMinutes || IN_OUT_WAIT_MINUTES} MIN` : null,
                         trip.date !== getTodayStr() ? 'Tomorrow' : null,
                         isSequenced ? 'Route Plan' : null,
                       ].filter(Boolean),
@@ -2667,7 +3411,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       workflowPhase,
                     }}
                     expandedId={expandedTripId}
-                    onToggle={(id) => setExpandedTripId(prev => prev === id ? null : id)}
+                    onToggle={(id) => openTripWorkPage(id)}
                     isSelected={isSelected}
                     onSelect={toggleTripSelect}
                     actions={{
@@ -2682,17 +3426,36 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       onReroute: handleReroute,
                       onShowLegs: handleShowLegs,
                       onEditTrip: handleEditTrip,
+                      onScheduleEdit: () => openScheduleEditor(trip),
                       onTransfer: () => openTransferPrompt('trip', trip),
                       renderWorkflow: !isTerminal && primary ? () => {
                         const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
                         const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
                         const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
+                        const cardStepBackTarget = getTripWorkStepBackTarget(trip);
+                        const canUndo = !!cardStepBackTarget;
                         return (
                           <div className={`rounded-xl border ${borderColor} ${bgColor} p-3 w-full`}>
                             <div className="flex items-center gap-0.5 mb-2">
                               {workflowSteps.map((step, idx) => (
                                 <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
                               ))}
+                              {canUndo && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (cardStepBackTarget && window.confirm(`Go back to "${cardStepBackTarget.label}"?`)) {
+                                      impact('medium');
+                                      advanceWorkflow(trip, cardStepBackTarget.status, cardStepBackTarget.fields, { allowRegression: true });
+                                    }
+                                  }}
+                                  className="ml-2 w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-300 text-slate-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-all cursor-pointer shrink-0"
+                                  title="Undo last step"
+                                >
+                                  <RotateCcw size={12} />
+                                </button>
+                              )}
                             </div>
                             <div className="flex items-center justify-between mb-2">
                               <span className={`text-xs font-bold uppercase tracking-wider ${labelColor}`}>
@@ -2740,6 +3503,140 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
           )}
 
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ===== SCHEDULE / TYPE EDITOR ===== */}
+      {scheduleEditorTrip && scheduleEditDraft && (
+        <div className="fixed inset-0 z-[125] flex items-end sm:items-center justify-center p-3">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={closeScheduleEditor} />
+          <div className="relative z-10 w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-base font-black text-slate-950">Update Trip Time</h3>
+                <p className="text-xs font-semibold text-slate-500 truncate">{scheduleEditorTrip.patient} #{scheduleEditorTrip.bookingId || scheduleEditorTrip.id}</p>
+              </div>
+              <button type="button" onClick={closeScheduleEditor} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center cursor-pointer"><X size={17} /></button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'time', label: 'Set Time', hint: 'Exact pickup time' },
+                  { id: 'willcall', label: 'Will Call', hint: 'No fixed time' },
+                  { id: 'inout', label: 'IN/OUT', hint: `Stay ${IN_OUT_WAIT_MINUTES} min` },
+                  { id: 'urgent', label: 'Urgent', hint: 'Deadline countdown' },
+                ].map((mode) => {
+                  const active = scheduleEditDraft.mode === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => updateScheduleDraft('mode', mode.id)}
+                      className={`rounded-2xl border px-3 py-3 text-left transition-all cursor-pointer ${active ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      <p className="text-sm font-black uppercase tracking-wide">{mode.label}</p>
+                      <p className="text-[11px] font-semibold opacity-70 mt-0.5">{mode.hint}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {(scheduleEditDraft.mode === 'time' || scheduleEditDraft.mode === 'inout' || scheduleEditDraft.mode === 'urgent') && (
+                <div>
+                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Pickup Time</label>
+                  <input
+                    type="time"
+                    value={scheduleEditDraft.time || ''}
+                    onChange={(e) => updateScheduleDraft('time', e.target.value)}
+                    className="mt-1 w-full h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-black text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+                  />
+                  {scheduleEditDraft.mode === 'inout' && (
+                    <p className="mt-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
+                      IN/OUT keeps the related B leg stacked under A leg and tells the driver to stay with the client about {IN_OUT_WAIT_MINUTES} minutes.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {scheduleEditDraft.mode === 'willcall' && (
+                <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3">
+                  <p className="text-sm font-black text-slate-900">This trip will show as Will Call.</p>
+                  <p className="text-xs font-semibold text-slate-500 mt-1">It will stay separate from timed trips and can be changed back later.</p>
+                </div>
+              )}
+
+              {scheduleEditDraft.mode === 'urgent' && (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[11px] font-black uppercase tracking-widest text-rose-600">Deadline Date</label>
+                      <input
+                        type="date"
+                        value={scheduleEditDraft.deadlineDate || ''}
+                        onChange={(e) => updateScheduleDraft('deadlineDate', e.target.value)}
+                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm font-black text-slate-900 outline-none focus:border-rose-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-black uppercase tracking-widest text-rose-600">Deadline Time</label>
+                      <input
+                        type="time"
+                        value={scheduleEditDraft.deadlineTime || ''}
+                        onChange={(e) => updateScheduleDraft('deadlineTime', e.target.value)}
+                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm font-black text-slate-900 outline-none focus:border-rose-400"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+                    <div>
+                      <label className="text-[11px] font-black uppercase tracking-widest text-rose-600">Required Within Hours</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="0.5"
+                        value={scheduleEditDraft.requiredWithinHours || ''}
+                        onChange={(e) => updateScheduleDraft('requiredWithinHours', e.target.value)}
+                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm font-black text-slate-900 outline-none focus:border-rose-400"
+                        placeholder="3"
+                      />
+                    </div>
+                    <button type="button" onClick={applyWithinHoursToDeadline} className="h-11 px-4 rounded-xl bg-rose-600 text-white text-xs font-black cursor-pointer">Apply</button>
+                  </div>
+                  {(() => {
+                    const deadline = scheduleEditDraft.deadlineDate && scheduleEditDraft.deadlineTime
+                      ? new Date(`${scheduleEditDraft.deadlineDate}T${scheduleEditDraft.deadlineTime}`)
+                      : null;
+                    if (!deadline || Number.isNaN(deadline.getTime())) return null;
+                    const diff = Math.ceil((deadline.getTime() - Date.now()) / 60000);
+                    const h = Math.floor(Math.abs(diff) / 60);
+                    const m = Math.abs(diff) % 60;
+                    const text = `${h ? `${h}h ` : ''}${m}m`;
+                    return (
+                      <p className="rounded-xl bg-white border border-rose-100 px-3 py-2 text-xs font-black text-rose-700">
+                        Countdown: {diff < 0 ? `${text} late` : `${text} left`} - deadline {to12hrFromTimeInput(scheduleEditDraft.deadlineTime)}
+                      </p>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {scheduleEditError && (
+                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">{scheduleEditError}</p>
+              )}
+
+              <p className="text-xs font-semibold text-slate-500">
+                Saving requires the driver password and syncs live with Firebase, admin, and dispatch.
+              </p>
+            </div>
+
+            <div className="px-5 pb-5 flex gap-3">
+              <button type="button" onClick={closeScheduleEditor} className="flex-1 h-12 rounded-2xl bg-white border border-slate-200 text-slate-700 font-bold cursor-pointer">Cancel</button>
+              <button type="button" onClick={saveScheduleEdit} className="flex-1 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black cursor-pointer">Save</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -3037,68 +3934,47 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <h2 className="font-bold text-sm text-slate-900 leading-tight">{showTripDetails.patient}</h2>
               <p className="text-xs text-slate-400">{showTripDetails.bookingId || '—'}</p>
             </div>
-            <button type="button" onClick={() => setShowTripDetails(null)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90 cursor-pointer"><X size={18} /></button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { handleEditTrip(showTripDetails); setShowTripDetails(null); }}
+                className="h-9 px-3 rounded-xl bg-blue-600 text-white text-xs font-bold flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              >
+                <Edit2 size={13} /> Edit
+              </button>
+              <button type="button" onClick={() => setShowTripDetails(null)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90 cursor-pointer"><X size={18} /></button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 text-white">
-              <div className="flex items-baseline gap-2 mb-3">
-                <span className="text-4xl font-black tracking-tight">{to12hr(showTripDetails.time)}</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${showTripDetails.status === 'Completed' ? 'bg-emerald-400/30 text-emerald-100' : showTripDetails.status === 'In Transit' ? 'bg-blue-400/30' : 'bg-white/20'}`}>{showTripDetails.status}</span>
-              </div>
-              <div className="h-px bg-white/20 my-3" />
-              <div className="space-y-2.5">
-                <div className="flex items-start gap-3">
-                  <MapPin size={14} className="mt-0.5 shrink-0 text-emerald-300" />
-                  <div>
-                    <p className="text-xs text-white/60 uppercase font-bold">Pickup</p>
-                    <p className="text-sm font-semibold">{showTripDetails.pickup}</p>
-                    {showTripDetails.pickupPhone && (() => {
-                      const contactType = getContactsForTrip(showTripDetails).find(c => cleanPhone(c.phone) === cleanPhone(showTripDetails.pickupPhone));
-                      const label = contactType ? contactType.label : 'Pickup';
-                      return <button type="button" onClick={() => handleCall(showTripDetails.pickupPhone, `${label}: ${showTripDetails.patient}`)} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5 cursor-pointer"><Phone size={10} /> {label} · {formatPhoneDisplay(showTripDetails.pickupPhone)}</button>;
-                    })()}
+            {(() => {
+              const statusMeta = getHistoryStatusMeta(showTripDetails.status);
+              return (
+                <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+                  <div className="bg-gradient-to-r from-blue-700 to-blue-500 px-4 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 rounded-xl bg-white text-slate-700 flex items-center justify-center shadow-sm shrink-0">
+                          <User size={22} />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-base font-black text-slate-950 uppercase tracking-wide truncate">{showTripDetails.patient || 'Trip'}</h3>
+                          <p className="text-sm font-black text-blue-800/60 truncate">#{showTripDetails.bookingId || showTripDetails.id}</p>
+                        </div>
+                      </div>
+                      <span className={`shrink-0 rounded-xl px-3 py-1 text-xs font-black uppercase tracking-wider ${statusMeta.bg}`}>
+                        {statusMeta.label}
+                      </span>
+                    </div>
                   </div>
+                  <HistoryTripDetailTable trip={showTripDetails} driver={me} />
                 </div>
-                <div className="flex items-start gap-3">
-                  <MapPin size={14} className="mt-0.5 shrink-0 text-rose-300" />
-                  <div>
-                    <p className="text-xs text-white/60 uppercase font-bold">Dropoff</p>
-                    <p className="text-sm font-semibold">{showTripDetails.dropoff}</p>
-                    {showTripDetails.dropoffPhone && (() => {
-                      const contactType = getContactsForTrip(showTripDetails).find(c => cleanPhone(c.phone) === cleanPhone(showTripDetails.dropoffPhone));
-                      const label = contactType ? contactType.label : 'Dropoff';
-                      return <button type="button" onClick={() => handleCall(showTripDetails.dropoffPhone, `${label}: ${showTripDetails.patient}`)} className="text-sm text-blue-200 font-bold flex items-center gap-1 mt-0.5 cursor-pointer"><Phone size={10} /> {label} · {formatPhoneDisplay(showTripDetails.dropoffPhone)}</button>;
-                    })()}
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-4">
-                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="flex-1 h-9 bg-blue-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Pickup</button>
-                <button type="button" onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="flex-1 h-9 bg-rose-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Dropoff</button>
-                <button type="button" onClick={() => openContactSelector(showTripDetails)} className="flex-1 h-9 bg-emerald-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><PhoneForwarded size={12} /> Contacts</button>
-              </div>
-            </div>
+              );
+            })()}
 
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
-              <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500">Trip Information</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Booking ID</p>
-                  <p className="text-sm font-bold text-slate-800">{showTripDetails.bookingId || '—'}</p>
-                </div>
-                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Service Type</p>
-                  <p className="text-sm font-bold text-slate-800">{showTripDetails.type || '—'}</p>
-                </div>
-                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Distance</p>
-                  <p className="text-sm font-bold text-slate-800">{showTripDetails.distance ? `${showTripDetails.distance} mi` : '—'}</p>
-                </div>
-                <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Driver</p>
-                  <p className="text-sm font-bold text-slate-800">{showTripDetails.driverId || '—'}</p>
-                </div>
-              </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Pickup</button>
+              <button type="button" onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Dropoff</button>
+              <button type="button" onClick={() => openContactSelector(showTripDetails)} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><PhoneForwarded size={12} /> Contacts</button>
             </div>
 
             {/* Smart Contacts Section */}
@@ -3163,48 +4039,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-xs text-amber-800">{showTripDetails.notes}</p>
                 </div>
               )}
-            </div>
-
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
-              <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500">Timeline & Odometer</h3>
-              <div className="space-y-2.5">
-                {showTripDetails.startTime && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">Started</span>
-                    <span className="text-xs font-bold text-slate-800">{new Date(showTripDetails.startTime).toLocaleString()}</span>
-                  </div>
-                )}
-                {showTripDetails.arrivalTime && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">Arrived</span>
-                    <span className="text-xs font-bold text-slate-800">{new Date(showTripDetails.arrivalTime).toLocaleString()}</span>
-                  </div>
-                )}
-                {showTripDetails.completedAt && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">Completed</span>
-                    <span className="text-xs font-bold text-slate-800">{new Date(showTripDetails.completedAt).toLocaleString()}</span>
-                  </div>
-                )}
-                {showTripDetails.pickupOdometer && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-emerald-600">Pickup Odometer</span>
-                    <span className="text-xs font-bold text-emerald-700">{showTripDetails.pickupOdometer?.toLocaleString()} mi</span>
-                  </div>
-                )}
-                {showTripDetails.arrivalOdometer && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-emerald-600">Arrival Odometer</span>
-                    <span className="text-xs font-bold text-emerald-700">{showTripDetails.arrivalOdometer?.toLocaleString()} mi</span>
-                  </div>
-                )}
-                {showTripDetails.dropoffOdometer && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-rose-600">Dropoff Odometer</span>
-                    <span className="text-xs font-bold text-rose-700">{showTripDetails.dropoffOdometer?.toLocaleString()} mi</span>
-                  </div>
-                )}
-              </div>
             </div>
 
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
@@ -3307,67 +4141,79 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       )}
 
       {/* ===== HISTORY PAGE ===== */}
-      {isClockedIn && activeNav === 'history' && (
+      {activeNav === 'history' && (
         <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
-          <div className="px-1 pt-2 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-black text-slate-900">History</h2>
-                <p className="text-slate-500 text-xs font-semibold mt-0.5">Review past trips and activity</p>
-              </div>
-              {filteredHistory.length > 0 && (
-                <button onClick={exportDailyLog} className="px-3 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 text-xs">
-                  <Download size={12} /> Export
-                </button>
-              )}
-            </div>
-            
-            {/* Date Navigator */}
-            <div className="bg-white border border-slate-200 rounded-xl p-1.5 flex items-center justify-between mt-3 shadow-sm">
-              <button 
-                onClick={() => {
-                  const d = new Date(historyDate + 'T12:00:00');
-                  d.setDate(d.getDate() - 1);
-                  setHistoryDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-                }}
-                disabled={(() => {
-                  const d = new Date(historyDate + 'T12:00:00');
-                  const min = new Date();
-                  min.setDate(min.getDate() - 14);
-                  return d <= min;
-                })()}
-                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors text-slate-600"
+          <div className="px-1 pt-2 pb-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap">
+              <h2 className="text-lg font-black text-slate-900 shrink-0 mr-1">History</h2>
+              <button
+                type="button"
+                onClick={() => goToHistoryDay(-1)}
+                disabled={selectedHistoryDate <= historyWindowStart}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-colors text-slate-600 shrink-0"
+                aria-label="Previous history day"
               >
-                <ChevronLeft size={20} />
+                <ChevronLeft size={17} />
               </button>
-              
-              <div className="relative flex items-center gap-2">
-                <Calendar size={16} className="text-blue-600" />
-                <input 
-                  type="date" 
-                  value={historyDate}
-                  min={(() => { const d = new Date(); d.setDate(d.getDate() - 14); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}
-                  max={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}
-                  onChange={(e) => setHistoryDate(e.target.value || historyDate)}
-                  className="bg-transparent font-bold text-slate-800 outline-none cursor-pointer"
-                />
+
+              <div className="h-8 px-2.5 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shrink-0" title={formatHistoryDayLabel(selectedHistoryDate)}>
+                <span className="text-xs font-black text-slate-900">{formatHistoryCompactDayLabel(selectedHistoryDate)}</span>
+                <span className="text-[10px] font-bold text-slate-400">({selectedHistoryDayTrips.length})</span>
               </div>
 
-              <button 
-                onClick={() => {
-                  const d = new Date(historyDate + 'T12:00:00');
-                  d.setDate(d.getDate() + 1);
-                  setHistoryDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-                }}
-                disabled={(() => {
-                  const d = new Date(historyDate + 'T12:00:00');
-                  const max = new Date();
-                  return d.toISOString().split('T')[0] >= max.toISOString().split('T')[0];
-                })()}
-                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors text-slate-600"
+              <button
+                type="button"
+                onClick={() => goToHistoryDay(1)}
+                disabled={selectedHistoryDate >= historyWindowEnd}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-colors text-slate-600 shrink-0"
+                aria-label="Next history day"
               >
-                <ChevronRight size={20} />
+                <ChevronRight size={17} />
               </button>
+
+              {[
+                { id: 'all', label: 'All', Icon: Clock },
+                { id: 'completed', label: 'Completed', Icon: CheckCircle2 },
+                { id: 'cancelled', label: 'Cancelled', Icon: XCircle },
+                { id: 'noshow', label: 'No Show', Icon: AlertTriangle },
+                { id: 'rerouted', label: 'Rerouted', Icon: Repeat },
+              ].map(f => {
+                const FilterIcon = f.Icon;
+                const active = historyFilter === f.id;
+                const activeClass = f.id === 'rerouted'
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : f.id === 'cancelled'
+                    ? 'bg-rose-600 text-white border-rose-600'
+                    : f.id === 'noshow'
+                      ? 'bg-amber-500 text-white border-amber-500'
+                      : f.id === 'completed'
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-blue-600 text-white border-blue-600';
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setHistoryFilter(f.id)}
+                    className={`relative w-8 h-8 rounded-lg border flex items-center justify-center transition-all shrink-0 ${active ? activeClass : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+                    title={`${f.label} (${historyStatusCounts[f.id] || 0})`}
+                    aria-label={`${f.label} filter, ${historyStatusCounts[f.id] || 0} trips`}
+                  >
+                    <FilterIcon size={15} />
+                  </button>
+                );
+              })}
+
+              {filteredHistory.length > 0 && (
+                <button
+                  type="button"
+                  onClick={exportDailyLog}
+                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-all flex items-center justify-center shrink-0"
+                  title="Export"
+                  aria-label="Export history"
+                >
+                  <Download size={14} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -3378,101 +4224,80 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             {historySearch && <button onClick={() => setHistorySearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X size={14} /></button>}
           </div>
 
-          <div className="flex gap-1.5 mb-5 overflow-x-auto no-scrollbar px-1">
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'completed', label: 'Completed' },
-              { id: 'noshow', label: 'No Show' },
-              { id: 'cancelled', label: 'Cancelled' },
-              { id: 'rerouted', label: 'Rerouted' },
-            ].map(f => (
-              <button key={f.id} onClick={() => setHistoryFilter(f.id)}
-                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all whitespace-nowrap ${historyFilter === f.id ? f.id === 'rerouted' ? 'bg-purple-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold'}`}>
-                {f.label} ({f.id === 'all' ? allHistory.length : f.id === 'rerouted' ? reroutedTrips.length : f.id === 'completed' ? completedTrips.length : f.id === 'noshow' ? noShowTrips.length : cancelledTrips.length})
-              </button>
-            ))}
-          </div>
-
-          <div className="space-y-2">
+          <div className="space-y-5">
             {filteredHistory.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-12 text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner">
                   <Clock size={28} className="text-slate-300" />
                 </div>
                 <h3 className="text-base font-black text-slate-900">{historySearch ? 'No matching trips' : 'No history'}</h3>
-                <p className="text-slate-500 text-xs font-semibold mt-1">{historySearch ? 'Try a different search term.' : 'Your completed trips will appear here.'}</p>
+                <p className="text-slate-500 text-xs font-semibold mt-1">{historySearch ? 'Try a different search term.' : `No completed, cancelled, no-show, or rerouted trips found for ${formatHistoryDayLabel(selectedHistoryDate)}.`}</p>
               </div>
             ) : (
-              filteredHistory.map(trip => {
-                const styles = {
-                  'Completed': { bg: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', border: 'border-l-emerald-400' },
-                  'No Show': { bg: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500', border: 'border-l-amber-400' },
-                  'Cancelled': { bg: 'bg-rose-100 text-rose-700', dot: 'bg-rose-500', border: 'border-l-rose-400' },
-                  'Rerouted': { bg: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500', border: 'border-l-purple-400' },
-                };
-                const s = styles[trip.status] || styles['Completed'];
+              sortedFilteredHistory.map(trip => {
+                const statusMeta = getHistoryStatusMeta(trip.status);
+                const StatusIcon = statusMeta.Icon;
                 const isExpanded = historyExpandedId === trip.id;
+                if (isExpanded) {
+                  return (
+                    <div key={trip.id} className="space-y-3">
+                      <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+                        <div
+                          onClick={() => setHistoryExpandedId(null)}
+                          className="bg-gradient-to-r from-blue-700 to-blue-500 px-4 py-4 cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-11 h-11 rounded-xl bg-white text-slate-700 flex items-center justify-center shadow-sm shrink-0">
+                                <User size={22} />
+                              </div>
+                              <div className="min-w-0">
+                                <h3 className="text-base font-black text-slate-950 uppercase tracking-wide truncate">{trip.patient || 'Trip'}</h3>
+                                <p className="text-sm font-black text-blue-800/60 truncate">#{trip.bookingId || trip.id}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`rounded-xl px-3 py-1 text-xs font-black uppercase tracking-wider ${statusMeta.bg}`}>
+                                {statusMeta.label}
+                              </span>
+                              <ChevronDown size={16} className="text-white/80" />
+                            </div>
+                          </div>
+                        </div>
+                        <HistoryTripDetailTable trip={trip} driver={me} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => handleEditTrip(trip)} className="h-11 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-sm shadow-sm"><Edit2 size={15} /> Edit</button>
+                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="h-11 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-sm shadow-sm"><RotateCcw size={15} /> Restore</button>
+                      </div>
+                    </div>
+                  );
+                }
                 return (
-                  <div key={trip.id} className={`bg-white rounded-2xl overflow-hidden transition-all duration-300 border border-slate-200/60 ${isExpanded ? 'shadow-md border-blue-200' : 'shadow-sm hover:border-slate-300'}`}>
+                  <div key={trip.id} className={`bg-white rounded-2xl overflow-hidden transition-all duration-300 border border-slate-200/60 border-l-4 ${statusMeta.border} ${isExpanded ? 'shadow-md border-blue-200' : 'shadow-sm hover:border-slate-300'}`}>
                     <div onClick={() => setHistoryExpandedId(prev => prev === trip.id ? null : trip.id)} className="p-3 cursor-pointer">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <div className={`w-2 h-2 rounded-full ${s.dot} shrink-0`} />
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${statusMeta.iconBg}`}>
+                            <StatusIcon size={13} />
+                          </div>
                           <span className="text-sm font-bold text-slate-900 truncate">{trip.patient}</span>
                           <span className="text-[11px] font-mono text-blue-600 font-semibold shrink-0">#{trip.bookingId || trip.id}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-sm font-bold text-emerald-600">{to12hr(trip.time)}</span>
-                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider ${s.bg}`}>{trip.status}</span>
+                          <span
+                            className={`w-6 h-6 rounded-lg flex items-center justify-center ${statusMeta.bg}`}
+                            title={statusMeta.label}
+                            aria-label={statusMeta.label}
+                          >
+                            <StatusIcon size={13} />
+                          </span>
                           {isExpanded ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
                         </div>
                       </div>
                     </div>
 
-                    {isExpanded && (
-                    <div className="border-t border-slate-100">
-                      <div className="p-3 space-y-3">
-                        {trip.pickup && (
-                        <div className="flex items-center gap-2">
-                          <ArrowRight size={10} className="text-emerald-500 shrink-0" />
-                          <span className="text-xs text-emerald-600 font-medium break-words">{trip.pickup}</span>
-                        </div>
-                        )}
-                        {trip.dropoff && (
-                        <div className="flex items-center gap-2">
-                          <ArrowRight size={10} className="text-rose-500 shrink-0" />
-                          <span className="text-xs text-rose-600 font-medium break-words">{trip.dropoff}</span>
-                        </div>
-                        )}
-                        {(trip.pickupOdometer || trip.dropoffOdometer) && (
-                        <div className="flex items-center gap-3 text-xs font-semibold flex-wrap">
-                          {trip.pickupOdometer && <span className="text-emerald-600">Start: {Number(trip.pickupOdometer).toLocaleString()} mi</span>}
-                          {trip.dropoffOdometer && <span className="text-rose-600">End: {Number(trip.dropoffOdometer).toLocaleString()} mi</span>}
-                          {trip.pickupOdometer && trip.dropoffOdometer && (
-                            <span className="text-blue-500">+{Math.max(0, Number(trip.dropoffOdometer) - Number(trip.pickupOdometer)).toLocaleString()} mi</span>
-                          )}
-                        </div>
-                        )}
-                        {trip.distance && (
-                        <p className="text-xs text-slate-500 font-semibold">Distance: {trip.distance} mi</p>
-                        )}
-                        {trip.status === 'Rerouted' && trip.cancellationReason && (
-                        <div className="bg-purple-50 rounded-xl px-3 py-2 border border-purple-200">
-                          <p className="text-[10px] uppercase tracking-wider text-purple-500 font-bold">Reroute Reason</p>
-                          <p className="text-xs text-slate-700 mt-0.5">{trip.cancellationReason}</p>
-                          {trip.cancelledBy && <p className="text-[10px] text-slate-400 mt-0.5">by {trip.cancelledBy}</p>}
-                        </div>
-                        )}
-                        {trip.completedAt && (
-                        <p className="text-[10px] text-slate-400">{new Date(trip.completedAt).toLocaleString()}</p>
-                        )}
-                      </div>
-                      <div className="px-3 pb-3 flex gap-2">
-                        <button type="button" onClick={() => setShowTripDetails(trip)} className="flex-1 h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><FileText size={12} /> Details</button>
-                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="flex-1 h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"><RotateCcw size={12} /> Restore</button>
-                      </div>
-                    </div>
-                    )}
                   </div>
                 );
               })
@@ -4085,7 +4910,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               const Icon = item.icon;
               const isActiveTab = activeNav === item.id;
               return (
-                <button key={item.id} onClick={() => setActiveNav(item.id)}
+                <button key={item.id} onClick={() => {
+                  if (item.id === 'trips' && activeWorkTrip) {
+                    setActiveWorkTripId(null);
+                    setWorkNotesOpen(false);
+                    return;
+                  }
+                  if (item.id !== 'trips') {
+                    setActiveWorkTripId(null);
+                    setWorkNotesOpen(false);
+                  }
+                  setActiveNav(item.id);
+                }}
                   className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${
                     isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
                   }`}>

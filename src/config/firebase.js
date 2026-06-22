@@ -1,11 +1,12 @@
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, memoryLocalCache, collection, getDocs, getDocsFromServer, doc, updateDoc, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, getDocFromServer, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork } from 'firebase/firestore';
 import { getAuth, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { buildOperationalTripRecord } from '../utils/tripLifecycle';
 import { buildLocationFraudSignals } from '../utils/locationFraud';
+import { isCorruptedTripRecord } from '../utils/tripIntegrity';
 const env = import.meta.env;
 
 const firebaseConfig = {
@@ -23,14 +24,12 @@ const app = initializeApp(firebaseConfig);
 let db;
 try {
   db = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager(),
-    }),
+    localCache: memoryLocalCache(),
   });
 } catch (err) {
   const message = String(err?.message || '');
   if (!message.includes('initializeFirestore() has already been called')) {
-    console.warn('Firestore persistent cache fell back to the default cache.', err);
+    console.warn('Firestore memory cache fell back to the default cache.', err);
   }
   db = getFirestore(app);
 }
@@ -47,8 +46,8 @@ const functions = getFunctions(app);
 
 export default app;
 export { app, db, auth, analytics, messaging, deleteApp, initializeApp, firebaseConfig,
-  getFirestore, collection, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp,
-  writeBatch, setDoc, getDoc, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork,
+  getFirestore, collection, getDocs, doc, updateDoc, addDoc, serverTimestamp,
+  writeBatch, setDoc, getDoc, getDocFromServer, getDocsFromServer, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
   EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail, setPersistence,
   browserLocalPersistence, getAuth, getMessaging, getToken, onMessage, logEvent, functions, httpsCallable };
@@ -101,6 +100,10 @@ export async function updateTripStatus(tripId, updates) {
   const beforeSnap = await getDoc(tripRef).catch(() => null);
   const beforeTrip = beforeSnap?.exists?.() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
   const nextTrip = buildOperationalTripRecord({ ...(beforeTrip || { id: tripId }), ...updates, id: tripId });
+  if (isCorruptedTripRecord(nextTrip)) {
+    console.warn('Blocked corrupted trip status update:', { tripId, updates });
+    return false;
+  }
   await setDoc(tripRef, nextTrip, { merge: true });
   await emitEventsSafely(({ buildTripEvents }) => buildTripEvents(
     beforeTrip ? [beforeTrip] : [],
@@ -110,11 +113,23 @@ export async function updateTripStatus(tripId, updates) {
 }
 
 export function getTripsStream(callback) {
-  const tripRef = collection(db, 'trips');
-  return onSnapshot(tripRef, (snapshot) => {
-    const trips = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    callback(trips);
-  });
+  let cancelled = false;
+  const loadTrips = async () => {
+    try {
+      const snapshot = await getDocsFromServer(collection(db, 'trips'));
+      if (!cancelled) {
+        callback(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      }
+    } catch (err) {
+      if (!cancelled) console.error('Trip stream refresh failed:', err);
+    }
+  };
+  loadTrips();
+  const timer = setInterval(loadTrips, 12000);
+  return () => {
+    cancelled = true;
+    clearInterval(timer);
+  };
 }
 
 export async function updateDriverLocation(location) {
@@ -206,6 +221,10 @@ export async function saveTripWorkflowUpdate(tripId, updates = {}) {
     workflowUpdatedAt: updates.workflowUpdatedAt || new Date().toISOString(),
   });
   const nextTripRecord = buildOperationalTripRecord({ ...(beforeTrip || { id: tripId }), ...cleanUpdates, id: tripId });
+  if (isCorruptedTripRecord(nextTripRecord)) {
+    console.warn('Blocked corrupted workflow trip mirror:', { tripId, updates: cleanUpdates });
+    return false;
+  }
   const progressRef = doc(db, 'driverTripProgress', tripId);
   const appDataRef = doc(db, 'appData', 'agape');
   const ledgerRef = doc(db, 'tripLedger', tripId);

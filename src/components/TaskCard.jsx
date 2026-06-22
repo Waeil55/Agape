@@ -34,8 +34,31 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const getTimeUrgency = (timeStr, status) => {
-  if (!timeStr || ['COMPLETED', 'CANCELLED', 'NO SHOW'].includes((status || '').toUpperCase())) return { type: 'normal' };
+const formatCountdown = (minutes) => {
+  const abs = Math.abs(Math.round(minutes));
+  if (abs < 60) return `${abs}m`;
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+};
+
+const getTimeUrgency = (timeOrTask, status) => {
+  const task = typeof timeOrTask === 'object' && timeOrTask !== null ? timeOrTask : null;
+  const timeStr = task ? task.time : timeOrTask;
+  const tripStatus = task ? task.status : status;
+  if (task?.urgentTrip && task?.urgentDeadlineAt && !['COMPLETED', 'CANCELLED', 'NO SHOW'].includes((tripStatus || '').toUpperCase())) {
+    const deadlineMs = new Date(task.urgentDeadlineAt).getTime();
+    if (!Number.isNaN(deadlineMs)) {
+      const diff = Math.ceil((deadlineMs - Date.now()) / 60000);
+      return {
+        type: diff <= 60 ? 'critical' : 'warning',
+        diff,
+        isPastDue: diff < 0,
+        label: diff < 0 ? `${formatCountdown(diff)} late` : `${formatCountdown(diff)} left`,
+      };
+    }
+  }
+  if (!timeStr || ['COMPLETED', 'CANCELLED', 'NO SHOW'].includes((tripStatus || '').toUpperCase())) return { type: 'normal' };
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
   const p = String(timeStr).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
@@ -47,7 +70,7 @@ const getTimeUrgency = (timeStr, status) => {
   const tripMins = h * 60 + m;
   const diff = tripMins - nowMins;
   const activeStatuses = ['IN PROGRESS', 'IN TRANSIT', 'AT PICKUP', 'AT DROPOFF', 'NAVIGATING PICKUP', 'NAVIGATING DROPOFF'];
-  if (diff < 0 && !activeStatuses.includes((status || '').toUpperCase())) return { type: 'critical', diff, isPastDue: true };
+  if (diff < 0 && !activeStatuses.includes((tripStatus || '').toUpperCase())) return { type: 'critical', diff, isPastDue: true };
   if (diff > 0 && diff <= 30) return { type: 'critical', diff };
   if (diff > 30 && diff <= 60) return { type: 'warning', diff };
   return { type: 'normal' };
@@ -66,7 +89,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const isAnotherExpanded = expandedId !== null && expandedId !== task.id;
   const [copiedId, setCopiedId] = useState('');
 
-  const timeUrgency = getTimeUrgency(task.time, task.status);
+  const timeUrgency = getTimeUrgency(task);
   const isTerminal = ['Completed', 'Cancelled', 'No Show'].includes(task.status);
   const dropoffAddress = task.dropoff?.address || task.dropoff || '';
   const dropoffSiteName = (task.dropoff?.site || task.dropoffSite || '').trim();
@@ -120,24 +143,31 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   {isSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} className="text-slate-300" />}
                 </button>
               )}
-              <Clock size={timeUrgency.type === 'critical' ? 18 : 16} className={`shrink-0 ${
-                timeUrgency.type === 'critical' ? 'text-rose-600 animate-pulse' :
-                timeUrgency.type === 'warning' ? 'text-orange-500' :
-                isExpanded ? 'text-blue-600' : 'text-slate-400'
-              }`} strokeWidth={timeUrgency.type === 'normal' ? 2.5 : 3} />
-              <span className={`text-[19px] font-black tracking-tight whitespace-nowrap ${
-                timeUrgency.type === 'critical' ? 'text-rose-600' :
-                timeUrgency.type === 'warning' ? 'text-orange-500' :
-                'text-slate-900'
-              }`}>
-                {task.time || 'TBD'}
-              </span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); actions?.onScheduleEdit?.(task); }}
+                className="flex items-center gap-2 rounded-xl -ml-1 px-1.5 py-1 hover:bg-white/70 active:scale-95 transition-all cursor-pointer"
+                title="Update time, Will Call, IN/OUT, or urgent deadline"
+              >
+                <Clock size={timeUrgency.type === 'critical' ? 18 : 16} className={`shrink-0 ${
+                  timeUrgency.type === 'critical' ? 'text-rose-600 animate-pulse' :
+                  timeUrgency.type === 'warning' ? 'text-orange-500' :
+                  isExpanded ? 'text-blue-600' : 'text-slate-400'
+                }`} strokeWidth={timeUrgency.type === 'normal' ? 2.5 : 3} />
+                <span className={`text-[19px] font-black tracking-tight whitespace-nowrap ${
+                  timeUrgency.type === 'critical' ? 'text-rose-600' :
+                  timeUrgency.type === 'warning' ? 'text-orange-500' :
+                  'text-slate-900'
+                }`}>
+                  {task.time || 'TBD'}
+                </span>
+              </button>
               {timeUrgency.type !== 'normal' && (
                 <span className={`px-2 py-0.5 rounded-md text-xs font-bold whitespace-nowrap ${
                   timeUrgency.type === 'critical' ? 'bg-rose-50 text-rose-600' :
                   'bg-orange-50 text-orange-600'
                 }`}>
-                  {timeUrgency.isPastDue ? 'Past due' : `${timeUrgency.diff}m away`}
+                  {timeUrgency.label || (timeUrgency.isPastDue ? 'Past due' : `${timeUrgency.diff}m away`)}
                 </span>
               )}
             </div>
@@ -235,7 +265,14 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   </div>
                 )}
                 {task.tags?.map((tag, i) => (
-                  <div key={i} className="flex items-center gap-1 bg-slate-50 text-slate-600 px-2 py-1 rounded-md text-[0.75em] font-semibold border border-slate-200">{tag}</div>
+                  <button
+                    type="button"
+                    key={i}
+                    onClick={(e) => { e.stopPropagation(); actions?.onScheduleEdit?.(task); }}
+                    className="flex items-center gap-1 bg-slate-50 text-slate-600 px-2 py-1 rounded-md text-[0.75em] font-semibold border border-slate-200 hover:bg-slate-100 cursor-pointer"
+                  >
+                    {tag}
+                  </button>
                 ))}
               </div>
 

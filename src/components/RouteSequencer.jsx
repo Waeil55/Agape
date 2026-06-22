@@ -30,7 +30,7 @@ import {
   CalendarX,
   Shield
 } from 'lucide-react';
-import { db, doc, setDoc, onSnapshot } from '../config/firebase';
+import { db, doc, getDocFromServer, setDoc } from '../config/firebase';
 import { timeToMinutes } from '../utils/tripDate';
 import {
   ROUTE_ASSIGNMENT_STATUS,
@@ -214,12 +214,26 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
   // Load saved sequences from Firestore
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, SEQUENCES_DOC), (snap) => {
+    let cancelled = false;
+    const refreshTemplates = async () => {
+      try {
+        const snap = await getDocFromServer(doc(db, SEQUENCES_DOC));
+        if (cancelled) return;
       if (snap.exists()) {
         setSavedTemplates(snap.data().templates || []);
       }
-    });
-    return () => unsub();
+      } catch (err) {
+        if (!cancelled) console.error('Route templates refresh failed:', err);
+      }
+    };
+    refreshTemplates();
+    const timer = setInterval(refreshTemplates, 15000);
+    window.addEventListener('online', refreshTemplates);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('online', refreshTemplates);
+    };
   }, []);
 
   const allLiveClients = useMemo(() => {

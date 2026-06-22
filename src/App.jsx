@@ -7,11 +7,11 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   RefreshCcw, X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, setDoc, onSnapshot, collection, getDocs, serverTimestamp } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromServer, setDoc, collection, getDocs, getDocsFromServer, serverTimestamp } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
-import { timeToMinutes, tripMatchesTodayOrTomorrow, tripMatchesCalendarDay } from './utils/tripDate';
+import { timeToMinutes, tripCalendarDateKey, tripMatchesTodayOrTomorrow, isCalendarDateKeyWithinLastDays } from './utils/tripDate';
 import { cleanPhone } from './utils/smartContacts';
 import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, isDriverAssignedToDispatcher, isTripInDispatcherScope, normalizeEmail } from './utils/accessControl';
 import ChatPage from './components/ChatPage';
@@ -88,6 +88,14 @@ const getLogTextColor = (color) => {
 };
 
 const todayStr = new Date().toISOString().split('T')[0];
+const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
+const DRIVER_HISTORY_STATUSES = new Set(['completed', 'cancelled', 'no show', 'rerouted']);
+const normalizeTripStatus = (status) => String(status || '').trim().toLowerCase();
+const getTripHistoryDateKey = (trip) => tripCalendarDateKey(trip?.date) || tripCalendarDateKey(trip?.completedAt);
+const isRecentDriverHistoryTrip = (trip) => (
+  DRIVER_HISTORY_STATUSES.has(normalizeTripStatus(trip?.status))
+  && isCalendarDateKeyWithinLastDays(getTripHistoryDateKey(trip), DRIVER_HISTORY_LOOKBACK_DAYS)
+);
 
 function isTripLate(tripTime) {
   if (!tripTime || tripTime === 'Will Call') return false;
@@ -383,7 +391,7 @@ const App = () => {
         // Register service worker
         await registerServiceWorker();
         
-        // Service worker is static-cache only; Firestore onSnapshot owns data sync.
+        // Service worker is static-cache only; Firestore reads own data sync.
         cleanupSWMessages = setupSWMessageHandler((data) => {
           if (data?.type === 'STATIC_CACHE_UPDATED') setRefreshTick(t => t + 1);
         });
@@ -399,7 +407,7 @@ const App = () => {
     };
   }, []);
 
-  // ALL DATA COMES FROM FIRESTORE VIA onSnapshot — single source of truth
+  // ALL DATA COMES FROM FIRESTORE — single source of truth
   const {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
     loading: dataLoading, saving: dataSaving, error: dataError, lastSavedAt,
@@ -469,8 +477,10 @@ const App = () => {
           driverIds.has(trip.transferRequest?.toDriverId)
           || normalizeEmail(trip.transferRequest?.toDriverEmail) === email
         );
-      const activeStatus = !['Completed', 'Cancelled', 'No Show'].includes(trip.status);
-      return (assignedToCurrentDriver || incomingTransfer) && (tripMatchesTodayOrTomorrow(trip.date) || activeStatus || incomingTransfer);
+      const activeStatus = !DRIVER_HISTORY_STATUSES.has(normalizeTripStatus(trip.status));
+      const visibleManifestTrip = tripMatchesTodayOrTomorrow(trip.date) || activeStatus || incomingTransfer;
+      const visibleHistoryTrip = isRecentDriverHistoryTrip(trip);
+      return (assignedToCurrentDriver || incomingTransfer) && (visibleManifestTrip || visibleHistoryTrip);
     });
   }, [trips, drivers, currentUserDriverProfile, currentUser, role]);
   useEffect(() => {
@@ -707,9 +717,11 @@ const App = () => {
       setDriverTelemetry([]);
       return undefined;
     }
-    const unsub = onSnapshot(
-      collection(db, 'driverTelemetry'),
-      (snap) => {
+    let cancelled = false;
+    const refreshTelemetry = async () => {
+      try {
+        const snap = await getDocsFromServer(collection(db, 'driverTelemetry'));
+        if (cancelled) return;
         const recentDocs = [];
         snap.forEach((itemDoc) => {
           recentDocs.push({ id: itemDoc.id, ...itemDoc.data() });
@@ -721,12 +733,18 @@ const App = () => {
           .filter((item) => !item.date || item.date >= cutoffKey)
           .sort((a, b) => Date.parse(b?.lastPingAt || b?.updatedAtLocal || 0) - Date.parse(a?.lastPingAt || a?.updatedAtLocal || 0));
         setDriverTelemetry(filtered);
-      },
-      (err) => {
-        console.error('Realtime driver telemetry sync failed:', err);
+      } catch (err) {
+        if (!cancelled) console.error('Driver telemetry refresh failed:', err);
       }
-    );
-    return () => unsub();
+    };
+    refreshTelemetry();
+    const timer = setInterval(refreshTelemetry, 12000);
+    window.addEventListener('online', refreshTelemetry);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('online', refreshTelemetry);
+    };
   }, [isAuthenticated, realtimeReliability.resubscribeKey]);
 
   useEffect(() => {
@@ -891,7 +909,7 @@ const App = () => {
         }
 
         const userEmail = user.email;
-        // Capture in local variables for onSnapshot closure (useEffect has [])
+        // Capture in local variables for async auth closure (useEffect has [])
         const capturedRole = userRole;
         loginPortalRoleRef.current = null;
         roleRef.current = userRole;
@@ -935,7 +953,7 @@ const App = () => {
         });
 
         // Data is automatically synced from Firestore via useFirestoreAppData hook.
-        // No manual hydration needed — the onSnapshot listener provides real-time data.
+        // No manual hydration needed; Firestore polling keeps data current.
         setDataLoaded(false);
         authBootResolvedRef.current = true;
         setIsLoading(false);
@@ -1073,8 +1091,12 @@ const App = () => {
 
   useEffect(() => {
     if (!isAuthenticated || !currentUser || !role) return;
+    let cancelled = false;
     let firstSnapshot = true;
-    const unsub = onSnapshot(doc(db, 'chatData/conversations'), snap => {
+    const refreshChatUnread = async () => {
+      try {
+        const snap = await getDocFromServer(doc(db, 'chatData/conversations'));
+        if (cancelled) return;
       if (!snap.exists()) { setChatUnreadCount(0); return; }
       const curr = snap.data().conversations || {};
       // Calculate unread count for nav badge
@@ -1113,8 +1135,18 @@ const App = () => {
         }
       }
       prevChatConvsRef.current = curr;
-    });
-    return () => { unsub(); };
+      } catch (err) {
+        if (!cancelled) console.error('Chat unread refresh failed:', err);
+      }
+    };
+    refreshChatUnread();
+    const timer = setInterval(refreshChatUnread, 12000);
+    window.addEventListener('online', refreshChatUnread);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('online', refreshChatUnread);
+    };
   }, [isAuthenticated, currentUser, role, activeTab]);
 
   const addAuditLog = (title, desc, color, meta = null) => {

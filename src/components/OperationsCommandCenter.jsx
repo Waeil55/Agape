@@ -7,7 +7,7 @@ import {
   Square, CheckSquare, X, ArrowRight, TrendingUp, TrendingDown,
   Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2
 } from 'lucide-react';
-import { db, doc, onSnapshot } from '../config/firebase';
+import { db, doc, getDocFromServer } from '../config/firebase';
 import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
 import SendSmsModal from './SendSmsModal';
 import SmsConversationModal from './SmsConversationModal';
@@ -623,15 +623,29 @@ const OperationsCommandCenter = ({
   };
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'routeData', 'sequences'), (snap) => {
+    let cancelled = false;
+    const refreshRoutes = async () => {
+      try {
+        const snap = await getDocFromServer(doc(db, 'routeData', 'sequences'));
+        if (cancelled) return;
       if (snap.exists()) {
         const templates = snap.data().templates || [];
         setRouteTemplates(getOperationalRoutes(templates));
       } else {
         setRouteTemplates([]);
       }
-    });
-    return () => unsub();
+      } catch (err) {
+        if (!cancelled) console.error('Route sequence refresh failed:', err);
+      }
+    };
+    refreshRoutes();
+    const timer = setInterval(refreshRoutes, 15000);
+    window.addEventListener('online', refreshRoutes);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('online', refreshRoutes);
+    };
   }, []);
 
   const routeTripMap = useMemo(() => {

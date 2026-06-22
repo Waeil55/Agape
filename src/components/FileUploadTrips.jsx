@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, ArrowRight, Download, Truck, X } from 'lucide-react';
 import { GEMINI_API_CONFIG } from '../config/firebase';
+import { annotateInOutPairs, hasInOutMarker, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
+import { isCorruptedTripRecord } from '../utils/tripIntegrity';
 
 const timeToMinutes = (t) => {
   if (!t) return 1440;
@@ -51,6 +53,14 @@ const COLUMN_ALIASES = {
 };
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
+
+const cleanOdometer = (value) => {
+  if (value === undefined || value === null || value === '') return '';
+  const s = String(value).trim();
+  if (!s || /^\d{1,2}:\d{2}/.test(s)) return '';
+  const cleaned = s.replace(/,/g, '').replace(/\bmi(?:les)?\b/gi, '').trim();
+  return /^\d+(\.\d+)?$/.test(cleaned) && Number(cleaned) > 0 ? cleaned : '';
+};
 
 function normalizeDateValue(value) {
   if (!value) return '';
@@ -602,6 +612,18 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         const completedAt = extract(m.completedAt, row['Completed At'], row['completedAt'], row['Completion Time']);
         const startTime = extract(m.startTime, row['Start Time'], row['startTime'], row['Started At']);
         const departedPickupTime = extract(m.departedPickupTime, row['Departed Pickup'], row['departedPickupTime']);
+        const hasInOut = [
+          m.time,
+          m.dropoffTime,
+          m.type,
+          m.notes,
+          row['IN/OUT'],
+          row['In/Out'],
+          row['In Out'],
+          row['Trip Type'],
+          row['Service Type'],
+          ...Object.values(row || {}),
+        ].some(hasInOutMarker);
 
         // Date: use mapped value, or try raw keys
         let date = normalizeDateValue(m.date);
@@ -637,6 +659,10 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           providerName: extract(row['Provider Name'], row['providerName']),
           directDistance: extract(row['Direct Distance'], row['directDistance']),
           notes,
+          inOutTrip: hasInOut,
+          tripKind: hasInOut ? 'IN_OUT' : '',
+          inOutStayWithClient: hasInOut,
+          inOutWaitMinutes: hasInOut ? IN_OUT_WAIT_MINUTES : null,
 
           // --- STATUS ---
           status: extract(row['Status'], row['status'], forceCompleted ? 'Completed' : 'Unassigned'),
@@ -646,8 +672,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           completedVehicle,
 
           // --- ODOMETER ---
-          pickupOdometer: pickupOdo,
-          dropoffOdometer: dropoffOdo,
+          pickupOdometer: cleanOdometer(pickupOdo),
+          dropoffOdometer: cleanOdometer(dropoffOdo),
 
           // --- TIMES (arrival/departure/completion) ---
           arrivalTime,
@@ -686,19 +712,20 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         };
       });
 
-      setMappedTrips(mapped);
+      const pairedMapped = annotateInOutPairs(mapped);
+      setMappedTrips(pairedMapped);
       setParsedRows(rows);
-      setSelectedCount(mapped.length);
+      setSelectedCount(pairedMapped.length);
 
       const geminiConfig = GEMINI_API_CONFIG();
 
       if (aiEnabled && geminiConfig.apiKey) {
-        const aiResults = await aiValidate(mapped, (msg, pct) => {
+        const aiResults = await aiValidate(pairedMapped, (msg, pct) => {
           setProgressMsg(msg);
           setProgressPct(pct);
         });
 
-        const updated = mapped.map((trip, idx) => {
+        const updated = pairedMapped.map((trip, idx) => {
           const ai = aiResults[idx];
           if (ai && ai.issues?.length > 0) {
             return { ...trip, _hasIssues: true, _issues: ai.issues, _confidence: ai.confidence || 100 };
@@ -740,7 +767,11 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         return { ...trip, driverId: finalDriverId, status: newStatus };
       }
       return { ...trip, status: newStatus };
-    });
+    }).filter((trip) => !isCorruptedTripRecord(trip));
+    if (cleanTrips.length === 0) {
+      setError('No valid trips found. Each trip needs a real client name, service date, and pickup or dropoff address.');
+      return;
+    }
     onTripsCreated(cleanTrips);
   };
 

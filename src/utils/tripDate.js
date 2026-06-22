@@ -74,6 +74,22 @@ export function localCalendarYmd(d = new Date()) {
   return localYmd(d);
 }
 
+export function calendarDateKeyDaysAgo(daysAgo = 0, from = new Date()) {
+  const base = from instanceof Date ? from : new Date(from);
+  const safeBase = Number.isNaN(base.getTime()) ? new Date() : base;
+  const d = new Date(safeBase.getFullYear(), safeBase.getMonth(), safeBase.getDate());
+  d.setDate(d.getDate() - Math.max(0, Number(daysAgo) || 0));
+  return localYmd(d);
+}
+
+export function isCalendarDateKeyWithinLastDays(dateKey, days = 14, from = new Date()) {
+  if (!dateKey) return false;
+  const lookbackDays = Math.max(1, Number(days) || 1);
+  const startKey = calendarDateKeyDaysAgo(lookbackDays - 1, from);
+  const endKey = localCalendarYmd(from);
+  return dateKey >= startKey && dateKey <= endKey;
+}
+
 /**
  * True if trip service date is today or tomorrow (local calendar), or date is missing/unparseable.
  * Used for driver manifest so next-day assignments are visible.
