@@ -2545,7 +2545,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   if (!me) {
     return (
-      <div className="flex-1 bg-[#F3F4F6] flex items-center justify-center p-8">
+      <div className="flex-1 bg-[var(--bg-app)] flex items-center justify-center p-8">
         <div className="text-center">
           <div className="w-20 h-20 bg-white rounded-[2rem] shadow-lg flex items-center justify-center mx-auto mb-6">
             <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
@@ -2558,7 +2558,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F3F4F6] text-slate-900" style={{ fontSize: '96%' }}>
+    <div className="flex-1 flex flex-col bg-[var(--bg-app)] text-slate-900" style={{ fontSize: '96%' }}>
       {activeNav === 'trips' && expandedTripId && !activeWorkTrip && (
         <div
           className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
@@ -2567,7 +2567,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       )}
       {!(activeNav === 'trips' && activeWorkTrip) && (
         <div
-          className="sticky top-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
+          className="sticky top-0 z-30 border-b border-slate-200/40 bg-white shadow-sm"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
           <div className="px-3 py-3 flex items-center gap-3">
@@ -2611,7 +2611,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {activeNav === 'trips' && (
         <div
           ref={tripsScrollRef}
-          className={activeWorkTrip ? "flex-1 overflow-y-auto bg-[#F3F4F6]" : "flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F3F4F6]"}
+          className={activeWorkTrip ? "flex-1 overflow-y-auto bg-[var(--bg-app)]" : "flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[var(--bg-app)]"}
           style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
         >
           {activeWorkTrip ? renderTripWorkPage(activeWorkTrip) : (
@@ -4944,17 +4944,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   setActiveNav(item.id);
                 }}
                   className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${
-                    isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
+                    isActiveTab ? 'text-[var(--brand-primary)] font-bold' : 'text-slate-400 hover:text-slate-500'
                   }`}>
                   <div className="relative">
                     <Icon size={22} strokeWidth={isActiveTab ? 2.5 : 1.5}
-                      className={`transition-all duration-200 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}
+                      className={`transition-all duration-200 ${isActiveTab ? 'text-[var(--brand-primary)]' : 'text-slate-400'}`}
                     />
                     {item.id === 'chat' && chatUnreadCount > 0 && (
                       <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-bold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>
                     )}
                   </div>
-                  <span className={`text-[10px] tracking-wide transition-all leading-none ${isActiveTab ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>{item.label}</span>
+                  <span className={`text-[10px] tracking-wide transition-all leading-none ${isActiveTab ? 'text-[var(--brand-primary)] font-bold' : 'text-slate-400 font-medium'}`}>{item.label}</span>
                 </button>
               );
             })}

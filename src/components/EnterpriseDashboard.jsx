@@ -626,33 +626,32 @@ const EnterpriseDashboard = ({
     </header>
   );
 
-  // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="bg-[#F3F4F6]/95 backdrop-blur-xl border-b border-slate-200/80 px-3 flex md:hidden items-center gap-2 shrink-0 h-[56px] z-20 relative">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300 bg-white">
-        <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain" />
+    <header className="bg-white border-b border-slate-200/40 px-4 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-sm">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm p-1.5 shrink-0">
+        <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain" />
       </div>
-      <div>
-        <h1 className="text-[13px] font-bold text-slate-900 tracking-tight leading-none">Agape Care</h1>
-        <p className="text-[10px] font-medium text-slate-500 capitalize">{activeWorkspaceMeta.title}</p>
+      <div className="min-w-0 pr-2">
+        <h1 className="text-sm font-black text-slate-900 tracking-tight leading-none">Agape Care</h1>
+        <p className="text-[10px] font-bold text-slate-500 capitalize mt-1 truncate">{activeWorkspaceMeta.title}</p>
       </div>
       <div className="flex-1" />
       {/* Online status dot */}
-      <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} title={isOnline ? 'Online' : 'Offline'} />
+      <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'} shrink-0`} title={isOnline ? 'Online' : 'Offline'} />
       {activePanel === 'operations' && (
         <button
           onClick={toggleRightPanel}
-          className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-bold shadow-sm ${
-            showRightPanel ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+          className={`flex items-center justify-center w-8 h-8 rounded-full shadow-sm border ${
+            showRightPanel ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 hover:bg-slate-200 border-slate-200/40 text-slate-600'
           }`}
         >
-          <PanelRight size={11} /> Panel
+          <PanelRight size={14} />
         </button>
       )}
       {/* User avatar -> settings */}
       <button
         onClick={() => setActivePanel('settings')}
-        className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-black hover:bg-slate-300 transition uppercase"
+        className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-black hover:bg-slate-300 transition uppercase shadow-sm shrink-0 border border-white"
       >
         {(currentUser || 'U')[0]}
       </button>
@@ -671,18 +670,18 @@ const EnterpriseDashboard = ({
             key={item.id}
             onClick={() => setActivePanel(item.id)}
             className={`flex-1 flex flex-col items-center justify-center py-1 gap-0.5 transition-all relative min-h-[52px] ${
-              isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
+              isActive ? 'text-[var(--brand-primary)] font-bold' : 'text-slate-400 hover:text-slate-500'
             }`}
           >
             <div className="relative">
-              <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} className={isActive ? 'text-[var(--brand-primary)]' : 'text-slate-400'} />
               {hasBadge && (
                 <span className="absolute -top-1 -right-2 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
                   {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
                 </span>
               )}
             </div>
-            <span className={`text-[10px] tracking-wide transition-all leading-none ${isActive ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>
+            <span className={`text-[10px] tracking-wide transition-all leading-none ${isActive ? 'text-[var(--brand-primary)] font-bold' : 'text-slate-400 font-medium'}`}>
               {item.label}
             </span>
           </button>
@@ -1125,7 +1124,7 @@ const EnterpriseDashboard = ({
 
   // ==================== MAIN LAYOUT ====================
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#f4f7fa] font-sans text-slate-900">
+    <div className="h-screen w-full overflow-hidden bg-[var(--bg-app)] font-sans text-slate-900">
       <div className="flex h-full min-w-0 flex-col">
         {/* Top Header - Desktop only */}
         {renderEnterpriseTopBar()}
@@ -1135,7 +1134,7 @@ const EnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'chat'].includes(activePanel) ? '' : 'p-6'}`}>
+          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'chat'].includes(activePanel) ? '' : 'p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : (

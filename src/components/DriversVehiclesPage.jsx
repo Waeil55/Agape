@@ -247,7 +247,7 @@ const [form, setForm] = useState({
   return (
     <div className={mode === 'all' ? 'space-y-5' : ''}>
       {mode === 'all' && (
-        <div className="flex gap-2 flex-wrap sticky top-0 z-10 bg-[#F3F4F6]/95 py-1 backdrop-blur">
+        <div className="flex gap-2 flex-wrap sticky top-0 z-10 bg-[var(--bg-app)]/95 py-1 backdrop-blur">
           {[
             { id: 'drivers', label: 'Drivers', icon: User },
             { id: 'vehicles', label: 'Vehicles', icon: Truck }
@@ -265,7 +265,7 @@ const [form, setForm] = useState({
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 sticky top-[52px] z-10 bg-[#F3F4F6] py-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 sticky top-[52px] z-10 bg-[var(--bg-app)] py-2">
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
           {resolvedTab === 'drivers' ? 'Drivers' : 'Vehicles'}
         </h2>

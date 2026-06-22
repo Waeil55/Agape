@@ -602,7 +602,7 @@ const AdminPage = ({
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 sticky top-0 z-10 bg-[#F3F4F6]/95 backdrop-blur">
+      <div className="flex gap-2 overflow-x-auto pb-2 sticky top-0 z-10 bg-[var(--bg-app)]/95 backdrop-blur">
         {role === 'admin' && (
           <button onClick={runSecurityAnalysis} disabled={aiSecLoading} className="px-3 py-2 rounded-xl text-[11px] font-bold transition-colors shrink-0 flex items-center gap-1.5 bg-slate-900 text-white hover:bg-slate-800 shadow-sm border border-slate-900 disabled:opacity-60">
             {aiSecLoading ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
