@@ -4140,7 +4140,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
           <div className="px-1 pt-2 pb-2">
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap">
-              <h2 className="text-lg font-black text-slate-900 shrink-0 mr-1">History</h2>
+
               <button
                 type="button"
                 onClick={() => goToHistoryDay(-1)}
