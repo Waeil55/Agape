@@ -3067,11 +3067,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 return (
                   <div key={`${getRoutePlanStopKey(stop)}-current`} className="relative pl-12 pr-2 my-4">
-                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-[#2A6495] border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-[#23568E] border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
                       <span className="text-xs font-black text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200">
-                      <div className="bg-[#2A6495] px-4 py-3 text-white">
+                      <div className="bg-[#23568E] px-4 py-3 text-white">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <span className="px-2 py-0.5 rounded-lg bg-white/15 text-[10px] font-black tracking-wider uppercase">{stopType === 'DO' ? 'Dropoff' : 'Pickup'}</span>
@@ -3711,7 +3711,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
             <div className="flex items-start justify-between mb-6">
               <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-[#2A6495] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/20">
+                <div className="w-16 h-16 bg-[#23568E] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/20">
                   <Gauge size={28} className="text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900">Arrived at Stop</h3>
@@ -3737,7 +3737,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-[#2A6495] hover:bg-[#204B70] text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
+                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-[#23568E] hover:bg-[#1B4471] text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
               </div>
             </div>
           </div>

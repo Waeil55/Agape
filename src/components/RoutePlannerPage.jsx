@@ -480,7 +480,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
                 {optimizing ? <Loader2 size={11} className="animate-spin" /> : <BrainCircuit size={11} />} Optimize
               </button>
               <button onClick={copyRoute} disabled={stops.length === 0} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-30" title="Copy route"><Copy size={13} /></button>
-              <button onClick={sendToSequencer} disabled={stops.length === 0 || typeof onSendToSequencer !== 'function'} className="h-7 w-[90px] bg-[#2A6495] text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-[#204B70] active:scale-95 disabled:opacity-30 shadow-sm" title="Send route to sequencer">
+              <button onClick={sendToSequencer} disabled={stops.length === 0 || typeof onSendToSequencer !== 'function'} className="h-7 w-[90px] bg-[#23568E] text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-[#1B4471] active:scale-95 disabled:opacity-30 shadow-sm" title="Send route to sequencer">
                 <Route size={11} /> Sequencer
               </button>
               <button onClick={clearRoute} disabled={stops.length === 0} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg disabled:opacity-30" title="Clear route"><Trash2 size={13} /></button>
