@@ -596,7 +596,33 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [scheduleEditorTrip, setScheduleEditorTrip] = useState(null);
   const [scheduleEditDraft, setScheduleEditDraft] = useState(null);
   const [scheduleEditError, setScheduleEditError] = useState('');
-  const [activeWorkTripId, setActiveWorkTripId] = useState(null);
+  const [activeWorkTripId, setActiveWorkTripIdRaw] = useState(() => {
+    try {
+      const savedNav = localStorage.getItem(`agape_drvNav_${userKey}`) || 'trips';
+      if (savedNav === 'trips') {
+        return localStorage.getItem(`agape_drvActiveTrip_${userKey}`) || null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
+
+  const setActiveWorkTripId = useCallback((val) => {
+    setActiveWorkTripIdRaw(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      try {
+        if (next) {
+          localStorage.setItem(`agape_drvActiveTrip_${userKey}`, next);
+        } else {
+          localStorage.removeItem(`agape_drvActiveTrip_${userKey}`);
+        }
+      } catch (err) {
+        console.error('Failed to save activeWorkTripId to localStorage:', err);
+      }
+      return next;
+    });
+  }, [userKey]);
   const [workNotesOpen, setWorkNotesOpen] = useState(false);
   const [showTripDetails, setShowTripDetails] = useState(null);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
@@ -762,7 +788,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   // Clear expandedTripId if the trip no longer exists
   useEffect(() => {
-    if (expandedTripId && !trips.some(t => t.id === expandedTripId)) {
+    if (expandedTripId && trips.length > 0 && !trips.some(t => t.id === expandedTripId)) {
       setExpandedTripId(null);
     }
   }, [trips, expandedTripId, setExpandedTripId]);
@@ -1060,11 +1086,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }
   }, [activeNav, activeWorkTripId]);
   useEffect(() => {
-    if (activeWorkTripId && !driverScopedTrips.some((trip) => trip.id === activeWorkTripId)) {
+    if (activeWorkTripId && trips.length > 0 && !driverScopedTrips.some((trip) => trip.id === activeWorkTripId)) {
       setActiveWorkTripId(null);
       setWorkNotesOpen(false);
     }
-  }, [activeWorkTripId, driverScopedTrips]);
+  }, [activeWorkTripId, driverScopedTrips, trips]);
   const activeLocationTrip = activeTrips.find((trip) => [
     'In Mission',
     'En Route',
