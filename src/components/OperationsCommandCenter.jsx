@@ -1036,15 +1036,15 @@ const OperationsCommandCenter = ({
   const renderControlBar = () => (
     <div className="flex items-center justify-between gap-3 px-2 py-1.5 border-b border-slate-200 bg-white shrink-0 overflow-x-auto no-scrollbar sticky top-0 z-20 shadow-sm">
       <div className="flex items-center gap-1.5 shrink-0">
-        <div className="flex items-center gap-0.5 shrink-0 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+        <div className="flex items-center gap-0.5 shrink-0 bg-[#e8eff6] p-1 rounded-full">
           {['manifest', 'willcall', 'fleet'].map(tab => (
             <button
               key={tab}
               onClick={() => setOperationsTab(tab)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all duration-200 ${
+              className={`px-4 py-1.5 rounded-full text-xs font-black transition-all duration-200 uppercase tracking-wider ${
                 operationsTab === tab
-                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 border border-transparent'
+                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/30'
               }`}
             >
               {tab === 'manifest' ? 'Manifest' : tab === 'willcall' ? 'Will Call' : 'Fleet'}
