@@ -128,7 +128,7 @@
   --glass-blur: 16px;
 
   /* Gradient accents */
-  --gradient-brand: linear-gradient(135deg, #23568E 0%, #1B4471 100%);
+  --gradient-brand: linear-gradient(135deg, #23568E 0%, #306FB4 100%);
   --gradient-success: linear-gradient(135deg, #059669 0%, #10b981 100%);
   --gradient-warning: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
   --gradient-danger: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
@@ -1405,7 +1405,7 @@ table thead,
 table thead[class],
 table thead tr,
 table thead tr[class] {
-  background: linear-gradient(135deg, #23568E 0%, #1B4471 100%) !important;
+  background: #23568E !important;
 }
 
 table thead th,
