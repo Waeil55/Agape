@@ -302,19 +302,14 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
     { label: 'DROPOFF ADDRESS', value: formatTripDetailValue(getFirstTripValue(trip, ['dropoff', 'dropoffAddress'])), tone: 'red' },
     { label: 'SIGNATURE', value: trip.paperSignatureConfirmed || trip.signature || trip.signatureUrl ? 'Yes' : 'No' },
   ];
-  const valueToneClass = {
-    blue: 'text-blue-800',
-    green: 'text-emerald-800',
-    red: 'text-rose-800',
-  };
   return (
-    <div className="overflow-hidden border-t border-slate-300 bg-white">
+    <div className="overflow-hidden border-t border-slate-400 bg-white">
       <table className="w-full table-fixed text-left">
         <tbody>
           {rows.map((row) => (
-            <tr key={row.label} className="align-top border-b border-slate-200 last:border-b-0">
-              <th className="w-[50%] bg-slate-100 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700">{row.label}</th>
-              <td className={`px-4 py-3 text-sm font-black break-words ${valueToneClass[row.tone] || 'text-slate-950'}`}>{row.value}</td>
+            <tr key={row.label} className="align-top border-b border-slate-300 last:border-b-0">
+              <th className="w-[50%] bg-slate-200 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-slate-950">{row.label}</th>
+              <td className="px-4 py-3 text-sm font-black break-words text-slate-950">{row.value}</td>
             </tr>
           ))}
         </tbody>
@@ -3957,8 +3952,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <User size={22} />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-base font-black text-slate-950 uppercase tracking-wide truncate">{showTripDetails.patient || 'Trip'}</h3>
-                          <p className="text-sm font-black text-blue-800/60 truncate">#{showTripDetails.bookingId || showTripDetails.id}</p>
+                          <h3 className="text-base font-black text-white uppercase tracking-wide truncate">{showTripDetails.patient || 'Trip'}</h3>
+                          <p className="text-sm font-black text-white/90 truncate">#{showTripDetails.bookingId || showTripDetails.id}</p>
                         </div>
                       </div>
                       <span className={`shrink-0 rounded-xl px-3 py-1 text-xs font-black uppercase tracking-wider ${statusMeta.bg}`}>
@@ -4252,8 +4247,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                 <User size={22} />
                               </div>
                               <div className="min-w-0">
-                                <h3 className="text-base font-black text-slate-950 uppercase tracking-wide truncate">{trip.patient || 'Trip'}</h3>
-                                <p className="text-sm font-black text-blue-800/60 truncate">#{trip.bookingId || trip.id}</p>
+                                <h3 className="text-base font-black text-white uppercase tracking-wide truncate">{trip.patient || 'Trip'}</h3>
+                                <p className="text-sm font-black text-white/90 truncate">#{trip.bookingId || trip.id}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">

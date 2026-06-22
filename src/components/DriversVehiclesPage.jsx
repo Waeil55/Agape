@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Truck, Plus, Trash2, Edit2, AlertCircle, X, Save, ClipboardList, Upload, CheckSquare, Clock, Phone, MessageSquare, BrainCircuit, Loader2, ChevronDown } from 'lucide-react';
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiAnalyzeDriver } from '../config/ai';
 
-const DriversVehiclesPage = ({ role, drivers = [], setDrivers, dispatchers = [], addAuditLog, currentUser, trips = [], onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles, mode = 'all' }) => {
+const DriversVehiclesPage = ({ role, drivers = [], setDrivers, dispatchers = [], addAuditLog, currentUser, trips = [], onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles, mode = 'all', createIntent = null, onCreateIntentHandled }) => {
   const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
   const [activeTab, setActiveTab] = useState(mode !== 'all' ? mode : 'drivers');
   const [showForm, setShowForm] = useState(false);
@@ -38,6 +38,13 @@ const [form, setForm] = useState({
     setVForm({ name: v.name, make: v.make || '', model: v.model || '', year: v.year || '', color: v.color || '', plate: v.plate || '', vin: v.vin || '', odometer: v.odometer || '' });
     setVehicleForm(true);
   };
+
+  useEffect(() => {
+    if (!createIntent?.nonce) return;
+    setActiveTab('vehicles');
+    openVAdd();
+    onCreateIntentHandled?.();
+  }, [createIntent?.nonce]);
   
   const saveVehicle = () => {
     if (!vForm.name.trim()) return;
@@ -125,15 +132,18 @@ const [form, setForm] = useState({
       addAuditLog('Driver Updated', `${currentUser} updated driver ${form.name}.`, 'blue');
     } else {
       const id = `DRV-${String(drivers.length + 1).padStart(3, '0')}`;
+      const currentDispatcher = role === 'dispatcher'
+        ? dispatchers.find((dispatcher) => normalizeEmail(dispatcher.email) === normalizeEmail(currentUser))
+        : null;
        setDrivers(prev => [...prev, {
-         id, name: form.name, status: form.status, vehicle: form.vehicle, dist: '--',
-         currentZone: form.currentZone, odometer: 0, nextOilChange: 5000,
-         assignedTo: form.assignedTo || '', schedule: [],
-         email: form.email, phone: form.phone,
-         vin: form.vin || '', insuranceExpiry: form.insuranceExpiry || '',
-         capacity: form.capacity || '1', licenseNumber: form.licenseNumber || '',
-         cdlStatus: form.cdlStatus || 'Active', assignedDispatcher: form.assignedDispatcher || '',
-       }]);
+          id, name: form.name, status: form.status, vehicle: form.vehicle, dist: '--',
+          currentZone: form.currentZone, odometer: 0, nextOilChange: 5000,
+          assignedTo: currentDispatcher?.id || form.assignedTo || '', schedule: [],
+          email: form.email, phone: form.phone,
+          vin: form.vin || '', insuranceExpiry: form.insuranceExpiry || '',
+          capacity: form.capacity || '1', licenseNumber: form.licenseNumber || '',
+          cdlStatus: form.cdlStatus || 'Active', assignedDispatcher: currentDispatcher?.id || form.assignedDispatcher || '',
+        }]);
       addAuditLog('Driver Added', `${currentUser} added driver ${form.name}.`, 'emerald');
     }
     setShowForm(false);

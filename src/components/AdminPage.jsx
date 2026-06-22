@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, Wifi, WifiOff, BrainCircuit, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
-import { sendPasswordResetEmail, auth } from '../config/firebase';
+import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, Wifi, WifiOff, BrainCircuit, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase } from 'lucide-react';
+import { sendPasswordResetEmail, auth, db, firebaseConfig, setDoc, doc, deleteApp, initializeApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from '../config/firebase';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiSecurityAnalysis } from '../config/ai';
 import DriversVehiclesPage from './DriversVehiclesPage';
@@ -27,6 +27,19 @@ const getTripIdFromLog = (log) => {
 const fmtTime = (t) => t ? new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 const fmtDate = (t) => t ? new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
 const displayRef = (trip) => (trip.bookingId || trip.id || '').replace(/^TRIP-/, 'Trip ID: ');
+const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
+const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
+const normalizeUsername = (value = '') => String(value || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+const usernameToAuthEmail = (username = '') => {
+  const normalized = normalizeUsername(username);
+  return normalized ? `${normalized}@${INTERNAL_AUTH_DOMAIN}` : '';
+};
+const buildStableProfileId = (role, uid) => {
+  const seed = String(uid || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'USER';
+  if (role === 'dispatcher') return `DSP-${seed}`;
+  if (role === 'driver') return `DRV-${seed}`;
+  return null;
+};
 
 const statusColor = (status) => {
   if (!status) return 'bg-slate-200 text-slate-600';
@@ -210,16 +223,136 @@ const AdminPage = ({
   addAuditLog, logs = [], trips, vehicles, setVehicles,
   assignTripToDriver, requestAuthAction, onViewTrip
 }) => {
-  const [activeSection, setActiveSection] = useState('dispatchers');
+  const [activeSection, setActiveSection] = useState(() => role === 'admin' ? 'dispatchers' : 'drivers');
   const [pwResetMsg, setPwResetMsg] = useState({});
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [aiSecurity, setAiSecurity] = useState(null);
   const [aiSecLoading, setAiSecLoading] = useState(false);
+  const [createUserRole, setCreateUserRole] = useState(null);
+  const [createForm, setCreateForm] = useState({ username: '', password: '', phone: '' });
+  const [createError, setCreateError] = useState('');
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [vehicleCreateIntent, setVehicleCreateIntent] = useState(null);
 
   const runSecurityAnalysis = useCallback(async () => { setAiSecLoading(true); const r = await aiSecurityAnalysis([...drivers, ...dispatchers].map(u => ({ email: u.email, role: u.role, lastLogin: u.lastLogin, disabled: u.disabled })), logs || []); setAiSecurity(r); setAiSecLoading(false); }, [drivers, dispatchers, logs]);
 
   const toggleSection = (id) => {
     setActiveSection(prev => prev === id ? null : id);
+  };
+
+  const openCreateUser = (targetRole) => {
+    if (targetRole === 'dispatcher' && role !== 'admin') return;
+    if (targetRole !== 'driver' && targetRole !== 'dispatcher') return;
+    setCreateError('');
+    setCreateForm({ username: '', password: '', phone: '' });
+    setCreateUserRole(targetRole);
+  };
+
+  const closeCreateUser = () => {
+    setCreateUserRole(null);
+    setCreateError('');
+    setCreatingUser(false);
+  };
+
+  const createRoleUser = async () => {
+    setCreateError('');
+    if (!createUserRole) return;
+    if (createUserRole === 'dispatcher' && role !== 'admin') {
+      setCreateError('Dispatchers cannot create dispatcher accounts.');
+      return;
+    }
+    if (!createForm.username || !createForm.password) {
+      setCreateError('Username and password are required.');
+      return;
+    }
+    if (createForm.password.length < 6) {
+      setCreateError('Password must be at least 6 characters.');
+      return;
+    }
+    const username = normalizeUsername(createForm.username);
+    if (!username) {
+      setCreateError('Username can use only letters, numbers, dot, dash, or underscore.');
+      return;
+    }
+    const authEmail = usernameToAuthEmail(username);
+    const duplicateDriver = drivers.some((item) => normalizeEmail(item.email) === authEmail || normalizeUsername(item.username || item.name) === username);
+    const duplicateDispatcher = dispatchers.some((item) => normalizeEmail(item.email) === authEmail || normalizeUsername(item.username || item.name) === username);
+    if (duplicateDriver || duplicateDispatcher) {
+      setCreateError('That username is already in use.');
+      return;
+    }
+
+    let secondaryApp;
+    setCreatingUser(true);
+    try {
+      secondaryApp = initializeApp(firebaseConfig, `secondary-admin-create-${Date.now()}`);
+      const secondaryAuth = getAuth(secondaryApp);
+      const userCred = await createUserWithEmailAndPassword(secondaryAuth, authEmail, createForm.password);
+      const profileId = buildStableProfileId(createUserRole, userCred.user.uid);
+      await setDoc(doc(db, 'users', userCred.user.uid), {
+        email: authEmail,
+        username,
+        name: username,
+        role: createUserRole,
+        phone: createForm.phone,
+        profileId,
+        loginType: 'username',
+      }, { merge: true });
+
+      await authSignOut(secondaryAuth);
+      await deleteApp(secondaryApp);
+      secondaryApp = null;
+
+      if (createUserRole === 'dispatcher') {
+        setDispatchers(prev => [...prev, {
+          id: profileId,
+          name: username,
+          email: authEmail,
+          username,
+          phone: createForm.phone,
+          clockedIn: false,
+        }]);
+      } else {
+        const currentDispatcher = role === 'dispatcher'
+          ? dispatchers.find((item) => normalizeEmail(item.email) === normalizeEmail(currentUser))
+          : null;
+        setDrivers(prev => [...prev, {
+          id: profileId,
+          name: username,
+          email: authEmail,
+          username,
+          phone: createForm.phone,
+          status: 'Available',
+          vehicle: 'Pending Assignment',
+          dist: '--',
+          currentZone: 'TBD',
+          odometer: 0,
+          nextOilChange: 5000,
+          assignedDispatcher: currentDispatcher?.id || '',
+          assignedTo: currentDispatcher?.id || '',
+          schedule: [],
+          clockedIn: false,
+        }]);
+      }
+
+      addAuditLog(
+        createUserRole === 'dispatcher' ? 'Dispatcher Added' : 'Driver Added',
+        `${currentUser} created ${createUserRole} account: ${username}`,
+        'emerald',
+        { entity: createUserRole, id: profileId, diffs: [{ field: 'username', before: null, after: username }] }
+      );
+      closeCreateUser();
+    } catch (err) {
+      if (secondaryApp) await deleteApp(secondaryApp).catch(() => {});
+      setCreateError(String(err?.message || 'Could not create account.').replace('Firebase: ', ''));
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const openVehicleCreate = () => {
+    setActiveSection('vehicles');
+    setVehicleCreateIntent({ nonce: Date.now() });
   };
 
   // All users merged from drivers + dispatchers with role labels
@@ -302,7 +435,7 @@ const AdminPage = ({
   }), [logs]);
 
   const sections = [
-    { id: 'dispatchers', title: 'Dispatcher Activity', icon: ClipboardList, count: dispatchers.length,
+    { id: 'dispatchers', title: 'Dispatcher Activity', icon: ClipboardList, count: dispatchers.length, roles: ['admin'],
       content: (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {dispatchers.filter(d => d.name).map((disp, i) => (
@@ -313,7 +446,7 @@ const AdminPage = ({
           )}
         </div>
       ) },
-    { id: 'drivers', title: 'Driver Activity', icon: Truck, count: drivers.length,
+    { id: 'drivers', title: 'Driver Activity', icon: Truck, count: drivers.length, roles: ['admin', 'dispatcher'],
       content: (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {activeDrivers.map((driver, i) => (
@@ -324,7 +457,7 @@ const AdminPage = ({
           )}
         </div>
       ) },
-    { id: 'logins', title: 'Logins & Roles', icon: UserCog, count: allUsers.length,
+    { id: 'logins', title: 'Logins & Roles', icon: UserCog, count: allUsers.length, roles: ['admin'],
       content: (
         <>
           <div className="overflow-x-auto rounded-2xl border border-slate-100 shadow-sm">
@@ -410,7 +543,7 @@ const AdminPage = ({
           </div>
         </>
       ) },
-    { id: 'vehicles', title: 'Vehicles', icon: CarFront, count: vehicles.length,
+    { id: 'vehicles', title: 'Vehicles', icon: CarFront, count: vehicles.length, roles: ['admin', 'dispatcher'],
       content: (
         <DriversVehiclesPage
           mode="vehicles"
@@ -420,9 +553,11 @@ const AdminPage = ({
           trips={trips} onAssignTrip={assignTripToDriver}
           requestAuthAction={requestAuthAction}
           vehicles={vehicles} setVehicles={setVehicles}
+          createIntent={vehicleCreateIntent}
+          onCreateIntentHandled={() => setVehicleCreateIntent(null)}
         />
       ) },
-    { id: 'activity', title: 'System Activity', icon: Activity,
+    { id: 'activity', title: 'System Activity', icon: Activity, roles: ['admin', 'dispatcher'],
       content: (
         <UsersPage
           activityFeedOnly
@@ -434,42 +569,128 @@ const AdminPage = ({
         />
       ) },
   ];
+  const visibleSections = sections.filter((section) => !section.roles || section.roles.includes(role));
 
   return (
+    <>
     <div className="space-y-4">
       <div className="rounded-3xl border border-slate-100/50 bg-white p-4 shadow-sm hover:shadow-md transition-all duration-200">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-blue-600">Admin Workspace</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-blue-600">{role === 'admin' ? 'Admin Workspace' : 'Dispatcher Fleet Tools'}</p>
             <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">People, Fleet, and Access Control</h2>
-            <p className="mt-1 text-sm font-medium text-slate-500">Dispatcher activity, driver movement, vehicle records, login control, and audit history.</p>
+            <p className="mt-1 text-sm font-medium text-slate-500">{role === 'admin' ? 'Dispatcher activity, driver movement, vehicle records, login control, and audit history.' : 'Create drivers, manage vehicles, and review your driver activity.'}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <span className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">{drivers?.length || 0} drivers</span>
-            <span className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700">{dispatchers?.length || 0} dispatchers</span>
+            {role === 'admin' && <span className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700">{dispatchers?.length || 0} dispatchers</span>}
             <span className="rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">{vehicles?.length || 0} vehicles</span>
           </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" onClick={() => openCreateUser('driver')} className="inline-flex h-9 items-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700">
+            <Plus size={14} /> Add Driver
+          </button>
+          <button type="button" onClick={openVehicleCreate} className="inline-flex h-9 items-center gap-2 rounded-xl bg-slate-900 px-3 text-xs font-black text-white shadow-sm transition hover:bg-slate-800">
+            <Plus size={14} /> Add Vehicle
+          </button>
+          {role === 'admin' && (
+            <button type="button" onClick={() => openCreateUser('dispatcher')} className="inline-flex h-9 items-center gap-2 rounded-xl bg-blue-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-blue-700">
+              <Plus size={14} /> Add Dispatcher
+            </button>
+          )}
         </div>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-2 sticky top-0 z-10 bg-[#F3F4F6]/95 backdrop-blur">
-        <button onClick={runSecurityAnalysis} disabled={aiSecLoading} className="px-3 py-2 rounded-xl text-[11px] font-bold transition-colors shrink-0 flex items-center gap-1.5 bg-slate-900 text-white hover:bg-slate-800 shadow-sm border border-slate-900 disabled:opacity-60">
-          {aiSecLoading ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
-          {aiSecLoading ? 'Scanning...' : 'Security Scan'}
-        </button>
-        {sections.map(s => (
+        {role === 'admin' && (
+          <button onClick={runSecurityAnalysis} disabled={aiSecLoading} className="px-3 py-2 rounded-xl text-[11px] font-bold transition-colors shrink-0 flex items-center gap-1.5 bg-slate-900 text-white hover:bg-slate-800 shadow-sm border border-slate-900 disabled:opacity-60">
+            {aiSecLoading ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
+            {aiSecLoading ? 'Scanning...' : 'Security Scan'}
+          </button>
+        )}
+        {visibleSections.map(s => (
           <SectionTab key={s.id} title={s.title} count={s.count} isActive={activeSection === s.id} onClick={() => toggleSection(s.id)} />
         ))}
       </div>
       <div className="space-y-3">
-        <AIInsightsBanner insights={aiSecurity} loading={aiSecLoading} onClose={() => setAiSecurity(null)} />
-        {sections.filter(s => activeSection === s.id).map(s => (
+        {role === 'admin' && <AIInsightsBanner insights={aiSecurity} loading={aiSecLoading} onClose={() => setAiSecurity(null)} />}
+        {visibleSections.filter(s => activeSection === s.id).map(s => (
           <div key={s.id} className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
             <div className="px-5 py-4">{s.content}</div>
           </div>
         ))}
       </div>
     </div>
+    {createUserRole && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+        <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className={`flex h-11 w-11 items-center justify-center rounded-2xl text-white ${createUserRole === 'dispatcher' ? 'bg-blue-600' : 'bg-emerald-600'}`}>
+                {createUserRole === 'dispatcher' ? <Briefcase size={20} /> : <Truck size={20} />}
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-950">Add {createUserRole === 'dispatcher' ? 'Dispatcher' : 'Driver'}</h3>
+                <p className="text-xs font-semibold text-slate-500">Creates the login and profile together.</p>
+              </div>
+            </div>
+            <button type="button" onClick={closeCreateUser} className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200" aria-label="Close">
+              <X size={18} />
+            </button>
+          </div>
+          <form onSubmit={(e) => { e.preventDefault(); createRoleUser(); }} className="space-y-4 p-5">
+            {createError && (
+              <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" /> {createError}
+              </div>
+            )}
+            <div>
+              <label className="mb-1 block text-sm font-bold text-slate-800">Username</label>
+              <input
+                type="text"
+                required
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
+                value={createForm.username}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, username: e.target.value }))}
+                className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                placeholder={createUserRole === 'dispatcher' ? 'dispatcher.name' : 'driver.name'}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-bold text-slate-800">Password</label>
+              <input
+                type="password"
+                required
+                value={createForm.password}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
+                className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                placeholder="Minimum 6 characters"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-bold text-slate-800">Phone Number</label>
+              <input
+                type="tel"
+                value={createForm.phone}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, phone: e.target.value }))}
+                className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                placeholder="+1 (555) 000-0000"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={closeCreateUser} className="h-11 flex-1 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 transition hover:bg-slate-50">Cancel</button>
+              <button type="submit" disabled={creatingUser} className={`h-11 flex-1 rounded-xl text-sm font-black text-white transition disabled:opacity-50 ${createUserRole === 'dispatcher' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                {creatingUser ? 'Creating...' : <span className="inline-flex items-center justify-center gap-2"><Save size={15} /> Create</span>}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

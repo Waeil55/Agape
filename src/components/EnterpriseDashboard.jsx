@@ -214,7 +214,7 @@ const EnterpriseDashboard = ({
     { id: 'routePlanner', label: 'Routes', icon: Route, roles: ['admin', 'dispatcher'] },
     { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['admin', 'dispatcher', 'billing', 'qa_auditor', 'fleet_manager', 'supervisor'] },
     { id: 'archives', label: 'Archives', icon: Archive, roles: ['admin', 'dispatcher'] },
-    { id: 'admin', label: 'Admin', icon: Users, roles: ['admin'] },
+    { id: 'admin', label: role === 'admin' ? 'Admin' : 'People/Fleet', icon: Users, roles: ['admin', 'dispatcher'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin', 'dispatcher'] },
   ].filter(item => item.roles.includes(role))
     .filter(item => item.id !== 'drive' || driverWorkDrivers.length > 0);
@@ -310,7 +310,7 @@ const EnterpriseDashboard = ({
       { id: 'dispatch', label: 'Dispatch Board', icon: Zap, active: activePanel === 'operations', action: () => openOperationsWorkspace('manifest') },
       { id: 'schedule', label: 'Schedule', icon: CalendarDays, active: showSequencerModal, action: () => setShowSequencerModal(true) },
       ...(driverWorkDrivers.length > 0 ? [{ id: 'drive', label: 'Drive', icon: Truck, active: activePanel === 'drive', action: () => setActivePanel('drive') }] : []),
-      ...(role === 'admin' ? [{ id: 'admin', label: 'Admin', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
+      ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'People/Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
       { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => setActivePanel('reports') },
       { id: 'map', label: 'Live Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
       { id: 'messages', label: 'Messages', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat') },
