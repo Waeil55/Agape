@@ -128,7 +128,7 @@
   --glass-blur: 16px;
 
   /* Gradient accents */
-  --gradient-brand: linear-gradient(135deg, #23568E 0%, #4581c1 100%);
+  --gradient-brand: linear-gradient(135deg, #23568E 0%, #1B4471 100%);
   --gradient-success: linear-gradient(135deg, #059669 0%, #10b981 100%);
   --gradient-warning: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
   --gradient-danger: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
@@ -1405,15 +1405,15 @@ table thead,
 table thead[class],
 table thead tr,
 table thead tr[class] {
-  background: var(--brand-primary) !important;
+  background: linear-gradient(135deg, #23568E 0%, #1B4471 100%) !important;
 }
 
 table thead th,
 table thead th[class],
 table th {
   color: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
-  border-bottom-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  border-bottom-color: rgba(15, 23, 42, 0.18) !important;
   font-size: 0.75rem !important;
   font-weight: 850 !important;
   line-height: 1.15;
