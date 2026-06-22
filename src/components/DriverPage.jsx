@@ -303,13 +303,15 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
     { label: 'SIGNATURE', value: trip.paperSignatureConfirmed || trip.signature || trip.signatureUrl ? 'Yes' : 'No' },
   ];
   return (
-    <div className="overflow-hidden border-t border-slate-400 bg-white">
+    <div className="overflow-hidden border-t border-slate-200 bg-white">
       <table className="driver-history-detail-table w-full table-fixed text-left">
         <tbody>
           {rows.map((row) => (
-            <tr key={row.label} className="align-top border-b border-slate-300 last:border-b-0">
-              <td role="rowheader" className="driver-history-detail-label w-[50%] bg-slate-200 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-slate-950">{row.label}</td>
-              <td className="px-4 py-3 text-sm font-black break-words text-slate-950">{row.value}</td>
+            <tr key={row.label} className="align-top border-b border-slate-150 last:border-b-0">
+              <td role="rowheader" className="driver-history-detail-label w-[36%] bg-slate-100/90 px-3 py-1.5 text-[9.5px] font-black uppercase tracking-wider text-slate-600">{row.label}</td>
+              <td className={`px-3 py-1.5 text-xs font-black break-words ${
+                row.tone === 'green' ? 'text-emerald-600' : row.tone === 'red' ? 'text-rose-600' : row.tone === 'blue' ? 'text-blue-600' : 'text-slate-950'
+              }`}>{row.value}</td>
             </tr>
           ))}
         </tbody>
@@ -2278,25 +2280,25 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const getPrimaryTripAction = (trip) => {
     if (!trip) return null;
     if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
-      return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); } };
+      return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-blue-500/25', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); } };
     }
     if (trip.status === 'In Progress') {
-      return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', onClick: () => handleNavigateToPickup(trip) };
+      return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 shadow-teal-500/25', onClick: () => handleNavigateToPickup(trip) };
     }
     if (trip.status === 'Navigating Pickup') {
-      return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
+      return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-emerald-500/25', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
     }
     if (trip.status === 'At Pickup') {
-      return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/25', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
+      return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
     }
     if (trip.status === 'In Transit') {
-      return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/25', onClick: () => handleNavigateToDropoff(trip) };
+      return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-amber-500 hover:from-emerald-600 hover:to-amber-600 shadow-amber-500/25', onClick: () => handleNavigateToDropoff(trip) };
     }
     if (trip.status === 'Navigating Dropoff') {
-      return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/25', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
+      return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-orange-500/25', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
     }
     if (trip.status === 'At Dropoff' || trip.status === 'Arrived') {
-      return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-red-600 hover:bg-red-700 shadow-red-500/25', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
+      return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-red-500/25', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
     }
     return null;
   };
@@ -2350,7 +2352,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 min-w-0">
                 <h1 className="text-base font-black text-slate-950 leading-tight truncate">{trip.patient || 'Trip'}</h1>
-                <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700 border border-blue-100">
+                 <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-black text-blue-700 border border-blue-100">
                   #{trip.bookingId || trip.id || '--'}
                 </span>
               </div>
@@ -2366,7 +2368,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
         <div className="px-3 pt-3 space-y-3">
           <div className="rounded-2xl bg-slate-900 text-white shadow-lg overflow-hidden">
-            <div className="relative p-4">
+            <div className="relative px-4 py-2.5">
               <div className="absolute right-4 top-4 flex gap-1 opacity-10">
                 <span className="w-2 h-2 rounded-full bg-white" />
                 <span className="w-2 h-2 rounded-full bg-white" />
@@ -2375,67 +2377,67 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Scheduled Time</p>
-                  <p className="mt-1 text-2xl font-black tracking-tight leading-none">{scheduledTime}</p>
+                  <p className="mt-1 text-xl font-black tracking-tight leading-none">{scheduledTime}</p>
                 </div>
-                <span className="mt-5 shrink-0 rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-amber-800 shadow-sm">
+                <span className="mt-0.5 shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-amber-800 shadow-sm">
                   {attentionText}
                 </span>
               </div>
 
-              <div className="mt-5 grid grid-cols-[18px_1fr] gap-x-4">
-                <div className="row-span-2 flex flex-col items-center pt-2">
-                  <span className="w-3.5 h-3.5 rounded-full bg-blue-400 shadow-lg shadow-blue-400/30" />
-                  <span className="w-0.5 flex-1 min-h-[74px] my-1 rounded-full bg-gradient-to-b from-blue-400 to-emerald-400" />
-                  <span className="w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/30" />
+              <div className="mt-2.5 grid grid-cols-[18px_1fr] gap-x-4">
+                <div className="row-span-2 flex flex-col items-center pt-1.5">
+                  <span className="w-3 h-3 rounded-full bg-blue-400 shadow-lg shadow-blue-400/30" />
+                  <span className="w-0.5 flex-1 min-h-[48px] my-0.5 rounded-full bg-gradient-to-b from-blue-400 to-emerald-400" />
+                  <span className="w-3 h-3 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/30" />
                 </div>
 
-                <div className="pb-5">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">From</p>
-                  <p className="mt-1.5 text-sm font-bold leading-snug text-white">{pickupAddress || '--'}</p>
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-8 px-2 rounded-lg text-xs font-black text-slate-400 hover:text-white flex items-center gap-1.5 cursor-pointer">
-                      <Copy size={13} /> Copy
+                <div className="pb-2">
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400">From</p>
+                  <p className="mt-0.5 text-xs font-bold leading-snug text-white truncate">{pickupAddress || '--'}</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer">
+                      <Copy size={12} /> Copy
                     </button>
-                    <span className="text-xs font-black text-slate-500">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-10 px-3 rounded-xl bg-blue-700/70 hover:bg-blue-700 text-blue-100 text-xs font-black flex items-center gap-1.5 cursor-pointer">
-                      <Navigation size={14} /> Navigate
+                    <span className="text-[10px] font-black text-slate-500">{trip.distance ? `${trip.distance} mi` : ''}</span>
+                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-2.5 rounded-xl bg-blue-700/70 hover:bg-blue-700 text-blue-100 text-[11px] font-black flex items-center gap-1 cursor-pointer">
+                      <Navigation size={13} /> Navigate
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">To</p>
-                  <p className="mt-1.5 text-sm font-bold leading-snug text-white">{dropoffAddress || '--'}</p>
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-8 px-2 rounded-lg text-xs font-black text-slate-400 hover:text-white flex items-center gap-1.5 cursor-pointer">
-                      <Copy size={13} /> Copy
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400">To</p>
+                  <p className="mt-0.5 text-xs font-bold leading-snug text-white truncate">{dropoffAddress || '--'}</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer">
+                      <Copy size={12} /> Copy
                     </button>
-                    <span className="text-xs font-black text-slate-500" />
-                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-10 px-3 rounded-xl bg-emerald-700/60 hover:bg-emerald-700 text-emerald-100 text-xs font-black flex items-center gap-1.5 cursor-pointer">
-                      <Navigation size={14} /> Navigate
+                    <span className="text-[10px] font-black text-slate-500" />
+                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-2.5 rounded-xl bg-emerald-700/60 hover:bg-emerald-700 text-emerald-100 text-[11px] font-black flex items-center gap-1 cursor-pointer">
+                      <Navigation size={13} /> Navigate
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-4 gap-2">
-                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-11 rounded-xl bg-white/12 hover:bg-white/18 disabled:opacity-40 text-white text-xs font-black flex items-center justify-center gap-1 cursor-pointer">
-                  <Phone size={15} /> Call
+              <div className="mt-2.5 grid grid-cols-4 gap-1.5">
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                  <Phone size={14} /> Call
                 </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-11 rounded-xl bg-white/12 hover:bg-white/18 disabled:opacity-40 text-white text-xs font-black flex items-center justify-center gap-1 cursor-pointer">
-                  <MessageCircle size={15} /> SMS
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                  <MessageCircle size={14} /> SMS
                 </button>
-                <button type="button" onClick={() => openContactSelector(trip)} className="h-11 rounded-xl bg-white/12 hover:bg-white/18 text-white text-xs font-black flex items-center justify-center gap-1 cursor-pointer">
-                  <PhoneForwarded size={15} /> Contacts
+                <button type="button" onClick={() => openContactSelector(trip)} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                  <PhoneForwarded size={14} /> Contacts
                 </button>
-                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-11 rounded-xl bg-white/12 hover:bg-white/18 text-white text-xs font-black flex items-center justify-center gap-1 cursor-pointer">
-                  <MoreHorizontal size={16} /> More
+                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                  <MoreHorizontal size={15} /> More
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl bg-white border border-slate-100 shadow-sm px-4 py-3.5">
+          <div className="rounded-2xl bg-white border border-slate-100 shadow-sm px-4 py-2">
             <div className="flex items-start gap-2">
               <div className="flex min-w-0 flex-1 items-start">
                 {TRIP_WORK_STEPS.map((label, idx) => {
@@ -2444,8 +2446,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   return (
                     <div key={label} className="flex-1 min-w-0">
                       <div className="flex items-center">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 font-black text-xs shadow-sm ${
-                          isActive ? 'bg-slate-950 text-white border-slate-200' : isDone ? 'bg-emerald-500 text-white border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 font-black text-xs shadow-sm ${
+                          isActive ? 'bg-slate-600 text-white border-slate-200' : isDone ? 'bg-emerald-500 text-white border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'
                         }`}>
                           {idx + 1}
                         </div>
@@ -2453,7 +2455,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <div className={`h-0.5 flex-1 rounded-full mx-1.5 ${idx < workStepIndex ? 'bg-slate-700' : 'bg-slate-200'}`} />
                         )}
                       </div>
-                      <p className={`mt-2 text-center -ml-2 text-[10px] font-black leading-tight ${isActive ? 'text-slate-950' : isDone ? 'text-slate-700' : 'text-slate-500'}`}>{label}</p>
+                      <p className={`mt-1 text-center -ml-2 text-[10px] font-black leading-tight ${isActive ? 'text-slate-800' : isDone ? 'text-slate-700' : 'text-slate-500'}`}>{label}</p>
                     </div>
                   );
                 })}
@@ -2462,27 +2464,25 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 type="button"
                 onClick={handleStepBack}
                 disabled={!stepBackTarget}
-                className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-700"
+                className="mt-0 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-700"
                 title={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
                 aria-label={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
               >
-                <Undo2 size={15} strokeWidth={2.5} />
+                <Undo2 size={13} strokeWidth={2.5} />
               </button>
             </div>
           </div>
 
-          <div className={`rounded-2xl border ${workNotesOpen ? 'border-amber-200 bg-amber-50' : 'border-amber-100 bg-amber-50/50'} overflow-hidden`}>
-            <button type="button" onClick={() => setWorkNotesOpen(prev => !prev)} className="w-full px-4 py-3 flex items-center justify-between gap-3 text-amber-600 cursor-pointer">
-              <span className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.1em]">
-                <AlertCircle size={15} /> Driver Notes
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 overflow-hidden">
+            <div className="px-4 pt-3 pb-1.5 flex items-center gap-2 text-amber-600">
+              <AlertCircle size={15} />
+              <span className="text-xs font-black uppercase tracking-[0.1em]">
+                Driver Notes
               </span>
-              <ChevronDown size={16} className={`transition-transform ${workNotesOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {workNotesOpen && (
-              <div className="px-4 pb-4 text-xs font-semibold text-slate-700 leading-relaxed">
-                {notes || 'No driver notes for this trip.'}
-              </div>
-            )}
+            </div>
+            <div className="px-4 pb-3.5 text-xs font-semibold text-slate-700 leading-relaxed">
+              {notes || 'No driver notes for this trip.'}
+            </div>
           </div>
         </div>
 
@@ -3338,13 +3338,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const doneBarColor = 'bg-emerald-400';
 
                 const getPrimaryAction = () => {
-                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); } };
-                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-teal-600 hover:bg-teal-700 shadow-teal-500/25', phase: 'pickup', onClick: () => handleNavigateToPickup(trip) };
-                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
-                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
-                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/25', phase: 'dropoff', onClick: () => handleNavigateToDropoff(trip) };
-                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
-                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-red-600 hover:bg-red-700 shadow-red-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
+                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); } };
+                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 shadow-teal-500/25', phase: 'pickup', onClick: () => handleNavigateToPickup(trip) };
+                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
+                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
+                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-amber-500 hover:from-emerald-600 hover:to-amber-600 shadow-amber-500/25', phase: 'dropoff', onClick: () => handleNavigateToDropoff(trip) };
+                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
+                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-red-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
                   return null;
                 };
                 const primary = getPrimaryAction();
@@ -3945,18 +3945,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               const statusMeta = getHistoryStatusMeta(showTripDetails.status);
               return (
                 <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
-                  <div className="bg-gradient-to-r from-blue-700 to-blue-500 px-4 py-4">
+                  <div className="bg-gradient-to-r from-blue-700 to-blue-500 px-4 py-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-white text-slate-700 flex items-center justify-center shadow-sm shrink-0">
-                          <User size={22} />
+                        <div className="w-9 h-9 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-sm shrink-0">
+                          <User size={18} />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-base font-black text-white uppercase tracking-wide truncate">{showTripDetails.patient || 'Trip'}</h3>
-                          <p className="text-sm font-black text-white/90 truncate">#{showTripDetails.bookingId || showTripDetails.id}</p>
+                          <h3 className="text-sm font-black text-white uppercase tracking-wide truncate">{showTripDetails.patient || 'Trip'}</h3>
+                          <p className="text-xs font-black text-white/90 truncate">#{showTripDetails.bookingId || showTripDetails.id}</p>
                         </div>
                       </div>
-                      <span className={`shrink-0 rounded-xl px-3 py-1 text-xs font-black uppercase tracking-wider ${statusMeta.bg}`}>
+                      <span className={`shrink-0 rounded-lg px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${statusMeta.bg}`}>
                         {statusMeta.label}
                       </span>
                     </div>
@@ -4236,23 +4236,23 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isExpanded) {
                   return (
                     <div key={trip.id} className="space-y-3">
-                      <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+                      <div className="bg-white rounded-2xl overflow-hidden border border-blue-200 shadow-md">
                         <div
                           onClick={() => setHistoryExpandedId(null)}
-                          className="bg-gradient-to-r from-blue-700 to-blue-500 px-4 py-4 cursor-pointer"
+                          className="bg-gradient-to-r from-blue-700 to-blue-500 px-4 py-2.5 cursor-pointer"
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-11 h-11 rounded-xl bg-white text-slate-700 flex items-center justify-center shadow-sm shrink-0">
-                                <User size={22} />
+                              <div className="w-9 h-9 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-sm shrink-0">
+                                <User size={18} />
                               </div>
                               <div className="min-w-0">
-                                <h3 className="text-base font-black text-white uppercase tracking-wide truncate">{trip.patient || 'Trip'}</h3>
-                                <p className="text-sm font-black text-white/90 truncate">#{trip.bookingId || trip.id}</p>
+                                <h3 className="text-sm font-black text-white uppercase tracking-wide truncate">{trip.patient || 'Trip'}</h3>
+                                <p className="text-xs font-black text-white/90 truncate">#{trip.bookingId || trip.id}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className={`rounded-xl px-3 py-1 text-xs font-black uppercase tracking-wider ${statusMeta.bg}`}>
+                              <span className={`rounded-lg px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${statusMeta.bg}`}>
                                 {statusMeta.label}
                               </span>
                               <ChevronDown size={16} className="text-white/80" />
@@ -4262,8 +4262,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <HistoryTripDetailTable trip={trip} driver={me} />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <button type="button" onClick={() => handleEditTrip(trip)} className="h-11 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-sm shadow-sm"><Edit2 size={15} /> Edit</button>
-                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="h-11 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-sm shadow-sm"><RotateCcw size={15} /> Restore</button>
+                        <button type="button" onClick={() => handleEditTrip(trip)} className="h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><Edit2 size={14} /> Edit</button>
+                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><RotateCcw size={14} /> Restore</button>
                       </div>
                     </div>
                   );

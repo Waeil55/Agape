@@ -1852,7 +1852,11 @@ const App = () => {
     };
 
     if (upsertDriverProfile) {
-      await upsertDriverProfile(driverId, profileUpdates);
+      try {
+        await upsertDriverProfile(driverId, profileUpdates);
+      } catch (upsertErr) {
+        console.warn('Driver profile upsert failed, continuing with location sync:', upsertErr);
+      }
     }
 
     const locationDoc = {
@@ -1904,6 +1908,20 @@ const App = () => {
             capturedAt: telemetry.capturedAt || telemetry.recordedAt || updatedAtIso,
           },
           lastLocationAt: serverTimestamp(),
+          updatedAtLocal: updatedAtIso,
+        }, { merge: true }),
+        setDoc(doc(db, 'driverProfiles', driverId), {
+          ...profileUpdates,
+          id: driverId,
+          userId: auth.currentUser?.uid || existingDriver.userId || '',
+          email: existingDriver.email || '',
+          name: existingDriver.name || '',
+          lat: Number(latitude),
+          lng: Number(longitude),
+          locationAccuracy: telemetry.accuracy ?? null,
+          speedMph: Number(Number(speedMph || 0).toFixed(1)),
+          heading: telemetry.heading ?? null,
+          lastLocationUpdate: updatedAtIso,
           updatedAtLocal: updatedAtIso,
         }, { merge: true }),
       ]);

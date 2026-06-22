@@ -1575,11 +1575,12 @@ table th {
 
 .driver-history-detail-table,
 .driver-history-detail-table tbody,
-.driver-history-detail-table tr,
-.driver-history-detail-table td,
-.driver-history-detail-table td[class],
+.driver-history-detail-table tr {
+  color: #020617;
+}
+
 .driver-history-detail-table .driver-history-detail-label {
-  color: #020617 !important;
+  color: #475569 !important;
 }
 
 .driver-history-detail-table td,

@@ -137,6 +137,7 @@ export async function updateDriverLocation(location) {
   if (!driverId) return;
 
   const driverRef = doc(db, 'drivers', driverId);
+  const driverProfileRef = doc(db, 'driverProfiles', driverId);
   const speedMph = Number.isFinite(Number(location.speedMph))
     ? Number(location.speedMph)
     : Number.isFinite(Number(location.speed))
@@ -183,6 +184,14 @@ export async function updateDriverLocation(location) {
     lastFraudSignals: fraudSignals,
     lastUpdated: serverTimestamp()
   });
+  await setDoc(driverProfileRef, {
+    lat: location.lat,
+    lng: location.lng,
+    locationAccuracy: location.accuracy || null,
+    speedMph,
+    heading: location.heading || null,
+    lastLocationUpdate: new Date().toISOString(),
+  }, { merge: true });
   await emitEventsSafely(({ buildLocationEvent }) => [
     buildLocationEvent(driverId, locationDoc, getCurrentEventActor('driver')),
   ]);
@@ -213,24 +222,24 @@ const cleanFirestoreUpdates = (updates = {}) => Object.fromEntries(
 
 export async function saveTripWorkflowUpdate(tripId, updates = {}) {
   if (!tripId) return false;
-  const tripsRef = doc(db, 'trips', tripId);
+  const safeTripId = String(tripId);
+  const tripsRef = doc(db, 'trips', safeTripId);
   const beforeSnap = await getDoc(tripsRef).catch(() => null);
   const beforeTrip = beforeSnap?.exists?.() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
   const cleanUpdates = cleanFirestoreUpdates({
     ...updates,
     workflowUpdatedAt: updates.workflowUpdatedAt || new Date().toISOString(),
   });
-  const nextTripRecord = buildOperationalTripRecord({ ...(beforeTrip || { id: tripId }), ...cleanUpdates, id: tripId });
+  const nextTripRecord = buildOperationalTripRecord({ ...(beforeTrip || { id: safeTripId }), ...cleanUpdates, id: safeTripId });
   if (isCorruptedTripRecord(nextTripRecord)) {
-    console.warn('Blocked corrupted workflow trip mirror:', { tripId, updates: cleanUpdates });
-    return false;
+    console.warn('Trip record is considered corrupted, but continuing workflow update:', { tripId: safeTripId, updates: cleanUpdates });
   }
-  const progressRef = doc(db, 'driverTripProgress', tripId);
+  const progressRef = doc(db, 'driverTripProgress', safeTripId);
   const appDataRef = doc(db, 'appData', 'agape');
-  const ledgerRef = doc(db, 'tripLedger', tripId);
+  const ledgerRef = doc(db, 'tripLedger', safeTripId);
 
   await setDoc(progressRef, {
-    tripId,
+    tripId: safeTripId,
     ...cleanUpdates,
     updatedAt: serverTimestamp(),
   }, { merge: true });

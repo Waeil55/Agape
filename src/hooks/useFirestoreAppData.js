@@ -34,7 +34,7 @@ const DRIVER_TRIP_PROGRESS_COLLECTION = 'driverTripProgress';
 
 // Deduplicate trips by bookingId — keeps the most advanced status copy
 function dedupTripsByBookingId(trips = []) {
-  const STATUS_PRIORITY = { 'Completed': 10, 'At Pickup': 9, 'In Mission': 9, 'Navigating Pickup': 8, 'Navigating Dropoff': 8, 'In Transit': 8, 'Assigned': 7, 'No Show': 5, 'Cancelled': 3, 'Unassigned': 1 };
+  const STATUS_PRIORITY = { 'Completed': 10, 'At Pickup': 9, 'In Mission': 9, 'Navigating Pickup': 8, 'En Route': 8, 'Navigating Dropoff': 8, 'In Transit': 8, 'In Progress': 8, 'Assigned': 7, 'No Show': 5, 'Cancelled': 3, 'Unassigned': 1 };
   const groups = {};
   (trips || []).forEach(t => {
     if (!t) return;
