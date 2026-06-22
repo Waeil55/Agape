@@ -507,19 +507,19 @@ const EnterpriseDashboard = ({
   );
 
   const renderEnterpriseTopBar = () => (
-    <header className="sticky top-0 z-30 hidden h-[72px] items-center gap-4 border-b border-slate-200/80 bg-[#F3F4F6]/95 px-6 backdrop-blur-[12px] md:flex">
-      <div className="flex min-w-[220px] items-center gap-3 shrink-0">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-300 bg-white">
-          <img src="/agape.png" alt="Agape Care" className="h-8 w-8 object-contain" />
+    <header className="sticky top-0 z-30 hidden h-20 items-center gap-4 border-b border-slate-200/40 bg-white px-6 backdrop-blur-[12px] md:flex shadow-sm">
+      <div className="flex min-w-[200px] items-center gap-3 shrink-0">
+        <div className="flex h-11 w-11 items-center justify-center rounded-[1.2rem] border border-slate-200 bg-white shadow-sm p-2">
+          <img src="/agape.png" alt="Agape Care" className="h-full w-full object-contain" />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-[14px] font-semibold text-slate-900">Agape Care</p>
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Enterprise Transport OS</p>
+          <p className="truncate text-base font-black text-slate-900 leading-none">Agape Care</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600 mt-1">Enterprise Fleet OS</p>
         </div>
       </div>
 
-      <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar">
-        <div className="flex min-w-max items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+      <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar flex justify-center">
+        <div className="flex min-w-max items-center gap-0.5 rounded-full bg-[#e8eff6] p-1 border border-slate-200/20">
           {topNavItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -527,14 +527,14 @@ const EnterpriseDashboard = ({
                 key={item.id}
                 type="button"
                 onClick={item.action}
-                className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-semibold transition ${
+                className={`inline-flex h-9 items-center gap-2 rounded-full px-4 text-xs font-black uppercase tracking-wider transition-all duration-200 ${
                   item.active
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-white hover:text-slate-900'
+                    ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
                 }`}
                 title={item.label}
               >
-                <Icon size={15} />
+                <Icon size={13} />
                 <span>{item.label}</span>
               </button>
             );
@@ -542,7 +542,56 @@ const EnterpriseDashboard = ({
         </div>
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-3">
+        {/* Online/Offline Status Toggle */}
+        {(() => {
+          const myDispatcher = dispatchers?.find(d => d.email === currentUser);
+          const amIOnline = myDispatcher ? myDispatcher.clockedIn : fallbackAdminOnline;
+          
+          return (
+            <button 
+              onClick={() => {
+                if (myDispatcher && onDispatcherStatusUpdate) {
+                  onDispatcherStatusUpdate(myDispatcher.id, !amIOnline);
+                } else {
+                  setFallbackAdminOnline(!fallbackAdminOnline);
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider border shadow-sm transition-all hover:scale-105 active:scale-95 ${
+                amIOnline ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80' : 'bg-rose-50 text-rose-700 border-rose-200/80'
+              }`}
+              title={amIOnline ? "Click to go Offline" : "Click to go Online"}
+            >
+              {amIOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+              {amIOnline ? 'Online' : 'Offline'}
+            </button>
+          );
+        })()}
+
+        {activePanel === 'operations' && (
+          <div className="flex items-center gap-2">
+            {selectedTasks.length > 0 && (
+              <button
+                onClick={() => setBulkAssignModal(true)}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-bold transition flex items-center gap-1 shadow-sm animate-in fade-in slide-in-from-top-1"
+              >
+                <Users size={12} /> Assign {selectedTasks.length}
+              </button>
+            )}
+            <button
+              onClick={toggleRightPanel}
+              title={showRightPanel ? 'Close command panel' : 'Open command panel'}
+              className={`p-2 rounded-full transition flex items-center justify-center text-xs font-bold shadow-sm border ${
+                showRightPanel
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-md'
+                  : 'bg-slate-100 hover:bg-slate-200 border-slate-200/40 text-slate-600'
+              }`}
+            >
+              <PanelRight size={14} />
+            </button>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => {
@@ -553,23 +602,24 @@ const EnterpriseDashboard = ({
               openRightPanel('alerts');
             }
           }}
-          className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 shadow-sm"
           title="Notifications"
         >
           <Bell size={16} />
-          {aiAlertCount > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-rose-500" />}
+          {aiAlertCount > 0 && <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-rose-500" />}
         </button>
+
         <button
           onClick={() => setActivePanel('settings')}
           title={displayLoginId}
-          className="flex h-9 min-w-[108px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 text-left shadow-sm transition hover:bg-slate-50"
+          className="flex h-10 min-w-[108px] items-center gap-2 rounded-full border border-slate-200 bg-white px-2 text-left shadow-sm transition hover:bg-slate-50"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold uppercase text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold uppercase text-white shadow-sm shrink-0">
             {(currentUser || 'U')[0]}
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-[12px] font-semibold text-slate-900">{displayLoginId || 'Account'}</p>
-            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{role}</p>
+          <div className="min-w-0 pr-1.5">
+            <p className="truncate text-[11px] font-black text-slate-900 leading-none">{displayLoginId || 'Account'}</p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mt-1">{role}</p>
           </div>
         </button>
       </div>
@@ -1075,160 +1125,35 @@ const EnterpriseDashboard = ({
 
   // ==================== MAIN LAYOUT ====================
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#5a94af] font-sans text-slate-900 p-0 md:p-6 lg:p-8">
-      <div className="flex h-full min-w-0 bg-white rounded-none md:rounded-[2.5rem] border border-slate-200/50 shadow-2xl overflow-hidden">
-        {/* Left Sidebar - Desktop only */}
-        <aside className="hidden md:flex flex-col items-center justify-between py-6 w-20 bg-slate-50 border-r border-slate-200/60 shrink-0">
-          {/* Logo */}
-          <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-white border border-slate-200/80 p-2 shadow-sm">
-            <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain" />
+    <div className="h-screen w-full overflow-hidden bg-[#f4f7fa] font-sans text-slate-900">
+      <div className="flex h-full min-w-0 flex-col">
+        {/* Top Header - Desktop only */}
+        {renderEnterpriseTopBar()}
+
+        {/* Mobile top bar */}
+        {renderMobileTopBar()}
+
+        {/* Panel content wrapper */}
+        <div className="flex-1 flex min-h-0 relative">
+          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'chat'].includes(activePanel) ? '' : 'p-6'}`}>
+            {activePanel === 'operations' ? (
+              renderPanelContent()
+            ) : (
+              <div className={
+                activePanel === 'drive'
+                  ? 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm flex flex-col flex-1 min-h-0'
+                  : activePanel === 'chat'
+                  ? 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
+                  : 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm overflow-hidden'
+              }>
+                {renderPanelContent()}
+              </div>
+            )}
           </div>
 
-          {/* Navigation Menu */}
-          <nav className="flex flex-col gap-4">
-            {sidebarItems.map(item => {
-              const Icon = item.icon;
-              const isActive = activePanel === item.id;
-              const hasBadge = item.id === 'chat' && chatUnreadCount > 0;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActivePanel(item.id)}
-                  title={item.label}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 relative ${
-                    isActive
-                      ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20'
-                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                  {hasBadge && (
-                    <span className="absolute top-1.5 right-1.5 w-3.5 h-3.5 bg-rose-500 rounded-full border-2 border-slate-50" />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Settings / User */}
-          <button
-            onClick={() => setActivePanel('settings')}
-            title={displayLoginId}
-            className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-black uppercase transition-all duration-200 ${
-              activePanel === 'settings'
-                ? 'bg-slate-900 text-white shadow-md'
-                : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-            }`}
-          >
-            {(currentUser || 'U')[0]}
-          </button>
-        </aside>
-
-        {/* Right side area: TopBar + Main Content */}
-        <div className="flex-1 flex flex-col min-w-0 bg-[#f4f7fa] overflow-hidden">
-          {/* Top Header - Desktop only */}
-          <header className="hidden md:flex h-20 items-center justify-between px-8 bg-white border-b border-slate-200/40 shrink-0">
-            <div>
-              <h2 className="text-lg font-black text-slate-900">{activeWorkspaceMeta.title}</h2>
-              <p className="text-xs font-medium text-slate-500 mt-0.5">{activeWorkspaceMeta.description}</p>
-            </div>
-
-            <div className="flex items-center gap-4">
-              {/* Online/Offline Status Toggle */}
-              {(() => {
-                const myDispatcher = dispatchers?.find(d => d.email === currentUser);
-                const amIOnline = myDispatcher ? myDispatcher.clockedIn : fallbackAdminOnline;
-                
-                return (
-                  <button 
-                    onClick={() => {
-                      if (myDispatcher && onDispatcherStatusUpdate) {
-                        onDispatcherStatusUpdate(myDispatcher.id, !amIOnline);
-                      } else {
-                        setFallbackAdminOnline(!fallbackAdminOnline);
-                      }
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border shadow-sm transition-all hover:scale-105 active:scale-95 ${
-                      amIOnline ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
-                    }`}
-                    title={amIOnline ? "Click to go Offline" : "Click to go Online"}
-                  >
-                    {amIOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
-                    {amIOnline ? 'Online' : 'Offline'}
-                  </button>
-                );
-              })()}
-
-              {/* Action tools */}
-              {activePanel === 'operations' && (
-                <div className="flex items-center gap-2">
-                  {selectedTasks.length > 0 && (
-                    <button
-                      onClick={() => setBulkAssignModal(true)}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-bold transition flex items-center gap-1 shadow-sm animate-in fade-in slide-in-from-top-1"
-                    >
-                      <Users size={12} /> Assign {selectedTasks.length}
-                    </button>
-                  )}
-                  <button
-                    onClick={toggleRightPanel}
-                    title={showRightPanel ? 'Close command panel' : 'Open command panel'}
-                    className={`p-2 rounded-full transition flex items-center justify-center text-xs font-bold shadow-sm ${
-                      showRightPanel
-                        ? 'bg-slate-900 text-white shadow-md'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                    }`}
-                  >
-                    <PanelRight size={14} />
-                  </button>
-                </div>
-              )}
-
-              {/* Notification icon */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (showRightPanel && rightPanelTab === 'alerts') {
-                    setShowRightPanel(false);
-                  } else {
-                    setActivePanel('operations');
-                    openRightPanel('alerts');
-                  }
-                }}
-                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 shadow-sm"
-                title="Notifications"
-              >
-                <Bell size={16} />
-                {aiAlertCount > 0 && <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-rose-500" />}
-              </button>
-            </div>
-          </header>
-
-          {/* Mobile top bar */}
-          {renderMobileTopBar()}
-
-          {/* Panel content wrapper */}
-          <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'chat'].includes(activePanel) ? '' : 'p-6'}`}>
-              {activePanel === 'operations' ? (
-                renderPanelContent()
-              ) : (
-                <div className={
-                  activePanel === 'drive'
-                    ? 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm flex flex-col flex-1 min-h-0'
-                    : activePanel === 'chat'
-                    ? 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
-                    : 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm overflow-hidden'
-                }>
-                  {renderPanelContent()}
-                </div>
-              )}
-            </div>
-
-            {/* Desktop right panel */}
-            <div className="hidden md:flex flex-shrink-0 border-l border-slate-200/50">
-              {showRightPanel && renderRightPanel()}
-            </div>
+          {/* Desktop right panel */}
+          <div className="hidden md:flex flex-shrink-0 border-l border-slate-200/50 bg-white">
+            {showRightPanel && renderRightPanel()}
           </div>
         </div>
       </div>
