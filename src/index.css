@@ -1573,3 +1573,25 @@ table th {
   }
 }
 
+.driver-history-detail-table,
+.driver-history-detail-table tbody,
+.driver-history-detail-table tr,
+.driver-history-detail-table td,
+.driver-history-detail-table td[class],
+.driver-history-detail-table .driver-history-detail-label {
+  color: #020617 !important;
+}
+
+.driver-history-detail-table td,
+.driver-history-detail-table td[class],
+.driver-history-detail-table td * {
+  white-space: normal !important;
+  text-wrap: wrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.driver-history-detail-table .driver-history-detail-label {
+  background-color: #e2e8f0 !important;
+  font-weight: 900 !important;
+}

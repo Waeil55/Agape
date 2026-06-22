@@ -304,11 +304,11 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
   ];
   return (
     <div className="overflow-hidden border-t border-slate-400 bg-white">
-      <table className="w-full table-fixed text-left">
+      <table className="driver-history-detail-table w-full table-fixed text-left">
         <tbody>
           {rows.map((row) => (
             <tr key={row.label} className="align-top border-b border-slate-300 last:border-b-0">
-              <th className="w-[50%] bg-slate-200 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-slate-950">{row.label}</th>
+              <td role="rowheader" className="driver-history-detail-label w-[50%] bg-slate-200 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-slate-950">{row.label}</td>
               <td className="px-4 py-3 text-sm font-black break-words text-slate-950">{row.value}</td>
             </tr>
           ))}
