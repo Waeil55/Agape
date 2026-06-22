@@ -87,12 +87,12 @@
   --text-inverse: #ffffff;
   --text-link: #3b82f6;
 
-  /* Brand (Luxurious Deep Blue) */
-  --brand-primary: #1e40af;
-  --brand-primary-hover: #1e3a8a;
+  /* Brand (LinkedIn Blue Theme) */
+  --brand-primary: #2A6495;
+  --brand-primary-hover: #204B70;
   --brand-primary-light: #dbeafe;
   --brand-primary-subtle: #eff6ff;
-  --brand-accent: #2563eb;
+  --brand-accent: #347AB5;
 
   /* Status */
   --success: #059669;
@@ -128,7 +128,7 @@
   --glass-blur: 16px;
 
   /* Gradient accents */
-  --gradient-brand: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  --gradient-brand: linear-gradient(135deg, #2A6495 0%, #4a8ac2 100%);
   --gradient-success: linear-gradient(135deg, #059669 0%, #10b981 100%);
   --gradient-warning: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
   --gradient-danger: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
@@ -161,7 +161,7 @@
 
   --brand-primary: #3b82f6;
   --brand-primary-hover: #60a5fa;
-  --brand-primary-light: #1e3a8a;
+  --brand-primary-light: #204B70;
   --brand-primary-subtle: #172554;
   --brand-accent: #8b5cf6;
 
@@ -490,7 +490,7 @@ table .font-black { font-weight: 750; }
   background: linear-gradient(135deg, #059669 0%, #10b981 100%);
 }
 .gradient-deep-blue {
-  background: linear-gradient(180deg, #1e3a8a 0%, #2563eb 100%);
+  background: linear-gradient(180deg, #204B70 0%, #2A6495 100%);
 }
 
 /* ===== BIG TIME DISPLAY ===== */
@@ -702,7 +702,7 @@ button:focus-visible,
 [role="button"]:focus-visible,
 a[role="button"]:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(18, 26, 102, 0.18);
+  box-shadow: 0 0 0 3px rgba(42, 100, 149, 0.18);
 }
 
 button:disabled,
@@ -1405,7 +1405,7 @@ table thead,
 table thead[class],
 table thead tr,
 table thead tr[class] {
-  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%) !important;
+  background: linear-gradient(135deg, #2A6495 0%, #4a8ac2 100%) !important;
 }
 
 table thead th,

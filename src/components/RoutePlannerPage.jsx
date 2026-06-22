@@ -476,11 +476,11 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
             </div>
             <div className="flex items-center gap-1">
               <button onClick={handleOptimize} disabled={stops.length < 2 || optimizing}
-                className="px-2.5 h-7 bg-indigo-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 hover:bg-indigo-700 active:scale-95 disabled:opacity-30">
+                className="h-7 w-[90px] bg-indigo-600 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-indigo-700 active:scale-95 disabled:opacity-30 shadow-sm">
                 {optimizing ? <Loader2 size={11} className="animate-spin" /> : <BrainCircuit size={11} />} Optimize
               </button>
               <button onClick={copyRoute} disabled={stops.length === 0} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-30" title="Copy route"><Copy size={13} /></button>
-              <button onClick={sendToSequencer} disabled={stops.length === 0 || typeof onSendToSequencer !== 'function'} className="px-2.5 h-7 bg-[#121A66] text-white rounded-lg text-[10px] font-bold flex items-center gap-1 hover:bg-[#182482] active:scale-95 disabled:opacity-30" title="Send route to sequencer">
+              <button onClick={sendToSequencer} disabled={stops.length === 0 || typeof onSendToSequencer !== 'function'} className="h-7 w-[90px] bg-[#2A6495] text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-[#204B70] active:scale-95 disabled:opacity-30 shadow-sm" title="Send route to sequencer">
                 <Route size={11} /> Sequencer
               </button>
               <button onClick={clearRoute} disabled={stops.length === 0} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg disabled:opacity-30" title="Clear route"><Trash2 size={13} /></button>
@@ -494,7 +494,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
             {completed.size > 0 && <span className="text-emerald-600"><strong>{completed.size}</strong> done</span>}
             {conflicts.length > 0 && <span className="text-rose-600 font-bold flex items-center gap-1"><AlertTriangle size={10} />{conflicts.length} clash</span>}
             {stops.length > 0 && (
-              <button onClick={startNav} className="ml-auto px-2.5 h-7 bg-emerald-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 hover:bg-emerald-700 active:scale-95">
+              <button onClick={startNav} className="ml-auto h-7 w-[90px] bg-emerald-600 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-emerald-700 active:scale-95 shadow-sm">
                 <Play size={11} /> Navigate
               </button>
             )}

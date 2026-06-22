@@ -8,8 +8,34 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#2563eb',
+        primary: '#2A6495',
         secondary: '#64748b',
+        blue: {
+          50: '#f0f6fa',
+          100: '#dbe9f3',
+          200: '#bcd3e7',
+          300: '#8eb3d7',
+          400: '#5a8dc3',
+          500: '#4a8ac2',
+          600: '#2A6495',
+          700: '#204B70',
+          800: '#1c3e5c',
+          900: '#112537',
+          950: '#0b1723',
+        },
+        indigo: {
+          50: '#f0f6fa',
+          100: '#dbe9f3',
+          200: '#bcd3e7',
+          300: '#8eb3d7',
+          400: '#5a8dc3',
+          500: '#4a8ac2',
+          600: '#2A6495',
+          700: '#204B70',
+          800: '#1c3e5c',
+          900: '#112537',
+          950: '#0b1723',
+        },
         surface: {
           DEFAULT: 'var(--bg-surface)',
           elevated: 'var(--bg-surface-elevated)',
