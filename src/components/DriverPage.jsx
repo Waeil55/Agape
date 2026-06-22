@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
-import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate } from '../utils/tripDate';
+import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate, tripCalendarDateKey } from '../utils/tripDate';
 import { auth, db, doc, onSnapshot, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles } from '../config/maps';
@@ -1006,8 +1006,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   };
 
   const filteredHistory = allHistory.filter(t => {
-    const tripDate = t.date || (t.completedAt ? t.completedAt.split('T')[0] : '');
-    if (tripDate && !tripDate.startsWith(historyDate)) return false;
+    const tripDate = t.date || t.completedAt;
+    const normalizedDate = tripDate ? tripCalendarDateKey(tripDate) : null;
+    if (normalizedDate && normalizedDate !== historyDate) return false;
 
     const matchFilter = historyFilter === 'all' ? true :
       historyFilter === 'completed' ? normalizeWorkflowStatus(t.status) === 'completed' :
