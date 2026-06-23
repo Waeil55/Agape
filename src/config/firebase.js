@@ -1,5 +1,5 @@
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getFirestore, initializeFirestore, memoryLocalCache, collection, getDocs, getDocsFromServer, doc, updateDoc, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, getDocFromServer, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, collection, getDocs, getDocsFromServer, doc, updateDoc, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, getDocFromServer, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork, onSnapshot } from 'firebase/firestore';
 import { getAuth, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
@@ -24,14 +24,20 @@ const app = initializeApp(firebaseConfig);
 let db;
 try {
   db = initializeFirestore(app, {
-    localCache: memoryLocalCache(),
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
   });
 } catch (err) {
   const message = String(err?.message || '');
-  if (!message.includes('initializeFirestore() has already been called')) {
-    console.warn('Firestore memory cache fell back to the default cache.', err);
+  console.warn('Persistent cache failed, falling back to memory cache:', message);
+  try {
+    db = initializeFirestore(app, {
+      localCache: memoryLocalCache(),
+    });
+  } catch (err2) {
+    db = getFirestore(app);
   }
-  db = getFirestore(app);
 }
 
 const auth = getAuth(app);
@@ -47,7 +53,7 @@ const functions = getFunctions(app);
 export default app;
 export { app, db, auth, analytics, messaging, deleteApp, initializeApp, firebaseConfig,
   getFirestore, collection, getDocs, doc, updateDoc, addDoc, serverTimestamp,
-  writeBatch, setDoc, getDoc, getDocFromServer, getDocsFromServer, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork,
+  writeBatch, setDoc, getDoc, getDocFromServer, getDocsFromServer, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork, onSnapshot,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
   EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail, setPersistence,
   browserLocalPersistence, getAuth, getMessaging, getToken, onMessage, logEvent, functions, httpsCallable };

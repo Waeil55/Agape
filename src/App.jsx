@@ -411,10 +411,10 @@ const App = () => {
   const {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
     loading: dataLoading, saving: dataSaving, error: dataError, lastSavedAt,
-    setTrips, setDrivers, upsertDriverProfile, setDispatchers, setVehicles,
+    setTrips, importTrips, setDrivers, upsertDriverProfile, setDispatchers, setVehicles,
     setTrashedTrips, setLogs, setPhoneNumbers,
     addLog, initializeAppData,
-  } = useFirestoreAppData({ resubscribeKey: realtimeReliability.resubscribeKey });
+  } = useFirestoreAppData({ enabled: isAuthenticated, resubscribeKey: realtimeReliability.resubscribeKey });
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
@@ -2469,7 +2469,7 @@ const App = () => {
   return (
     <>
       {/* Offline Banner */}
-      <div className={`offline-banner${isOffline ? ' visible' : ''}`}>
+      <div className={`offline-banner${isAuthenticated && isOffline ? ' visible' : ''}`}>
         You are offline — changes will sync when connection returns
       </div>
       <div className="min-h-screen flex-1 flex flex-col bg-[var(--bg-app)] overflow-visible w-full">
@@ -2617,6 +2617,7 @@ const App = () => {
               currentUser={currentUser}
               trips={scopedTrips}
               setTrips={setTrips}
+              importTrips={importTrips}
               drivers={scopedDrivers}
               setDrivers={setDrivers}
               dispatchers={dispatchers}

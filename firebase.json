@@ -14,7 +14,7 @@
   },
   "hosting": [
     {
-      "target": "agape5",
+      "target": "agape-app5",
       "public": "dist",
       "ignore": [
         "firebase.json",

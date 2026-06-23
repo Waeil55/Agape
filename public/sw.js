@@ -3,7 +3,7 @@
    Do not cache, poll, or background-sync trips, drivers, assignments, or APIs here.
 */
 
-const CACHE_VERSION = 'agape-v7-static';
+const CACHE_VERSION = 'agape-v9-static';
 const STATIC_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-assets`;
 
@@ -35,7 +35,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') {
+  if (event.data?.type === 'SKIP_WAITING' || event.data?.action === 'skipWaiting') {
     self.skipWaiting();
     return;
   }
@@ -57,7 +57,7 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'reload' })
         .then((response) => {
           const clone = response.clone();
           caches.open(STATIC_CACHE).then((cache) => cache.put('/index.html', clone));
@@ -72,7 +72,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
-        return fetch(request).then((response) => {
+        return fetch(request, { cache: 'reload' }).then((response) => {
           if (response.ok) {
             const clone = response.clone();
             caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, clone));

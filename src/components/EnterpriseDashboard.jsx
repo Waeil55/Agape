@@ -92,7 +92,7 @@ const findTripLocations = (trip, trips, trashedTrips, logs) => {
 };
 
 const EnterpriseDashboard = ({
-  role, currentUser, trips, setTrips, drivers, setDrivers, dispatchers, setDispatchers, vehicles, setVehicles,
+  role, currentUser, trips, setTrips, importTrips, drivers, setDrivers, dispatchers, setDispatchers, vehicles, setVehicles,
   trashedTrips, setTrashedTrips, restoreTrip, logs, setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
   selectedTasks, setSelectedTasks, searchQuery, setSearchQuery,
   smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
@@ -1193,45 +1193,20 @@ const EnterpriseDashboard = ({
                   uploadContext={activePanel}
                   drivers={drivers}
                   preSelectDriver={uploadAssignDriver}
-                  onTripsCreated={(newTrips) => {
-                    setTrips(prev => {
-                      // Build a normalized key lookup for existing trips
-                      const makeKey = (t) => {
-                        const bk = t?.bookingId;
-                        if (bk && !/^(BK-\d+-\d+|TRP-\d+|TRIP-\d{10,}-\d+)$/i.test(bk)) return `bk::${bk}`;
-                        const parts = [
-                          (t?.patient || '').trim().toLowerCase(),
-                          (t?.date || '').trim(),
-                          (t?.time || '').trim(),
-                          (t?.pickup || '').trim().toLowerCase().replace(/\s+/g, ' '),
-                          (t?.dropoff || '').trim().toLowerCase().replace(/\s+/g, ' '),
-                        ];
-                        return `cmp::${parts.join('|')}`;
-                      };
-                      const existingKeys = new Map();
-                      prev.forEach((et, idx) => { existingKeys.set(makeKey(et), idx); });
-                      
-                      const updatedTrips = [...prev];
-                      let newCount = 0;
-                      let updatedCount = 0;
-                      
-                      newTrips.forEach(nt => {
-                        const key = makeKey(nt);
-                        if (existingKeys.has(key)) {
-                          const idx = existingKeys.get(key);
-                          updatedTrips[idx] = { ...updatedTrips[idx], ...nt, id: updatedTrips[idx].id };
-                          updatedCount++;
-                        } else {
-                          updatedTrips.push(nt);
-                          existingKeys.set(key, updatedTrips.length - 1);
-                          newCount++;
-                        }
-                      });
-                      
-                      return updatedTrips;
-                    });
+                  onTripsCreated={async (newTrips) => {
+                    const importer = typeof importTrips === 'function' ? importTrips : null;
+                    if (!importer) {
+                      throw new Error('Trip importer is not available. Please refresh and try again.');
+                    }
+                    const saved = await importer(newTrips);
+                    if (saved === false) {
+                      throw new Error('Trips were parsed but could not be saved to Firestore. Please check your connection and try again.');
+                    }
+                    return saved;
+                  }}
+                  onImportComplete={(count) => {
                     setShowUploadModal(false);
-                    addToast('Trips Imported', `${newTrips.length} trip(s) imported successfully.`, 'success');
+                    addToast('Trips Imported', `${count} trip(s) saved to Firestore.`, 'success');
                   }}
                 />
               </Suspense>

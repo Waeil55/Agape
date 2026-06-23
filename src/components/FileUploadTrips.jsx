@@ -3,7 +3,6 @@ import * as XLSX from 'xlsx';
 import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, ArrowRight, Download, Truck, X } from 'lucide-react';
 import { GEMINI_API_CONFIG } from '../config/firebase';
 import { annotateInOutPairs, hasInOutMarker, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
-import { isCorruptedTripRecord } from '../utils/tripIntegrity';
 
 const timeToMinutes = (t) => {
   if (!t) return 1440;
@@ -354,7 +353,17 @@ const Badge = ({ children, variant = 'info' }) => {
   return <span className={`px-2 py-0.5 rounded-full text-xs font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
 };
 
-const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', uploadContext = 'operations' }) => {
+const IMPORT_CONFIRM_TIMEOUT_MS = 30000;
+
+function withUiTimeout(promise, timeoutMs, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
+const FileUploadTrips = ({ onTripsCreated, onImportComplete, drivers = [], preSelectDriver = '', uploadContext = 'operations' }) => {
   const [file, setFile] = useState(null);
   const [step, setStep] = useState('upload');
   const [parsedRows, setParsedRows] = useState([]);
@@ -369,11 +378,33 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   const [selectedCount, setSelectedCount] = useState(0);
   const [assignToDriver, setAssignToDriver] = useState(preSelectDriver || '');
   const [showAssignPrompt, setShowAssignPrompt] = useState(true);
+  const [importing, setImporting] = useState(false);
   const forceCompleted = uploadContext === 'reports';
   const dropRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const importRunRef = useRef(0);
+
+  const clearFileInput = () => {
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const resetUpload = () => {
+    importRunRef.current += 1;
+    setStep('upload');
+    setFile(null);
+    setMappedTrips([]);
+    setParsedRows([]);
+    setAiResults([]);
+    setError('');
+    setProgressMsg('');
+    setProgressPct(0);
+    setImporting(false);
+    clearFileInput();
+  };
 
   const handleFileSelect = (selectedFile) => {
     setError('');
+    setProgressMsg('');
     if (!selectedFile) return;
     const ext = selectedFile.name.split('.').pop().toLowerCase();
     if (!['csv', 'xlsx', 'xls'].includes(ext)) {
@@ -390,6 +421,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
   const handleInputChange = (e) => {
     if (e.target.files?.length) handleFileSelect(e.target.files[0]);
+    e.target.value = '';
   };
 
   const processFile = async () => {
@@ -749,7 +781,9 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
     }
   };
 
-  const confirmImport = () => {
+  const confirmImport = async () => {
+    if (importing) return;
+    const tripSource = uploadContext === 'reports' ? 'report_upload' : 'dispatch_upload';
     const cleanTrips = mappedTrips.map(({ _originalRow, _hasIssues, _issues, _confidence, _travelTime, ...trip }) => {
       const finalDriverId = trip.driverId || assignToDriver || _originalRow['Driver ID'] || null;
       let newStatus = trip.status;
@@ -762,17 +796,66 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           newStatus = 'Assigned';
         }
       }
-      
-      if (finalDriverId) {
-        return { ...trip, driverId: finalDriverId, status: newStatus };
+
+      let dateKey = null;
+      const dateFields = ['date', 'scheduledDate', 'scheduleDate', 'tripDate'];
+      for (const field of dateFields) {
+        if (trip[field]) {
+          const d = new Date(trip[field]);
+          if (!isNaN(d.getTime())) {
+            dateKey = d.toISOString().split('T')[0];
+            break;
+          }
+        }
       }
-      return { ...trip, status: newStatus };
-    }).filter((trip) => !isCorruptedTripRecord(trip));
+      if (!dateKey) dateKey = new Date().toISOString().split('T')[0];
+
+      const now = new Date().toISOString();
+      const baseTrip = {
+        ...trip,
+        dateKey,
+        source: tripSource,
+        status: newStatus,
+        date: trip.date || dateKey,
+        patient: trip.patient || trip.clientName || trip.memberName || 'Unknown Client',
+        pickup: trip.pickup || trip.pickupAddress || trip.originAddress || '',
+        dropoff: trip.dropoff || trip.dropoffAddress || trip.destinationAddress || '',
+        time: trip.time || trip.scheduledTime || '',
+        updatedAtLocal: now,
+      };
+
+      if (finalDriverId) {
+        return { ...baseTrip, driverId: finalDriverId };
+      }
+      return baseTrip;
+    }).filter((trip) => (trip.patient && trip.patient !== 'Unknown Client') || trip.pickup || trip.dropoff);
     if (cleanTrips.length === 0) {
       setError('No valid trips found. Each trip needs a real client name, service date, and pickup or dropoff address.');
       return;
     }
-    onTripsCreated(cleanTrips);
+    setImporting(true);
+    setError('');
+    setProgressMsg('Saving trips to Firestore...');
+    const runId = ++importRunRef.current;
+    try {
+      const saved = await withUiTimeout(
+        onTripsCreated(cleanTrips),
+        IMPORT_CONFIRM_TIMEOUT_MS,
+        'Saving trips is taking too long. The screen has been released; check the connection and try again.'
+      );
+      if (runId !== importRunRef.current) return;
+      if (saved === false) {
+        throw new Error('The upload was parsed, but the trips were not saved. Please check your connection and try again.');
+      }
+      setImporting(false);
+      setProgressMsg('');
+      onImportComplete?.(cleanTrips.length);
+    } catch (err) {
+      if (runId !== importRunRef.current) return;
+      setError(err?.message || 'The upload was parsed, but the trips were not saved. Please try again.');
+      setImporting(false);
+      setProgressMsg('');
+    }
   };
 
   const totalSelected = mappedTrips.length;
@@ -804,7 +887,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-1">Drag & drop your file here</h3>
               <p className="text-slate-500 text-xs sm:text-sm mb-3 sm:mb-4">or click to browse</p>
               <p className="text-xs sm:text-sm text-slate-400 font-medium">Supports .csv, .xlsx, .xls &bull; Auto-detects columns</p>
-              <input id="fu-file-input" type="file" accept=".csv,.xlsx,.xls" onChange={handleInputChange} className="hidden" />
+              <input ref={fileInputRef} id="fu-file-input" type="file" accept=".csv,.xlsx,.xls" onChange={handleInputChange} className="hidden" />
             </div>
 
             {file && (
@@ -814,7 +897,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                   <p className="font-semibold text-slate-900 text-sm truncate">{file.name}</p>
                   <p className="text-xs sm:text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
                 </div>
-                <button onClick={() => setFile(null)} className="text-slate-400 hover:text-rose-600 p-1 shrink-0">&times;</button>
+                <button onClick={() => { setFile(null); clearFileInput(); }} className="text-slate-400 hover:text-rose-600 p-1 shrink-0">&times;</button>
               </div>
             )}
 
@@ -865,6 +948,18 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
       {step === 'review' && (
         <div className="space-y-4 sm:space-y-6">
+          {error && (
+            <div className="p-3 sm:p-4 bg-rose-50 border border-rose-200 rounded-lg flex gap-3 items-start">
+              <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+              <p className="text-rose-700 text-xs sm:text-sm font-semibold">{error}</p>
+            </div>
+          )}
+          {importing && progressMsg && (
+            <div className="p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3 items-center">
+              <Loader size={18} className="text-blue-600 shrink-0 animate-spin" />
+              <p className="text-blue-700 text-xs sm:text-sm font-semibold">{progressMsg}</p>
+            </div>
+          )}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
             <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
               <div className={`w-10 sm:w-12 h-10 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${withIssues === 0 ? 'bg-emerald-100' : 'bg-amber-100'}`}>
@@ -1030,12 +1125,12 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             </div>
 
             <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <button onClick={() => { setStep('upload'); setFile(null); setMappedTrips([]); setParsedRows([]); setError(''); }} className="w-full sm:flex-1 py-3 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition text-sm">
+              <button onClick={resetUpload} className="w-full sm:flex-1 py-3 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition text-sm">
                 Cancel
               </button>
-              <button onClick={confirmImport} className="w-full sm:flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm text-sm">
-                <CheckCircle2 size={18} />
-                Import {totalSelected} {forceCompleted ? 'Completed ' : ''}Trips
+              <button onClick={confirmImport} disabled={importing} className="w-full sm:flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm text-sm disabled:opacity-60 disabled:cursor-not-allowed">
+                {importing ? <Loader size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                {importing ? 'Saving Trips...' : `Import ${totalSelected} ${forceCompleted ? 'Completed ' : ''}Trips`}
               </button>
             </div>
           </div>

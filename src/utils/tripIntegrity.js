@@ -86,6 +86,10 @@ export const isCorruptedTripRecord = (trip = {}) => {
     trip.tripId,
     trip.clientId,
   ].some(isRouteKeyIdentifier)) return true;
+  
+  // Uploaded trips are always valid
+  if (trip.source === 'dispatch_upload' || trip.source === 'report_upload') return false;
+  
   if (!hasRealTripPatient(trip)) return true;
   if (!hasRealTripAddress(trip)) return true;
   if (!hasTripServiceDate(trip)) return true;

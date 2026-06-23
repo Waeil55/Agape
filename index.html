@@ -42,7 +42,7 @@
 
     <!-- ===== PWA AUTO-REFRESH SERVICE WORKER ===== -->
     <script>
-      if ('serviceWorker' in navigator) {
+      if (false && 'serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
           console.log('[SW] Registered:', registration.scope);
 
