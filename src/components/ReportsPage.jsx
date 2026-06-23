@@ -1058,7 +1058,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                     const driverName = getDriverLabel(trip, drivers);
                     if (!byDriver[driverName]) byDriver[driverName] = { trips: 0, totalDistance: 0, passengers: new Set() };
                     byDriver[driverName].trips++;
-                    const d = calcMiles(trip.pickupOdometer, trip.dropoffOdometer);
+                    const d = calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance);
                     if (d !== '—') byDriver[driverName].totalDistance += parseFloat(d);
                     if (trip.patient) byDriver[driverName].passengers.add(trip.patient);
                   });

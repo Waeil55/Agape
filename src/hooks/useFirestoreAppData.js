@@ -233,7 +233,7 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
     const applyCollectionData = (field, snap) => {
       if (cancelled) return;
       const nextList = [];
-      snap.forEach((itemDoc) => nextList.push({ id: itemDoc.id, ...itemDoc.data() }));
+      snap.forEach((itemDoc) => nextList.push({ ...itemDoc.data(), id: itemDoc.id }));
       dataRef.current = { ...normalizeData(dataRef.current), [field]: nextList };
       setState(prev => ({ ...prev, [field]: nextList, loading: false, initialized: true, error: null }));
     };
@@ -243,7 +243,7 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
       const liveTrips = [];
       const corruptedIds = [];
       snap.forEach((tripDoc) => {
-        const trip = { id: tripDoc.id, ...tripDoc.data() };
+        const trip = { ...tripDoc.data(), id: tripDoc.id };
         if (trip.source === 'dispatch_upload' || trip.source === 'report_upload') {
           liveTrips.push(normalizeTrip(trip));
           return;
@@ -262,16 +262,18 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
       }
       liveTripsRef.current = liveTrips;
       const baseData = normalizeData(dataRef.current);
-      const mergedTrips = cleanTripCollection(
-        liveTrips.map((liveTrip) => {
+      const liveKeys = new Set(liveTrips.map((t) => t.id));
+      const mergedTrips = cleanTripCollection([
+        ...(baseData.trips || []).filter((t) => !liveKeys.has(t.id)),
+        ...liveTrips.map((liveTrip) => {
           const progress = tripProgressRef.current[liveTrip.id];
           if (!progress) return liveTrip;
           const progressTime = Date.parse(progress.workflowUpdatedAt || progress.updatedAt || 0);
           const liveTime = Date.parse(liveTrip.workflowUpdatedAt || liveTrip.updatedAt || 0);
           if (progressTime > liveTime) return { ...liveTrip, ...progress };
           return { ...progress, ...liveTrip };
-        })
-      );
+        }),
+      ]);
       dataRef.current = { ...baseData, trips: mergedTrips };
       setState(prev => ({ ...prev, trips: mergedTrips, loading: false, initialized: true, error: null }));
 
@@ -287,21 +289,24 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
       if (cancelled) return;
       const progressByTrip = {};
       snap.forEach((progressDoc) => {
-        progressByTrip[progressDoc.id] = { id: progressDoc.id, ...progressDoc.data() };
+        progressByTrip[progressDoc.id] = { ...progressDoc.data(), id: progressDoc.id };
         delete progressByTrip[progressDoc.id].tripId;
       });
       tripProgressRef.current = progressByTrip;
       const baseData = normalizeData(dataRef.current);
-      const mergedTrips = cleanTripCollection(
-        (liveTripsRef.current.length > 0 ? liveTripsRef.current : baseData.trips).map((trip) => {
+      const progressSource = liveTripsRef.current.length > 0 ? liveTripsRef.current : baseData.trips;
+      const sourceKeys = new Set(progressSource.map((t) => t.id));
+      const mergedTrips = cleanTripCollection([
+        ...(baseData.trips || []).filter((t) => !sourceKeys.has(t.id)),
+        ...progressSource.map((trip) => {
           const progress = progressByTrip[trip.id];
           if (!progress) return trip;
           const progressTime = Date.parse(progress.workflowUpdatedAt || progress.updatedAt || 0);
           const tripTime = Date.parse(trip.workflowUpdatedAt || trip.updatedAt || 0);
           if (progressTime > tripTime) return { ...trip, ...progress };
           return { ...progress, ...trip };
-        })
-      );
+        }),
+      ]);
       dataRef.current = { ...baseData, trips: mergedTrips };
       setState(prev => ({ ...prev, trips: mergedTrips, loading: false, error: null }));
     };
