@@ -236,7 +236,7 @@ class WriteBatcher {
     }
 
     try {
-      await setDoc(doc(db, 'appData/agape'), {
+      await setDoc(doc(db, 'systemConfig', 'dataStoreMeta'), {
         ...data,
         updatedAt: serverTimestamp(),
         updatedField: 'batch:' + fields.join(','),
@@ -543,10 +543,9 @@ class EnterpriseDataStore {
     versionTracker.bump(field);
 
     try {
-      // Write to Firestore. Large root collections stay in their own
-      // collections; appData/agape only keeps lightweight metadata.
+      // Write to Firestore metadata document (no longer uses monolithic appData/agape)
       await setDoc(
-        doc(db, 'appData/agape'),
+        doc(db, 'systemConfig', 'dataStoreMeta'),
         buildAppDataFieldPayload(field, after, {
           _version: versionTracker.getVersion(field).version,
         }),
@@ -622,7 +621,7 @@ class EnterpriseDataStore {
       try {
         if (op.type === 'setField') {
           await setDoc(
-            doc(db, 'appData/agape'),
+            doc(db, 'systemConfig', 'dataStoreMeta'),
             buildAppDataFieldPayload(op.field, op.value),
             { merge: true }
           );

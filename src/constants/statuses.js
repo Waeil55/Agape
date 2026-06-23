@@ -76,3 +76,54 @@ export const NOTIFICATION_TYPES = {
   DRIVER_OFFLINE: 'driver_offline',
   GPS_LOSS: 'gps_loss',
 };
+
+export const DRIVER_LIVE_STATUS_LABELS = {
+  'assigned': 'Assigned',
+  'accepted': 'Accepted',
+  'en route': 'En Route',
+  'navigating pickup': 'Going to Pickup',
+  'at pickup': 'At Pickup',
+  'pickup complete': 'Picked Up',
+  'in transit': 'In Transit',
+  'navigating dropoff': 'Going to Dropoff',
+  'at dropoff': 'At Dropoff',
+  'arrived': 'Arrived',
+  'in mission': 'On Mission',
+  'in progress': 'In Progress',
+  'completed': 'Completed',
+};
+
+export const DRIVER_LIVE_STATUS_COLORS = {
+  'assigned': 'bg-blue-100 text-blue-700',
+  'accepted': 'bg-purple-100 text-purple-700',
+  'en route': 'bg-cyan-100 text-cyan-700',
+  'navigating pickup': 'bg-sky-100 text-sky-700',
+  'at pickup': 'bg-amber-100 text-amber-700',
+  'pickup complete': 'bg-fuchsia-100 text-fuchsia-700',
+  'in transit': 'bg-teal-100 text-teal-700',
+  'navigating dropoff': 'bg-sky-100 text-sky-700',
+  'at dropoff': 'bg-yellow-100 text-yellow-700',
+  'arrived': 'bg-green-100 text-green-700',
+  'in mission': 'bg-indigo-100 text-indigo-700',
+  'in progress': 'bg-cyan-100 text-cyan-700',
+  'completed': 'bg-emerald-100 text-emerald-700',
+};
+
+export function getDriverLiveStatus(driver) {
+  if (!driver) return { label: 'Unknown', color: 'bg-slate-100 text-slate-600' };
+  const driverStatus = String(driver.status || '').toLowerCase();
+  if (driverStatus === 'offline' || !driver.clockedIn) {
+    return { label: 'Offline', color: 'bg-slate-100 text-slate-600' };
+  }
+  if (driverStatus === 'available') {
+    return { label: 'Available', color: 'bg-green-100 text-green-700' };
+  }
+  const tripState = String(driver.currentTripState || '').toLowerCase();
+  if (tripState && DRIVER_LIVE_STATUS_LABELS[tripState]) {
+    return { label: DRIVER_LIVE_STATUS_LABELS[tripState], color: DRIVER_LIVE_STATUS_COLORS[tripState] || 'bg-blue-100 text-blue-700' };
+  }
+  if (driverStatus === 'on trip') {
+    return { label: 'On Trip', color: 'bg-blue-100 text-blue-700' };
+  }
+  return { label: driver.status || 'Active', color: 'bg-blue-100 text-blue-700' };
+}

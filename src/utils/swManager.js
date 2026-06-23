@@ -98,10 +98,11 @@ const notifyUpdateAvailable = () => {
  * Skip waiting and activate new SW immediately
  */
 export const skipWaiting = () => {
-  if (!('serviceWorker' in navigator)) return;
-  const message = { type: 'SKIP_WAITING', action: 'skipWaiting' };
-  const worker = swRegistration?.waiting || swRegistration?.installing || navigator.serviceWorker.controller;
-  worker?.postMessage(message);
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SKIP_WAITING'
+    });
+  }
 };
 
 export default {

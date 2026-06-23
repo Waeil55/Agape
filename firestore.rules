@@ -11,6 +11,16 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
+    function validateTrip() {
+      let data = request.resource.data;
+      return data is map
+        && data.keys().hasAll(['id', 'updatedAtLocal']);
+    }
+    function validateDriverProfile() {
+      let data = request.resource.data;
+      return data is map
+        && data.keys().hasAny(['userId', 'email', 'name']);
+    }
 
     match /users/{userId} {
       allow read: if request.auth != null;
@@ -23,8 +33,8 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
     match /appData/agape {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && isDispatcher();
+      allow read: if false;
+      allow write: if false;
     }
     match /logs/{logId} {
       allow read: if request.auth != null;
@@ -33,8 +43,8 @@ service cloud.firestore {
     }
     match /trips/{tripId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow create: if request.auth != null && validateTrip();
+      allow update: if request.auth != null && validateTrip();
       allow delete: if request.auth != null && isAdmin();
     }
     match /assignments/{assignmentId} {
@@ -44,7 +54,7 @@ service cloud.firestore {
         || resource.data.userId == request.auth.uid
         || resource.data.driverId == request.auth.uid
       );
-      allow create: if request.auth != null && isDispatcher();
+      allow create: if false;
       allow update: if request.auth != null && (
         isDispatcher()
         || resource.data.driverEmail == request.auth.token.email
@@ -54,7 +64,7 @@ service cloud.firestore {
         || resource.data.driverId == request.auth.uid
         || request.resource.data.driverId == request.auth.uid
       );
-      allow delete: if request.auth != null && isAdmin();
+      allow delete: if false;
     }
     match /sessions/{sessionId} {
       allow read: if request.auth != null && (isDispatcher() || resource.data.userId == request.auth.uid);
@@ -98,8 +108,8 @@ service cloud.firestore {
     }
     match /driverProfiles/{driverId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
-      allow update: if request.auth != null && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow create: if request.auth != null && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher()) && validateDriverProfile();
+      allow update: if request.auth != null && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher()) && validateDriverProfile();
       allow delete: if request.auth != null && isAdmin();
     }
     match /dispatcherProfiles/{dispatcherId} {

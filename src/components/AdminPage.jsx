@@ -1,10 +1,13 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, Wifi, WifiOff, BrainCircuit, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase } from 'lucide-react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, Wifi, WifiOff, BrainCircuit, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase, Download } from 'lucide-react';
 import { sendPasswordResetEmail, auth, db, firebaseConfig, setDoc, doc, deleteApp, initializeApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from '../config/firebase';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiSecurityAnalysis } from '../config/ai';
 import DriversVehiclesPage from './DriversVehiclesPage';
 import UsersPage from './UsersPage';
+import DriverAvatar from './DriverAvatar';
+import DriverPerformanceCard from './DriverPerformanceCard';
+import { getDriverLiveStatus } from '../constants/statuses';
 
 const getEntityType = (log) => {
   const action = String(log?.t || '').toLowerCase();
@@ -70,16 +73,15 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
     <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
       <div className="p-4 border-b border-slate-100 bg-slate-50/70">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-sm font-black text-blue-700 uppercase shrink-0">
-            {(driver.name || '?')[0]}
-          </div>
+          <DriverAvatar driver={driver} size="md" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <p className="font-bold text-slate-900 truncate">{driver.name}</p>
-              <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${statusColor(driver.status)}`}>{driver.status || 'Unknown'}</span>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${getDriverLiveStatus(driver).color}`}>{getDriverLiveStatus(driver).label}</span>
             </div>
             <p className="text-[11px] text-slate-500">{driver.vehicle || 'No vehicle'} {driver.phone ? `- ${driver.phone}` : ''}</p>
           </div>
+          <DriverPerformanceCard driver={driver} trips={trips} compact />
         </div>
       </div>
 
@@ -218,6 +220,58 @@ const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
   );
 };
 
+const buildCsvValue = (value) => `"${String(value ?? '').replace(/"/g, '""').replace(/—/g, '')}"`;
+
+const downloadFile = (content, filename, mimeType) => {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
+const exportTripsCsv = (trips, drivers) => {
+  const headers = ['Date', 'Driver', 'Scheduled Time', 'Trip ID', 'Passenger', 'Pickup', 'Dropoff', 'Status', 'Reviewed'];
+  const rows = (trips || []).map(trip => {
+    const driver = drivers?.find(d => d.id === trip.driverId || d.email === trip.driverEmail);
+    return [
+      buildCsvValue(trip.date || ''),
+      buildCsvValue(driver?.name || trip.driverName || ''),
+      buildCsvValue(trip.time || ''),
+      buildCsvValue(trip.bookingId || trip.id || ''),
+      buildCsvValue(trip.patient || ''),
+      buildCsvValue(trip.pickup || ''),
+      buildCsvValue(trip.dropoff || ''),
+      buildCsvValue(trip.status || ''),
+      buildCsvValue(trip.reviewed ? 'Yes' : 'No'),
+    ].join(',');
+  });
+  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+  downloadFile(csv, `agape-trips-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;');
+};
+
+const exportDriversCsv = (drivers) => {
+  const headers = ['Name', 'Email', 'Phone', 'Vehicle', 'Status', 'ID'];
+  const rows = (drivers || []).map(d => [
+    buildCsvValue(d.name || ''),
+    buildCsvValue(d.email || ''),
+    buildCsvValue(d.phone || ''),
+    buildCsvValue(d.vehicle || ''),
+    buildCsvValue(d.status || ''),
+    buildCsvValue(d.id || ''),
+  ].join(','));
+  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+  downloadFile(csv, `agape-drivers-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;');
+};
+
+const exportFullJson = (trips, drivers, dispatchers, vehicles, logs) => {
+  const data = { exportedAt: new Date().toISOString(), trips, drivers, dispatchers, vehicles, logs };
+  const json = JSON.stringify(data, null, 2);
+  downloadFile(json, `agape-full-export-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+};
+
 const AdminPage = ({
   role, currentUser, drivers, setDrivers, dispatchers, setDispatchers,
   addAuditLog, logs = [], trips, vehicles, setVehicles,
@@ -233,6 +287,16 @@ const AdminPage = ({
   const [createError, setCreateError] = useState('');
   const [creatingUser, setCreatingUser] = useState(false);
   const [vehicleCreateIntent, setVehicleCreateIntent] = useState(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (exportRef.current && !exportRef.current.contains(e.target)) setExportOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const runSecurityAnalysis = useCallback(async () => { setAiSecLoading(true); const r = await aiSecurityAnalysis([...drivers, ...dispatchers].map(u => ({ email: u.email, role: u.role, lastLogin: u.lastLogin, disabled: u.disabled })), logs || []); setAiSecurity(r); setAiSecLoading(false); }, [drivers, dispatchers, logs]);
 
@@ -599,6 +663,18 @@ const AdminPage = ({
               <Plus size={14} /> Add Dispatcher
             </button>
           )}
+          <div className="relative" ref={exportRef}>
+            <button type="button" onClick={() => setExportOpen(v => !v)} className="inline-flex h-9 items-center gap-2 rounded-xl bg-slate-700 px-3 text-xs font-black text-white shadow-sm transition hover:bg-slate-600">
+              <Download size={14} /> Export
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-52 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                <button onClick={() => { exportTripsCsv(trips, drivers); setExportOpen(false); }} className="flex w-full items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Export Trips (CSV)</button>
+                <button onClick={() => { exportDriversCsv(drivers); setExportOpen(false); }} className="flex w-full items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Export Drivers (CSV)</button>
+                <button onClick={() => { exportFullJson(trips, drivers, dispatchers, vehicles, logs); setExportOpen(false); }} className="flex w-full items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Export Full JSON</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

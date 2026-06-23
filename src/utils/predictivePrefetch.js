@@ -17,7 +17,7 @@
 
 import { db } from '../config/firebase';
 import { doc, getDoc, collection, getDocs, query, where, orderBy, limit } from '../config/firebase';
-import { connectionMonitor, ConnectionState } from './dataStore';
+import { connectionMonitor, ConnectionState } from './connectionMonitor';
 import { networkQuality } from './networkQuality';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -38,14 +38,6 @@ export const PrefetchPriority = {
 const PREFETCH_RULES = [
   // Startup rules — always prefetch
   {
-    name: 'startup-trips',
-    trigger: 'startup',
-    priority: PrefetchPriority.CRITICAL,
-    fetch: () => getDoc(doc(db, 'appData/agape')),
-    cacheKey: 'appData',
-    ttl: 30000, // 30 seconds
-  },
-  {
     name: 'startup-drivers',
     trigger: 'startup',
     priority: PrefetchPriority.CRITICAL,
@@ -55,14 +47,6 @@ const PREFETCH_RULES = [
   },
 
   // Page-based rules
-  {
-    name: 'dashboard-trips',
-    trigger: 'page:dashboard',
-    priority: PrefetchPriority.HIGH,
-    fetch: () => getDoc(doc(db, 'appData/agape')),
-    cacheKey: 'appData',
-    ttl: 15000,
-  },
   {
     name: 'operations-telemetry',
     trigger: 'page:operations',
@@ -78,32 +62,6 @@ const PREFETCH_RULES = [
     fetch: () => getDocs(collection(db, 'driverProfiles')),
     cacheKey: 'driverProfiles',
     ttl: 30000,
-  },
-  {
-    name: 'archives-trashed',
-    trigger: 'page:archives',
-    priority: PrefetchPriority.HIGH,
-    fetch: () => getDoc(doc(db, 'appData/agape')),
-    cacheKey: 'appData',
-    ttl: 30000,
-  },
-
-  // Time-based rules
-  {
-    name: 'morning-trips',
-    trigger: 'time:morning', // 6am-10am
-    priority: PrefetchPriority.MEDIUM,
-    fetch: () => getDoc(doc(db, 'appData/agape')),
-    cacheKey: 'appData',
-    ttl: 60000,
-  },
-  {
-    name: 'evening-reports',
-    trigger: 'time:evening', // 5pm-9pm
-    priority: PrefetchPriority.LOW,
-    fetch: () => getDoc(doc(db, 'appData/agape')),
-    cacheKey: 'appData',
-    ttl: 120000,
   },
 
   // Idle rules

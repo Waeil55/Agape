@@ -439,3 +439,82 @@ exports.diagnoseTelnyx = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("internal", err.message || "Diagnosis failed");
   }
 });
+
+exports.createAssignments = functions.https.onCall(async (data, context) => {
+  await requireAdminOrDispatcher(context);
+  const { assignments } = data;
+  if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
+    throw new functions.https.HttpsError("invalid-argument", "'assignments' must be a non-empty array.");
+  }
+  const batch = admin.firestore().batch();
+  let count = 0;
+  for (const a of assignments) {
+    if (!a.id || !a.tripId) continue;
+    batch.set(admin.firestore().doc("assignments", a.id), a, { merge: true });
+    count++;
+  }
+  if (count > 0) await batch.commit();
+  functions.logger.info(`createAssignments: created ${count} assignment(s) by ${context.auth.uid}`);
+  return { created: count };
+});
+
+// ── Stub functions — previously deployed, preserved to avoid deletion ──────────
+
+exports.cleanupOldTelemetry = functions.pubsub.schedule("0 3 * * *").onRun(async (ctx) => {
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const snap = await admin.firestore().collection("telemetry").where("timestamp", "<", cutoff).get();
+  let deleted = 0;
+  const batch = admin.firestore().batch();
+  snap.forEach((doc) => { batch.delete(doc.ref); deleted++; });
+  if (deleted > 0) await batch.commit();
+  functions.logger.info(`cleanupOldTelemetry: deleted ${deleted} telemetry docs older than ${cutoff.toISOString()}`);
+});
+
+exports.createUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
+  const ref = await admin.firestore().collection("users").add(data);
+  return { id: ref.id };
+});
+
+exports.dayRollover = functions.pubsub.schedule("0 0 * * *").onRun(async (ctx) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const snap = await admin.firestore().collection("assignments").where("date", "<", today).get();
+  let cleaned = 0;
+  snap.forEach(() => cleaned++);
+  functions.logger.info(`dayRollover: ${today} — ${cleaned} past assignments found`);
+});
+
+exports.migrateTripDateKeys = functions.https.onCall(async (data, context) => {
+  const tripsSnap = await admin.firestore().collection("trips").get();
+  const batch = admin.firestore().batch();
+  let updated = 0;
+  tripsSnap.forEach((doc) => {
+    const d = doc.data();
+    if (!d.dateKey && d.date) {
+      batch.update(doc.ref, { dateKey: d.date });
+      updated++;
+    }
+  });
+  if (updated > 0) await batch.commit();
+  return { updated };
+});
+
+exports.sendPushNotification = functions.https.onCall(async (data, context) => {
+  functions.logger.warn("sendPushNotification stub called — notifications not implemented", { data });
+  return { success: false, message: "Push notifications not implemented" };
+});
+
+exports.systemHealthCheck = functions.https.onRequest(async (req, res) => {
+  const checks = { firestore: false, auth: false };
+  try {
+    await admin.firestore().doc("_health/check").get();
+    checks.firestore = true;
+  } catch (e) { /* */ }
+  try {
+    await admin.auth().getUser("_nonexistent_");
+  } catch (e) {
+    if (e.code === "auth/user-not-found") checks.auth = true;
+  }
+  const healthy = checks.firestore && checks.auth;
+  res.status(healthy ? 200 : 503).json({ status: healthy ? "healthy" : "degraded", checks });
+});

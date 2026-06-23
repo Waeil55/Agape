@@ -4,8 +4,8 @@ import {
   auth,
   collection,
   doc,
-  getDocFromServer,
   getDocsFromServer,
+  onSnapshot,
   query,
   serverTimestamp,
   setDoc,
@@ -261,23 +261,17 @@ export function useDriverLiveState({
       .catch((err) => console.error('Driver session initialization failed:', err));
 
     unsubSessionRef.current?.();
-    const checkSession = async () => {
-      try {
-        const snap = await getDocFromServer(sessionRef);
-        if (cancelled || !snap.exists()) return;
-        const session = snap.data();
-        if (session.status !== SESSION_STATUSES.ACTIVE) {
-          sessionInvalidRef.current = true;
-          setSessionState((prev) => ({ ...prev, valid: false, status: session.status }));
-          onInvalidSession?.(session);
-        }
-      } catch (err) {
-        console.error('Driver session refresh failed:', err);
+    unsubSessionRef.current = onSnapshot(sessionRef, (snap) => {
+      if (cancelled || !snap.exists()) return;
+      const session = snap.data();
+      if (session.status !== SESSION_STATUSES.ACTIVE) {
+        sessionInvalidRef.current = true;
+        setSessionState((prev) => ({ ...prev, valid: false, status: session.status }));
+        onInvalidSession?.(session);
       }
-    };
-    checkSession();
-    const sessionPollTimer = setInterval(checkSession, HEARTBEAT_INTERVAL_MS);
-    unsubSessionRef.current = () => clearInterval(sessionPollTimer);
+    }, (err) => {
+      console.error('Driver session refresh failed:', err);
+    });
 
     const heartbeatTimer = setInterval(() => {
       writeLiveState(false).catch((err) => console.error('Driver heartbeat failed:', err));
@@ -442,24 +436,16 @@ export function useDriverLivenessMonitor({ enabled, resubscribeKey = 0 }) {
       });
     };
 
-    let cancelled = false;
-    const refreshHeartbeats = async () => {
-      try {
-        const snap = await getDocsFromServer(collection(db, FIRESTORE_COLLECTIONS.HEARTBEAT));
-        if (cancelled) return;
-        heartbeatRef.current = snap.docs.map((heartbeatDoc) => ({ id: heartbeatDoc.id, ...heartbeatDoc.data() }));
-        markOfflineDrivers();
-      } catch (err) {
-        if (!cancelled) console.error('Driver heartbeat liveness refresh failed:', err);
-      }
-    };
+    const unsub = onSnapshot(collection(db, FIRESTORE_COLLECTIONS.HEARTBEAT), (snapshot) => {
+      heartbeatRef.current = snapshot.docs.map((heartbeatDoc) => ({ id: heartbeatDoc.id, ...heartbeatDoc.data() }));
+      markOfflineDrivers();
+    }, (err) => {
+      console.error('Driver heartbeat liveness refresh failed:', err);
+    });
 
-    refreshHeartbeats();
-    const heartbeatFetchTimer = setInterval(refreshHeartbeats, HEARTBEAT_INTERVAL_MS);
     const livenessTimer = setInterval(markOfflineDrivers, HEARTBEAT_INTERVAL_MS);
     return () => {
-      cancelled = true;
-      clearInterval(heartbeatFetchTimer);
+      unsub();
       clearInterval(livenessTimer);
     };
   }, [enabled, resubscribeKey]);

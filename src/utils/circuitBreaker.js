@@ -14,7 +14,7 @@
  *                                     └───── [probe fail] ───────┘
  */
 
-import { connectionMonitor, ConnectionState } from './dataStore';
+import { connectionMonitor, ConnectionState } from './connectionMonitor';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CIRCUIT STATES

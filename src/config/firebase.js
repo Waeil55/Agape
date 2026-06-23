@@ -24,21 +24,18 @@ const app = initializeApp(firebaseConfig);
 let db;
 try {
   db = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager(),
-    }),
+    localCache: memoryLocalCache(),
   });
+  console.log('[Firebase] Using memory local cache');
 } catch (err) {
-  const message = String(err?.message || '');
-  console.warn('Persistent cache failed, falling back to memory cache:', message);
-  try {
-    db = initializeFirestore(app, {
-      localCache: memoryLocalCache(),
-    });
-  } catch (err2) {
-    db = getFirestore(app);
-  }
+  console.warn('Memory cache failed, using default Firestore:', err.message);
+  db = getFirestore(app);
 }
+
+// If you need offline persistence across page reloads, switch to persistentLocalCache:
+//   initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })
+// Note: persistentLocalCache can cause FIRESTORE INTERNAL ASSERTION FAILED errors
+// with many onSnapshot listeners (targetId > 1000). memoryLocalCache avoids this entirely.
 
 const auth = getAuth(app);
 const analytics = getAnalytics(app);

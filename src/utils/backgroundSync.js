@@ -1,4 +1,7 @@
 /**
+ * @deprecated This module is no longer used. The sync queue processor
+ * (src/services/syncQueueProcessor.js) handles offline write retries.
+ * 
  * BackgroundSyncManager — SW-integrated offline write queue with conflict detection
  * 
  * What Google/Uber/Duolingo use:
@@ -30,7 +33,6 @@ import {
 
 const TRIPS_COLLECTION = 'trips';
 const TRASHED_TRIPS_COLLECTION = 'trashedTrips';
-const DATA_DOC = 'appData/agape';
 
 const sanitizeForFirestore = (value) => JSON.parse(JSON.stringify(value, (_key, item) => item === undefined ? null : item));
 
@@ -48,17 +50,6 @@ async function syncRootTripCollection(collectionName, nextRecords = [], previous
       .map((trip) => setDoc(doc(db, collectionName, String(trip.id)), sanitizeForFirestore(trip), { merge: true })),
     ...removedIds(nextRecords, previousRecords).map((id) => deleteDoc(doc(db, collectionName, id))),
   ]);
-}
-
-async function touchTripCollectionMetadata(updatedField, extra = {}) {
-  await setDoc(doc(db, DATA_DOC), {
-    ...extra,
-    tripStorageMode: 'rootCollections',
-    tripStorageVersion: 2,
-    updatedAt: serverTimestamp(),
-    updatedField,
-    updatedAtLocal: new Date().toISOString(),
-  }, { merge: true });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -293,14 +284,19 @@ class BackgroundSyncManager {
    */
   async _detectConflict(op) {
     try {
-      const remoteDoc = await getDoc(doc(db, op.collection || 'appData/agape'));
+      const ref = op.collection && op.docId
+        ? doc(db, op.collection, op.docId)
+        : op.collection
+          ? doc(db, op.collection, op.field || 'meta')
+          : null;
+      if (!ref) return false;
+      const remoteDoc = await getDoc(ref);
       if (!remoteDoc.exists()) return false;
 
       const remoteData = remoteDoc.data();
       const remoteVersion = remoteData?._version || 0;
       const localVersion = op.version || 0;
 
-      // If remote has a higher version for the same field, we have a conflict
       if (remoteVersion > localVersion && op.field) {
         const remoteFieldVersion = remoteData?._fieldVersions?.[op.field] || 0;
         if (remoteFieldVersion > localVersion) {
@@ -310,7 +306,7 @@ class BackgroundSyncManager {
 
       return false;
     } catch {
-      return false; // Can't check, proceed with write
+      return false;
     }
   }
 
@@ -341,7 +337,10 @@ class BackgroundSyncManager {
    */
   async _executeWrite(op) {
     if (op.type === 'setField') {
-      await setDoc(doc(db, op.collection || 'appData/agape'), {
+      const ref = op.collection && op.docId
+        ? doc(db, op.collection, op.docId)
+        : doc(db, 'systemConfig', 'syncQueueMeta');
+      await setDoc(ref, {
         [op.field]: op.value,
         updatedAt: serverTimestamp(),
         updatedField: op.field,
@@ -355,7 +354,6 @@ class BackgroundSyncManager {
       const rootCollection = field === 'trashedTrips' ? TRASHED_TRIPS_COLLECTION : TRIPS_COLLECTION;
       const value = op.value || [];
       await syncRootTripCollection(rootCollection, value, op.previous || []);
-      await touchTripCollectionMetadata(field, { [`${field}Count`]: value.length });
     } else if (op.type === 'setTripsBatch') {
       const trips = op.trips || [];
       const trashedTrips = op.trashedTrips || [];
@@ -363,10 +361,6 @@ class BackgroundSyncManager {
         syncRootTripCollection(TRIPS_COLLECTION, trips, op.previousTrips || []),
         syncRootTripCollection(TRASHED_TRIPS_COLLECTION, trashedTrips, op.previousTrashedTrips || []),
       ]);
-      await touchTripCollectionMetadata('trips+trashed', {
-        tripsCount: trips.length,
-        trashedTripsCount: trashedTrips.length,
-      });
     } else if (op.type === 'setDoc') {
       await setDoc(doc(db, op.collection, op.docId), {
         ...op.data,

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { formatTelemetryDuration } from '../utils/driverTelemetry';
 import { aiAnalyzeTrips } from '../config/ai';
+import { tripCalendarDateKey } from '../utils/tripDate';
 
 const STATUS_OPTIONS = ['Completed', 'No Show', 'Cancelled'];
 
@@ -115,10 +116,18 @@ const calcDuration = (start, end) => {
   return h > 0 ? `${h}h${m > 0 ? m : ''}` : `${m}m`;
 };
 
-const calcMiles = (pickupOdo, dropoffOdo) => {
-  if (!pickupOdo || !dropoffOdo) return '—';
-  const diff = Number(dropoffOdo) - Number(pickupOdo);
-  return diff > 0 ? diff.toFixed(1) : '—';
+const calcMiles = (pickupOdo, dropoffOdo, storedDistance) => {
+  const p = pickupOdo === null || pickupOdo === undefined || pickupOdo === '' ? null : Number(pickupOdo);
+  const d = dropoffOdo === null || dropoffOdo === undefined || dropoffOdo === '' ? null : Number(dropoffOdo);
+  if (p !== null && d !== null) {
+    const diff = d - p;
+    if (diff > 0) return diff.toFixed(1);
+  }
+  if (storedDistance !== null && storedDistance !== undefined && storedDistance !== '') {
+    const sd = Number(storedDistance);
+    if (sd > 0) return sd.toFixed(1);
+  }
+  return '—';
 };
 
 const formatDateLabel = (dateStr) => {
@@ -180,6 +189,8 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
   const [collapsedDays, setCollapsedDays] = useState(() => {
     try { return JSON.parse(localStorage.getItem('agape_rptCollapsedDays') || '{}'); } catch { return {}; }
   });
+  const PAGE_SIZE = 100;
+  const [page, setPage] = useState(1);
   const toggleDay = (dateLabel) => {
     setCollapsedDays(prev => ({ ...prev, [dateLabel]: !prev[dateLabel] }));
   };
@@ -300,7 +311,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
       case 'pickupOdometer': return Number(trip.pickupOdometer || 0);
       case 'dropoffOdometer': return Number(trip.dropoffOdometer || 0);
       case 'travelTime': return (trip.departedPickupTime || trip.arrivalTime) && (trip.arrivalDropoffTime || trip.completedAt) ? new Date(trip.arrivalDropoffTime || trip.completedAt) - new Date(trip.departedPickupTime || trip.arrivalTime) : 0;
-      case 'distance': return Number(calcMiles(trip.pickupOdometer, trip.dropoffOdometer)) || 0;
+      case 'distance': { const dm = calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance); return dm !== '—' ? Number(dm) : 0; }
       case 'signature': return trip.paperSignatureConfirmed ? 1 : 0;
       case 'reviewed': return trip.reviewed ? 1 : 0;
       default: return '';
@@ -323,7 +334,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
       case 'pickupOdometer': return trip.pickupOdometer || '';
       case 'dropoffOdometer': return trip.dropoffOdometer || '';
       case 'travelTime': return trip.travelTime || calcDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
-      case 'distance': { const m = calcMiles(trip.pickupOdometer, trip.dropoffOdometer); return m !== '—' ? m : '—'; }
+      case 'distance': return calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance);
       case 'signature': {
         if (!('paperSignatureConfirmed' in trip)) return '—';
         return trip.paperSignatureConfirmed ? 'Yes' : 'No';
@@ -458,7 +469,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         return trip.driverId === driverFilter || trip.driverEmail === driverFilter;
       })
       .filter((trip) => {
-        const tripDate = trip.date || '';
+        const tripDate = tripCalendarDateKey(trip.date) || trip.date || '';
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;
         return true;
@@ -498,7 +509,11 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
       acc[key].push(trip);
       return acc;
     }, {});
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+    return Object.entries(groups).sort(([a], [b]) => {
+      if (a === 'No Date') return 1;
+      if (b === 'No Date') return -1;
+      return b.localeCompare(a);
+    });
   }, [reportTrips]);
 
   // Group trips by passenger within each date
@@ -517,6 +532,14 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     });
     return result;
   }, [groupedTrips]);
+
+  const totalPages = Math.max(1, Math.ceil(groupedTrips.length / PAGE_SIZE));
+  const paginatedGroupedTrips = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return groupedTrips.slice(start, start + PAGE_SIZE);
+  }, [groupedTrips, page]);
+
+  useEffect(() => { setPage(1); }, [statusFilter, driverFilter, startDate, endDate, searchQuery]);
 
   const stats = useMemo(() => ({
     total: reportTrips.length,
@@ -641,7 +664,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
       const pickupOdo = trip.pickupOdometer || '';
       const dropoffOdo = trip.dropoffOdometer || '';
       const signed = 'paperSignatureConfirmed' in trip ? (trip.paperSignatureConfirmed ? 'Yes' : 'No') : '';
-      const miles = calcMiles(trip.pickupOdometer, trip.dropoffOdometer);
+      const miles = calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance);
       const reviewed = trip.reviewed ? 'Yes' : 'No';
 
       const formattedDate = formatDateLabel(trip.date || 'No Date');
@@ -731,6 +754,13 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
             <span className={`text-[10px] font-bold ${s.color}`}>{s.value}</span>
           </span>
         ))}
+        {totalPages > 1 && (
+          <span className="flex items-center gap-1 text-[9px]">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="px-1 py-0.5 rounded bg-slate-200 hover:bg-slate-300 disabled:opacity-30 font-bold">&lsaquo;</button>
+            <span className="text-slate-500 font-medium mx-0.5">{page}/{totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-1 py-0.5 rounded bg-slate-200 hover:bg-slate-300 disabled:opacity-30 font-bold">&rsaquo;</button>
+          </span>
+        )}
         <span className="text-[9px] text-slate-400">{reportTrips.length > 0 && `${reportTrips.length}`}</span>
         <span className="w-px h-4 bg-slate-200" />
         <span className="flex items-center gap-1 text-[9px] text-slate-500">
@@ -789,14 +819,14 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
 
       {/* Table Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {groupedTrips.length === 0 ? (
+        {paginatedGroupedTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             <FileText size={40} className="mb-3 opacity-40" />
             <p className="text-sm font-medium">No report data for selected filters</p>
             <button onClick={resetFilters} className="mt-2 text-xs text-blue-600 hover:underline">Reset filters</button>
           </div>
         ) : (
-          groupedTrips.map(([dateLabel, dayTrips]) => {
+          paginatedGroupedTrips.map(([dateLabel, dayTrips]) => {
             const passengerData = groupedByPassenger[dateLabel] || [];
             const isCollapsed = collapsedDays[dateLabel];
             const dayTrackingDocs = trackingDocs.filter((doc) => doc.date === dateLabel);

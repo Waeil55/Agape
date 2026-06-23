@@ -1,4 +1,7 @@
 /**
+ * @deprecated This module is no longer used. The sync queue processor
+ * (src/services/syncQueueProcessor.js) handles offline write retries.
+ * 
  * RetryQueue — Failed operations isolated, inspected, replayed
  * 
  * What Google/Netflix/Uber use:
@@ -26,7 +29,6 @@ const BACKOFF_MULTIPLIER = 3;
 const MAX_BACKOFF = 45000;
 const TRIPS_COLLECTION = 'trips';
 const TRASHED_TRIPS_COLLECTION = 'trashedTrips';
-const DATA_DOC = 'appData/agape';
 
 const sanitizeForFirestore = (value) => JSON.parse(JSON.stringify(value, (_key, item) => item === undefined ? null : item));
 
@@ -44,17 +46,6 @@ async function syncRootTripCollection(collectionName, nextRecords = [], previous
       .map((trip) => setDoc(doc(db, collectionName, String(trip.id)), sanitizeForFirestore(trip), { merge: true })),
     ...removedIds(nextRecords, previousRecords).map((id) => deleteDoc(doc(db, collectionName, id))),
   ]);
-}
-
-async function touchTripCollectionMetadata(updatedField, extra = {}) {
-  await setDoc(doc(db, DATA_DOC), {
-    ...extra,
-    tripStorageMode: 'rootCollections',
-    tripStorageVersion: 2,
-    updatedAt: serverTimestamp(),
-    updatedField,
-    updatedAtLocal: new Date().toISOString(),
-  }, { merge: true });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -204,7 +195,10 @@ class RetryQueue {
         retriedAt: serverTimestamp(),
       }, { merge: true });
     } else if (operation.type === 'setField') {
-      await setDoc(doc(db, operation.collection || 'appData/agape'), {
+      const ref = operation.collection && operation.docId
+        ? doc(db, operation.collection, operation.docId)
+        : doc(db, 'trips', `sync_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+      await setDoc(ref, {
         [operation.field]: operation.value,
         updatedAt: serverTimestamp(),
         updatedAtLocal: new Date().toISOString(),
@@ -214,7 +208,6 @@ class RetryQueue {
       const rootCollection = field === 'trashedTrips' ? TRASHED_TRIPS_COLLECTION : TRIPS_COLLECTION;
       const value = operation.value || [];
       await syncRootTripCollection(rootCollection, value, operation.previous || []);
-      await touchTripCollectionMetadata(field, { [`${field}Count`]: value.length });
     } else if (operation.type === 'setTripsBatch') {
       const trips = operation.trips || [];
       const trashedTrips = operation.trashedTrips || [];
@@ -222,10 +215,6 @@ class RetryQueue {
         syncRootTripCollection(TRIPS_COLLECTION, trips, operation.previousTrips || []),
         syncRootTripCollection(TRASHED_TRIPS_COLLECTION, trashedTrips, operation.previousTrashedTrips || []),
       ]);
-      await touchTripCollectionMetadata('trips+trashed', {
-        tripsCount: trips.length,
-        trashedTripsCount: trashedTrips.length,
-      });
     }
   }
 

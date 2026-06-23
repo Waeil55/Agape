@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import {
   Truck, Users, MapPin, Clock, Search, ShieldCheck,
-  ArrowRight, CheckCircle2, Archive, Map as MapIcon, LogOut,
+  ArrowRight, CheckCircle2, Archive, Map as MapIcon, LogOut, AlertTriangle,
   Settings, BrainCircuit, Zap,
   Target, Upload, AlertCircle,
   Activity, Wand2, Lock, Briefcase, User,
@@ -38,6 +38,7 @@ import { buildLocationFraudSignals } from './utils/locationFraud';
 import { buildLocationEvent, emitSystemEvent } from './services/firestoreEventEngine';
 import './utils/clientExport';
 import { registerServiceWorker, setupSWMessageHandler, skipWaiting } from './utils/swManager';
+import { syncQueueProcessor } from './services/syncQueueProcessor';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
 import { useRealtimeReliability } from './hooks/useRealtimeReliability';
 import { useDriverLiveState, useDriverLivenessMonitor } from './hooks/useDriverLiveState';
@@ -407,14 +408,20 @@ const App = () => {
     };
   }, []);
 
+  // Start the sync queue processor to drain pending offline writes
+  useEffect(() => {
+    syncQueueProcessor.start();
+    return () => syncQueueProcessor.stop();
+  }, []);
+
   // ALL DATA COMES FROM FIRESTORE — single source of truth
   const {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
     loading: dataLoading, saving: dataSaving, error: dataError, lastSavedAt,
-    setTrips, importTrips, setDrivers, upsertDriverProfile, setDispatchers, setVehicles,
+    setTrips, setDrivers, upsertDriverProfile, setDispatchers, setVehicles,
     setTrashedTrips, setLogs, setPhoneNumbers,
     addLog, initializeAppData,
-  } = useFirestoreAppData({ enabled: isAuthenticated, resubscribeKey: realtimeReliability.resubscribeKey });
+  } = useFirestoreAppData({ resubscribeKey: realtimeReliability.resubscribeKey });
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
@@ -590,6 +597,14 @@ const App = () => {
     setToasts(prev => [...prev, { id, title, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
   };
+
+  const dataErrorRef = useRef(dataError);
+  useEffect(() => {
+    if (dataError && dataError !== dataErrorRef.current) {
+      addToast('Data Save Error', dataError, 'danger');
+    }
+    dataErrorRef.current = dataError;
+  }, [dataError]);
 
   const updateAppSettings = useCallback((updates, isProfileUpdate = false) => {
     if (isProfileUpdate && role === 'driver' && updates.odometer !== undefined) {
@@ -845,15 +860,11 @@ const App = () => {
       try {
       if (user) {
         // Load user role — ensure doc exists for Firestore security rules
-        const [userDocResult, dataSnapResult] = await Promise.all([
-          withTimeout(getDoc(doc(db, 'users', user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'user profile'),
-          withTimeout(getDoc(doc(db, 'appData/agape')), FIRESTORE_BOOT_TIMEOUT_MS, 'operations data'),
-        ]);
+        const userDocResult = await withTimeout(getDoc(doc(db, 'users', user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'user profile');
         if (cancelled) return;
 
         const requestedPortalRole = loginPortalRoleRef.current;
         let userDoc = userDocResult.ok ? userDocResult.value : null;
-        const dataSnap = dataSnapResult.ok ? dataSnapResult.value : null;
         let userRole = '';
         if (userDoc?.exists()) {
           userRole = String(userDoc.data()?.role || '').toLowerCase();
@@ -2469,7 +2480,7 @@ const App = () => {
   return (
     <>
       {/* Offline Banner */}
-      <div className={`offline-banner${isAuthenticated && isOffline ? ' visible' : ''}`}>
+      <div className={`offline-banner${isOffline ? ' visible' : ''}`}>
         You are offline — changes will sync when connection returns
       </div>
       <div className="min-h-screen flex-1 flex flex-col bg-[var(--bg-app)] overflow-visible w-full">
@@ -2617,7 +2628,6 @@ const App = () => {
               currentUser={currentUser}
               trips={scopedTrips}
               setTrips={setTrips}
-              importTrips={importTrips}
               drivers={scopedDrivers}
               setDrivers={setDrivers}
               dispatchers={dispatchers}
@@ -2726,8 +2736,14 @@ const App = () => {
           <div className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-[200] flex flex-col gap-3 pointer-events-none">
             {toasts.map(toast => (
               <div key={toast.id} className="pointer-events-auto bg-white/90 backdrop-blur-xl border border-slate-200 rounded-xl p-4 shadow-2xl flex gap-3 items-start animate-in max-w-sm">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                  {toast.type === 'success' ? <CheckCircle2 size={20} /> : <Zap size={20} />}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                  toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' :
+                  toast.type === 'danger' ? 'bg-red-50 text-red-600' :
+                  'bg-blue-50 text-blue-600'
+                }`}>
+                  {toast.type === 'success' ? <CheckCircle2 size={20} /> :
+                   toast.type === 'danger' ? <AlertTriangle size={20} /> :
+                   <Zap size={20} />}
                 </div>
                 <div>
                   <h4 className="font-bold text-sm text-slate-900">{toast.title}</h4>

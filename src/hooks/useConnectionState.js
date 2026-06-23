@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { connectionMonitor, ConnectionState } from '../utils/dataStore';
+import { connectionMonitor, ConnectionState } from '../utils/connectionMonitor';
 import { networkQuality } from '../utils/networkQuality';
 
 const STATE_COLORS = {

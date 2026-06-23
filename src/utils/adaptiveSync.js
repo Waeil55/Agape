@@ -13,7 +13,7 @@
  *   → Adaptive Sync Interval Calculator → Dynamic Sync Scheduler
  */
 
-import { connectionMonitor, ConnectionState } from './dataStore';
+import { connectionMonitor, ConnectionState } from './connectionMonitor';
 import { networkQuality } from './networkQuality';
 
 // ═══════════════════════════════════════════════════════════════════════════════

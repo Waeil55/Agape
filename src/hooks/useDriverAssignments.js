@@ -3,8 +3,8 @@ import {
   db,
   collection,
   doc,
-  getDocsFromServer,
   limit,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -46,61 +46,49 @@ export function useDriverAssignments({ enabled, driver, currentUser, resubscribe
       return undefined;
     }
 
-    let cancelled = false;
-    let inFlight = null;
     setLoading(true);
-
-    const publish = (resultSets) => {
-      const byId = new Map();
-      resultSets.forEach((docs) => {
-        docs.forEach((assignment) => {
-          if (assignment?.id) byId.set(assignment.id, assignment);
-        });
-      });
-      setAssignments(sortAssignments([...byId.values()]));
-      setLoading(false);
-      setError(null);
-    };
-
-    const fetchFor = async (field, value) => {
-      if (!value) return [field, []];
-      const assignmentQuery = query(
-        collection(db, FIRESTORE_COLLECTIONS.ASSIGNMENTS),
-        where(field, '==', value),
-        where('status', 'in', ACTIVE_ASSIGNMENT_STATUSES),
-        orderBy('offeredAt', 'desc'),
-        limit(25)
+    const queries = [];
+    if (driverId) {
+      queries.push(
+        query(
+          collection(db, FIRESTORE_COLLECTIONS.ASSIGNMENTS),
+          where('driverId', '==', driverId),
+          where('status', 'in', ACTIVE_ASSIGNMENT_STATUSES),
+          orderBy('offeredAt', 'desc'),
+          limit(25)
+        )
       );
-      const snap = await getDocsFromServer(assignmentQuery);
-      return [field, snap.docs.map((assignmentDoc) => ({ id: assignmentDoc.id, ...assignmentDoc.data() }))];
-    };
+    }
+    if (driverEmail) {
+      queries.push(
+        query(
+          collection(db, FIRESTORE_COLLECTIONS.ASSIGNMENTS),
+          where('driverEmail', '==', driverEmail),
+          where('status', 'in', ACTIVE_ASSIGNMENT_STATUSES),
+          orderBy('offeredAt', 'desc'),
+          limit(25)
+        )
+      );
+    }
 
-    const refreshAssignments = async () => {
-      if (inFlight) return inFlight;
-      inFlight = Promise.all([
-        fetchFor('driverId', driverId),
-        fetchFor('driverEmail', driverEmail),
-      ]).then((entries) => {
-        if (cancelled) return;
-        publish(new Map(entries));
-      }).catch((err) => {
-        if (cancelled) return;
+    const unsubscribes = queries.map((q) =>
+      onSnapshot(q, (snapshot) => {
+        const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setAssignments((prev) => {
+          const byId = new Map(prev.map((a) => [a.id, a]));
+          docs.forEach((d) => byId.set(d.id, d));
+          return sortAssignments([...byId.values()]);
+        });
+        setLoading(false);
+        setError(null);
+      }, (err) => {
         setError(err.message || 'Driver assignment refresh failed');
         setLoading(false);
-      }).finally(() => {
-        inFlight = null;
-      });
-      return inFlight;
-    };
-
-    refreshAssignments();
-    const timer = setInterval(refreshAssignments, 12000);
-    window.addEventListener('online', refreshAssignments);
+      })
+    );
 
     return () => {
-      cancelled = true;
-      clearInterval(timer);
-      window.removeEventListener('online', refreshAssignments);
+      unsubscribes.forEach((unsub) => unsub());
     };
   }, [enabled, driverId, driverEmail, resubscribeKey]);
 
