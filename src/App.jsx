@@ -40,7 +40,7 @@ import './utils/clientExport';
 import { registerServiceWorker, setupSWMessageHandler, skipWaiting } from './utils/swManager';
 import { syncQueueProcessor } from './services/syncQueueProcessor';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
-import { useRealtimeReliability } from './hooks/useRealtimeReliability';
+import { useRealtimeReliability, requestRealtimeResubscribe } from './hooks/useRealtimeReliability';
 import { useDriverLiveState, useDriverLivenessMonitor } from './hooks/useDriverLiveState';
 import { useDriverAssignments } from './hooks/useDriverAssignments';
 
@@ -326,6 +326,7 @@ const App = () => {
   const [showLoadingRecovery, setShowLoadingRecovery] = useState(false);
   const [showDataLoadingRecovery, setShowDataLoadingRecovery] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [forceDataLoad, setForceDataLoad] = useState(false);
   const authBootResolvedRef = useRef(false);
   const prevChatConvsRef = useRef(null);
   const loginPortalRoleRef = useRef(null);
@@ -849,6 +850,13 @@ const App = () => {
       }
     }, 120000);
     return () => { clearTimeout(recoveryT); clearTimeout(errorT); };
+  }, [dataLoading]);
+  // Force dataLoading to end after 45s so auth watchdog (90s) never fires
+  useEffect(() => {
+    setForceDataLoad(false);
+    if (!dataLoading) return;
+    const t = setTimeout(() => setForceDataLoad(true), 45000);
+    return () => clearTimeout(t);
   }, [dataLoading]);
 
   useEffect(() => {
@@ -2563,7 +2571,7 @@ const App = () => {
         </div>
       ) : !isAuthenticated ? (
         renderLoginScreen()
-      ) : dataLoading ? (
+      ) : dataLoading && !forceDataLoad ? (
         <div className="flex-1 bg-[#5a94af] flex items-center justify-center px-4">
           <div className="w-full max-w-md bg-white border border-slate-200/50 rounded-[2.5rem] overflow-hidden shadow-2xl p-8 flex flex-col items-center gap-5 text-center">
             <img src="/agape.png" alt="Agape Care" className="w-16 h-16 object-contain" />
@@ -2582,7 +2590,7 @@ const App = () => {
               <div className="w-full border-t border-slate-100 pt-4 space-y-3">
                 <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. You can retry the cloud connection.</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => window.location.reload()} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
+                  <button onClick={() => { requestRealtimeResubscribe('retry'); setShowDataLoadingRecovery(false); setStartupIssue('Reconnecting...'); }} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
                     <RefreshCcw size={15} /> Retry
                   </button>
                   <button onClick={async () => {
