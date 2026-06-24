@@ -231,8 +231,8 @@ function getBestDriverProfileForEmail(drivers = [], email = '', trips = []) {
   })[0];
 }
 
-const FIRESTORE_BOOT_TIMEOUT_MS = 30000;
-const AUTH_WATCHDOG_TIMEOUT_MS = 45000;
+const FIRESTORE_BOOT_TIMEOUT_MS = 60000;
+const AUTH_WATCHDOG_TIMEOUT_MS = 90000;
 
 const buildTravelDuration = (startTime, endTime) => {
   if (!startTime || !endTime) return '';
