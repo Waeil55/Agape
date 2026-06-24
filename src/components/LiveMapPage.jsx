@@ -17,8 +17,8 @@ import {
   Radio,
   RefreshCw,
   Route,
+  Search,
   ShieldCheck,
-  Sparkles,
   Target,
   Truck,
   Users,
@@ -270,6 +270,10 @@ const LiveMapPage = ({
   const [driverTrailPoints, setDriverTrailPoints] = useState([]);
   const [trailLoading, setTrailLoading] = useState(false);
   const [showTrail, setShowTrail] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailTab, setDetailTab] = useState('overview');
+  const [hudSearch, setHudSearch] = useState('');
 
   const runFleetAiAnalysis = useCallback(async () => {
     setFleetAiLoading(true);
@@ -462,261 +466,422 @@ const LiveMapPage = ({
   useEffect(() => () => stopMyGpsTracking(), []);
 
   return (
-    <div className="h-full min-h-0 bg-slate-50 text-slate-900">
-      <div className="h-full min-h-0 flex flex-col">
-        <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sticky top-0 z-20">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusPill tone={role === 'admin' ? 'blue' : 'emerald'}>
-                  <ShieldCheck size={12} /> {role === 'admin' ? 'CEO full fleet' : 'Assigned fleet'}
-                </StatusPill>
-                <StatusPill tone={hasGoogleMapsConfigured() ? 'emerald' : 'amber'}>
-                  <Map size={12} /> {hasGoogleMapsConfigured() ? 'Google Maps active' : 'Maps key needed'}
-                </StatusPill>
-              </div>
-              <p className="mt-1 text-xs font-medium text-slate-500">
-                Exact fleet location, dwell time, current destination, ETA, remaining work, nearest pickup, and ride-share opportunities.
+    <div className="h-screen w-full min-h-0 bg-slate-950 flex flex-col overflow-hidden select-none">
+      {/* ===== HUD BAR (36px) ===== */}
+      <header className="shrink-0 h-9 bg-slate-950 border-b border-white/[0.06] flex items-center gap-2 px-3 z-30">
+        <span className="text-[11px] font-black text-white tracking-[0.08em]">AGAPE</span>
+        <div className="w-px h-3 bg-white/[0.08]" />
+        <span className="flex items-center gap-1 text-[11px]"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /><span className="text-slate-300 font-medium">{fleetStats.live}/{drivers.length} live</span></span>
+        <span className="flex items-center gap-1 text-[11px]"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" /><span className="text-blue-300 font-medium">{fleetStats.moving} moving</span></span>
+        <span className="flex items-center gap-1 text-[11px]"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" /><span className="text-amber-300 font-medium">{fleetStats.stopped} stopped</span></span>
+        <span className="text-emerald-400 text-[11px] font-bold">&#10003;{fleetStats.complete}</span>
+        <span className="text-slate-600 text-[11px] font-medium">| {fleetStats.remaining} remaining</span>
+        <div className="flex-1" />
+        <div className="relative flex items-center">
+          <Search size={12} className="absolute left-2 text-slate-500 pointer-events-none" />
+          <input
+            value={hudSearch}
+            onChange={(e) => setHudSearch(e.target.value)}
+            placeholder="Search drivers..."
+            className="w-36 h-6 rounded-md bg-white/[0.06] border border-white/[0.08] pl-6 pr-2 text-[11px] text-white placeholder-slate-500 outline-none focus:border-blue-500/40 transition-colors"
+          />
+          {hudSearch && <X size={12} className="absolute right-2 text-slate-500 cursor-pointer hover:text-white" onClick={() => setHudSearch('')} />}
+        </div>
+        <div className="w-px h-3 bg-white/[0.06]" />
+        {myDriverProfile && (
+          gpsActive ? (
+            <button type="button" onClick={stopMyGpsTracking} className="flex items-center gap-1 h-6 px-2 rounded-md bg-rose-600/20 text-rose-400 text-[10px] font-bold hover:bg-rose-600/30 transition-colors" title="Stop sharing GPS">
+              <WifiOff size={11} /> Stop
+            </button>
+          ) : (
+            <button type="button" onClick={startMyGpsTracking} className="flex items-center gap-1 h-6 px-2 rounded-md bg-emerald-600/20 text-emerald-400 text-[10px] font-bold hover:bg-emerald-600/30 transition-colors" title="Share your GPS location on the map">
+              <Wifi size={11} /> Share GPS
+            </button>
+          )
+        )}
+        <button type="button" onClick={runFleetAiAnalysis} disabled={fleetAiLoading} className="flex items-center gap-1 h-6 px-2 rounded-md bg-indigo-600/20 text-indigo-400 text-[10px] font-bold hover:bg-indigo-600/30 disabled:opacity-40 transition-colors">
+          {fleetAiLoading ? <Loader2 size={11} className="animate-spin" /> : <BrainCircuit size={11} />} AI
+        </button>
+        <button type="button" onClick={() => setIntelRefreshToken(t => t + 1)} className="flex items-center justify-center h-6 w-6 rounded-md bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors" title="Refresh view">
+          <RefreshCw size={12} />
+        </button>
+      </header>
+
+      {/* ===== MAP AREA (fills remaining space) ===== */}
+      <div className="flex-1 relative overflow-hidden bg-slate-900">
+        {/* Map image */}
+        {mapUrl && !mapError ? (
+          <img
+            src={mapUrl}
+            alt="Live fleet map"
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={() => setMapError(true)}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <Map size={48} className="mx-auto text-slate-700" />
+              <h3 className="mt-3 text-base font-black text-slate-400">Fleet Command Center</h3>
+              <p className="mt-1 max-w-md text-sm font-medium text-slate-500">
+                {hasGoogleMapsConfigured() ? 'Waiting for driver GPS data...' : 'Configure Google Maps API key to enable the map.'}
               </p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {myDriverProfile && (
-                gpsActive ? (
-                  <button type="button" onClick={stopMyGpsTracking} className="inline-flex h-9 items-center gap-2 rounded-lg bg-rose-600 px-3 text-xs font-bold text-white transition hover:bg-rose-700">
-                    <WifiOff size={14} /> Stop my GPS
-                  </button>
-                ) : (
-                  <button type="button" onClick={startMyGpsTracking} className="inline-flex h-9 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white transition hover:bg-emerald-700">
-                    <Wifi size={14} /> Share my GPS
-                  </button>
-                )
-              )}
-              <button type="button" onClick={runFleetAiAnalysis} disabled={fleetAiLoading} className="inline-flex h-9 items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50">
-                {fleetAiLoading ? <Loader2 size={14} className="animate-spin" /> : <BrainCircuit size={14} />} {fleetAiLoading ? 'Analyzing...' : 'Fleet AI Analysis'}
-              </button>
-              <button type="button" onClick={() => setIntelRefreshToken(token => token + 1)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50">
-                <RefreshCw size={14} /> Refresh view
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[10px] font-black uppercase text-slate-400">Live drivers</p>
-              <p className="mt-1 text-xl font-black tabular-nums">{fleetStats.live}/{drivers.length}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[10px] font-black uppercase text-slate-400">Fresh pings</p>
-              <p className="mt-1 text-xl font-black tabular-nums">{fleetStats.fresh}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[10px] font-black uppercase text-slate-400">Moving now</p>
-              <p className="mt-1 text-xl font-black tabular-nums">{fleetStats.moving}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[10px] font-black uppercase text-slate-400">Stopped now</p>
-              <p className="mt-1 text-xl font-black tabular-nums">{fleetStats.stopped}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[10px] font-black uppercase text-slate-400">Moving work</p>
-              <p className="mt-1 text-xl font-black tabular-nums">{fleetStats.active}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[10px] font-black uppercase text-slate-400">Remaining</p>
-              <p className="mt-1 text-xl font-black tabular-nums">{fleetStats.remaining}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[10px] font-black uppercase text-slate-400">Completed</p>
-              <p className="mt-1 text-xl font-black tabular-nums">{fleetStats.complete}</p>
-            </div>
-          </div>
-        </div>
-
-        {fleetAiResult && (
-          <div className="px-4 py-2 bg-white border-b border-slate-200">
-            <AIInsightsBanner insights={fleetAiResult} onClose={() => setFleetAiResult(null)} compact />
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)_360px]">
-            <aside className="min-h-0 overflow-y-auto border-r border-slate-200 bg-white p-3">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-xs font-black uppercase tracking-wide text-slate-500">Drivers</h3>
-                <StatusPill tone="slate">{drivers.length} visible</StatusPill>
+        {/* Gradient edge fade */}
+        <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-slate-950/40 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950/60 to-transparent pointer-events-none" />
+
+        {/* ===== RIGHT FLOATING PANEL (driver list) ===== */}
+        <div className="absolute right-3 top-3 z-20 flex flex-col items-end">
+          {/* Collapsed toggle badge */}
+          {!rightPanelOpen && (
+            <button
+              type="button"
+              onClick={() => setRightPanelOpen(true)}
+              className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-slate-900/90 backdrop-blur-md border border-white/10 text-white text-xs font-bold shadow-lg hover:bg-slate-800 transition-colors"
+            >
+              <Users size={14} /> {drivers.length}
+            </button>
+          )}
+
+          {/* Expanded panel */}
+          {rightPanelOpen && (
+            <div className="w-64 rounded-xl bg-slate-900/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.06]">
+                <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5"><Users size={13} /> Drivers <span className="text-slate-500 font-medium">({drivers.length})</span></span>
+                <button type="button" onClick={() => setRightPanelOpen(false)} className="text-slate-500 hover:text-white transition-colors"><X size={13} /></button>
               </div>
-              <div className="space-y-2">
-                {driverSummaries.map(({ driver, currentTrip, phase, point, fresh, completed, upcoming, totalTrips, movementState, dwellMinutes, movingMinutes }) => (
+              <div className="max-h-[60vh] overflow-y-auto overscroll-contain py-1">
+                {driverSummaries
+                  .filter(s => !hudSearch || s.driver.name?.toLowerCase().includes(hudSearch.toLowerCase()) || s.driver.vehicle?.toLowerCase().includes(hudSearch.toLowerCase()))
+                  .map(({ driver, currentTrip, phase, point, fresh, completed, movementState, dwellMinutes, movingMinutes }) => (
                   <button
                     type="button"
                     key={driver.id}
                     onClick={() => setSelectedDriverId(driver.id)}
-                    className={`w-full rounded-lg border p-3 text-left transition ${
-                      selectedDriver?.id === driver.id
-                        ? 'border-blue-300 bg-blue-50 shadow-sm'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
+                      selectedDriver?.id === driver.id ? 'bg-blue-500/10' : 'hover:bg-white/[0.04]'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-black ${
-                          fresh ? 'bg-emerald-100 text-emerald-700' : point ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {String(driver?.name || 'D').charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-black text-slate-950">{driver.name || 'Unnamed driver'}</p>
-                          <p className="truncate text-xs font-medium text-slate-500">{driver.vehicle || 'No vehicle'} | {driver.status || 'Unknown'}</p>
-                        </div>
-                      </div>
-                      <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${fresh ? 'bg-emerald-500' : point ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                    <span className={`w-2 h-2 shrink-0 rounded-full ${fresh && movementState === 'moving' ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)]' : fresh ? 'bg-amber-400' : 'bg-slate-600'}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className={`truncate text-[13px] font-bold ${selectedDriver?.id === driver.id ? 'text-white' : 'text-slate-300'}`}>{driver.name || 'Unnamed'}</p>
+                      <p className="truncate text-[10px] font-medium text-slate-500">
+                        {movementState === 'moving' ? `Moving ${formatTelemetryDuration(movingMinutes)}` : movementState === 'stopped' ? `Stopped ${formatTelemetryDuration(dwellMinutes)}` : 'Waiting for telemetry'}
+                        {currentTrip?.patient ? ` · ${currentTrip.patient}` : ''}
+                      </p>
                     </div>
-                    <div className="mt-3 grid grid-cols-3 gap-1 text-center">
-                      <div className="rounded-md bg-white px-2 py-1">
-                        <p className="text-[10px] font-bold text-slate-400">Done</p>
-                        <p className="text-xs font-black">{completed}</p>
-                      </div>
-                      <div className="rounded-md bg-white px-2 py-1">
-                        <p className="text-[10px] font-bold text-slate-400">Next</p>
-                        <p className="text-xs font-black">{upcoming.length}</p>
-                      </div>
-                      <div className="rounded-md bg-white px-2 py-1">
-                        <p className="text-[10px] font-bold text-slate-400">Total</p>
-                        <p className="text-xs font-black">{totalTrips}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex items-start gap-2 rounded-md bg-slate-50 p-2">
-                      <Navigation size={13} className={`mt-0.5 shrink-0 ${getPhaseIconClass(phase.color)}`} />
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-black text-slate-700">{phase.label}</p>
-                        <p className="truncate text-[11px] font-medium text-slate-500">{currentTrip?.patient || currentTrip?.pickup || 'No moving assignment'}</p>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
-                      <StatusPill tone={movementState === 'moving' ? 'emerald' : movementState === 'stopped' ? 'amber' : 'slate'}>
-                        <Activity size={11} /> {formatMovementState(movementState)}
-                      </StatusPill>
-                      <span className="truncate font-semibold text-slate-500">
-                        {movementState === 'stopped'
-                          ? `Stopped ${formatTelemetryDuration(dwellMinutes)}`
-                          : movementState === 'moving'
-                            ? `Moving ${formatTelemetryDuration(movingMinutes)}`
-                            : 'Waiting for telemetry'}
-                      </span>
-                    </div>
+                    <span className={`text-[10px] font-bold ${completed > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>{completed}</span>
                   </button>
                 ))}
+                {driverSummaries.length === 0 && (
+                  <p className="px-3 py-6 text-center text-xs text-slate-500">No drivers available.</p>
+                )}
               </div>
-            </aside>
+            </div>
+          )}
+        </div>
 
-            <main className="min-h-0 overflow-y-auto bg-slate-100">
-              <div className="p-3">
-                <div className="relative overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm">
-                  {mapUrl && !mapError ? (
-                    <div className="relative min-h-[520px]">
-                      <img
-                        src={mapUrl}
-                        alt="Live fleet map"
-                        className="h-[520px] w-full object-cover"
-                        onError={() => setMapError(true)}
-                      />
-                      <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-                        <StatusPill tone={selectedSummary?.fresh ? 'emerald' : selectedPoint ? 'amber' : 'rose'}>
-                          <Radio size={12} /> {selectedSummary?.fresh ? 'Live ping' : selectedPoint ? 'Stale ping' : 'No GPS'}
-                        </StatusPill>
-                        <StatusPill tone="blue">
-                          <Crosshair size={12} /> {selectedDriver?.name || 'No driver selected'}
-                        </StatusPill>
-                        {selectedDriver && driverTrailPoints.length >= 2 && (
-                          <button
-                            onClick={() => setShowTrail(prev => !prev)}
-                            className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-bold transition-colors ${
-                              showTrail
-                                ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
-                                : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-100'
-                            }`}
-                          >
-                            {trailLoading ? <RefreshCw size={12} className="animate-spin" /> : <Map size={12} />}
-                            {showTrail ? `${driverTrailPoints.length} trail pts` : 'Trail hidden'}
-                          </button>
+        {/* Trail toggle (when driver selected) */}
+        {selectedDriver && driverTrailPoints.length >= 2 && (
+          <button
+            type="button"
+            onClick={() => setShowTrail(p => !p)}
+            className="absolute left-3 top-3 z-20 flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-slate-900/80 backdrop-blur-sm border border-white/10 text-[10px] font-bold shadow-lg transition-colors hover:bg-slate-800"
+            style={{ color: showTrail ? '#60A5FA' : '#94A3B8' }}
+          >
+            {trailLoading ? <Loader2 size={11} className="animate-spin" /> : <Map size={11} />}
+            {showTrail ? `${driverTrailPoints.length} trail` : 'Trail'}
+          </button>
+        )}
+
+        {/* Trail loading indicator */}
+        {trailLoading && (
+          <div className="absolute left-3 top-12 z-20 flex items-center gap-1.5 h-6 px-2 rounded-md bg-slate-900/80 backdrop-blur-sm border border-white/10 text-[10px] text-slate-400 font-medium">
+            <Loader2 size={10} className="animate-spin" /> Loading trail...
+          </div>
+        )}
+
+        {/* ===== BOTTOM INFO BAR ===== */}
+        {selectedDriverId && selectedDriver && selectedPoint && (
+          <div className="absolute bottom-4 left-4 right-4 z-20 animate-in slide-in-from-bottom-2 duration-200">
+            <div className="rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-white/[0.08] p-4 shadow-2xl">
+              <div className="flex items-center gap-4">
+                {/* Left: driver identity */}
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-black text-sm ${
+                    selectedSummary?.fresh && selectedSummary?.movementState === 'moving'
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : selectedSummary?.fresh
+                        ? 'bg-amber-500/20 text-amber-400'
+                        : 'bg-slate-700 text-slate-400'
+                  }`}>
+                    {String(selectedDriver?.name || 'D').charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-black text-white">{selectedDriver.name || 'Unnamed driver'}</p>
+                      <span className={`flex items-center gap-1 text-[10px] font-bold ${
+                        selectedSummary?.fresh ? 'text-emerald-400' : 'text-amber-400'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${selectedSummary?.fresh ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                        {selectedSummary?.fresh ? 'Live' : 'Stale'}
+                      </span>
+                    </div>
+                    <p className="truncate text-[11px] font-medium text-slate-400">
+                      {formatMovementState(selectedSummary?.movementState)}
+                      {selectedSummary?.movementState === 'moving' && ` · ${formatTelemetryDuration(selectedSummary?.movingMinutes)}`}
+                      {selectedSummary?.movementState === 'stopped' && ` · ${formatTelemetryDuration(selectedSummary?.dwellMinutes)}`}
+                      {selectedTracking?.totalTrackedMiles ? ` · ${Number(selectedTracking.totalTrackedMiles).toFixed(1)} mi` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Center: destination + ETA */}
+                <div className="hidden md:block min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-slate-300">
+                    <ArrowRight size={12} className="inline mr-1 text-blue-400" />
+                    {selectedDestination || selectedTrip?.patient || 'No active destination'}
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+                    {selectedSummary?.lastPing ? `${formatAge(selectedSummary.lastPing)}` : ''}
+                    {nearestTrips[0] ? ` · ETA ${formatEta(nearestTrips[0].etaMinutes)} · ${formatMiles(nearestTrips[0].miles)}` : ''}
+                  </p>
+                </div>
+
+                {/* Right: stats */}
+                <div className="flex items-center gap-4 text-[11px] shrink-0">
+                  <div className="text-center">
+                    <p className="text-slate-500 font-medium">Moving</p>
+                    <p className="text-white font-bold tabular-nums">{formatTelemetryDuration(selectedSummary?.movingMinutes || 0)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-slate-500 font-medium">Stopped</p>
+                    <p className="text-white font-bold tabular-nums">{formatTelemetryDuration(selectedSummary?.dwellMinutes || 0)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-slate-500 font-medium">Trips</p>
+                    <p className="text-emerald-400 font-bold tabular-nums">&#10003;{selectedSummary?.completed || 0}</p>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {selectedDriver?.phone && (
+                    <>
+                      <button type="button" onClick={() => makeCall?.(selectedDriver.phone, selectedDriver.name)} className="flex items-center gap-1 h-8 px-2.5 rounded-lg bg-white/[0.06] text-slate-300 text-[11px] font-bold hover:bg-white/[0.1] transition-colors" title="Call driver">
+                        <Phone size={13} />
+                      </button>
+                      <button type="button" onClick={() => sendSMS?.(selectedDriver.phone, selectedDriver.name)} className="flex items-center gap-1 h-8 px-2.5 rounded-lg bg-white/[0.06] text-slate-300 text-[11px] font-bold hover:bg-white/[0.1] transition-colors" title="Text driver">
+                        <Radio size={13} />
+                      </button>
+                    </>
+                  )}
+                  {selectedDestination && (
+                    <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', selectedDestination)} className="flex items-center gap-1 h-8 px-2.5 rounded-lg bg-white/[0.06] text-slate-300 text-[11px] font-bold hover:bg-white/[0.1] transition-colors" title="Open in Google Maps">
+                      <Compass size={13} />
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setShowDetailModal(true)} className="flex items-center gap-1 h-8 px-3 rounded-lg bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-500 transition-colors">
+                    <Target size={13} /> Detail
+                  </button>
+                  <button type="button" onClick={() => { setSelectedDriverId(''); setShowDetailModal(false); }} className="flex items-center justify-center h-8 w-8 rounded-lg bg-white/[0.04] text-slate-500 hover:text-white hover:bg-white/[0.08] transition-colors">
+                    <X size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ===== DETAIL MODAL (full report) ===== */}
+      {showDetailModal && selectedDriver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}>
+          <div className="relative w-full max-w-2xl max-h-[85vh] mx-4 rounded-2xl bg-slate-900 border border-white/[0.08] shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-9 w-9 items-center justify-center rounded-xl font-black text-sm ${
+                  selectedSummary?.fresh && selectedSummary?.movementState === 'moving'
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : selectedSummary?.fresh ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'
+                }`}>
+                  {String(selectedDriver?.name || 'D').charAt(0)}
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-white">{selectedDriver.name || 'Unnamed driver'}</h2>
+                  <p className="text-[11px] font-medium text-slate-400">{selectedDriver.vehicle || 'No vehicle'} · {formatAge(selectedSummary?.lastPing)}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowDetailModal(false)} className="flex items-center justify-center h-8 w-8 rounded-lg bg-white/[0.04] text-slate-500 hover:text-white hover:bg-white/[0.08] transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-white/[0.06]">
+              {[
+                { id: 'overview', label: 'Overview', icon: Gauge },
+                { id: 'trips', label: 'Trips', icon: Route },
+                { id: 'timeline', label: 'Timeline', icon: Activity },
+              ].map(({ id, label, icon: Icon }) => (
+                <button key={id} type="button" onClick={() => setDetailTab(id)} className={`flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-bold transition-colors ${
+                  detailTab === id ? 'text-white border-b-2 border-blue-500 bg-blue-500/5' : 'text-slate-500 hover:text-slate-300'
+                }`}>
+                  <Icon size={13} /> {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab content */}
+            <div className="max-h-[60vh] overflow-y-auto p-5 space-y-4">
+              {/* OVERVIEW TAB */}
+              {detailTab === 'overview' && (
+                <>
+                  {/* Time stats grid */}
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Moving</p>
+                      <p className="mt-1 text-lg font-black text-blue-400 tabular-nums">{formatTelemetryDuration(selectedTracking?.totalMovingMinutes || selectedSummary?.movingMinutes || 0)}</p>
+                      <p className="text-[10px] text-slate-600">today</p>
+                    </div>
+                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Stopped</p>
+                      <p className="mt-1 text-lg font-black text-amber-400 tabular-nums">{formatTelemetryDuration(selectedTracking?.totalStoppedMinutes || selectedSummary?.dwellMinutes || 0)}</p>
+                      <p className="text-[10px] text-slate-600">today</p>
+                    </div>
+                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Longest</p>
+                      <p className="mt-1 text-lg font-black text-rose-400 tabular-nums">{formatTelemetryDuration(selectedTracking?.longestStopMinutes || 0)}</p>
+                      <p className="text-[10px] text-slate-600">stop</p>
+                    </div>
+                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Miles</p>
+                      <p className="mt-1 text-lg font-black text-emerald-400 tabular-nums">{selectedTracking ? `${Number(selectedTracking.totalTrackedMiles || 0).toFixed(1)}` : '0.0'}</p>
+                      <p className="text-[10px] text-slate-600">tracked</p>
+                    </div>
+                  </div>
+
+                  {/* Current status card */}
+                  <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Current status</p>
+                        <p className="mt-1 text-sm font-black text-white">{formatMovementState(selectedSummary?.movementState)}</p>
+                        {selectedTrip && (
+                          <>
+                            <p className="mt-2 text-xs font-medium text-slate-400 flex items-center gap-1">
+                              <Navigation size={12} className="text-blue-400" />
+                              {selectedTrip.patient || 'Unknown patient'}
+                            </p>
+                            <p className="mt-1 text-[11px] font-medium text-slate-500">{selectedTrip.pickup} → {selectedTrip.dropoff}</p>
+                          </>
                         )}
                       </div>
-
-                      <div className="absolute bottom-3 left-3 right-3 grid gap-2 md:grid-cols-3">
-                        <div className="rounded-lg border border-white/20 bg-slate-950/85 p-3 text-white shadow-lg backdrop-blur">
-                          <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Exact location</p>
-                          <p className="mt-1 font-mono text-xs">{selectedPoint ? `${selectedPoint.lat.toFixed(6)}, ${selectedPoint.lng.toFixed(6)}` : 'No coordinates'}</p>
-                          <p className="mt-1 text-[11px] font-medium text-slate-300">{formatAge(selectedSummary?.lastPing)} | {formatMovementState(selectedSummary?.movementState)}</p>
-                        </div>
-                        <div className="rounded-lg border border-white/20 bg-slate-950/85 p-3 text-white shadow-lg backdrop-blur">
-                          <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Motion / dwell</p>
-                          <p className="mt-1 truncate text-xs font-black">{selectedTrip?.patient || 'No active destination'}</p>
-                          <p className="mt-1 truncate text-[11px] font-medium text-slate-300">
-                            {selectedSummary?.movementState === 'stopped'
-                              ? `Stopped ${formatTelemetryDuration(selectedSummary?.dwellMinutes)} | ${selectedDestination || 'Waiting for assignment'}`
-                              : selectedSummary?.movementState === 'moving'
-                                ? `Moving ${formatTelemetryDuration(selectedSummary?.movingMinutes)} | ${selectedDestination || 'Driving route'}`
-                                : (selectedDestination || 'Waiting for assignment')}
-                          </p>
-                        </div>
-                        <div className="rounded-lg border border-white/20 bg-slate-950/85 p-3 text-white shadow-lg backdrop-blur">
-                          <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Next pickup / tracked miles</p>
-                          <p className="mt-1 text-xs font-black">{nearestTrips[0] ? `${formatEta(nearestTrips[0].etaMinutes)} | ${formatMiles(nearestTrips[0].miles)}` : 'No route data'}</p>
-                          <p className="mt-1 text-[11px] font-medium text-slate-300">
-                            {nearestTrips[0]?.trip?.patient || 'Select a live driver'}
-                            {selectedTracking ? ` | ${Number(selectedTracking.totalTrackedMiles || 0).toFixed(1)} mi today` : ''}
-                          </p>
-                        </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Last ping</p>
+                        <p className="mt-1 text-sm font-black text-white tabular-nums">{formatAge(selectedSummary?.lastPing)}</p>
+                        <p className="text-[10px] text-slate-600 mt-1">{selectedDriver?.speedMph ?? selectedDriver?.telemetry?.speedMph ?? 0} mph</p>
                       </div>
                     </div>
-                  ) : (
-                    <div className="flex min-h-[520px] items-center justify-center p-8 text-center">
-                      <div>
-                        <Map size={42} className="mx-auto text-slate-400" />
-                        <h3 className="mt-3 text-base font-black text-slate-900">Map needs live driver coordinates</h3>
-                        <p className="mt-1 max-w-md text-sm font-medium text-slate-500">
-                          Drivers must allow GPS in the driver console. Firestore will then stream exact coordinates here for dispatch and CEO control.
-                        </p>
+                  </div>
+
+                  {/* Stops + upcoming summary */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Stops</p>
+                      <p className="mt-1 text-lg font-black text-white tabular-nums">{selectedTracking?.stopCount || 0}</p>
+                      <p className="text-[10px] text-slate-600">today</p>
+                    </div>
+                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Trips done</p>
+                      <p className="mt-1 text-lg font-black text-emerald-400 tabular-nums">{selectedSummary?.completed || 0}</p>
+                      <p className="text-[10px] text-slate-600">{selectedSummary?.upcoming?.length || 0} upcoming</p>
+                    </div>
+                  </div>
+
+                  {/* Location coordinates */}
+                  <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                    <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Coordinates</p>
+                    <p className="mt-1 font-mono text-xs text-slate-300">{selectedPoint ? `${selectedPoint.lat.toFixed(6)}, ${selectedPoint.lng.toFixed(6)}` : 'No coordinates'}</p>
+                    <p className="text-[10px] text-slate-600 mt-0.5">Accuracy: {selectedDriver?.locationAccuracy ? `${Math.round(selectedDriver.locationAccuracy)}m` : 'Unknown'}</p>
+                  </div>
+                </>
+              )}
+
+              {/* TRIPS TAB */}
+              {detailTab === 'trips' && (
+                <>
+                  {/* Active trips */}
+                  {selectedSummary?.activeTrips && selectedSummary.activeTrips.length > 0 && (
+                    <div>
+                      <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Active trips</h4>
+                      <div className="space-y-2">
+                        {selectedSummary.activeTrips.map(trip => {
+                          const phase = getTripPhase(trip);
+                          return (
+                            <div key={trip.id} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-black text-white">{trip.patient || 'Unknown client'}</p>
+                                  <p className="text-[11px] font-medium text-slate-400">{trip.time || 'Will Call'} · {trip.status}</p>
+                                </div>
+                                <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                  phase.color === 'blue' ? 'bg-blue-500/20 text-blue-400' :
+                                  phase.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' :
+                                  'bg-amber-500/20 text-amber-400'
+                                }`}>{phase.label}</span>
+                              </div>
+                              <div className="mt-2 space-y-1 text-xs text-slate-400">
+                                <p className="flex items-start gap-1"><MapPin size={12} className="mt-0.5 shrink-0 text-emerald-500" /> <span className="line-clamp-2">{trip.pickup}</span></p>
+                                <p className="flex items-start gap-1"><ArrowRight size={12} className="mt-0.5 shrink-0 text-orange-500" /> <span className="line-clamp-2">{trip.dropoff}</span></p>
+                              </div>
+                              <div className="mt-3 flex gap-2">
+                                <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', phase.destination)} className="flex items-center gap-1 h-7 px-2.5 rounded-lg bg-white/[0.06] text-slate-300 text-[10px] font-bold hover:bg-white/[0.1] transition-colors">
+                                  <Navigation size={11} /> Navigate
+                                </button>
+                                {triggerSmartAssign && (
+                                  <button type="button" onClick={() => triggerSmartAssign(trip)} className="flex items-center gap-1 h-7 px-2.5 rounded-lg bg-indigo-600/20 text-indigo-400 text-[10px] font-bold hover:bg-indigo-600/30 transition-colors">
+                                    <BrainCircuit size={11} /> AI
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
-                </div>
 
-                <div className="mt-3 grid gap-3 xl:grid-cols-2">
-                  <section className="rounded-lg border border-slate-200 bg-white p-3">
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="flex items-center gap-2 text-xs font-black uppercase text-slate-600"><Target size={14} /> Nearest pickup queue</h3>
-                      <StatusPill tone={distanceLoading ? 'amber' : 'emerald'}>
-                        {distanceLoading ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                        {distanceLoading ? 'Calculating' : 'Ready'}
-                      </StatusPill>
-                    </div>
+                  {/* Nearest pickup queue */}
+                  <div>
+                    <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Nearest pickups</h4>
                     <div className="space-y-2">
                       {nearestTrips.length === 0 && (
-                        <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm font-medium text-slate-500">
-                          Select a driver with GPS to rank the closest pickups.
-                        </div>
+                        <p className="text-xs text-slate-500 py-4 text-center border border-dashed border-white/[0.06] rounded-xl">Select a driver with GPS to show nearest pickups.</p>
                       )}
-                      {nearestTrips.map(({ trip, miles, etaMinutes }, index) => (
-                        <div key={trip.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-xs font-black text-white">{index + 1}</span>
-                                <p className="truncate text-sm font-black text-slate-950">{trip.patient || 'Unknown client'}</p>
-                                <StatusPill tone={trip.status === 'Unassigned' ? 'amber' : 'blue'}>{trip.status || 'Open'}</StatusPill>
+                      {nearestTrips.slice(0, 5).map(({ trip, miles, etaMinutes }, index) => (
+                        <div key={trip.id} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-600 text-[10px] font-black text-white shrink-0">{index + 1}</span>
+                                <p className="truncate text-sm font-black text-white">{trip.patient || 'Unknown client'}</p>
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">{trip.status || 'Open'}</span>
                               </div>
-                              <p className="mt-2 line-clamp-2 text-xs font-medium text-slate-600">{trip.pickup}</p>
-                              <p className="mt-1 text-[11px] font-bold text-slate-400">{trip.time || 'Will Call'} | {formatMiles(miles)} | {formatEta(etaMinutes)}</p>
+                              <p className="mt-1 text-xs text-slate-400 line-clamp-2">{trip.pickup}</p>
+                              <p className="mt-1 text-[11px] font-medium text-slate-500">{trip.time || 'Will Call'} · {formatMiles(miles)} · {formatEta(etaMinutes)}</p>
                             </div>
-                            <div className="flex shrink-0 flex-col gap-1">
-                              <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', trip.pickup)} className="inline-flex h-8 items-center gap-1 rounded-md bg-slate-900 px-2 text-[11px] font-bold text-white">
-                                <Navigation size={12} /> Route
+                            <div className="flex flex-col gap-1 shrink-0">
+                              <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', trip.pickup)} className="flex items-center gap-1 h-7 px-2 rounded-lg bg-white/[0.06] text-slate-300 text-[10px] font-bold hover:bg-white/[0.1]">
+                                <Navigation size={11} /> Route
                               </button>
                               {trip.status === 'Unassigned' && selectedDriver && assignTripToDriver && (
-                                <button type="button" onClick={() => assignTripToDriver(trip.id, selectedDriver.id)} className="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600 px-2 text-[11px] font-bold text-white">
-                                  <CheckCircle2 size={12} /> Assign
+                                <button type="button" onClick={() => assignTripToDriver(trip.id, selectedDriver.id)} className="flex items-center gap-1 h-7 px-2 rounded-lg bg-emerald-600/20 text-emerald-400 text-[10px] font-bold hover:bg-emerald-600/30">
+                                  <CheckCircle2 size={11} /> Assign
                                 </button>
                               )}
                             </div>
@@ -724,258 +889,122 @@ const LiveMapPage = ({
                         </div>
                       ))}
                     </div>
-                  </section>
+                  </div>
 
-                  <section className="rounded-lg border border-slate-200 bg-white p-3">
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="flex items-center gap-2 text-xs font-black uppercase text-slate-600"><Users size={14} /> Ride-share savings</h3>
-                      <StatusPill tone="blue"><BrainCircuit size={12} /> Smart pairs</StatusPill>
+                  {/* Upcoming trips */}
+                  {selectedSummary?.upcoming && selectedSummary.upcoming.length > 0 && (
+                    <div>
+                      <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Upcoming ({selectedSummary.upcoming.length})</h4>
+                      <div className="space-y-2">
+                        {selectedSummary.upcoming.slice(0, 5).map(trip => (
+                          <div key={trip.id} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                            <p className="truncate text-sm font-black text-white">{trip.patient || 'Unknown client'}</p>
+                            <p className="text-[11px] font-medium text-slate-400">{trip.time || 'Will Call'} · {trip.status}</p>
+                            <p className="mt-1 line-clamp-2 text-xs text-slate-500">{trip.pickup}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      {rideShareCandidates.length === 0 && (
-                        <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm font-medium text-slate-500">
-                          No strong ride-share matches for today yet.
-                        </div>
-                      )}
-                      {rideShareCandidates.map(candidate => (
-                        <div key={candidate.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <Zap size={14} className="shrink-0 text-amber-500" />
-                                <p className="truncate text-sm font-black text-slate-950">{candidate.a.patient} + {candidate.b.patient}</p>
+                  )}
+
+                  {/* Ride-share savings */}
+                  {rideShareCandidates.length > 0 && (
+                    <div>
+                      <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Ride-share savings</h4>
+                      <div className="space-y-2">
+                        {rideShareCandidates.map(candidate => (
+                          <div key={candidate.id} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-black text-white"><Zap size={13} className="inline text-amber-400 mr-1" />{candidate.a.patient} + {candidate.b.patient}</p>
+                                <p className="text-xs text-slate-400 mt-1">{candidate.reason} · {candidate.timeGap}min gap · score {candidate.score}</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{candidate.a.pickup}</p>
+                                <p className="text-[11px] text-slate-500 line-clamp-1">{candidate.b.pickup}</p>
                               </div>
-                              <p className="mt-2 text-xs font-medium text-slate-600">
-                                {candidate.reason} | {candidate.timeGap} minute time gap | score {candidate.score}
-                              </p>
-                              <p className="mt-1 line-clamp-1 text-[11px] font-medium text-slate-500">{candidate.a.pickup}</p>
-                              <p className="line-clamp-1 text-[11px] font-medium text-slate-500">{candidate.b.pickup}</p>
+                              <button type="button" onClick={() => setManualAssignTrip?.(candidate.a)} className="flex items-center gap-1 h-7 px-2.5 rounded-lg bg-blue-600/20 text-blue-400 text-[10px] font-bold hover:bg-blue-600/30 shrink-0">
+                                <Route size={11} /> Work
+                              </button>
                             </div>
-                            <button type="button" onClick={() => setManualAssignTrip?.(candidate.a)} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md bg-blue-600 px-2 text-[11px] font-bold text-white">
-                              <Route size={12} /> Work
-                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* TIMELINE TAB */}
+              {detailTab === 'timeline' && (
+                <>
+                  {/* Breadcrumb trail */}
+                  <div>
+                    <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Breadcrumb trail</h4>
+                    <div className="space-y-1">
+                      {(selectedTracking?.breadcrumbs || []).slice(-12).reverse().map((sample, idx) => (
+                        <div key={`${sample.at}-${idx}`} className="flex items-center gap-3 rounded-lg bg-white/[0.03] border border-white/[0.04] px-3 py-2">
+                          <span className={`w-2 h-2 shrink-0 rounded-full ${
+                            sample.state === 'moving' ? 'bg-blue-400' : sample.state === 'stopped' ? 'bg-amber-400' : 'bg-slate-500'
+                          }`} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-white">{formatMovementState(sample.state)}</p>
+                            <p className="text-[10px] font-medium text-slate-500">{sample.lat?.toFixed?.(4) || sample.lat}, {sample.lng?.toFixed?.(4) || sample.lng}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-[11px] font-bold text-slate-300 tabular-nums">{sample.speedMph || 0} mph</p>
+                            <p className="text-[10px] text-slate-500">{formatAge(sample.at)}</p>
                           </div>
                         </div>
                       ))}
+                      {(!selectedTracking?.breadcrumbs || selectedTracking.breadcrumbs.length === 0) && (
+                        <p className="text-xs text-slate-500 py-4 text-center border border-dashed border-white/[0.06] rounded-xl">No breadcrumb history yet.</p>
+                      )}
                     </div>
-                  </section>
-                </div>
-              </div>
-            </main>
+                  </div>
 
-            <aside className="min-h-0 overflow-y-auto border-l border-slate-200 bg-white p-3">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Selected driver</p>
-                    <h3 className="mt-1 truncate text-lg font-black text-slate-950">{selectedDriver?.name || 'No driver'}</h3>
-                    <p className="truncate text-xs font-medium text-slate-500">{selectedDriver?.email || selectedDriver?.vehicle || ''}</p>
-                  </div>
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${selectedSummary?.fresh ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                    <Truck size={18} />
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="rounded-md bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Status</p>
-                    <p className="mt-1 text-xs font-black">{selectedDriver?.status || 'Unknown'}</p>
-                  </div>
-                  <div className="rounded-md bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">GPS age</p>
-                    <p className="mt-1 text-xs font-black">{formatAge(selectedSummary?.lastPing)}</p>
-                  </div>
-                  <div className="rounded-md bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Motion</p>
-                    <p className="mt-1 text-xs font-black">{formatMovementState(selectedSummary?.movementState)}</p>
-                  </div>
-                  <div className="rounded-md bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Stopped / moving</p>
-                    <p className="mt-1 text-xs font-black">
-                      {selectedSummary?.movementState === 'stopped'
-                        ? formatTelemetryDuration(selectedSummary?.dwellMinutes)
-                        : formatTelemetryDuration(selectedSummary?.movingMinutes)}
-                    </p>
-                  </div>
-                  <div className="rounded-md bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Speed</p>
-                    <p className="mt-1 text-xs font-black">{selectedDriver?.speedMph ?? selectedDriver?.telemetry?.speedMph ?? 0} mph</p>
-                  </div>
-                  <div className="rounded-md bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Accuracy</p>
-                    <p className="mt-1 text-xs font-black">{selectedDriver?.locationAccuracy ? `${Math.round(selectedDriver.locationAccuracy)} m` : 'Unknown'}</p>
-                  </div>
-                  <div className="rounded-md bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Tracked miles</p>
-                    <p className="mt-1 text-xs font-black">{selectedTracking ? `${Number(selectedTracking.totalTrackedMiles || 0).toFixed(1)} mi` : '0.0 mi'}</p>
-                  </div>
-                  <div className="rounded-md bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Stops today</p>
-                    <p className="mt-1 text-xs font-black">{selectedTracking?.stopCount || 0}</p>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="rounded-md border border-slate-200 bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Moving time today</p>
-                    <p className="mt-1 text-xs font-black">{formatTelemetryDuration(selectedTracking?.totalMovingMinutes || 0)}</p>
-                  </div>
-                  <div className="rounded-md border border-slate-200 bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Stopped time today</p>
-                    <p className="mt-1 text-xs font-black">{formatTelemetryDuration(selectedTracking?.totalStoppedMinutes || 0)}</p>
-                  </div>
-                  <div className="rounded-md border border-slate-200 bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Longest stop</p>
-                    <p className="mt-1 text-xs font-black">{formatTelemetryDuration(selectedTracking?.longestStopMinutes || 0)}</p>
-                  </div>
-                  <div className="rounded-md border border-slate-200 bg-white p-2">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Ping count</p>
-                    <p className="mt-1 text-xs font-black">{selectedTracking?.totalPings || 0}</p>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedDriver?.phone && (
-                    <>
-                      <button type="button" onClick={() => makeCall?.(selectedDriver.phone, selectedDriver.name)} className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-700">
-                        <Phone size={12} /> Call
-                      </button>
-                      <button type="button" onClick={() => sendSMS?.(selectedDriver.phone, selectedDriver.name)} className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-700">
-                        <Radio size={12} /> Text
-                      </button>
-                    </>
-                  )}
-                  {selectedDestination && (
-                    <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', selectedDestination)} className="inline-flex h-8 items-center gap-1 rounded-md bg-slate-900 px-2 text-[11px] font-bold text-white">
-                      <Compass size={12} /> Open route
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-                <h3 className="mb-3 flex items-center gap-2 text-xs font-black uppercase text-slate-600"><Layers size={14} /> Current work</h3>
-                {selectedSummary?.activeTrips.length ? (
-                  <div className="space-y-2">
-                    {selectedSummary.activeTrips.map(trip => {
-                      const phase = getTripPhase(trip);
-                      return (
-                        <div key={trip.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-black text-slate-950">{trip.patient || 'Unknown client'}</p>
-                              <p className="mt-1 text-[11px] font-bold text-slate-500">{trip.time || 'Will Call'} | {trip.status}</p>
-                            </div>
-                            <StatusPill tone={phase.color}>{phase.label}</StatusPill>
+                  {/* Stop events */}
+                  <div>
+                    <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Stop events</h4>
+                    <div className="space-y-1">
+                      {(selectedTracking?.stopEvents || []).slice(-6).reverse().map((stop, index) => (
+                        <div key={`${stop.startedAt || index}`} className="flex items-center gap-3 rounded-lg bg-white/[0.03] border border-white/[0.04] px-3 py-2">
+                          <span className="w-2 h-2 shrink-0 rounded-full bg-amber-400" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-white">{formatTelemetryDuration(stop.minutes || 0)} stop</p>
+                            <p className="text-[10px] font-medium text-slate-500 line-clamp-1">{stop.destination || stop.patient || 'Waiting location'}</p>
                           </div>
-                          <div className="mt-3 space-y-2 text-xs font-medium text-slate-600">
-                            <div className="flex gap-2">
-                              <MapPin size={13} className="mt-0.5 shrink-0 text-emerald-600" />
-                              <span className="line-clamp-2">{trip.pickup}</span>
-                            </div>
-                            <div className="flex gap-2">
-                              <ArrowRight size={13} className="mt-0.5 shrink-0 text-orange-600" />
-                              <span className="line-clamp-2">{trip.dropoff}</span>
-                            </div>
-                          </div>
-                          <div className="mt-3 flex gap-2">
-                            <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', phase.destination)} className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-md bg-slate-900 px-2 text-[11px] font-bold text-white">
-                              <Navigation size={12} /> Navigate
-                            </button>
-                            {triggerSmartAssign && (
-                              <button type="button" onClick={() => triggerSmartAssign(trip)} className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-md bg-indigo-600 px-2 text-[11px] font-bold text-white">
-                                <BrainCircuit size={12} /> AI
-                              </button>
-                            )}
+                          <div className="text-right shrink-0">
+                            <p className="text-[11px] font-bold text-slate-300">{formatAge(stop.startedAt)}</p>
+                            <p className="text-[10px] text-slate-500">{stop.endedAt ? 'Closed' : 'Live'}</p>
                           </div>
                         </div>
-                      );
-                    })}
+                      ))}
+                      {(!selectedTracking?.stopEvents || selectedTracking.stopEvents.length === 0) && (
+                        <p className="text-xs text-slate-500 py-4 text-center border border-dashed border-white/[0.06] rounded-xl">No stop events recorded today.</p>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm font-medium text-slate-500">
-                    This driver has no active moving work.
+
+                  {/* Telemetry stats */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Ping count</p>
+                      <p className="mt-1 text-lg font-black text-white tabular-nums">{selectedTracking?.totalPings || 0}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">GPS age</p>
+                      <p className="mt-1 text-lg font-black text-white tabular-nums">{formatAge(selectedSummary?.lastPing)}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Speed</p>
+                      <p className="mt-1 text-lg font-black text-white tabular-nums">{selectedDriver?.speedMph ?? selectedDriver?.telemetry?.speedMph ?? 0} mph</p>
+                    </div>
                   </div>
-                )}
-              </div>
-
-              <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-                <h3 className="mb-3 flex items-center gap-2 text-xs font-black uppercase text-slate-600"><Clock size={14} /> Upcoming</h3>
-                <div className="space-y-2">
-                  {(selectedSummary?.upcoming || []).slice(0, 5).map(trip => (
-                    <div key={trip.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <p className="truncate text-sm font-black text-slate-950">{trip.patient || 'Unknown client'}</p>
-                      <p className="mt-1 text-[11px] font-bold text-slate-500">{trip.time || 'Will Call'} | {trip.status}</p>
-                      <p className="mt-2 line-clamp-2 text-xs font-medium text-slate-600">{trip.pickup}</p>
-                    </div>
-                  ))}
-                  {(selectedSummary?.upcoming || []).length === 0 && (
-                    <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm font-medium text-slate-500">No upcoming trips assigned.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-                <h3 className="mb-3 flex items-center gap-2 text-xs font-black uppercase text-slate-600"><Crosshair size={14} /> Recent breadcrumbs</h3>
-                <div className="space-y-2">
-                  {(selectedTracking?.breadcrumbs || []).slice(-8).reverse().map((sample) => (
-                    <div key={`${sample.at}-${sample.lat}-${sample.lng}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-xs font-black text-slate-900">{formatMovementState(sample.state)}</p>
-                          <p className="mt-1 font-mono text-[11px] text-slate-500">{sample.lat?.toFixed?.(6) || sample.lat}, {sample.lng?.toFixed?.(6) || sample.lng}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[11px] font-bold text-slate-700">{sample.speedMph || 0} mph</p>
-                          <p className="text-[10px] text-slate-400">{formatAge(sample.at)}</p>
-                        </div>
-                      </div>
-                      <p className="mt-2 line-clamp-1 text-[11px] font-medium text-slate-500">{sample.destination || sample.patient || 'No active destination'}</p>
-                    </div>
-                  ))}
-                  {(selectedTracking?.breadcrumbs || []).length === 0 && (
-                    <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm font-medium text-slate-500">No breadcrumb history yet for this driver.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-                <h3 className="mb-3 flex items-center gap-2 text-xs font-black uppercase text-slate-600"><Clock size={14} /> Stop events</h3>
-                <div className="space-y-2">
-                  {(selectedTracking?.stopEvents || []).slice(-6).reverse().map((stop, index) => (
-                    <div key={`${stop.startedAt || index}-${stop.lat}-${stop.lng}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-xs font-black text-slate-900">{formatTelemetryDuration(stop.minutes || 0)} stop</p>
-                          <p className="mt-1 line-clamp-1 text-[11px] font-medium text-slate-500">{stop.destination || stop.patient || 'Waiting location'}</p>
-                        </div>
-                        <div className="text-right text-[10px] font-medium text-slate-400">
-                          <p>{formatAge(stop.startedAt)}</p>
-                          <p>{stop.endedAt ? 'Closed' : 'Live'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {(selectedTracking?.stopEvents || []).length === 0 && (
-                    <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm font-medium text-slate-500">No stop events recorded yet today.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-950 p-3 text-white">
-                <h3 className="mb-3 flex items-center gap-2 text-xs font-black uppercase text-slate-300"><Gauge size={14} /> Command notes</h3>
-                <div className="space-y-2 text-xs font-medium text-slate-300">
-                  <p>Fresh GPS means the driver pinged in the last 10 minutes.</p>
-                  <p>Stopped drivers now keep sending heartbeat pings so dispatch can see dwell time instead of losing visibility when the car is not moving.</p>
-                  <p>Nearest pickup uses the selected driver's current coordinates and Google distance data when available.</p>
-                  <p>Dispatchers only see the drivers and trips scoped to their assignment.</p>
-                  {lastIntelRefresh && <p className="text-slate-400">Last intelligence refresh: {formatAge(lastIntelRefresh)}</p>}
-                </div>
-              </div>
-            </aside>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
