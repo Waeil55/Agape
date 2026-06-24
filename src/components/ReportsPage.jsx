@@ -196,6 +196,9 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   });
+  const [hiddenCols, setHiddenCols] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('agape_rptHiddenCols') || '[]'); } catch { return []; }
+  });
   const datePickerRef = useRef(null);
   const PAGE_SIZE = 100;
   const [page, setPage] = useState(1);
@@ -212,7 +215,8 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     localStorage.setItem('agape_rptSortCol', sortColumn);
     localStorage.setItem('agape_rptSortDir', sortDirection);
     localStorage.setItem('agape_rptCollapsedDays', JSON.stringify(collapsedDays));
-  }, [startDate, endDate, statusFilter, driverFilter, searchQuery, sortColumn, sortDirection, collapsedDays]);
+    localStorage.setItem('agape_rptHiddenCols', JSON.stringify(hiddenCols));
+  }, [startDate, endDate, statusFilter, driverFilter, searchQuery, sortColumn, sortDirection, collapsedDays, hiddenCols]);
 
   // ===== RESIZABLE COLUMNS =====
   const DEFAULT_COL_WIDTHS = {
@@ -648,6 +652,8 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     [colWidths]
   );
 
+  const visibleColumns = useMemo(() => Columns.filter(col => !hiddenCols.includes(col.key)), [hiddenCols]);
+
   const isEditingCell = (tripId, colKey) => editingCell?.tripId === tripId && editingCell?.field === colKey;
 
   const exportCsv = () => {
@@ -849,6 +855,9 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
             {drivers.map((d) => (<option key={d.id} value={d.id || d.email}>{d.name}</option>))}
           </select>
           <button onClick={resetFilters} className="p-1 rounded-lg bg-white/80 border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all" title="Reset filters"><RefreshCw size={9} /></button>
+          <button onClick={() => setHiddenCols(prev => prev.includes('arrivalTime') ? prev.filter(c => c !== 'arrivalTime') : [...prev, 'arrivalTime'])} className={`p-1 rounded-lg border transition-all ${hiddenCols.includes('arrivalTime') ? 'bg-rose-50 border-rose-200 text-rose-500' : 'bg-white/80 border-slate-200 text-slate-400 hover:text-slate-600'}`} title={hiddenCols.includes('arrivalTime') ? 'Show Pickup Arrival' : 'Hide Pickup Arrival'}>
+            <Eye size={9} />
+          </button>
         </div>
         {selectedTasks.length > 0 && (
           <button onClick={() => requestBulkDelete(selectedTasks, () => setSelectedTasks([]))} className="flex items-center gap-1 px-1.5 py-1 bg-rose-50 text-rose-600 rounded-lg font-semibold border border-rose-200/50 hover:bg-rose-100 transition-colors"><Archive size={9} /> {selectedTasks.length}</button>
@@ -1020,12 +1029,12 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                   <table className="resizable-table text-xs w-full">
                     <colgroup>
                       <col style={{ width: 48 }} />
-                      {Columns.map(col => {
+                      {visibleColumns.map(col => {
                         const pct = Math.max(4, Math.round(((colWidths[col.key] || 100) / reportTableMinWidth) * 100));
                         return <col key={col.key} style={{ width: pct + '%' }} />;
                       })}
                     </colgroup>
-                    <thead className="bg-slate-800 text-slate-100 border-b border-slate-200">
+                    <thead className="sticky top-[40px] z-10 bg-slate-800 text-slate-100 border-b border-slate-200">
                       <tr>
                         <th className="p-2 text-center align-middle resizable-th" style={{ width: 48 }}>
                           <div className="flex items-center justify-center gap-2">
@@ -1050,7 +1059,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                             {canEdit && <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Edit</span>}
                           </div>
                         </th>
-                        {Columns.map(col => (
+                        {visibleColumns.map(col => (
                           <th
                             key={col.key}
                             className="resizable-th p-0 text-left select-none"
@@ -1140,7 +1149,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                                 )}
                               </div>
                             </td>
-                            {Columns.map(col => {
+                            {visibleColumns.map(col => {
                               const cellKey = col.key;
                               const displayValue = renderCellValue(trip, col);
                               const isEditing = isEditingCell(trip.id, cellKey);
