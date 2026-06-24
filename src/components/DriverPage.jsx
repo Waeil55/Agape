@@ -730,6 +730,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       setDoc(doc(db, 'driverProfiles', me.id), { activeTripId: null, userId: auth.currentUser?.uid || '' }, { merge: true }).catch((err) => {
         console.error('[DriverPage] Failed to clear activeTripId:', err);
       });
+      setActiveWorkTripId(null);
+      setWorkNotesOpen(false);
     }
   }, [me?.id]);
 
@@ -2542,13 +2544,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     );
   };
 
-  const navItems = [
-    { id: 'trips', label: 'Trips', icon: Home },
-    { id: 'tools', label: 'Route', icon: Route },
-    { id: 'history', label: 'History', icon: Clock },
-    { id: 'chat', label: 'Chat', icon: MessageCircle },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ];
+  const navItems = useMemo(() => {
+    const items = [
+      { id: 'trips', label: 'Trips', icon: Home },
+      { id: 'tools', label: 'Route', icon: Route },
+      { id: 'history', label: 'History', icon: Clock },
+      { id: 'chat', label: 'Chat', icon: MessageCircle },
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ];
+    if (activeWorkTripId && activeWorkTrip) {
+      items.splice(1, 0, { id: 'active-trip', label: activeWorkTrip.patient || 'Active', icon: Truck });
+    }
+    return items;
+  }, [activeWorkTripId, activeWorkTrip]);
 
   const navApp = appSettings.navigationApp || 'google';
 
@@ -4884,14 +4892,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               const isActiveTab = activeNav === item.id;
               return (
                 <button key={item.id} onClick={() => {
-                  if (item.id === 'trips' && activeWorkTrip) {
-                    setActiveWorkTripId(null);
-                    setWorkNotesOpen(false);
+                  if (item.id === 'active-trip') {
+                    setActiveWorkTripId(activeWorkTripId);
+                    setActiveNav('trips');
                     return;
-                  }
-                  if (item.id !== 'trips') {
-                    setActiveWorkTripId(null);
-                    setWorkNotesOpen(false);
                   }
                   setActiveNav(item.id);
                 }}
