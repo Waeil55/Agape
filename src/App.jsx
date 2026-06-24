@@ -234,6 +234,24 @@ function getBestDriverProfileForEmail(drivers = [], email = '', trips = []) {
 const FIRESTORE_BOOT_TIMEOUT_MS = 8000;
 const AUTH_WATCHDOG_TIMEOUT_MS = 90000;
 
+// --- Role cache: persist role to localStorage so boot is instant for returning users ---
+const ROLE_CACHE_KEY = 'agape_session_v1';
+function readRoleCache(uid) {
+  try {
+    const raw = localStorage.getItem(ROLE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.uid === uid && parsed?.role) return parsed;
+    return null;
+  } catch { return null; }
+}
+function writeRoleCache(uid, role, email) {
+  try { localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ uid, role, email, cachedAt: Date.now() })); } catch {}
+}
+function clearRoleCache() {
+  try { localStorage.removeItem(ROLE_CACHE_KEY); } catch {}
+}
+
 const buildTravelDuration = (startTime, endTime) => {
   if (!startTime || !endTime) return '';
   const parseMinutes = (value) => {
@@ -695,6 +713,7 @@ const App = () => {
   const handleDriverSessionInvalidated = useCallback((session = {}) => {
     if (roleRef.current !== 'driver') return;
     skipNextSignedOutResetRef.current = true;
+    clearRoleCache();
     signOut(auth).catch(() => {});
     resetSessionState({
       loginErrorMessage: session.invalidatedReason === 'new_login'
@@ -865,54 +884,132 @@ const App = () => {
     let unsubFcm = null;
     let cancelled = false;
     authBootResolvedRef.current = false;
+
+    // Watchdog: if nothing resolves in 90s, unblock loading
     const bootWatchdog = setTimeout(() => {
       if (cancelled || authBootResolvedRef.current) return;
-      if (navigator.onLine === false) {
-        authBootResolvedRef.current = true;
-        setIsLoading(false);
-        setStartupIssue('');
+      authBootResolvedRef.current = true;
+      setIsLoading(false);
+      setStartupIssue('Connection timed out. Please sign in again.');
+    }, AUTH_WATCHDOG_TIMEOUT_MS);
+
+    // Helper: apply authenticated session state and clear loading immediately
+    const applySession = (userRole, userEmail, userDoc, capturedUser) => {
+      if (cancelled) return;
+      const requestedPortalRole = loginPortalRoleRef.current;
+
+      // Role gate check
+      if (requestedPortalRole && requestedPortalRole !== userRole) {
+        const preferredLoginId = String(userDoc?.data?.()?.username || authEmailToUsername(userEmail || '') || userEmail || '').trim();
+        skipNextSignedOutResetRef.current = true;
+        signOut(auth).catch(() => {});
+        resetSessionState({
+          loginErrorMessage: getRoleGateMessage(requestedPortalRole, userRole),
+          preserveEmail: true,
+          emailValue: preferredLoginId,
+          pendingRoleValue: requestedPortalRole,
+          nextLoginStep: 'credentials',
+        });
         return;
       }
-      // Don't auto-sign-out — show recovery UI and let user choose
-      setStartupIssue('Firestore is not responding. Use Retry below or Access Portal to re-authenticate.');
-    }, AUTH_WATCHDOG_TIMEOUT_MS);
+
+      // Cache the role so next boot is instant
+      writeRoleCache(capturedUser.uid, userRole, userEmail);
+
+      loginPortalRoleRef.current = null;
+      roleRef.current = userRole;
+      currentUserRef.current = userEmail || '';
+      setRole(userRole);
+      setCurrentUser(userEmail);
+      setIsAuthenticated(true);
+      setLoginStep('role_selection');
+      setPendingRole(null);
+      setPassword('');
+      setLoginError('');
+      setStartupIssue('');
+
+      const driverTabs = ['driverHome', 'chat', 'completed', 'cancelled', 'noshow', 'settings'];
+      const userSettings = userDoc && userDoc.exists?.() ? (userDoc.data().settings || {}) : {};
+      const preferredTab = userSettings.activeTab || null;
+      const validTab = userRole === 'driver'
+        ? (driverTabs.includes(preferredTab) ? preferredTab : 'driverHome')
+        : (preferredTab && preferredTab !== 'login' ? preferredTab : 'dashboard');
+      setActiveTab(validTab);
+
+      if (userSettings && Object.keys(userSettings).length > 0) {
+        setAppSettings(prev => ({ ...prev, ...userSettings }));
+        setUserSettingsLoaded(true);
+      }
+
+      requestNotificationPermission().then(token => {
+        if (token) { setNotificationsEnabled(true); }
+      });
+
+      unsubFcm = onForegroundMessage((payload) => {
+        const title = payload.notification?.title || payload.data?.title || 'Agape Care';
+        const body = payload.notification?.body || payload.data?.body || '';
+        const type = payload.data?.type === 'chat' || title.toLowerCase().includes('message') ? 'message' : 'notification';
+        if (title && body) {
+          if (type === 'message') playMessageSound(); else playNotificationSound();
+          showLocalNotification(title, body, type);
+        }
+      });
+
+      setDataLoaded(false);
+      authBootResolvedRef.current = true;
+      setIsLoading(false);
+    };
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       try {
       if (user) {
-        // Load user role — ensure doc exists for Firestore security rules
-        // Retry on timeout up to 3 times with linear backoff
         const requestedPortalRole = loginPortalRoleRef.current;
-        let userDocResult, userDoc = null;
-        for (let attempt = 0; attempt < 3; attempt++) {
-          userDocResult = await withTimeout(getDoc(doc(db, 'users', user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'user profile');
-          if (cancelled) return;
-          if (userDocResult.ok) { userDoc = userDocResult.value; break; }
-          if (attempt < 2) await new Promise(r => setTimeout(r, 5000));
+        const userEmail = user.email || '';
+
+        // ── FAST PATH: use cached role for instant boot ──────────────────────
+        const cached = readRoleCache(user.uid);
+        if (cached && cached.role && !requestedPortalRole) {
+          // Apply session immediately — loading clears in milliseconds
+          applySession(cached.role, userEmail, null, user);
+
+          // Then verify role from Firestore in the background (non-blocking)
+          getDoc(doc(db, 'users', user.uid)).then((freshDoc) => {
+            if (cancelled || !freshDoc.exists()) return;
+            const freshRole = String(freshDoc.data()?.role || '').toLowerCase();
+            if (freshRole && freshRole !== cached.role) {
+              // Role changed — force re-auth cleanly
+              console.warn('[Auth] Role changed in Firestore — reloading session');
+              writeRoleCache(user.uid, freshRole, userEmail);
+              window.location.reload();
+            }
+          }).catch(() => { /* background check — ignore network errors */ });
+          return;
         }
 
-        let userRole = '';
-        if (userDoc?.exists()) {
-          userRole = String(userDoc.data()?.role || '').toLowerCase();
-        } else {
-          // If we timed out on all retries, keep loading state and let onAuthStateChanged fire again
-          if (!userDocResult?.ok) {
-            setStartupIssue('Firestore is taking longer than expected. Retrying connection...');
-            await new Promise(r => setTimeout(r, 10000));
-            if (cancelled) return;
-            // Final attempt without a timeout wrapper — let Firebase SDK handle retries
-            try {
-              userDoc = await getDoc(doc(db, 'users', user.uid));
-              if (cancelled) return;
-            } catch { /* fall through */ }
-            if (userDoc?.exists()) {
-              userRole = String(userDoc.data()?.role || '').toLowerCase();
-            }
+        // ── FIRST LOGIN or EXPLICIT ROLE CHECK: fetch from Firestore ─────────
+        const userDocResult = await withTimeout(
+          getDoc(doc(db, 'users', user.uid)),
+          4000,
+          'user profile'
+        );
+        if (cancelled) return;
+
+        let userDoc = userDocResult.ok ? userDocResult.value : null;
+        let userRole = userDoc?.exists?.() ? String(userDoc.data()?.role || '').toLowerCase() : '';
+
+        // If Firestore timed out, try one more time quickly then proceed
+        if (!userDocResult.ok || (!userRole && userDoc)) {
+          const retryResult = await withTimeout(getDoc(doc(db, 'users', user.uid)), 4000, 'user profile retry');
+          if (cancelled) return;
+          if (retryResult.ok && retryResult.value?.exists?.()) {
+            userDoc = retryResult.value;
+            userRole = String(userDoc.data()?.role || '').toLowerCase();
           }
         }
 
         if (!userRole) {
-          const usersSnap = await withTimeout(getDocs(collection(db, 'users')), FIRESTORE_BOOT_TIMEOUT_MS, 'user directory');
+          // Check if this could be the first-ever admin bootstrapping
+          const usersSnap = await withTimeout(getDocs(collection(db, 'users')), 4000, 'user directory');
           const hasExistingUsers = usersSnap.ok ? !usersSnap.value.empty : true;
           const canBootstrapFirstAdmin = !hasExistingUsers && requestedPortalRole === 'admin';
 
@@ -935,10 +1032,17 @@ const App = () => {
               { merge: true }
             );
             userRole = 'admin';
-            userDoc = await getDoc(doc(db, 'users', user.uid));
+            userDoc = await getDoc(doc(db, 'users', user.uid)).catch(() => null);
+          } else if (!usersSnap.ok) {
+            // Firestore completely unreachable — show login so user can retry
+            authBootResolvedRef.current = true;
+            setIsLoading(false);
+            setStartupIssue('Could not reach the server. Check your connection and sign in again.');
+            return;
           } else {
             skipNextSignedOutResetRef.current = true;
             await signOut(auth).catch(() => {});
+            clearRoleCache();
             resetSessionState({
               loginErrorMessage: hasExistingUsers
                 ? 'Account not found in Agape system. Please contact your administrator.'
@@ -948,69 +1052,7 @@ const App = () => {
           }
         }
 
-        if (requestedPortalRole && requestedPortalRole !== userRole) {
-          const preferredLoginId = String(userDoc?.data()?.username || authEmailToUsername(user.email || '') || user.email || '').trim();
-          skipNextSignedOutResetRef.current = true;
-          await signOut(auth).catch(() => {});
-          resetSessionState({
-            loginErrorMessage: getRoleGateMessage(requestedPortalRole, userRole),
-            preserveEmail: true,
-            emailValue: preferredLoginId,
-            pendingRoleValue: requestedPortalRole,
-            nextLoginStep: 'credentials',
-          });
-          return;
-        }
-
-        const userEmail = user.email;
-        // Capture in local variables for async auth closure (useEffect has [])
-        const capturedRole = userRole;
-        loginPortalRoleRef.current = null;
-        roleRef.current = userRole;
-        currentUserRef.current = userEmail || '';
-        setRole(userRole);
-        setCurrentUser(userEmail);
-        setIsAuthenticated(true);
-        setLoginStep('role_selection');
-        setPendingRole(null);
-        setPassword('');
-        setLoginError('');
-        const driverTabs = ['driverHome', 'chat', 'completed', 'cancelled', 'noshow', 'settings'];
-        // Load per-user UI settings from users/{uid}.settings if available
-        const userSettings = userDoc && userDoc.exists() ? (userDoc.data().settings || {}) : {};
-        const preferredTab = userSettings.activeTab || null;
-        const validTab = capturedRole === 'driver'
-          ? (driverTabs.includes(preferredTab) ? preferredTab : 'driverHome')
-          : (preferredTab && preferredTab !== 'login' ? preferredTab : 'dashboard');
-        setActiveTab(validTab);
-
-        // Apply saved app settings if any
-        if (userSettings && Object.keys(userSettings).length > 0) {
-          setAppSettings(prev => ({ ...prev, ...userSettings }));
-          setUserSettingsLoaded(true);
-        }
-
-        // Request notification permission for every role so chat/trip alerts can sound everywhere.
-        requestNotificationPermission().then(token => {
-          if (token) { setNotificationsEnabled(true); }
-        });
-        
-        // Listen for foreground push messages
-        unsubFcm = onForegroundMessage((payload) => {
-          const title = payload.notification?.title || payload.data?.title || 'Agape Care';
-          const body = payload.notification?.body || payload.data?.body || '';
-          const type = payload.data?.type === 'chat' || title.toLowerCase().includes('message') ? 'message' : 'notification';
-          if (title && body) {
-            if (type === 'message') playMessageSound(); else playNotificationSound();
-            showLocalNotification(title, body, type);
-          }
-        });
-
-        // Data is automatically synced from Firestore via useFirestoreAppData hook.
-        // No manual hydration needed; Firestore polling keeps data current.
-        setDataLoaded(false);
-        authBootResolvedRef.current = true;
-        setIsLoading(false);
+        applySession(userRole, userEmail, userDoc, user);
         
         try {
           const r = roleRef.current;
@@ -1336,6 +1378,7 @@ const App = () => {
   const handleLogout = async () => {
     try {
       if (role === 'dispatcher') addAuditLog('Dispatcher Logged Out', `Dispatcher ${currentUser} left the system.`, 'slate');
+      clearRoleCache();
       skipNextSignedOutResetRef.current = true;
       await signOut(auth);
     } finally {
