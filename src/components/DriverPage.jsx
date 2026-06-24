@@ -851,10 +851,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const getContactsForTrip = (trip) => tripContacts[trip?.id] || [];
 
-  // Count legs per patient for today
+  // Count legs per patient for today/tomorrow
   const patientLegs = useMemo(() => {
     const counts = {};
     driverScopedTrips.forEach(t => {
+      if (!tripMatchesTodayOrTomorrow(t.date)) return;
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
       counts[key] = (counts[key] || 0) + 1;
@@ -862,10 +863,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     return counts;
   }, [driverScopedTrips]);
 
-  // Count ACTIVE legs per patient (for no-show/cancel decision)
+  // Count ACTIVE legs per patient for today/tomorrow (for no-show/cancel decision)
   const patientActiveLegs = useMemo(() => {
     const counts = {};
     driverScopedTrips.forEach(t => {
+      if (!tripMatchesTodayOrTomorrow(t.date)) return;
       if (isWorkflowTerminalTrip(t)) return;
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
@@ -1953,6 +1955,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleNoShow = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
     const activeLegs = driverScopedTrips.filter(t =>
+      tripMatchesTodayOrTomorrow(t.date) &&
       (t.patient || '').trim().toLowerCase() === patientKey &&
       !isWorkflowTerminalTrip(t)
     );
@@ -1966,6 +1969,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleCancel = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
     const activeLegs = driverScopedTrips.filter(t =>
+      tripMatchesTodayOrTomorrow(t.date) &&
       (t.patient || '').trim().toLowerCase() === patientKey &&
       !isWorkflowTerminalTrip(t)
     );
@@ -1979,6 +1983,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleReroute = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
     const activeLegs = driverScopedTrips.filter(t =>
+      tripMatchesTodayOrTomorrow(t.date) &&
       (t.patient || '').trim().toLowerCase() === patientKey &&
       !isWorkflowTerminalTrip(t)
     );
@@ -1992,7 +1997,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleShowLegs = (task) => {
     const patientKey = (task.patient || task.patientName || '').trim().toLowerCase();
     const allLegs = driverScopedTrips
-      .filter(t => (t.patient || '').trim().toLowerCase() === patientKey)
+      .filter(t => tripMatchesTodayOrTomorrow(t.date) && (t.patient || '').trim().toLowerCase() === patientKey)
       .map(t => ({
         id: t.id,
         bookingId: t.bookingId,
