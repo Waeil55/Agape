@@ -1772,15 +1772,23 @@ const App = () => {
     const clockChanged = wasClockedIn !== clockedIn;
     let clockEvents = prevDriverState.clockEvents || [];
     if (clockChanged && clockedIn) {
-      clockEvents = [...clockEvents, { type: 'in', timestamp: now }];
+      const event = { type: 'in', timestamp: now };
+      if (extraFields.clockLocation) event.lat = extraFields.clockLocation.lat;
+      if (extraFields.clockLocation) event.lng = extraFields.clockLocation.lng;
+      clockEvents = [...clockEvents, event];
     } else if (clockChanged && !clockedIn) {
-      clockEvents = [...clockEvents, { type: 'out', timestamp: now }];
+      const event = { type: 'out', timestamp: now };
+      if (extraFields.clockLocation) event.lat = extraFields.clockLocation.lat;
+      if (extraFields.clockLocation) event.lng = extraFields.clockLocation.lng;
+      clockEvents = [...clockEvents, event];
     }
     const merged = {
-      ...extraFields,
+      ...(extraFields.clockLocation ? {} : extraFields),
       ...(clockChanged ? { clockEvents } : {}),
       ...(clockedIn && clockChanged ? { clockedInAt: now } : {}),
     };
+    // Strip clockLocation from top-level — it's only used inside clockEvents
+    if (merged.clockLocation) delete merged.clockLocation;
     setDrivers(prevDrivers => {
       const driverExists = prevDrivers.some(d => d.id === driverId);
       const workingDrivers = driverExists

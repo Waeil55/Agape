@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspens
 import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd } from '../utils/tripDate';
 import { auth, db, doc, getDocFromServer, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, updateDriverProfile } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
-import { getDistanceMiles } from '../config/maps';
+import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
 import { playNotificationSound } from '../utils/notificationSound';
 import ChatPage from './ChatPage';
@@ -1273,7 +1273,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const clockHistory = useMemo(() => {
     const events = me?.clockEvents || [];
-    if (events.length === 0) return [];
+    if (events.length === 0) return { days: [], weeklyTotal: 0, weeklyOvertime: 0 };
     const byDate = {};
     events.forEach(e => {
       const dateKey = e.timestamp.slice(0, 10);
@@ -1282,6 +1282,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     });
     const today = new Date();
     const days = [];
+    let weeklyTotal = 0;
     for (let i = 13; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
@@ -1294,20 +1295,29 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         const diff = new Date(clockOut.timestamp) - new Date(clockIn.timestamp);
         if (diff > 0) hours = (diff / (1000 * 60 * 60)).toFixed(1);
       }
+      const inPos = clockIn?.lat && clockIn?.lng ? `${clockIn.lat.toFixed(4)}, ${clockIn.lng.toFixed(4)}` : null;
+      const outPos = clockOut?.lat && clockOut?.lng ? `${clockOut.lat.toFixed(4)}, ${clockOut.lng.toFixed(4)}` : null;
       days.push({
         dateKey,
         hasEvents: dayEvents.length > 0,
         clockIn: clockIn?.timestamp || null,
         clockOut: clockOut?.timestamp || null,
-        hours,
+        hours: hours ? parseFloat(hours) : null,
+        inLocation: inPos,
+        outLocation: outPos,
       });
+      if (hours) weeklyTotal += parseFloat(hours);
     }
-    return days;
+    const weeklyOvertime = weeklyTotal > 40 ? weeklyTotal - 40 : 0;
+    return { days, weeklyTotal: Math.round(weeklyTotal * 10) / 10, weeklyOvertime: Math.round(weeklyOvertime * 10) / 10 };
   }, [me?.clockEvents]);
 
   const handleClockToggle = useCallback(() => {
     const newStatus = !isClockedIn;
-    onDriverStatusUpdate(driverId, newStatus);
+    const extra = driverPosition?.lat && driverPosition?.lng
+      ? { clockLocation: { lat: driverPosition.lat, lng: driverPosition.lng } }
+      : {};
+    onDriverStatusUpdate(driverId, newStatus, extra);
     if (newStatus) {
       setShowToast({ type: 'success', message: 'Clocked in — you\'re online for trips.' });
     } else {
@@ -1320,33 +1330,45 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       clockOutOfferedRef.current = false;
       setShowToast({ type: 'info', message: 'Clocked out — trips are now read-only.' });
     }
-  }, [isClockedIn, driverId, onDriverStatusUpdate]);
+  }, [isClockedIn, driverId, onDriverStatusUpdate, driverPosition?.lat, driverPosition?.lng]);
 
-  const haversineKm = useCallback((lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }, []);
-
-  const estimateClockOutFromHome = useCallback(() => {
+  const estimateClockOutFromHome = useCallback(async () => {
     if (!driverPosition?.lat || !driverPosition?.lng || !me?.homeLat || !me?.homeLng) {
       setClockOutEstimate(null);
       return;
     }
-    const km = haversineKm(driverPosition.lat, driverPosition.lng, me.homeLat, me.homeLng);
-    const avgSpeedKmph = 40; // ~25 mph city driving
-    const hours = km / avgSpeedKmph;
-    const minutes = Math.max(Math.ceil(hours * 60), 5);
+    try {
+      const duration = await getTravelDuration(
+        { lat: driverPosition.lat, lng: driverPosition.lng },
+        { lat: me.homeLat, lng: me.homeLng }
+      );
+      if (duration) {
+        const minutes = Math.max(Math.ceil(duration.durationSeconds / 60), 2);
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + minutes);
+        setClockOutEstimate({
+          minutes,
+          targetTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+          label: `${duration.durationText} (${duration.distanceText}) via Google Maps`,
+        });
+        return;
+      }
+    } catch (_) {}
+    // Fallback: Haversine estimate
+    const R = 6371;
+    const dLat = (me.homeLat - driverPosition.lat) * Math.PI / 180;
+    const dLon = (me.homeLng - driverPosition.lng) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(driverPosition.lat*Math.PI/180)*Math.cos(me.homeLat*Math.PI/180)*Math.sin(dLon/2)**2;
+    const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const minutes = Math.max(Math.ceil(km / 40 * 60), 5);
     const now = new Date();
     now.setMinutes(now.getMinutes() + minutes);
     setClockOutEstimate({
       minutes,
       targetTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
-      label: `${minutes} min (${km.toFixed(1)} km from home)`,
+      label: `~${minutes} min est. (${km.toFixed(1)} km)`,
     });
-  }, [driverPosition, me?.homeLat, me?.homeLng, haversineKm]);
+  }, [driverPosition, me?.homeLat, me?.homeLng]);
 
   const scheduleDelayedClockOut = useCallback((targetTime24) => {
     if (pendingClockOutRef.current) {
@@ -1436,6 +1458,28 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       return () => clearTimeout(timer);
     }
   }, [trips, driverPosition?.lat, driverPosition?.lng]);
+
+  // Geofence auto-suggest: near home + clocked in + no active trips → offer clock-out
+  const geofencePromptedRef = useRef(false);
+  useEffect(() => {
+    if (!isClockedIn || !driverPosition?.lat || !me?.homeLat || !me?.homeLng) return;
+    if (geofencePromptedRef.current) return;
+    const activeTripCount = activeTrips.length;
+    if (activeTripCount > 0) {
+      geofencePromptedRef.current = false;
+      return;
+    }
+    const R = 3958.8;
+    const toRad = (d) => d * Math.PI / 180;
+    const dLat = toRad(me.homeLat - driverPosition.lat);
+    const dLng = toRad(me.homeLng - driverPosition.lng);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(driverPosition.lat))*Math.cos(toRad(me.homeLat))*Math.sin(dLng/2)**2;
+    const distMiles = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    if (distMiles <= 0.12) { // ~200 meters
+      geofencePromptedRef.current = true;
+      setShowToast({ type: 'info', message: 'Looks like you\'re near home! Clock out to end your shift.', action: 'geofence-clockout' });
+    }
+  }, [isClockedIn, driverPosition?.lat, driverPosition?.lng, me?.homeLat, me?.homeLng, activeTrips.length]);
 
   // Detect ride-sharing opportunities — deduplicated, max 3
   useEffect(() => {
@@ -4645,65 +4689,142 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             {/* Home Location */}
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><MapPin size={16} /> Home Location</div>
-              {me?.homeLat && me?.homeLng ? (
-                <p className="text-xs text-slate-500 font-semibold mb-2">Home set at {me.homeLat.toFixed(4)}, {me.homeLng.toFixed(4)}</p>
+              {me?.homeAddress ? (
+                <p className="text-xs text-slate-500 font-semibold mb-2">{me.homeAddress}</p>
               ) : (
-                <p className="text-xs text-slate-400 font-semibold mb-2">Set your home location for commute time estimates.</p>
+                <p className="text-xs text-slate-400 font-semibold mb-2">Enter your home address for commute time estimates.</p>
               )}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (driverPosition?.lat && driverPosition?.lng) {
-                      onDriverStatusUpdate(driverId, isClockedIn, {
-                        homeLat: driverPosition.lat,
-                        homeLng: driverPosition.lng,
-                        homeAddress: `${driverPosition.lat.toFixed(6)}, ${driverPosition.lng.toFixed(6)}`,
-                      });
-                      setEditHomeAddress(`${driverPosition.lat.toFixed(6)}, ${driverPosition.lng.toFixed(6)}`);
-                      setShowToast({ type: 'success', message: 'Home location saved to current position.' });
-                    } else {
-                      setShowToast({ type: 'info', message: 'GPS position not available yet.' });
-                    }
-                  }}
-                  className="flex-1 h-9 rounded-xl bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"
-                >
-                  <MapPin size={12} /> Use Current Location
-                </button>
+              <div className="space-y-2">
+                <input type="text" value={editHomeAddress}
+                  onChange={(e) => setEditHomeAddress(e.target.value)}
+                  placeholder="123 Main St, City, State"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!editHomeAddress.trim()) {
+                        setShowToast({ type: 'info', message: 'Enter an address first.' });
+                        return;
+                      }
+                      const coords = await geocodeAddress(editHomeAddress.trim());
+                      if (coords) {
+                        onDriverStatusUpdate(driverId, isClockedIn, {
+                          homeLat: coords.lat,
+                          homeLng: coords.lng,
+                          homeAddress: coords.formattedAddress,
+                        });
+                        setShowToast({ type: 'success', message: `Home set: ${coords.formattedAddress}` });
+                      } else {
+                        // Save as-is if geocoding fails
+                        onDriverStatusUpdate(driverId, isClockedIn, {
+                          homeAddress: editHomeAddress.trim(),
+                        });
+                        setShowToast({ type: 'info', message: 'Could not geocode. Address saved as text.' });
+                      }
+                    }}
+                    className="flex-1 h-9 rounded-xl bg-blue-600 text-white text-xs font-bold active:scale-95"
+                  >
+                    Save Address
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (driverPosition?.lat && driverPosition?.lng) {
+                        const label = `${driverPosition.lat.toFixed(6)}, ${driverPosition.lng.toFixed(6)}`;
+                        onDriverStatusUpdate(driverId, isClockedIn, {
+                          homeLat: driverPosition.lat,
+                          homeLng: driverPosition.lng,
+                          homeAddress: label,
+                        });
+                        setEditHomeAddress(label);
+                        setShowToast({ type: 'success', message: 'Home set to current GPS position.' });
+                      } else {
+                        setShowToast({ type: 'info', message: 'GPS position not available yet.' });
+                      }
+                    }}
+                    className="h-9 px-3 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 flex items-center gap-1"
+                    title="Use current GPS location"
+                  >
+                    <MapPin size={12} /> GPS
+                  </button>
+                </div>
               </div>
-              {me?.homeAddress && (
-                <p className="text-[10px] text-slate-400 mt-2 font-semibold">{me.homeAddress}</p>
-              )}
             </div>
 
             {/* Clock History (last 14 days) */}
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
-              <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Clock size={16} /> Clock History</div>
-              {clockHistory.length === 0 || clockHistory.every(d => !d.hasEvents) ? (
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-slate-800 font-semibold"><Clock size={16} /> Clock History</div>
+                {clockHistory.days.some(d => d.hasEvents) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rows = [['Date', 'Clock In', 'Clock Out', 'Hours', 'In Location', 'Out Location']];
+                      clockHistory.days.filter(d => d.hasEvents).forEach(d => {
+                        rows.push([
+                          d.dateKey,
+                          d.clockIn ? formatClockTime(d.clockIn) : '',
+                          d.clockOut ? formatClockTime(d.clockOut) : '',
+                          d.hours ? d.hours.toFixed(1) : '',
+                          d.inLocation || '',
+                          d.outLocation || '',
+                        ]);
+                      });
+                      rows.push(['', '', '', '', '', '']);
+                      rows.push(['Weekly Total', '', '', clockHistory.weeklyTotal.toFixed(1), '', '']);
+                      if (clockHistory.weeklyOvertime > 0) rows.push(['Overtime', '', '', clockHistory.weeklyOvertime.toFixed(1), '', '']);
+                      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url; a.download = `clock-history-${new Date().toISOString().slice(0, 10)}.csv`;
+                      a.click(); URL.revokeObjectURL(url);
+                    }}
+                    className="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  >
+                    <Download size={12} /> CSV
+                  </button>
+                )}
+              </div>
+              {clockHistory.days.length === 0 || clockHistory.days.every(d => !d.hasEvents) ? (
                 <p className="text-xs text-slate-400 text-center py-4">No clock in/out history yet.</p>
               ) : (
-                <div className="overflow-x-auto -mx-1">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-100">
-                        <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">Date</th>
-                        <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">In</th>
-                        <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">Out</th>
-                        <th className="text-right font-bold text-slate-500 pb-1.5 uppercase tracking-wider">Hrs</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {clockHistory.map(day => (
-                        <tr key={day.dateKey} className={`border-b border-slate-50 ${!day.hasEvents ? 'opacity-40' : ''}`}>
-                          <td className="py-1.5 pr-2 font-semibold text-slate-700 whitespace-nowrap">{formatHistoryCompactDayLabel(day.dateKey)}</td>
-                          <td className="py-1.5 pr-2 font-bold text-slate-800 whitespace-nowrap">{day.clockIn ? formatClockTime(day.clockIn) : '—'}</td>
-                          <td className="py-1.5 pr-2 font-bold text-slate-800 whitespace-nowrap">{day.clockOut ? formatClockTime(day.clockOut) : '—'}</td>
-                          <td className="py-1.5 text-right font-bold text-slate-700 whitespace-nowrap">{day.hours ? `${day.hours}h` : '—'}</td>
+                <>
+                  <div className="overflow-x-auto -mx-1">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100">
+                          <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">Date</th>
+                          <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">In</th>
+                          <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">Out</th>
+                          <th className="text-right font-bold text-slate-500 pb-1.5 uppercase tracking-wider">Hrs</th>
+                          <th className="text-left font-bold text-slate-500 pb-1.5 uppercase tracking-wider">Location</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {clockHistory.days.map(day => (
+                          <tr key={day.dateKey} className={`border-b border-slate-50 ${!day.hasEvents ? 'opacity-40' : ''}`}>
+                            <td className="py-1.5 pr-2 font-semibold text-slate-700 whitespace-nowrap">{formatHistoryCompactDayLabel(day.dateKey)}</td>
+                            <td className="py-1.5 pr-2 font-bold text-slate-800 whitespace-nowrap">{day.clockIn ? formatClockTime(day.clockIn) : '—'}</td>
+                            <td className="py-1.5 pr-2 font-bold text-slate-800 whitespace-nowrap">{day.clockOut ? formatClockTime(day.clockOut) : '—'}</td>
+                            <td className="py-1.5 pr-2 text-right font-bold text-slate-700 whitespace-nowrap">{day.hours ? `${day.hours.toFixed(1)}h` : '—'}</td>
+                            <td className="py-1.5 text-[9px] font-mono text-slate-400 truncate max-w-[80px]">{day.inLocation || day.outLocation || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-600">This week total</span>
+                    <span className={`font-bold ${clockHistory.weeklyOvertime > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                      {clockHistory.weeklyTotal.toFixed(1)}h
+                      {clockHistory.weeklyOvertime > 0 && (
+                        <span className="ml-2 text-[10px] text-rose-500">({clockHistory.weeklyOvertime.toFixed(1)}h OT)</span>
+                      )}
+                    </span>
+                  </div>
+                </>
               )}
             </div>
 
@@ -5459,6 +5580,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             {showToast.action === 'arrive-dropoff' && (
               <button type="button" onClick={() => { setShowToast(null); handleArriveDropoff(showToast.trip); }} className="px-4 py-2 bg-orange-500 rounded-xl text-xs font-bold hover:bg-orange-400 transition-all shrink-0 cursor-pointer">
                 Arrive
+              </button>
+            )}
+            {showToast.action === 'geofence-clockout' && (
+              <button type="button" onClick={() => { setShowToast(null); handleClockToggle(); }} className="px-4 py-2 bg-rose-500 rounded-xl text-xs font-bold hover:bg-rose-400 transition-all shrink-0 cursor-pointer">
+                Clock Out
               </button>
             )}
             <button type="button" onClick={() => setShowToast(null)} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0 cursor-pointer">

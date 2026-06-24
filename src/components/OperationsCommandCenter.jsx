@@ -1507,6 +1507,11 @@ const OperationsCommandCenter = ({
                       {densityProfile.showAssignmentMeta && densityProfile.lineCount >= 3 && (
                         <div className={`text-[10px] font-medium leading-snug ${densityProfile.showExecutiveAccent ? 'text-slate-300' : 'text-slate-500'}`}>{driver.vehicle || driver.status || 'Driver active'}</div>
                       )}
+                      {densityProfile.showAssignmentMeta && densityProfile.lineCount >= 4 && driver.homeAddress && (
+                        <div className={`mt-0.5 text-[9px] font-medium truncate ${densityProfile.showExecutiveAccent ? 'text-slate-400' : 'text-slate-400'}`}>
+                          <MapPin size={9} className="inline mr-0.5" />{driver.homeAddress}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-xs font-semibold text-rose-600`}>Awaiting dispatch assignment</div>
@@ -1911,6 +1916,11 @@ const OperationsCommandCenter = ({
                                   <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[11px] font-bold ${densityProfile.showExecutiveAccent ? 'text-white' : 'text-slate-900'}`}>{driver.name}</div>
                                   {densityProfile.showAssignmentMeta && densityProfile.lineCount >= 3 && (
                                     <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium leading-snug ${densityProfile.showExecutiveAccent ? 'text-slate-300' : 'text-slate-500'}`}>{driver.vehicle || driver.status || 'Driver active'}</div>
+                                  )}
+                                  {densityProfile.lineCount >= 4 && driver.homeAddress && (
+                                    <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[9px] font-medium truncate text-slate-400`}>
+                                      <MapPin size={9} className="inline mr-0.5" />{driver.homeAddress}
+                                    </div>
                                   )}
                                 </>
                               ) : (

@@ -85,6 +85,20 @@ export async function getDistanceMatrix(origins, destinations) {
   }
 }
 
+export async function getTravelDuration(origin, destination) {
+  if (!origin || !destination) return null;
+  const rows = await getDistanceMatrix([origin], [destination]);
+  const durationSeconds = rows?.[0]?.elements?.[0]?.duration?.value;
+  const distanceMeters = rows?.[0]?.elements?.[0]?.distance?.value;
+  if (typeof durationSeconds !== 'number' || typeof distanceMeters !== 'number') return null;
+  return {
+    durationSeconds,
+    durationText: rows[0].elements[0].duration.text,
+    distanceMiles: distanceMeters / 1609.344,
+    distanceText: rows[0].elements[0].distance.text,
+  };
+}
+
 export async function getDistanceMiles(origin, destination) {
   if (!origin || !destination) return null;
 
