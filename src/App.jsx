@@ -831,18 +831,18 @@ const App = () => {
         setLoginError('Could not reach the cloud. Please check your connection and sign in.');
         setIsLoading(false);
       }
-    }, 15000);
+      }, 120000);
     return () => clearTimeout(force);
   }, [isLoading]);
-  // Ultimate fallback — never stay on loading >18s
-  useEffect(() => { const t = setTimeout(() => { if (isLoading) setIsLoading(false); }, 18000); return () => clearTimeout(t); }, [isLoading]);
-  // Firestore data timeout — never stay on "Syncing live operations" >20s
+  // Ultimate fallback — never stay on loading >150s
+  useEffect(() => { const t = setTimeout(() => { if (isLoading) setIsLoading(false); }, 150000); return () => clearTimeout(t); }, [isLoading]);
+  // Firestore data timeout — never stay on "Syncing live operations" >120s
   useEffect(() => {
     const t = setTimeout(() => {
       if (dataLoading) {
         setStartupIssue('Firestore sync timed out. Check your connection and retry.');
       }
-    }, 20000);
+    }, 120000);
     return () => clearTimeout(t);
   }, [dataLoading]);
 
@@ -2545,6 +2545,12 @@ const App = () => {
               <p className="text-sm font-medium text-slate-500 mt-1">Pulling trips, drivers, assignments, and route data from Firestore.</p>
             </div>
             <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+            {startupIssue && (
+              <div className="w-full bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs font-semibold text-amber-800 flex items-center justify-between gap-2">
+                <span>{startupIssue}</span>
+                <button onClick={() => setStartupIssue('')} className="text-amber-700 hover:text-amber-900 font-bold shrink-0">Dismiss</button>
+              </div>
+            )}
           </div>
         </div>
       ) : (
