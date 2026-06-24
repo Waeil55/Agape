@@ -357,7 +357,7 @@ table .font-black { font-weight: 750; }
 
 #root > div {
   min-height: 100%;
-  min-height: 100dvh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -1494,23 +1494,16 @@ body,
   overflow-x: hidden !important;
 }
 
-/* Tables inside scrollable areas expand naturally for horizontal scroll */
-.overflow-x-auto,
-.overflow-x-scroll {
-  -webkit-overflow-scrolling: touch;
-  overflow-x: auto !important;
-}
-
-.overflow-x-auto table,
-.overflow-x-scroll table {
-  width: max-content;
-  min-width: 100%;
+body * {
+  max-width: 100%;
 }
 
 table,
 table.resizable-table {
   table-layout: fixed !important;
   width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
 }
 
 table thead th,
@@ -1539,6 +1532,8 @@ table thead th[class] {
   max-width: none !important;
 }
 
+.overflow-x-auto,
+.overflow-x-scroll,
 .overflow-auto,
 .overflow-scroll,
 .no-scrollbar,
@@ -1547,64 +1542,24 @@ table thead th[class] {
   max-width: 100% !important;
 }
 
+.overflow-x-auto table,
+.overflow-x-scroll table,
 .overflow-auto table,
 .overflow-scroll table {
   width: 100% !important;
+  min-width: 0 !important;
   table-layout: fixed !important;
+}
+
+.min-w-max,
+.w-max {
+  min-width: 0 !important;
+  width: auto !important;
 }
 
 .resizable-th,
 table th {
   min-width: 4.5rem;
-}
-
-/* Mobile responsive: minimize column widths on small screens */
-@media (max-width: 768px) {
-  .overflow-x-auto table,
-  .overflow-x-scroll table {
-    font-size: 0.72rem;
-  }
-  .overflow-x-auto table thead th,
-  .overflow-x-scroll table thead th {
-    padding: 0.25rem 0.35rem;
-  }
-  .overflow-x-auto table tbody td,
-  .overflow-x-scroll table tbody td {
-    padding: 0.25rem 0.35rem;
-  }
-}
-
-/* GPU acceleration for smooth scrolling */
-.overflow-y-auto,
-.overflow-x-auto {
-  -webkit-overflow-scrolling: touch;
-  transform: translateZ(0);
-}
-
-/* Touch-friendly minimum tap targets */
-button, a, select, input[type="checkbox"], input[type="radio"] {
-  min-height: 44px;
-}
-
-/* Mobile-friendly scrollable panels */
-@media (max-width: 768px) {
-  .mobile-scroll {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-  }
-  .hide-mobile { display: none !important; }
-  .show-mobile { display: block !important; }
-  .mobile-full-width { width: 100% !important; min-width: 0 !important; }
-  .mobile-stack { flex-direction: column !important; }
-  .mobile-text-sm { font-size: 0.72rem !important; }
-  .mobile-p-2 { padding: 0.5rem !important; }
-  .mobile-gap-1 { gap: 0.25rem !important; }
-}
-
-@media (min-width: 769px) {
-  .hide-desktop { display: none !important; }
-  .show-desktop { display: block !important; }
 }
 
 @media (min-width: 768px) {

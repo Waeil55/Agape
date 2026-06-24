@@ -5,9 +5,6 @@ import {
   metersPerSecondToMph,
 } from '../utils/locationFraud';
 
-const MOVEMENT_THRESHOLD_M = 30;
-const BATTERY_SAVE_INTERVAL_MS = 10000;
-
 export function useDriverLocationStream({
   enabled,
   driver,
@@ -24,8 +21,6 @@ export function useDriverLocationStream({
   const lastSentRef = useRef(null);
   const flushingRef = useRef(false);
   const driverId = driver?.id || '';
-  const stationaryCountRef = useRef(0);
-  const lastSignificantPositionRef = useRef(null);
 
   const flushLatestPosition = useCallback(async (reason = 'interval') => {
     if (!enabled || !driverId || !latestPositionRef.current || flushingRef.current) return;
@@ -80,48 +75,27 @@ export function useDriverLocationStream({
         .catch(() => undefined);
     }
 
-    const haversineMeters = (lat1, lng1, lat2, lng2) => {
-      const R = 6371000;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLng = (lng2 - lng1) * Math.PI / 180;
-      const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    };
-
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const capturedAt = new Date(pos.timestamp || Date.now()).toISOString();
-        const speedMph = metersPerSecondToMph(pos.coords.speed);
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const accuracy = pos.coords.accuracy ?? null;
         const sample = {
-          lat, lng, accuracy,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy ?? null,
           altitude: pos.coords.altitude ?? null,
-          speedMph,
+          speedMph: metersPerSecondToMph(pos.coords.speed),
           heading: Number.isFinite(Number(pos.coords.heading)) ? Number(pos.coords.heading) : null,
           capturedAt,
           clientTimeMs: Date.now(),
         };
         latestPositionRef.current = sample;
-        onPositionChange?.({ lat, lng, accuracy });
+        onPositionChange?.({ lat: sample.lat, lng: sample.lng, accuracy: sample.accuracy });
         onTrackingChange?.(true);
         setError('');
 
-        const last = lastSignificantPositionRef.current;
-        const dist = last ? haversineMeters(last.lat, last.lng, lat, lng) : MOVEMENT_THRESHOLD_M + 1;
-
-        if (dist > MOVEMENT_THRESHOLD_M || speedMph > 3) {
-          stationaryCountRef.current = 0;
-          lastSignificantPositionRef.current = { lat, lng };
-        } else {
-          stationaryCountRef.current += 1;
-        }
-
-        const effectiveInterval = stationaryCountRef.current > 5 ? BATTERY_SAVE_INTERVAL_MS : LOCATION_STREAM_INTERVAL_MS;
         const lastSentMs = Date.parse(lastSentRef.current?.capturedAt || 0);
-        if (!Number.isFinite(lastSentMs) || Date.now() - lastSentMs >= effectiveInterval) {
-          flushLatestPosition(dist > MOVEMENT_THRESHOLD_M ? 'gps' : 'stationary').catch(() => undefined);
+        if (!Number.isFinite(lastSentMs) || Date.now() - lastSentMs >= LOCATION_STREAM_INTERVAL_MS) {
+          flushLatestPosition('gps').catch(() => undefined);
         }
       },
       (err) => {
