@@ -1091,7 +1091,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     ? driverScopedTrips.find((trip) => trip.id === activeWorkTripId) || null
     : null;
   useEffect(() => {
-    if (activeNav !== 'trips' && activeWorkTripId) {
+    if (activeNav !== 'trips' && activeNav !== 'active-trip' && activeWorkTripId) {
       setActiveWorkTripId(null);
       setWorkNotesOpen(false);
     }
