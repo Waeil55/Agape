@@ -7,7 +7,7 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   RefreshCcw, X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromServer, setDoc, collection, getDocs, getDocsFromServer, serverTimestamp } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -330,6 +330,7 @@ const App = () => {
   const authBootResolvedRef = useRef(false);
   const prevChatConvsRef = useRef(null);
   const loginPortalRoleRef = useRef(null);
+  const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
   
   const [refreshTick, setRefreshTick] = useState(0);
@@ -1998,6 +1999,19 @@ const App = () => {
       fraudSignals,
     };
 
+    const nowMs = Date.now();
+    const trailPromises = [];
+    if (nowMs - lastTrailWriteRef.current >= 15000) {
+      lastTrailWriteRef.current = nowMs;
+      trailPromises.push(
+        addDoc(collection(db, 'driver_locations', driverId, 'trail'), {
+          ...locationDoc,
+          receivedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+        }).catch(() => undefined)
+      );
+    }
+
     try {
       await Promise.all([
         setDoc(doc(db, 'driver_locations', driverId), {
@@ -2035,6 +2049,7 @@ const App = () => {
           lastLocationUpdate: updatedAtIso,
           updatedAtLocal: updatedAtIso,
         }, { merge: true }),
+        ...trailPromises,
       ]);
       emitSystemEvent(buildLocationEvent(driverId, locationDoc, {
         userId: auth.currentUser?.uid || currentUserRef.current || driverId,

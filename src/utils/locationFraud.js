@@ -1,6 +1,6 @@
 import { haversineMiles, roundNumber } from './driverTelemetry';
 
-export const LOCATION_STREAM_INTERVAL_MS = 4000;
+export const LOCATION_STREAM_INTERVAL_MS = 2000;
 export const LOCATION_STALE_AFTER_MS = 15000;
 export const MAX_REASONABLE_SPEED_MPH = 95;
 export const TELEPORT_SPEED_MPH = 140;

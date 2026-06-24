@@ -27,6 +27,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
+import { db, collection, query, orderBy, limit as firestoreLimit, getDocs } from '../config/firebase';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiOptimizeFleet } from '../config/ai';
 import { getDistanceMiles, hasGoogleMapsConfigured } from '../config/maps';
@@ -152,7 +153,7 @@ function openDirections(origin, destination) {
   window.open(`https://www.google.com/maps/dir/?${params.toString()}`, '_blank', 'noopener,noreferrer');
 }
 
-function buildStaticMapUrl(drivers, selectedDriver, selectedTrip) {
+function buildStaticMapUrl(drivers, selectedDriver, selectedTrip, trailPoints = []) {
   if (!hasGoogleMapsConfigured()) return null;
 
   const driverMarkers = drivers
@@ -173,7 +174,15 @@ function buildStaticMapUrl(drivers, selectedDriver, selectedTrip) {
   }
 
   const markers = [...driverMarkers, ...tripMarkers];
-  if (markers.length === 0) return null;
+
+  // Add driver breadcrumb trail as polyline
+  let trailPath = '';
+  if (trailPoints.length >= 2) {
+    const pathCoords = trailPoints.map((p) => `${p.lat},${p.lng}`).join('|');
+    trailPath = `&path=color:0x4285F4|weight:3|fillcolor:0x4285F420|${pathCoords}`;
+  }
+
+  if (markers.length === 0 && !trailPath) return null;
 
   const center = selectedDriver ? getDriverPoint(selectedDriver) : null;
   const params = new URLSearchParams({
@@ -187,7 +196,7 @@ function buildStaticMapUrl(drivers, selectedDriver, selectedTrip) {
     params.set('zoom', selectedTrip ? '12' : '11');
   }
 
-  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}&${markers.join('&')}`;
+  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}&${markers.join('&')}${trailPath}`;
 }
 
 function buildRideShareCandidates(trips) {
@@ -259,6 +268,30 @@ const LiveMapPage = ({
   const [intelRefreshToken, setIntelRefreshToken] = useState(0);
   const [fleetAiResult, setFleetAiResult] = useState(null);
   const [fleetAiLoading, setFleetAiLoading] = useState(false);
+  const [driverTrailPoints, setDriverTrailPoints] = useState([]);
+  const [trailLoading, setTrailLoading] = useState(false);
+
+  // Fetch driver breadcrumb trail when a driver is selected
+  useEffect(() => {
+    if (!selectedDriver?.id) { setDriverTrailPoints([]); return; }
+    let cancelled = false;
+    setTrailLoading(true);
+    const trailRef = collection(db, 'driver_locations', selectedDriver.id, 'trail');
+    const trailQuery = query(trailRef, orderBy('capturedAt', 'desc'), firestoreLimit(60));
+    getDocs(trailQuery)
+      .then((snap) => {
+        if (cancelled) return;
+        const points = snap.docs
+          .map((d) => ({ lat: Number(d.data().lat), lng: Number(d.data().lng), capturedAt: d.data().capturedAt }))
+          .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+          .reverse();
+        setDriverTrailPoints(points);
+        setTrailLoading(false);
+      })
+      .catch(() => { if (!cancelled) { setDriverTrailPoints([]); setTrailLoading(false); } });
+    return () => { cancelled = true; };
+  }, [selectedDriver?.id]);
+
   const runFleetAiAnalysis = useCallback(async () => {
     setFleetAiLoading(true);
     const result = await aiOptimizeFleet(trips, drivers);
@@ -383,7 +416,7 @@ const LiveMapPage = ({
     };
   }, [selectedPoint?.lat, selectedPoint?.lng, selectedSummary?.driver?.id, selectedSummary?.upcoming, unassignedTrips, intelRefreshToken]);
 
-  const mapUrl = buildStaticMapUrl(drivers, selectedDriver, selectedTrip);
+  const mapUrl = buildStaticMapUrl(drivers, selectedDriver, selectedTrip, driverTrailPoints);
   const selectedDestination = getTripPhase(selectedTrip).destination;
 
   const startMyGpsTracking = () => {
