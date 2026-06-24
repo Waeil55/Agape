@@ -423,7 +423,7 @@ const App = () => {
     setTrips, setDrivers, upsertDriverProfile, setDispatchers, setVehicles,
     setTrashedTrips, setLogs, setPhoneNumbers,
     addLog, initializeAppData,
-  } = useFirestoreAppData({ resubscribeKey: realtimeReliability.resubscribeKey });
+  } = useFirestoreAppData({ resubscribeKey: realtimeReliability.resubscribeKey, enabled: isAuthenticated });
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
@@ -1105,11 +1105,14 @@ const App = () => {
           setStartupIssue('Session lost. Use Access Portal to sign in again, or wait for auto-reconnect.');
           return;
         }
-        // Initial boot — wait for token refresh
+        // Initial boot — wait for auth persistence to load (slower on mobile)
         await new Promise(r => setTimeout(r, 10000));
         if (cancelled) return;
         if (auth.currentUser) return;
-        resetSessionState();
+        // Still null after 10s — auth persistence may still be loading.
+        // Don't auto-logout. Recovery UI (8s on loading screen) has
+        // "Access Portal" button for explicit sign-out if needed.
+        setStartupIssue('Checking your session. If this persists, use Access Portal to sign in.');
       }
       } catch (bootErr) {
         console.error("Auth boot error:", bootErr);

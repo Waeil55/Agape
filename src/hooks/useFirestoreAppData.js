@@ -228,7 +228,7 @@ async function writeAssignmentsToCollection(trips = []) {
   }
 }
 
-export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
+export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {}) {
   const [state, setState] = useState({
     trips: [], drivers: [], dispatchers: [], vehicles: [], trashedTrips: [], logs: [],
     phoneNumbers: DEFAULT_DATA.phoneNumbers,
@@ -242,6 +242,7 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
   const prevTripCountRef = useRef(0);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     const unsubscribers = [];
 
@@ -402,7 +403,7 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
       cancelled = true;
       unsubscribers.forEach((unsub) => unsub());
     };
-  }, [resubscribeKey]);
+  }, [resubscribeKey, enabled]);
 
   const writeField = useCallback(async (field, value) => {
     const previousData = normalizeData(dataRef.current);
