@@ -324,6 +324,7 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [startupIssue, setStartupIssue] = useState('');
   const [showLoadingRecovery, setShowLoadingRecovery] = useState(false);
+  const [showDataLoadingRecovery, setShowDataLoadingRecovery] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const authBootResolvedRef = useRef(false);
   const prevChatConvsRef = useRef(null);
@@ -836,14 +837,18 @@ const App = () => {
   }, [isLoading]);
   // Ultimate fallback — never stay on loading >150s
   useEffect(() => { const t = setTimeout(() => { if (isLoading) setIsLoading(false); }, 150000); return () => clearTimeout(t); }, [isLoading]);
-  // Firestore data timeout — never stay on "Syncing live operations" >120s
+  // Firestore data timeout — show recovery after 30s, fire error at 120s
   useEffect(() => {
-    const t = setTimeout(() => {
+    setShowDataLoadingRecovery(false);
+    const recoveryT = setTimeout(() => {
+      if (dataLoading) setShowDataLoadingRecovery(true);
+    }, 30000);
+    const errorT = setTimeout(() => {
       if (dataLoading) {
         setStartupIssue('Firestore sync timed out. Check your connection and retry.');
       }
     }, 120000);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(recoveryT); clearTimeout(errorT); };
   }, [dataLoading]);
 
   useEffect(() => {
@@ -2571,6 +2576,23 @@ const App = () => {
               <div className="w-full bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs font-semibold text-amber-800 flex items-center justify-between gap-2">
                 <span>{startupIssue}</span>
                 <button onClick={() => setStartupIssue('')} className="text-amber-700 hover:text-amber-900 font-bold shrink-0">Dismiss</button>
+              </div>
+            )}
+            {showDataLoadingRecovery && (
+              <div className="w-full border-t border-slate-100 pt-4 space-y-3">
+                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. You can retry the cloud connection.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => window.location.reload()} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
+                    <RefreshCcw size={15} /> Retry
+                  </button>
+                  <button onClick={async () => {
+                    skipNextSignedOutResetRef.current = true;
+                    await signOut(auth).catch(() => {});
+                    resetSessionState({ loginErrorMessage: 'Session reset. Please sign in again.' });
+                  }} className="h-11 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm active:scale-95 transition">
+                    Access Portal
+                  </button>
+                </div>
               </div>
             )}
           </div>
