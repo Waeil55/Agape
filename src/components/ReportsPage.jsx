@@ -518,7 +518,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     });
 
     return filtered;
-  }, [driverFilter, endDate, startDate, statusFilter, trips, searchQuery, sortColumn, sortDirection, drivers]);
+  }, [driverFilter, endDate, reviewedFilter, startDate, statusFilter, trips, searchQuery, sortColumn, sortDirection, drivers]);
 
   const groupedTrips = useMemo(() => {
     const groups = reportTrips.reduce((acc, trip) => {
