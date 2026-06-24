@@ -723,7 +723,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       console.error('[DriverPage] Failed to persist workflow update:', err);
     });
     if (status === 'In Progress' && me?.id) {
-      updateDriverProfile(me.id, { activeTripId: trip.id }).catch((err) => {
+      setDoc(doc(db, 'driverProfiles', me.id), { activeTripId: trip.id, userId: auth.currentUser?.uid || '' }, { merge: true }).catch((err) => {
         console.error('[DriverPage] Failed to persist activeTripId:', err);
       });
     }
@@ -731,7 +731,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const clearActiveTrip = useCallback(() => {
     if (me?.id) {
-      updateDriverProfile(me.id, { activeTripId: null }).catch((err) => {
+      setDoc(doc(db, 'driverProfiles', me.id), { activeTripId: null, userId: auth.currentUser?.uid || '' }, { merge: true }).catch((err) => {
         console.error('[DriverPage] Failed to clear activeTripId:', err);
       });
     }
