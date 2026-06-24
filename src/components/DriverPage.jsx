@@ -352,6 +352,24 @@ const getWorkflowSteps = (trip) => {
 
 const getCurrentWorkflowStep = (trip) => getWorkflowSteps(trip).findIndex(s => !s.done);
 
+const formatClockTime = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+const formatClockTime24 = (time24) => {
+  if (!time24) return '';
+  const [h, m] = time24.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+const parseMinutes = (time24) => {
+  if (!time24) return 0;
+  const [h, m] = time24.split(':').map(Number);
+  return h * 60 + m;
+};
+
 const TRIP_WORK_STEPS = ['Scheduled', 'En Route', 'At Pickup', 'In Transit', 'Complete'];
 
 const getTripWorkStepIndex = (trip) => {
@@ -1250,6 +1268,91 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   ), [routeTemplates, me?.id, me?.email, currentUser]);
 
   const isClockedIn = me?.clockedIn || false;
+  const [showClockPrompt, setShowClockPrompt] = useState(false);
+  const [showShiftEndWarning, setShowShiftEndWarning] = useState(false);
+  const [showIdleLogoutPrompt, setShowIdleLogoutPrompt] = useState(false);
+  const idlePromptedRef = useRef(false);
+  const shiftEndTimeoutRef = useRef(null);
+  const [editClockInTime, setEditClockInTime] = useState(me?.clockInTime || '08:00');
+  const [editClockOutTime, setEditClockOutTime] = useState(me?.clockOutTime || '18:00');
+
+  const driverId = me?.id || (() => {
+    const normalizedEmail = String(currentUser || '').trim().toLowerCase();
+    const seed = normalizedEmail.replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'USER';
+    return `DRV-${seed}`;
+  })();
+
+  const handleClockToggle = useCallback(() => {
+    const newStatus = !isClockedIn;
+    onDriverStatusUpdate(driverId, newStatus);
+    if (newStatus) {
+      setShowToast({ type: 'success', message: 'Clocked in — you\'re online for trips.' });
+    } else {
+      setShowToast({ type: 'info', message: 'Clocked out — trips are now read-only.' });
+    }
+  }, [isClockedIn, driverId, onDriverStatusUpdate]);
+
+  // Shift-end timer
+  useEffect(() => {
+    if (!isClockedIn || !me?.clockOutTime) return;
+    const now = new Date();
+    const [h, m] = me.clockOutTime.split(':').map(Number);
+    const shiftEnd = new Date(now);
+    shiftEnd.setHours(h, m, 0, 0);
+    if (shiftEnd <= now) return; // already past shift end
+    const msUntilEnd = shiftEnd.getTime() - now.getTime();
+    shiftEndTimeoutRef.current = setTimeout(() => {
+      const activeTripsCount = (patientActiveLegs || []).length;
+      if (activeTripsCount > 0) {
+        setShowShiftEndWarning(true);
+      } else {
+        setShowToast({ type: 'info', message: `Your shift ended at ${formatClockTime24(me.clockOutTime)}. Clocking out.` });
+        onDriverStatusUpdate(driverId, false);
+        onLogout?.();
+      }
+    }, msUntilEnd);
+    return () => {
+      if (shiftEndTimeoutRef.current) clearTimeout(shiftEndTimeoutRef.current);
+    };
+  }, [isClockedIn, me?.clockOutTime, patientActiveLegs?.length, driverId, onDriverStatusUpdate, onLogout]);
+
+  // Idle logout prompt — when no trips for 30s while clocked in
+  useEffect(() => {
+    if (!isClockedIn || idlePromptedRef.current) return;
+    const activeTripsCount = (orderedTrips || []).length;
+    if (activeTripsCount > 0) {
+      idlePromptedRef.current = false;
+      setShowIdleLogoutPrompt(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (!isClockedIn) return;
+      setShowIdleLogoutPrompt(true);
+      idlePromptedRef.current = true;
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [isClockedIn, orderedTrips?.length]);
+
+  // Clock-in prompt on mount
+  useEffect(() => {
+    if (!me?.clockInTime || !me?.clockOutTime || isClockedIn) return;
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const inMin = parseMinutes(me.clockInTime);
+    const outMin = parseMinutes(me.clockOutTime);
+    if (nowMin >= inMin && nowMin < outMin) {
+      setShowClockPrompt(true);
+    }
+  }, [me?.clockInTime, me?.clockOutTime, isClockedIn]);
+
+  const handleSaveShiftSchedule = useCallback(() => {
+    onDriverStatusUpdate(driverId, isClockedIn, {
+      clockInTime: editClockInTime,
+      clockOutTime: editClockOutTime,
+    });
+    setShowToast({ type: 'success', message: `Shift saved: ${formatClockTime24(editClockInTime)} — ${formatClockTime24(editClockOutTime)}` });
+  }, [driverId, isClockedIn, editClockInTime, editClockOutTime, onDriverStatusUpdate]);
+
   const handleStreamLocationUpdate = useCallback(async (driverId, latitude, longitude, telemetry = {}) => {
     if (!driverId) return;
     if (navigator.onLine) {
@@ -1394,16 +1497,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }, 15000);
     return () => clearInterval(timer);
   }, [driverPosition, activeTrips]);
-
-  const handleStatusToggle = () => {
-    const newStatus = !me?.clockedIn;
-    const driverId = me?.id || (() => {
-      const normalizedEmail = String(currentUser || '').trim().toLowerCase();
-      const seed = normalizedEmail.replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'USER';
-      return `DRV-${seed}`;
-    })();
-    onDriverStatusUpdate(driverId, newStatus);
-  };
 
   const filteredHistory = selectedHistoryDayTrips.filter(t => {
     const matchFilter = historyFilter === 'all' ? true :
@@ -2664,9 +2757,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
           )}
           {!isClockedIn && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 flex items-center gap-2">
-              <WifiOff size={14} className="text-amber-600 shrink-0" />
-              <p className="text-xs font-medium text-amber-700">GPS sharing is off. Clock in to enable live trip updates.</p>
+            <div className="rounded-xl border border-amber-200 bg-amber-100 px-4 py-3 flex items-center gap-2">
+              <Clock size={14} className="text-amber-700 shrink-0" />
+              <p className="text-xs font-bold text-amber-800">Clocked out — clock in to start trips and share live updates.</p>
             </div>
           )}
 
@@ -3422,15 +3515,53 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       onSms: (t) => handleSmartSMS(t),
                       onContacts: (t) => openContactSelector(t),
                       onRevert: revertTripStatus,
-                      onNoShow: handleNoShow,
-                      onCancel: handleCancel,
-                      onReroute: handleReroute,
                       onShowLegs: handleShowLegs,
                       onEditTrip: handleEditTrip,
                       onScheduleEdit: () => openScheduleEditor(trip),
-                      onTransfer: () => openTransferPrompt('trip', trip),
                       onClearActiveTrip: clearActiveTrip,
-                      renderWorkflow: !isTerminal && primary ? () => {
+                      ...(isClockedIn ? {
+                        onNoShow: handleNoShow,
+                        onCancel: handleCancel,
+                        onReroute: handleReroute,
+                        onTransfer: () => openTransferPrompt('trip', trip),
+                      } : {}),
+                      renderWorkflow: !isTerminal && primary && isClockedIn ? () => {
+                        const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
+                        const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
+                        const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
+                        const cardStepBackTarget = getTripWorkStepBackTarget(trip);
+                        const canUndo = !!cardStepBackTarget;
+                        return (
+                          <div className={`rounded-xl border ${borderColor} ${bgColor} p-3 w-full`}>
+                            <div className="flex items-center gap-0.5 mb-2">
+                              {workflowSteps.map((step, idx) => (
+                                <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
+                              ))}
+                              {canUndo && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (cardStepBackTarget && window.confirm(`Go back to "${cardStepBackTarget.label}"?`)) {
+                                      impact('medium');
+                                      advanceWorkflow(trip, cardStepBackTarget.status, cardStepBackTarget.fields, { allowRegression: true });
+                                    }
+                                  }}
+                                  className="ml-2 w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-300 text-slate-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-all cursor-pointer shrink-0"
+                                  title="Undo last step"
+                                >
+                                  <RotateCcw size={12} />
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <button type="button" disabled className="flex-[4] h-12 bg-slate-200 text-slate-500 text-sm rounded-xl font-bold flex items-center justify-center gap-2 cursor-not-allowed">
+                                <Clock size={14} /> Clock in to start trips
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      } : !isTerminal && primary ? () => {
                         const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
                         const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
                         const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
@@ -4337,30 +4468,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-4">
-                  <button onClick={handleStatusToggle} className={`px-4 h-9 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border ${isClockedIn ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-600' : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'}`}>
-                    {isClockedIn ? 'Go Offline' : 'Go Online'}
+                  <button onClick={handleClockToggle} className={`h-9 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border flex items-center gap-1.5 px-4 ${isClockedIn ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-600' : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'}`}>
+                    {isClockedIn ? <LogOut size={13} /> : <Play size={13} />}
+                    {isClockedIn ? 'Clock Out' : 'Clock In'}
                   </button>
-                  <div className="flex items-center gap-1.5 px-3 h-9 bg-white/10 backdrop-blur-md rounded-xl border border-white/10">
-                    <Gauge size={12} className="text-white/70" />
-                    <span className="text-xs font-medium text-white">{me?.odometer?.toLocaleString() || 0} mi</span>
-                  </div>
+                  <span className="text-[10px] font-bold text-white/60">
+                    {isClockedIn
+                      ? `Since ${formatClockTime(me?.clockedInAt || me?.lastUpdate)}`
+                      : me?.clockInTime ? `Shift: ${formatClockTime24(me?.clockInTime)} — ${formatClockTime24(me?.clockOutTime)}` : ''}
+                  </span>
                 </div>
-              </div>
-            </div>
-
-            {/* Connection Status */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isOnline ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                    {isOnline ? <Wifi size={18} /> : <WifiOff size={18} />}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">{isOnline ? 'Connected' : 'Offline'}</p>
-                    <p className="text-slate-500 text-xs font-semibold">Location sharing active</p>
-                  </div>
-                </div>
-                <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'} ${isOnline ? 'animate-pulse' : ''}`} />
               </div>
             </div>
 
@@ -4444,8 +4561,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   ['Vehicle', me?.vehicle || 'N/A'],
                   ['Zone', me?.currentZone || 'N/A'],
                   ['Status', isClockedIn ? 'Online' : 'Offline'],
-                  ['GPS', 'Active'],
-                  ['Background Tracking', backgroundLocation ? 'Enabled' : 'Not Available'],
+                  ['GPS', 'Always On'],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between items-center">
                     <span className="text-slate-500 text-xs font-semibold">{label}</span>
@@ -4453,6 +4569,31 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Shift Schedule */}
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
+              <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Clock size={16} /> Shift Schedule</div>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1 block">Clock In</label>
+                  <input type="time" value={editClockInTime} onChange={(e) => setEditClockInTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
+                </div>
+                <div>
+                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1 block">Clock Out</label>
+                  <input type="time" value={editClockOutTime} onChange={(e) => setEditClockOutTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
+                </div>
+              </div>
+              <button onClick={handleSaveShiftSchedule} className="w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition active:scale-95">
+                Save Schedule
+              </button>
+              <p className="text-[10px] font-semibold text-slate-400 mt-2 text-center">
+                {isClockedIn
+                  ? `Clocked in since ${formatClockTime(me?.clockedInAt || me?.lastUpdate)}`
+                  : `Next shift: ${formatClockTime24(editClockInTime)} — ${formatClockTime24(editClockOutTime)}`}
+              </p>
             </div>
 
             {/* Navigation App */}
@@ -4527,6 +4668,70 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <ChevronRight size={15} className="text-slate-300" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== CLOCK-IN PROMPT MODAL ===== */}
+      {showClockPrompt && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 200 }} onClick={() => setShowClockPrompt(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 pointer-events-auto" onClick={e => e.stopPropagation()}>
+            <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto mb-4">
+              <Clock size={24} className="text-blue-600" />
+            </div>
+            <h3 className="text-lg font-black text-slate-900 text-center">Your shift started at {formatClockTime24(me?.clockInTime)}</h3>
+            <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
+              Clock in to start receiving trips and sharing live updates.
+            </p>
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <button onClick={() => { setShowClockPrompt(false); handleClockToggle(); }} className="h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition active:scale-95">
+                Clock In
+              </button>
+              <button onClick={() => setShowClockPrompt(false)} className="h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition active:scale-95">
+                Browse Trips
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== SHIFT-END WARNING MODAL ===== */}
+      {showShiftEndWarning && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 200 }} onClick={() => setShowShiftEndWarning(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 pointer-events-auto" onClick={e => e.stopPropagation()}>
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={24} className="text-amber-600" />
+            </div>
+            <h3 className="text-lg font-black text-slate-900 text-center">Shift ending at {formatClockTime24(me?.clockOutTime)}</h3>
+            <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
+              Your shift ends soon. Please complete your current trips before clocking out.
+            </p>
+            <button onClick={() => setShowShiftEndWarning(false)} className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm mt-6 transition active:scale-95">
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== IDLE LOGOUT PROMPT MODAL ===== */}
+      {showIdleLogoutPrompt && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 200 }} onClick={() => setShowIdleLogoutPrompt(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 pointer-events-auto" onClick={e => e.stopPropagation()}>
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+              <LogOut size={24} className="text-slate-600" />
+            </div>
+            <h3 className="text-lg font-black text-slate-900 text-center">No upcoming trips</h3>
+            <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
+              You don't have any trips right now. Would you like to clock out?
+            </p>
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <button onClick={() => { setShowIdleLogoutPrompt(false); handleClockToggle(); }} className="h-12 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition active:scale-95">
+                Clock Out
+              </button>
+              <button onClick={() => { setShowIdleLogoutPrompt(false); idlePromptedRef.current = true; }} className="h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition active:scale-95">
+                Stay On
+              </button>
+            </div>
           </div>
         </div>
       )}

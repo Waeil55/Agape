@@ -173,6 +173,8 @@ function buildDriverProfileFromEmail(email, uid = '') {
     assignedTo: '',
     schedule: [],
     clockedIn: false,
+    clockInTime: '08:00',
+    clockOutTime: '18:00',
   };
 }
 
@@ -1765,7 +1767,7 @@ const App = () => {
     });
   };
 
-  const handleDriverStatusUpdate = (driverId, clockedIn) => {
+  const handleDriverStatusUpdate = (driverId, clockedIn, extraFields = {}) => {
     const prevDriverState = drivers.find(d => d.id === driverId) || {};
     setDrivers(prevDrivers => {
       const driverExists = prevDrivers.some(d => d.id === driverId);
@@ -1777,6 +1779,7 @@ const App = () => {
         clockedIn,
         lastUpdate: new Date().toISOString(),
         status: clockedIn ? 'Available' : 'Offline',
+        ...extraFields,
       } : d);
       return updated;
     });
@@ -1790,6 +1793,15 @@ const App = () => {
       clockedIn ? 'emerald' : 'blue',
       { entity: 'driver', id: driverId, diffs: changed }
     );
+    if (driverId) {
+      upsertDriverProfile(driverId, {
+        clockedIn,
+        status: clockedIn ? 'Available' : 'Offline',
+        ...extraFields,
+        lastUpdate: new Date().toISOString(),
+        updatedAtLocal: new Date().toISOString(),
+      }).catch((err) => console.error('Driver status update failed:', err));
+    }
   };
 
   const handleDispatcherStatusUpdate = (dispatcherId, clockedIn) => {
@@ -2568,7 +2580,7 @@ const App = () => {
       {isLoading ? (
         <div className="flex-1 bg-[#5a94af] flex items-center justify-center px-4">
           <div className="w-full max-w-md bg-white border border-slate-200/50 rounded-[2.5rem] overflow-hidden shadow-2xl p-8 flex flex-col items-center gap-6 text-center">
-            <img src="/agape.png" alt="Agape Care" className="w-20 h-20 object-contain" />
+            <img src="/agape.png" alt="Agape Care" className="w-24 h-24 object-contain" />
             <div className="text-center">
               <p className="text-lg font-bold text-slate-700">Loading Agape Care</p>
               <p className="text-sm font-medium text-slate-400 mt-1">Preparing your workspace...</p>
@@ -2598,7 +2610,7 @@ const App = () => {
       ) : dataLoading && !forceDataLoad ? (
         <div className="flex-1 bg-[#5a94af] flex items-center justify-center px-4">
           <div className="w-full max-w-md bg-white border border-slate-200/50 rounded-[2.5rem] overflow-hidden shadow-2xl p-8 flex flex-col items-center gap-5 text-center">
-            <img src="/agape.png" alt="Agape Care" className="w-16 h-16 object-contain" />
+            <img src="/agape.png" alt="Agape Care" className="w-20 h-20 object-contain" />
             <div>
               <p className="text-lg font-bold text-slate-800">Syncing live operations</p>
               <p className="text-sm font-medium text-slate-500 mt-1">{role === 'driver' ? 'Connecting to your trips and profile...' : 'Pulling trips, drivers, assignments, and route data from Firestore.'}</p>
@@ -2637,7 +2649,7 @@ const App = () => {
               return (
                 <div className="flex-1 bg-slate-100 flex items-center justify-center px-4">
                   <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl shadow-sm p-6 text-center">
-                    <img src="/agape.png" alt="Agape Care" className="w-16 h-16 object-contain mx-auto mb-4" />
+                    <img src="/agape.png" alt="Agape Care" className="w-20 h-20 object-contain mx-auto mb-4" />
                     <h2 className="text-lg font-black text-slate-900">
                       {dataLoading ? 'Syncing your driver profile...' : 'Driver profile not ready'}
                     </h2>
