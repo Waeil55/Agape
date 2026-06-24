@@ -1,12 +1,10 @@
-import { Device } from '@capacitor/device';
-
 let _platform = null;
 let _isNative = null;
 
 export async function getPlatform() {
   if (_platform) return _platform;
   try {
-    const info = await Device.getInfo();
+    const info = await window.Capacitor?.plugins?.Device?.getInfo();
     _platform = {
       platform: info.platform,
       osVersion: info.osVersion,

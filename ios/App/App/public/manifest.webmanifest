@@ -1,0 +1,37 @@
+{
+  "name": "Agape Care Fleet Management",
+  "short_name": "Agape Care",
+  "description": "Enterprise fleet management, dispatch, routing, and driver operations for Agape Care NEMT.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#1e3a8a",
+  "theme_color": "#2563eb",
+  "categories": ["business", "productivity", "navigation"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/agape.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/agape.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Operations",
+      "short_name": "Ops",
+      "description": "Open the operations command center",
+      "url": "/"
+    }
+  ]
+}

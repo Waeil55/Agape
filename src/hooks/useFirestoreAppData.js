@@ -399,10 +399,21 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
     });
     unsubscribers.push(unsubPhones);
 
+    // Hard timeout: if no onSnapshot has fired within 5 seconds, unblock loading.
+    // Data will continue streaming in reactively — this just prevents the UI from
+    // being permanently stuck on a loading screen due to slow initial Firestore response.
+    const loadingTimeoutId = setTimeout(() => {
+      if (!cancelled) {
+        setState(prev => prev.loading ? { ...prev, loading: false, initialized: true } : prev);
+      }
+    }, 5000);
+
     return () => {
       cancelled = true;
+      clearTimeout(loadingTimeoutId);
       unsubscribers.forEach((unsub) => unsub());
     };
+
   }, [resubscribeKey, enabled]);
 
   const writeField = useCallback(async (field, value) => {

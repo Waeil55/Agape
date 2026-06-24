@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/agape.png" />
+    <link rel="apple-touch-icon" href="/agape.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/agape.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/agape.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/agape.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Agape Care" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#1E3A8A" />
+    <meta name="description" content="Agape Care - Professional Fleet Management System for Enterprise" />
+    <meta name="keywords" content="fleet management, dispatch system, vehicle tracking, logistics, NEMT" />
+    <meta name="author" content="Agape Care" />
+    <!-- iOS Safari: full-screen launch images (optional but improves PWA feel) -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Reload on chunk/TDZ errors (catches stale cached JS from old deploys) -->
+    <script>
+      var agapeCacheError = /ChunkLoadError|Loading chunk|dynamically imported|Failed to fetch dynamically|Cannot access.*before initialization/;
+      window.addEventListener('error', function agapeOnError(e) {
+        if (e.target && e.target.tagName === 'LINK') return;
+        if (e.message && agapeCacheError.test(e.message)) {
+          console.warn('[Agape] Stale cache detected (' + e.message + '), clearing and reloading...');
+          var reloadCount = parseInt(sessionStorage.getItem('agape_reload_count') || '0', 10);
+          if (reloadCount > 3) { console.error('Too many reloads. Halting.'); sessionStorage.removeItem('agape_reload_count'); return; }
+          sessionStorage.setItem('agape_reload_count', (reloadCount + 1).toString());
+          if ('caches' in window) { caches.keys().then(function(keys) { Promise.all(keys.map(function(k) { return caches.delete(k); })).then(function() { location.reload(true); }); }); }
+          else { location.reload(true); }
+        }
+      });
+    </script>
+    <title>Agape Care - Fleet Management System</title>
+    <script type="module" crossorigin src="/assets/index-D98d0CCH.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-vendor-Crjl1FS8.js">
+    <link rel="modulepreload" crossorigin href="/assets/native-vendor-xqBGXHBu.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-dOuK7WOe.js">
+    <link rel="modulepreload" crossorigin href="/assets/firebase-core-BGCnD7GU.js">
+    <link rel="modulepreload" crossorigin href="/assets/firebase-firestore-DDPQmd7S.js">
+    <link rel="modulepreload" crossorigin href="/assets/firebase-auth-D_MglKHq.js">
+    <link rel="modulepreload" crossorigin href="/assets/firebase-analytics-J7px9Lmo.js">
+    <link rel="modulepreload" crossorigin href="/assets/firebase-messaging-NE1Io20S.js">
+    <link rel="modulepreload" crossorigin href="/assets/firebase-functions-YmSXfhhj.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-D72Ejvip.css">
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!-- ===== PWA AUTO-REFRESH SERVICE WORKER ===== -->
+    <script>
+      if (false && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
+          console.log('[SW] Registered:', registration.scope);
+
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            if (!newWorker) return;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('[SW] New version available — activating immediately.');
+                newWorker.postMessage({ action: 'skipWaiting' });
+              }
+            });
+          });
+
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            console.log('[SW] Controller changed. Reloading with fresh assets.');
+            location.reload(true);
+          });
+
+        }).catch(err => {
+          console.warn('[SW] Registration failed:', err);
+        });
+
+        // Also register the Firebase Messaging SW for push notifications
+        navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(() => {});
+      }
+    </script>
+  </body>
+</html>

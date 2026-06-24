@@ -1,6 +1,3 @@
-import { ActionSheet } from '@capacitor/action-sheet';
-import { Browser } from '@capacitor/browser';
-import { App } from '@capacitor/app';
 import { isNativeShell, isIOS, isAndroid } from './platform';
 import { impact, notification } from './haptics';
 
@@ -94,6 +91,7 @@ function buildNavUrls(address, origin) {
 
 async function openUrlNative(url) {
   try {
+    const { Browser } = await import('@capacitor/browser');
     await Browser.open({ url, windowName: '_self' });
   } catch {
     window.location.href = url;
@@ -157,6 +155,7 @@ export async function openNavigation(address, app, origin) {
       await openUrlWithFallback(urls.waze, urls.wazeWeb);
     } else if (isNativeShell()) {
       try {
+        const { App } = await import('@capacitor/app');
         await App.canOpenUrl({ url: urls.waze });
         await App.openUrl({ url: urls.waze });
       } catch {
@@ -190,6 +189,7 @@ export async function showNavActionSheet(address, origin, preferredApp) {
 
   if (isNative) {
     try {
+      const { ActionSheet } = await import('@capacitor/action-sheet');
       const result = await ActionSheet.showActions({
         title: 'Navigate to',
         options: items.map((item, i) => ({
@@ -224,6 +224,7 @@ export async function makeCall(phone, name) {
 
   if (isNativeShell()) {
     try {
+      const { App } = await import('@capacitor/app');
       await App.openUrl({ url: `tel:${cleaned}` });
       await notification('success');
       return;
@@ -258,6 +259,7 @@ export async function sendSMS(phone, name) {
 
   if (isNativeShell()) {
     try {
+      const { App } = await import('@capacitor/app');
       await App.openUrl({ url: `sms:${cleaned}` });
       return;
     } catch (err) {
@@ -300,6 +302,7 @@ export async function showCallActionSheet(phone, name) {
 
   if (isNative) {
     try {
+      const { ActionSheet } = await import('@capacitor/action-sheet');
       const result = await ActionSheet.showActions({
         title: name || cleaned,
         options: items.map((item) => ({ title: item.title })),

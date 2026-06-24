@@ -231,7 +231,7 @@ function getBestDriverProfileForEmail(drivers = [], email = '', trips = []) {
   })[0];
 }
 
-const FIRESTORE_BOOT_TIMEOUT_MS = 60000;
+const FIRESTORE_BOOT_TIMEOUT_MS = 8000;
 const AUTH_WATCHDOG_TIMEOUT_MS = 90000;
 
 const buildTravelDuration = (startTime, endTime) => {
@@ -1101,19 +1101,23 @@ const App = () => {
             setStartupIssue('');
             return;
           }
-          // Still null after 15s — show recovery UI but DON'T auto-logout
-          console.warn('[Auth] Session still null after 15s — showing recovery options');
-          setStartupIssue('Session lost. Use Access Portal to sign in again, or wait for auto-reconnect.');
+          // Still null after 15s — show recovery UI and allow user to interact
+          console.warn('[Auth] Session still null after 15s — showing login screen');
+          authBootResolvedRef.current = true;
+          setStartupIssue('Session lost. Please sign in again.');
+          setIsLoading(false);
           return;
         }
         // Initial boot — wait for auth persistence to load (slower on mobile)
         await new Promise(r => setTimeout(r, 10000));
         if (cancelled) return;
         if (auth.currentUser) return;
-        // Still null after 10s — auth persistence may still be loading.
-        // Don't auto-logout. Recovery UI (8s on loading screen) has
-        // "Access Portal" button for explicit sign-out if needed.
+        // Still null after 10s — show login screen instead of hanging forever.
+        // The user can sign in again, or wait if their session auto-restores.
+        console.warn('[Auth] No session after 10s cold-start wait — showing login screen');
+        authBootResolvedRef.current = true;
         setStartupIssue('Checking your session. If this persists, use Access Portal to sign in.');
+        setIsLoading(false);
       }
       } catch (bootErr) {
         console.error("Auth boot error:", bootErr);
@@ -2680,19 +2684,27 @@ const App = () => {
       ) : (
         <>
           {role === 'driver' ? (() => {
-            const myDriver = currentUserDriverProfile;
-            if (!myDriver) {
+            // Build a provisional profile if none exists yet — never block on profile existence
+            const myDriver = currentUserDriverProfile || (
+              auth.currentUser ? {
+                ...buildDriverProfileFromEmail(
+                  auth.currentUser.email || currentUser || '',
+                  auth.currentUser.uid
+                ),
+                id: buildStableProfileId('driver', auth.currentUser.uid) ||
+                    buildDriverProfileFromEmail(auth.currentUser.email || currentUser || '', auth.currentUser.uid).id,
+                isProvisioningProfile: true,
+              } : null
+            );
+            // Only show the syncing screen if data is still loading AND we truly have no profile
+            if (!myDriver && dataLoading) {
               return (
                 <div className="flex-1 bg-slate-100 flex items-center justify-center px-4">
                   <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl shadow-sm p-6 text-center">
                     <img src="/agape.png" alt="Agape Care" className="w-20 h-20 object-contain mx-auto mb-4" />
-                    <h2 className="text-lg font-black text-slate-900">
-                      {dataLoading ? 'Syncing your driver profile...' : 'Driver profile not ready'}
-                    </h2>
+                    <h2 className="text-lg font-black text-slate-900">Syncing your driver profile...</h2>
                     <p className="text-sm font-medium text-slate-500 mt-2 leading-relaxed">
-                      {dataLoading
-                        ? 'We are reconnecting your cloud driver record and live trips.'
-                        : 'We are reconnecting your cloud driver record and assigned trips. Dispatch can help if the trip board still looks empty after sync.'}
+                      We are reconnecting your cloud driver record and live trips.
                     </p>
                     <div className="mt-5 grid grid-cols-1 gap-2">
                       <button
@@ -2708,6 +2720,8 @@ const App = () => {
                 </div>
               );
             }
+            // If data finished loading but no profile exists at all — render with provisional profile
+            if (!myDriver) return null;
             const driverId = myDriver.id;
             const myTrips = currentUserDriverTrips;
             const myDrivers = myDriver ? [myDriver] : [];

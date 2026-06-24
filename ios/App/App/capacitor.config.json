@@ -1,0 +1,27 @@
+{
+	"appId": "com.agapecare.fleet",
+	"appName": "Agape Care",
+	"webDir": "dist",
+	"backgroundColor": "#5a94af",
+	"server": {
+		"androidScheme": "https"
+	},
+	"android": {
+		"useLegacyBridge": true
+	},
+	"plugins": {
+		"Geolocation": {
+			"permissions": "always"
+		}
+	},
+	"packageClassList": [
+		"BackgroundGeolocation",
+		"ActionSheetPlugin",
+		"AppPlugin",
+		"CAPBrowserPlugin",
+		"DevicePlugin",
+		"DialogPlugin",
+		"GeolocationPlugin",
+		"HapticsPlugin"
+	]
+}
