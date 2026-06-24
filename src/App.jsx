@@ -173,8 +173,6 @@ function buildDriverProfileFromEmail(email, uid = '') {
     assignedTo: '',
     schedule: [],
     clockedIn: false,
-    clockInTime: '08:00',
-    clockOutTime: '18:00',
   };
 }
 
@@ -1769,6 +1767,20 @@ const App = () => {
 
   const handleDriverStatusUpdate = (driverId, clockedIn, extraFields = {}) => {
     const prevDriverState = drivers.find(d => d.id === driverId) || {};
+    const now = new Date().toISOString();
+    const wasClockedIn = Boolean(prevDriverState.clockedIn);
+    const clockChanged = wasClockedIn !== clockedIn;
+    let clockEvents = prevDriverState.clockEvents || [];
+    if (clockChanged && clockedIn) {
+      clockEvents = [...clockEvents, { type: 'in', timestamp: now }];
+    } else if (clockChanged && !clockedIn) {
+      clockEvents = [...clockEvents, { type: 'out', timestamp: now }];
+    }
+    const merged = {
+      ...extraFields,
+      ...(clockChanged ? { clockEvents } : {}),
+      ...(clockedIn && clockChanged ? { clockedInAt: now } : {}),
+    };
     setDrivers(prevDrivers => {
       const driverExists = prevDrivers.some(d => d.id === driverId);
       const workingDrivers = driverExists
@@ -1777,15 +1789,15 @@ const App = () => {
       const updated = workingDrivers.map(d => d.id === driverId ? {
         ...d,
         clockedIn,
-        lastUpdate: new Date().toISOString(),
+        lastUpdate: now,
         status: clockedIn ? 'Available' : 'Offline',
-        ...extraFields,
+        ...merged,
       } : d);
       return updated;
     });
     const driverName = prevDriverState?.name || driverId;
     const changed = [];
-    if (Boolean(prevDriverState.clockedIn) !== clockedIn) changed.push({ field: 'clockedIn', before: prevDriverState.clockedIn, after: clockedIn });
+    if (wasClockedIn !== clockedIn) changed.push({ field: 'clockedIn', before: prevDriverState.clockedIn, after: clockedIn });
     if (prevDriverState.status !== (clockedIn ? 'Available' : 'Offline')) changed.push({ field: 'status', before: prevDriverState.status, after: clockedIn ? 'Available' : 'Offline' });
     addAuditLog(
       clockedIn ? 'Driver Clocked In' : 'Driver Clocked Out',
@@ -1797,9 +1809,9 @@ const App = () => {
       upsertDriverProfile(driverId, {
         clockedIn,
         status: clockedIn ? 'Available' : 'Offline',
-        ...extraFields,
-        lastUpdate: new Date().toISOString(),
-        updatedAtLocal: new Date().toISOString(),
+        ...merged,
+        lastUpdate: now,
+        updatedAtLocal: now,
       }).catch((err) => console.error('Driver status update failed:', err));
     }
   };

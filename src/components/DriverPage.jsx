@@ -357,18 +357,6 @@ const formatClockTime = (iso) => {
   const d = new Date(iso);
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 };
-const formatClockTime24 = (time24) => {
-  if (!time24) return '';
-  const [h, m] = time24.split(':').map(Number);
-  const d = new Date();
-  d.setHours(h, m, 0, 0);
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-};
-const parseMinutes = (time24) => {
-  if (!time24) return 0;
-  const [h, m] = time24.split(':').map(Number);
-  return h * 60 + m;
-};
 
 const TRIP_WORK_STEPS = ['Scheduled', 'En Route', 'At Pickup', 'In Transit', 'Complete'];
 
@@ -1268,19 +1256,48 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   ), [routeTemplates, me?.id, me?.email, currentUser]);
 
   const isClockedIn = me?.clockedIn || false;
-  const [showClockPrompt, setShowClockPrompt] = useState(false);
-  const [showShiftEndWarning, setShowShiftEndWarning] = useState(false);
   const [showIdleLogoutPrompt, setShowIdleLogoutPrompt] = useState(false);
   const idlePromptedRef = useRef(false);
-  const shiftEndTimeoutRef = useRef(null);
-  const [editClockInTime, setEditClockInTime] = useState(me?.clockInTime || '08:00');
-  const [editClockOutTime, setEditClockOutTime] = useState(me?.clockOutTime || '18:00');
 
   const driverId = me?.id || (() => {
     const normalizedEmail = String(currentUser || '').trim().toLowerCase();
     const seed = normalizedEmail.replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'USER';
     return `DRV-${seed}`;
   })();
+
+  const clockHistory = useMemo(() => {
+    const events = me?.clockEvents || [];
+    if (events.length === 0) return [];
+    const byDate = {};
+    events.forEach(e => {
+      const dateKey = e.timestamp.slice(0, 10);
+      if (!byDate[dateKey]) byDate[dateKey] = [];
+      byDate[dateKey].push(e);
+    });
+    const today = new Date();
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateKey = d.toISOString().slice(0, 10);
+      const dayEvents = (byDate[dateKey] || []).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+      const clockIn = dayEvents.find(e => e.type === 'in');
+      const clockOut = [...dayEvents].reverse().find(e => e.type === 'out');
+      let hours = null;
+      if (clockIn && clockOut) {
+        const diff = new Date(clockOut.timestamp) - new Date(clockIn.timestamp);
+        if (diff > 0) hours = (diff / (1000 * 60 * 60)).toFixed(1);
+      }
+      days.push({
+        dateKey,
+        hasEvents: dayEvents.length > 0,
+        clockIn: clockIn?.timestamp || null,
+        clockOut: clockOut?.timestamp || null,
+        hours,
+      });
+    }
+    return days;
+  }, [me?.clockEvents]);
 
   const handleClockToggle = useCallback(() => {
     const newStatus = !isClockedIn;
@@ -1292,29 +1309,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }
   }, [isClockedIn, driverId, onDriverStatusUpdate]);
 
-  // Shift-end timer
-  useEffect(() => {
-    if (!isClockedIn || !me?.clockOutTime) return;
-    const now = new Date();
-    const [h, m] = me.clockOutTime.split(':').map(Number);
-    const shiftEnd = new Date(now);
-    shiftEnd.setHours(h, m, 0, 0);
-    if (shiftEnd <= now) return; // already past shift end
-    const msUntilEnd = shiftEnd.getTime() - now.getTime();
-    shiftEndTimeoutRef.current = setTimeout(() => {
-      const activeTripsCount = (patientActiveLegs || []).length;
-      if (activeTripsCount > 0) {
-        setShowShiftEndWarning(true);
-      } else {
-        setShowToast({ type: 'info', message: `Your shift ended at ${formatClockTime24(me.clockOutTime)}. Clocking out.` });
-        onDriverStatusUpdate(driverId, false);
-        onLogout?.();
-      }
-    }, msUntilEnd);
-    return () => {
-      if (shiftEndTimeoutRef.current) clearTimeout(shiftEndTimeoutRef.current);
-    };
-  }, [isClockedIn, me?.clockOutTime, patientActiveLegs?.length, driverId, onDriverStatusUpdate, onLogout]);
+
 
   // Idle logout prompt — when no trips for 30s while clocked in
   useEffect(() => {
@@ -1333,25 +1328,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     return () => clearTimeout(timer);
   }, [isClockedIn, orderedTrips?.length]);
 
-  // Clock-in prompt on mount
-  useEffect(() => {
-    if (!me?.clockInTime || !me?.clockOutTime || isClockedIn) return;
-    const now = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    const inMin = parseMinutes(me.clockInTime);
-    const outMin = parseMinutes(me.clockOutTime);
-    if (nowMin >= inMin && nowMin < outMin) {
-      setShowClockPrompt(true);
-    }
-  }, [me?.clockInTime, me?.clockOutTime, isClockedIn]);
 
-  const handleSaveShiftSchedule = useCallback(() => {
-    onDriverStatusUpdate(driverId, isClockedIn, {
-      clockInTime: editClockInTime,
-      clockOutTime: editClockOutTime,
-    });
-    setShowToast({ type: 'success', message: `Shift saved: ${formatClockTime24(editClockInTime)} — ${formatClockTime24(editClockOutTime)}` });
-  }, [driverId, isClockedIn, editClockInTime, editClockOutTime, onDriverStatusUpdate]);
+
+
 
   const handleStreamLocationUpdate = useCallback(async (driverId, latitude, longitude, telemetry = {}) => {
     if (!driverId) return;
@@ -4472,11 +4451,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     {isClockedIn ? <LogOut size={13} /> : <Play size={13} />}
                     {isClockedIn ? 'Clock Out' : 'Clock In'}
                   </button>
-                  <span className="text-[10px] font-bold text-white/60">
-                    {isClockedIn
-                      ? `Since ${formatClockTime(me?.clockedInAt || me?.lastUpdate)}`
-                      : me?.clockInTime ? `Shift: ${formatClockTime24(me?.clockInTime)} — ${formatClockTime24(me?.clockOutTime)}` : ''}
-                  </span>
+                  {isClockedIn && (
+                    <span className="text-[10px] font-bold text-white/60">
+                      Since {formatClockTime(me?.clockedInAt || me?.lastUpdate)}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -4571,29 +4550,35 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
             </div>
 
-            {/* Shift Schedule */}
+            {/* Clock History (last 14 days) */}
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
-              <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Clock size={16} /> Shift Schedule</div>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1 block">Clock In</label>
-                  <input type="time" value={editClockInTime} onChange={(e) => setEditClockInTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
+              <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Clock size={16} /> Clock History</div>
+              {clockHistory.length === 0 || clockHistory.every(d => !d.hasEvents) ? (
+                <p className="text-xs text-slate-400 text-center py-4">No clock in/out history yet.</p>
+              ) : (
+                <div className="overflow-x-auto -mx-1">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">Date</th>
+                        <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">In</th>
+                        <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">Out</th>
+                        <th className="text-right font-bold text-slate-500 pb-1.5 uppercase tracking-wider">Hrs</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clockHistory.map(day => (
+                        <tr key={day.dateKey} className={`border-b border-slate-50 ${!day.hasEvents ? 'opacity-40' : ''}`}>
+                          <td className="py-1.5 pr-2 font-semibold text-slate-700 whitespace-nowrap">{formatHistoryCompactDayLabel(day.dateKey)}</td>
+                          <td className="py-1.5 pr-2 font-bold text-slate-800 whitespace-nowrap">{day.clockIn ? formatClockTime(day.clockIn) : '—'}</td>
+                          <td className="py-1.5 pr-2 font-bold text-slate-800 whitespace-nowrap">{day.clockOut ? formatClockTime(day.clockOut) : '—'}</td>
+                          <td className="py-1.5 text-right font-bold text-slate-700 whitespace-nowrap">{day.hours ? `${day.hours}h` : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div>
-                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1 block">Clock Out</label>
-                  <input type="time" value={editClockOutTime} onChange={(e) => setEditClockOutTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
-                </div>
-              </div>
-              <button onClick={handleSaveShiftSchedule} className="w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition active:scale-95">
-                Save Schedule
-              </button>
-              <p className="text-[10px] font-semibold text-slate-400 mt-2 text-center">
-                {isClockedIn
-                  ? `Clocked in since ${formatClockTime(me?.clockedInAt || me?.lastUpdate)}`
-                  : `Next shift: ${formatClockTime24(editClockInTime)} — ${formatClockTime24(editClockOutTime)}`}
-              </p>
+              )}
             </div>
 
             {/* Navigation App */}
@@ -4667,47 +4652,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <span className="font-medium text-sm text-rose-600">Sign Out</span>
               </div>
               <ChevronRight size={15} className="text-slate-300" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ===== CLOCK-IN PROMPT MODAL ===== */}
-      {showClockPrompt && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 200 }} onClick={() => setShowClockPrompt(false)}>
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 pointer-events-auto" onClick={e => e.stopPropagation()}>
-            <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto mb-4">
-              <Clock size={24} className="text-blue-600" />
-            </div>
-            <h3 className="text-lg font-black text-slate-900 text-center">Your shift started at {formatClockTime24(me?.clockInTime)}</h3>
-            <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
-              Clock in to start receiving trips and sharing live updates.
-            </p>
-            <div className="grid grid-cols-2 gap-3 mt-6">
-              <button onClick={() => { setShowClockPrompt(false); handleClockToggle(); }} className="h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition active:scale-95">
-                Clock In
-              </button>
-              <button onClick={() => setShowClockPrompt(false)} className="h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition active:scale-95">
-                Browse Trips
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== SHIFT-END WARNING MODAL ===== */}
-      {showShiftEndWarning && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 200 }} onClick={() => setShowShiftEndWarning(false)}>
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 pointer-events-auto" onClick={e => e.stopPropagation()}>
-            <div className="w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle size={24} className="text-amber-600" />
-            </div>
-            <h3 className="text-lg font-black text-slate-900 text-center">Shift ending at {formatClockTime24(me?.clockOutTime)}</h3>
-            <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
-              Your shift ends soon. Please complete your current trips before clocking out.
-            </p>
-            <button onClick={() => setShowShiftEndWarning(false)} className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm mt-6 transition active:scale-95">
-              Dismiss
             </button>
           </div>
         </div>
