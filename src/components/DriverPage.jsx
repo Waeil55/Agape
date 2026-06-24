@@ -2632,66 +2632,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
           )}
 
-          {driverAssignments.length > 0 && (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3 shadow-sm space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Zap size={15} className="text-blue-700 shrink-0" />
-                  <div className="min-w-0">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-blue-950">Live Dispatch Assignment</h3>
-                    <p className="text-xs font-semibold text-blue-700 truncate">
-                      {assignmentUnreadCount > 0 ? `${assignmentUnreadCount} new assignment${assignmentUnreadCount !== 1 ? 's' : ''}` : 'Assignments are synced live'}
-                    </p>
-                  </div>
-                </div>
-                <span className="rounded-full bg-white border border-blue-200 px-2 py-1 text-[10px] font-black text-blue-700">
-                  LIVE
-                </span>
-              </div>
-              {driverAssignments.slice(0, 3).map((assignment) => {
-                const trip = trips.find((item) => item.id === assignment.tripId);
-                const snapshot = assignment.tripSnapshot || {};
-                const patient = trip?.patient || snapshot.patient || 'Assigned trip';
-                const time = trip?.time || snapshot.time || '';
-                const pickup = trip?.pickup || snapshot.pickup || '';
-                const dropoff = trip?.dropoff || snapshot.dropoff || '';
-                const isSeen = assignment.deliveryState === 'seen';
-                return (
-                  <div key={assignment.id} className="rounded-xl bg-white border border-blue-100 p-3 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-black text-slate-900 truncate">{patient}{time ? ` · ${to12hr(time)}` : ''}</p>
-                        <p className="text-xs font-semibold text-slate-500 truncate mt-0.5">{pickup}</p>
-                        {dropoff && <p className="text-xs font-semibold text-slate-400 truncate">{dropoff}</p>}
-                      </div>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${isSeen ? 'bg-slate-100 text-slate-500' : 'bg-blue-100 text-blue-700 animate-pulse'}`}>
-                        {isSeen ? 'Seen' : 'New'}
-                      </span>
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      {!isSeen && (
-                        <button
-                          type="button"
-                          onClick={() => onAcknowledgeAssignment?.(assignment.id)}
-                          className="flex-1 h-9 rounded-xl bg-white border border-blue-200 text-blue-700 text-xs font-black"
-                        >
-                          Acknowledge
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => onAcceptAssignment?.(assignment.id)}
-                        className="flex-1 h-9 rounded-xl bg-blue-600 text-white text-xs font-black shadow-sm"
-                      >
-                        Accept
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
           {(incomingTransferTrips.length > 0 || incomingTransferRoutes.length > 0) && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 shadow-sm space-y-2">
               <div className="flex items-center gap-2">

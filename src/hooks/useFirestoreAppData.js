@@ -275,12 +275,13 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
           console.error('Corrupted trip cleanup failed:', err);
         });
       }
-      liveTripsRef.current = liveTrips;
       const baseData = normalizeData(dataRef.current);
-      const liveKeys = new Set(liveTrips.map((t) => t.id));
-      const mergedTrips = cleanTripCollection([
-        ...(baseData.trips || []).filter((t) => !liveKeys.has(t.id)),
-        ...liveTrips.map((liveTrip) => {
+      const trashedIds = new Set((baseData.trashedTrips || []).map(t => t.id));
+      liveTripsRef.current = liveTrips.filter((t) => !trashedIds.has(t.id));
+      const liveKeys = new Set(liveTripsRef.current.map((t) => t.id));
+      const mergedTripsBase = cleanTripCollection([
+        ...(baseData.trips || []).filter((t) => !liveKeys.has(t.id) && !trashedIds.has(t.id)),
+        ...liveTripsRef.current.map((liveTrip) => {
           const progress = tripProgressRef.current[liveTrip.id];
           if (!progress) return liveTrip;
           const progressTime = Date.parse(progress.workflowUpdatedAt || progress.updatedAt || 0);
@@ -289,6 +290,7 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
           return { ...progress, ...liveTrip };
         }),
       ]);
+      const mergedTrips = mergedTripsBase.filter((t) => !trashedIds.has(t.id));
       dataRef.current = { ...baseData, trips: mergedTrips };
       setState(prev => ({ ...prev, trips: mergedTrips, loading: false, initialized: true, error: null }));
 
@@ -323,10 +325,11 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
       });
       tripProgressRef.current = progressByTrip;
       const baseData = normalizeData(dataRef.current);
-      const progressSource = liveTripsRef.current.length > 0 ? liveTripsRef.current : baseData.trips;
+      const trashedIds = new Set((baseData.trashedTrips || []).map(t => t.id));
+      const progressSource = (liveTripsRef.current.length > 0 ? liveTripsRef.current : baseData.trips).filter((t) => !trashedIds.has(t.id));
       const sourceKeys = new Set(progressSource.map((t) => t.id));
-      const mergedTrips = cleanTripCollection([
-        ...(baseData.trips || []).filter((t) => !sourceKeys.has(t.id)),
+      const mergedTripsBase = cleanTripCollection([
+        ...(baseData.trips || []).filter((t) => !sourceKeys.has(t.id) && !trashedIds.has(t.id)),
         ...progressSource.map((trip) => {
           const progress = progressByTrip[trip.id];
           if (!progress) return trip;
@@ -336,6 +339,7 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
           return { ...progress, ...trip };
         }),
       ]);
+      const mergedTrips = mergedTripsBase.filter((t) => !trashedIds.has(t.id));
       dataRef.current = { ...baseData, trips: mergedTrips };
       setState(prev => ({ ...prev, trips: mergedTrips, loading: false, error: null }));
     };
@@ -410,6 +414,19 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
 
     try {
       if (MIRRORED_TRIP_FIELDS.has(field)) {
+        const archivedTrips = cleanTripCollection(dataRef.current.trashedTrips || [])
+          .filter((trip) => trip?.id || trip?.bookingId)
+          .map((trip) => ({
+            id: String(trip.id || trip.bookingId || `archived_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+            data: sanitizeForFirestore({ ...buildOperationalTripRecord(trip), archiveState: 'archived', archivedAtLocal: trip.archivedAtLocal || new Date().toISOString() }),
+          }));
+        for (let i = 0; i < archivedTrips.length; i += 450) {
+          const batch = writeBatch(db);
+          archivedTrips.slice(i, i + 450).forEach(({ id, data }) => {
+            batch.set(doc(db, TRIPS_COLLECTION, id), data, { merge: true });
+          });
+          await batch.commit();
+        }
         const prevTrips = cleanTripCollection(previousData.trips || []);
         const prevMap = new Map(prevTrips.map(t => [t.id, t]));
         const currentTrips = dataRef.current.trips || [];
@@ -431,19 +448,6 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
           });
         } catch (assignErr) {
           console.warn('[writeField] Assignment write non-fatal error (outer):', assignErr.code, assignErr.message);
-        }
-        const archivedTrips = cleanTripCollection(dataRef.current.trashedTrips || [])
-          .filter((trip) => trip?.id || trip?.bookingId)
-          .map((trip) => ({
-            id: String(trip.id || trip.bookingId || `archived_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
-            data: sanitizeForFirestore({ ...buildOperationalTripRecord(trip), archiveState: 'archived', archivedAtLocal: trip.archivedAtLocal || new Date().toISOString() }),
-          }));
-        for (let i = 0; i < archivedTrips.length; i += 450) {
-          const batch = writeBatch(db);
-          archivedTrips.slice(i, i + 450).forEach(({ id, data }) => {
-            batch.set(doc(db, TRIPS_COLLECTION, id), data, { merge: true });
-          });
-          await batch.commit();
         }
       } else if (field === 'drivers') {
         await writeDriversToCollection(dataRef.current.drivers || []);

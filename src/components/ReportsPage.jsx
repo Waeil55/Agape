@@ -870,6 +870,9 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           <button onClick={() => setHiddenCols(prev => prev.includes('arrivalTime') ? prev.filter(c => c !== 'arrivalTime') : [...prev, 'arrivalTime'])} className={`p-1 rounded-lg border transition-all ${hiddenCols.includes('arrivalTime') ? 'bg-rose-50 border-rose-200 text-rose-500' : 'bg-white/80 border-slate-200 text-slate-400 hover:text-slate-600'}`} title={hiddenCols.includes('arrivalTime') ? 'Show Pickup Arrival' : 'Hide Pickup Arrival'}>
             <Eye size={9} />
           </button>
+          <button onClick={() => setHiddenCols(prev => prev.includes('departedPickupTime') ? prev.filter(c => c !== 'departedPickupTime') : [...prev, 'departedPickupTime'])} className={`p-1 rounded-lg border transition-all ${hiddenCols.includes('departedPickupTime') ? 'bg-rose-50 border-rose-200 text-rose-500' : 'bg-white/80 border-slate-200 text-slate-400 hover:text-slate-600'}`} title={hiddenCols.includes('departedPickupTime') ? 'Show Departed Pickup' : 'Hide Departed Pickup'}>
+            <Eye size={9} />
+          </button>
         </div>
         {selectedTasks.length > 0 && (
           <button onClick={() => requestBulkDelete(selectedTasks, () => setSelectedTasks([]))} className="flex items-center gap-1 px-1.5 py-1 bg-rose-50 text-rose-600 rounded-lg font-semibold border border-rose-200/50 hover:bg-rose-100 transition-colors"><Archive size={9} /> {selectedTasks.length}</button>
