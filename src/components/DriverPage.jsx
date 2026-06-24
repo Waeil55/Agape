@@ -1258,6 +1258,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const isClockedIn = me?.clockedIn || false;
   const [showIdleLogoutPrompt, setShowIdleLogoutPrompt] = useState(false);
   const idlePromptedRef = useRef(false);
+  const [showClockOutOffer, setShowClockOutOffer] = useState(false);
+  const [delayedClockOutTarget, setDelayedClockOutTarget] = useState('');
+  const [clockOutEstimate, setClockOutEstimate] = useState(null);
+  const pendingClockOutRef = useRef(null);
+  const clockOutOfferedRef = useRef(false);
+  const [editHomeAddress, setEditHomeAddress] = useState(me?.homeAddress || '');
 
   const driverId = me?.id || (() => {
     const normalizedEmail = String(currentUser || '').trim().toLowerCase();
@@ -1305,11 +1311,80 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (newStatus) {
       setShowToast({ type: 'success', message: 'Clocked in — you\'re online for trips.' });
     } else {
+      if (pendingClockOutRef.current) {
+        clearTimeout(pendingClockOutRef.current);
+        pendingClockOutRef.current = null;
+      }
+      setDelayedClockOutTarget('');
+      setShowClockOutOffer(false);
+      clockOutOfferedRef.current = false;
       setShowToast({ type: 'info', message: 'Clocked out — trips are now read-only.' });
     }
   }, [isClockedIn, driverId, onDriverStatusUpdate]);
 
+  const haversineKm = useCallback((lat1, lon1, lat2, lon2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }, []);
 
+  const estimateClockOutFromHome = useCallback(() => {
+    if (!driverPosition?.lat || !driverPosition?.lng || !me?.homeLat || !me?.homeLng) {
+      setClockOutEstimate(null);
+      return;
+    }
+    const km = haversineKm(driverPosition.lat, driverPosition.lng, me.homeLat, me.homeLng);
+    const avgSpeedKmph = 40; // ~25 mph city driving
+    const hours = km / avgSpeedKmph;
+    const minutes = Math.max(Math.ceil(hours * 60), 5);
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + minutes);
+    setClockOutEstimate({
+      minutes,
+      targetTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+      label: `${minutes} min (${km.toFixed(1)} km from home)`,
+    });
+  }, [driverPosition, me?.homeLat, me?.homeLng, haversineKm]);
+
+  const scheduleDelayedClockOut = useCallback((targetTime24) => {
+    if (pendingClockOutRef.current) {
+      clearTimeout(pendingClockOutRef.current);
+      pendingClockOutRef.current = null;
+    }
+    setDelayedClockOutTarget(targetTime24);
+    const now = new Date();
+    const [h, m] = targetTime24.split(':').map(Number);
+    const target = new Date(now);
+    target.setHours(h, m, 0, 0);
+    let ms = target.getTime() - now.getTime();
+    if (ms <= 0) {
+      // Target time already passed today — schedule for next day or clock out now
+      setShowToast({ type: 'info', message: 'Time already passed — clocking out now.' });
+      handleClockToggle();
+      return;
+    }
+    pendingClockOutRef.current = setTimeout(() => {
+      if (isClockedIn) {
+        onDriverStatusUpdate(driverId, false);
+        setShowToast({ type: 'info', message: `Auto clock-out at ${targetTime24} — shift ended.` });
+      }
+      pendingClockOutRef.current = null;
+      setDelayedClockOutTarget('');
+      setShowClockOutOffer(false);
+      clockOutOfferedRef.current = false;
+    }, ms);
+    setShowToast({ type: 'success', message: `Clock-out set for ${targetTime24}.` });
+    setShowClockOutOffer(false);
+  }, [driverId, isClockedIn, onDriverStatusUpdate]);
+
+  // Cleanup delayed clock-out timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingClockOutRef.current) clearTimeout(pendingClockOutRef.current);
+    };
+  }, []);
 
   // Idle logout prompt — when no trips for 30s while clocked in
   useEffect(() => {
@@ -2358,6 +2433,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setActiveWorkTripId(null);
     setActiveNav('trips');
     setWorkNotesOpen(false);
+
+    // Check if all trips are done — offer clock-out
+    if (isClockedIn && !clockOutOfferedRef.current) {
+      const remaining = driverScopedTrips.filter(t =>
+        tripMatchesTodayOrTomorrow(t.date) && !isWorkflowTerminalTrip(t) && t.id !== showCompleteModal.id
+      );
+      if (remaining.length === 0) {
+        clockOutOfferedRef.current = true;
+        estimateClockOutFromHome();
+        setShowClockOutOffer(true);
+      }
+    }
   };
 
   // Swipe-to-complete gesture handler
@@ -2742,7 +2829,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
           )}
 
-          {(incomingTransferTrips.length > 0 || incomingTransferRoutes.length > 0) && (
+          {(incomingTransferTrips.length > 0 || incomingTransferRoutes.length > 0) && (() => {
+            const transferDisabled = !isClockedIn;
+            return (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 shadow-sm space-y-2">
               <div className="flex items-center gap-2">
                 <Forward size={15} className="text-amber-700" />
@@ -2753,9 +2842,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-sm font-black text-slate-900">{trip.patient || 'Trip'} · {to12hr(trip.time)}</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {trip.transferRequest?.fromDriverName || 'Driver'}: {trip.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} className="flex-1 h-9 rounded-xl bg-emerald-600 text-white text-xs font-black">Accept</button>
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_trip', trip })} className="flex-1 h-9 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-black">Decline</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-9 rounded-xl text-xs font-black ${transferDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white'}`}>Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-9 rounded-xl text-xs font-black ${transferDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
                   </div>
+                  {transferDisabled && <p className="text-[10px] text-amber-600 font-semibold mt-1">Clock in to respond</p>}
                 </div>
               ))}
               {incomingTransferRoutes.map((route) => (
@@ -2763,13 +2853,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-sm font-black text-slate-900">{route.name || 'Route Plan'} · {(route.sequence || []).length} stops</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {route.transferRequest?.fromDriverName || 'Driver'}: {route.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} className="flex-1 h-9 rounded-xl bg-emerald-600 text-white text-xs font-black">Accept</button>
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_route', route, trip: {} })} className="flex-1 h-9 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-black">Decline</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-9 rounded-xl text-xs font-black ${transferDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-0' : 'bg-emerald-600 text-white'}`}>Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-9 rounded-xl text-xs font-black ${transferDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
                   </div>
+                  {transferDisabled && <p className="text-[10px] text-amber-600 font-semibold mt-1">Clock in to respond</p>}
                 </div>
               ))}
             </div>
-          )}
+            );
+          })()}
 
           {/* Dispatcher Assigned Sequence Banner */}
           {assignedSequence && !guidedMode && (
@@ -4550,6 +4642,40 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
             </div>
 
+            {/* Home Location */}
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
+              <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><MapPin size={16} /> Home Location</div>
+              {me?.homeLat && me?.homeLng ? (
+                <p className="text-xs text-slate-500 font-semibold mb-2">Home set at {me.homeLat.toFixed(4)}, {me.homeLng.toFixed(4)}</p>
+              ) : (
+                <p className="text-xs text-slate-400 font-semibold mb-2">Set your home location for commute time estimates.</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (driverPosition?.lat && driverPosition?.lng) {
+                      onDriverStatusUpdate(driverId, isClockedIn, {
+                        homeLat: driverPosition.lat,
+                        homeLng: driverPosition.lng,
+                        homeAddress: `${driverPosition.lat.toFixed(6)}, ${driverPosition.lng.toFixed(6)}`,
+                      });
+                      setEditHomeAddress(`${driverPosition.lat.toFixed(6)}, ${driverPosition.lng.toFixed(6)}`);
+                      setShowToast({ type: 'success', message: 'Home location saved to current position.' });
+                    } else {
+                      setShowToast({ type: 'info', message: 'GPS position not available yet.' });
+                    }
+                  }}
+                  className="flex-1 h-9 rounded-xl bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"
+                >
+                  <MapPin size={12} /> Use Current Location
+                </button>
+              </div>
+              {me?.homeAddress && (
+                <p className="text-[10px] text-slate-400 mt-2 font-semibold">{me.homeAddress}</p>
+              )}
+            </div>
+
             {/* Clock History (last 14 days) */}
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Clock size={16} /> Clock History</div>
@@ -4652,6 +4778,54 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <span className="font-medium text-sm text-rose-600">Sign Out</span>
               </div>
               <ChevronRight size={15} className="text-slate-300" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== CLOCK-OUT OFFER MODAL (last trip complete) ===== */}
+      {showClockOutOffer && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 200 }} onClick={() => setShowClockOutOffer(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 pointer-events-auto" onClick={e => e.stopPropagation()}>
+            <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 size={24} className="text-emerald-600" />
+            </div>
+            <h3 className="text-lg font-black text-slate-900 text-center">All trips complete!</h3>
+            <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
+              You've finished all your trips. Would you like to clock out?
+            </p>
+
+            <div className="mt-5 space-y-2">
+              <button onClick={() => { setShowClockOutOffer(false); handleClockToggle(); }} className="w-full h-11 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition active:scale-95 flex items-center justify-center gap-2">
+                <LogOut size={14} /> Clock Out Now
+              </button>
+
+              <div className="border-t border-slate-100 pt-3 mt-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 text-center">Schedule clock-out</p>
+                <div className="flex items-center gap-2">
+                  <input type="time" value={delayedClockOutTarget}
+                    onChange={(e) => setDelayedClockOutTarget(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
+                  <button onClick={() => { if (delayedClockOutTarget) scheduleDelayedClockOut(delayedClockOutTarget); else setShowToast({ type: 'info', message: 'Select a time first.' }); }}
+                    disabled={!delayedClockOutTarget}
+                    className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs transition active:scale-95">
+                    Set Time
+                  </button>
+                </div>
+              </div>
+
+              {clockOutEstimate && (
+                <div className="border-t border-slate-100 pt-3 mt-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 text-center">Estimate from home</p>
+                  <button onClick={() => scheduleDelayedClockOut(clockOutEstimate.targetTime)} className="w-full h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition active:scale-95 flex items-center justify-center gap-2">
+                    <Navigation size={12} /> Clock out in ~{clockOutEstimate.label}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button onClick={() => { setShowClockOutOffer(false); clockOutOfferedRef.current = false; }} className="w-full h-10 text-xs font-bold text-slate-400 hover:text-slate-600 mt-3 transition">
+              Dismiss
             </button>
           </div>
         </div>
