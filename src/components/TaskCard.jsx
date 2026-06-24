@@ -6,7 +6,7 @@ import {
   Ruler, Users, Activity, Building, Home, Accessibility,
   Copy, Check, RotateCcw, PhoneForwarded, MessageCircle,
   Square, CheckSquare, RefreshCw, Forward,
-  Edit2
+  Edit2, Truck, X
 } from 'lucide-react';
 
 const StatusBadge = ({ status }) => {
@@ -188,8 +188,21 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
           </div>
 
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-[15px] font-bold text-slate-800 truncate min-w-0">
+            <h3 className="text-[15px] font-bold text-slate-800 truncate min-w-0 flex items-center gap-0.5">
               {task.patient || task.patientName}
+              {task.activeTrip && (
+                <span className="inline-flex items-center gap-0.5 shrink-0 ml-0.5">
+                  <Truck size={14} className="text-blue-600" strokeWidth={2.5} />
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); actions?.onClearActiveTrip?.(); }}
+                    className="w-3.5 h-3.5 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 transition-colors"
+                    title="Dismiss active trip"
+                  >
+                    <X size={8} className="text-slate-500" />
+                  </button>
+                </span>
+              )}
             </h3>
             {!isExpanded && task.details?.distance && (
               <span className="text-[13px] font-semibold text-slate-400 shrink-0 ml-2">{task.details.distance}</span>

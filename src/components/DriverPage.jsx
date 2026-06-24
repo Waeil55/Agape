@@ -3346,20 +3346,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="h-px flex-1 bg-slate-200" />
                       </div>
                     )}
-                    <div className="relative">
-                      {isActiveTrip && (
-                        <div className="absolute -top-2 -right-2 z-10 flex items-center gap-1 bg-blue-600 text-white pl-2.5 pr-1.5 py-1 rounded-full text-[11px] font-bold shadow-lg shadow-blue-600/30">
-                          <Truck size={14} />
-                          <span>Active</span>
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); clearActiveTrip(); }}
-                            className="ml-0.5 w-4 h-4 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                      )}
                     <TaskCard
                     task={{
                       id: trip.id,
@@ -3398,6 +3384,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       pickup: { address: trip.pickup, phone: trip.pickupPhone },
                       dropoff: { address: trip.dropoff, phone: trip.dropoffPhone, time: null },
                       workflowPhase,
+                      activeTrip: isActiveTrip,
                     }}
                     expandedId={expandedTripId}
                     onToggle={(id) => openTripWorkPage(id)}
@@ -3417,6 +3404,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       onEditTrip: handleEditTrip,
                       onScheduleEdit: () => openScheduleEditor(trip),
                       onTransfer: () => openTransferPrompt('trip', trip),
+                      onClearActiveTrip: clearActiveTrip,
                       renderWorkflow: !isTerminal && primary ? () => {
                         const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
                         const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
@@ -3486,7 +3474,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       } : null,
                     }}
                   />
-                  </div>
                 </React.Fragment>
               );
               })}
