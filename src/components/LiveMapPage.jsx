@@ -26,8 +26,7 @@ import {
   WifiOff,
   Zap,
 } from 'lucide-react';
-import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
-import { db, collection, query, orderBy, limit as firestoreLimit, getDocs } from '../config/firebase';
+import { GOOGLE_MAPS_API_KEY, db, collection, query, orderBy, limit as firestoreLimit, getDocs } from '../config/firebase';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiOptimizeFleet } from '../config/ai';
 import { getDistanceMiles, hasGoogleMapsConfigured } from '../config/maps';
@@ -272,27 +271,6 @@ const LiveMapPage = ({
   const [trailLoading, setTrailLoading] = useState(false);
   const [showTrail, setShowTrail] = useState(true);
 
-  // Fetch driver breadcrumb trail when a driver is selected
-  useEffect(() => {
-    if (!selectedDriver?.id) { setDriverTrailPoints([]); return; }
-    let cancelled = false;
-    setTrailLoading(true);
-    const trailRef = collection(db, 'driver_locations', selectedDriver.id, 'trail');
-    const trailQuery = query(trailRef, orderBy('capturedAt', 'desc'), firestoreLimit(60));
-    getDocs(trailQuery)
-      .then((snap) => {
-        if (cancelled) return;
-        const points = snap.docs
-          .map((d) => ({ lat: Number(d.data().lat), lng: Number(d.data().lng), capturedAt: d.data().capturedAt }))
-          .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
-          .reverse();
-        setDriverTrailPoints(points);
-        setTrailLoading(false);
-      })
-      .catch(() => { if (!cancelled) { setDriverTrailPoints([]); setTrailLoading(false); } });
-    return () => { cancelled = true; };
-  }, [selectedDriver?.id]);
-
   const runFleetAiAnalysis = useCallback(async () => {
     setFleetAiLoading(true);
     const result = await aiOptimizeFleet(trips, drivers);
@@ -314,6 +292,27 @@ const LiveMapPage = ({
       setSelectedDriverId(drivers[0].id);
     }
   }, [drivers, selectedDriverId]);
+
+  // Fetch driver breadcrumb trail when a driver is selected
+  useEffect(() => {
+    if (!selectedDriver?.id) { setDriverTrailPoints([]); return; }
+    let cancelled = false;
+    setTrailLoading(true);
+    const trailRef = collection(db, 'driver_locations', selectedDriver.id, 'trail');
+    const trailQuery = query(trailRef, orderBy('capturedAt', 'desc'), firestoreLimit(60));
+    getDocs(trailQuery)
+      .then((snap) => {
+        if (cancelled) return;
+        const points = snap.docs
+          .map((d) => ({ lat: Number(d.data().lat), lng: Number(d.data().lng), capturedAt: d.data().capturedAt }))
+          .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+          .reverse();
+        setDriverTrailPoints(points);
+        setTrailLoading(false);
+      })
+      .catch(() => { if (!cancelled) { setDriverTrailPoints([]); setTrailLoading(false); } });
+    return () => { cancelled = true; };
+  }, [selectedDriver?.id]);
 
   const myDriverProfile = useMemo(() => {
     const email = normalizeEmail(currentUser);
