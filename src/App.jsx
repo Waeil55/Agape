@@ -836,6 +836,15 @@ const App = () => {
   }, [isLoading]);
   // Ultimate fallback — never stay on loading >18s
   useEffect(() => { const t = setTimeout(() => { if (isLoading) setIsLoading(false); }, 18000); return () => clearTimeout(t); }, [isLoading]);
+  // Firestore data timeout — never stay on "Syncing live operations" >20s
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (dataLoading) {
+        setStartupIssue('Firestore sync timed out. Check your connection and retry.');
+      }
+    }, 20000);
+    return () => clearTimeout(t);
+  }, [dataLoading]);
 
   useEffect(() => {
     let unsubData = null;

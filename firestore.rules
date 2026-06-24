@@ -113,7 +113,7 @@ service cloud.firestore {
       allow delete: if request.auth != null && isAdmin();
     }
     match /dispatcherProfiles/{dispatcherId} {
-      allow read: if request.auth != null && isDispatcher();
+      allow read: if request.auth != null;
       allow write: if request.auth != null && isAdmin();
     }
     match /fleetVehicles/{vehicleId} {

@@ -353,7 +353,7 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
             retryCount++;
             if (retryCount > MAX_RETRIES) {
               console.error(`${label} listener: max retries (${MAX_RETRIES}) reached. Giving up.`);
-              setState(prev => ({ ...prev, error: `Firestore ${label} sync failed: ${err.message}` }));
+              setState(prev => ({ ...prev, error: `Firestore ${label} sync failed: ${err.message}`, loading: false }));
               return;
             }
             const delay = getDelay();
@@ -368,7 +368,7 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
               }
             }, delay);
           } else {
-            setState(prev => ({ ...prev, error: `Firestore ${label} sync failed: ${err.message}` }));
+            setState(prev => ({ ...prev, error: `Firestore ${label} sync failed: ${err.message}`, loading: false }));
           }
         });
         unsubscribers.push(unsub);
