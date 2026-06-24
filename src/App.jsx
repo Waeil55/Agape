@@ -2008,6 +2008,7 @@ const App = () => {
           ...locationDoc,
           receivedAt: serverTimestamp(),
           createdAt: serverTimestamp(),
+          ttlExpireAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         }).catch(() => undefined)
       );
     }

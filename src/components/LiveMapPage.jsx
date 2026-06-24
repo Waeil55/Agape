@@ -270,6 +270,7 @@ const LiveMapPage = ({
   const [fleetAiLoading, setFleetAiLoading] = useState(false);
   const [driverTrailPoints, setDriverTrailPoints] = useState([]);
   const [trailLoading, setTrailLoading] = useState(false);
+  const [showTrail, setShowTrail] = useState(true);
 
   // Fetch driver breadcrumb trail when a driver is selected
   useEffect(() => {
@@ -416,7 +417,7 @@ const LiveMapPage = ({
     };
   }, [selectedPoint?.lat, selectedPoint?.lng, selectedSummary?.driver?.id, selectedSummary?.upcoming, unassignedTrips, intelRefreshToken]);
 
-  const mapUrl = buildStaticMapUrl(drivers, selectedDriver, selectedTrip, driverTrailPoints);
+  const mapUrl = buildStaticMapUrl(drivers, selectedDriver, selectedTrip, showTrail ? driverTrailPoints : []);
   const selectedDestination = getTripPhase(selectedTrip).destination;
 
   const startMyGpsTracking = () => {
@@ -628,6 +629,19 @@ const LiveMapPage = ({
                         <StatusPill tone="blue">
                           <Crosshair size={12} /> {selectedDriver?.name || 'No driver selected'}
                         </StatusPill>
+                        {selectedDriver && driverTrailPoints.length >= 2 && (
+                          <button
+                            onClick={() => setShowTrail(prev => !prev)}
+                            className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-bold transition-colors ${
+                              showTrail
+                                ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-100'
+                            }`}
+                          >
+                            {trailLoading ? <RefreshCw size={12} className="animate-spin" /> : <Map size={12} />}
+                            {showTrail ? `${driverTrailPoints.length} trail pts` : 'Trail hidden'}
+                          </button>
+                        )}
                       </div>
 
                       <div className="absolute bottom-3 left-3 right-3 grid gap-2 md:grid-cols-3">

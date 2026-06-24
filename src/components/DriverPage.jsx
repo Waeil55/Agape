@@ -678,6 +678,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [routeTemplates, setRouteTemplates] = useState([]);
   const [assignedSequence, setAssignedSequence] = useState(null);
   const [showAssignedRouteDetails, setShowAssignedRouteDetails] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
   const displayLoginId = useMemo(
     () => String(me?.email || currentUser || '').replace(/@auth\.agapecare\.local$/i, ''),
     [me?.email, currentUser]
@@ -1438,7 +1439,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     addToQueue('updateLocation', { lat: latitude, lng: longitude, telemetry });
   }, [addToQueue, onUpdateDriverLocation]);
 
-  useDriverLocationStream({
+  const locStreamDebug = useDriverLocationStream({
     enabled: Boolean(me?.id),
     driver: me,
     role,
@@ -5590,6 +5591,42 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <button type="button" onClick={() => setShowToast(null)} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0 cursor-pointer">
               <X size={14} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== DEBUG OVERLAY ===== */}
+      <div className="fixed bottom-20 left-2 z-[60]">
+        <button
+          type="button"
+          onClick={() => setShowDebugPanel(prev => !prev)}
+          className="w-7 h-7 rounded-full bg-black/40 text-white flex items-center justify-center text-[10px] font-mono font-bold hover:bg-black/60 transition-colors"
+          title="Toggle debug panel"
+        >Dbg</button>
+      </div>
+      {showDebugPanel && (
+        <div className="fixed bottom-32 left-2 z-[60] min-w-[200px] max-w-[220px] rounded-lg border border-slate-300 bg-slate-950/90 p-2.5 text-[10px] font-mono text-white shadow-xl backdrop-blur">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between border-b border-white/10 pb-1 mb-1">
+              <span className="font-bold text-[9px] uppercase tracking-wider text-slate-400">GPS Debug</span>
+              <button type="button" onClick={() => setShowDebugPanel(false)} className="text-white/50 hover:text-white"><X size={10} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+              <span className="text-slate-400">Status</span>
+              <span className={isGpsTracking ? 'text-emerald-400' : 'text-rose-400'}>{isGpsTracking ? 'Tracking' : 'Idle'}</span>
+              <span className="text-slate-400">Online</span>
+              <span className={isOnline ? 'text-emerald-400' : 'text-rose-400'}>{isOnline ? 'Yes' : 'No'}</span>
+              <span className="text-slate-400">Lat</span>
+              <span className="text-blue-300 truncate">{driverPosition?.lat?.toFixed(5) || '—'}</span>
+              <span className="text-slate-400">Lng</span>
+              <span className="text-blue-300 truncate">{driverPosition?.lng?.toFixed(5) || '—'}</span>
+              <span className="text-slate-400">Age</span>
+              <span className="text-yellow-300">{driverPosition?.capturedAt ? `${Math.round((Date.now() - new Date(driverPosition.capturedAt).getTime()) / 1000)}s ago` : '—'}</span>
+              <span className="text-slate-400">Interval</span>
+              <span className="text-white">{locStreamDebug?.intervalMs || '—'}ms</span>
+              <span className="text-slate-400">Err</span>
+              <span className={`truncate ${locStreamDebug?.error ? 'text-rose-400' : 'text-slate-500'}`}>{locStreamDebug?.error || 'none'}</span>
+            </div>
           </div>
         </div>
       )}
