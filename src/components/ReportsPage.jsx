@@ -799,7 +799,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-slate-50">
+    <div className="flex flex-col h-full min-h-0">
       <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-[0_1px_6px_rgba(0,0,0,0.04)] px-3 py-1.5 flex items-center gap-1.5 flex-wrap text-[10px]">
         <div className="flex items-center gap-1.5 bg-slate-100/80 rounded-lg px-2 py-1 min-w-[100px] border border-slate-200/50">
           <Search size={10} className="text-slate-400 shrink-0" />
