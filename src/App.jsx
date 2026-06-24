@@ -872,10 +872,8 @@ const App = () => {
         setStartupIssue('');
         return;
       }
-      setStartupIssue('Startup took too long. Use Retry or Return to Access Portal.');
-      skipNextSignedOutResetRef.current = true;
-      signOut(auth).catch(() => {});
-      resetSessionState({ loginErrorMessage: 'Could not verify your session quickly enough. Please sign in again.' });
+      // Don't auto-sign-out — show recovery UI and let user choose
+      setStartupIssue('Firestore is not responding. Use Retry below or Access Portal to re-authenticate.');
     }, AUTH_WATCHDOG_TIMEOUT_MS);
 
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -1091,15 +1089,34 @@ const App = () => {
           setIsLoading(false);
           return;
         }
-        // Don't immediately reset — token refresh can briefly fire null
-        await new Promise(r => setTimeout(r, 3000));
+        // If user was already authenticated, this is likely a token refresh.
+        // Don't auto-logout — wait for reconnection.
+        if (authBootResolvedRef.current) {
+          console.warn('[Auth] Session went null after boot — waiting 15s for token refresh');
+          setStartupIssue('Connection interrupted. Reconnecting...');
+          await new Promise(r => setTimeout(r, 15000));
+          if (cancelled) return;
+          if (auth.currentUser) {
+            setStartupIssue('');
+            return;
+          }
+          // Still null after 15s — show recovery UI but DON'T auto-logout
+          console.warn('[Auth] Session still null after 15s — showing recovery options');
+          setStartupIssue('Session lost. Use Access Portal to sign in again, or wait for auto-reconnect.');
+          return;
+        }
+        // Initial boot — wait for token refresh
+        await new Promise(r => setTimeout(r, 10000));
         if (cancelled) return;
-        if (auth.currentUser) return; // session recovered
+        if (auth.currentUser) return;
         resetSessionState();
       }
       } catch (bootErr) {
         console.error("Auth boot error:", bootErr);
         setStartupIssue('Startup encountered an error. Please retry.');
+        if (authBootResolvedRef.current) {
+          return;
+        }
         skipNextSignedOutResetRef.current = true;
         signOut(auth).catch(() => {});
         resetSessionState({ loginErrorMessage: 'Could not initialize your session. Please sign in again.' });
