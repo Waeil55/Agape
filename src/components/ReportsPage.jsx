@@ -3,11 +3,11 @@ import {
   ChevronDown, ChevronUp, Download, UploadCloud, RefreshCw,
   X, Search, FileText, Calendar, Archive, Eye, RotateCcw,
   Square, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, SquarePen, Check,
-  BrainCircuit, Loader2, AlertTriangle, Lightbulb
+  BrainCircuit, Loader2, AlertTriangle, Lightbulb, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatTelemetryDuration } from '../utils/driverTelemetry';
 import { aiAnalyzeTrips } from '../config/ai';
-import { tripCalendarDateKey } from '../utils/tripDate';
+import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
 
 const STATUS_OPTIONS = ['Completed', 'No Show', 'Cancelled'];
 
@@ -169,8 +169,8 @@ const FIELD_FOR_COL = {
 const ROW_CONTROL_COL_WIDTH = 92;
 
 const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry = [], onUpdateTrip, role, setShowUploadModal, requestBulkDelete }) => {
-  const [startDate, setStartDate] = useState(() => localStorage.getItem('agape_rptStartDate') || '');
-  const [endDate, setEndDate] = useState(() => localStorage.getItem('agape_rptEndDate') || '');
+  const [startDate, setStartDate] = useState(() => localStorage.getItem('agape_rptStartDate') || localCalendarYmd());
+  const [endDate, setEndDate] = useState(() => localStorage.getItem('agape_rptEndDate') || localCalendarYmd());
   const [statusFilter, setStatusFilter] = useState(() => localStorage.getItem('agape_rptStatusFilter') || 'all');
   const [driverFilter, setDriverFilter] = useState(() => localStorage.getItem('agape_rptDriverFilter') || 'all');
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('agape_rptSearch') || '');
@@ -189,6 +189,14 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
   const [collapsedDays, setCollapsedDays] = useState(() => {
     try { return JSON.parse(localStorage.getItem('agape_rptCollapsedDays') || '{}'); } catch { return {}; }
   });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [rangeMode, setRangeMode] = useState(false);
+  const [selectingFrom, setSelectingFrom] = useState(true);
+  const [pickerMonth, setPickerMonth] = useState(() => {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  });
+  const datePickerRef = useRef(null);
   const PAGE_SIZE = 100;
   const [page, setPage] = useState(1);
   const toggleDay = (dateLabel) => {
@@ -701,8 +709,8 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
   };
 
   const resetFilters = () => {
-    setStartDate('');
-    setEndDate('');
+    setStartDate(localCalendarYmd());
+    setEndDate(localCalendarYmd());
     setStatusFilter('all');
     setDriverFilter('all');
     setSearchQuery('');
@@ -710,65 +718,183 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     setSortDirection('asc');
   };
 
+  const shiftDateRange = (days) => {
+    const shift = (d) => {
+      const dt = new Date(d + 'T00:00:00');
+      dt.setDate(dt.getDate() + days);
+      return dt.toISOString().split('T')[0];
+    };
+    setStartDate(shift(startDate));
+    setEndDate(shift(endDate));
+  };
+
+  const formatDateLabel = (d) => {
+    const dt = new Date(d + 'T00:00:00');
+    return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  useEffect(() => {
+    if (!showDatePicker) return;
+    const handler = (e) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDatePicker]);
+
+  const getMonthDays = (ym) => {
+    const [y, m] = ym.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const firstDay = new Date(y, m - 1, 1).getDay();
+    const cells = [];
+    for (let i = 0; i < firstDay; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+    }
+    return cells;
+  };
+
+  const handleDateSelect = (dateStr) => {
+    if (!rangeMode) {
+      setStartDate(dateStr);
+      setEndDate(dateStr);
+      setShowDatePicker(false);
+    } else if (selectingFrom) {
+      setStartDate(dateStr);
+      if (endDate < dateStr) setEndDate(dateStr);
+      setSelectingFrom(false);
+    } else {
+      if (dateStr < startDate) {
+        setEndDate(startDate);
+        setStartDate(dateStr);
+      } else {
+        setEndDate(dateStr);
+      }
+      setSelectingFrom(true);
+      setShowDatePicker(false);
+    }
+  };
+
+  const isSelectedDate = (ds) => ds === startDate || ds === endDate;
+  const isInRange = (ds) => rangeMode && startDate && endDate && ds > startDate && ds < endDate;
+
+  const changePickerMonth = (delta) => {
+    const [y, m] = pickerMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setPickerMonth(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+  };
+
+  const toggleRangeMode = () => {
+    setRangeMode(prev => !prev);
+    setSelectingFrom(true);
+    setShowDatePicker(false);
+  };
+
   return (
-    <div className="flex flex-col h-full min-h-0 bg-slate-100">
-      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-2 py-1 flex items-center gap-2 flex-wrap text-[10px]">
-        <div className="flex items-center gap-1 bg-slate-100 rounded px-1.5 py-0.5 min-w-[90px]">
+    <div className="flex flex-col h-full min-h-0 bg-slate-50">
+      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-[0_1px_6px_rgba(0,0,0,0.04)] px-3 py-1.5 flex items-center gap-1.5 flex-wrap text-[10px]">
+        <div className="flex items-center gap-1.5 bg-slate-100/80 rounded-lg px-2 py-1 min-w-[100px] border border-slate-200/50">
           <Search size={10} className="text-slate-400 shrink-0" />
-          <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-transparent outline-none w-full min-w-0 placeholder:text-slate-400" />
+          <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-transparent outline-none w-full min-w-0 placeholder:text-slate-400 text-[10px]" />
           {searchQuery && <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600"><X size={10} /></button>}
         </div>
-        <div className="flex items-center gap-0.5 bg-slate-100 rounded px-1.5 py-0.5">
-          <Calendar size={10} className="text-slate-400 shrink-0" />
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-0.5 py-0 border border-slate-200 rounded text-[9px] outline-none focus:border-blue-500 w-[85px] bg-white" />
-          <span className="text-[8px] text-slate-400">→</span>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-0.5 py-0 border border-slate-200 rounded text-[9px] outline-none focus:border-blue-500 w-[85px] bg-white" />
+        <div className="relative flex items-center gap-0.5 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 rounded-lg px-1.5 py-1 border border-blue-100/50 shadow-[inset_0_1px_2px_rgba(255,255,255,0.8)]">
+          <button onClick={() => shiftDateRange(-1)} className="p-0.5 rounded-md hover:bg-white/70 text-slate-500 transition-colors"><ChevronLeft size={12} /></button>
+          <button onClick={() => setShowDatePicker(prev => !prev)} className="px-2 py-0.5 rounded-md hover:bg-white/70 text-[11px] font-semibold text-slate-800 min-w-[120px] text-center select-none transition-colors">
+            {startDate === endDate ? formatDateLabel(startDate) : `${formatDateLabel(startDate)} — ${formatDateLabel(endDate)}`}
+          </button>
+          <button onClick={() => shiftDateRange(1)} className="p-0.5 rounded-md hover:bg-white/70 text-slate-500 transition-colors"><ChevronRight size={12} /></button>
+          <span className="w-px h-4 bg-blue-200/50 mx-0.5" />
+          <button onClick={toggleRangeMode} className={`px-1.5 py-0.5 rounded-md text-[8px] font-bold tracking-wider transition-all ${rangeMode ? 'bg-blue-500 text-white shadow-sm' : 'bg-white/70 text-slate-500 hover:bg-white border border-slate-200/50'}`}>
+            {rangeMode ? 'RANGE' : 'DAY'}
+          </button>
+          {showDatePicker && (
+            <div ref={datePickerRef} className="absolute top-full left-0 mt-1.5 z-50 bg-white rounded-xl shadow-xl border border-slate-200 p-3 w-[244px]">
+              <div className="flex items-center justify-between mb-2">
+                <button onClick={() => changePickerMonth(-1)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"><ChevronLeft size={14} /></button>
+                <span className="text-xs font-bold text-slate-800">
+                  {new Date(pickerMonth + '-T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </span>
+                <button onClick={() => changePickerMonth(1)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"><ChevronRight size={14} /></button>
+              </div>
+              <div className="grid grid-cols-7 gap-px text-center">
+                {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+                  <div key={d} className="text-[9px] text-slate-400 font-semibold py-1">{d}</div>
+                ))}
+                {getMonthDays(pickerMonth).map((ds, i) => (
+                  <div key={i} className="aspect-square p-px">
+                    {ds ? (
+                      <button onClick={() => handleDateSelect(ds)} className={`w-full h-full flex items-center justify-center text-[11px] rounded-full transition-all ${isSelectedDate(ds) ? 'bg-blue-600 text-white font-bold shadow-sm' : ''} ${isInRange(ds) ? 'bg-blue-100' : ''} ${!isSelectedDate(ds) && !isInRange(ds) ? 'hover:bg-slate-100 text-slate-700' : ''} ${ds === localCalendarYmd() && !isSelectedDate(ds) ? 'ring-1 ring-blue-300' : ''}`}>
+                        {new Date(ds + 'T12:00:00').getDate()}
+                      </button>
+                    ) : <div />}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 text-[9px] text-center font-medium">
+                {rangeMode ? (selectingFrom ? <span className="text-blue-600">Tap <b>From</b> date</span> : <span className="text-emerald-600">Tap <b>To</b> date</span>) : <span className="text-slate-400">Tap a date to select</span>}
+              </div>
+            </div>
+          )}
         </div>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-1 py-0.5 border border-slate-200 rounded text-[9px] outline-none bg-white">
-          <option value="all">All</option>
-          {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-1 py-0.5 border border-slate-200 rounded text-[9px] outline-none bg-white">
-          <option value="all">Drivers</option>
-          {drivers.map((d) => (<option key={d.id} value={d.id || d.email}>{d.name}</option>))}
-        </select>
-        <button onClick={resetFilters} className="p-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200" title="Reset"><RefreshCw size={9} /></button>
+        <div className="flex items-center gap-0.5">
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-1.5 py-1 border border-slate-200 rounded-lg text-[9px] outline-none bg-white/80 text-slate-600 font-medium cursor-pointer hover:border-slate-300 transition-colors">
+            <option value="all">All status</option>
+            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-1.5 py-1 border border-slate-200 rounded-lg text-[9px] outline-none bg-white/80 text-slate-600 font-medium cursor-pointer hover:border-slate-300 transition-colors max-w-[100px]">
+            <option value="all">All drivers</option>
+            {drivers.map((d) => (<option key={d.id} value={d.id || d.email}>{d.name}</option>))}
+          </select>
+          <button onClick={resetFilters} className="p-1 rounded-lg bg-white/80 border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all" title="Reset filters"><RefreshCw size={9} /></button>
+        </div>
         {selectedTasks.length > 0 && (
-          <button onClick={() => requestBulkDelete(selectedTasks, () => setSelectedTasks([]))} className="flex items-center gap-0.5 px-1 py-0.5 bg-rose-50 text-rose-600 rounded font-semibold"><Archive size={9} /> Arch {selectedTasks.length}</button>
+          <button onClick={() => requestBulkDelete(selectedTasks, () => setSelectedTasks([]))} className="flex items-center gap-1 px-1.5 py-1 bg-rose-50 text-rose-600 rounded-lg font-semibold border border-rose-200/50 hover:bg-rose-100 transition-colors"><Archive size={9} /> {selectedTasks.length}</button>
         )}
-        <button onClick={() => setShowUploadModal(true)} className="px-1 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold"><UploadCloud size={9} /> Upload</button>
-        <button onClick={exportCsv} disabled={reportTrips.length === 0} className="px-1 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold disabled:opacity-40"><Download size={9} /> CSV</button>
-        <button onClick={generateAiReport} disabled={reportTrips.length === 0 || aiReportLoading} className="px-1 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold disabled:opacity-40 flex items-center gap-1">
-          {aiReportLoading ? <Loader2 size={9} className="animate-spin" /> : <BrainCircuit size={9} />} AI Report
-        </button>
-        <span className="w-px h-4 bg-slate-200" />
-        {[
-          { label: 'Total', value: stats.total, color: 'text-slate-700' },
-          { label: 'Done', value: stats.completed, color: 'text-emerald-600' },
-          { label: 'Reviewed', value: stats.reviewed, color: 'text-indigo-600' },
-          { label: 'NS', value: stats.noShow, color: 'text-rose-600' },
-          { label: 'Canc.', value: stats.cancelled, color: 'text-amber-600' },
-        ].map((s) => (
-          <span key={s.label} className="flex items-center gap-0.5">
-            <span className="text-[9px] text-slate-400 font-medium">{s.label}</span>
-            <span className={`text-[10px] font-bold ${s.color}`}>{s.value}</span>
-          </span>
-        ))}
+        <div className="flex items-center gap-1">
+          <button onClick={() => setShowUploadModal(true)} className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors shadow-sm flex items-center gap-1"><UploadCloud size={9} /> Upload</button>
+          <button onClick={exportCsv} disabled={reportTrips.length === 0} className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold disabled:opacity-40 transition-colors shadow-sm flex items-center gap-1"><Download size={9} /> CSV</button>
+          <button onClick={generateAiReport} disabled={reportTrips.length === 0 || aiReportLoading} className="px-2 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg font-bold disabled:opacity-40 transition-all shadow-sm flex items-center gap-1">
+            {aiReportLoading ? <Loader2 size={9} className="animate-spin" /> : <BrainCircuit size={9} />} AI
+          </button>
+        </div>
+        <span className="w-px h-5 bg-slate-200/60" />
+        <div className="flex items-center gap-1.5 bg-slate-100/50 rounded-lg px-1.5 py-0.5">
+          {[
+            { label: 'Total', value: stats.total, color: 'text-slate-700' },
+            { label: 'Done', value: stats.completed, color: 'text-emerald-600' },
+            { label: 'Rvw', value: stats.reviewed, color: 'text-indigo-600' },
+            { label: 'NS', value: stats.noShow, color: 'text-rose-600' },
+            { label: 'Can', value: stats.cancelled, color: 'text-amber-600' },
+          ].map((s) => (
+            <span key={s.label} className="flex items-center gap-0.5">
+              <span className="text-[8px] text-slate-400 font-semibold uppercase">{s.label}</span>
+              <span className={`text-[10px] font-extrabold ${s.color}`}>{s.value}</span>
+            </span>
+          ))}
+        </div>
         {totalPages > 1 && (
-          <span className="flex items-center gap-1 text-[9px]">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="px-1 py-0.5 rounded bg-slate-200 hover:bg-slate-300 disabled:opacity-30 font-bold">&lsaquo;</button>
-            <span className="text-slate-500 font-medium mx-0.5">{page}/{totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-1 py-0.5 rounded bg-slate-200 hover:bg-slate-300 disabled:opacity-30 font-bold">&rsaquo;</button>
+          <span className="flex items-center gap-1 text-[9px] bg-slate-100/50 rounded-lg px-1.5 py-0.5">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="px-1 py-0.5 rounded-md bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-30 font-bold transition-colors">&lsaquo;</button>
+            <span className="text-slate-500 font-semibold mx-0.5 min-w-[20px] text-center">{page}/{totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-1 py-0.5 rounded-md bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-30 font-bold transition-colors">&rsaquo;</button>
           </span>
         )}
-        <span className="text-[9px] text-slate-400">{reportTrips.length > 0 && `${reportTrips.length}`}</span>
-        <span className="w-px h-4 bg-slate-200" />
-        <span className="flex items-center gap-1 text-[9px] text-slate-500">
+        {reportTrips.length > 0 && <span className="text-[9px] text-slate-400 font-semibold bg-slate-100/50 rounded-lg px-1.5 py-0.5">{reportTrips.length}</span>}
+        <span className="w-px h-5 bg-slate-200/60" />
+        <span className="flex items-center gap-1.5 text-[8px] text-slate-500 bg-slate-100/50 rounded-lg px-1.5 py-0.5 font-medium">
           <span>Trk:{trackingStats.trackedDrivers}</span>
+          <span className="text-slate-300">|</span>
           <span>Mov:{formatTelemetryDuration(trackingStats.movingMinutes)}</span>
+          <span className="text-slate-300">|</span>
           <span>Stp:{formatTelemetryDuration(trackingStats.stoppedMinutes)}</span>
+          <span className="text-slate-300">|</span>
           <span>Mi:{trackingStats.trackedMiles.toFixed(1)}</span>
+          <span className="text-slate-300">|</span>
           <span>Ev:{trackingStats.stopCount}</span>
+          <span className="text-slate-300">|</span>
           <span>Lng:{formatTelemetryDuration(trackingStats.longestStopMinutes)}</span>
         </span>
       </div>
@@ -891,16 +1017,17 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                   <>
                     {/* Table */}
                     <div className="w-full overflow-x-auto">
-                  <table className="resizable-table text-xs" style={{ tableLayout: 'fixed', width: '100%', minWidth: reportTableMinWidth }}>
+                  <table className="resizable-table text-xs w-full">
                     <colgroup>
-                      <col style={{ width: ROW_CONTROL_COL_WIDTH }} />
-                      {Columns.map(col => (
-                        <col key={col.key} style={{ width: colWidths[col.key] || 100 }} />
-                      ))}
+                      <col style={{ width: 48 }} />
+                      {Columns.map(col => {
+                        const pct = Math.max(4, Math.round(((colWidths[col.key] || 100) / reportTableMinWidth) * 100));
+                        return <col key={col.key} style={{ width: pct + '%' }} />;
+                      })}
                     </colgroup>
                     <thead className="bg-slate-800 text-slate-100 border-b border-slate-200">
                       <tr>
-                        <th className="p-2 text-center align-middle resizable-th" style={{ width: ROW_CONTROL_COL_WIDTH }}>
+                        <th className="p-2 text-center align-middle resizable-th" style={{ width: 48 }}>
                           <div className="flex items-center justify-center gap-2">
                             <button
                               type="button"
@@ -927,7 +1054,6 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                           <th
                             key={col.key}
                             className="resizable-th p-0 text-left select-none"
-                            style={{ width: colWidths[col.key] || 100 }}
                           >
                             <div
                               className="flex items-center justify-between cursor-pointer group hover:bg-slate-700 transition-colors px-2 py-2 h-full"
@@ -1028,6 +1154,14 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                                     <span
                                       className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
                                       onClick={() => startCellEdit(trip.id, cellKey, (trip[FIELD_FOR_COL[cellKey]] ?? ''))}
+                                    >
+                                      {displayValue}
+                                    </span>
+                                  ) : cellKey === 'reviewed' && canEdit ? (
+                                    <span
+                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-bold"
+                                      onClick={() => saveCell(trip, 'reviewed', !trip.reviewed)}
+                                      title={trip.reviewed ? 'Mark as pending' : 'Mark as done'}
                                     >
                                       {displayValue}
                                     </span>

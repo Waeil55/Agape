@@ -1135,9 +1135,13 @@ const EnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'chat'].includes(activePanel) ? '' : 'p-6'}`}>
+          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : activePanel === 'reports' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'chat', 'reports'].includes(activePanel) ? '' : 'p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
+            ) : activePanel === 'reports' ? (
+              <div className="flex flex-col flex-1 min-h-0">
+                {renderPanelContent()}
+              </div>
             ) : (
               <div className={
                 activePanel === 'drive'
