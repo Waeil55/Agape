@@ -135,7 +135,15 @@ function parseCSV(text) {
     }
     values.push(v.trim());
     const row = {};
-    headers.forEach((h, idx) => { row[h.trim()] = values[idx] || ''; });
+    headers.forEach((h, idx) => {
+      const raw = values[idx];
+      row[h.trim()] = raw !== undefined ? raw.trim() : '';
+    });
+    if (values.length > headers.length) {
+      const lastH = headers[headers.length - 1].trim();
+      const extra = values.slice(headers.length).map(v => v.trim()).join(',');
+      if (row[lastH] && extra) row[lastH] += ',' + extra;
+    }
     data.push(row);
   }
   return data;
@@ -702,7 +710,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           cancelledBy: extract(row['Cancelled By'], row['cancelledBy']),
 
           // --- ACTIVITY / TRAVEL TIME (Agape report extras) ---
-          _travelTime: extract(row['_agape_travelTime'], row['Travel Time'], row['travelTime']),
+          travelTime: extract(row['_agape_travelTime'], row['Travel Time'], row['travelTime']),
 
           // --- RAW DATA (always preserved) ---
           _originalRow: row,
@@ -751,7 +759,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
   const confirmImport = () => {
     const tripSource = uploadContext === 'reports' ? 'report_upload' : 'dispatch_upload';
-    const cleanTrips = mappedTrips.map(({ _originalRow, _hasIssues, _issues, _confidence, _travelTime, ...trip }) => {
+    const cleanTrips = mappedTrips.map(({ _originalRow, _hasIssues, _issues, _confidence, ...trip }) => {
       const finalDriverId = trip.driverId || assignToDriver || _originalRow['Driver ID'] || null;
       let newStatus = trip.status;
       
@@ -1011,6 +1019,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               </table>
             </div>
 
+            {uploadContext !== 'reports' && (
             <div className="mt-4 sm:mt-6 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
               <div className="flex items-center justify-between mb-3">
                 <label className="text-sm font-black text-slate-900 flex items-center gap-2">
@@ -1056,6 +1065,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                 </div>
               )}
             </div>
+            )}
 
             <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
               <button onClick={() => { setStep('upload'); setFile(null); setMappedTrips([]); setParsedRows([]); setError(''); }} className="w-full sm:flex-1 py-3 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition text-sm">

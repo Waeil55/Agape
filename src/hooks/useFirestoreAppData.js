@@ -156,13 +156,28 @@ async function writeTripsToCollection(trips = []) {
 
   let writtenCount = 0;
   for (let i = 0; i < docs.length; i += 450) {
-    const batch = writeBatch(db);
     const chunk = docs.slice(i, i + 450);
-    chunk.forEach(({ id, data }) => {
-      batch.set(doc(db, TRIPS_COLLECTION, id), data, { merge: true });
-    });
-    await batch.commit();
-    writtenCount += chunk.length;
+    try {
+      const batch = writeBatch(db);
+      chunk.forEach(({ id, data }) => {
+        batch.set(doc(db, TRIPS_COLLECTION, id), data, { merge: true });
+      });
+      await batch.commit();
+      writtenCount += chunk.length;
+    } catch (batchErr) {
+      console.error(`[writeTrips] Batch commit failed for chunk ${i}-${i + chunk.length}:`, batchErr.code, batchErr.message);
+      let fallbackSuccess = 0;
+      for (const { id, data } of chunk) {
+        try {
+          await setDoc(doc(db, TRIPS_COLLECTION, id), data, { merge: true });
+          fallbackSuccess++;
+        } catch (singleErr) {
+          console.error(`[writeTrips] Individual setDoc failed for doc ${id}:`, singleErr.code, singleErr.message);
+          throw singleErr;
+        }
+      }
+      writtenCount += fallbackSuccess;
+    }
   }
 
   if (writtenCount !== docs.length) {
@@ -283,6 +298,20 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
         console.warn(`Trip count dropped from ${prevCount} to ${currentCount} — potential data loss. Verify Firestore.`);
       }
       prevTripCountRef.current = currentCount;
+
+      if (liveTrips.length > 0 && liveTrips.length <= 20) {
+        const FIELDS = ['source', 'arrivalTime', 'pickupOdometer', 'dropoffOdometer', 'distance', 'completedVehicle', 'travelTime', 'departedPickupTime', 'arrivalDropoffTime', 'bookingId', 'patient', 'status', 'date'];
+        liveTrips.slice(0, 3).forEach((t, i) => {
+          const present = {};
+          FIELDS.forEach(f => { present[f] = t[f] !== undefined && t[f] !== null && t[f] !== '' ? t[f] : '(missing)'; });
+          console.log(`[DEBUG] Trip ${i + 1} (id=${t.id}, source=${t.source}):`, JSON.stringify(present));
+        });
+        console.log(`[DEBUG] ${liveTrips.length} live trips, ${corruptedIds.length} corrupted. source breakdown:`, {
+          report_upload: liveTrips.filter(t => t.source === 'report_upload').length,
+          dispatch_upload: liveTrips.filter(t => t.source === 'dispatch_upload').length,
+          other: liveTrips.filter(t => t.source !== 'report_upload' && t.source !== 'dispatch_upload').length,
+        });
+      }
     };
 
     const applyTripProgressSnapshot = (snap) => {
@@ -312,24 +341,40 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
     };
 
     const setupListener = (ref, applyFn, label) => {
+      let retryCount = 0;
       let retryTimeout = null;
+      const MAX_RETRIES = 3;
+      const getDelay = () => Math.min(2000 * Math.pow(2, retryCount - 1), 15000);
       const subscribe = () => {
         const unsub = onSnapshot(ref, applyFn, (err) => {
           if (cancelled || shouldIgnoreRealtimePermissionError(err)) return;
-          console.error(`${label} listener error:`, err);
-          setState(prev => ({ ...prev, error: `Firestore ${label} sync failed: ${err.message}` }));
+          console.error(`${label} listener error (retry ${retryCount}):`, err);
           if (/INTERNAL ASSERTION FAILED|Unexpected state/.test(err?.message || '')) {
-            console.warn(`${label} listener crashed — re-subscribing in 2s`);
+            retryCount++;
+            if (retryCount > MAX_RETRIES) {
+              console.error(`${label} listener: max retries (${MAX_RETRIES}) reached. Giving up.`);
+              setState(prev => ({ ...prev, error: `Firestore ${label} sync failed: ${err.message}` }));
+              return;
+            }
+            const delay = getDelay();
+            console.warn(`${label} listener crashed — re-subscribing in ${delay}ms (retry ${retryCount}/${MAX_RETRIES})`);
+            const idx = unsubscribers.indexOf(unsub);
+            if (idx !== -1) unsubscribers.splice(idx, 1);
             clearTimeout(retryTimeout);
             retryTimeout = setTimeout(() => {
-              if (!cancelled) { unsub(); subscribe(); }
-            }, 2000);
+              if (!cancelled) {
+                try { unsub(); } catch (_) {}
+                subscribe();
+              }
+            }, delay);
+          } else {
+            setState(prev => ({ ...prev, error: `Firestore ${label} sync failed: ${err.message}` }));
           }
         });
+        unsubscribers.push(unsub);
         return unsub;
       };
-      const unsub = subscribe();
-      unsubscribers.push(unsub);
+      subscribe();
     };
 
     setupListener(collection(db, TRIPS_COLLECTION), applyTripsSnapshot, 'Trips');
@@ -365,11 +410,28 @@ export function useFirestoreAppData({ resubscribeKey = 0 } = {}) {
 
     try {
       if (MIRRORED_TRIP_FIELDS.has(field)) {
-        await writeTripsToCollection(dataRef.current.trips || []);
-        await writeAssignmentsToCollection(dataRef.current.trips || []).catch((err) => {
-          if (err?.code === 'permission-denied') { console.warn('Assignment write skipped:', err); return; }
-          throw err;
+        const prevTrips = cleanTripCollection(previousData.trips || []);
+        const prevMap = new Map(prevTrips.map(t => [t.id, t]));
+        const currentTrips = dataRef.current.trips || [];
+        const changedTrips = currentTrips.filter(t => {
+          const prev = prevMap.get(t.id);
+          if (!prev) return true;
+          return JSON.stringify(prev) !== JSON.stringify(t);
         });
+        try {
+          await writeTripsToCollection(changedTrips);
+        } catch (tripsErr) {
+          console.error('[writeField] writeTripsToCollection failed:', tripsErr.code, tripsErr.message, tripsErr.stack);
+          throw tripsErr;
+        }
+        try {
+          await writeAssignmentsToCollection(dataRef.current.trips || []).catch((err) => {
+            console.warn('[writeField] Assignment write non-fatal error:', err?.code, err?.message);
+            return;
+          });
+        } catch (assignErr) {
+          console.warn('[writeField] Assignment write non-fatal error (outer):', assignErr.code, assignErr.message);
+        }
         const archivedTrips = cleanTripCollection(dataRef.current.trashedTrips || [])
           .filter((trip) => trip?.id || trip?.bookingId)
           .map((trip) => ({

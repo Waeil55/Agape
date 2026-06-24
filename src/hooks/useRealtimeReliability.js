@@ -35,27 +35,25 @@ export function useRealtimeReliability({ enabled = true } = {}) {
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return undefined;
 
-    const restoreNetwork = (reason) => {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        setIsOnline(false);
-        return;
-      }
+    const bumpOnly = (reason) => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
       setIsOnline(true);
-      enableNetwork(db)
-        .catch((err) => console.warn('Firestore network resume failed:', err))
-        .finally(() => bumpResubscribe(reason));
+      bumpResubscribe(reason);
     };
 
-    const handleOnline = () => restoreNetwork('online');
-    const handleOffline = () => setIsOnline(false);
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') restoreNetwork('visibility');
+    const handleOnline = () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) { setIsOnline(false); return; }
+      setIsOnline(true);
+      enableNetwork(db).catch((err) => console.warn('Firestore network resume failed:', err));
+      bumpResubscribe('online');
     };
-    const handlePageShow = () => restoreNetwork('pageshow');
-    const handleFocus = () => restoreNetwork('focus');
-    const handleControllerChange = () => restoreNetwork('service_worker_controller');
+    const handleOffline = () => setIsOnline(false);
+    const handleVisibility = () => { /* no-op — SDK handles reconnection */ };
+    const handlePageShow = () => { /* no-op */ };
+    const handleFocus = () => { /* no-op */ };
+    const handleControllerChange = () => { /* no-op */ };
     const handleManualResubscribe = (event) => {
-      restoreNetwork(event.detail?.reason || 'manual');
+      bumpOnly(event.detail?.reason || 'manual');
     };
 
     window.addEventListener('online', handleOnline);
@@ -65,8 +63,6 @@ export function useRealtimeReliability({ enabled = true } = {}) {
     window.addEventListener('swControllerChanged', handleControllerChange);
     window.addEventListener(REALTIME_RESUBSCRIBE_EVENT, handleManualResubscribe);
     document.addEventListener('visibilitychange', handleVisibility);
-
-    restoreNetwork('initial');
 
     return () => {
       window.removeEventListener('online', handleOnline);

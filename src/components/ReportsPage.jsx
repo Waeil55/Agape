@@ -117,15 +117,15 @@ const calcDuration = (start, end) => {
 };
 
 const calcMiles = (pickupOdo, dropoffOdo, storedDistance) => {
+  if (storedDistance !== null && storedDistance !== undefined && storedDistance !== '') {
+    const sd = Number(storedDistance);
+    if (sd > 0) return sd.toFixed(1);
+  }
   const p = pickupOdo === null || pickupOdo === undefined || pickupOdo === '' ? null : Number(pickupOdo);
   const d = dropoffOdo === null || dropoffOdo === undefined || dropoffOdo === '' ? null : Number(dropoffOdo);
   if (p !== null && d !== null) {
     const diff = d - p;
     if (diff > 0) return diff.toFixed(1);
-  }
-  if (storedDistance !== null && storedDistance !== undefined && storedDistance !== '') {
-    const sd = Number(storedDistance);
-    if (sd > 0) return sd.toFixed(1);
   }
   return '—';
 };
