@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd } from '../utils/tripDate';
-import { auth, db, doc, getDocFromServer, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate } from '../config/firebase';
+import { auth, db, doc, getDocFromServer, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, updateDriverProfile } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
@@ -722,7 +722,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }).catch((err) => {
       console.error('[DriverPage] Failed to persist workflow update:', err);
     });
-  }, [onUpdateTrip, setWorkflowProgressData]);
+    if (status === 'In Progress' && me?.id) {
+      updateDriverProfile(me.id, { activeTripId: trip.id }).catch((err) => {
+        console.error('[DriverPage] Failed to persist activeTripId:', err);
+      });
+    }
+  }, [onUpdateTrip, setWorkflowProgressData, me?.id]);
+
+  const clearActiveTrip = useCallback(() => {
+    if (me?.id) {
+      updateDriverProfile(me.id, { activeTripId: null }).catch((err) => {
+        console.error('[DriverPage] Failed to clear activeTripId:', err);
+      });
+    }
+  }, [me?.id]);
 
   useEffect(() => {
     Object.entries(workflowProgress).forEach(([tripId, progress]) => {
@@ -3295,6 +3308,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const isSequenced = assignedSequence?.sequence?.some(s => s.clientId === trip.id);
                 const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
                 const isTerminal = isWorkflowTerminalTrip(trip);
+                const isActiveTrip = trip.id === me?.activeTripId;
 
                 const workflowSteps = getWorkflowSteps(trip);
                 const currentStepIdx = getCurrentWorkflowStep(trip);
@@ -3332,6 +3346,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="h-px flex-1 bg-slate-200" />
                       </div>
                     )}
+                    <div className="relative">
+                      {isActiveTrip && (
+                        <div className="absolute -top-2 -right-2 z-10 flex items-center gap-1 bg-blue-600 text-white pl-2.5 pr-1.5 py-1 rounded-full text-[11px] font-bold shadow-lg shadow-blue-600/30">
+                          <Truck size={14} />
+                          <span>Active</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); clearActiveTrip(); }}
+                            className="ml-0.5 w-4 h-4 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      )}
                     <TaskCard
                     task={{
                       id: trip.id,
@@ -3458,6 +3486,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       } : null,
                     }}
                   />
+                  </div>
                 </React.Fragment>
               );
               })}
