@@ -1091,6 +1091,10 @@ const App = () => {
           setIsLoading(false);
           return;
         }
+        // Don't immediately reset — token refresh can briefly fire null
+        await new Promise(r => setTimeout(r, 3000));
+        if (cancelled) return;
+        if (auth.currentUser) return; // session recovered
         resetSessionState();
       }
       } catch (bootErr) {
