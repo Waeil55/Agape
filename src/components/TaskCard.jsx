@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import {
   MapPin, Navigation, Clock, User, PhoneCall,
@@ -6,7 +6,7 @@ import {
   Ruler, Users, Activity, Building, Home, Accessibility,
   Copy, Check, RotateCcw, PhoneForwarded, MessageCircle,
   Square, CheckSquare, RefreshCw, Forward,
-  Edit2, Truck, X
+  Edit2, Truck, X, MoreVertical
 } from 'lucide-react';
 
 const StatusBadge = ({ status }) => {
@@ -88,9 +88,20 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const isExpanded = expandedId === task.id;
   const isAnotherExpanded = expandedId !== null && expandedId !== task.id;
   const [copiedId, setCopiedId] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
 
   const timeUrgency = getTimeUrgency(task);
-  const isTerminal = ['Completed', 'Cancelled', 'No Show'].includes(task.status);
+  const isTerminal = ['Completed', 'Cancelled', 'No Show', 'Rerouted'].includes(task.status);
   const dropoffAddress = task.dropoff?.address || task.dropoff || '';
   const dropoffSiteName = (task.dropoff?.site || task.dropoffSite || '').trim();
   const pickupAddress = task.pickup?.address || task.pickup || '';
@@ -181,9 +192,37 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 </button>
               )}
               {isExpanded && <StatusBadge status={task.status} />}
-              <button onClick={(e) => { e.stopPropagation(); onToggle(task.id); }} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
-                <ChevronDown size={18} className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} strokeWidth={2} />
-              </button>
+              {!isExpanded && !isTerminal && actions && (actions.onNoShow || actions.onCancel || actions.onReroute || actions.onTransfer) && (
+                <div className="relative" ref={menuRef}>
+                  <button onClick={(e) => { e.stopPropagation(); setMenuOpen(prev => !prev); }} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
+                    <MoreVertical size={16} strokeWidth={2} />
+                  </button>
+                  {menuOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[150px] overflow-hidden">
+                      {actions?.onNoShow && (
+                        <button onClick={(e) => { e.stopPropagation(); actions.onNoShow(task); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors text-left">
+                          <AlertCircle size={14} /> No Show
+                        </button>
+                      )}
+                      {actions?.onCancel && (
+                        <button onClick={(e) => { e.stopPropagation(); actions.onCancel(task); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors text-left">
+                          <XCircle size={14} /> Cancel Trip
+                        </button>
+                      )}
+                      {actions?.onReroute && (
+                        <button onClick={(e) => { e.stopPropagation(); actions.onReroute(task); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-purple-700 hover:bg-purple-50 transition-colors text-left">
+                          <RefreshCw size={14} /> Rerouted
+                        </button>
+                      )}
+                      {actions?.onTransfer && (
+                        <button onClick={(e) => { e.stopPropagation(); actions.onTransfer(task); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 transition-colors text-left">
+                          <Forward size={14} /> Transfer
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
