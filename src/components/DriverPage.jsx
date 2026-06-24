@@ -556,7 +556,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const [activeNav, setActiveNav] = useState(() => {
     const savedNav = localStorage.getItem(`agape_drvNav_${userKey}`) || 'trips';
-    return ['trips', 'tools', 'history', 'chat', 'settings'].includes(savedNav) ? savedNav : 'trips';
+    return ['trips', 'tools', 'history', 'chat', 'settings', 'active-trip'].includes(savedNav) ? savedNav : 'trips';
   });
   const [historyFilter, setHistoryFilter] = useState(() => localStorage.getItem(`agape_drvHistFilter_${userKey}`) || 'all');
   const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
@@ -2311,6 +2311,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setExpandedTripId(null);
     setWorkNotesOpen(false);
     setActiveWorkTripId(tripId);
+    setActiveNav('active-trip');
     requestAnimationFrame(() => tripsScrollRef.current?.scrollTo?.({ top: 0, behavior: 'smooth' }));
   };
 
@@ -2582,7 +2583,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           onClick={() => setExpandedTripId(null)}
         />
       )}
-      {!(activeNav === 'trips' && activeWorkTrip) && (
+      {activeNav !== 'active-trip' && (
         <div
           className="sticky top-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
@@ -2624,14 +2625,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
       )}
 
+      {/* ===== ACTIVE TRIP WORK PAGE ===== */}
+      {activeNav === 'active-trip' && activeWorkTrip && (
+        <div
+          ref={tripsScrollRef}
+          className="flex-1 overflow-y-auto bg-[#F3F4F6]"
+          style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
+        >
+          {renderTripWorkPage(activeWorkTrip)}
+        </div>
+      )}
+
       {/* ===== TRIPS PAGE ===== */}
       {activeNav === 'trips' && (
         <div
           ref={tripsScrollRef}
-          className={activeWorkTrip ? "flex-1 overflow-y-auto bg-[#F3F4F6]" : "flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F3F4F6]"}
+          className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F3F4F6]"
           style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
         >
-          {activeWorkTrip ? renderTripWorkPage(activeWorkTrip) : (
             <>
 
 
@@ -3485,7 +3496,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           )}
 
             </>
-          )}
         </div>
       )}
 
@@ -4894,7 +4904,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button key={item.id} onClick={() => {
                   if (item.id === 'active-trip') {
                     setActiveWorkTripId(activeWorkTripId);
-                    setActiveNav('trips');
+                    setActiveNav('active-trip');
                     return;
                   }
                   setActiveNav(item.id);
