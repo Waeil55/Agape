@@ -789,7 +789,7 @@ const App = () => {
       setShowLoadingRecovery(false);
       return;
     }
-    const timer = setTimeout(() => setShowLoadingRecovery(true), 8000);
+    const timer = setTimeout(() => setShowLoadingRecovery(true), 3000);
     return () => clearTimeout(timer);
   }, [isLoading]);
 
@@ -841,35 +841,23 @@ const App = () => {
     }
   }, [appSettings]);
 
-  // Force fail-safe: if loading takes >15s, show login (allow time for offline cache)
+  // Force fail-safe: if loading takes >6s, show login
   useEffect(() => {
     const force = setTimeout(() => {
       if (!isLoading) return;
-      if (navigator.onLine === false) {
-        setStartupIssue('You are offline — showing cached data.');
-        setIsLoading(false);
-      } else {
-        setStartupIssue('Connection timed out. Retry or sign in again.');
-        setLoginError('Could not reach the cloud. Please check your connection and sign in.');
-        setIsLoading(false);
-      }
-      }, 120000);
+      setIsLoading(false);
+      }, 6000);
     return () => clearTimeout(force);
   }, [isLoading]);
-  // Ultimate fallback — never stay on loading >150s
-  useEffect(() => { const t = setTimeout(() => { if (isLoading) setIsLoading(false); }, 150000); return () => clearTimeout(t); }, [isLoading]);
-  // Firestore data timeout — show recovery after 30s, fire error at 120s
+  // Ultimate fallback — never stay on loading >10s
+  useEffect(() => { const t = setTimeout(() => { if (isLoading) setIsLoading(false); }, 10000); return () => clearTimeout(t); }, [isLoading]);
+  // Firestore data timeout — show recovery after 8s
   useEffect(() => {
     setShowDataLoadingRecovery(false);
     const recoveryT = setTimeout(() => {
       if (dataLoading) setShowDataLoadingRecovery(true);
-    }, 30000);
-    const errorT = setTimeout(() => {
-      if (dataLoading) {
-        setStartupIssue('Firestore sync timed out. Check your connection and retry.');
-      }
-    }, 120000);
-    return () => { clearTimeout(recoveryT); clearTimeout(errorT); };
+    }, 8000);
+    return () => { clearTimeout(recoveryT); };
   }, [dataLoading]);
   // Force dataLoading to end after 45s so auth watchdog (90s) never fires
   useEffect(() => {
@@ -1132,33 +1120,26 @@ const App = () => {
           setIsLoading(false);
           return;
         }
-        // If user was already authenticated, this is likely a token refresh.
-        // Don't auto-logout — wait for reconnection.
+        // If user was already authenticated in this session, this is a token refresh.
+        // Wait briefly for Firebase to restore the session.
         if (authBootResolvedRef.current) {
-          console.warn('[Auth] Session went null after boot — waiting 15s for token refresh');
-          setStartupIssue('Connection interrupted. Reconnecting...');
-          await new Promise(r => setTimeout(r, 15000));
+          console.warn('[Auth] Session went null after boot — waiting 3s for token refresh');
+          await new Promise(r => setTimeout(r, 3000));
           if (cancelled) return;
           if (auth.currentUser) {
-            setStartupIssue('');
             return;
           }
-          // Still null after 15s — show recovery UI and allow user to interact
-          console.warn('[Auth] Session still null after 15s — showing login screen');
-          authBootResolvedRef.current = true;
-          setStartupIssue('Session lost. Please sign in again.');
-          setIsLoading(false);
+          // Session truly lost — show login immediately
+          clearRoleCache();
+          skipNextSignedOutResetRef.current = true;
+          signOut(auth).catch(() => {});
+          resetSessionState({ loginErrorMessage: 'Session expired. Please sign in again.' });
           return;
         }
-        // Initial boot — wait for auth persistence to load (slower on mobile)
-        await new Promise(r => setTimeout(r, 10000));
-        if (cancelled) return;
-        if (auth.currentUser) return;
-        // Still null after 10s — show login screen instead of hanging forever.
-        // The user can sign in again, or wait if their session auto-restores.
-        console.warn('[Auth] No session after 10s cold-start wait — showing login screen');
+        // Initial boot with no session — show login IMMEDIATELY.
+        // Firebase Auth persistence restores sessions synchronously before firing
+        // onAuthStateChanged. If it fired with null, there IS no saved session.
         authBootResolvedRef.current = true;
-        setStartupIssue('Checking your session. If this persists, use Access Portal to sign in.');
         setIsLoading(false);
       }
       } catch (bootErr) {
