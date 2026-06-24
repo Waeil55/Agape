@@ -173,6 +173,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
   const [endDate, setEndDate] = useState(() => localStorage.getItem('agape_rptEndDate') || localCalendarYmd());
   const [statusFilter, setStatusFilter] = useState(() => localStorage.getItem('agape_rptStatusFilter') || 'all');
   const [driverFilter, setDriverFilter] = useState(() => localStorage.getItem('agape_rptDriverFilter') || 'all');
+  const [reviewedFilter, setReviewedFilter] = useState(() => localStorage.getItem('agape_rptReviewedFilter') || 'all');
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('agape_rptSearch') || '');
   const [activeRow, setActiveRow] = useState(null);
   const [selectedTasks, setSelectedTasks] = useState([]);
@@ -211,12 +212,13 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     localStorage.setItem('agape_rptEndDate', endDate);
     localStorage.setItem('agape_rptStatusFilter', statusFilter);
     localStorage.setItem('agape_rptDriverFilter', driverFilter);
+    localStorage.setItem('agape_rptReviewedFilter', reviewedFilter);
     localStorage.setItem('agape_rptSearch', searchQuery);
     localStorage.setItem('agape_rptSortCol', sortColumn);
     localStorage.setItem('agape_rptSortDir', sortDirection);
     localStorage.setItem('agape_rptCollapsedDays', JSON.stringify(collapsedDays));
     localStorage.setItem('agape_rptHiddenCols', JSON.stringify(hiddenCols));
-  }, [startDate, endDate, statusFilter, driverFilter, searchQuery, sortColumn, sortDirection, collapsedDays, hiddenCols]);
+  }, [startDate, endDate, statusFilter, driverFilter, reviewedFilter, searchQuery, sortColumn, sortDirection, collapsedDays, hiddenCols]);
 
   // ===== RESIZABLE COLUMNS =====
   const DEFAULT_COL_WIDTHS = {
@@ -481,6 +483,10 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         return trip.driverId === driverFilter || trip.driverEmail === driverFilter;
       })
       .filter((trip) => {
+        if (reviewedFilter === 'all') return true;
+        return reviewedFilter === 'done' ? trip.reviewed : !trip.reviewed;
+      })
+      .filter((trip) => {
         const tripDate = tripCalendarDateKey(trip.date) || trip.date || '';
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;
@@ -719,6 +725,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     setEndDate(localCalendarYmd());
     setStatusFilter('all');
     setDriverFilter('all');
+    setReviewedFilter('all');
     setSearchQuery('');
     setSortColumn('time');
     setSortDirection('asc');
@@ -853,6 +860,11 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
           <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-1.5 py-1 border border-slate-200 rounded-lg text-[9px] outline-none bg-white/80 text-slate-600 font-medium cursor-pointer hover:border-slate-300 transition-colors max-w-[100px]">
             <option value="all">All drivers</option>
             {drivers.map((d) => (<option key={d.id} value={d.id || d.email}>{d.name}</option>))}
+          </select>
+          <select value={reviewedFilter} onChange={(e) => setReviewedFilter(e.target.value)} className={`px-1.5 py-1 border rounded-lg text-[9px] outline-none font-medium cursor-pointer transition-colors ${reviewedFilter === 'done' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : reviewedFilter === 'pending' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white/80 border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+            <option value="all">All reviewed</option>
+            <option value="done">Done</option>
+            <option value="pending">Pending</option>
           </select>
           <button onClick={resetFilters} className="p-1 rounded-lg bg-white/80 border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all" title="Reset filters"><RefreshCw size={9} /></button>
           <button onClick={() => setHiddenCols(prev => prev.includes('arrivalTime') ? prev.filter(c => c !== 'arrivalTime') : [...prev, 'arrivalTime'])} className={`p-1 rounded-lg border transition-all ${hiddenCols.includes('arrivalTime') ? 'bg-rose-50 border-rose-200 text-rose-500' : 'bg-white/80 border-slate-200 text-slate-400 hover:text-slate-600'}`} title={hiddenCols.includes('arrivalTime') ? 'Show Pickup Arrival' : 'Hide Pickup Arrival'}>
