@@ -953,7 +953,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
       )}
 
       {/* Table Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
         {paginatedGroupedTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             <FileText size={40} className="mb-3 opacity-40" />
@@ -1025,7 +1025,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                 {!isCollapsed && (
                   <>
                     {/* Table */}
-                    <div className="w-full overflow-x-auto">
+                    <div>
                   <table className="resizable-table text-xs w-full">
                     <colgroup>
                       <col style={{ width: 48 }} />
