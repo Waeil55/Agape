@@ -1100,6 +1100,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   useEffect(() => {
     if (activeWorkTripId && trips.length > 0 && !driverScopedTrips.some((trip) => trip.id === activeWorkTripId)) {
       setActiveWorkTripId(null);
+      setActiveNav('trips');
       setWorkNotesOpen(false);
     }
   }, [activeWorkTripId, driverScopedTrips, trips]);
@@ -2581,13 +2582,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   return (
     <div className="flex-1 flex flex-col bg-[#F3F4F6] text-slate-900" style={{ fontSize: '96%' }}>
-      {activeNav === 'trips' && expandedTripId && !activeWorkTrip && (
+      {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && expandedTripId && !activeWorkTrip && (
         <div
           className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
           onClick={() => setExpandedTripId(null)}
         />
       )}
-      {activeNav !== 'active-trip' && (
+      {!(activeNav === 'active-trip' && activeWorkTrip) && (
         <div
           className="sticky top-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
@@ -2640,8 +2641,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
       )}
 
-      {/* ===== TRIPS PAGE ===== */}
-      {activeNav === 'trips' && (
+      {/* ===== TRIPS PAGE (also fallback when active-trip has no trip) ===== */}
+      {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && (
         <div
           ref={tripsScrollRef}
           className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F3F4F6]"
