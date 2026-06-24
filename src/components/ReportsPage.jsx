@@ -952,6 +952,23 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         </div>
       )}
 
+      {/* Column Header Bar - always visible, never scrolls vertically */}
+      {paginatedGroupedTrips.length > 0 && (
+        <div className="shrink-0 bg-slate-800 text-slate-100 border-b border-slate-200 overflow-x-auto">
+          <div className="flex items-center h-[34px]" style={{ minWidth: reportTableMinWidth }}>
+            <div className="w-[48px] shrink-0" />
+            {visibleColumns.map(col => {
+              const pct = Math.max(4, Math.round(((colWidths[col.key] || 100) / reportTableMinWidth) * 100));
+              return (
+                <div key={col.key} className="text-[10px] font-semibold truncate px-2 py-2" style={{ width: pct + '%', minWidth: 36 }}>
+                  {col.label}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Table Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {paginatedGroupedTrips.length === 0 ? (
@@ -1034,7 +1051,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
                         return <col key={col.key} style={{ width: pct + '%' }} />;
                       })}
                     </colgroup>
-                    <thead className="sticky top-[40px] z-10 bg-slate-800 text-slate-100 border-b border-slate-200">
+                    <thead className="bg-slate-800 text-slate-100 border-b border-slate-200">
                       <tr>
                         <th className="p-2 text-center align-middle resizable-th" style={{ width: 48 }}>
                           <div className="flex items-center justify-center gap-2">
