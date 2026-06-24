@@ -17,7 +17,7 @@ import CommandIntelligencePanel from './CommandIntelligencePanel';
 import { aiPrioritizeTrips } from '../config/ai';
 
 
-const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show'];
+const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
 const TIME_SORT_BOTTOM_STATUSES = ['Cancelled', 'No Show', 'Rerouted'];
 const ACTIVE_PROGRESS_STATUSES = ['In Mission', 'En Route', 'At Pickup', 'At Dropoff', 'Assigned', 'In Progress', 'Navigating Pickup', 'Navigating Dropoff', 'In Transit', 'Arrived'];
 const MANIFEST_VIEW_OPTIONS = [
@@ -181,6 +181,7 @@ const getStatusPillClass = (status) => {
   if (status === 'Completed') return 'bg-emerald-100 text-emerald-700';
   if (status === 'Cancelled') return 'bg-rose-100 text-rose-700';
   if (status === 'No Show') return 'bg-amber-100 text-amber-700';
+  if (status === 'Rerouted') return 'bg-purple-100 text-purple-700';
   return 'bg-slate-100 text-slate-700';
 };
 
@@ -965,7 +966,7 @@ const OperationsCommandCenter = ({
     if (!showOnlyAttention) return filteredTrips;
     return filteredTrips.filter((trip) => {
       const urgency = getTripUrgencyLevel(trip);
-      return trip.status === 'Unassigned' || urgency === 'late' || urgency === 'soon';
+      return trip.status === 'Unassigned' || trip.status === 'Cancelled' || trip.status === 'No Show' || trip.status === 'Rerouted' || urgency === 'late' || urgency === 'soon';
     });
   }, [filteredTrips, showOnlyAttention]);
 

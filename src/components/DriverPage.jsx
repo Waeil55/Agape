@@ -126,7 +126,7 @@ const buildFallbackDriverProfile = (email = '') => ({
   clockedIn: false,
 });
 
-const WORKFLOW_TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
+const WORKFLOW_TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted', 'Transferred']);
 const normalizeWorkflowStatus = (status) => String(status || '').trim().toLowerCase();
 const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
 const getTripHistoryDateKey = (trip) => tripCalendarDateKey(trip?.date) || tripCalendarDateKey(trip?.completedAt);
@@ -953,7 +953,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const restoreHistoryTrip = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
-    const relatedLegs = driverScopedTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientKey && isWorkflowTerminalTrip(t));
+    const relatedLegs = driverScopedTrips.filter(t => tripMatchesTodayOrTomorrow(t.date) && (t.patient || '').trim().toLowerCase() === patientKey && isWorkflowTerminalTrip(t));
     if (relatedLegs.length > 1) {
       setRestorePrompt({ trip, legs: relatedLegs });
     } else {
@@ -1805,7 +1805,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     };
     if (transferPrompt.type === 'trip') {
       const trip = transferPrompt.item;
-      onUpdateTrip?.(trip.id, trip.status, {
+      advanceWorkflow(trip, 'Transferred', {
         transferRequest: request,
         transferStatus: 'pending',
       });

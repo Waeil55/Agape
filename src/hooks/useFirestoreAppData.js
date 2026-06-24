@@ -35,7 +35,7 @@ const DRIVER_TRIP_PROGRESS_COLLECTION = 'driverTripProgress';
 const MIRRORED_TRIP_FIELDS = new Set(['trips', 'trashedTrips']);
 
 function dedupTripsByBookingId(trips = []) {
-  const STATUS_PRIORITY = { 'Completed': 10, 'At Pickup': 9, 'In Mission': 9, 'Navigating Pickup': 8, 'En Route': 8, 'Navigating Dropoff': 8, 'In Transit': 8, 'In Progress': 8, 'Assigned': 7, 'No Show': 5, 'Cancelled': 3, 'Unassigned': 1 };
+  const STATUS_PRIORITY = { 'Completed': 10, 'At Pickup': 9, 'In Mission': 9, 'Rerouted': 6, 'Transferred': 6, 'Navigating Pickup': 8, 'En Route': 8, 'Navigating Dropoff': 8, 'In Transit': 8, 'In Progress': 8, 'Assigned': 7, 'No Show': 5, 'Cancelled': 3, 'Unassigned': 1 };
   const groups = {};
   (trips || []).forEach(t => {
     if (!t) return;
