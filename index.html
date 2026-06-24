@@ -40,9 +40,9 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- ===== PWA AUTO-REFRESH SERVICE WORKER (disabled: causes reload loops with cached SW) ===== -->
+    <!-- ===== PWA AUTO-REFRESH SERVICE WORKER ===== -->
     <script>
-      if (false && 'serviceWorker' in navigator) {
+      if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
           console.log('[SW] Registered:', registration.scope);
 
