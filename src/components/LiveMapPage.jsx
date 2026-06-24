@@ -24,6 +24,7 @@ import {
   Users,
   Wifi,
   WifiOff,
+  X,
   Zap,
 } from 'lucide-react';
 import { GOOGLE_MAPS_API_KEY, db, collection, query, orderBy, limit as firestoreLimit, getDocs } from '../config/firebase';
