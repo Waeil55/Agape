@@ -2569,7 +2569,7 @@ const App = () => {
             <img src="/agape.png" alt="Agape Care" className="w-16 h-16 object-contain" />
             <div>
               <p className="text-lg font-bold text-slate-800">Syncing live operations</p>
-              <p className="text-sm font-medium text-slate-500 mt-1">Pulling trips, drivers, assignments, and route data from Firestore.</p>
+              <p className="text-sm font-medium text-slate-500 mt-1">{role === 'driver' ? 'Connecting to your trips and profile...' : 'Pulling trips, drivers, assignments, and route data from Firestore.'}</p>
             </div>
             <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
             {startupIssue && (
