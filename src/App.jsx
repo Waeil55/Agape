@@ -869,15 +869,37 @@ const App = () => {
       try {
       if (user) {
         // Load user role — ensure doc exists for Firestore security rules
-        const userDocResult = await withTimeout(getDoc(doc(db, 'users', user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'user profile');
-        if (cancelled) return;
-
+        // Retry on timeout up to 3 times with linear backoff
         const requestedPortalRole = loginPortalRoleRef.current;
-        let userDoc = userDocResult.ok ? userDocResult.value : null;
+        let userDocResult, userDoc = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          userDocResult = await withTimeout(getDoc(doc(db, 'users', user.uid)), FIRESTORE_BOOT_TIMEOUT_MS, 'user profile');
+          if (cancelled) return;
+          if (userDocResult.ok) { userDoc = userDocResult.value; break; }
+          if (attempt < 2) await new Promise(r => setTimeout(r, 5000));
+        }
+
         let userRole = '';
         if (userDoc?.exists()) {
           userRole = String(userDoc.data()?.role || '').toLowerCase();
         } else {
+          // If we timed out on all retries, keep loading state and let onAuthStateChanged fire again
+          if (!userDocResult?.ok) {
+            setStartupIssue('Firestore is taking longer than expected. Retrying connection...');
+            await new Promise(r => setTimeout(r, 10000));
+            if (cancelled) return;
+            // Final attempt without a timeout wrapper — let Firebase SDK handle retries
+            try {
+              userDoc = await getDoc(doc(db, 'users', user.uid));
+              if (cancelled) return;
+            } catch { /* fall through */ }
+            if (userDoc?.exists()) {
+              userRole = String(userDoc.data()?.role || '').toLowerCase();
+            }
+          }
+        }
+
+        if (!userRole) {
           const usersSnap = await withTimeout(getDocs(collection(db, 'users')), FIRESTORE_BOOT_TIMEOUT_MS, 'user directory');
           const hasExistingUsers = usersSnap.ok ? !usersSnap.value.empty : true;
           const canBootstrapFirstAdmin = !hasExistingUsers && requestedPortalRole === 'admin';
