@@ -41,85 +41,101 @@ export default function CommandSidebar({
   const completedTrips = todaysTrips.filter(t => t.status === 'Completed');
 
   return (
-    <div className="w-[450px] shrink-0 border-r border-white/10 bg-slate-950 flex flex-col z-20 shadow-[10px_0_30px_rgba(0,0,0,0.5)]">
-      {/* TABS */}
-      <div className="flex px-4 pt-4 pb-0 gap-1 border-b border-white/[0.06] shrink-0 bg-slate-950">
-        {[
-          { id: 'drivers', icon: Users, label: 'Drivers' },
-          { id: 'trips', icon: Route, label: 'Trips' },
-          { id: 'vehicles', icon: Truck, label: 'Vehicles' }
-        ].map(tab => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setLeftTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all border-b-2 ${
-                leftTab === tab.id 
-                  ? 'text-white border-blue-500 bg-white/[0.04]' 
-                  : 'text-slate-500 border-transparent hover:text-slate-300 hover:bg-white/[0.02]'
-              }`}
-            >
-              <Icon size={14} /> {tab.label}
-            </button>
-          );
-        })}
+    <div className="w-[400px] xl:w-[450px] shrink-0 border-r border-slate-200/60 bg-slate-50 flex flex-col z-20 shadow-2xl relative font-outfit">
+      
+      {/* TABS HEADER */}
+      <div className="bg-white px-4 pt-5 pb-4 border-b border-slate-200 shrink-0 z-10">
+        <h2 className="text-xl font-black tracking-tight text-slate-900 mb-4">Command <span className="text-blue-600">Center</span></h2>
+        
+        {/* Segmented Control */}
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          {[
+            { id: 'drivers', icon: Users, label: 'Drivers' },
+            { id: 'trips', icon: Route, label: 'Trips' },
+            { id: 'vehicles', icon: Truck, label: 'Vehicles' }
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = leftTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setLeftTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-[12px] font-bold transition-all duration-300 rounded-lg ${
+                  isActive 
+                    ? 'bg-white text-blue-600 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                }`}
+              >
+                <Icon size={14} /> {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* CONTENT */}
-      <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-950 custom-scrollbar">
+      {/* CONTENT REGION */}
+      <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-50/50 p-3 space-y-3 custom-scrollbar">
+        
+        {/* === DRIVERS TAB === */}
         {leftTab === 'drivers' && (
-          <div className="flex flex-col">
-            {driverSummaries.length === 0 && <p className="p-6 text-center text-xs text-slate-500">No drivers available.</p>}
+          <div className="flex flex-col gap-3">
+            {driverSummaries.length === 0 && <p className="p-6 text-center text-sm font-medium text-slate-400">No drivers available.</p>}
             {driverSummaries
               .filter(s => !hudSearch || s.driver.name?.toLowerCase().includes(hudSearch.toLowerCase()))
               .map(summary => {
                 const { driver, currentTrip, upcoming, completed, movementState, fresh } = summary;
                 const isSelected = selectedDriverId === driver.id;
+                
                 return (
                   <div 
                     key={driver.id} 
-                    className={`p-3 border-b border-white/[0.04] transition-colors cursor-pointer ${isSelected ? 'bg-blue-500/10 border-l-2 border-l-blue-500' : 'hover:bg-white/[0.02] bg-slate-950 border-l-2 border-l-transparent'}`} 
+                    className={`bg-white rounded-2xl p-4 transition-all duration-300 cursor-pointer border ${
+                      isSelected 
+                        ? 'border-blue-300 shadow-md ring-4 ring-blue-50' 
+                        : 'border-slate-200 hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5'
+                    }`} 
                     onClick={() => setSelectedDriverId(driver.id)}
                   >
                      <div className="flex items-start justify-between">
                        <div className="flex gap-3 items-center">
-                          <span className={`w-2.5 h-2.5 shrink-0 rounded-full ${fresh && movementState === 'moving' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : fresh ? 'bg-amber-400' : 'bg-slate-600'}`} />
+                          <span className={`w-3 h-3 shrink-0 rounded-full border-2 border-white shadow-sm ${
+                            fresh && movementState === 'moving' ? 'bg-emerald-500' : fresh ? 'bg-amber-400' : 'bg-slate-400'
+                          }`} />
                           <div>
-                            <h4 className="text-sm font-black text-white">{driver.name || 'Unnamed'}</h4>
-                            <p className="text-[11px] text-slate-500">
-                              {driver.vehicle || 'No vehicle'} • {formatMovementState(movementState)}
+                            <h4 className="text-base font-black text-slate-900 leading-tight">{driver.name || 'Unnamed'}</h4>
+                            <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                              {driver.vehicle || 'No vehicle'} <span className="text-slate-300 mx-1">•</span> {formatMovementState(movementState)}
                             </p>
                           </div>
                        </div>
                        {isSelected && (
-                         <button onClick={(e) => { e.stopPropagation(); setShowDetailModal(true); }} className="px-2 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold rounded flex items-center gap-1 transition-colors">
-                           <Target size={12} /> Details
+                         <button onClick={(e) => { e.stopPropagation(); setShowDetailModal(true); }} className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors border border-blue-200/60">
+                           <Target size={14} /> Details
                          </button>
                        )}
                      </div>
                      
-                     <div className="mt-3 ml-5 pl-3 border-l-2 border-white/[0.05] flex flex-col gap-2">
+                     <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2.5">
                        {currentTrip ? (
-                         <div className="bg-slate-900 rounded-lg p-2.5 border border-white/5 shadow-inner">
-                           <div className="flex justify-between items-center mb-1">
-                              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Current Mission</p>
-                              <span className="text-[10px] text-slate-500">{currentTrip.time || ''}</span>
+                         <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                           <div className="flex justify-between items-center mb-1.5">
+                              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Current Mission</p>
+                              <span className="text-[11px] font-bold text-slate-500">{currentTrip.time || ''}</span>
                            </div>
-                           <p className="text-xs font-bold text-slate-200 mb-1">{currentTrip.patient || 'Unknown Client'}</p>
-                           <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
-                             <ArrowRight size={12} className="shrink-0 text-blue-400"/>
+                           <p className="text-sm font-bold text-slate-800 mb-0.5">{currentTrip.patient || 'Unknown Client'}</p>
+                           <p className="text-xs font-medium text-slate-600 truncate flex items-center gap-1.5">
+                             <ArrowRight size={14} className="shrink-0 text-blue-400"/>
                              {getTripPhase(currentTrip).destination}
                            </p>
                          </div>
                        ) : (
-                         <p className="text-[11px] font-medium text-slate-500 italic py-1">No active mission</p>
+                         <p className="text-xs font-bold text-slate-400 italic py-1 px-1">No active mission</p>
                        )}
                        
                        {(upcoming.length > 0 || completed > 0) && (
-                         <div className="flex items-center gap-3 pt-1">
-                           {upcoming.length > 0 && <span className="text-[10px] text-slate-400 font-medium bg-white/[0.04] px-2 py-1 rounded">{upcoming.length} upcoming</span>}
-                           {completed > 0 && <span className="text-[10px] text-emerald-400 font-bold bg-emerald-400/10 px-2 py-1 rounded">&#10003; {completed} completed</span>}
+                         <div className="flex items-center gap-2 pt-1">
+                           {upcoming.length > 0 && <span className="text-[11px] text-slate-600 font-bold bg-slate-100 border border-slate-200 px-2 py-1 rounded-md">{upcoming.length} upcoming</span>}
+                           {completed > 0 && <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md flex items-center gap-1"><span className="text-emerald-500">✓</span> {completed} completed</span>}
                          </div>
                        )}
                      </div>
@@ -130,20 +146,23 @@ export default function CommandSidebar({
           </div>
         )}
 
+        {/* === TRIPS TAB === */}
         {leftTab === 'trips' && (
-          <div className="p-3 space-y-4">
+          <div className="space-y-5">
             {unassignedTrips.length > 0 && (
-              <div className="bg-rose-950/20 border border-rose-500/20 rounded-xl overflow-hidden">
-                <div className="bg-rose-500/10 px-3 py-2 flex justify-between items-center">
-                  <h3 className="text-xs font-bold text-rose-400 uppercase tracking-wider">Needs Assignment</h3>
-                  <span className="text-[10px] font-bold bg-rose-500 text-white px-1.5 rounded">{unassignedTrips.length}</span>
+              <div className="bg-white rounded-2xl border border-rose-200 overflow-hidden shadow-sm">
+                <div className="bg-rose-50 border-b border-rose-100 px-4 py-3 flex justify-between items-center">
+                  <h3 className="text-xs font-black text-rose-700 uppercase tracking-widest">Needs Assignment</h3>
+                  <span className="text-[11px] font-bold bg-rose-600 text-white px-2 py-0.5 rounded-full shadow-sm">{unassignedTrips.length}</span>
                 </div>
-                <div className="flex flex-col divide-y divide-white/[0.04]">
+                <div className="flex flex-col divide-y divide-slate-100">
                   {unassignedTrips.map(t => (
-                    <div key={t.id} className="p-3">
-                      <p className="text-[11px] text-rose-300 font-bold mb-1">{t.time || 'No time'}</p>
-                      <p className="text-[12px] font-black text-white">{t.patient || 'Unknown'}</p>
-                      <p className="text-[11px] text-slate-400 truncate mt-1">Pickup: {t.pickup}</p>
+                    <div key={t.id} className="p-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                      <p className="text-[11px] font-bold text-rose-500 mb-1">{t.time || 'No time'}</p>
+                      <p className="text-sm font-black text-slate-900">{t.patient || 'Unknown'}</p>
+                      <p className="text-xs font-medium text-slate-500 truncate mt-1 flex items-center gap-1">
+                        <MapPin size={12} className="text-slate-400"/> {t.pickup}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -151,19 +170,21 @@ export default function CommandSidebar({
             )}
 
             {activeTrips.length > 0 && (
-              <div className="bg-blue-950/20 border border-blue-500/20 rounded-xl overflow-hidden">
-                <div className="bg-blue-500/10 px-3 py-2 flex justify-between items-center">
-                  <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Active Now</h3>
-                  <span className="text-[10px] font-bold bg-blue-500 text-white px-1.5 rounded">{activeTrips.length}</span>
+              <div className="bg-white rounded-2xl border border-blue-200 overflow-hidden shadow-sm">
+                <div className="bg-blue-50 border-b border-blue-100 px-4 py-3 flex justify-between items-center">
+                  <h3 className="text-xs font-black text-blue-700 uppercase tracking-widest">Active Now</h3>
+                  <span className="text-[11px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full shadow-sm">{activeTrips.length}</span>
                 </div>
-                <div className="flex flex-col divide-y divide-white/[0.04]">
+                <div className="flex flex-col divide-y divide-slate-100">
                   {activeTrips.map(t => (
-                    <div key={t.id} className="p-3">
-                      <div className="flex justify-between items-start">
-                        <p className="text-[12px] font-black text-white">{t.patient || 'Unknown'}</p>
-                        <span className="text-[10px] text-blue-300 font-bold bg-blue-500/20 px-1.5 rounded">{t.status}</span>
+                    <div key={t.id} className="p-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                      <div className="flex justify-between items-start mb-1">
+                        <p className="text-sm font-black text-slate-900">{t.patient || 'Unknown'}</p>
+                        <span className="text-[10px] font-bold text-blue-700 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md">{t.status}</span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1"><MapPin size={10}/> {t.dropoff}</p>
+                      <p className="text-xs font-medium text-slate-500 truncate flex items-center gap-1">
+                        <ArrowRight size={12} className="text-slate-400"/> {t.dropoff}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -171,27 +192,28 @@ export default function CommandSidebar({
             )}
             
             {completedTrips.length > 0 && (
-              <div className="bg-emerald-950/20 border border-emerald-500/20 rounded-xl overflow-hidden">
-                <div className="bg-emerald-500/10 px-3 py-2 flex justify-between items-center">
-                  <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Completed</h3>
-                  <span className="text-[10px] font-bold bg-emerald-500 text-white px-1.5 rounded">{completedTrips.length}</span>
+              <div className="bg-white rounded-2xl border border-emerald-200 overflow-hidden shadow-sm">
+                <div className="bg-emerald-50 border-b border-emerald-100 px-4 py-3 flex justify-between items-center">
+                  <h3 className="text-xs font-black text-emerald-700 uppercase tracking-widest">Completed</h3>
+                  <span className="text-[11px] font-bold bg-emerald-600 text-white px-2 py-0.5 rounded-full shadow-sm">{completedTrips.length}</span>
                 </div>
               </div>
             )}
           </div>
         )}
 
+        {/* === VEHICLES TAB === */}
         {leftTab === 'vehicles' && (
-          <div className="flex flex-col gap-1 p-2">
+          <div className="flex flex-col gap-3">
             {driverSummaries.map(summary => (
-              <div key={summary.driver.id} className="p-3 bg-slate-900 border border-white/[0.04] rounded-xl flex items-center justify-between">
+              <div key={summary.driver.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-white flex items-center gap-1"><Truck size={12} className="text-slate-400"/> {summary.driver.vehicle || 'Unknown Vehicle'}</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Operated by {summary.driver.name}</p>
+                  <h4 className="text-sm font-black text-slate-900 flex items-center gap-1.5"><Truck size={14} className="text-blue-500"/> {summary.driver.vehicle || 'Unknown Vehicle'}</h4>
+                  <p className="text-xs font-semibold text-slate-500 mt-1">Operated by {summary.driver.name}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-black text-white tabular-nums">{summary.driver?.speedMph ?? summary.driver?.telemetry?.speedMph ?? 0} <span className="text-[10px] text-slate-500 font-normal">mph</span></p>
-                  <p className="text-[10px] text-slate-400">{formatAge(summary.lastPing)}</p>
+                  <p className="text-xl font-black text-slate-800 tabular-nums leading-none">{summary.driver?.speedMph ?? summary.driver?.telemetry?.speedMph ?? 0} <span className="text-xs text-slate-500 font-bold ml-0.5">mph</span></p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{formatAge(summary.lastPing)}</p>
                 </div>
               </div>
             ))}

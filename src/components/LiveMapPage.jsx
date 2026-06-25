@@ -682,49 +682,49 @@ const LiveMapPage = ({
   };
 
   return (
-    <div className="h-screen w-full min-h-0 bg-slate-950 flex flex-col overflow-hidden select-none">
+    <div className="h-screen w-full min-h-0 bg-slate-50 flex flex-col overflow-hidden select-none font-outfit">
       {/* ===== HUD BAR (36px) ===== */}
-      <header className="shrink-0 h-9 bg-slate-950 border-b border-white/[0.06] flex items-center gap-2 px-3 z-30">
-        <span className="text-[11px] font-black text-white tracking-[0.08em]">AGAPE</span>
-        <div className="w-px h-3 bg-white/[0.08]" />
-        <span className="flex items-center gap-1 text-[11px]"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /><span className="text-slate-300 font-medium">{fleetStats.live}/{drivers.length} live</span></span>
-        <span className="flex items-center gap-1 text-[11px]"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" /><span className="text-blue-300 font-medium">{fleetStats.moving} moving</span></span>
-        <span className="flex items-center gap-1 text-[11px]"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" /><span className="text-amber-300 font-medium">{fleetStats.stopped} stopped</span></span>
-        <span className="text-emerald-400 text-[11px] font-bold">&#10003;{fleetStats.complete}</span>
-        <span className="text-slate-600 text-[11px] font-medium">| {fleetStats.remaining} remaining</span>
+      <header className="shrink-0 h-10 bg-white border-b border-slate-200 shadow-sm flex items-center gap-3 px-4 z-30">
+        <span className="text-[12px] font-black text-slate-800 tracking-widest uppercase">Agape</span>
+        <div className="w-px h-4 bg-slate-200" />
+        <span className="flex items-center gap-1.5 text-[11px] font-bold"><span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" /><span className="text-slate-600">{fleetStats.live}/{drivers.length} live</span></span>
+        <span className="flex items-center gap-1.5 text-[11px] font-bold"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-sm" /><span className="text-blue-700">{fleetStats.moving} moving</span></span>
+        <span className="flex items-center gap-1.5 text-[11px] font-bold"><span className="w-2 h-2 rounded-full bg-amber-400 shadow-sm" /><span className="text-amber-700">{fleetStats.stopped} stopped</span></span>
+        <span className="text-emerald-600 text-[11px] font-black flex items-center gap-0.5"><span className="text-emerald-500">✓</span> {fleetStats.complete}</span>
+        <span className="text-slate-400 text-[11px] font-bold">| {fleetStats.remaining} remaining</span>
         <div className="flex-1" />
         <div className="relative flex items-center">
-          <Search size={12} className="absolute left-2 text-slate-500 pointer-events-none" />
+          <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
           <input
             value={hudSearch}
             onChange={(e) => setHudSearch(e.target.value)}
             placeholder="Search drivers..."
-            className="w-36 h-6 rounded-md bg-white/[0.06] border border-white/[0.08] pl-6 pr-2 text-[11px] text-white placeholder-slate-500 outline-none focus:border-blue-500/40 transition-colors"
+            className="w-40 h-7 rounded-lg bg-slate-100 border border-slate-200 pl-8 pr-2 text-[11px] font-semibold text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
           />
-          {hudSearch && <X size={12} className="absolute right-2 text-slate-500 cursor-pointer hover:text-white" onClick={() => setHudSearch('')} />}
+          {hudSearch && <X size={14} className="absolute right-2 text-slate-400 cursor-pointer hover:text-slate-700" onClick={() => setHudSearch('')} />}
         </div>
-        <div className="w-px h-3 bg-white/[0.06]" />
+        <div className="w-px h-4 bg-slate-200" />
         {myDriverProfile && (
           gpsActive ? (
-            <button type="button" onClick={stopMyGpsTracking} className="flex items-center gap-1 h-6 px-2 rounded-md bg-rose-600/20 text-rose-400 text-[10px] font-bold hover:bg-rose-600/30 transition-colors" title="Stop sharing GPS">
-              <WifiOff size={11} /> Stop
+            <button type="button" onClick={stopMyGpsTracking} className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-bold hover:bg-rose-100 transition-colors" title="Stop sharing GPS">
+              <WifiOff size={13} /> Stop
             </button>
           ) : (
-            <button type="button" onClick={startMyGpsTracking} className="flex items-center gap-1 h-6 px-2 rounded-md bg-emerald-600/20 text-emerald-400 text-[10px] font-bold hover:bg-emerald-600/30 transition-colors" title="Share your GPS location on the map">
-              <Wifi size={11} /> Share GPS
+            <button type="button" onClick={startMyGpsTracking} className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold hover:bg-emerald-100 transition-colors" title="Share your GPS location on the map">
+              <Wifi size={13} /> Share GPS
             </button>
           )
         )}
-        <button type="button" onClick={runFleetAiAnalysis} disabled={fleetAiLoading} className="flex items-center gap-1 h-6 px-2 rounded-md bg-indigo-600/20 text-indigo-400 text-[10px] font-bold hover:bg-indigo-600/30 disabled:opacity-40 transition-colors">
-          {fleetAiLoading ? <Loader2 size={11} className="animate-spin" /> : <BrainCircuit size={11} />} AI
+        <button type="button" onClick={runFleetAiAnalysis} disabled={fleetAiLoading} className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold hover:bg-indigo-100 disabled:opacity-50 transition-colors">
+          {fleetAiLoading ? <Loader2 size={13} className="animate-spin" /> : <BrainCircuit size={13} />} AI
         </button>
-        <button type="button" onClick={() => setIntelRefreshToken(t => t + 1)} className="flex items-center justify-center h-6 w-6 rounded-md bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors" title="Refresh view">
-          <RefreshCw size={12} />
+        <button type="button" onClick={() => setIntelRefreshToken(t => t + 1)} className="flex items-center justify-center h-7 w-7 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors" title="Refresh view">
+          <RefreshCw size={13} />
         </button>
       </header>
 
       {/* ===== COMMAND CENTER LAYOUT ===== */}
-      <div className="flex-1 flex overflow-hidden bg-slate-900">
+      <div className="flex-1 flex overflow-hidden bg-slate-50">
         
         {/* ===== LEFT DATA PANEL ===== */}
         <CommandSidebar 
@@ -738,25 +738,25 @@ const LiveMapPage = ({
         />
 
         {/* ===== MAP AREA ===== */}
-        <div className="flex-1 relative overflow-hidden bg-slate-900">
+        <div className="flex-1 relative overflow-hidden bg-slate-100">
           {/* Interactive map container */}
           <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
           {/* Maps loading / error overlay */}
           {!mapsLoadError && !mapReady && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-10">
               <div className="text-center">
-                <Loader2 size={48} className="mx-auto text-slate-700 animate-spin" />
-                <h3 className="mt-3 text-base font-black text-slate-400">Loading Map...</h3>
+                <Loader2 size={48} className="mx-auto text-blue-500 animate-spin" />
+                <h3 className="mt-4 text-lg font-black text-slate-800">Loading Map...</h3>
               </div>
             </div>
           )}
           {mapsLoadError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
-              <div className="text-center">
-                <Map size={48} className="mx-auto text-slate-700" />
-                <h3 className="mt-3 text-base font-black text-slate-400">Fleet Command Center</h3>
-                <p className="mt-1 max-w-md text-sm font-medium text-slate-500">
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-10">
+              <div className="text-center bg-white p-8 rounded-3xl shadow-xl border border-slate-200">
+                <Map size={48} className="mx-auto text-rose-500 mb-4" />
+                <h3 className="text-xl font-black text-slate-900">Fleet Command Center</h3>
+                <p className="mt-2 max-w-md text-sm font-medium text-slate-500">
                   {hasGoogleMapsConfigured() ? 'Could not load Google Maps. Check API key.' : 'Configure Google Maps API key to enable the map.'}
                 </p>
               </div>
@@ -765,164 +765,158 @@ const LiveMapPage = ({
           
           {/* Map Overlays */}
           <div className="absolute top-4 left-4 flex gap-2 z-20">
-            <button type="button" onClick={() => setShowTraffic(t => !t)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${showTraffic ? 'bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.4)] border-amber-400' : 'bg-slate-900/80 text-slate-400 border border-white/10 hover:bg-slate-800 hover:text-white'}`}>
+            <button type="button" onClick={() => setShowTraffic(t => !t)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md backdrop-blur-md border ${showTraffic ? 'bg-amber-500/90 text-white border-amber-400' : 'bg-white/90 text-slate-700 border-slate-200/50 hover:bg-white'}`}>
               🚦 Live Traffic
             </button>
-            <button type="button" onClick={() => setShowClusters(c => !c)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${showClusters ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border-indigo-400' : 'bg-slate-900/80 text-slate-400 border border-white/10 hover:bg-slate-800 hover:text-white'}`}>
+            <button type="button" onClick={() => setShowClusters(c => !c)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md backdrop-blur-md border ${showClusters ? 'bg-indigo-500/90 text-white border-indigo-400' : 'bg-white/90 text-slate-700 border-slate-200/50 hover:bg-white'}`}>
               🌐 Clustering
             </button>
           </div>
 
           {/* Street View Split Panel */}
           {streetViewLoc && (
-            <div className="absolute top-0 right-0 w-[450px] max-w-[90vw] h-full z-30 bg-slate-950 border-l border-white/10 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-              <div className="flex items-center justify-between px-4 h-14 border-b border-white/10 bg-slate-900/50 shrink-0">
-                <span className="text-white text-sm font-bold flex items-center gap-2"><MapPin size={16} className="text-blue-400" /> Street View Entrance</span>
-                <button onClick={() => setStreetViewLoc(null)} className="text-slate-400 hover:text-white p-1.5 bg-white/5 rounded-md hover:bg-white/10 transition-colors"><X size={16} /></button>
+            <div className="absolute top-0 right-0 w-[450px] max-w-[90vw] h-full z-30 bg-white border-l border-slate-200 flex flex-col shadow-2xl">
+              <div className="flex items-center justify-between px-4 h-14 border-b border-slate-200 bg-slate-50 shrink-0">
+                <span className="text-slate-900 text-sm font-bold flex items-center gap-2"><MapPin size={16} className="text-blue-600" /> Street View Entrance</span>
+                <button onClick={() => setStreetViewLoc(null)} className="text-slate-400 hover:text-slate-700 p-1.5 bg-white rounded-md hover:bg-slate-100 transition-colors shadow-sm border border-slate-200"><X size={16} /></button>
               </div>
-              <div ref={svContainerRef} className="flex-1 w-full bg-slate-800" />
+              <div ref={svContainerRef} className="flex-1 w-full bg-slate-100" />
             </div>
           )}
-
-          {/* Gradient edge fade */}
-          <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-slate-950/40 to-transparent pointer-events-none" />
-          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950/60 to-transparent pointer-events-none" />
 
           {/* Trail toggle (when driver selected) */}
           {selectedDriver && driverTrailPoints.length >= 2 && (
             <button
               type="button"
               onClick={() => setShowTrail(p => !p)}
-              className="absolute right-4 bottom-8 z-20 flex items-center gap-1.5 h-8 px-3 rounded-lg bg-slate-900/90 backdrop-blur-md border border-white/10 text-[11px] font-bold shadow-lg transition-colors hover:bg-slate-800"
-              style={{ color: showTrail ? '#60A5FA' : '#94A3B8' }}
+              className="absolute right-4 bottom-8 z-20 flex items-center gap-1.5 h-9 px-4 rounded-xl bg-white/90 backdrop-blur-md border border-slate-200 text-xs font-bold shadow-lg transition-colors hover:bg-white"
+              style={{ color: showTrail ? '#2563EB' : '#64748B' }}
             >
-              {trailLoading ? <Loader2 size={13} className="animate-spin" /> : <Map size={13} />}
+              {trailLoading ? <Loader2 size={14} className="animate-spin" /> : <Map size={14} />}
               {showTrail ? `${driverTrailPoints.length} trail` : 'Show Trail'}
             </button>
           )}
 
           {/* Trail loading indicator */}
           {trailLoading && (
-            <div className="absolute right-4 bottom-20 z-20 flex items-center gap-1.5 h-8 px-3 rounded-md bg-slate-900/90 backdrop-blur-md border border-white/10 text-[11px] text-slate-400 font-medium shadow-lg">
+            <div className="absolute right-4 bottom-20 z-20 flex items-center gap-1.5 h-8 px-3 rounded-xl bg-white/90 backdrop-blur-md border border-slate-200 text-[11px] text-slate-500 font-medium shadow-lg">
               <Loader2 size={12} className="animate-spin" /> Loading trail...
             </div>
           )}
         </div>
       </div>
 
-
-
       {/* ===== DETAIL MODAL (full report) ===== */}
       {showDetailModal && selectedDriver && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}>
-          <div className="relative w-full max-w-2xl max-h-[85vh] mx-4 rounded-2xl bg-slate-900 border border-white/[0.08] shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}>
+          <div className="relative w-full max-w-2xl max-h-[85vh] mx-4 rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden font-outfit" onClick={(e) => e.stopPropagation()}>
             {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
-              <div className="flex items-center gap-3">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-xl font-black text-sm ${
+            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-4">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl font-black text-xl shadow-sm border ${
                   selectedSummary?.fresh && selectedSummary?.movementState === 'moving'
-                    ? 'bg-emerald-500/20 text-emerald-400'
-                    : selectedSummary?.fresh ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                    : selectedSummary?.fresh ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-100 text-slate-500 border-slate-200'
                 }`}>
                   {String(selectedDriver?.name || 'D').charAt(0)}
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-white">{selectedDriver.name || 'Unnamed driver'}</h2>
-                  <p className="text-[11px] font-medium text-slate-400">{selectedDriver.vehicle || 'No vehicle'} · {formatAge(selectedSummary?.lastPing)}</p>
+                  <h2 className="text-xl font-black text-slate-900 leading-none mb-1">{selectedDriver.name || 'Unnamed driver'}</h2>
+                  <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">{selectedDriver.vehicle || 'No vehicle'} <span className="text-slate-300">•</span> {formatAge(selectedSummary?.lastPing)}</p>
                 </div>
               </div>
-              <button type="button" onClick={() => setShowDetailModal(false)} className="flex items-center justify-center h-8 w-8 rounded-lg bg-white/[0.04] text-slate-500 hover:text-white hover:bg-white/[0.08] transition-colors">
-                <X size={14} />
+              <button type="button" onClick={() => setShowDetailModal(false)} className="flex items-center justify-center h-8 w-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all shadow-sm">
+                <X size={16} />
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-white/[0.06]">
+            <div className="flex px-6 pt-2 border-b border-slate-100 bg-white">
               {[
                 { id: 'overview', label: 'Overview', icon: Gauge },
                 { id: 'trips', label: 'Trips', icon: Route },
                 { id: 'timeline', label: 'Timeline', icon: Activity },
               ].map(({ id, label, icon: Icon }) => (
-                <button key={id} type="button" onClick={() => setDetailTab(id)} className={`flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-bold transition-colors ${
-                  detailTab === id ? 'text-white border-b-2 border-blue-500 bg-blue-500/5' : 'text-slate-500 hover:text-slate-300'
+                <button key={id} type="button" onClick={() => setDetailTab(id)} className={`flex items-center gap-1.5 px-4 py-3 text-xs font-bold transition-all border-b-2 ${
+                  detailTab === id ? 'text-blue-600 border-blue-600' : 'text-slate-500 border-transparent hover:text-slate-800'
                 }`}>
-                  <Icon size={13} /> {label}
+                  <Icon size={14} /> {label}
                 </button>
               ))}
             </div>
 
             {/* Tab content */}
-            <div className="max-h-[60vh] overflow-y-auto p-5 space-y-4">
+            <div className="max-h-[60vh] overflow-y-auto p-6 space-y-6 bg-slate-50/30">
               {/* OVERVIEW TAB */}
               {detailTab === 'overview' && (
                 <>
                   {/* Time stats grid */}
-                  <div className="grid grid-cols-4 gap-3">
-                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Moving</p>
-                      <p className="mt-1 text-lg font-black text-blue-400 tabular-nums">{formatTelemetryDuration(selectedTracking?.totalMovingMinutes || selectedSummary?.movingMinutes || 0)}</p>
-                      <p className="text-[10px] text-slate-600">today</p>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Moving</p>
+                      <p className="mt-1 text-2xl font-black text-blue-600 tabular-nums">{formatTelemetryDuration(selectedTracking?.totalMovingMinutes || selectedSummary?.movingMinutes || 0)}</p>
+                      <p className="text-[10px] font-bold text-slate-500 mt-0.5 uppercase">today</p>
                     </div>
-                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Stopped</p>
-                      <p className="mt-1 text-lg font-black text-amber-400 tabular-nums">{formatTelemetryDuration(selectedTracking?.totalStoppedMinutes || selectedSummary?.dwellMinutes || 0)}</p>
-                      <p className="text-[10px] text-slate-600">today</p>
+                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Stopped</p>
+                      <p className="mt-1 text-2xl font-black text-amber-500 tabular-nums">{formatTelemetryDuration(selectedTracking?.totalStoppedMinutes || selectedSummary?.dwellMinutes || 0)}</p>
+                      <p className="text-[10px] font-bold text-slate-500 mt-0.5 uppercase">today</p>
                     </div>
-                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Longest</p>
-                      <p className="mt-1 text-lg font-black text-rose-400 tabular-nums">{formatTelemetryDuration(selectedTracking?.longestStopMinutes || 0)}</p>
-                      <p className="text-[10px] text-slate-600">stop</p>
+                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Longest</p>
+                      <p className="mt-1 text-2xl font-black text-rose-500 tabular-nums">{formatTelemetryDuration(selectedTracking?.longestStopMinutes || 0)}</p>
+                      <p className="text-[10px] font-bold text-slate-500 mt-0.5 uppercase">stop</p>
                     </div>
-                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Miles</p>
-                      <p className="mt-1 text-lg font-black text-emerald-400 tabular-nums">{selectedTracking ? `${Number(selectedTracking.totalTrackedMiles || 0).toFixed(1)}` : '0.0'}</p>
-                      <p className="text-[10px] text-slate-600">tracked</p>
+                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Miles</p>
+                      <p className="mt-1 text-2xl font-black text-emerald-600 tabular-nums">{selectedTracking ? `${Number(selectedTracking.totalTrackedMiles || 0).toFixed(1)}` : '0.0'}</p>
+                      <p className="text-[10px] font-bold text-slate-500 mt-0.5 uppercase">tracked</p>
                     </div>
                   </div>
 
                   {/* Current status card */}
-                  <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-4">
+                  <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Current status</p>
-                        <p className="mt-1 text-sm font-black text-white">{formatMovementState(selectedSummary?.movementState)}</p>
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Current status</p>
+                        <p className="mt-1 text-lg font-black text-slate-900">{formatMovementState(selectedSummary?.movementState)}</p>
                         {selectedTrip && (
                           <>
-                            <p className="mt-2 text-xs font-medium text-slate-400 flex items-center gap-1">
-                              <Navigation size={12} className="text-blue-400" />
+                            <p className="mt-2 text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                              <Navigation size={14} className="text-blue-500" />
                               {selectedTrip.patient || 'Unknown patient'}
                             </p>
-                            <p className="mt-1 text-[11px] font-medium text-slate-500">{selectedTrip.pickup} → {selectedTrip.dropoff}</p>
+                            <p className="mt-1 text-xs font-semibold text-slate-500">{selectedTrip.pickup} → {selectedTrip.dropoff}</p>
                           </>
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Last ping</p>
-                        <p className="mt-1 text-sm font-black text-white tabular-nums">{formatAge(selectedSummary?.lastPing)}</p>
-                        <p className="text-[10px] text-slate-600 mt-1">{selectedDriver?.speedMph ?? selectedDriver?.telemetry?.speedMph ?? 0} mph</p>
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Last ping</p>
+                        <p className="mt-1 text-lg font-black text-slate-900 tabular-nums">{formatAge(selectedSummary?.lastPing)}</p>
+                        <p className="text-xs font-bold text-slate-500 mt-1">{selectedDriver?.speedMph ?? selectedDriver?.telemetry?.speedMph ?? 0} mph</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Stops + upcoming summary */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Stops</p>
-                      <p className="mt-1 text-lg font-black text-white tabular-nums">{selectedTracking?.stopCount || 0}</p>
-                      <p className="text-[10px] text-slate-600">today</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Stops</p>
+                      <p className="mt-1 text-2xl font-black text-slate-900 tabular-nums">{selectedTracking?.stopCount || 0}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase mt-0.5">today</p>
                     </div>
-                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Trips done</p>
-                      <p className="mt-1 text-lg font-black text-emerald-400 tabular-nums">{selectedSummary?.completed || 0}</p>
-                      <p className="text-[10px] text-slate-600">{selectedSummary?.upcoming?.length || 0} upcoming</p>
+                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Trips done</p>
+                      <p className="mt-1 text-2xl font-black text-emerald-600 tabular-nums">{selectedSummary?.completed || 0}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase mt-0.5">{selectedSummary?.upcoming?.length || 0} upcoming</p>
                     </div>
                   </div>
 
                   {/* Location coordinates */}
-                  <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                    <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Coordinates</p>
-                    <p className="mt-1 font-mono text-xs text-slate-300">{selectedPoint ? `${selectedPoint.lat.toFixed(6)}, ${selectedPoint.lng.toFixed(6)}` : 'No coordinates'}</p>
-                    <p className="text-[10px] text-slate-600 mt-0.5">Accuracy: {selectedDriver?.locationAccuracy ? `${Math.round(selectedDriver.locationAccuracy)}m` : 'Unknown'}</p>
+                  <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Coordinates</p>
+                    <p className="mt-1 font-mono text-sm font-bold text-slate-700">{selectedPoint ? `${selectedPoint.lat.toFixed(6)}, ${selectedPoint.lng.toFixed(6)}` : 'No coordinates'}</p>
+                    <p className="text-[11px] font-semibold text-slate-500 mt-1">Accuracy: {selectedDriver?.locationAccuracy ? `${Math.round(selectedDriver.locationAccuracy)}m` : 'Unknown'}</p>
                   </div>
                 </>
               )}
@@ -933,34 +927,34 @@ const LiveMapPage = ({
                   {/* Active trips */}
                   {selectedSummary?.activeTrips && selectedSummary.activeTrips.length > 0 && (
                     <div>
-                      <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Active trips</h4>
-                      <div className="space-y-2">
+                      <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Active trips</h4>
+                      <div className="space-y-3">
                         {selectedSummary.activeTrips.map(trip => {
                           const phase = getTripPhase(trip);
                           return (
-                            <div key={trip.id} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                              <div className="flex items-start justify-between gap-2">
+                            <div key={trip.id} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                              <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <p className="truncate text-sm font-black text-white">{trip.patient || 'Unknown client'}</p>
-                                  <p className="text-[11px] font-medium text-slate-400">{trip.time || 'Will Call'} · {trip.status}</p>
+                                  <p className="truncate text-base font-black text-slate-900 leading-tight">{trip.patient || 'Unknown client'}</p>
+                                  <p className="text-xs font-bold text-slate-500 mt-1">{trip.time || 'Will Call'} · {trip.status}</p>
                                 </div>
-                                <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                                  phase.color === 'blue' ? 'bg-blue-500/20 text-blue-400' :
-                                  phase.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' :
-                                  'bg-amber-500/20 text-amber-400'
+                                <span className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-md border ${
+                                  phase.color === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                  phase.color === 'emerald' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                  'bg-amber-50 text-amber-700 border-amber-200'
                                 }`}>{phase.label}</span>
                               </div>
-                              <div className="mt-2 space-y-1 text-xs text-slate-400">
-                                <p className="flex items-start gap-1"><MapPin size={12} className="mt-0.5 shrink-0 text-emerald-500" /> <span className="line-clamp-2">{trip.pickup}</span></p>
-                                <p className="flex items-start gap-1"><ArrowRight size={12} className="mt-0.5 shrink-0 text-orange-500" /> <span className="line-clamp-2">{trip.dropoff}</span></p>
+                              <div className="mt-3 space-y-1.5 text-xs font-medium text-slate-600">
+                                <p className="flex items-start gap-2"><MapPin size={14} className="mt-0.5 shrink-0 text-emerald-500" /> <span className="line-clamp-2">{trip.pickup}</span></p>
+                                <p className="flex items-start gap-2"><ArrowRight size={14} className="mt-0.5 shrink-0 text-orange-500" /> <span className="line-clamp-2">{trip.dropoff}</span></p>
                               </div>
-                              <div className="mt-3 flex gap-2">
-                                <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', phase.destination)} className="flex items-center gap-1 h-7 px-2.5 rounded-lg bg-white/[0.06] text-slate-300 text-[10px] font-bold hover:bg-white/[0.1] transition-colors">
-                                  <Navigation size={11} /> Navigate
+                              <div className="mt-4 flex gap-2">
+                                <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', phase.destination)} className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold hover:bg-slate-200 transition-colors">
+                                  <Navigation size={13} /> Navigate
                                 </button>
                                 {triggerSmartAssign && (
-                                  <button type="button" onClick={() => triggerSmartAssign(trip)} className="flex items-center gap-1 h-7 px-2.5 rounded-lg bg-indigo-600/20 text-indigo-400 text-[10px] font-bold hover:bg-indigo-600/30 transition-colors">
-                                    <BrainCircuit size={11} /> AI
+                                  <button type="button" onClick={() => triggerSmartAssign(trip)} className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold hover:bg-indigo-100 transition-colors">
+                                    <BrainCircuit size={13} /> AI
                                   </button>
                                 )}
                               </div>
@@ -973,30 +967,30 @@ const LiveMapPage = ({
 
                   {/* Nearest pickup queue */}
                   <div>
-                    <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Nearest pickups</h4>
-                    <div className="space-y-2">
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Nearest pickups</h4>
+                    <div className="space-y-3">
                       {nearestTrips.length === 0 && (
-                        <p className="text-xs text-slate-500 py-4 text-center border border-dashed border-white/[0.06] rounded-xl">Select a driver with GPS to show nearest pickups.</p>
+                        <p className="text-sm font-semibold text-slate-500 py-6 text-center border-2 border-dashed border-slate-200 rounded-2xl">Select a driver with GPS to show nearest pickups.</p>
                       )}
                       {nearestTrips.slice(0, 5).map(({ trip, miles, etaMinutes }, index) => (
-                        <div key={trip.id} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                          <div className="flex items-start justify-between gap-2">
+                        <div key={trip.id} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 mb-1">
                                 <span className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-600 text-[10px] font-black text-white shrink-0">{index + 1}</span>
-                                <p className="truncate text-sm font-black text-white">{trip.patient || 'Unknown client'}</p>
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">{trip.status || 'Open'}</span>
+                                <p className="truncate text-base font-black text-slate-900">{trip.patient || 'Unknown client'}</p>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-700">{trip.status || 'Open'}</span>
                               </div>
-                              <p className="mt-1 text-xs text-slate-400 line-clamp-2">{trip.pickup}</p>
-                              <p className="mt-1 text-[11px] font-medium text-slate-500">{trip.time || 'Will Call'} · {formatMiles(miles)} · {formatEta(etaMinutes)}</p>
+                              <p className="mt-2 text-xs font-semibold text-slate-500 line-clamp-2">{trip.pickup}</p>
+                              <p className="mt-1.5 text-[11px] font-bold text-slate-600">{trip.time || 'Will Call'} · {formatMiles(miles)} · {formatEta(etaMinutes)}</p>
                             </div>
-                            <div className="flex flex-col gap-1 shrink-0">
-                              <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', trip.pickup)} className="flex items-center gap-1 h-7 px-2 rounded-lg bg-white/[0.06] text-slate-300 text-[10px] font-bold hover:bg-white/[0.1]">
-                                <Navigation size={11} /> Route
+                            <div className="flex flex-col gap-2 shrink-0">
+                              <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', trip.pickup)} className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold hover:bg-slate-200 transition-colors">
+                                <Navigation size={13} /> Route
                               </button>
                               {trip.status === 'Unassigned' && selectedDriver && assignTripToDriver && (
-                                <button type="button" onClick={() => assignTripToDriver(trip.id, selectedDriver.id)} className="flex items-center gap-1 h-7 px-2 rounded-lg bg-emerald-600/20 text-emerald-400 text-[10px] font-bold hover:bg-emerald-600/30">
-                                  <CheckCircle2 size={11} /> Assign
+                                <button type="button" onClick={() => assignTripToDriver(trip.id, selectedDriver.id)} className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold hover:bg-emerald-100 transition-colors">
+                                  <CheckCircle2 size={13} /> Assign
                                 </button>
                               )}
                             </div>
@@ -1009,13 +1003,13 @@ const LiveMapPage = ({
                   {/* Upcoming trips */}
                   {selectedSummary?.upcoming && selectedSummary.upcoming.length > 0 && (
                     <div>
-                      <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Upcoming ({selectedSummary.upcoming.length})</h4>
-                      <div className="space-y-2">
+                      <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Upcoming ({selectedSummary.upcoming.length})</h4>
+                      <div className="space-y-3">
                         {selectedSummary.upcoming.slice(0, 5).map(trip => (
-                          <div key={trip.id} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                            <p className="truncate text-sm font-black text-white">{trip.patient || 'Unknown client'}</p>
-                            <p className="text-[11px] font-medium text-slate-400">{trip.time || 'Will Call'} · {trip.status}</p>
-                            <p className="mt-1 line-clamp-2 text-xs text-slate-500">{trip.pickup}</p>
+                          <div key={trip.id} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                            <p className="truncate text-base font-black text-slate-900">{trip.patient || 'Unknown client'}</p>
+                            <p className="text-[11px] font-bold text-slate-500 mt-1">{trip.time || 'Will Call'} · {trip.status}</p>
+                            <p className="mt-2 line-clamp-2 text-xs font-medium text-slate-600">{trip.pickup}</p>
                           </div>
                         ))}
                       </div>
@@ -1025,19 +1019,19 @@ const LiveMapPage = ({
                   {/* Ride-share savings */}
                   {rideShareCandidates.length > 0 && (
                     <div>
-                      <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Ride-share savings</h4>
-                      <div className="space-y-2">
+                      <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Ride-share savings</h4>
+                      <div className="space-y-3">
                         {rideShareCandidates.map(candidate => (
-                          <div key={candidate.id} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                            <div className="flex items-start justify-between gap-2">
+                          <div key={candidate.id} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                            <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-black text-white"><Zap size={13} className="inline text-amber-400 mr-1" />{candidate.a.patient} + {candidate.b.patient}</p>
-                                <p className="text-xs text-slate-400 mt-1">{candidate.reason} · {candidate.timeGap}min gap · score {candidate.score}</p>
-                                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{candidate.a.pickup}</p>
-                                <p className="text-[11px] text-slate-500 line-clamp-1">{candidate.b.pickup}</p>
+                                <p className="text-base font-black text-slate-900"><Zap size={14} className="inline text-amber-500 mr-1.5 mb-0.5" />{candidate.a.patient} + {candidate.b.patient}</p>
+                                <p className="text-xs font-bold text-slate-500 mt-1">{candidate.reason} · {candidate.timeGap}min gap · score {candidate.score}</p>
+                                <p className="text-xs font-medium text-slate-600 mt-2 line-clamp-1">{candidate.a.pickup}</p>
+                                <p className="text-xs font-medium text-slate-600 line-clamp-1">{candidate.b.pickup}</p>
                               </div>
-                              <button type="button" onClick={() => setManualAssignTrip?.(candidate.a)} className="flex items-center gap-1 h-7 px-2.5 rounded-lg bg-blue-600/20 text-blue-400 text-[10px] font-bold hover:bg-blue-600/30 shrink-0">
-                                <Route size={11} /> Work
+                              <button type="button" onClick={() => setManualAssignTrip?.(candidate.a)} className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold hover:bg-blue-100 shrink-0 transition-colors">
+                                <Route size={13} /> Work
                               </button>
                             </div>
                           </div>
@@ -1053,65 +1047,65 @@ const LiveMapPage = ({
                 <>
                   {/* Breadcrumb trail */}
                   <div>
-                    <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Breadcrumb trail</h4>
-                    <div className="space-y-1">
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Breadcrumb trail</h4>
+                    <div className="space-y-2">
                       {(selectedTracking?.breadcrumbs || []).slice(-12).reverse().map((sample, idx) => (
-                        <div key={`${sample.at}-${idx}`} className="flex items-center gap-3 rounded-lg bg-white/[0.03] border border-white/[0.04] px-3 py-2">
-                          <span className={`w-2 h-2 shrink-0 rounded-full ${
-                            sample.state === 'moving' ? 'bg-blue-400' : sample.state === 'stopped' ? 'bg-amber-400' : 'bg-slate-500'
+                        <div key={`${sample.at}-${idx}`} className="flex items-center gap-4 rounded-xl bg-white border border-slate-100 p-3 shadow-sm">
+                          <span className={`w-2.5 h-2.5 shrink-0 rounded-full shadow-sm ${
+                            sample.state === 'moving' ? 'bg-blue-500' : sample.state === 'stopped' ? 'bg-amber-400' : 'bg-slate-400'
                           }`} />
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold text-white">{formatMovementState(sample.state)}</p>
-                            <p className="text-[10px] font-medium text-slate-500">{sample.lat?.toFixed?.(4) || sample.lat}, {sample.lng?.toFixed?.(4) || sample.lng}</p>
+                            <p className="text-sm font-black text-slate-900">{formatMovementState(sample.state)}</p>
+                            <p className="text-[11px] font-semibold text-slate-500 mt-0.5">{sample.lat?.toFixed?.(4) || sample.lat}, {sample.lng?.toFixed?.(4) || sample.lng}</p>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="text-[11px] font-bold text-slate-300 tabular-nums">{sample.speedMph || 0} mph</p>
-                            <p className="text-[10px] text-slate-500">{formatAge(sample.at)}</p>
+                            <p className="text-xs font-black text-slate-700 tabular-nums">{sample.speedMph || 0} mph</p>
+                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{formatAge(sample.at)}</p>
                           </div>
                         </div>
                       ))}
                       {(!selectedTracking?.breadcrumbs || selectedTracking.breadcrumbs.length === 0) && (
-                        <p className="text-xs text-slate-500 py-4 text-center border border-dashed border-white/[0.06] rounded-xl">No breadcrumb history yet.</p>
+                        <p className="text-sm font-semibold text-slate-500 py-6 text-center border-2 border-dashed border-slate-200 rounded-2xl">No breadcrumb history yet.</p>
                       )}
                     </div>
                   </div>
 
                   {/* Stop events */}
                   <div>
-                    <h4 className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Stop events</h4>
-                    <div className="space-y-1">
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Stop events</h4>
+                    <div className="space-y-2">
                       {(selectedTracking?.stopEvents || []).slice(-6).reverse().map((stop, index) => (
-                        <div key={`${stop.startedAt || index}`} className="flex items-center gap-3 rounded-lg bg-white/[0.03] border border-white/[0.04] px-3 py-2">
-                          <span className="w-2 h-2 shrink-0 rounded-full bg-amber-400" />
+                        <div key={`${stop.startedAt || index}`} className="flex items-center gap-4 rounded-xl bg-white border border-slate-100 p-3 shadow-sm">
+                          <span className="w-2.5 h-2.5 shrink-0 rounded-full bg-amber-400 shadow-sm" />
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold text-white">{formatTelemetryDuration(stop.minutes || 0)} stop</p>
-                            <p className="text-[10px] font-medium text-slate-500 line-clamp-1">{stop.destination || stop.patient || 'Waiting location'}</p>
+                            <p className="text-sm font-black text-slate-900">{formatTelemetryDuration(stop.minutes || 0)} stop</p>
+                            <p className="text-[11px] font-semibold text-slate-500 mt-0.5 line-clamp-1">{stop.destination || stop.patient || 'Waiting location'}</p>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="text-[11px] font-bold text-slate-300">{formatAge(stop.startedAt)}</p>
-                            <p className="text-[10px] text-slate-500">{stop.endedAt ? 'Closed' : 'Live'}</p>
+                            <p className="text-[11px] font-black text-slate-700">{formatAge(stop.startedAt)}</p>
+                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{stop.endedAt ? 'Closed' : 'Live'}</p>
                           </div>
                         </div>
                       ))}
                       {(!selectedTracking?.stopEvents || selectedTracking.stopEvents.length === 0) && (
-                        <p className="text-xs text-slate-500 py-4 text-center border border-dashed border-white/[0.06] rounded-xl">No stop events recorded today.</p>
+                        <p className="text-sm font-semibold text-slate-500 py-6 text-center border-2 border-dashed border-slate-200 rounded-2xl">No stop events recorded today.</p>
                       )}
                     </div>
                   </div>
 
                   {/* Telemetry stats */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Ping count</p>
-                      <p className="mt-1 text-lg font-black text-white tabular-nums">{selectedTracking?.totalPings || 0}</p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ping count</p>
+                      <p className="mt-1 text-2xl font-black text-slate-900 tabular-nums">{selectedTracking?.totalPings || 0}</p>
                     </div>
-                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">GPS age</p>
-                      <p className="mt-1 text-lg font-black text-white tabular-nums">{formatAge(selectedSummary?.lastPing)}</p>
+                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">GPS age</p>
+                      <p className="mt-1 text-2xl font-black text-slate-900 tabular-nums">{formatAge(selectedSummary?.lastPing)}</p>
                     </div>
-                    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                      <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Speed</p>
-                      <p className="mt-1 text-lg font-black text-white tabular-nums">{selectedDriver?.speedMph ?? selectedDriver?.telemetry?.speedMph ?? 0} mph</p>
+                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Speed</p>
+                      <p className="mt-1 text-2xl font-black text-slate-900 tabular-nums">{selectedDriver?.speedMph ?? selectedDriver?.telemetry?.speedMph ?? 0} mph</p>
                     </div>
                   </div>
                 </>
