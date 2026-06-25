@@ -2619,7 +2619,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
 
         <div className="px-3 pt-3 space-y-3">
-          <div className="rounded-2xl overflow-hidden shadow-lg" style={{ background: 'linear-gradient(145deg, #2c5282 0%, #3b6bbf 50%, #2d5fa6 100%)' }}>
+          <div className="rounded-2xl overflow-hidden shadow-lg" style={{ background: 'linear-gradient(145deg, #1e3a5f 0%, #274b7c 50%, #1a3355 100%)' }}>
             <div className="relative px-4 py-2.5">
               <div className="absolute right-4 top-4 flex gap-1 opacity-10">
                 <span className="w-2 h-2 rounded-full bg-white" />
