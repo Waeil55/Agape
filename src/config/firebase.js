@@ -40,8 +40,6 @@ try {
 const auth = getAuth(app);
 const analytics = getAnalytics(app);
 
-setPersistence(auth, browserLocalPersistence).catch(() => {});
-
 let messaging;
 try { messaging = getMessaging(app); } catch { /* FCM not available in all environments */ }
 
