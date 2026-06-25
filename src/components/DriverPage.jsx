@@ -209,7 +209,7 @@ const formatTripDetailOdometer = (value) => {
   const cleaned = s.replace(/,/g, '').replace(/\bmi(?:les)?\b/gi, '').trim();
   if (!/^\d+(\.\d+)?$/.test(cleaned)) return '--';
   const n = Number(cleaned);
-  return Number.isFinite(n) && n > 0 ? `${n.toLocaleString()} mi` : '--';
+  return Number.isFinite(n) && n >= 0 ? `${n.toLocaleString()} mi` : '--';
 };
 const formatTripDistance = (value) => {
   if (value === undefined || value === null || value === '') return '--';
@@ -283,7 +283,7 @@ const getHistoryFinishedSortMs = (trip) => {
 };
 const HistoryTripDetailTable = ({ trip, driver }) => {
   if (!trip) return null;
-  const pickupClock = getFirstTripClock(trip, ['arrivalTime', 'pickupArrival', 'pickupArrivalTime', 'actualPickupTime', 'startTime']);
+  const pickupClock = getFirstTripClock(trip, ['departedPickupTime', 'arrivalTime', 'pickupArrival', 'pickupArrivalTime', 'actualPickupTime', 'startTime']);
   const dropoffClock = getFirstTripClock(trip, ['arrivalDropoffTime', 'dropoffArrival', 'dropoffArrivalTime', 'actualDropoffTime', 'dropoffTime']);
   const pickupOdometer = getFirstTripOdometer(trip, ['pickupOdometer', 'startOdometer', 'startMileage', 'pickupMileage']);
   const dropoffOdometer = getFirstTripOdometer(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'dropoffMileage']);

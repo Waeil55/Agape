@@ -5,7 +5,7 @@ import {
   BrainCircuit, Phone, MessageSquare,
   ChevronDown, ChevronUp, AlertTriangle, MapPin,
   Square, CheckSquare, X, ArrowRight, TrendingUp, TrendingDown,
-  Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2
+  Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2, Filter
 } from 'lucide-react';
 import { db, doc, getDocFromServer } from '../config/firebase';
 import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
@@ -15,6 +15,7 @@ import { getOperationalRoutes } from '../utils/routePlans';
 import EditTripModal from './EditTripModal';
 import CommandIntelligencePanel from './CommandIntelligencePanel';
 import { aiPrioritizeTrips } from '../config/ai';
+import { getDriverLiveStatus } from '../constants/statuses';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -425,6 +426,7 @@ const OperationsCommandCenter = ({
   const [routeTemplates, setRouteTemplates] = useState([]);
   const [showIntelligence, setShowIntelligence] = useState(() => localStorage.getItem('agape_opsShowIntelligence') !== 'false');
   const [expandedTripIds, setExpandedTripIds] = useState([]);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [lastIntelRefresh, setLastIntelRefresh] = useState(() => new Date().toISOString());
   const [aiSortOrder, setAiSortOrder] = useState(null);
   const [aiSortLoading, setAiSortLoading] = useState(false);
@@ -1053,59 +1055,68 @@ const OperationsCommandCenter = ({
           ))}
         </div>
 
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-xl text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
-          <option value="all">All</option>
-          <option value="Unassigned">Unassigned</option>
-          <option value="Assigned">Assigned</option>
-          <option value="in-progress">In Progress</option>
-          <option value="In Mission">In Mission</option>
-          <option value="Completed">Completed</option>
-          <option value="Cancelled">Cancelled</option>
-          <option value="No Show">No Show</option>
-          <option value="Rerouted">Rerouted</option>
-        </select>
+        <button
+          onClick={() => setShowMobileFilters(!showMobileFilters)}
+          className={`md:hidden flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-colors ${showMobileFilters ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+        >
+          <Filter size={12} /> {showMobileFilters ? 'Hide Options' : 'Options'}
+        </button>
 
-        <div className="flex items-center gap-1">
-          <select value={sortBy} onChange={(e) => handleSortSelect(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-xl text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+        <div className={`${showMobileFilters ? 'flex' : 'hidden'} md:flex absolute md:relative top-full left-0 right-0 md:top-auto bg-white md:bg-transparent shadow-lg md:shadow-none p-3 md:p-0 flex-col md:flex-row items-stretch md:items-center gap-2 z-50 border-b md:border-0 border-slate-200 mt-1 md:mt-0`}>
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-2 py-1.5 text-[11px] md:text-[10px] bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-white cursor-pointer w-full md:w-auto">
+            <option value="all">All</option>
+            <option value="Unassigned">Unassigned</option>
+            <option value="Assigned">Assigned</option>
+            <option value="in-progress">In Progress</option>
+            <option value="In Mission">In Mission</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+            <option value="No Show">No Show</option>
+            <option value="Rerouted">Rerouted</option>
+          </select>
+
+          <div className="flex items-center gap-1 w-full md:w-auto">
+            <select value={sortBy} onChange={(e) => handleSortSelect(e.target.value)} className="flex-1 md:flex-none px-2 py-1.5 text-[11px] md:text-[10px] bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-white cursor-pointer min-w-0">
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            {sortBy !== 'ai' && (
+              <button
+                type="button"
+                onClick={() => setSortDirection((prev) => prev === 'asc' ? 'desc' : 'asc')}
+                className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] md:text-[10px] font-bold text-slate-700 hover:bg-white shrink-0"
+                title="Toggle sort direction"
+              >
+                {sortDirection === 'asc' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                {sortDirection === 'asc' ? 'Asc' : 'Desc'}
+              </button>
+            )}
+            {sortBy === 'time' && (
+              <button
+                type="button"
+                onClick={() => setTimeSortBottomInactive((prev) => !prev)}
+                className={`inline-flex items-center justify-center gap-1 rounded-xl border px-2 py-1.5 text-[11px] md:text-[10px] font-bold transition-colors shrink-0 ${
+                  timeSortBottomInactive
+                    ? 'border-blue-300 bg-blue-100 text-blue-800'
+                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
+                }`}
+                title="Keep Cancelled, No Show, and Rerouted trips at the bottom while sorting by schedule"
+              >
+                {timeSortBottomInactive ? <CheckCircle2 size={12} /> : <Square size={12} />}
+                Closed bottom
+              </button>
+            )}
+            {sortBy === 'ai' && aiSortLoading && <Loader2 size={12} className="text-blue-600 animate-spin shrink-0" />}
+          </div>
+          <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-2 py-1.5 text-[11px] md:text-[10px] bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-white cursor-pointer w-full md:w-auto">
+            <option value="all">Drivers</option>
+            <option value="unassigned">No Driver</option>
+            {driverOptions.map((driver) => (
+              <option key={driver.id} value={driver.id}>{driver.name}</option>
             ))}
           </select>
-          {sortBy !== 'ai' && (
-            <button
-              type="button"
-              onClick={() => setSortDirection((prev) => prev === 'asc' ? 'desc' : 'asc')}
-              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50"
-              title="Toggle sort direction"
-            >
-              {sortDirection === 'asc' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-              {sortDirection === 'asc' ? 'Asc' : 'Desc'}
-            </button>
-          )}
-          {sortBy === 'time' && (
-            <button
-              type="button"
-              onClick={() => setTimeSortBottomInactive((prev) => !prev)}
-              className={`inline-flex items-center gap-1 rounded-xl border px-2 py-1 text-[10px] font-bold transition-colors ${
-                timeSortBottomInactive
-                  ? 'border-blue-200 bg-blue-50 text-blue-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-              }`}
-              title="Keep Cancelled, No Show, and Rerouted trips at the bottom while sorting by schedule"
-            >
-              {timeSortBottomInactive ? <CheckCircle2 size={11} /> : <Square size={11} />}
-              Closed bottom
-            </button>
-          )}
-          {sortBy === 'ai' && aiSortLoading && <Loader2 size={11} className="text-blue-600 animate-spin shrink-0" />}
         </div>
-        <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-xl text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
-          <option value="all">Drivers</option>
-          <option value="unassigned">No Driver</option>
-          {driverOptions.map((driver) => (
-            <option key={driver.id} value={driver.id}>{driver.name}</option>
-          ))}
-        </select>
 
       </div>
 
@@ -2100,15 +2111,9 @@ const OperationsCommandCenter = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5">
-                      {d.status === 'Available' ? (
-                        <span className="relative flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                        </span>
-                      ) : (
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                      )}
-                      <span className="text-micro text-slate-400">{d.status}</span>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${getDriverLiveStatus(d).color}`}>
+                        {getDriverLiveStatus(d).label}
+                      </span>
                     </div>
                     <div className="p-1 rounded hover:bg-slate-100 transition-colors">
                       {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}

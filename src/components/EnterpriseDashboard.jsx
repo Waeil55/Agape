@@ -210,14 +210,12 @@ const EnterpriseDashboard = ({
   const todayStr = new Date().toISOString().split('T')[0];
 
   const sidebarItems = [
-    { id: 'operations', label: 'Operations', icon: LayoutDashboard, roles: ['admin', 'dispatcher'] },
+    { id: 'operations', label: 'Dispatch', icon: LayoutDashboard, roles: ['admin', 'dispatcher'] },
     { id: 'drive', label: 'Drive', icon: Truck, roles: ['admin', 'dispatcher'] },
-    { id: 'liveMap', label: 'Live Map', icon: MapPin, roles: ['admin', 'dispatcher', 'fleet_manager', 'qa_auditor', 'supervisor'] },
+    { id: 'liveMap', label: 'Map', icon: MapPin, roles: ['admin', 'dispatcher', 'fleet_manager', 'qa_auditor', 'supervisor'] },
     { id: 'chat', label: 'Chat', icon: MessageCircle, roles: ['admin', 'dispatcher'] },
-    { id: 'routePlanner', label: 'Routes', icon: Route, roles: ['admin', 'dispatcher'] },
     { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['admin', 'dispatcher', 'billing', 'qa_auditor', 'fleet_manager', 'supervisor'] },
-    { id: 'archives', label: 'Archives', icon: Archive, roles: ['admin', 'dispatcher'] },
-    { id: 'admin', label: role === 'admin' ? 'Admin' : 'People/Fleet', icon: Users, roles: ['admin', 'dispatcher'] },
+    { id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, roles: ['admin', 'dispatcher'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin', 'dispatcher'] },
   ].filter(item => item.roles.includes(role))
     .filter(item => item.id !== 'drive' || driverWorkDrivers.length > 0);
@@ -310,15 +308,13 @@ const EnterpriseDashboard = ({
 
   const topNavItems = useMemo(() => {
     const items = [
-      { id: 'dispatch', label: 'Dispatch Board', icon: Zap, active: activePanel === 'operations', action: () => openOperationsWorkspace('manifest') },
-      { id: 'schedule', label: 'Schedule', icon: CalendarDays, active: showSequencerModal, action: () => setShowSequencerModal(true) },
+      { id: 'dispatch', label: 'Dispatch', icon: Zap, active: activePanel === 'operations', action: () => openOperationsWorkspace('manifest') },
+      { id: 'schedule', label: 'Routes', icon: Route, active: showSequencerModal, action: () => setShowSequencerModal(true) },
       ...(driverWorkDrivers.length > 0 ? [{ id: 'drive', label: 'Drive', icon: Truck, active: activePanel === 'drive', action: () => setActivePanel('drive') }] : []),
-      ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'People/Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
+      ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
       { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => setActivePanel('reports') },
-      { id: 'map', label: 'Live Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
-      { id: 'messages', label: 'Messages', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat') },
-      { id: 'routes', label: 'Routes', icon: Route, active: activePanel === 'routePlanner', action: () => setActivePanel('routePlanner') },
-      { id: 'archives', label: 'Archives', icon: Archive, active: activePanel === 'archives', action: () => setActivePanel('archives') },
+      { id: 'map', label: 'Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
+      { id: 'messages', label: 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat') },
       { id: 'settings', label: 'Settings', icon: Settings, active: activePanel === 'settings', action: () => setActivePanel('settings') },
     ];
     return items;
@@ -1116,9 +1112,15 @@ const EnterpriseDashboard = ({
           }}
         />
       );
+      case 'archives': // Archives is now embedded in Settings
       case 'settings': return (
-        <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} />
+        <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} initialSection={activePanel === 'archives' ? 'archives' : undefined} />
       );
+      case 'routePlanner': {
+        // Route Planner is now consolidated — open sequencer modal and redirect to operations
+        setShowSequencerModal(true);
+        return renderOperationsPage();
+      }
       case 'drive': return driverWorkDrivers.length > 0 ? (
         <DriverPage currentUser={currentUser} role={role} drivers={driverWorkDrivers} trips={driverWorkTrips} allDrivers={allDrivers} dispatchers={dispatchers} phoneNumbers={phoneNumbers} onUpdateTrip={onUpdateDriverTrip} onCompleteTrip={onCompleteTrip} onDriverStatusUpdate={onDriverStatusUpdate} onAddAuditLog={addAuditLog} onLogout={() => {}} requestAuthAction={requestAuthAction} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} onUpdateDriverLocation={handleUpdateDriverLocation} onOpenSettings={() => setActivePanel('settings')} onAddTrip={addTrip} showAddTripModal={showAddTripModal} setShowAddTripModal={setShowAddTripModal} />
       ) : renderOperationsPage();

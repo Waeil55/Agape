@@ -98,6 +98,8 @@ const SettingsPage = ({
   onLogout,
   onResetSystem,
   trashedTrips = [],
+  restoreTrip,
+  updateTrashedTrip,
   appSettings,
   onUpdateAppSettings,
   driverProfile,
@@ -110,10 +112,18 @@ const SettingsPage = ({
   dispatchers = [],
   vehicles = [],
   logs = [],
+  initialSection,
 }) => {
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
-  const [activeSection, setActiveSection] = useState(() => localStorage.getItem(`agape_settingsSection_${userKey}`) || 'overview');
+  const resolvedInitialSection = initialSection === 'archives' ? 'archived' : initialSection;
+  const [activeSection, setActiveSection] = useState(() => resolvedInitialSection || localStorage.getItem(`agape_settingsSection_${userKey}`) || 'overview');
   const [showArchivedTrips, setShowArchivedTrips] = useState(false);
+
+  useEffect(() => {
+    if (resolvedInitialSection && resolvedInitialSection !== activeSection) {
+      setActiveSection(resolvedInitialSection);
+    }
+  }, [resolvedInitialSection]);
 
   useEffect(() => {
     localStorage.setItem(`agape_settingsSection_${userKey}`, activeSection);
