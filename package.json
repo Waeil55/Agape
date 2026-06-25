@@ -23,6 +23,7 @@
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.3.4",
     "@google/generative-ai": "^0.3.0",
+    "@googlemaps/markerclusterer": "^2.6.2",
     "axios": "^1.6.0",
     "date-fns": "^2.30.0",
     "firebase": "^12.15.0",

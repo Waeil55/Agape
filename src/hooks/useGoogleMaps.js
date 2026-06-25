@@ -15,7 +15,7 @@ export default function useGoogleMaps() {
       return;
     }
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY()}&libraries=places,directions,geometry&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY()}&libraries=places,directions,geometry,drawing&v=weekly`;
     script.async = true;
     script.defer = true;
     loadingPromise = new Promise((resolve, reject) => {

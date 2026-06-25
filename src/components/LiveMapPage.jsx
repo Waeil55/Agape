@@ -28,6 +28,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { GOOGLE_MAPS_API_KEY, db, collection, query, orderBy, limit as firestoreLimit, getDocs } from '../config/firebase';
+import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiOptimizeFleet } from '../config/ai';
 import { getDistanceMiles, hasGoogleMapsConfigured } from '../config/maps';
@@ -55,6 +56,12 @@ const ACTIVE_STATUSES = new Set([
 const COMPLETE_STATUSES = new Set(['Completed', 'Cancelled', 'No Show']);
 
 const DRIVER_COLORS = ['blue', 'green', 'orange', 'purple', 'red', 'yellow', 'gray', 'brown'];
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
 
 function todayLocal() {
   const d = new Date();
@@ -153,52 +160,6 @@ function openDirections(origin, destination) {
   window.open(`https://www.google.com/maps/dir/?${params.toString()}`, '_blank', 'noopener,noreferrer');
 }
 
-function buildStaticMapUrl(drivers, selectedDriver, selectedTrip, trailPoints = []) {
-  if (!hasGoogleMapsConfigured()) return null;
-
-  const driverMarkers = drivers
-    .map((driver, index) => ({ driver, point: getDriverPoint(driver), index }))
-    .filter(item => item.point)
-    .map(({ driver, point, index }) => {
-      const color = driver.id === selectedDriver?.id ? 'red' : DRIVER_COLORS[index % DRIVER_COLORS.length];
-      const label = String(driver?.name || 'D').trim().charAt(0).toUpperCase() || 'D';
-      return `markers=color:${color}%7Clabel:${encodeURIComponent(label)}%7C${point.lat},${point.lng}`;
-    });
-
-  const tripMarkers = [];
-  if (selectedTrip?.pickup) {
-    tripMarkers.push(`markers=color:green%7Clabel:P%7C${encodeURIComponent(selectedTrip.pickup)}`);
-  }
-  if (selectedTrip?.dropoff) {
-    tripMarkers.push(`markers=color:orange%7Clabel:D%7C${encodeURIComponent(selectedTrip.dropoff)}`);
-  }
-
-  const markers = [...driverMarkers, ...tripMarkers];
-
-  // Add driver breadcrumb trail as polyline
-  let trailPath = '';
-  if (trailPoints.length >= 2) {
-    const pathCoords = trailPoints.map((p) => `${p.lat},${p.lng}`).join('|');
-    trailPath = `&path=color:0x4285F4|weight:3|fillcolor:0x4285F420|${pathCoords}`;
-  }
-
-  if (markers.length === 0 && !trailPath) return null;
-
-  const center = selectedDriver ? getDriverPoint(selectedDriver) : null;
-  const params = new URLSearchParams({
-    size: '1280x720',
-    scale: '2',
-    maptype: 'roadmap',
-    key: GOOGLE_MAPS_API_KEY(),
-  });
-  if (center) {
-    params.set('center', `${center.lat},${center.lng}`);
-    params.set('zoom', selectedTrip ? '12' : '11');
-  }
-
-  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}&${markers.join('&')}${trailPath}`;
-}
-
 function buildRideShareCandidates(trips) {
   const openTrips = sortTripsByTime(trips.filter(t => !COMPLETE_STATUSES.has(t.status)));
   const pairs = [];
@@ -231,6 +192,63 @@ function buildRideShareCandidates(trips) {
   return pairs.sort((a, b) => b.score - a.score).slice(0, 6);
 }
 
+const DARK_MAP_STYLES = [
+  { elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#334155' }] },
+  { featureType: 'administrative.country', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+  { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#334155' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+  { featureType: 'poi', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#475569' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#64748b' }] },
+  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#334155' }] },
+  { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
+];
+
+function loadGoogleMapsApi(key) {
+  return new Promise((resolve, reject) => {
+    if (window.google?.maps) { resolve(window.google.maps); return; }
+    const existing = document.getElementById('gm-live-api');
+    if (existing) {
+      if (window.google?.maps) { resolve(window.google.maps); return; }
+      existing.addEventListener('load', () => resolve(window.google.maps), { once: true });
+      existing.addEventListener('error', reject, { once: true });
+      return;
+    }
+    const s = document.createElement('script');
+    s.id = 'gm-live-api';
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}`;
+    s.async = true;
+    s.defer = true;
+    s.onload = () => resolve(window.google.maps);
+    s.onerror = () => reject(new Error('Google Maps script failed to load'));
+    document.head.appendChild(s);
+  });
+}
+
+function createMarkerIcon(mapsLib, initial, fillColor, isSelected = false, isPulsing = false) {
+  const size = isSelected ? 36 : 28;
+  const fontSize = isSelected ? 13 : 11;
+  const pulseAnim = isPulsing ? `<animate attributeName="r" from="${size / 2 - 2}" to="${size / 2 + 10}" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" from="0.6" to="0" dur="1.5s" repeatCount="indefinite"/>` : '';
+  const ring = (isSelected || isPulsing)
+    ? `<circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 + 5}" fill="none" stroke="${fillColor}" stroke-width="2" opacity="0.4">${pulseAnim}</circle>`
+    : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${ring}<circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" fill="${fillColor}" stroke="#ffffff" stroke-width="2" /><text x="${size / 2}" y="${size / 2 + fontSize / 3}" text-anchor="middle" fill="#ffffff" font-size="${fontSize}" font-weight="bold" font-family="system-ui">${initial}</text></svg>`;
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new mapsLib.Size(size, size),
+    anchor: new mapsLib.Point(size / 2, size / 2),
+  };
+}
+
 const StatusPill = ({ children, tone = 'slate' }) => {
   const classes = {
     emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -260,7 +278,6 @@ const LiveMapPage = ({
   sendSMS,
 }) => {
   const [selectedDriverId, setSelectedDriverId] = useState(() => drivers[0]?.id || '');
-  const [mapError, setMapError] = useState(false);
   const [gpsActive, setGpsActive] = useState(false);
   const [nearestTrips, setNearestTrips] = useState([]);
   const [distanceLoading, setDistanceLoading] = useState(false);
@@ -275,6 +292,21 @@ const LiveMapPage = ({
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailTab, setDetailTab] = useState('overview');
   const [hudSearch, setHudSearch] = useState('');
+  const [mapReady, setMapReady] = useState(false);
+  const [mapsLoadError, setMapsLoadError] = useState(false);
+  const [showTraffic, setShowTraffic] = useState(false);
+  const [showClusters, setShowClusters] = useState(true);
+  const [streetViewLoc, setStreetViewLoc] = useState(null);
+
+  const mapContainerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef([]);
+  const clustererRef = useRef(null);
+  const trafficLayerRef = useRef(null);
+  const svContainerRef = useRef(null);
+  const svInstanceRef = useRef(null);
+  const trailPolyRef = useRef(null);
+  const infoWindowRef = useRef(null);
 
   const runFleetAiAnalysis = useCallback(async () => {
     setFleetAiLoading(true);
@@ -421,8 +453,175 @@ const LiveMapPage = ({
     };
   }, [selectedPoint?.lat, selectedPoint?.lng, selectedSummary?.driver?.id, selectedSummary?.upcoming, unassignedTrips, intelRefreshToken]);
 
-  const mapUrl = buildStaticMapUrl(drivers, selectedDriver, selectedTrip, showTrail ? driverTrailPoints : []);
   const selectedDestination = getTripPhase(selectedTrip).destination;
+
+  // Map initialization
+  useEffect(() => {
+    if (!hasGoogleMapsConfigured()) { setMapsLoadError(true); return; }
+    let cancelled = false;
+    loadGoogleMapsApi(GOOGLE_MAPS_API_KEY())
+      .then((mapsLib) => {
+        if (cancelled || mapRef.current) return;
+        const el = mapContainerRef.current;
+        if (!el) return;
+        try {
+          const map = new mapsLib.Map(el, {
+            zoom: 11,
+            center: { lat: 38.9072, lng: -77.0369 },
+            mapTypeId: 'roadmap',
+            styles: DARK_MAP_STYLES,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            zoomControl: true,
+            zoomControlOptions: { position: mapsLib.ControlPosition.RIGHT_BOTTOM },
+          });
+          mapRef.current = map;
+          infoWindowRef.current = new mapsLib.InfoWindow({
+            pixelOffset: new mapsLib.Size(0, -18),
+          });
+          if (!cancelled) setMapReady(true);
+        } catch (err) {
+          console.error('[LiveMap] Error initializing map', err);
+          if (!cancelled) setMapsLoadError(true);
+        }
+      })
+      .catch(() => { if (!cancelled) setMapsLoadError(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Traffic Layer update
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const mapsLib = window.google.maps;
+    if (showTraffic) {
+      if (!trafficLayerRef.current) trafficLayerRef.current = new mapsLib.TrafficLayer();
+      trafficLayerRef.current.setMap(mapRef.current);
+    } else if (trafficLayerRef.current) {
+      trafficLayerRef.current.setMap(null);
+    }
+  }, [mapReady, showTraffic]);
+
+  // Street View Side-panel update
+  useEffect(() => {
+    if (!svContainerRef.current || !streetViewLoc) return;
+    const mapsLib = window.google.maps;
+    if (!svInstanceRef.current) {
+      svInstanceRef.current = new mapsLib.StreetViewPanorama(svContainerRef.current, {
+        position: streetViewLoc,
+        pov: { heading: 0, pitch: 0 },
+        zoom: 1,
+        addressControl: false,
+        linksControl: false,
+        panControl: false,
+        enableCloseButton: false,
+        fullscreenControl: false,
+      });
+      mapRef.current?.setStreetView(svInstanceRef.current);
+    } else {
+      svInstanceRef.current.setPosition(streetViewLoc);
+    }
+  }, [streetViewLoc]);
+
+  // Markers update
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const mapsLib = window.google.maps;
+
+    // Clear old markers
+    markersRef.current.forEach((m) => m.setMap(null));
+    markersRef.current = [];
+
+    // Build driver markers
+    drivers.forEach((driver) => {
+      const point = getDriverPoint(driver);
+      if (!point) return;
+      const initial = String(driver?.name || 'D').charAt(0).toUpperCase();
+      const colors = { blue: '#3B82F6', green: '#22C55E', orange: '#F97316', purple: '#A855F7', red: '#EF4444', yellow: '#EAB308', gray: '#64748B', brown: '#78716C' };
+      const colorIdx = drivers.indexOf(driver) % DRIVER_COLORS.length;
+      const baseColor = colors[DRIVER_COLORS[colorIdx]] || '#64748B';
+      const isPulsing = ACTIVE_STATUSES.has(driver.status) || driver.status === 'Delayed';
+
+      try {
+        const marker = new mapsLib.Marker({
+          position: point,
+          map: showClusters ? null : mapRef.current,
+          title: driver.name || 'Driver',
+          icon: createMarkerIcon(mapsLib, initial, driver.id === selectedDriverId ? '#3B82F6' : baseColor, driver.id === selectedDriverId, isPulsing),
+          zIndex: driver.id === selectedDriverId ? 100 : 10,
+        });
+
+        marker.addListener('click', () => {
+          setSelectedDriverId(driver.id);
+          infoWindowRef.current?.setContent(`
+            <div style="font-family:system-ui;color:#e2e8f0;font-size:12px;line-height:1.4;min-width:160px">
+              <div style="font-weight:800;font-size:14px;color:#f8fafc;margin-bottom:2px">${escapeHtml(driver.name || 'Unnamed')}</div>
+              <div style="color:#94a3b8;font-size:11px">${escapeHtml(driver.vehicle || 'No vehicle')}</div>
+              <div style="color:#64748b;font-size:10px;margin-top:4px">${formatAge(driver.lastLocationUpdate || driver.lastUpdate)}</div>
+            </div>
+          `);
+          infoWindowRef.current?.open(mapRef.current, marker);
+        });
+
+        markersRef.current.push(marker);
+      } catch (err) {
+        console.error('[LiveMap] Error creating marker for', driver.name, err);
+      }
+    });
+
+    if (showClusters) {
+      if (!clustererRef.current) {
+        clustererRef.current = new MarkerClusterer({ map: mapRef.current, markers: markersRef.current });
+      } else {
+        clustererRef.current.clearMarkers();
+        clustererRef.current.addMarkers(markersRef.current);
+      }
+    } else if (clustererRef.current) {
+      clustererRef.current.clearMarkers();
+    }
+
+    // Auto-pan to selected driver
+    const selPoint = selectedDriver ? getDriverPoint(selectedDriver) : null;
+    if (selPoint) {
+      mapRef.current.panTo(selPoint);
+    }
+  }, [mapReady, drivers, selectedDriverId, showClusters]);
+
+  // Trail polyline update
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const mapsLib = window.google.maps;
+
+    // Remove old trail
+    if (trailPolyRef.current) {
+      trailPolyRef.current.setMap(null);
+      trailPolyRef.current = null;
+    }
+
+    if (!showTrail || driverTrailPoints.length < 2) return;
+
+    try {
+      const path = driverTrailPoints.map((p) => ({ lat: p.lat, lng: p.lng }));
+      trailPolyRef.current = new mapsLib.Polyline({
+        path,
+        geodesic: true,
+        strokeColor: '#4285F4',
+        strokeOpacity: 0.8,
+        strokeWeight: 3,
+        map: mapRef.current,
+      });
+    } catch (err) {
+      console.error('[LiveMap] Error creating trail polyline', err);
+    }
+  }, [mapReady, driverTrailPoints, showTrail]);
+
+  // Resize handler
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const handler = () => { mapRef.current?.google?.maps?.event?.trigger(mapRef.current, 'resize'); };
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [mapReady]);
 
   const startMyGpsTracking = () => {
     if (!navigator.geolocation || !myDriverProfile?.id || watchIdRef.current !== null) return;
@@ -465,6 +664,20 @@ const LiveMapPage = ({
   };
 
   useEffect(() => () => stopMyGpsTracking(), []);
+
+  const handleOpenStreetView = (destStr) => {
+    if (!destStr) return;
+    const mapsLib = window.google.maps;
+    if (!mapsLib) return;
+    const geocoder = new mapsLib.Geocoder();
+    geocoder.geocode({ address: destStr }, (results, status) => {
+      if (status === 'OK' && results[0]) {
+        setStreetViewLoc(results[0].geometry.location);
+      } else {
+        console.warn('Geocode failed for street view:', status);
+      }
+    });
+  };
 
   return (
     <div className="h-screen w-full min-h-0 bg-slate-950 flex flex-col overflow-hidden select-none">
@@ -510,23 +723,47 @@ const LiveMapPage = ({
 
       {/* ===== MAP AREA (fills remaining space) ===== */}
       <div className="flex-1 relative overflow-hidden bg-slate-900">
-        {/* Map image */}
-        {mapUrl && !mapError ? (
-          <img
-            src={mapUrl}
-            alt="Live fleet map"
-            className="absolute inset-0 w-full h-full object-cover"
-            onError={() => setMapError(true)}
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
+        {/* Interactive map container */}
+        <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+
+        {/* Maps loading / error overlay */}
+        {!mapsLoadError && !mapReady && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
+            <div className="text-center">
+              <Loader2 size={48} className="mx-auto text-slate-700 animate-spin" />
+              <h3 className="mt-3 text-base font-black text-slate-400">Loading Map...</h3>
+            </div>
+          </div>
+        )}
+        {mapsLoadError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
             <div className="text-center">
               <Map size={48} className="mx-auto text-slate-700" />
               <h3 className="mt-3 text-base font-black text-slate-400">Fleet Command Center</h3>
               <p className="mt-1 max-w-md text-sm font-medium text-slate-500">
-                {hasGoogleMapsConfigured() ? 'Waiting for driver GPS data...' : 'Configure Google Maps API key to enable the map.'}
+                {hasGoogleMapsConfigured() ? 'Could not load Google Maps. Check API key.' : 'Configure Google Maps API key to enable the map.'}
               </p>
             </div>
+          </div>
+        )}
+        {/* Map Overlays */}
+        <div className="absolute top-4 left-4 flex gap-2 z-20">
+          <button type="button" onClick={() => setShowTraffic(t => !t)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${showTraffic ? 'bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.4)] border-amber-400' : 'bg-slate-900/80 text-slate-400 border border-white/10 hover:bg-slate-800 hover:text-white'}`}>
+            🚦 Live Traffic
+          </button>
+          <button type="button" onClick={() => setShowClusters(c => !c)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${showClusters ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border-indigo-400' : 'bg-slate-900/80 text-slate-400 border border-white/10 hover:bg-slate-800 hover:text-white'}`}>
+            🌐 Clustering
+          </button>
+        </div>
+
+        {/* Street View Split Panel */}
+        {streetViewLoc && (
+          <div className="absolute top-0 right-0 w-[450px] max-w-[90vw] h-full z-30 bg-slate-950 border-l border-white/10 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+            <div className="flex items-center justify-between px-4 h-14 border-b border-white/10 bg-slate-900/50 shrink-0">
+              <span className="text-white text-sm font-bold flex items-center gap-2"><MapPin size={16} className="text-blue-400" /> Street View Entrance</span>
+              <button onClick={() => setStreetViewLoc(null)} className="text-slate-400 hover:text-white p-1.5 bg-white/5 rounded-md hover:bg-white/10 transition-colors"><X size={16} /></button>
+            </div>
+            <div ref={svContainerRef} className="flex-1 w-full bg-slate-800" />
           </div>
         )}
 
@@ -681,9 +918,14 @@ const LiveMapPage = ({
                     </>
                   )}
                   {selectedDestination && (
-                    <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', selectedDestination)} className="flex items-center gap-1 h-8 px-2.5 rounded-lg bg-white/[0.06] text-slate-300 text-[11px] font-bold hover:bg-white/[0.1] transition-colors" title="Open in Google Maps">
-                      <Compass size={13} />
-                    </button>
+                    <>
+                      <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', selectedDestination)} className="flex items-center gap-1 h-8 px-2.5 rounded-lg bg-white/[0.06] text-slate-300 text-[11px] font-bold hover:bg-white/[0.1] transition-colors" title="Open in Google Maps">
+                        <Compass size={13} />
+                      </button>
+                      <button type="button" onClick={() => handleOpenStreetView(selectedDestination)} className="flex items-center gap-1 h-8 px-2.5 rounded-lg bg-white/[0.06] text-emerald-400 text-[11px] font-bold hover:bg-white/[0.1] transition-colors" title="View Street Entrance">
+                        <MapPin size={13} /> Street
+                      </button>
+                    </>
                   )}
                   <button type="button" onClick={() => setShowDetailModal(true)} className="flex items-center gap-1 h-8 px-3 rounded-lg bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-500 transition-colors">
                     <Target size={13} /> Detail
