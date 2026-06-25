@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { db, collection, addDoc, query, where, orderBy, serverTimestamp, getDocs, getDocsFromServer, doc, setDoc, getDoc, getDocFromServer, updateDoc, deleteField, arrayUnion } from '../config/firebase';
 import { limit } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -176,36 +176,21 @@ const TeamChatPanel = ({ currentUser, role }) => {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const refreshUsers = async () => {
-      try {
-        const snap = await getDocsFromServer(collection(db, 'users'));
-        if (cancelled) return;
+    const unsubscribe = onSnapshot(collection(db, 'users'), (snap) => {
       const arr = [];
       snap.forEach(d => { const data = d.data(); if (data.email && data.email !== currentUser) arr.push(data.email); });
       setAllUsers(arr);
-      } catch (err) {
-        if (!cancelled) console.error('Chat users refresh failed:', err);
-      }
-    };
-    refreshUsers();
-    const timer = setInterval(refreshUsers, 15000);
-    window.addEventListener('online', refreshUsers);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-      window.removeEventListener('online', refreshUsers);
-    };
+    }, (err) => {
+      console.error('Chat users listener failed:', err);
+    });
+
+    return () => unsubscribe();
   }, [currentUser]);
 
   const prevConvsRef = useRef({});
   useEffect(() => {
-    let cancelled = false;
     let isFirst = true;
-    const refreshConversations = async () => {
-      try {
-        const snap = await getDocFromServer(doc(db, 'chatData/conversations'));
-        if (cancelled) return;
+    const unsubscribe = onSnapshot(doc(db, 'chatData/conversations'), (snap) => {
       if (!snap.exists()) { setDoc(doc(db, 'chatData/conversations'), { conversations: {} }, { merge: true }).catch(() => {}); setConversations([]); return; }
       const data = snap.data();
       const convs = Object.entries(data.conversations || {})
@@ -221,30 +206,20 @@ const TeamChatPanel = ({ currentUser, role }) => {
       } else { convs.forEach(conv => { prevConvsRef.current[conv.id] = { ...conv }; }); isFirst = false; }
       const convsWithUnread = convs.map(conv => { const lastMsg = conv.lastMessage || {}; return { ...conv, unreadCount: lastMsg.sender !== currentUser && !(lastMsg.readBy || []).includes(currentUser) ? 1 : 0 }; });
       setConversations(convsWithUnread);
-      } catch (err) {
-        if (!cancelled) console.error('Chat conversations refresh failed:', err);
-      }
-    };
-    refreshConversations();
-    const timer = setInterval(refreshConversations, 8000);
-    window.addEventListener('online', refreshConversations);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-      window.removeEventListener('online', refreshConversations);
-    };
+    }, (err) => {
+      console.error('Chat conversations listener failed:', err);
+    });
+
+    return () => unsubscribe();
   }, [currentUser, role, activeConv?.id]);
 
   useEffect(() => {
     if (!activeConv?.id) { setMessages([]); return; }
-    let cancelled = false;
     let firstSnapshot = true;
     let knownMessageIds = new Set();
     const q = query(collection(db, 'chat_messages'), where('conversationId', '==', activeConv.id));
-    const refreshMessages = async () => {
-      try {
-        const snap = await getDocsFromServer(q);
-        if (cancelled) return;
+    
+    const unsubscribe = onSnapshot(q, (snap) => {
       const isInitial = firstSnapshot;
       const msgs = [];
       snap.forEach(d => {
@@ -257,20 +232,12 @@ const TeamChatPanel = ({ currentUser, role }) => {
       msgs.sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));
       setMessages(msgs);
       updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${activeConv.id}.lastMessage.readBy`]: arrayUnion(currentUser) }).catch(() => {});
-      } catch (err) {
-        if (!cancelled) console.error('Chat messages refresh failed:', err);
-      } finally {
-        firstSnapshot = false;
-      }
-    };
-    refreshMessages();
-    const timer = setInterval(refreshMessages, 5000);
-    window.addEventListener('online', refreshMessages);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-      window.removeEventListener('online', refreshMessages);
-    };
+      firstSnapshot = false;
+    }, (err) => {
+      console.error('Chat messages listener failed:', err);
+    });
+
+    return () => unsubscribe();
   }, [activeConv?.id, currentUser]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);

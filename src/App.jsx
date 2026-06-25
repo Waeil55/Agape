@@ -757,34 +757,24 @@ const App = () => {
       setDriverTelemetry([]);
       return undefined;
     }
-    let cancelled = false;
-    const refreshTelemetry = async () => {
-      try {
-        const snap = await getDocsFromServer(collection(db, 'driverTelemetry'));
-        if (cancelled) return;
-        const recentDocs = [];
-        snap.forEach((itemDoc) => {
-          recentDocs.push({ id: itemDoc.id, ...itemDoc.data() });
-        });
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - 10);
-        const cutoffKey = todayLocal(cutoff);
-        const filtered = recentDocs
-          .filter((item) => !item.date || item.date >= cutoffKey)
-          .sort((a, b) => Date.parse(b?.lastPingAt || b?.updatedAtLocal || 0) - Date.parse(a?.lastPingAt || a?.updatedAtLocal || 0));
-        setDriverTelemetry(filtered);
-      } catch (err) {
-        if (!cancelled) console.error('Driver telemetry refresh failed:', err);
-      }
-    };
-    refreshTelemetry();
-    const timer = setInterval(refreshTelemetry, 12000);
-    window.addEventListener('online', refreshTelemetry);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-      window.removeEventListener('online', refreshTelemetry);
-    };
+    
+    const unsubscribe = onSnapshot(collection(db, 'driverTelemetry'), (snap) => {
+      const recentDocs = [];
+      snap.forEach((itemDoc) => {
+        recentDocs.push({ id: itemDoc.id, ...itemDoc.data() });
+      });
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 10);
+      const cutoffKey = todayLocal(cutoff);
+      const filtered = recentDocs
+        .filter((item) => !item.date || item.date >= cutoffKey)
+        .sort((a, b) => Date.parse(b?.lastPingAt || b?.updatedAtLocal || 0) - Date.parse(a?.lastPingAt || a?.updatedAtLocal || 0));
+      setDriverTelemetry(filtered);
+    }, (err) => {
+      console.error('Driver telemetry listener failed:', err);
+    });
+
+    return () => unsubscribe();
   }, [isAuthenticated, realtimeReliability.resubscribeKey]);
 
   useEffect(() => {
@@ -1201,14 +1191,12 @@ const App = () => {
 
   useEffect(() => {
     if (!isAuthenticated || !currentUser || !role) return;
-    let cancelled = false;
     let firstSnapshot = true;
-    const refreshChatUnread = async () => {
-      try {
-        const snap = await getDocFromServer(doc(db, 'chatData/conversations'));
-        if (cancelled) return;
+    
+    const unsubscribe = onSnapshot(doc(db, 'chatData/conversations'), (snap) => {
       if (!snap.exists()) { setChatUnreadCount(0); return; }
       const curr = snap.data().conversations || {};
+      
       // Calculate unread count for nav badge
       let totalUnread = 0;
       const normalizedCurrentUser = String(currentUser || '').trim().toLowerCase();
@@ -1223,7 +1211,9 @@ const App = () => {
         }
       }
       setChatUnreadCount(totalUnread);
+      
       if (firstSnapshot) { firstSnapshot = false; prevChatConvsRef.current = curr; return; }
+      
       const prev = prevChatConvsRef.current || {};
       for (const [id, c] of Object.entries(curr)) {
         const prevLast = prev[id]?.lastMessage;
@@ -1234,29 +1224,19 @@ const App = () => {
           if (activeTab !== 'chat') {
             playMessageSound();
             showLocalNotification(
-              `New message from ${currLast.sender.split('@')[0]}`,
+              c?.groupName || 'New Message',
               currLast.text,
-              'message'
+              () => setActiveTab('chat')
             );
-          } else {
-            playMessageSound();
           }
-          break;
         }
       }
       prevChatConvsRef.current = curr;
-      } catch (err) {
-        if (!cancelled) console.error('Chat unread refresh failed:', err);
-      }
-    };
-    refreshChatUnread();
-    const timer = setInterval(refreshChatUnread, 12000);
-    window.addEventListener('online', refreshChatUnread);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-      window.removeEventListener('online', refreshChatUnread);
-    };
+    }, (err) => {
+      console.error('Chat unread listener failed:', err);
+    });
+
+    return () => unsubscribe();
   }, [isAuthenticated, currentUser, role, activeTab]);
 
   const addAuditLog = (title, desc, color, meta = null) => {
@@ -2630,7 +2610,7 @@ const App = () => {
       <div className={`offline-banner${isOffline ? ' visible' : ''}`}>
         You are offline — changes will sync when connection returns
       </div>
-      <div className="min-h-screen flex-1 flex flex-col bg-[var(--bg-app)] overflow-visible w-full">
+      <div className="min-h-[100dvh] flex-1 flex flex-col bg-[var(--bg-app)] overflow-visible w-full">
       {/* Header removed: DriverPage handles its own UI */}
       {startupIssue && !isLoading && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-2 text-xs sm:text-sm font-semibold text-amber-800 flex items-center justify-between gap-3">

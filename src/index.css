@@ -10,16 +10,16 @@
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
 
-  /* ===== TYPOGRAPHY SCALE ===== */
-  --text-xs: 0.72rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.9375rem;
-  --text-lg: 1.0625rem;
-  --text-xl: 1.1875rem;
-  --text-2xl: 1.375rem;
-  --text-3xl: 1.625rem;
-  --text-4xl: 2rem;
-  --text-5xl: 2.5rem;
+  /* ===== ENTERPRISE TYPOGRAPHY SCALE ===== */
+  --text-xs: 0.85rem;
+  --text-sm: 0.95rem;
+  --text-base: 1.05rem;
+  --text-lg: 1.20rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.60rem;
+  --text-3xl: 1.90rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3.0rem;
 
   /* ===== FONT WEIGHTS ===== */
   --font-normal: 400;
@@ -315,8 +315,27 @@
 }
 
 html {
-  height: 100%;
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   -webkit-text-size-adjust: 100%;
+}
+
+html[data-font-scale="sm"] { font-size: 14px; }
+html[data-font-scale="md"] { font-size: 16px; }
+html[data-font-scale="lg"] { font-size: 18px; }
+html[data-font-scale="xl"] { font-size: 20px; }
+html[data-font-scale="driver"] { font-size: 24px; }
+
+html[data-readability="enhanced"] * {
+  font-weight: 700 !important;
+}
+
+html[data-theme="dark"], html.theme-dark {
+  --bg-app: #0f172a;
+  --text-app: #f1f5f9;
 }
 
 body {
@@ -357,7 +376,7 @@ table .font-black { font-weight: 750; }
 
 #root > div {
   min-height: 100%;
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   width: 100%;

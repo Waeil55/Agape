@@ -3671,8 +3671,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               )}
                             </div>
                             <div className="flex items-center gap-2 mb-2">
-                              <button type="button" disabled className="flex-[4] h-12 bg-slate-200 text-slate-500 text-sm rounded-xl font-bold flex items-center justify-center gap-2 cursor-not-allowed">
-                                <Clock size={14} /> Clock in to start trips
+                              <button type="button" disabled className="flex-[4] h-14 bg-slate-200 text-slate-500 text-base md:text-lg rounded-2xl font-bold flex items-center justify-center gap-2 cursor-not-allowed shadow-sm">
+                                <Clock size={16} /> Clock in to start trips
                               </button>
                             </div>
                           </div>
@@ -3715,7 +3715,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               </span>
                             </div>
                             <div className="flex items-center gap-2 mb-2">
-                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-12 ${primary.gradient} text-sm text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-14 ${primary.gradient} text-base md:text-lg text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
                                 {primary.icon} {primary.label}
                               </button>
                               {(trip.status === 'In Progress' || trip.status === 'In Transit') && (

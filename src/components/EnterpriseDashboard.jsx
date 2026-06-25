@@ -1128,7 +1128,7 @@ const EnterpriseDashboard = ({
 
   // ==================== MAIN LAYOUT ====================
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#f4f7fa] font-sans text-slate-900">
+    <div className="h-[100dvh] w-full overflow-hidden bg-[#f4f7fa] font-sans text-slate-900">
       <div className="flex h-full min-w-0 flex-col">
         {/* Top Header - Desktop only */}
         {renderEnterpriseTopBar()}
