@@ -55,6 +55,8 @@ const ACTIVE_STATUSES = new Set([
 
 const COMPLETE_STATUSES = new Set(['Completed', 'Cancelled', 'No Show']);
 
+import CommandSidebar from './CommandSidebar';
+
 const DRIVER_COLORS = ['blue', 'green', 'orange', 'purple', 'red', 'yellow', 'gray', 'brown'];
 
 function escapeHtml(str) {
@@ -721,224 +723,94 @@ const LiveMapPage = ({
         </button>
       </header>
 
-      {/* ===== MAP AREA (fills remaining space) ===== */}
-      <div className="flex-1 relative overflow-hidden bg-slate-900">
-        {/* Interactive map container */}
-        <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+      {/* ===== COMMAND CENTER LAYOUT ===== */}
+      <div className="flex-1 flex overflow-hidden bg-slate-900">
+        
+        {/* ===== LEFT DATA PANEL ===== */}
+        <CommandSidebar 
+          driverSummaries={driverSummaries}
+          todaysTrips={todaysTrips}
+          unassignedTrips={unassignedTrips}
+          selectedDriverId={selectedDriverId}
+          setSelectedDriverId={setSelectedDriverId}
+          setShowDetailModal={setShowDetailModal}
+          hudSearch={hudSearch}
+        />
 
-        {/* Maps loading / error overlay */}
-        {!mapsLoadError && !mapReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
-            <div className="text-center">
-              <Loader2 size={48} className="mx-auto text-slate-700 animate-spin" />
-              <h3 className="mt-3 text-base font-black text-slate-400">Loading Map...</h3>
+        {/* ===== MAP AREA ===== */}
+        <div className="flex-1 relative overflow-hidden bg-slate-900">
+          {/* Interactive map container */}
+          <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+
+          {/* Maps loading / error overlay */}
+          {!mapsLoadError && !mapReady && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
+              <div className="text-center">
+                <Loader2 size={48} className="mx-auto text-slate-700 animate-spin" />
+                <h3 className="mt-3 text-base font-black text-slate-400">Loading Map...</h3>
+              </div>
             </div>
-          </div>
-        )}
-        {mapsLoadError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
-            <div className="text-center">
-              <Map size={48} className="mx-auto text-slate-700" />
-              <h3 className="mt-3 text-base font-black text-slate-400">Fleet Command Center</h3>
-              <p className="mt-1 max-w-md text-sm font-medium text-slate-500">
-                {hasGoogleMapsConfigured() ? 'Could not load Google Maps. Check API key.' : 'Configure Google Maps API key to enable the map.'}
-              </p>
+          )}
+          {mapsLoadError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
+              <div className="text-center">
+                <Map size={48} className="mx-auto text-slate-700" />
+                <h3 className="mt-3 text-base font-black text-slate-400">Fleet Command Center</h3>
+                <p className="mt-1 max-w-md text-sm font-medium text-slate-500">
+                  {hasGoogleMapsConfigured() ? 'Could not load Google Maps. Check API key.' : 'Configure Google Maps API key to enable the map.'}
+                </p>
+              </div>
             </div>
+          )}
+          
+          {/* Map Overlays */}
+          <div className="absolute top-4 left-4 flex gap-2 z-20">
+            <button type="button" onClick={() => setShowTraffic(t => !t)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${showTraffic ? 'bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.4)] border-amber-400' : 'bg-slate-900/80 text-slate-400 border border-white/10 hover:bg-slate-800 hover:text-white'}`}>
+              🚦 Live Traffic
+            </button>
+            <button type="button" onClick={() => setShowClusters(c => !c)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${showClusters ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border-indigo-400' : 'bg-slate-900/80 text-slate-400 border border-white/10 hover:bg-slate-800 hover:text-white'}`}>
+              🌐 Clustering
+            </button>
           </div>
-        )}
-        {/* Map Overlays */}
-        <div className="absolute top-4 left-4 flex gap-2 z-20">
-          <button type="button" onClick={() => setShowTraffic(t => !t)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${showTraffic ? 'bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.4)] border-amber-400' : 'bg-slate-900/80 text-slate-400 border border-white/10 hover:bg-slate-800 hover:text-white'}`}>
-            🚦 Live Traffic
-          </button>
-          <button type="button" onClick={() => setShowClusters(c => !c)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${showClusters ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border-indigo-400' : 'bg-slate-900/80 text-slate-400 border border-white/10 hover:bg-slate-800 hover:text-white'}`}>
-            🌐 Clustering
-          </button>
-        </div>
 
-        {/* Street View Split Panel */}
-        {streetViewLoc && (
-          <div className="absolute top-0 right-0 w-[450px] max-w-[90vw] h-full z-30 bg-slate-950 border-l border-white/10 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-            <div className="flex items-center justify-between px-4 h-14 border-b border-white/10 bg-slate-900/50 shrink-0">
-              <span className="text-white text-sm font-bold flex items-center gap-2"><MapPin size={16} className="text-blue-400" /> Street View Entrance</span>
-              <button onClick={() => setStreetViewLoc(null)} className="text-slate-400 hover:text-white p-1.5 bg-white/5 rounded-md hover:bg-white/10 transition-colors"><X size={16} /></button>
+          {/* Street View Split Panel */}
+          {streetViewLoc && (
+            <div className="absolute top-0 right-0 w-[450px] max-w-[90vw] h-full z-30 bg-slate-950 border-l border-white/10 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center justify-between px-4 h-14 border-b border-white/10 bg-slate-900/50 shrink-0">
+                <span className="text-white text-sm font-bold flex items-center gap-2"><MapPin size={16} className="text-blue-400" /> Street View Entrance</span>
+                <button onClick={() => setStreetViewLoc(null)} className="text-slate-400 hover:text-white p-1.5 bg-white/5 rounded-md hover:bg-white/10 transition-colors"><X size={16} /></button>
+              </div>
+              <div ref={svContainerRef} className="flex-1 w-full bg-slate-800" />
             </div>
-            <div ref={svContainerRef} className="flex-1 w-full bg-slate-800" />
-          </div>
-        )}
+          )}
 
-        {/* Gradient edge fade */}
-        <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-slate-950/40 to-transparent pointer-events-none" />
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950/60 to-transparent pointer-events-none" />
+          {/* Gradient edge fade */}
+          <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-slate-950/40 to-transparent pointer-events-none" />
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950/60 to-transparent pointer-events-none" />
 
-        {/* ===== RIGHT FLOATING PANEL (driver list) ===== */}
-        <div className="absolute right-3 top-3 z-20 flex flex-col items-end">
-          {/* Collapsed toggle badge */}
-          {!rightPanelOpen && (
+          {/* Trail toggle (when driver selected) */}
+          {selectedDriver && driverTrailPoints.length >= 2 && (
             <button
               type="button"
-              onClick={() => setRightPanelOpen(true)}
-              className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-slate-900/90 backdrop-blur-md border border-white/10 text-white text-xs font-bold shadow-lg hover:bg-slate-800 transition-colors"
+              onClick={() => setShowTrail(p => !p)}
+              className="absolute right-4 bottom-8 z-20 flex items-center gap-1.5 h-8 px-3 rounded-lg bg-slate-900/90 backdrop-blur-md border border-white/10 text-[11px] font-bold shadow-lg transition-colors hover:bg-slate-800"
+              style={{ color: showTrail ? '#60A5FA' : '#94A3B8' }}
             >
-              <Users size={14} /> {drivers.length}
+              {trailLoading ? <Loader2 size={13} className="animate-spin" /> : <Map size={13} />}
+              {showTrail ? `${driverTrailPoints.length} trail` : 'Show Trail'}
             </button>
           )}
 
-          {/* Expanded panel */}
-          {rightPanelOpen && (
-            <div className="w-64 rounded-xl bg-slate-900/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.06]">
-                <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5"><Users size={13} /> Drivers <span className="text-slate-500 font-medium">({drivers.length})</span></span>
-                <button type="button" onClick={() => setRightPanelOpen(false)} className="text-slate-500 hover:text-white transition-colors"><X size={13} /></button>
-              </div>
-              <div className="max-h-[60vh] overflow-y-auto overscroll-contain py-1">
-                {driverSummaries
-                  .filter(s => !hudSearch || s.driver.name?.toLowerCase().includes(hudSearch.toLowerCase()) || s.driver.vehicle?.toLowerCase().includes(hudSearch.toLowerCase()))
-                  .map(({ driver, currentTrip, phase, point, fresh, completed, movementState, dwellMinutes, movingMinutes }) => (
-                  <button
-                    type="button"
-                    key={driver.id}
-                    onClick={() => setSelectedDriverId(driver.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
-                      selectedDriver?.id === driver.id ? 'bg-blue-500/10' : 'hover:bg-white/[0.04]'
-                    }`}
-                  >
-                    <span className={`w-2 h-2 shrink-0 rounded-full ${fresh && movementState === 'moving' ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)]' : fresh ? 'bg-amber-400' : 'bg-slate-600'}`} />
-                    <div className="min-w-0 flex-1">
-                      <p className={`truncate text-[13px] font-bold ${selectedDriver?.id === driver.id ? 'text-white' : 'text-slate-300'}`}>{driver.name || 'Unnamed'}</p>
-                      <p className="truncate text-[10px] font-medium text-slate-500">
-                        {movementState === 'moving' ? `Moving ${formatTelemetryDuration(movingMinutes)}` : movementState === 'stopped' ? `Stopped ${formatTelemetryDuration(dwellMinutes)}` : 'Waiting for telemetry'}
-                        {currentTrip?.patient ? ` · ${currentTrip.patient}` : ''}
-                      </p>
-                    </div>
-                    <span className={`text-[10px] font-bold ${completed > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>{completed}</span>
-                  </button>
-                ))}
-                {driverSummaries.length === 0 && (
-                  <p className="px-3 py-6 text-center text-xs text-slate-500">No drivers available.</p>
-                )}
-              </div>
+          {/* Trail loading indicator */}
+          {trailLoading && (
+            <div className="absolute right-4 bottom-20 z-20 flex items-center gap-1.5 h-8 px-3 rounded-md bg-slate-900/90 backdrop-blur-md border border-white/10 text-[11px] text-slate-400 font-medium shadow-lg">
+              <Loader2 size={12} className="animate-spin" /> Loading trail...
             </div>
           )}
         </div>
-
-        {/* Trail toggle (when driver selected) */}
-        {selectedDriver && driverTrailPoints.length >= 2 && (
-          <button
-            type="button"
-            onClick={() => setShowTrail(p => !p)}
-            className="absolute left-3 top-3 z-20 flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-slate-900/80 backdrop-blur-sm border border-white/10 text-[10px] font-bold shadow-lg transition-colors hover:bg-slate-800"
-            style={{ color: showTrail ? '#60A5FA' : '#94A3B8' }}
-          >
-            {trailLoading ? <Loader2 size={11} className="animate-spin" /> : <Map size={11} />}
-            {showTrail ? `${driverTrailPoints.length} trail` : 'Trail'}
-          </button>
-        )}
-
-        {/* Trail loading indicator */}
-        {trailLoading && (
-          <div className="absolute left-3 top-12 z-20 flex items-center gap-1.5 h-6 px-2 rounded-md bg-slate-900/80 backdrop-blur-sm border border-white/10 text-[10px] text-slate-400 font-medium">
-            <Loader2 size={10} className="animate-spin" /> Loading trail...
-          </div>
-        )}
-
-        {/* ===== BOTTOM INFO BAR ===== */}
-        {selectedDriverId && selectedDriver && selectedPoint && (
-          <div className="absolute bottom-4 left-4 right-4 z-20 animate-in slide-in-from-bottom-2 duration-200">
-            <div className="rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-white/[0.08] p-4 shadow-2xl">
-              <div className="flex items-center gap-4">
-                {/* Left: driver identity */}
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-black text-sm ${
-                    selectedSummary?.fresh && selectedSummary?.movementState === 'moving'
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : selectedSummary?.fresh
-                        ? 'bg-amber-500/20 text-amber-400'
-                        : 'bg-slate-700 text-slate-400'
-                  }`}>
-                    {String(selectedDriver?.name || 'D').charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-black text-white">{selectedDriver.name || 'Unnamed driver'}</p>
-                      <span className={`flex items-center gap-1 text-[10px] font-bold ${
-                        selectedSummary?.fresh ? 'text-emerald-400' : 'text-amber-400'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${selectedSummary?.fresh ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                        {selectedSummary?.fresh ? 'Live' : 'Stale'}
-                      </span>
-                    </div>
-                    <p className="truncate text-[11px] font-medium text-slate-400">
-                      {formatMovementState(selectedSummary?.movementState)}
-                      {selectedSummary?.movementState === 'moving' && ` · ${formatTelemetryDuration(selectedSummary?.movingMinutes)}`}
-                      {selectedSummary?.movementState === 'stopped' && ` · ${formatTelemetryDuration(selectedSummary?.dwellMinutes)}`}
-                      {selectedTracking?.totalTrackedMiles ? ` · ${Number(selectedTracking.totalTrackedMiles).toFixed(1)} mi` : ''}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Center: destination + ETA */}
-                <div className="hidden md:block min-w-0 flex-1">
-                  <p className="truncate text-xs font-bold text-slate-300">
-                    <ArrowRight size={12} className="inline mr-1 text-blue-400" />
-                    {selectedDestination || selectedTrip?.patient || 'No active destination'}
-                  </p>
-                  <p className="mt-0.5 text-[11px] font-medium text-slate-500">
-                    {selectedSummary?.lastPing ? `${formatAge(selectedSummary.lastPing)}` : ''}
-                    {nearestTrips[0] ? ` · ETA ${formatEta(nearestTrips[0].etaMinutes)} · ${formatMiles(nearestTrips[0].miles)}` : ''}
-                  </p>
-                </div>
-
-                {/* Right: stats */}
-                <div className="flex items-center gap-4 text-[11px] shrink-0">
-                  <div className="text-center">
-                    <p className="text-slate-500 font-medium">Moving</p>
-                    <p className="text-white font-bold tabular-nums">{formatTelemetryDuration(selectedSummary?.movingMinutes || 0)}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-slate-500 font-medium">Stopped</p>
-                    <p className="text-white font-bold tabular-nums">{formatTelemetryDuration(selectedSummary?.dwellMinutes || 0)}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-slate-500 font-medium">Trips</p>
-                    <p className="text-emerald-400 font-bold tabular-nums">&#10003;{selectedSummary?.completed || 0}</p>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {selectedDriver?.phone && (
-                    <>
-                      <button type="button" onClick={() => makeCall?.(selectedDriver.phone, selectedDriver.name)} className="flex items-center gap-1 h-8 px-2.5 rounded-lg bg-white/[0.06] text-slate-300 text-[11px] font-bold hover:bg-white/[0.1] transition-colors" title="Call driver">
-                        <Phone size={13} />
-                      </button>
-                      <button type="button" onClick={() => sendSMS?.(selectedDriver.phone, selectedDriver.name)} className="flex items-center gap-1 h-8 px-2.5 rounded-lg bg-white/[0.06] text-slate-300 text-[11px] font-bold hover:bg-white/[0.1] transition-colors" title="Text driver">
-                        <Radio size={13} />
-                      </button>
-                    </>
-                  )}
-                  {selectedDestination && (
-                    <>
-                      <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', selectedDestination)} className="flex items-center gap-1 h-8 px-2.5 rounded-lg bg-white/[0.06] text-slate-300 text-[11px] font-bold hover:bg-white/[0.1] transition-colors" title="Open in Google Maps">
-                        <Compass size={13} />
-                      </button>
-                      <button type="button" onClick={() => handleOpenStreetView(selectedDestination)} className="flex items-center gap-1 h-8 px-2.5 rounded-lg bg-white/[0.06] text-emerald-400 text-[11px] font-bold hover:bg-white/[0.1] transition-colors" title="View Street Entrance">
-                        <MapPin size={13} /> Street
-                      </button>
-                    </>
-                  )}
-                  <button type="button" onClick={() => setShowDetailModal(true)} className="flex items-center gap-1 h-8 px-3 rounded-lg bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-500 transition-colors">
-                    <Target size={13} /> Detail
-                  </button>
-                  <button type="button" onClick={() => { setSelectedDriverId(''); setShowDetailModal(false); }} className="flex items-center justify-center h-8 w-8 rounded-lg bg-white/[0.04] text-slate-500 hover:text-white hover:bg-white/[0.08] transition-colors">
-                    <X size={13} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+
 
       {/* ===== DETAIL MODAL (full report) ===== */}
       {showDetailModal && selectedDriver && (
