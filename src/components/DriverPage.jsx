@@ -2619,7 +2619,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
 
         <div className="px-3 pt-3 space-y-3">
-          <div className="rounded-2xl bg-slate-900 text-white shadow-lg overflow-hidden">
+          <div className="rounded-2xl overflow-hidden shadow-lg" style={{ background: 'linear-gradient(145deg, #2c5282 0%, #3b6bbf 50%, #2d5fa6 100%)' }}>
             <div className="relative px-4 py-2.5">
               <div className="absolute right-4 top-4 flex gap-1 opacity-10">
                 <span className="w-2 h-2 rounded-full bg-white" />
@@ -2628,8 +2628,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Scheduled Time</p>
-                  <p className="mt-1 text-xl font-black tracking-tight leading-none">{scheduledTime}</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-200">Scheduled Time</p>
+                  <p className="mt-1 text-xl font-black tracking-tight leading-none text-white">{scheduledTime}</p>
                 </div>
                 <span className="mt-0.5 shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-amber-800 shadow-sm">
                   {attentionText}
@@ -2638,34 +2638,34 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
               <div className="mt-2.5 grid grid-cols-[18px_1fr] gap-x-4">
                 <div className="row-span-2 flex flex-col items-center pt-1.5">
-                  <span className="w-3 h-3 rounded-full bg-blue-400 shadow-lg shadow-blue-400/30" />
-                  <span className="w-0.5 flex-1 min-h-[48px] my-0.5 rounded-full bg-gradient-to-b from-blue-400 to-emerald-400" />
-                  <span className="w-3 h-3 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/30" />
+                  <span className="w-3 h-3 rounded-full bg-blue-200 shadow-lg shadow-blue-200/30" />
+                  <span className="w-0.5 flex-1 min-h-[48px] my-0.5 rounded-full bg-gradient-to-b from-blue-200 to-emerald-300" />
+                  <span className="w-3 h-3 rounded-full bg-emerald-300 shadow-lg shadow-emerald-300/30" />
                 </div>
 
                 <div className="pb-2">
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400">From</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-200">From</p>
                   <p className="mt-0.5 text-xs font-bold leading-snug text-white truncate">{pickupAddress || '--'}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer">
+                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
                       <Copy size={12} /> Copy
                     </button>
-                    <span className="text-[10px] font-black text-slate-500">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-2.5 rounded-xl bg-blue-700/70 hover:bg-blue-700 text-blue-100 text-[11px] font-black flex items-center gap-1 cursor-pointer">
+                    <span className="text-[10px] font-black text-blue-200/60">{trip.distance ? `${trip.distance} mi` : ''}</span>
+                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-black flex items-center gap-1 cursor-pointer">
                       <Navigation size={13} /> Navigate
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400">To</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-300">To</p>
                   <p className="mt-0.5 text-xs font-bold leading-snug text-white truncate">{dropoffAddress || '--'}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer">
+                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
                       <Copy size={12} /> Copy
                     </button>
-                    <span className="text-[10px] font-black text-slate-500" />
-                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-2.5 rounded-xl bg-emerald-700/60 hover:bg-emerald-700 text-emerald-100 text-[11px] font-black flex items-center gap-1 cursor-pointer">
+                    <span className="text-[10px] font-black text-blue-200/60" />
+                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-black flex items-center gap-1 cursor-pointer">
                       <Navigation size={13} /> Navigate
                     </button>
                   </div>
@@ -2673,16 +2673,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
 
               <div className="mt-2.5 grid grid-cols-4 gap-1.5">
-                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <Phone size={14} /> Call
                 </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <MessageCircle size={14} /> SMS
                 </button>
-                <button type="button" onClick={() => openContactSelector(trip)} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => openContactSelector(trip)} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <PhoneForwarded size={14} /> Contacts
                 </button>
-                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <MoreHorizontal size={15} /> More
                 </button>
               </div>
