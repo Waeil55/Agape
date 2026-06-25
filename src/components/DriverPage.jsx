@@ -4109,65 +4109,67 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {/* ===== COMPLETE TRIP MODAL ===== */}
       {showCompleteModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="text-center mb-5">
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
-                <Check size={28} className="text-white" />
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative border border-white/20 pointer-events-auto max-h-[85dvh] flex flex-col" style={{ zIndex: 10 }}>
+            <div className="overflow-y-auto hide-scrollbar flex-1 -mx-2 px-2 pb-2">
+              <div className="text-center mb-3 mt-1">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-lg shadow-emerald-600/20">
+                  <Check size={20} className="text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Complete Trip</h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium">{showCompleteModal.patient} - {showCompleteModal.bookingId || ''}</p>
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Complete Trip</h3>
-              <p className="text-sm text-slate-500 mt-1 font-medium">{showCompleteModal.patient} — {showCompleteModal.bookingId || ''}</p>
-            </div>
 
-            <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
-              <div className="flex justify-between">
-                <span className="text-xs text-emerald-600 font-bold uppercase">Pickup Odometer</span>
-                <span className="text-sm font-bold text-emerald-700">{showCompleteModal.pickupOdometer?.toLocaleString() || '—'} mi</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-xs text-slate-400 font-bold uppercase">Started At</span>
-                <span className="text-sm font-bold text-slate-800">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '—'}</span>
-              </div>
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Departed Pickup Time</label>
-                <input type="time" value={departedTime} onChange={(e) => setDepartedTime(e.target.value)}
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5" />
-              </div>
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Arrival Dropoff Time</label>
-                <input type="time" value={arrivalDropoffTime} onChange={(e) => setArrivalDropoffTime(e.target.value)}
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5" />
-              </div>
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-rose-600">Final Odometer (mi)</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={completeOdometer}
-                  onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
-                  placeholder="Enter final odometer"
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5"
-                  autoFocus
-                />
-                {!completeOdometer && (
-                  <p className="mt-2 text-center text-[11px] font-semibold text-slate-500">
-                    Enter a final odometer reading to enable completion.
+              <div className="bg-slate-50 rounded-2xl p-4 mb-4 space-y-2.5">
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-xs text-emerald-600 font-bold uppercase">Pickup Odometer</span>
+                  <span className="text-sm font-bold text-emerald-700">{showCompleteModal.pickupOdometer?.toLocaleString() || '-'} mi</span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-xs text-slate-400 font-bold uppercase">Started At</span>
+                  <span className="text-sm font-bold text-slate-800">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '-'}</span>
+                </div>
+                <div>
+                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Departed Pickup Time</label>
+                  <input type="time" value={departedTime} onChange={(e) => setDepartedTime(e.target.value)}
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1" />
+                </div>
+                <div>
+                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Arrival Dropoff Time</label>
+                  <input type="time" value={arrivalDropoffTime} onChange={(e) => setArrivalDropoffTime(e.target.value)}
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1" />
+                </div>
+                <div>
+                  <label className="text-micro font-bold uppercase tracking-wider text-rose-600">Final Odometer (mi)</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={completeOdometer}
+                    onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
+                    placeholder="Enter final odometer"
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5"
+                    autoFocus
+                  />
+                  {!completeOdometer && (
+                    <p className="mt-2 text-center text-[11px] font-semibold text-slate-500">
+                      Enter a final odometer reading to enable completion.
+                    </p>
+                  )}
+                </div>
+                {completeError && (
+                  <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-bold text-rose-700">
+                    {completeError}
                   </p>
                 )}
+                {showCompleteModal.pickupOdometer && completeOdometer && (
+                  <div className="text-center text-sm text-blue-600 font-bold">
+                    Distance: {(parseInt(completeOdometer) - (showCompleteModal.pickupOdometer || 0)).toLocaleString()} mi
+                  </div>
+                )}
               </div>
-              {completeError && (
-                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-bold text-rose-700">
-                  {completeError}
-                </p>
-              )}
-              {showCompleteModal.pickupOdometer && completeOdometer && (
-                <div className="text-center text-sm text-blue-600 font-bold">
-                  Distance: {(parseInt(completeOdometer) - (showCompleteModal.pickupOdometer || 0)).toLocaleString()} mi
-                </div>
-              )}
             </div>
 
-            <div className="flex gap-3">
-              <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+            <div className="flex gap-3 mt-2 shrink-0 pt-2">
+              <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
               <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
             </div>
           </div>

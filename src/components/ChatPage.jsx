@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { db, collection, addDoc, query, where, orderBy, serverTimestamp, getDocs, getDocsFromServer, doc, setDoc, getDoc, getDocFromServer, updateDoc, deleteField, arrayUnion } from '../config/firebase';
+import { db, collection, addDoc, query, where, orderBy, serverTimestamp, getDocs, getDocsFromServer, doc, setDoc, getDoc, getDocFromServer, updateDoc, deleteField, arrayUnion, onSnapshot } from '../config/firebase';
 import { limit } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { MessageCircle, Send, Plus, ArrowLeft, X, Truck, ShieldCheck, Users, Phone, Trash2, Search, ChevronDown, ExternalLink, Loader2, User, Menu, Check, CheckCheck, BrainCircuit, Sparkles } from 'lucide-react';

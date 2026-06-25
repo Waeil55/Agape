@@ -7,7 +7,7 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   RefreshCcw, X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
