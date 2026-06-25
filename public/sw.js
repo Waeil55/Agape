@@ -4,8 +4,8 @@
 */
 
 const CACHE_VERSION = 'agape-v9-static';
-const STATIC_CACHE = `${CACHE_VERSION}-shell`;
-const RUNTIME_CACHE = `${CACHE_VERSION}-assets`;
+const STATIC_CACHE = ${CACHE_VERSION}-shell;
+const RUNTIME_CACHE = ${CACHE_VERSION}-assets;
 
 const PRECACHE_URLS = [
   '/',
@@ -14,6 +14,7 @@ const PRECACHE_URLS = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then((cache) => cache.addAll(PRECACHE_URLS))

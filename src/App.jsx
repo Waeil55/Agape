@@ -407,6 +407,8 @@ const App = () => {
 
     const onSWUpdate = () => { skipWaiting(); };
     window.addEventListener('swUpdateAvailable', onSWUpdate);
+    const onControllerChange = () => { window.location.reload(); };
+    window.addEventListener('swControllerChanged', onControllerChange);
 
     (async () => {
       try {
@@ -426,6 +428,7 @@ const App = () => {
     return () => {
       cleanupSWMessages();
       window.removeEventListener('swUpdateAvailable', onSWUpdate);
+      window.removeEventListener('swControllerChanged', onControllerChange);
     };
   }, []);
 
@@ -976,7 +979,7 @@ const App = () => {
 
         // ── FIRST LOGIN or EXPLICIT ROLE CHECK: fetch from Firestore ─────────
         const userDocResult = await withTimeout(
-          getDoc(doc(db, 'users', user.uid)),
+          getDocFromServer(doc(db, 'users', user.uid)),
           4000,
           'user profile'
         );
@@ -987,7 +990,7 @@ const App = () => {
 
         // If Firestore timed out, try one more time quickly then proceed
         if (!userDocResult.ok || (!userRole && userDoc)) {
-          const retryResult = await withTimeout(getDoc(doc(db, 'users', user.uid)), 4000, 'user profile retry');
+          const retryResult = await withTimeout(getDocFromServer(doc(db, 'users', user.uid)), 4000, 'user profile retry');
           if (cancelled) return;
           if (retryResult.ok && retryResult.value?.exists?.()) {
             userDoc = retryResult.value;
@@ -1020,7 +1023,7 @@ const App = () => {
               { merge: true }
             );
             userRole = 'admin';
-            userDoc = await getDoc(doc(db, 'users', user.uid)).catch(() => null);
+            userDoc = await getDocFromServer(doc(db, 'users', user.uid)).catch(() => null);
           } else if (!usersSnap.ok) {
             // Firestore completely unreachable — show login so user can retry
             authBootResolvedRef.current = true;
