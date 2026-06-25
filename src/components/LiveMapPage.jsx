@@ -28,6 +28,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { GOOGLE_MAPS_API_KEY, db, collection, query, orderBy, limit as firestoreLimit, getDocs } from '../config/firebase';
+import { openMapLink } from '../utils/nativeActions';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiOptimizeFleet } from '../config/ai';
@@ -159,7 +160,9 @@ function openDirections(origin, destination) {
     travelmode: 'driving',
   });
   if (origin) params.set('origin', origin);
-  window.open(`https://www.google.com/maps/dir/?${params.toString()}`, '_blank', 'noopener,noreferrer');
+  const googleWeb = `https://www.google.com/maps/dir/?${params.toString()}`;
+  const googleIntent = `intent://maps.google.com/maps/dir/?${params.toString()}#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=${encodeURIComponent(googleWeb)};end;`;
+  openMapLink(googleIntent, googleWeb);
 }
 
 function buildRideShareCandidates(trips) {

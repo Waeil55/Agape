@@ -10,6 +10,7 @@ import {
   CalendarDays, ClipboardList, ShieldCheck, Receipt, Siren, CarFront, Plus,
 } from 'lucide-react';
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
+import { openMapLink } from '../utils/nativeActions';
 import { timeToMinutes, isTripLate } from '../utils/tripDate';
 import ChatPage from './ChatPage';
 import ArchivesPage from './ArchivesPage';
@@ -76,7 +77,9 @@ const formatPhoneDisplay = (phone) => {
 const openAddressInMaps = (address = '') => {
   if (!address) return;
   const query = encodeURIComponent(address);
-  window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank', 'noopener,noreferrer');
+  const googleWeb = `https://www.google.com/maps/search/?api=1&query=${query}`;
+  const googleIntent = `intent://maps.google.com/maps/search/?api=1&query=${query}#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=${encodeURIComponent(googleWeb)};end;`;
+  openMapLink(googleIntent, googleWeb);
 };
 
 const findTripLocations = (trip, trips, trashedTrips, logs) => {

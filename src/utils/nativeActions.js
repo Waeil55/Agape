@@ -118,8 +118,25 @@ async function openUrlWithFallback(url, fallbackUrl, timeout = 2500) {
 
   if (!hidden && Date.now() - start >= timeout - 200) {
     if (fallbackUrl) {
-      window.location.href = fallbackUrl;
+      if (isIOS() || isAndroid()) {
+        window.location.href = fallbackUrl;
+      } else {
+        window.open(fallbackUrl, '_blank');
+      }
     }
+  }
+}
+
+export async function openMapLink(primaryUrl, webFallbackUrl) {
+  if (isNativeShell()) {
+    await openUrlNative(primaryUrl);
+    return;
+  }
+  
+  if (isIOS() || isAndroid()) {
+    await openUrlWithFallback(primaryUrl, webFallbackUrl || primaryUrl, 2500);
+  } else {
+    window.open(webFallbackUrl || primaryUrl, '_blank', 'noopener,noreferrer');
   }
 }
 
@@ -127,51 +144,29 @@ export async function openNavigation(address, app, origin) {
   await impact('medium');
 
   const urls = buildNavUrls(address, origin);
+  const encoded = encodeURIComponent(address);
+  const originParam = origin ? `&origin=${encodeURIComponent(origin)}` : '';
 
   if (app === 'apple') {
-    if (isNativeShell()) {
-      await openUrlNative(urls.apple);
-    } else {
-      window.location.href = urls.apple;
-    }
+    await openMapLink(urls.apple, urls.apple);
     return;
   }
 
   if (app === 'google') {
-    if (isIOS()) {
-      await openUrlWithFallback(urls.google, urls.googleWeb);
-    } else if (isAndroid()) {
-      window.location.href = urls.googleWeb;
-    } else if (isNativeShell()) {
-      await openUrlNative(urls.googleWeb);
-    } else {
-      window.open(urls.googleWeb, '_blank');
-    }
+    const androidIntent = `intent://maps.google.com/maps/dir/?api=1${originParam}&destination=${encoded}#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=${encodeURIComponent(urls.googleWeb)};end;`;
+    const primary = isAndroid() ? androidIntent : urls.google;
+    await openMapLink(primary, urls.googleWeb);
     return;
   }
 
   if (app === 'waze') {
-    if (isIOS()) {
-      await openUrlWithFallback(urls.waze, urls.wazeWeb);
-    } else if (isNativeShell()) {
-      try {
-        const { App } = await import('@capacitor/app');
-        await App.canOpenUrl({ url: urls.waze });
-        await App.openUrl({ url: urls.waze });
-      } catch {
-        await openUrlNative(urls.wazeWeb);
-      }
-    } else {
-      window.open(urls.wazeWeb, '_blank');
-    }
+    const androidWazeIntent = `intent://waze.com/ul?q=${encoded}&navigate=yes#Intent;scheme=https;package=com.waze;S.browser_fallback_url=${encodeURIComponent(urls.wazeWeb)};end;`;
+    const primary = isAndroid() ? androidWazeIntent : urls.waze;
+    await openMapLink(primary, urls.wazeWeb);
     return;
   }
 
-  if (isNativeShell()) {
-    await openUrlNative(urls.googleWeb);
-  } else {
-    window.open(urls.googleWeb, '_blank');
-  }
+  await openMapLink(urls.googleWeb, urls.googleWeb);
 }
 
 export async function showNavActionSheet(address, origin, preferredApp) {

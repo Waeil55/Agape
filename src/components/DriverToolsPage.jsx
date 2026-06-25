@@ -5,6 +5,7 @@ import {
   Timer, Copy, CheckSquare, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { impact } from '../utils/haptics';
+import { openMapLink } from '../utils/nativeActions';
 import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
 
 const timeToMinutes = (t) => {
@@ -463,11 +464,15 @@ const RoutePlanSection = ({
     const waypoints = labels.slice(1, -1);
 
     if (navApp === 'waze' && labels.length === 2) {
-      window.open(`https://waze.com/ul?q=${encodeURIComponent(destination)}&navigate=yes`, '_blank', 'noopener,noreferrer');
+      const encodedDest = encodeURIComponent(destination);
+      const wazeWeb = `https://www.waze.com/ul?q=${encodedDest}&navigate=yes`;
+      const primary = `intent://waze.com/ul?q=${encodedDest}&navigate=yes#Intent;scheme=https;package=com.waze;S.browser_fallback_url=${encodeURIComponent(wazeWeb)};end;`;
+      openMapLink(primary, wazeWeb);
       return;
     }
     if (navApp === 'apple' && labels.length === 2) {
-      window.open(`https://maps.apple.com/?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(destination)}&dirflg=d`, '_blank', 'noopener,noreferrer');
+      const appleUrl = `http://maps.apple.com/?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(destination)}&dirflg=d`;
+      openMapLink(appleUrl, appleUrl);
       return;
     }
 
@@ -477,8 +482,9 @@ const RoutePlanSection = ({
     const originEnc = encodeURIComponent(origin);
     const destEnc = encodeURIComponent(destination);
     const wps = waypoints.map(w => encodeURIComponent(w)).join('|');
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${originEnc}&destination=${destEnc}${wps ? `&waypoints=${wps}` : ''}&travelmode=driving`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const googleWeb = `https://www.google.com/maps/dir/?api=1&origin=${originEnc}&destination=${destEnc}${wps ? `&waypoints=${wps}` : ''}&travelmode=driving`;
+    const googleIntent = `intent://maps.google.com/maps/dir/?api=1&origin=${originEnc}&destination=${destEnc}${wps ? `&waypoints=${wps}` : ''}&travelmode=driving#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=${encodeURIComponent(googleWeb)};end;`;
+    openMapLink(googleIntent, googleWeb);
   };
 
   const sendToSequencer = () => {
