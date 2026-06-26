@@ -7,11 +7,11 @@ import {
 import { localCalendarYmd } from '../utils/tripDate';
 
 const DetailRow = ({ label, value, valueColor = "text-slate-900" }) => (
-  <div className="grid grid-cols-[130px_1fr] gap-4 py-1.5 items-start">
+  <div className="grid grid-cols-1 gap-1 py-1.5 items-start sm:grid-cols-[130px_1fr] sm:gap-4">
     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
       {label}
     </span>
-    <span className={`text-[13px] font-bold ${valueColor}`}>
+    <span className={`text-[13px] font-bold break-words ${valueColor}`}>
       {value}
     </span>
   </div>
@@ -60,8 +60,8 @@ const ReportsPage = ({ trips = [], drivers = [], onUpdateTrip, role, setEditTrip
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex justify-center font-sans">
-      <div className="w-full max-w-3xl bg-white min-h-screen relative shadow-2xl overflow-hidden flex flex-col mx-auto">
+    <div className="flex min-h-0 flex-1 flex-col bg-[#f4f7fa] font-sans">
+      <div className="relative mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white shadow-sm">
         
         {/* TOP APP BAR (Local to Reports) */}
         <div className="px-4 py-3 flex items-center justify-between bg-white border-b border-slate-100 shrink-0">
@@ -81,11 +81,11 @@ const ReportsPage = ({ trips = [], drivers = [], onUpdateTrip, role, setEditTrip
 
         {/* DATE & FILTERS BAR */}
         <div className="px-4 py-3 flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center gap-1">
+          <div className="flex min-w-0 items-center gap-1">
             <button onClick={() => shiftDate(-1)} className="p-1 border border-slate-200 rounded text-slate-600 hover:bg-slate-50 transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button className="px-3 py-1 text-sm font-bold text-slate-800 border border-slate-200 rounded hover:bg-slate-50">
+            <button className="min-w-0 px-3 py-1 text-sm font-bold text-slate-800 border border-slate-200 rounded hover:bg-slate-50">
               {new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
               <span className="text-slate-400 font-normal text-xs ml-1">({filteredTrips.length})</span>
             </button>

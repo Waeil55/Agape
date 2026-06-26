@@ -7,7 +7,7 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   RefreshCcw, X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot, setPersistence, browserLocalPersistence } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -18,9 +18,7 @@ import ChatPage from './components/ChatPage';
 import ArchivesPage from './components/ArchivesPage';
 import DriversVehiclesPage from './components/DriversVehiclesPage';
 import SettingsPage from './components/SettingsPage';
-import DriverPage from './components/DriverPage';
 import UsersPage from './components/UsersPage';
-import EnterpriseDashboard from './components/EnterpriseDashboard';
 import AddTripModal from './components/AddTripModal';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
 import { playMessageSound, playNotificationSound, initAudioContext } from './utils/notificationSound';
@@ -47,19 +45,41 @@ import { useDriverAssignments } from './hooks/useDriverAssignments';
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v348';
+const APP_VERSION = 'v349';
 
-// Version check: if version changed, clear all caches and reload
-const storedVersion = localStorage.getItem(APP_VERSION_KEY);
-if (storedVersion && storedVersion !== APP_VERSION) {
-  localStorage.removeItem(APP_VERSION_KEY);
-  caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
-  if (window.indexedDB?.databases) {
-    window.indexedDB.databases().then((dbs) => dbs.forEach((db) => window.indexedDB.deleteDatabase(db.name)));
+async function clearAgapeStaticCaches() {
+  if (typeof window === 'undefined' || !window.caches) return;
+  const cacheNames = await window.caches.keys();
+  await Promise.all(
+    cacheNames
+      .filter((name) => /^agape-|^workbox-|vite/i.test(name))
+      .map((name) => window.caches.delete(name))
+  );
+}
+
+async function repairBrowserStatePreservingAuth() {
+  await clearAgapeStaticCaches();
+  if (typeof navigator !== 'undefined' && navigator.serviceWorker?.getRegistrations) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.update().catch(() => null)));
   }
-  window.location.reload();
-} else {
-  localStorage.setItem(APP_VERSION_KEY, APP_VERSION);
+}
+
+// Version changes should refresh stale app assets, never wipe Firebase Auth IndexedDB.
+try {
+  const storedVersion = localStorage.getItem(APP_VERSION_KEY);
+  if (storedVersion && storedVersion !== APP_VERSION) {
+    localStorage.setItem(APP_VERSION_KEY, APP_VERSION);
+    const reloadKey = `${APP_VERSION_KEY}_reload_${APP_VERSION}`;
+    if (!sessionStorage.getItem(reloadKey)) {
+      sessionStorage.setItem(reloadKey, '1');
+      clearAgapeStaticCaches().finally(() => window.location.reload());
+    }
+  } else {
+    localStorage.setItem(APP_VERSION_KEY, APP_VERSION);
+  }
+} catch {
+  // Storage can be unavailable in restricted browser modes; let Firebase handle auth state.
 }
 
 // Lazy-loaded heavy components
@@ -78,6 +98,8 @@ const LiveMapPage = lazyWithRetry(() => import('./components/LiveMapPage'));
 const DispatchAssistant = lazyWithRetry(() => import('./components/DispatchAssistant'));
 const FileUploadTrips = lazyWithRetry(() => import('./components/FileUploadTrips'));
 const ReportsPage = lazyWithRetry(() => import('./components/ReportsPage'));
+const DriverPage = lazyWithRetry(() => import('./components/DriverPage'));
+const EnterpriseDashboard = lazyWithRetry(() => import('./components/EnterpriseDashboard'));
 
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
@@ -378,9 +400,9 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    setIsOffline(!realtimeReliability.isOnline);
-    if (realtimeReliability.isOnline) setRefreshTick(t => t + 1);
-  }, [realtimeReliability.isOnline, realtimeReliability.resubscribeKey]);
+    setIsOffline(isAuthenticated && !realtimeReliability.isOnline);
+    if (isAuthenticated && realtimeReliability.isOnline) setRefreshTick(t => t + 1);
+  }, [isAuthenticated, realtimeReliability.isOnline, realtimeReliability.resubscribeKey]);
 
   // Clear SW reload flag after successful boot to allow future SW updates
   useEffect(() => {
@@ -865,16 +887,6 @@ const App = () => {
     }
   }, [appSettings]);
 
-  // Force fail-safe: if loading takes >6s AND auth hasn't resolved, show login
-  useEffect(() => {
-    const force = setTimeout(() => {
-      if (!isLoading || authBootResolvedRef.current) return;
-      setIsLoading(false);
-      }, 6000);
-    return () => clearTimeout(force);
-  }, [isLoading]);
-  // Ultimate fallback — never stay on loading >15s
-  useEffect(() => { const t = setTimeout(() => { if (isLoading && !authBootResolvedRef.current) setIsLoading(false); }, 15000); return () => clearTimeout(t); }, [isLoading]);
   // Firestore data timeout — show recovery after 8s
   useEffect(() => {
     setShowDataLoadingRecovery(false);
@@ -980,7 +992,7 @@ const App = () => {
 
         // ── FAST PATH: use cached role for instant boot ──────────────────────
         const cached = readRoleCache(user.uid);
-        if (cached && cached.role && !requestedPortalRole) {
+        if (cached && cached.role && (!requestedPortalRole || requestedPortalRole === cached.role)) {
           // Apply session immediately — loading clears in milliseconds
           applySession(cached.role, userEmail, null, user);
 
@@ -989,10 +1001,8 @@ const App = () => {
             if (cancelled || !freshDoc.exists()) return;
             const freshRole = String(freshDoc.data()?.role || '').toLowerCase();
             if (freshRole && freshRole !== cached.role) {
-              // Role changed — force re-auth cleanly
-              console.warn('[Auth] Role changed in Firestore — reloading session');
               writeRoleCache(user.uid, freshRole, userEmail);
-              window.location.reload();
+              applySession(freshRole, userEmail, freshDoc, user);
             }
           }).catch(() => { /* background check — ignore network errors */ });
           return;
@@ -1162,11 +1172,7 @@ const App = () => {
             await new Promise(r => setTimeout(r, 2000));
             if (auth.currentUser) return;
           } catch {}
-          // Final: show login
-          clearRoleCache();
-          skipNextSignedOutResetRef.current = true;
-          signOut(auth).catch(() => {});
-          resetSessionState({ loginErrorMessage: 'Session expired. Please sign in again.' });
+          resetSessionState({ loginErrorMessage: 'We could not restore the saved session. Please sign in again.' });
           return;
         }
         // Initial boot with no session — show login IMMEDIATELY.
@@ -1181,8 +1187,6 @@ const App = () => {
         if (authBootResolvedRef.current) {
           return;
         }
-        skipNextSignedOutResetRef.current = true;
-        signOut(auth).catch(() => {});
         resetSessionState({ loginErrorMessage: 'Could not initialize your session. Please sign in again.' });
       }
     });
@@ -1317,6 +1321,7 @@ const App = () => {
         setLoginError('Enter a valid username using letters, numbers, dot, dash, or underscore.');
         return;
       }
+      await setPersistence(auth, browserLocalPersistence);
       const userCred = await createUserWithEmailAndPassword(auth, authEmail, password);
       await setDoc(
         doc(db, 'users', userCred.user.uid),
@@ -1370,6 +1375,7 @@ const App = () => {
         setLoginError('Enter a valid username.');
         return;
       }
+      await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, authEmail, password);
     } catch (err) {
       loginPortalRoleRef.current = requestedRole;
@@ -2675,7 +2681,7 @@ const App = () => {
             </div>
             {showLoadingRecovery && (
               <div className="w-full border-t border-slate-100 pt-5 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. You can retry, clear cached data, or return to the access portal.</p>
+                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. Retry first, or repair stale browser files without signing out.</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={() => window.location.reload()} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
                     <RefreshCcw size={15} /> Retry
@@ -2689,15 +2695,10 @@ const App = () => {
                   </button>
                 </div>
                 <button onClick={async () => {
-                  try { localStorage.clear(); sessionStorage.clear(); } catch {}
-                  try {
-                    const dbs = await window.indexedDB?.databases?.() || [];
-                    await Promise.all(dbs.map((db) => new Promise((r) => { const req = window.indexedDB.deleteDatabase(db.name); req.onsuccess = r; req.onerror = r; req.onblocked = r; })));
-                  } catch {}
-                  try { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); } catch {}
+                  await repairBrowserStatePreservingAuth().catch(() => {});
                   window.location.reload();
                 }} className="w-full h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-sm active:scale-95 transition">
-                  Clear Cache & Reload
+                  Repair Browser & Reload
                 </button>
               </div>
             )}
@@ -2722,7 +2723,7 @@ const App = () => {
             )}
             {showDataLoadingRecovery && (
               <div className="w-full border-t border-slate-100 pt-4 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. You can retry, clear cached data, or return to the access portal.</p>
+                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. Retry first, or repair stale browser files without signing out.</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={() => { requestRealtimeResubscribe('retry'); setShowDataLoadingRecovery(false); setStartupIssue('Reconnecting...'); }} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
                     <RefreshCcw size={15} /> Retry
@@ -2736,15 +2737,10 @@ const App = () => {
                   </button>
                 </div>
                 <button onClick={async () => {
-                  try { localStorage.clear(); sessionStorage.clear(); } catch {}
-                  try {
-                    const dbs = await window.indexedDB?.databases?.() || [];
-                    await Promise.all(dbs.map((db) => new Promise((r) => { const req = window.indexedDB.deleteDatabase(db.name); req.onsuccess = r; req.onerror = r; req.onblocked = r; })));
-                  } catch {}
-                  try { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); } catch {}
+                  await repairBrowserStatePreservingAuth().catch(() => {});
                   window.location.reload();
                 }} className="w-full h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-sm active:scale-95 transition">
-                  Clear Cache & Reload
+                  Repair Browser & Reload
                 </button>
               </div>
             )}
@@ -2794,7 +2790,7 @@ const App = () => {
             const driverId = myDriver.id;
             const myTrips = currentUserDriverTrips;
             const myDrivers = myDriver ? [myDriver] : [];
-            return <DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
+            return <Suspense fallback={<LazyFallback />}><DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
               allDrivers={drivers}
               dispatchers={dispatchers}
               chatUnreadCount={chatUnreadCount}
@@ -2843,9 +2839,9 @@ const App = () => {
               requestAuthAction={requestAuthAction}
               showAddTripModal={showAddTripModal}
               setShowAddTripModal={setShowAddTripModal}
-            />;
+            /></Suspense>;
           })() : (
-            <EnterpriseDashboard
+            <Suspense fallback={<LazyFallback />}><EnterpriseDashboard
               role={role}
               currentUser={currentUser}
               trips={scopedTrips}
@@ -2911,8 +2907,8 @@ const App = () => {
               addTrip={addTrip}
               showAddTripModal={showAddTripModal}
               setShowAddTripModal={setShowAddTripModal}
-              driverWorkDrivers={currentUserDriverProfile ? [currentUserDriverProfile] : []}
-              driverWorkTrips={currentUserDriverTrips}
+              driverWorkDrivers={role === 'admin' ? drivers : role === 'dispatcher' ? scopedDrivers : currentUserDriverProfile ? [currentUserDriverProfile] : []}
+              driverWorkTrips={role === 'admin' ? trips : role === 'dispatcher' ? scopedTrips : currentUserDriverTrips}
               allDrivers={drivers}
               onUpdateMission={(updatedMission) => {
                 setDrivers(prev => prev.map(d => normalizeEmail(d.email) === normalizeEmail(currentUser) ? { ...d, activeMission: updatedMission } : d));
@@ -2938,7 +2934,7 @@ const App = () => {
               onDriverStatusUpdate={handleDriverStatusUpdate}
               onCompleteTrip={handleCompleteTrip}
               onLogout={handleLogout}
-            />
+            /></Suspense>
           )}
 
           {/* Global Modals */}

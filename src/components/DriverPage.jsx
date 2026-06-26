@@ -491,8 +491,8 @@ const applyWorkflowProgress = (trip, progress) => {
 const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers, dispatchers, chatUnreadCount = 0, driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction }) => {
   const me = useMemo(
     () =>
-      drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase()) ||
-      (allDrivers || []).find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase()) ||
+      drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase() || String(d.id || '').toLowerCase() === String(currentUser || '').toLowerCase()) ||
+      (allDrivers || []).find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase() || String(d.id || '').toLowerCase() === String(currentUser || '').toLowerCase()) ||
       buildFallbackDriverProfile(currentUser || ''),
     [drivers, allDrivers, currentUser]
   );
@@ -504,7 +504,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const knownProfiles = [...(drivers || []), ...(allDrivers || [])];
     return new Set(
       knownProfiles
-        .filter((driver) => (driver?.email || '').trim().toLowerCase() === normalizedCurrentUserEmail)
+        .filter((driver) => (
+          (driver?.email || '').trim().toLowerCase() === normalizedCurrentUserEmail ||
+          String(driver?.id || '').trim().toLowerCase() === normalizedCurrentUserEmail
+        ))
         .map((driver) => driver.id)
         .concat(me?.id ? [me.id] : [])
         .filter(Boolean)
@@ -837,7 +840,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (trip.dropoff && !addressCoordsCache.current[trip.dropoff]) addressesToGeocode.push({ addr: trip.dropoff, type: 'dropoff' });
     for (const { addr, type } of addressesToGeocode) {
       try {
-        const { geocodeAddress } = await import('../config/maps');
         const coords = await geocodeAddress(addr);
         if (coords?.lat && coords?.lng) {
           addressCoordsCache.current[addr] = { lat: coords.lat, lng: coords.lng, type };

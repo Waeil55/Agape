@@ -21,6 +21,7 @@ import {
   isOperationalTrip,
   mergeTripCollections,
 } from '../utils/tripLifecycle';
+import { ASSIGNMENT_STATUSES } from '../config/firestoreSchema';
 import {
   filterValidTripRecords,
   isCorruptedTripRecord,
@@ -129,7 +130,7 @@ async function deleteDocsById(collectionName, ids = []) {
 async function safeFirestoreDocId(value, fallbackPrefix = 'trip') {
   const cleaned = String(value || '')
     .trim()
-    .replace(/[\\/#?\[\]\s]+/g, '_')
+    .replace(/[\\/#?[\]\s]+/g, '_')
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .replace(/^_+|_+$/g, '')
     .slice(0, 140);
@@ -207,7 +208,6 @@ const safeIdPart = (value) => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_'
 const createAssignmentsFn = httpsCallable(functions, 'createAssignments');
 
 async function writeAssignmentsToCollection(trips = []) {
-  const { ASSIGNMENT_STATUSES } = await import('../config/firestoreSchema');
   const assignments = cleanTripCollection(trips)
     .filter((trip) => trip?.id && hasAssignedDriver(trip) && !isTerminalTrip(trip))
     .map((trip) => ({

@@ -171,6 +171,7 @@ const SettingsPage = ({
     ...(role === 'admin' ? [{ group: 'Administration', items: adminNav }] : []),
     { group: 'Personal', items: personalNav },
   ];
+  const mobileNavItems = navItems.flatMap((group) => group.items);
 
   const activeLabel = [...adminNav, ...personalNav].find(s => s.id === activeSection)?.label || '';
 
@@ -644,7 +645,7 @@ const SettingsPage = ({
   };
 
   return (
-    <div className="flex gap-6">
+    <div className="flex min-h-0 w-full flex-col gap-3 lg:flex-row lg:gap-6">
       {/* Sidebar */}
       <div className="w-56 flex-shrink-0 hidden lg:block">
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm sticky top-4">
@@ -674,7 +675,7 @@ const SettingsPage = ({
       {/* Mobile nav */}
       <div className="lg:hidden w-full overflow-x-auto no-scrollbar pb-2 -mx-1 px-1 touch-manipulation">
         <div className="flex gap-1.5">
-          {[...adminNav, ...personalNav].map(item => {
+          {mobileNavItems.map(item => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;
             return (
@@ -687,7 +688,7 @@ const SettingsPage = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div className="w-full flex-1 min-w-0">
         {sectionContent()}
       </div>
     </div>

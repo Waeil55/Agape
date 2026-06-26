@@ -4,9 +4,9 @@ import {
   Truck,
   BrainCircuit, Phone, MessageSquare,
   ChevronDown, ChevronUp, AlertTriangle, MapPin,
-  Square, CheckSquare, X, ArrowRight, TrendingUp, TrendingDown,
+  Square, CheckSquare, X, ArrowRight, ArrowUp, ArrowDown, TrendingUp, TrendingDown,
   Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2, Filter,
-  User, Car, Map as MapIcon, Navigation, UserPlus
+  User, Car, Map as MapIcon, Navigation, UserPlus, Flag
 } from 'lucide-react';
 import { db, doc, getDocFromServer } from '../config/firebase';
 import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
@@ -715,6 +715,174 @@ const OperationsCommandCenter = ({
     ));
   }, []);
 
+  const getTripDriver = useCallback((trip) => (
+    drivers.find((driver) => (
+      driver.id === trip?.driverId ||
+      driver.email === trip?.driverEmail ||
+      (trip?.driverName && driver.name === trip.driverName)
+    ))
+  ), [drivers]);
+
+  const applyTripStatusWithAudit = useCallback((trip, status, extraFields = {}, auditTitle = 'Trip Updated') => {
+    if (!trip?.id || !updateTrip) return;
+    const nowIso = new Date().toISOString();
+    const driver = getTripDriver(trip);
+    const updates = {
+      status,
+      workflowUpdatedAt: nowIso,
+      updatedBy: currentUser,
+      ...extraFields,
+    };
+    if (driver) {
+      updates.driverId = trip.driverId || driver.id;
+      updates.driverName = trip.driverName || driver.name;
+      updates.driverEmail = trip.driverEmail || driver.email || null;
+    }
+    updateTrip(trip.id, updates);
+    const diffs = Object.entries(updates)
+      .filter(([field, value]) => String(trip?.[field] ?? '') !== String(value ?? ''))
+      .map(([field, value]) => ({ field, before: trip?.[field], after: value }));
+    addAuditLog?.(
+      auditTitle,
+      `${currentUser || 'Dispatcher'} updated ${trip.patient || trip.id} to ${status}.`,
+      status === 'Completed' ? 'emerald' : status === 'Cancelled' || status === 'No Show' ? 'rose' : 'blue',
+      {
+        entity: 'trip',
+        id: trip.id,
+        diffs,
+        summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '--'} -> ${diff.after ?? '--'}`).join('; '),
+      }
+    );
+    addToast?.(auditTitle, `${trip.patient || 'Trip'} is now ${status}.`, status === 'Cancelled' || status === 'No Show' ? 'warning' : 'success');
+  }, [addAuditLog, addToast, currentUser, getTripDriver, updateTrip]);
+
+  const markTripException = useCallback((trip, status) => {
+    const run = () => applyTripStatusWithAudit(trip, status, {
+      exceptionAt: new Date().toISOString(),
+      exceptionBy: currentUser,
+      exceptionSource: role,
+    }, `Marked ${status}`);
+    if (requestAuthAction && ['Cancelled', 'No Show', 'Rerouted'].includes(status)) {
+      requestAuthAction(`Mark ${trip.patient || 'trip'} as ${status}`, run);
+      return;
+    }
+    run();
+  }, [applyTripStatusWithAudit, currentUser, requestAuthAction, role]);
+
+  const applyDriverWorkStep = useCallback((trip, step) => {
+    const driver = getTripDriver(trip);
+    if (!driver) {
+      setManualAssignTrip(trip);
+      return;
+    }
+    const nowIso = new Date().toISOString();
+    const base = {
+      driverId: trip.driverId || driver.id,
+      driverName: trip.driverName || driver.name,
+      driverEmail: trip.driverEmail || driver.email || null,
+      driverWorkUpdatedBy: currentUser,
+      driverWorkUpdatedByRole: role,
+    };
+    const stepConfig = {
+      start: {
+        status: 'Navigating Pickup',
+        title: 'Driver Work Started',
+        fields: { ...base, startedAt: trip.startedAt || nowIso },
+      },
+      pickup: {
+        status: 'At Pickup',
+        title: 'Pickup Reached',
+        fields: { ...base, arrivalTime: trip.arrivalTime || nowIso },
+      },
+      transport: {
+        status: 'In Transit',
+        title: 'Transport Started',
+        fields: { ...base, departedPickupTime: trip.departedPickupTime || nowIso },
+      },
+      dropoff: {
+        status: 'At Dropoff',
+        title: 'Dropoff Reached',
+        fields: { ...base, arrivalDropoffTime: trip.arrivalDropoffTime || nowIso },
+      },
+      complete: {
+        status: 'Completed',
+        title: 'Trip Completed',
+        fields: {
+          ...base,
+          completedAt: trip.completedAt || nowIso,
+          completedBy: currentUser,
+          completedVehicle: trip.completedVehicle || driver.vehicle || '',
+          dispatcherCompletionOverride: true,
+        },
+      },
+    };
+    const config = stepConfig[step];
+    if (!config) return;
+    const run = () => applyTripStatusWithAudit(trip, config.status, config.fields, config.title);
+    if (step === 'complete' && requestAuthAction) {
+      requestAuthAction(`Complete driver work for ${trip.patient || 'trip'}`, run);
+      return;
+    }
+    run();
+  }, [applyTripStatusWithAudit, currentUser, getTripDriver, requestAuthAction, role, setManualAssignTrip]);
+
+  const renderDriverWorkActions = (trip) => {
+    const driver = getTripDriver(trip);
+    const terminal = TERMINAL_STATUSES.includes(trip.status);
+    if (!driver) {
+      return (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-blue-700">Driver Work</p>
+              <p className="text-xs font-semibold text-blue-900">Assign a driver before running workflow steps.</p>
+            </div>
+            <button type="button" onClick={() => setManualAssignTrip(trip)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-700">
+              <UserPlus size={14} /> Assign Driver
+            </button>
+          </div>
+        </div>
+      );
+    }
+    const workButtons = [
+      { id: 'start', label: 'Start', icon: Navigation },
+      { id: 'pickup', label: 'Pickup', icon: MapPin },
+      { id: 'transport', label: 'Transport', icon: Truck },
+      { id: 'dropoff', label: 'Dropoff', icon: Flag },
+      { id: 'complete', label: 'Complete', icon: CheckCircle2 },
+    ];
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-2.5">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Driver Work</p>
+            <p className="text-xs font-semibold text-slate-700 truncate">{driver.name} - {driver.vehicle || 'No vehicle'}</p>
+          </div>
+          <span className={`rounded-lg px-2 py-1 text-[10px] font-black ${getDriverLiveStatus(driver).color}`}>
+            {getDriverLiveStatus(driver).label}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {workButtons.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              disabled={terminal && id !== 'complete'}
+              onClick={() => applyDriverWorkStep(trip, id)}
+              className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-black transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                id === 'complete'
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const renderExpandedTripDetails = (trip, options = {}) => {
     const { compact = false, embeddedInTable = false } = options;
     const driver = drivers.find((entry) => entry.id === trip.driverId);
@@ -1139,7 +1307,7 @@ const OperationsCommandCenter = ({
         <div className="flex flex-wrap gap-2 flex-1">
           {[
             { id: 'time', label: 'Time' },
-            { id: 'driver', label: 'Driver' },
+            { id: 'assignment', label: 'Driver' },
             { id: 'status', label: 'Status' },
             { id: 'patient', label: 'Client' },
             { id: 'urgency', label: 'Urgency' }
@@ -1183,6 +1351,23 @@ const OperationsCommandCenter = ({
               <option key={driver.id} value={driver.id}>{driver.name}</option>
             ))}
           </select>
+
+          <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+            {MANIFEST_VIEW_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setManifestView(option.value)}
+                className={`h-7 rounded-md px-2.5 text-[10px] font-black uppercase tracking-wide transition-colors ${
+                  manifestView === option.value
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                }`}
+              >
+                {option.value === 'card' ? 'Cards' : option.value === 'table' ? 'Ledger' : option.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -1288,43 +1473,39 @@ const OperationsCommandCenter = ({
 
         {/* Expanded Actions Panel */}
         {isExpanded && (
-          <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
-            {!driver ? (
-              <>
-                <button onClick={() => setManualAssignTrip(trip)} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-semibold transition-colors">
-                  <UserPlus size={14} /> Assign
-                </button>
-                <button onClick={() => triggerSmartAssign(trip)} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs font-semibold transition-colors">
-                  <BrainCircuit size={14} /> Auto
-                </button>
-              </>
-            ) : (
-              <button onClick={() => setEditTrip(trip)} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-2 rounded-lg text-xs font-semibold transition-colors">
-                <Edit2 size={14} /> Edit Trip
+          <div className="mt-3 space-y-2 border-t border-slate-100 pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              <button onClick={() => setManualAssignTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-blue-700">
+                <UserPlus size={14} /> {driver ? 'Reassign' : 'Assign'}
               </button>
-            )}
-            
-            <button onClick={() => updateTrip && updateTrip(trip.id, { status: 'Rerouted' })} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-xs font-semibold transition-colors">
-              <MapPin size={14} /> Reroute
-            </button>
-            
-            <button onClick={() => updateTrip && updateTrip(trip.id, { status: 'No Show' })} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-lg text-xs font-semibold transition-colors">
-              <AlertCircle size={14} /> No Show
-            </button>
-
-            <button onClick={() => updateTrip && updateTrip(trip.id, { status: 'Cancelled' })} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 bg-rose-500 hover:bg-rose-600 text-white px-3 py-2 rounded-lg text-xs font-semibold transition-colors">
-              <XCircle size={14} /> Cancel
-            </button>
-
-            <button onClick={() => requestDeleteTrip(trip.id)} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold transition-colors">
-              <Archive size={14} /> Archive
-            </button>
-
-            {(trip.patientPhone || trip.pickupPhone || trip.dropoffPhone) && (
-              <button onClick={() => makeCall(trip.patientPhone || trip.pickupPhone, trip.patient)} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white px-3 py-2 rounded-lg text-xs font-semibold transition-colors">
-                <Phone size={14} /> Contacts
+              <button onClick={() => triggerSmartAssign(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-indigo-700">
+                <BrainCircuit size={14} /> Auto
               </button>
-            )}
+              <button onClick={() => setEditTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition-colors hover:bg-blue-100">
+                <Edit2 size={14} /> Edit
+              </button>
+              <button onClick={() => markTripException(trip, 'Rerouted')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-amber-600">
+                <MapPin size={14} /> Reroute
+              </button>
+              <button onClick={() => markTripException(trip, 'No Show')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-700 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-slate-800">
+                <AlertCircle size={14} /> No Show
+              </button>
+              <button onClick={() => markTripException(trip, 'Cancelled')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-rose-600">
+                <XCircle size={14} /> Cancel
+              </button>
+              <button onClick={() => requestDeleteTrip(trip.id)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700 transition-colors hover:bg-slate-200">
+                <Archive size={14} /> Archive
+              </button>
+              {(trip.patientPhone || trip.pickupPhone || trip.dropoffPhone) && (
+                <button onClick={() => makeCall(trip.patientPhone || trip.pickupPhone, trip.patient)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-teal-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-teal-600">
+                  <Phone size={14} /> Call
+                </button>
+              )}
+              <button onClick={() => setSmsConversationTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-indigo-600">
+                <MessageSquare size={14} /> SMS
+              </button>
+            </div>
+            {renderDriverWorkActions(trip)}
           </div>
         )}
         {/* Render detailed metadata block inside expanded state as well */}
@@ -1591,61 +1772,62 @@ const OperationsCommandCenter = ({
 
                     {/* Expandable Actions */}
                     {isExpanded && (
-                      <div className="border-t border-slate-100 p-3 bg-white">
-                        <div className="flex flex-wrap gap-2">
-                          {!driver && (
+                      <div className="space-y-2 border-t border-slate-100 bg-white p-3">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                          <button
+                            onClick={() => setManualAssignTrip(trip)}
+                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-blue-700"
+                          >
+                            <UserPlus size={14} /> {driver ? 'Reassign' : 'Assign'}
+                          </button>
+                          <button
+                            onClick={() => triggerSmartAssign(trip)}
+                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-indigo-700"
+                          >
+                            <BrainCircuit size={14} /> Auto
+                          </button>
+                          <button
+                            onClick={() => setEditTrip(trip)}
+                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition-colors hover:bg-blue-100"
+                          >
+                            <Edit2 size={14} /> Edit
+                          </button>
+                          {hasPermission(role, 'canDeleteTrip') && (
                             <>
                               <button
-                                onClick={() => triggerSmartAssign(trip)}
-                                className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors"
+                                onClick={() => markTripException(trip, 'Rerouted')}
+                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-amber-600"
                               >
-                                <BrainCircuit size={14} /> Smart Assign
+                                <MapPin size={14} /> Reroute
                               </button>
                               <button
-                                onClick={() => setManualAssignTrip(trip)}
-                                className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors"
+                                onClick={() => markTripException(trip, 'No Show')}
+                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-700 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-slate-800"
                               >
-                                <UserPlus size={14} /> Assign
+                                <AlertCircle size={14} /> No Show
+                              </button>
+                              <button
+                                onClick={() => markTripException(trip, 'Cancelled')}
+                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-rose-600"
+                              >
+                                <XCircle size={14} /> Cancel
+                              </button>
+                              <button
+                                onClick={() => requestDeleteTrip(trip.id)}
+                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700 transition-colors hover:bg-slate-200"
+                              >
+                                <Archive size={14} /> Archive
                               </button>
                             </>
                           )}
                           <button
-                            onClick={() => setEditTrip(trip)}
-                            className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors"
-                          >
-                            <MapPin size={14} /> Reroute
-                          </button>
-                          {hasPermission(role, 'canDeleteTrip') && (
-                            <button
-                              onClick={() => updateTrip(trip.id, { status: 'No Show' })}
-                              className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold transition-colors"
-                            >
-                              <AlertCircle size={14} /> No Show
-                            </button>
-                          )}
-                          {hasPermission(role, 'canDeleteTrip') && (
-                            <button
-                              onClick={() => updateTrip(trip.id, { status: 'Cancelled' })}
-                              className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-colors"
-                            >
-                              <XCircle size={14} /> Cancel
-                            </button>
-                          )}
-                          {hasPermission(role, 'canDeleteTrip') && (
-                            <button
-                              onClick={() => requestDeleteTrip(trip.id)}
-                              className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
-                            >
-                              <Archive size={14} /> Archive
-                            </button>
-                          )}
-                          <button
                             onClick={() => setSmsConversationTrip(trip)}
-                            className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold transition-colors"
+                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-indigo-600"
                           >
                             <Phone size={14} /> Contacts
                           </button>
                         </div>
+                        {renderDriverWorkActions(trip)}
                       </div>
                     )}
 

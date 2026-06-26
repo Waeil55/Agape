@@ -138,11 +138,16 @@ const EnterpriseDashboard = ({
   const [routePlannerSequencerSequence, setRoutePlannerSequencerSequence] = useState(null);
   const [routePlannerSequencerKey, setRoutePlannerSequencerKey] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [driverWorkDriverId, setDriverWorkDriverId] = useState(() => localStorage.getItem('agape_driverWorkDriverId') || '');
 
   // Persist navigation state to localStorage (survives refresh)
   useEffect(() => { localStorage.setItem('agape_activePanel', activePanel); }, [activePanel]);
   useEffect(() => { localStorage.setItem('agape_operationsTab', operationsTab); }, [operationsTab]);
   useEffect(() => { if (rightPanelTab) localStorage.setItem('agape_rightPanelTab', rightPanelTab); else localStorage.removeItem('agape_rightPanelTab'); }, [rightPanelTab]);
+  useEffect(() => {
+    if (driverWorkDriverId) localStorage.setItem('agape_driverWorkDriverId', driverWorkDriverId);
+    else localStorage.removeItem('agape_driverWorkDriverId');
+  }, [driverWorkDriverId]);
   useEffect(() => {
     if (showRightPanel && !rightPanelTab) {
       setRightPanelTab('alerts');
@@ -158,6 +163,33 @@ const EnterpriseDashboard = ({
       setActivePanel('operations');
     }
   }, [activePanel, driverWorkDrivers.length]);
+
+  const activeDriverWorkDriver = useMemo(() => {
+    if (driverWorkDrivers.length === 0) return null;
+    return driverWorkDrivers.find((driver) => driver.id === driverWorkDriverId) || driverWorkDrivers[0];
+  }, [driverWorkDriverId, driverWorkDrivers]);
+
+  useEffect(() => {
+    if (!activeDriverWorkDriver?.id) return;
+    if (driverWorkDriverId !== activeDriverWorkDriver.id) {
+      setDriverWorkDriverId(activeDriverWorkDriver.id);
+    }
+  }, [activeDriverWorkDriver?.id, driverWorkDriverId]);
+
+  const activeDriverWorkTrips = useMemo(() => {
+    if (!activeDriverWorkDriver) return [];
+    const driverEmail = String(activeDriverWorkDriver.email || '').trim().toLowerCase();
+    return driverWorkTrips.filter((trip) => {
+      const tripDriverEmail = String(
+        trip.driverEmail ||
+        allDrivers.find((driver) => driver.id === trip.driverId)?.email ||
+        ''
+      ).trim().toLowerCase();
+      return trip.driverId === activeDriverWorkDriver.id ||
+        (driverEmail && tripDriverEmail === driverEmail) ||
+        (activeDriverWorkDriver.name && trip.driverName === activeDriverWorkDriver.name);
+    });
+  }, [activeDriverWorkDriver, allDrivers, driverWorkTrips]);
 
   // Online/offline listener
   useEffect(() => {
@@ -1119,17 +1151,62 @@ const EnterpriseDashboard = ({
           }}
         />
       );
-      case 'archives': // Archives is now embedded in Settings
       case 'settings': return (
         <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} initialSection={activePanel === 'archives' ? 'archives' : undefined} />
       );
-      case 'routePlanner': {
-        // Route Planner is now consolidated — open sequencer modal and redirect to operations
-        setShowSequencerModal(true);
-        return renderOperationsPage();
-      }
-      case 'drive': return driverWorkDrivers.length > 0 ? (
-        <DriverPage currentUser={currentUser} role={role} drivers={driverWorkDrivers} trips={driverWorkTrips} allDrivers={allDrivers} dispatchers={dispatchers} phoneNumbers={phoneNumbers} onUpdateTrip={onUpdateDriverTrip} onCompleteTrip={onCompleteTrip} onDriverStatusUpdate={onDriverStatusUpdate} onAddAuditLog={addAuditLog} onLogout={() => {}} requestAuthAction={requestAuthAction} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} onUpdateDriverLocation={handleUpdateDriverLocation} onOpenSettings={() => setActivePanel('settings')} onAddTrip={addTrip} showAddTripModal={showAddTripModal} setShowAddTripModal={setShowAddTripModal} />
+      case 'drive': return driverWorkDrivers.length > 0 && activeDriverWorkDriver ? (
+        <div className="flex h-full min-h-0 flex-col bg-[#f4f7fa]">
+          <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Driver Workstation</p>
+                <p className="truncate text-sm font-black text-slate-900">
+                  {role === 'admin' ? 'Admin' : 'Dispatcher'} operating driver workflow
+                </p>
+              </div>
+              <div className="flex min-w-0 items-center gap-2">
+                <select
+                  value={activeDriverWorkDriver.id}
+                  onChange={(event) => setDriverWorkDriverId(event.target.value)}
+                  className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 sm:min-w-[240px]"
+                >
+                  {driverWorkDrivers.map((driver) => (
+                    <option key={driver.id || driver.email || driver.name} value={driver.id}>
+                      {driver.name || driver.email || driver.id} - {driver.vehicle || 'No vehicle'}
+                    </option>
+                  ))}
+                </select>
+                <span className={`hidden rounded-lg px-2 py-1 text-[10px] font-black sm:inline-flex ${getDriverLiveStatus(activeDriverWorkDriver).color}`}>
+                  {getDriverLiveStatus(activeDriverWorkDriver).label}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1">
+            <DriverPage
+              currentUser={activeDriverWorkDriver.email || activeDriverWorkDriver.id || currentUser}
+              role="driver"
+              drivers={[activeDriverWorkDriver]}
+              trips={activeDriverWorkTrips}
+              allDrivers={allDrivers}
+              dispatchers={dispatchers}
+              phoneNumbers={phoneNumbers}
+              onUpdateTrip={onUpdateDriverTrip}
+              onCompleteTrip={onCompleteTrip}
+              onDriverStatusUpdate={onDriverStatusUpdate}
+              onAddAuditLog={addAuditLog}
+              onLogout={() => {}}
+              requestAuthAction={requestAuthAction}
+              appSettings={appSettings}
+              onUpdateAppSettings={updateAppSettings}
+              onUpdateDriverLocation={handleUpdateDriverLocation}
+              onOpenSettings={() => setActivePanel('settings')}
+              onAddTrip={addTrip}
+              showAddTripModal={showAddTripModal}
+              setShowAddTripModal={setShowAddTripModal}
+            />
+          </div>
+        </div>
       ) : renderOperationsPage();
       default: return renderOperationsPage();
     }

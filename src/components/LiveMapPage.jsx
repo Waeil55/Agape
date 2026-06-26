@@ -687,26 +687,26 @@ const LiveMapPage = ({
   return (
     <div className="h-[100dvh] w-full min-h-0 bg-slate-50 flex flex-col overflow-hidden select-none font-outfit">
       {/* ===== HUD BAR (36px) ===== */}
-      <header className="shrink-0 h-10 bg-white border-b border-slate-200 shadow-sm flex items-center gap-3 px-4 z-30">
+      <header className="shrink-0 min-h-10 bg-white border-b border-slate-200 shadow-sm flex flex-wrap items-center gap-2 px-3 py-2 z-30 sm:flex-nowrap sm:gap-3 sm:px-4 sm:py-0">
         <span className="text-[12px] font-black text-slate-800 tracking-widest uppercase">Agape</span>
-        <div className="w-px h-4 bg-slate-200" />
+        <div className="hidden h-4 w-px bg-slate-200 sm:block" />
         <span className="flex items-center gap-1.5 text-[11px] font-bold"><span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" /><span className="text-slate-600">{fleetStats.live}/{drivers.length} live</span></span>
-        <span className="flex items-center gap-1.5 text-[11px] font-bold"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-sm" /><span className="text-blue-700">{fleetStats.moving} moving</span></span>
-        <span className="flex items-center gap-1.5 text-[11px] font-bold"><span className="w-2 h-2 rounded-full bg-amber-400 shadow-sm" /><span className="text-amber-700">{fleetStats.stopped} stopped</span></span>
+        <span className="hidden items-center gap-1.5 text-[11px] font-bold sm:flex"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-sm" /><span className="text-blue-700">{fleetStats.moving} moving</span></span>
+        <span className="hidden items-center gap-1.5 text-[11px] font-bold sm:flex"><span className="w-2 h-2 rounded-full bg-amber-400 shadow-sm" /><span className="text-amber-700">{fleetStats.stopped} stopped</span></span>
         <span className="text-emerald-600 text-[11px] font-black flex items-center gap-0.5"><span className="text-emerald-500">✓</span> {fleetStats.complete}</span>
         <span className="text-slate-400 text-[11px] font-bold">| {fleetStats.remaining} remaining</span>
-        <div className="flex-1" />
-        <div className="relative flex items-center">
+        <div className="hidden flex-1 sm:block" />
+        <div className="relative flex w-full items-center sm:w-auto">
           <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
           <input
             value={hudSearch}
             onChange={(e) => setHudSearch(e.target.value)}
             placeholder="Search drivers..."
-            className="w-40 h-7 rounded-lg bg-slate-100 border border-slate-200 pl-8 pr-2 text-[11px] font-semibold text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+            className="h-7 w-full rounded-lg bg-slate-100 border border-slate-200 pl-8 pr-2 text-[11px] font-semibold text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all sm:w-40"
           />
           {hudSearch && <X size={14} className="absolute right-2 text-slate-400 cursor-pointer hover:text-slate-700" onClick={() => setHudSearch('')} />}
         </div>
-        <div className="w-px h-4 bg-slate-200" />
+        <div className="hidden h-4 w-px bg-slate-200 sm:block" />
         {myDriverProfile && (
           gpsActive ? (
             <button type="button" onClick={stopMyGpsTracking} className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-bold hover:bg-rose-100 transition-colors" title="Stop sharing GPS">
@@ -727,7 +727,7 @@ const LiveMapPage = ({
       </header>
 
       {/* ===== COMMAND CENTER LAYOUT ===== */}
-      <div className="flex-1 flex overflow-hidden bg-slate-50">
+      <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 md:flex-row">
         
         {/* ===== LEFT DATA PANEL ===== */}
         <CommandSidebar 
@@ -767,7 +767,7 @@ const LiveMapPage = ({
           )}
           
           {/* Map Overlays */}
-          <div className="absolute top-4 left-4 flex gap-2 z-20">
+          <div className="absolute left-3 right-3 top-3 flex flex-wrap gap-2 z-20 md:left-4 md:right-auto md:top-4">
             <button type="button" onClick={() => setShowTraffic(t => !t)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md backdrop-blur-md border ${showTraffic ? 'bg-amber-500/90 text-white border-amber-400' : 'bg-white/90 text-slate-700 border-slate-200/50 hover:bg-white'}`}>
               🚦 Live Traffic
             </button>
@@ -778,7 +778,7 @@ const LiveMapPage = ({
 
           {/* Street View Split Panel */}
           {streetViewLoc && (
-            <div className="absolute top-0 right-0 w-[450px] max-w-[90vw] h-full z-30 bg-white border-l border-slate-200 flex flex-col shadow-2xl">
+            <div className="absolute inset-x-0 bottom-0 h-[50%] z-30 bg-white border-t border-slate-200 flex flex-col shadow-2xl md:inset-x-auto md:bottom-auto md:right-0 md:top-0 md:h-full md:w-[450px] md:max-w-[90vw] md:border-l md:border-t-0">
               <div className="flex items-center justify-between px-4 h-14 border-b border-slate-200 bg-slate-50 shrink-0">
                 <span className="text-slate-900 text-sm font-bold flex items-center gap-2"><MapPin size={16} className="text-blue-600" /> Street View Entrance</span>
                 <button onClick={() => setStreetViewLoc(null)} className="text-slate-400 hover:text-slate-700 p-1.5 bg-white rounded-md hover:bg-slate-100 transition-colors shadow-sm border border-slate-200"><X size={16} /></button>
@@ -812,10 +812,10 @@ const LiveMapPage = ({
       {/* ===== DETAIL MODAL (full report) ===== */}
       {showDetailModal && selectedDriver && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}>
-          <div className="relative w-full max-w-2xl max-h-[85vh] mx-4 rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden font-outfit" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-2xl max-h-[90dvh] mx-3 rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden font-outfit sm:mx-4 sm:max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
             {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between gap-3 px-4 py-4 border-b border-slate-100 bg-slate-50/50 sm:px-6 sm:py-5">
+              <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                 <div className={`flex h-12 w-12 items-center justify-center rounded-2xl font-black text-xl shadow-sm border ${
                   selectedSummary?.fresh && selectedSummary?.movementState === 'moving'
                     ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
@@ -823,8 +823,8 @@ const LiveMapPage = ({
                 }`}>
                   {String(selectedDriver?.name || 'D').charAt(0)}
                 </div>
-                <div>
-                  <h2 className="text-xl font-black text-slate-900 leading-none mb-1">{selectedDriver.name || 'Unnamed driver'}</h2>
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-black text-slate-900 leading-none mb-1 sm:text-xl">{selectedDriver.name || 'Unnamed driver'}</h2>
                   <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">{selectedDriver.vehicle || 'No vehicle'} <span className="text-slate-300">•</span> {formatAge(selectedSummary?.lastPing)}</p>
                 </div>
               </div>
@@ -834,7 +834,7 @@ const LiveMapPage = ({
             </div>
 
             {/* Tabs */}
-            <div className="flex px-6 pt-2 border-b border-slate-100 bg-white">
+            <div className="flex overflow-x-auto px-4 pt-2 border-b border-slate-100 bg-white sm:px-6">
               {[
                 { id: 'overview', label: 'Overview', icon: Gauge },
                 { id: 'trips', label: 'Trips', icon: Route },
@@ -849,12 +849,12 @@ const LiveMapPage = ({
             </div>
 
             {/* Tab content */}
-            <div className="max-h-[60vh] overflow-y-auto p-6 space-y-6 bg-slate-50/30">
+            <div className="max-h-[62dvh] overflow-y-auto p-4 space-y-4 bg-slate-50/30 sm:max-h-[60vh] sm:p-6 sm:space-y-6">
               {/* OVERVIEW TAB */}
               {detailTab === 'overview' && (
                 <>
                   {/* Time stats grid */}
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
                     <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Moving</p>
                       <p className="mt-1 text-2xl font-black text-blue-600 tabular-nums">{formatTelemetryDuration(selectedTracking?.totalMovingMinutes || selectedSummary?.movingMinutes || 0)}</p>
@@ -902,7 +902,7 @@ const LiveMapPage = ({
                   </div>
 
                   {/* Stops + upcoming summary */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                     <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Stops</p>
                       <p className="mt-1 text-2xl font-black text-slate-900 tabular-nums">{selectedTracking?.stopCount || 0}</p>
