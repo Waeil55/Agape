@@ -3,23 +3,12 @@
    Do not cache, poll, or background-sync trips, drivers, assignments, or APIs here.
 */
 
-const CACHE_VERSION = 'agape-v9-static';
-const STATIC_CACHE = ${CACHE_VERSION}-shell;
-const RUNTIME_CACHE = ${CACHE_VERSION}-assets;
-
-const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-];
+const CACHE_VERSION = 'agape-v10';
+const STATIC_CACHE = CACHE_VERSION + '-shell';
+const RUNTIME_CACHE = CACHE_VERSION + '-assets';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .catch(() => undefined)
-  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -27,7 +16,7 @@ self.addEventListener('activate', (event) => {
     Promise.all([
       caches.keys().then((cacheNames) => Promise.all(
         cacheNames
-          .filter((name) => name.startsWith('agape-') && name !== STATIC_CACHE && name !== RUNTIME_CACHE)
+          .filter((name) => name.startsWith('agape-'))
           .map((name) => caches.delete(name))
       )),
       self.clients.claim(),
@@ -58,13 +47,7 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request, { cache: 'reload' })
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(STATIC_CACHE).then((cache) => cache.put('/index.html', clone));
-          return response;
-        })
-        .catch(() => caches.match('/index.html').then((cached) => cached || Response.error()))
+      fetch(request).catch(() => caches.match('/index.html').then((cached) => cached || Response.error()))
     );
     return;
   }
@@ -73,7 +56,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
-        return fetch(request, { cache: 'reload' }).then((response) => {
+        return fetch(request).then((response) => {
           if (response.ok) {
             const clone = response.clone();
             caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, clone));

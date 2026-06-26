@@ -585,7 +585,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [aiRideShare, setAiRideShare] = useState([]);
   const [showOdometerPrompt, setShowOdometerPrompt] = useState(null);
   const [odometerValue, setOdometerValue] = useState('');
-  const [lastOdometer, setLastOdometer] = useState(0);
+  const [lastOdometer, setLastOdometer] = useState(() => {
+    try { return Number(localStorage.getItem(`agape_drvOdo_${userKey}`)) || 0; } catch { return 0; }
+  });
+  useEffect(() => {
+    if (lastOdometer > 0) {
+      try { localStorage.setItem(`agape_drvOdo_${userKey}`, String(lastOdometer)); } catch {}
+    }
+  }, [lastOdometer, userKey]);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(null);
   const [arrivalOdometer, setArrivalOdometer] = useState('');
   const [signatureConfirmed, setSignatureConfirmed] = useState(false);
@@ -2746,14 +2753,35 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               return <div key={step.key} className={`h-1 flex-1 rounded-full ${isComplete || idx < currentStep ? 'bg-emerald-400' : idx === currentStep ? 'bg-blue-500' : 'bg-slate-200'}`} />;
             })}
           </div>
-          <button
-            type="button"
-            onClick={bottomAction.onClick}
-            disabled={!primary}
-            className={`w-full h-12 ${bottomAction.gradient} text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
-          >
-            {bottomAction.icon} {bottomAction.label}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={bottomAction.onClick}
+              disabled={!primary}
+              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-12 ${bottomAction.gradient} text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
+            >
+              {bottomAction.icon} {bottomAction.label}
+            </button>
+            {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
+              skipConfirmTripId === `work-${trip.id}` ? (
+                <button
+                  type="button"
+                  onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
+                  className="flex-[2] h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                >
+                  <MapPin size={14} /> {trip.status === 'In Progress' ? 'Already here?' : 'At dropoff?'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { impact('medium'); setSkipConfirmTripId(`work-${trip.id}`); }}
+                  className="flex-[2] h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <Forward size={14} /> Skip Nav
+                </button>
+              )
+            )}
+          </div>
         </div>
       </div>
     );
