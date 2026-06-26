@@ -628,7 +628,7 @@ const EnterpriseDashboard = ({
 
   // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="bg-[#F3F4F6]/95 backdrop-blur-xl border-b border-slate-200/80 px-3 flex md:hidden items-center gap-2 shrink-0 h-[56px] z-20 relative">
+    <header className="bg-white border-b-2 border-amber-400 px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300 bg-white">
         <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain" />
       </div>
@@ -1157,10 +1157,10 @@ const EnterpriseDashboard = ({
             ) : (
               <div className={
                 activePanel === 'drive' || activePanel === 'admin'
-                  ? 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm flex flex-col flex-1 min-h-0'
+                  ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0'
                   : activePanel === 'chat'
-                  ? 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
-                  : 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm overflow-hidden'
+                  ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
+                  : 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm overflow-hidden'
               }>
                 {renderPanelContent()}
               </div>
