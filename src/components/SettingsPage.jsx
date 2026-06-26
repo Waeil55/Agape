@@ -672,14 +672,14 @@ const SettingsPage = ({
       </div>
 
       {/* Mobile nav */}
-      <div className="lg:hidden w-full overflow-x-auto pb-2">
-        <div className="flex gap-1">
+      <div className="lg:hidden w-full overflow-x-auto no-scrollbar pb-2 -mx-1 px-1 touch-manipulation">
+        <div className="flex gap-1.5">
           {[...adminNav, ...personalNav].map(item => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;
             return (
-              <button key={item.id} onClick={() => setActiveSection(item.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap text-xs font-bold transition-all ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                <Icon size={13} /> {item.label}
+              <button key={item.id} onClick={() => setActiveSection(item.id)} className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl whitespace-nowrap text-xs font-bold transition-all active:scale-[0.97] touch-manipulation ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 active:bg-slate-300'}`}>
+                <Icon size={14} /> {item.label}
               </button>
             );
           })}

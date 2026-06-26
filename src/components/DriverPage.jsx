@@ -28,7 +28,7 @@ import { isNativeShell } from '../utils/platform';
 import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
 import { normalizeEmail } from '../utils/accessControl';
 import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
-
+import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
@@ -4678,12 +4678,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 {[
                   ['Vehicle', me?.vehicle || 'N/A'],
                   ['Zone', me?.currentZone || 'N/A'],
-                  ['Status', isClockedIn ? 'Online' : 'Offline'],
+                  ['Status', getDriverLiveStatus(me).label],
                   ['GPS', 'Always On'],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between items-center">
                     <span className="text-slate-500 text-xs font-semibold">{label}</span>
-                    <span className={`font-semibold text-xs ${value === 'Online' || value === 'Active' || value === 'Enabled' ? 'text-emerald-600' : value === 'Offline' || value === 'Inactive' || value === 'Not Available' ? 'text-slate-400' : 'text-slate-800'}`}>{value}</span>
+                    {label === 'Status' ? (
+                      <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${getDriverLiveStatus(me).color}`}>{value}</span>
+                    ) : (
+                      <span className={`font-semibold text-xs ${value === 'Always On' ? 'text-emerald-600' : 'text-slate-800'}`}>{value}</span>
+                    )}
                   </div>
                 ))}
               </div>

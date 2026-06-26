@@ -185,6 +185,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
   const [editingRow, setEditingRow] = useState(null);
   const [editingRowSnapshot, setEditingRowSnapshot] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('agape_rptViewMode') || 'table');
   const inputRef = useRef(null);
 
   const [collapsedDays, setCollapsedDays] = useState(() => {
@@ -218,7 +219,8 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     localStorage.setItem('agape_rptSortDir', sortDirection);
     localStorage.setItem('agape_rptCollapsedDays', JSON.stringify(collapsedDays));
     localStorage.setItem('agape_rptHiddenCols', JSON.stringify(hiddenCols));
-  }, [startDate, endDate, statusFilter, driverFilter, reviewedFilter, searchQuery, sortColumn, sortDirection, collapsedDays, hiddenCols]);
+    localStorage.setItem('agape_rptViewMode', viewMode);
+  }, [startDate, endDate, statusFilter, driverFilter, reviewedFilter, searchQuery, sortColumn, sortDirection, collapsedDays, hiddenCols, viewMode]);
 
   // ===== RESIZABLE COLUMNS =====
   const DEFAULT_COL_WIDTHS = {
@@ -879,6 +881,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         )}
         <div className="flex items-center gap-1">
           <button onClick={() => setShowUploadModal(true)} className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors shadow-sm flex items-center gap-1"><UploadCloud size={9} /> Upload</button>
+          <button onClick={() => setViewMode(v => v === 'table' ? 'card' : 'table')} className="px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg font-bold transition-colors shadow-sm flex items-center gap-1 hover:border-slate-300"><FileText size={9} /> {viewMode === 'table' ? 'Cards' : 'Table'}</button>
           <button onClick={exportCsv} disabled={reportTrips.length === 0} className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold disabled:opacity-40 transition-colors shadow-sm flex items-center gap-1"><Download size={9} /> CSV</button>
           <button onClick={generateAiReport} disabled={reportTrips.length === 0 || aiReportLoading} className="px-2 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg font-bold disabled:opacity-40 transition-all shadow-sm flex items-center gap-1">
             {aiReportLoading ? <Loader2 size={9} className="animate-spin" /> : <BrainCircuit size={9} />} AI
@@ -967,273 +970,428 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
         </div>
       )}
 
-      {/* Table Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
+      {/* Content: Card view or Table view */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {paginatedGroupedTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             <FileText size={40} className="mb-3 opacity-40" />
             <p className="text-sm font-medium">No report data for selected filters</p>
             <button onClick={resetFilters} className="mt-2 text-xs text-blue-600 hover:underline">Reset filters</button>
           </div>
-        ) : (
-          paginatedGroupedTrips.map(([dateLabel, dayTrips]) => {
-            const passengerData = groupedByPassenger[dateLabel] || [];
-            const isCollapsed = collapsedDays[dateLabel];
-            const dayTrackingDocs = trackingDocs.filter((doc) => doc.date === dateLabel);
-            const dayTrackingSummary = dayTrackingDocs.reduce((acc, doc) => {
-              acc.trackedDrivers += 1;
-              acc.movingMinutes += Number(doc.totalMovingMinutes || 0);
-              acc.stoppedMinutes += Number(doc.totalStoppedMinutes || 0);
-              acc.trackedMiles += Number(doc.totalTrackedMiles || 0);
-              acc.stopCount += Number(doc.stopCount || 0);
-              return acc;
-            }, { trackedDrivers: 0, movingMinutes: 0, stoppedMinutes: 0, trackedMiles: 0, stopCount: 0 });
-            return (
-              <div key={dateLabel} className="border-b border-slate-200 last:border-b-0">
-                {/* Date Group Header */}
-                <div
-                  className="bg-slate-100 border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-2 cursor-pointer hover:bg-slate-200 transition-colors w-max min-w-full"
-                  style={{ minWidth: reportTableMinWidth }}
-                  onClick={() => toggleDay(dateLabel)}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
+        ) : viewMode === 'card' ? (
+          <div className="p-3 sm:p-4 space-y-4 bg-[#F3F4F6] min-h-full">
+            {paginatedGroupedTrips.map(([dateLabel, dayTrips]) => {
+              const isCollapsed = collapsedDays[dateLabel];
+              return (
+                <div key={dateLabel}>
+                  {/* Date Group Header */}
+                  <div
+                    className="flex items-center justify-between px-1 py-2 cursor-pointer select-none"
+                    onClick={() => toggleDay(dateLabel)}
+                  >
                     <div className="flex items-center gap-2">
-                      <Calendar size={13} className="text-slate-500" />
-                      <span className="text-sm font-bold text-slate-700">{formatDateLabel(dateLabel)}</span>
+                      <Calendar size={14} className="text-slate-500" />
+                      <span className="text-sm font-bold text-slate-800">{formatDateLabel(dateLabel)}</span>
+                      <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">{dayTrips.length} trips</span>
                     </div>
-                    <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                      {dayTrips.length} trips
-                    </span>
-                    <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                      {dayTrips.filter(t => t.reviewed).length}/{dayTrips.length} reviewed
-                    </span>
-                    {dayTrackingSummary.trackedDrivers > 0 && (
-                      <>
-                        <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                          {formatTelemetryDuration(dayTrackingSummary.movingMinutes)} moving
-                        </span>
-                        <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                          {formatTelemetryDuration(dayTrackingSummary.stoppedMinutes)} stopped
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => markTripsReviewed(dayTrips, true)}
-                        className="px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-200 transition-colors"
-                      >
-                        Mark Day Done
-                      </button>
-                      <button
-                        onClick={() => markTripsReviewed(dayTrips, false)}
-                        className="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold hover:bg-slate-200 transition-colors"
-                      >
-                        Reset Review
-                      </button>
+                    <div className="flex items-center gap-2">
+                      <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
                     </div>
-                    <ChevronDown size={16} className={`text-slate-500 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
                   </div>
-                </div>
 
-                {!isCollapsed && (
-                  <>
-                    {/* Table */}
-                    <div>
-                  <table className="resizable-table text-xs w-full">
-                    <colgroup>
-                      <col style={{ width: 48 }} />
-                      {visibleColumns.map(col => {
-                        const pct = Math.max(4, Math.round(((colWidths[col.key] || 100) / reportTableMinWidth) * 100));
-                        return <col key={col.key} style={{ width: pct + '%' }} />;
-                      })}
-                    </colgroup>
-                    <thead className="sticky top-0 z-10 bg-slate-800 text-slate-100 border-b border-slate-200">
-                      <tr>
-                        <th className="p-2 text-center align-middle resizable-th" style={{ width: 48 }}>
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const dayTripIds = dayTrips.map(t => t.id);
-                                const allSelected = dayTripIds.every(id => selectedTasks.includes(id));
-                                if (allSelected) {
-                                  setSelectedTasks(selectedTasks.filter(id => !dayTripIds.includes(id)));
-                                } else {
-                                  const newSelection = [...new Set([...selectedTasks, ...dayTripIds])];
-                                  setSelectedTasks(newSelection);
-                                }
-                              }}
-                              className={`p-0.5 rounded transition-all duration-150 ${dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
-                              title="Select all trips for this day"
-                              aria-label="Select all trips for this day"
-                            >
-                              {dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? <CheckSquare size={14} /> : <Square size={14} />}
-                            </button>
-                            {canEdit && <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Edit</span>}
-                          </div>
-                        </th>
-                        {visibleColumns.map(col => (
-                          <th
-                            key={col.key}
-                            className="resizable-th p-0 text-left select-none"
-                          >
-                            <div
-                              className="flex items-center justify-between cursor-pointer group hover:bg-slate-700 transition-colors px-2 py-2 h-full"
-                              onClick={() => handleSort(col.key)}
-                            >
-                              <span className="text-[10px] font-semibold truncate">{col.label}</span>
-                              <span className="ml-1 shrink-0">{renderSortIcon(col.key)}</span>
-                            </div>
-                            {/* Resize handle */}
-                            <div
-                              className="col-resize-handle"
-                              onMouseDown={(e) => startColResize(e, col.key)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {dayTrips.map((trip, tIdx) => {
-                        const bgClass = tIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50';
+                  {!isCollapsed && (
+                    <div className="space-y-2">
+                      {dayTrips.map((trip) => {
+                        const driverName = getDriverLabel(trip, drivers);
+                        const vehicleName = trip.completedVehicle || '—';
+                        const pickupTime = formatClock24(trip.arrivalTime);
+                        const dropoffTime = formatClock24(trip.arrivalDropoffTime || trip.completedAt);
+                        const departedPickup = formatClock24(trip.departedPickupTime);
+                        const scheduledTime = formatClock24(trip.time) !== '—' ? formatClock24(trip.time) : pickupTime;
+                        const distance = calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance);
+                        const travelTime = trip.travelTime || calcDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
+                        const isSelected = selectedTasks.includes(trip.id);
+
                         return (
-                          <tr
+                          <div
                             key={trip.id}
-                            className={`${activeRow === trip.id ? 'bg-blue-100' : bgClass} hover:bg-blue-50/70 transition-colors cursor-pointer`}
-                            onClick={(e) => {
-                              const interactiveTags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'SVG', 'PATH'];
-                              if (interactiveTags.includes(e.target.tagName)) return;
-                              setActiveRow(trip.id);
-                            }}
+                            className={`bg-white rounded-3xl border shadow-sm overflow-hidden transition-all ${isSelected ? 'ring-2 ring-blue-500/20 border-blue-200' : 'border-slate-100/50 hover:shadow-md'}`}
                           >
-                            <td className="p-2 align-middle">
-                              <div className="flex items-center gap-1 whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const isSelected = selectedTasks.includes(trip.id);
-                                    if (isSelected) {
-                                      setSelectedTasks(selectedTasks.filter(id => id !== trip.id));
-                                    } else {
-                                      setSelectedTasks([...selectedTasks, trip.id]);
-                                    }
-                                  }}
-                                  className={`p-0.5 rounded transition-all duration-150 ${selectedTasks.includes(trip.id) ? 'text-blue-600' : 'text-slate-300 hover:text-slate-500'}`}
-                                  title={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
-                                  aria-label={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
-                                >
-                                  {selectedTasks.includes(trip.id) ? <CheckSquare size={14} /> : <Square size={14} />}
-                                </button>
-                                {canEdit && (
-                                  editingRow === trip.id ? (
-                                    <div className="flex items-center gap-1">
-                                      <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); finishRowEdit(); }}
-                                        className="p-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150"
-                                        title="Keep changes"
-                                        aria-label="Keep changes"
-                                      >
-                                        <Check size={13} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); revertRowEdit(); }}
-                                        className="p-0.5 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150"
-                                        title="Cancel and restore original row"
-                                        aria-label="Cancel and restore original row"
-                                      >
-                                        <X size={13} />
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
-                                      className="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
-                                      title="Edit row"
-                                      aria-label="Edit row"
-                                    >
-                                      <SquarePen size={13} />
-                                    </button>
-                                  )
+                            {/* Card Header - Status + Time + Patient */}
+                            <div className="px-4 pt-3 pb-2 flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_VARIANT[trip.status] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                    {trip.status || 'Unknown'}
+                                  </span>
+                                  <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                                    #{trip.bookingId || trip.id?.slice(0, 6)}
+                                  </span>
+                                </div>
+                                <h3 className="text-sm font-black text-slate-900 truncate">{trip.patient || 'Unknown Passenger'}</h3>
+                                <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                                  {scheduledTime} — {driverName}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setSelectedTasks(prev => prev.includes(trip.id) ? prev.filter(id => id !== trip.id) : [...prev, trip.id]); }}
+                                className={`p-1 rounded-lg shrink-0 transition-all ${isSelected ? 'bg-blue-100 text-blue-600' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}
+                              >
+                                {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                              </button>
+                            </div>
+
+                            {/* Addresses */}
+                            <div className="px-4 pb-1 space-y-1">
+                              {trip.pickup && (
+                                <div className="flex items-start gap-2">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                                  <span className="text-[11px] text-emerald-700 font-semibold truncate">{trip.pickup}</span>
+                                </div>
+                              )}
+                              {trip.dropoff && (
+                                <div className="flex items-start gap-2">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0" />
+                                  <span className="text-[11px] text-rose-700 font-semibold truncate">{trip.dropoff}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Timestamps Row */}
+                            <div className="px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-medium border-t border-slate-100">
+                              {pickupTime !== '—' && (
+                                <span className="text-emerald-600 bg-emerald-50/50 px-1.5 py-0.5 rounded-md">
+                                  PU {pickupTime}
+                                </span>
+                              )}
+                              {departedPickup !== '—' && (
+                                <span className="text-amber-600 bg-amber-50/50 px-1.5 py-0.5 rounded-md">
+                                  DP {departedPickup}
+                                </span>
+                              )}
+                              {dropoffTime !== '—' && (
+                                <span className="text-rose-600 bg-rose-50/50 px-1.5 py-0.5 rounded-md">
+                                  DO {dropoffTime}
+                                </span>
+                              )}
+                              {distance !== '—' && (
+                                <span className="text-blue-600 bg-blue-50/50 px-1.5 py-0.5 rounded-md font-bold">
+                                  {distance} mi
+                                </span>
+                              )}
+                              {travelTime !== '—' && (
+                                <span className="text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded-md">
+                                  {travelTime}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Odometer + Details Row */}
+                            <div className="px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] border-t border-slate-100">
+                              {vehicleName !== '—' && (
+                                <span className="text-slate-400 font-mono font-semibold">{vehicleName}</span>
+                              )}
+                              {trip.pickupOdometer !== undefined && trip.pickupOdometer !== '' && (
+                                <span className="text-emerald-600 font-mono">Odo: {trip.pickupOdometer}</span>
+                              )}
+                              {trip.dropoffOdometer !== undefined && trip.dropoffOdometer !== '' && (
+                                <span className="text-rose-600 font-mono">→ {trip.dropoffOdometer}</span>
+                              )}
+                            </div>
+
+                            {/* Footer - Review + Signature */}
+                            <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                {trip.reviewed ? (
+                                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50/50 px-2 py-0.5 rounded-full border border-emerald-200/50">Reviewed</span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50/50 px-2 py-0.5 rounded-full border border-amber-200/50">Pending Review</span>
+                                )}
+                                {'paperSignatureConfirmed' in trip && (
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${trip.paperSignatureConfirmed ? 'text-emerald-600 bg-emerald-50/50 border-emerald-200/50' : 'text-slate-400 bg-slate-50/50 border-slate-200'}`}>
+                                    {trip.paperSignatureConfirmed ? 'Signed' : 'No Sig'}
+                                  </span>
                                 )}
                               </div>
-                            </td>
-                            {visibleColumns.map(col => {
-                              const cellKey = col.key;
-                              const displayValue = renderCellValue(trip, col);
-                              const isEditing = isEditingCell(trip.id, cellKey);
-                              return (
-                                                                 <td key={cellKey} className={`p-2 whitespace-nowrap ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== '—' ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 text-[10px] font-mono tracking-wider uppercase' : ''} ${cellKey === 'reviewed' && displayValue === 'Done' ? 'text-emerald-600 font-bold' : cellKey === 'reviewed' ? 'text-slate-500' : ''}`}
-                                  title={cellKey === 'pickup' || cellKey === 'dropoff' ? displayValue : undefined}
+                              {canEdit && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); saveCell(trip, 'reviewed', !trip.reviewed); }}
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-lg transition-colors ${trip.reviewed ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
                                 >
-                                  {isEditing ? (
-                                    renderCellEditor(trip, col)
-                                  ) : canEdit && editingRow === trip.id && cellKey !== 'signature' ? (
-                                    <span
-                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
-                                      onClick={() => startCellEdit(trip.id, cellKey, (trip[FIELD_FOR_COL[cellKey]] ?? ''))}
-                                    >
-                                      {displayValue}
-                                    </span>
-                                  ) : cellKey === 'reviewed' && canEdit ? (
-                                    <span
-                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-bold"
-                                      onClick={() => saveCell(trip, 'reviewed', !trip.reviewed)}
-                                      title={trip.reviewed ? 'Mark as pending' : 'Mark as done'}
-                                    >
-                                      {displayValue}
-                                    </span>
-                                  ) : cellKey === 'signature' && canEdit && editingRow === trip.id ? (
-                                    <span
-                                      className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
-                                      onClick={() => saveCell(trip, 'paperSignatureConfirmed', !trip.paperSignatureConfirmed)}
-                                    >
-                                      {displayValue}
-                                    </span>
-                                  ) : (
-                                    <span className="block leading-5">{displayValue}</span>
-                                  )}
-                                </td>
-                              );
-                            })}
-                          </tr>
+                                  {trip.reviewed ? 'Unmark' : 'Mark Done'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         );
                       })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Daily Summary per Driver */}
-                {(() => {
-                  const byDriver = {};
-                  dayTrips.forEach(trip => {
-                    const driverName = getDriverLabel(trip, drivers);
-                    if (!byDriver[driverName]) byDriver[driverName] = { trips: 0, totalDistance: 0, passengers: new Set() };
-                    byDriver[driverName].trips++;
-                    const d = calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance);
-                    if (d !== '—') byDriver[driverName].totalDistance += parseFloat(d);
-                    if (trip.patient) byDriver[driverName].passengers.add(trip.patient);
-                  });
-                  return Object.entries(byDriver).map(([driverName, info]) => (
-                    <div key={driverName} className="px-4 py-2 bg-slate-50/80 border-t border-slate-200 flex items-center gap-4 text-xs">
-                      <span className="font-bold text-slate-700 min-w-[100px]">{driverName}</span>
-                      <span className="text-slate-500">{info.trips} trips</span>
-                      <span className="text-slate-500">{info.totalDistance.toFixed(1)} mi</span>
-                      <span className="text-slate-400 truncate">{[...info.passengers].join(', ')}</span>
                     </div>
-                  ));
-                })()}
-                  </>
-                )}
-              </div>
-            );
-          })
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            {paginatedGroupedTrips.map(([dateLabel, dayTrips]) => {
+              const isCollapsed = collapsedDays[dateLabel];
+              const dayTrackingDocs = trackingDocs.filter((doc) => doc.date === dateLabel);
+              const dayTrackingSummary = dayTrackingDocs.reduce((acc, doc) => {
+                acc.trackedDrivers += 1;
+                acc.movingMinutes += Number(doc.totalMovingMinutes || 0);
+                acc.stoppedMinutes += Number(doc.totalStoppedMinutes || 0);
+                acc.trackedMiles += Number(doc.totalTrackedMiles || 0);
+                acc.stopCount += Number(doc.stopCount || 0);
+                return acc;
+              }, { trackedDrivers: 0, movingMinutes: 0, stoppedMinutes: 0, trackedMiles: 0, stopCount: 0 });
+              return (
+                <div key={dateLabel} className="border-b border-slate-200 last:border-b-0">
+                  {/* Date Group Header */}
+                  <div
+                    className="bg-slate-100 border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-2 cursor-pointer hover:bg-slate-200 transition-colors w-max min-w-full"
+                    style={{ minWidth: reportTableMinWidth }}
+                    onClick={() => toggleDay(dateLabel)}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={13} className="text-slate-500" />
+                        <span className="text-sm font-bold text-slate-700">{formatDateLabel(dateLabel)}</span>
+                      </div>
+                      <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                        {dayTrips.length} trips
+                      </span>
+                      <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                        {dayTrips.filter(t => t.reviewed).length}/{dayTrips.length} reviewed
+                      </span>
+                      {dayTrackingSummary.trackedDrivers > 0 && (
+                        <>
+                          <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                            {formatTelemetryDuration(dayTrackingSummary.movingMinutes)} moving
+                          </span>
+                          <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                            {formatTelemetryDuration(dayTrackingSummary.stoppedMinutes)} stopped
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => markTripsReviewed(dayTrips, true)}
+                          className="px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-200 transition-colors"
+                        >
+                          Mark Day Done
+                        </button>
+                        <button
+                          onClick={() => markTripsReviewed(dayTrips, false)}
+                          className="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold hover:bg-slate-200 transition-colors"
+                        >
+                          Reset Review
+                        </button>
+                      </div>
+                      <ChevronDown size={16} className={`text-slate-500 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
+                    </div>
+                  </div>
+
+                  {!isCollapsed && (
+                    <>
+                      {/* Table */}
+                      <div>
+                    <table className="resizable-table text-xs w-full">
+                      <colgroup>
+                        <col style={{ width: 48 }} />
+                        {visibleColumns.map(col => {
+                          const pct = Math.max(4, Math.round(((colWidths[col.key] || 100) / reportTableMinWidth) * 100));
+                          return <col key={col.key} style={{ width: pct + '%' }} />;
+                        })}
+                      </colgroup>
+                      <thead className="sticky top-0 z-10 bg-slate-800 text-slate-100 border-b border-slate-200">
+                        <tr>
+                          <th className="p-2 text-center align-middle resizable-th" style={{ width: 48 }}>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const dayTripIds = dayTrips.map(t => t.id);
+                                  const allSelected = dayTripIds.every(id => selectedTasks.includes(id));
+                                  if (allSelected) {
+                                    setSelectedTasks(selectedTasks.filter(id => !dayTripIds.includes(id)));
+                                  } else {
+                                    const newSelection = [...new Set([...selectedTasks, ...dayTripIds])];
+                                    setSelectedTasks(newSelection);
+                                  }
+                                }}
+                                className={`p-0.5 rounded transition-all duration-150 ${dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
+                                title="Select all trips for this day"
+                                aria-label="Select all trips for this day"
+                              >
+                                {dayTrips.length > 0 && dayTrips.every(t => selectedTasks.includes(t.id)) ? <CheckSquare size={14} /> : <Square size={14} />}
+                              </button>
+                              {canEdit && <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Edit</span>}
+                            </div>
+                          </th>
+                          {visibleColumns.map(col => (
+                            <th
+                              key={col.key}
+                              className="resizable-th p-0 text-left select-none"
+                            >
+                              <div
+                                className="flex items-center justify-between cursor-pointer group hover:bg-slate-700 transition-colors px-2 py-2 h-full"
+                                onClick={() => handleSort(col.key)}
+                              >
+                                <span className="text-[10px] font-semibold truncate">{col.label}</span>
+                                <span className="ml-1 shrink-0">{renderSortIcon(col.key)}</span>
+                              </div>
+                              {/* Resize handle */}
+                              <div
+                                className="col-resize-handle"
+                                onMouseDown={(e) => startColResize(e, col.key)}
+                                title="Drag to resize column"
+                              />
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {dayTrips.map((trip, tIdx) => {
+                          const bgClass = tIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50';
+                          return (
+                            <tr
+                              key={trip.id}
+                              className={`${activeRow === trip.id ? 'bg-blue-100' : bgClass} hover:bg-blue-50/70 transition-colors cursor-pointer`}
+                              onClick={(e) => {
+                                const interactiveTags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'SVG', 'PATH'];
+                                if (interactiveTags.includes(e.target.tagName)) return;
+                                setActiveRow(trip.id);
+                              }}
+                            >
+                              <td className="p-2 align-middle">
+                                <div className="flex items-center gap-1 whitespace-nowrap">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const isSelected = selectedTasks.includes(trip.id);
+                                      if (isSelected) {
+                                        setSelectedTasks(selectedTasks.filter(id => id !== trip.id));
+                                      } else {
+                                        setSelectedTasks([...selectedTasks, trip.id]);
+                                      }
+                                    }}
+                                    className={`p-0.5 rounded transition-all duration-150 ${selectedTasks.includes(trip.id) ? 'text-blue-600' : 'text-slate-300 hover:text-slate-500'}`}
+                                    title={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
+                                    aria-label={selectedTasks.includes(trip.id) ? 'Deselect trip' : 'Select trip'}
+                                  >
+                                    {selectedTasks.includes(trip.id) ? <CheckSquare size={14} /> : <Square size={14} />}
+                                  </button>
+                                  {canEdit && (
+                                    editingRow === trip.id ? (
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); finishRowEdit(); }}
+                                          className="p-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150"
+                                          title="Keep changes"
+                                          aria-label="Keep changes"
+                                        >
+                                          <Check size={13} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); revertRowEdit(); }}
+                                          className="p-0.5 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150"
+                                          title="Cancel and restore original row"
+                                          aria-label="Cancel and restore original row"
+                                        >
+                                          <X size={13} />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
+                                        className="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
+                                        title="Edit row"
+                                        aria-label="Edit row"
+                                      >
+                                        <SquarePen size={13} />
+                                      </button>
+                                    )
+                                  )}
+                                </div>
+                              </td>
+                              {visibleColumns.map(col => {
+                                const cellKey = col.key;
+                                const displayValue = renderCellValue(trip, col);
+                                const isEditing = isEditingCell(trip.id, cellKey);
+                                return (
+                                                                    <td key={cellKey} className={`p-2 whitespace-nowrap ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600 font-bold' : ''} ${cellKey === 'distance' && displayValue !== '—' ? 'text-blue-600 font-bold bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 font-semibold bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 font-semibold bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 font-semibold bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'font-semibold text-slate-900' : ''} ${cellKey === 'driver' ? 'font-semibold text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600 font-medium' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 text-[10px] font-mono tracking-wider uppercase' : ''} ${cellKey === 'reviewed' && displayValue === 'Done' ? 'text-emerald-600 font-bold' : cellKey === 'reviewed' ? 'text-slate-500' : ''}`}
+                                    title={cellKey === 'pickup' || cellKey === 'dropoff' ? displayValue : undefined}
+                                  >
+                                    {isEditing ? (
+                                      renderCellEditor(trip, col)
+                                    ) : canEdit && editingRow === trip.id && cellKey !== 'signature' ? (
+                                      <span
+                                        className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
+                                        onClick={() => startCellEdit(trip.id, cellKey, (trip[FIELD_FOR_COL[cellKey]] ?? ''))}
+                                      >
+                                        {displayValue}
+                                      </span>
+                                    ) : cellKey === 'reviewed' && canEdit ? (
+                                      <span
+                                        className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-bold"
+                                        onClick={() => saveCell(trip, 'reviewed', !trip.reviewed)}
+                                        title={trip.reviewed ? 'Mark as pending' : 'Mark as done'}
+                                      >
+                                        {displayValue}
+                                      </span>
+                                    ) : cellKey === 'signature' && canEdit && editingRow === trip.id ? (
+                                      <span
+                                        className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
+                                        onClick={() => saveCell(trip, 'paperSignatureConfirmed', !trip.paperSignatureConfirmed)}
+                                      >
+                                        {displayValue}
+                                      </span>
+                                    ) : (
+                                      <span className="block leading-5">{displayValue}</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Daily Summary per Driver */}
+                  {(() => {
+                    const byDriver = {};
+                    dayTrips.forEach(trip => {
+                      const driverName = getDriverLabel(trip, drivers);
+                      if (!byDriver[driverName]) byDriver[driverName] = { trips: 0, totalDistance: 0, passengers: new Set() };
+                      byDriver[driverName].trips++;
+                      const d = calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance);
+                      if (d !== '—') byDriver[driverName].totalDistance += parseFloat(d);
+                      if (trip.patient) byDriver[driverName].passengers.add(trip.patient);
+                    });
+                    return Object.entries(byDriver).map(([driverName, info]) => (
+                      <div key={driverName} className="px-4 py-2 bg-slate-50/80 border-t border-slate-200 flex items-center gap-4 text-xs">
+                        <span className="font-bold text-slate-700 min-w-[100px]">{driverName}</span>
+                        <span className="text-slate-500">{info.trips} trips</span>
+                        <span className="text-slate-500">{info.totalDistance.toFixed(1)} mi</span>
+                        <span className="text-slate-400 truncate">{[...info.passengers].join(', ')}</span>
+                      </div>
+                    ));
+                  })()}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

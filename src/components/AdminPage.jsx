@@ -565,10 +565,16 @@ const AdminPage = ({
                       </select>
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${statusColor(user.clockedIn !== undefined ? (user.clockedIn ? 'online' : 'offline') : user.status)}`}>
-                        {user.clockedIn !== undefined ? (user.clockedIn ? <Wifi size={10} /> : <WifiOff size={10} />) : null}
-                        {user.clockedIn !== undefined ? (user.clockedIn ? 'Online' : 'Offline') : (user.status || '-')}
-                      </span>
+                      {user._role === 'driver' ? (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${getDriverLiveStatus(user).color}`}>
+                          {getDriverLiveStatus(user).label}
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${statusColor(user.clockedIn !== undefined ? (user.clockedIn ? 'online' : 'offline') : user.status)}`}>
+                          {user.clockedIn !== undefined ? (user.clockedIn ? <Wifi size={10} /> : <WifiOff size={10} />) : null}
+                          {user.clockedIn !== undefined ? (user.clockedIn ? 'Online' : 'Offline') : (user.status || '-')}
+                        </span>
+                      )}
                       {workTimes[user.name]?.length > 0 && (
                         <div className="mt-1 text-[9px] text-slate-400">
                           {workTimes[user.name].slice(-2).map((w, j) => (
@@ -636,137 +642,154 @@ const AdminPage = ({
   const visibleSections = sections.filter((section) => !section.roles || section.roles.includes(role));
 
   return (
-    <>
-    <div className="space-y-4">
-      <div className="rounded-3xl border border-slate-100/50 bg-white p-4 shadow-sm hover:shadow-md transition-all duration-200">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-blue-600">{role === 'admin' ? 'Admin Workspace' : 'Dispatcher Fleet Tools'}</p>
-            <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">People, Fleet, and Access Control</h2>
-            <p className="mt-1 text-sm font-medium text-slate-500">{role === 'admin' ? 'Dispatcher activity, driver movement, vehicle records, login control, and audit history.' : 'Create drivers, manage vehicles, and review your driver activity.'}</p>
+    <div className="flex-1 flex flex-col bg-[#F3F4F6] text-slate-900" style={{ fontSize: '96%' }}>
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-30 border-b border-slate-200/50 bg-[#F3F4F6]/95 backdrop-blur-md">
+        <div className="px-3 py-2.5">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">
+                {role === 'admin' ? 'Admin' : 'Dispatcher'} Workspace
+              </p>
+              <p className="text-sm font-black text-slate-900 truncate">People, Fleet & Access Control</p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button onClick={() => openCreateUser('driver')} className="h-8 px-2.5 rounded-xl bg-emerald-600 text-white text-[10px] font-black flex items-center gap-1 hover:bg-emerald-700 active:scale-[0.97] transition-colors">
+                <Plus size={12} /> Driver
+              </button>
+              <button onClick={openVehicleCreate} className="h-8 px-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black flex items-center gap-1 hover:bg-slate-800 active:scale-[0.97] transition-colors">
+                <Plus size={12} /> Vehicle
+              </button>
+              {role === 'admin' && (
+                <button onClick={() => openCreateUser('dispatcher')} className="h-8 px-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-black flex items-center gap-1 hover:bg-blue-700 active:scale-[0.97] transition-colors">
+                  <Plus size={12} /> Disp.
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">{drivers?.length || 0} drivers</span>
-            {role === 'admin' && <span className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700">{dispatchers?.length || 0} dispatchers</span>}
-            <span className="rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">{vehicles?.length || 0} vehicles</span>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <span className="px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-100 text-blue-700 text-[10px] font-bold">{drivers?.length || 0} drivers</span>
+            {role === 'admin' && <span className="px-2 py-0.5 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold">{dispatchers?.length || 0} dispatchers</span>}
+            <span className="px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-bold">{vehicles?.length || 0} vehicles</span>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={() => openCreateUser('driver')} className="inline-flex h-9 items-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700">
-            <Plus size={14} /> Add Driver
-          </button>
-          <button type="button" onClick={openVehicleCreate} className="inline-flex h-9 items-center gap-2 rounded-xl bg-slate-900 px-3 text-xs font-black text-white shadow-sm transition hover:bg-slate-800">
-            <Plus size={14} /> Add Vehicle
-          </button>
+        {/* Section Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar px-3 pb-2.5 touch-manipulation">
           {role === 'admin' && (
-            <button type="button" onClick={() => openCreateUser('dispatcher')} className="inline-flex h-9 items-center gap-2 rounded-xl bg-blue-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-blue-700">
-              <Plus size={14} /> Add Dispatcher
+            <button onClick={runSecurityAnalysis} disabled={aiSecLoading} className="shrink-0 px-2.5 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1 bg-slate-900 text-white border border-slate-900 disabled:opacity-60 hover:bg-slate-800 transition-colors">
+              {aiSecLoading ? <Loader2 size={11} className="animate-spin" /> : <ShieldCheck size={11} />}
+              {aiSecLoading ? 'Scanning' : 'Security'}
             </button>
           )}
-          <div className="relative" ref={exportRef}>
-            <button type="button" onClick={() => setExportOpen(v => !v)} className="inline-flex h-9 items-center gap-2 rounded-xl bg-slate-700 px-3 text-xs font-black text-white shadow-sm transition hover:bg-slate-600">
-              <Download size={14} /> Export
+          {visibleSections.map(s => (
+            <SectionTab key={s.id} title={s.title} count={s.count} isActive={activeSection === s.id} onClick={() => toggleSection(s.id)} />
+          ))}
+          <div className="relative shrink-0" ref={exportRef}>
+            <button onClick={() => setExportOpen(v => !v)} className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-slate-700 text-white flex items-center gap-1 hover:bg-slate-600 transition-colors">
+              <Download size={11} /> Export
             </button>
             {exportOpen && (
-              <div className="absolute right-0 top-full mt-1 z-50 w-52 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-                <button onClick={() => { exportTripsCsv(trips, drivers); setExportOpen(false); }} className="flex w-full items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Export Trips (CSV)</button>
-                <button onClick={() => { exportDriversCsv(drivers); setExportOpen(false); }} className="flex w-full items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Export Drivers (CSV)</button>
-                <button onClick={() => { exportFullJson(trips, drivers, dispatchers, vehicles, logs); setExportOpen(false); }} className="flex w-full items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Export Full JSON</button>
+              <div className="absolute right-0 top-full mt-1 z-50 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                <button onClick={() => { exportTripsCsv(trips, drivers); setExportOpen(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-50">Trips CSV</button>
+                <button onClick={() => { exportDriversCsv(drivers); setExportOpen(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-50">Drivers CSV</button>
+                <button onClick={() => { exportFullJson(trips, drivers, dispatchers, vehicles, logs); setExportOpen(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-50">Full JSON</button>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 sticky top-0 z-10 bg-[#F3F4F6]/95 backdrop-blur">
-        {role === 'admin' && (
-          <button onClick={runSecurityAnalysis} disabled={aiSecLoading} className="px-3 py-2 rounded-xl text-[11px] font-bold transition-colors shrink-0 flex items-center gap-1.5 bg-slate-900 text-white hover:bg-slate-800 shadow-sm border border-slate-900 disabled:opacity-60">
-            {aiSecLoading ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
-            {aiSecLoading ? 'Scanning...' : 'Security Scan'}
-          </button>
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto px-3 pt-2 pb-28 space-y-2">
+        {role === 'admin' && aiSecurity && (
+          <AIInsightsBanner insights={aiSecurity} loading={aiSecLoading} onClose={() => setAiSecurity(null)} />
         )}
-        {visibleSections.map(s => (
-          <SectionTab key={s.id} title={s.title} count={s.count} isActive={activeSection === s.id} onClick={() => toggleSection(s.id)} />
-        ))}
-      </div>
-      <div className="space-y-3">
-        {role === 'admin' && <AIInsightsBanner insights={aiSecurity} loading={aiSecLoading} onClose={() => setAiSecurity(null)} />}
         {visibleSections.filter(s => activeSection === s.id).map(s => (
-          <div key={s.id} className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
-            <div className="px-5 py-4">{s.content}</div>
+          <div key={s.id} className="bg-white border border-slate-100/50 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
+            <div className="px-3.5 sm:px-5 py-3 sm:py-4">{s.content}</div>
           </div>
         ))}
       </div>
-    </div>
-    {createUserRole && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-        <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <div className="flex items-center gap-3">
-              <div className={`flex h-11 w-11 items-center justify-center rounded-2xl text-white ${createUserRole === 'dispatcher' ? 'bg-blue-600' : 'bg-emerald-600'}`}>
-                {createUserRole === 'dispatcher' ? <Briefcase size={20} /> : <Truck size={20} />}
+
+      {/* Bottom Nav */}
+      <nav className="bottom-nav md:hidden">
+        <div className="flex items-stretch justify-around px-1 safe-area-bottom">
+          {visibleSections.map(s => {
+            const Icon = s.icon;
+            const isActive = activeSection === s.id;
+            return (
+              <button key={s.id} onClick={() => toggleSection(s.id)}
+                className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}>
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} className="transition-all" />
+                <span className={`text-[10px] tracking-wide leading-none ${isActive ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>{s.title}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Create User Modal */}
+      {createUserRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 sm:p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 sm:px-5 py-3 sm:py-4">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl sm:rounded-2xl text-white ${createUserRole === 'dispatcher' ? 'bg-blue-600' : 'bg-emerald-600'}`}>
+                  {createUserRole === 'dispatcher' ? <Briefcase size={18} /> : <Truck size={18} />}
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-950">Add {createUserRole === 'dispatcher' ? 'Dispatcher' : 'Driver'}</h3>
+                  <p className="text-xs font-semibold text-slate-500">Creates login + profile.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-950">Add {createUserRole === 'dispatcher' ? 'Dispatcher' : 'Driver'}</h3>
-                <p className="text-xs font-semibold text-slate-500">Creates the login and profile together.</p>
-              </div>
-            </div>
-            <button type="button" onClick={closeCreateUser} className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200" aria-label="Close">
-              <X size={18} />
-            </button>
-          </div>
-          <form onSubmit={(e) => { e.preventDefault(); createRoleUser(); }} className="space-y-4 p-5">
-            {createError && (
-              <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
-                <AlertTriangle size={16} className="mt-0.5 shrink-0" /> {createError}
-              </div>
-            )}
-            <div>
-              <label className="mb-1 block text-sm font-bold text-slate-800">Username</label>
-              <input
-                type="text"
-                required
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck="false"
-                value={createForm.username}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, username: e.target.value }))}
-                className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
-                placeholder={createUserRole === 'dispatcher' ? 'dispatcher.name' : 'driver.name'}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-bold text-slate-800">Password</label>
-              <input
-                type="password"
-                required
-                value={createForm.password}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
-                className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
-                placeholder="Minimum 6 characters"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-bold text-slate-800">Phone Number</label>
-              <input
-                type="tel"
-                value={createForm.phone}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, phone: e.target.value }))}
-                className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
-                placeholder="+1 (555) 000-0000"
-              />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button type="button" onClick={closeCreateUser} className="h-11 flex-1 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 transition hover:bg-slate-50">Cancel</button>
-              <button type="submit" disabled={creatingUser} className={`h-11 flex-1 rounded-xl text-sm font-black text-white transition disabled:opacity-50 ${createUserRole === 'dispatcher' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
-                {creatingUser ? 'Creating...' : <span className="inline-flex items-center justify-center gap-2"><Save size={15} /> Create</span>}
+              <button type="button" onClick={closeCreateUser} className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200" aria-label="Close">
+                <X size={18} />
               </button>
             </div>
-          </form>
+            <form onSubmit={(e) => { e.preventDefault(); createRoleUser(); }} className="space-y-4 p-4 sm:p-5">
+              {createError && (
+                <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+                  <AlertTriangle size={16} className="mt-0.5 shrink-0" /> {createError}
+                </div>
+              )}
+              <div>
+                <label className="mb-1 block text-sm font-bold text-slate-800">Username</label>
+                <input type="text" required autoCapitalize="none" autoCorrect="off" spellCheck="false"
+                  value={createForm.username}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, username: e.target.value }))}
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                  placeholder={createUserRole === 'dispatcher' ? 'dispatcher.name' : 'driver.name'}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-bold text-slate-800">Password</label>
+                <input type="password" required
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                  placeholder="Min 6 characters"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-bold text-slate-800">Phone Number</label>
+                <input type="tel"
+                  value={createForm.phone}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, phone: e.target.value }))}
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                  placeholder="+1 (555) 000-0000"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={closeCreateUser} className="h-11 flex-1 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 transition hover:bg-slate-50 active:bg-slate-100">Cancel</button>
+                <button type="submit" disabled={creatingUser} className={`h-11 flex-1 rounded-xl text-sm font-black text-white transition disabled:opacity-50 active:scale-[0.98] ${createUserRole === 'dispatcher' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                  {creatingUser ? 'Creating...' : <span className="inline-flex items-center justify-center gap-2"><Save size={15} /> Create</span>}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
-    )}
-    </>
+      )}
+    </div>
   );
 };
 

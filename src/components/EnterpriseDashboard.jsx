@@ -12,6 +12,7 @@ import {
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 import { openMapLink } from '../utils/nativeActions';
 import { timeToMinutes, isTripLate } from '../utils/tripDate';
+import { getDriverLiveStatus } from '../constants/statuses';
 import ChatPage from './ChatPage';
 import ArchivesPage from './ArchivesPage';
 import DriversVehiclesPage from './DriversVehiclesPage';
@@ -660,7 +661,7 @@ const EnterpriseDashboard = ({
 
   // ==================== BOTTOM NAVIGATION (Mobile only for dispatcher/admin) ====================
   const renderBottomNav = () => (
-    <nav className="bottom-nav md:hidden flex items-stretch">
+    <nav className="bottom-nav md:hidden flex items-stretch safe-area-bottom">
       {sidebarItems.map(item => {
         const Icon = item.icon;
         const isActive = activePanel === item.id;
@@ -669,19 +670,25 @@ const EnterpriseDashboard = ({
           <button
             key={item.id}
             onClick={() => setActivePanel(item.id)}
-            className={`flex-1 flex flex-col items-center justify-center py-1 gap-0.5 transition-all relative min-h-[52px] ${
-              isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all relative touch-manipulation ${
+              isActive ? 'text-blue-600' : 'text-slate-400 active:text-slate-600'
             }`}
+            style={{ minHeight: '56px', paddingTop: '6px', paddingBottom: 'max(6px, env(safe-area-inset-bottom, 0px))' }}
           >
-            <div className="relative">
-              <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
+            <div className="relative flex items-center justify-center">
+              {isActive && (
+                <span className="absolute -inset-2 bg-blue-500/10 rounded-full animate-in fade-in duration-150" />
+              )}
+              <Icon size={24} strokeWidth={isActive ? 2.5 : 1.8} className="relative" />
               {hasBadge && (
-                <span className="absolute -top-1 -right-2 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                <span className="absolute -top-0.5 -right-2 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
                   {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
                 </span>
               )}
             </div>
-            <span className={`text-[10px] tracking-wide transition-all leading-none ${isActive ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>
+            <span className={`text-[10px] tracking-wide leading-none ${
+              isActive ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'
+            }`}>
               {item.label}
             </span>
           </button>
@@ -1140,7 +1147,7 @@ const EnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : activePanel === 'reports' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'chat', 'reports'].includes(activePanel) ? '' : 'p-6'}`}>
+            <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : activePanel === 'reports' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'chat', 'reports', 'admin', 'drive'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
@@ -1149,7 +1156,7 @@ const EnterpriseDashboard = ({
               </Suspense>
             ) : (
               <div className={
-                activePanel === 'drive'
+                activePanel === 'drive' || activePanel === 'admin'
                   ? 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm flex flex-col flex-1 min-h-0'
                   : activePanel === 'chat'
                   ? 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
@@ -1170,10 +1177,18 @@ const EnterpriseDashboard = ({
       {/* Right panel as mobile drawer */}
       <div className="block md:hidden">
         {showRightPanel && (
-          <div className="fixed inset-0 z-[100] flex items-start justify-end">
-            <div className="absolute inset-0 bg-black/60" onClick={() => setShowRightPanel(false)} />
-            <div className="w-[320px] max-w-full bg-white border-l border-slate-200 flex flex-col h-full shadow-xl z-10 relative">
-              {renderRightPanel()}
+          <div className="fixed inset-0 z-[100] flex">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowRightPanel(false)} />
+            <div className="relative w-full bg-white flex flex-col h-full shadow-2xl z-10 animate-in slide-in-from-right duration-300">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
+                <span className="text-sm font-bold text-slate-900">Command Panel</span>
+                <button onClick={() => setShowRightPanel(false)} className="p-2 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors">
+                  <X size={18} className="text-slate-500" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                {renderRightPanel()}
+              </div>
             </div>
           </div>
         )}
@@ -1267,7 +1282,7 @@ const EnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs ring-1 ring-blue-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400">{d.vehicle} • {d.status}</p>
+                      <p className="text-xs text-slate-400">{d.vehicle} • <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span></p>
                     </div>
                   </div>
                   <span className="text-blue-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
@@ -1322,7 +1337,7 @@ const EnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs ring-1 ring-slate-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400">{d.status} • {d.vehicle}</p>
+                      <p className="text-xs text-slate-400"><span className={`px-1 py-0.5 rounded text-[9px] font-bold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span> • {d.vehicle}</p>
                     </div>
                   </div>
                   <span className="text-slate-400 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
