@@ -2538,6 +2538,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const getPrimaryTripAction = (trip) => {
     if (!trip) return null;
+    if (!isClockedIn) return null;
     if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
       return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-blue-500/25', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
     }
@@ -2753,35 +2754,41 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               return <div key={step.key} className={`h-1 flex-1 rounded-full ${isComplete || idx < currentStep ? 'bg-emerald-400' : idx === currentStep ? 'bg-blue-500' : 'bg-slate-200'}`} />;
             })}
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={bottomAction.onClick}
-              disabled={!primary}
-              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-12 ${bottomAction.gradient} text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
-            >
-              {bottomAction.icon} {bottomAction.label}
+          {!isClockedIn ? (
+            <button type="button" disabled className="w-full h-12 bg-slate-200 text-slate-500 rounded-xl font-black text-sm flex items-center justify-center gap-2 cursor-not-allowed shadow-sm">
+              <Clock size={16} /> Clock in to start trips
             </button>
-            {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
-              skipConfirmTripId === `work-${trip.id}` ? (
-                <button
-                  type="button"
-                  onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
-                  className="flex-[2] h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-sm"
-                >
-                  <MapPin size={14} /> {trip.status === 'In Progress' ? 'Already here?' : 'At dropoff?'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { impact('medium'); setSkipConfirmTripId(`work-${trip.id}`); }}
-                  className="flex-[2] h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
-                >
-                  <Forward size={14} /> Skip Nav
-                </button>
-              )
-            )}
-          </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={bottomAction.onClick}
+                disabled={!primary}
+                className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-12 ${bottomAction.gradient} text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
+              >
+                {bottomAction.icon} {bottomAction.label}
+              </button>
+              {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
+                skipConfirmTripId === `work-${trip.id}` ? (
+                  <button
+                    type="button"
+                    onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
+                    className="flex-[2] h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <MapPin size={14} /> {trip.status === 'In Progress' ? 'Already here?' : 'At dropoff?'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { impact('medium'); setSkipConfirmTripId(`work-${trip.id}`); }}
+                    className="flex-[2] h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    <Forward size={14} /> Skip Nav
+                  </button>
+                )
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -3273,6 +3280,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const displayStep = activeStepIndex === -1 ? doneKeys.length : activeStepIndex + 1;
                 const routePct = Math.round((index / Math.max(assignedRoutePlanStops.length, 1)) * 100);
                 const nextAction = (() => {
+                  if (!isClockedIn) return { label: 'Clock in to start trips', icon: <Clock size={14} />, className: 'bg-slate-200 text-slate-500 cursor-not-allowed', disabled: true };
                   if (!workflow.startedAt) return { label: 'Start Stop', icon: <Play size={14} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleStartRoutePlanStop(stop) };
                   if (!workflow.navigatingAt) return { label: `Navigate to ${stopType}`, icon: <Navigation size={14} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleNavigateRoutePlanStop(stop) };
                   if (!workflow.arrivedAt) return { label: `Arrive at ${stopType}`, icon: <MapPin size={14} />, className: typeColor === 'orange' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700', onClick: () => handleArriveRoutePlanStop(stop) };
@@ -3345,8 +3353,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           </div>
                           <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); nextAction.onClick(); }}
-                            className={`w-full h-12 rounded-xl text-white text-sm font-black flex items-center justify-center gap-2 transition-all shadow-sm ${nextAction.className}`}
+                            onClick={(e) => { e.stopPropagation(); if (!nextAction.disabled) nextAction.onClick(); }}
+                            disabled={nextAction.disabled}
+                            className={`w-full h-12 rounded-xl text-white text-sm font-black flex items-center justify-center gap-2 transition-all shadow-sm ${nextAction.disabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : nextAction.className}`}
                           >
                             {nextAction.icon} {nextAction.label}
                           </button>
@@ -3527,6 +3536,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                          </div>
 
                           {(() => {
+                            if (!isClockedIn) {
+                              return <button type="button" disabled className="w-full bg-slate-200 text-slate-500 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed"><Clock size={13} /> Clock in to start trips</button>;
+                            }
                             if (step.type === 'PU') {
                               if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
                                 return renderPrimaryBtn('Start Trip', <Play size={14} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); });
