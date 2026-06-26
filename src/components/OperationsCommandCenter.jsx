@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, AlertTriangle, MapPin,
   Square, CheckSquare, X, ArrowRight, TrendingUp, TrendingDown,
   Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2, Filter,
-  User, Car, Map, Navigation, UserPlus
+  User, Car, Map as MapIcon, Navigation, UserPlus
 } from 'lucide-react';
 import { db, doc, getDocFromServer } from '../config/firebase';
 import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
@@ -1281,7 +1281,7 @@ const OperationsCommandCenter = ({
             <span className="text-[11px] font-medium text-slate-700 truncate">ETA: {etaDisplay}</span>
           </div>
           <div className="flex items-center gap-2 min-w-0">
-            <Map size={14} className="text-slate-400 shrink-0" />
+            <MapIcon size={14} className="text-slate-400 shrink-0" />
             <span className="text-[11px] font-medium text-slate-700 truncate">{routeMileage}</span>
           </div>
         </div>
@@ -1581,7 +1581,7 @@ const OperationsCommandCenter = ({
                           )}
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <Map size={12} className="text-slate-400 shrink-0" />
+                          <MapIcon size={12} className="text-slate-400 shrink-0" />
                           <span className="text-xs font-semibold text-slate-700 truncate">
                             {distance !== '—' ? `${distance} mi` : '—'}
                           </span>
