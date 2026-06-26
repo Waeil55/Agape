@@ -46,22 +46,31 @@ import { useDriverAssignments } from './hooks/useDriverAssignments';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
+const APP_VERSION_KEY = 'agape_app_version';
+const APP_VERSION = 'v348';
+
+// Version check: if version changed, clear all caches and reload
+const storedVersion = localStorage.getItem(APP_VERSION_KEY);
+if (storedVersion && storedVersion !== APP_VERSION) {
+  localStorage.removeItem(APP_VERSION_KEY);
+  caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
+  if (window.indexedDB?.databases) {
+    window.indexedDB.databases().then((dbs) => dbs.forEach((db) => window.indexedDB.deleteDatabase(db.name)));
+  }
+  window.location.reload();
+} else {
+  localStorage.setItem(APP_VERSION_KEY, APP_VERSION);
+}
+
 // Lazy-loaded heavy components
 const lazyWithRetry = (componentImport) =>
   lazy(async () => {
-    const pageHasAlreadyBeenForceRefreshed = JSON.parse(
-      window.sessionStorage.getItem('page-has-been-force-refreshed') || 'false'
-    );
     try {
-      const component = await componentImport();
-      window.sessionStorage.setItem('page-has-been-force-refreshed', 'false');
-      return component;
+      return await componentImport();
     } catch (error) {
-      if (!pageHasAlreadyBeenForceRefreshed) {
-        window.sessionStorage.setItem('page-has-been-force-refreshed', 'true');
-        return window.location.reload();
-      }
-      throw error;
+      console.warn('[LazyLoad] Chunk load failed, clearing cache and reloading...', error);
+      caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
+      window.location.reload();
     }
   });
 
@@ -373,23 +382,39 @@ const App = () => {
     if (realtimeReliability.isOnline) setRefreshTick(t => t + 1);
   }, [realtimeReliability.isOnline, realtimeReliability.resubscribeKey]);
 
-  // Handle dynamic import failures (stale chunk hashes after deploy) by reloading
+  // Clear SW reload flag after successful boot to allow future SW updates
   useEffect(() => {
+    if (isAuthenticated) {
+      window.sessionStorage.removeItem('sw-reload-pending');
+    }
+  }, [isAuthenticated]);
+
+  // Handle dynamic import failures (stale chunk hashes after deploy) by clearing cache and reloading once
+  useEffect(() => {
+    let reloaded = false;
     const onError = (event) => {
+      if (reloaded) return;
       if (event.target?.tagName === 'LINK' && event.target?.rel === 'modulepreload') {
         event.preventDefault();
+        reloaded = true;
+        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
         window.location.reload();
         return;
       }
       if (event.target?.tagName === 'SCRIPT' && event.target?.type === 'module' && event.target?.src) {
         if (!event.target.src.includes(location.origin)) return;
         event.preventDefault();
+        reloaded = true;
+        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
         window.location.reload();
       }
     };
     const onRejection = (event) => {
+      if (reloaded) return;
       if (event.reason && typeof event.reason === 'object' && event.reason?.message?.includes('dynamically imported module')) {
         event.preventDefault();
+        reloaded = true;
+        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
         window.location.reload();
       }
     };
@@ -407,7 +432,13 @@ const App = () => {
 
     const onSWUpdate = () => { skipWaiting(); };
     window.addEventListener('swUpdateAvailable', onSWUpdate);
-    const onControllerChange = () => { window.location.reload(); };
+    const onControllerChange = () => {
+      // New SW activated — reload once to pick up fresh assets
+      if (!window.sessionStorage.getItem('sw-reload-pending')) {
+        window.sessionStorage.setItem('sw-reload-pending', 'true');
+        window.location.reload();
+      }
+    };
     window.addEventListener('swControllerChanged', onControllerChange);
 
     (async () => {
@@ -834,16 +865,16 @@ const App = () => {
     }
   }, [appSettings]);
 
-  // Force fail-safe: if loading takes >6s, show login
+  // Force fail-safe: if loading takes >6s AND auth hasn't resolved, show login
   useEffect(() => {
     const force = setTimeout(() => {
-      if (!isLoading) return;
+      if (!isLoading || authBootResolvedRef.current) return;
       setIsLoading(false);
       }, 6000);
     return () => clearTimeout(force);
   }, [isLoading]);
-  // Ultimate fallback — never stay on loading >10s
-  useEffect(() => { const t = setTimeout(() => { if (isLoading) setIsLoading(false); }, 10000); return () => clearTimeout(t); }, [isLoading]);
+  // Ultimate fallback — never stay on loading >15s
+  useEffect(() => { const t = setTimeout(() => { if (isLoading && !authBootResolvedRef.current) setIsLoading(false); }, 15000); return () => clearTimeout(t); }, [isLoading]);
   // Firestore data timeout — show recovery after 8s
   useEffect(() => {
     setShowDataLoadingRecovery(false);
@@ -1114,15 +1145,24 @@ const App = () => {
           return;
         }
         // If user was already authenticated in this session, this is a token refresh.
-        // Wait briefly for Firebase to restore the session.
+        // Wait longer for Firebase to restore the session — IndexedDB can be slow.
         if (authBootResolvedRef.current) {
-          console.warn('[Auth] Session went null after boot — waiting 3s for token refresh');
-          await new Promise(r => setTimeout(r, 3000));
-          if (cancelled) return;
-          if (auth.currentUser) {
-            return;
+          console.warn('[Auth] Session went null after boot — waiting 5s for token refresh');
+          for (let i = 0; i < 5; i++) {
+            await new Promise(r => setTimeout(r, 1000));
+            if (cancelled) return;
+            if (auth.currentUser) {
+              console.warn('[Auth] Token refreshed successfully');
+              return;
+            }
           }
-          // Session truly lost — show login immediately
+          // Session truly lost after 5 retries — try one more sign-in attempt
+          console.warn('[Auth] Session lost — attempting silent re-auth');
+          try {
+            await new Promise(r => setTimeout(r, 2000));
+            if (auth.currentUser) return;
+          } catch {}
+          // Final: show login
           clearRoleCache();
           skipNextSignedOutResetRef.current = true;
           signOut(auth).catch(() => {});
@@ -2635,7 +2675,7 @@ const App = () => {
             </div>
             {showLoadingRecovery && (
               <div className="w-full border-t border-slate-100 pt-5 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. You can retry the cloud connection or return to the access portal without waiting.</p>
+                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. You can retry, clear cached data, or return to the access portal.</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={() => window.location.reload()} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
                     <RefreshCcw size={15} /> Retry
@@ -2648,6 +2688,17 @@ const App = () => {
                     Access Portal
                   </button>
                 </div>
+                <button onClick={async () => {
+                  try { localStorage.clear(); sessionStorage.clear(); } catch {}
+                  try {
+                    const dbs = await window.indexedDB?.databases?.() || [];
+                    await Promise.all(dbs.map((db) => new Promise((r) => { const req = window.indexedDB.deleteDatabase(db.name); req.onsuccess = r; req.onerror = r; req.onblocked = r; })));
+                  } catch {}
+                  try { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); } catch {}
+                  window.location.reload();
+                }} className="w-full h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-sm active:scale-95 transition">
+                  Clear Cache & Reload
+                </button>
               </div>
             )}
           </div>
@@ -2671,7 +2722,7 @@ const App = () => {
             )}
             {showDataLoadingRecovery && (
               <div className="w-full border-t border-slate-100 pt-4 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. You can retry the cloud connection.</p>
+                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. You can retry, clear cached data, or return to the access portal.</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={() => { requestRealtimeResubscribe('retry'); setShowDataLoadingRecovery(false); setStartupIssue('Reconnecting...'); }} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
                     <RefreshCcw size={15} /> Retry
@@ -2684,6 +2735,17 @@ const App = () => {
                     Access Portal
                   </button>
                 </div>
+                <button onClick={async () => {
+                  try { localStorage.clear(); sessionStorage.clear(); } catch {}
+                  try {
+                    const dbs = await window.indexedDB?.databases?.() || [];
+                    await Promise.all(dbs.map((db) => new Promise((r) => { const req = window.indexedDB.deleteDatabase(db.name); req.onsuccess = r; req.onerror = r; req.onblocked = r; })));
+                  } catch {}
+                  try { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); } catch {}
+                  window.location.reload();
+                }} className="w-full h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-sm active:scale-95 transition">
+                  Clear Cache & Reload
+                </button>
               </div>
             )}
           </div>

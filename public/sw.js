@@ -1,10 +1,9 @@
-/* Agape Care PWA Service Worker - static assets only.
+/* Agape Care PWA Service Worker v11
+   Static assets only. Never cache index.html.
    Firestore onSnapshot listeners own all realtime data delivery.
-   Do not cache, poll, or background-sync trips, drivers, assignments, or APIs here.
 */
 
-const CACHE_VERSION = 'agape-v10';
-const STATIC_CACHE = CACHE_VERSION + '-shell';
+const CACHE_VERSION = 'agape-v11';
 const RUNTIME_CACHE = CACHE_VERSION + '-assets';
 
 self.addEventListener('install', (event) => {
@@ -15,9 +14,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
       caches.keys().then((cacheNames) => Promise.all(
-        cacheNames
-          .filter((name) => name.startsWith('agape-'))
-          .map((name) => caches.delete(name))
+        cacheNames.map((name) => caches.delete(name))
       )),
       self.clients.claim(),
     ])
@@ -27,6 +24,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING' || event.data?.action === 'skipWaiting') {
     self.skipWaiting();
+    return;
+  }
+
+  if (event.data?.type === 'FORCE_REFRESH') {
+    self.clients.matchAll().then((clients) => {
+      clients.forEach((client) => client.postMessage({ type: 'FORCE_REFRESH' }));
+    });
     return;
   }
 
@@ -45,13 +49,15 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
+  // Navigation: ALWAYS fetch fresh from network, never cache
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/index.html').then((cached) => cached || Response.error()))
+      fetch(request).catch(() => caches.match('/index.html').then((cached) => cached || new Response('Offline', { status: 503 })))
     );
     return;
   }
 
+  // Static assets with content hashes: cache-first (safe because filenames change on deploy)
   if (url.pathname.startsWith('/assets/') || /\.(png|jpg|jpeg|gif|svg|ico|webp|woff2?|ttf)$/i.test(url.pathname)) {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -68,5 +74,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Everything else: network only
   event.respondWith(fetch(request));
 });
