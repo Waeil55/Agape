@@ -5398,7 +5398,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       })()}
 
       {/* ===== BOTTOM NAVIGATION ===== */}
-      <nav className="bottom-nav">
+      <nav className="md:hidden flex items-stretch bg-[#0f172a] border-t border-slate-800 safe-area-bottom shadow-[0_-8px_30px_rgba(0,0,0,0.3)] relative z-20">
         <div className="flex items-stretch justify-around px-1">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -5413,11 +5413,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   setActiveNav(item.id);
                 }}
                   className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${
-                    isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
+                    isActiveTab ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'
                   }`}>
                   <div className="relative">
                     <Icon size={22} strokeWidth={isActiveTab ? 2.5 : 1.5}
-                      className={`transition-all duration-200 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}
+                      className={`transition-all duration-200 ${isActiveTab ? 'text-blue-400' : 'text-slate-500'}`}
                     />
                     {item.id === 'chat' && chatUnreadCount > 0 && (
                       <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-bold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>

@@ -712,16 +712,16 @@ const AdminPage = ({
       </div>
 
       {/* Bottom Nav */}
-      <nav className="bottom-nav md:hidden">
+      <nav className="md:hidden bg-[#0f172a] border-t border-slate-800">
         <div className="flex items-stretch justify-around px-1 safe-area-bottom">
           {visibleSections.map(s => {
             const Icon = s.icon;
             const isActive = activeSection === s.id;
             return (
               <button key={s.id} onClick={() => toggleSection(s.id)}
-                className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}>
+                className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'}`}>
                 <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} className="transition-all" />
-                <span className={`text-[10px] tracking-wide leading-none ${isActive ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>{s.title}</span>
+                <span className={`text-[10px] tracking-wide leading-none ${isActive ? 'text-blue-400 font-bold' : 'text-slate-500 font-medium'}`}>{s.title}</span>
               </button>
             );
           })}

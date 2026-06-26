@@ -1,0 +1,406 @@
+import React, { useState, useMemo, useEffect } from "react";
+import {
+  Search, Plus, Upload, Route, Users, Truck, MapPin, Phone,
+  ChevronDown, X, User, Wifi, WifiOff, Edit2, Archive,
+  SlidersHorizontal
+} from "lucide-react";
+import { getDriverLiveStatus } from "../constants/statuses";
+
+/* ─── Helpers ─────────────────────────────────────────────────────── */
+const timeToMinutes = (t) => {
+  if (!t) return 1440;
+  const s = String(t).toUpperCase().trim();
+  if (s === "WILL CALL" || s === "WC") return 1440;
+  const m = s.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
+  if (!m) return 1440;
+  let h = parseInt(m[1], 10), min = parseInt(m[2] || "0", 10);
+  const p = m[3];
+  if (p === "PM" && h < 12) h += 12;
+  if (p === "AM" && h === 12) h = 0;
+  return h * 60 + min;
+};
+
+const to12hr = (time) => {
+  if (!time || time === "Will Call") return "Will Call";
+  const m = String(time).match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)?/i);
+  if (!m) return time;
+  let h = parseInt(m[1]);
+  const min = m[2] || "00", p = m[3]?.toUpperCase();
+  const ampm = p || (h >= 12 ? "PM" : "AM");
+  h = h % 12 || 12;
+  return h + ":" + min + " " + ampm;
+};
+
+const getUrgency = (trip) => {
+  const mins = timeToMinutes(trip?.time);
+  if (mins === 1440) return null;
+  const now = new Date(), sched = new Date();
+  sched.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+  const diff = sched - now;
+  if (diff < 0) return "Late";
+  const dm = Math.round(diff / 60000);
+  if (dm <= 60) return "in " + dm + "m";
+  return null;
+};
+
+const TERMINAL = ["Completed", "Cancelled", "No Show", "Rerouted"];
+const IN_PROGRESS = ["In Mission","En Route","At Pickup","At Dropoff","In Progress",
+  "Navigating Pickup","Navigating Dropoff","In Transit","Arrived","Assigned"];
+
+const getStatusStyle = (status) => {
+  if (status === "Unassigned") return { pill: "bg-rose-100 text-rose-700 border-rose-200", border: "border-l-rose-500" };
+  if (status === "Assigned") return { pill: "bg-blue-100 text-blue-700 border-blue-200", border: "border-l-blue-500" };
+  if (IN_PROGRESS.includes(status)) return { pill: "bg-amber-100 text-amber-700 border-amber-200", border: "border-l-amber-500" };
+  if (status === "Completed") return { pill: "bg-emerald-100 text-emerald-700 border-emerald-200", border: "border-l-emerald-500" };
+  if (status === "Cancelled") return { pill: "bg-slate-100 text-slate-500 border-slate-200", border: "border-l-slate-400" };
+  if (status === "No Show") return { pill: "bg-orange-100 text-orange-700 border-orange-200", border: "border-l-orange-500" };
+  return { pill: "bg-slate-100 text-slate-700 border-slate-200", border: "border-l-slate-400" };
+};
+
+const trunc = (str, n) => str && str.length > n ? str.slice(0, n) + "…" : str || "";
+const getAddr = (v) => typeof v === "object" ? v?.address || "" : v || "";
+
+/* ─── Trip Card ───────────────────────────────────────────────────── */
+const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeCall,
+  requestDeleteTrip, onSetTripDetails, role }) => {
+  const [showMenu, setShowMenu] = useState(false);
+  const urgency = getUrgency(trip);
+  const isLate = urgency === "Late", isSoon = urgency && urgency !== "Late";
+  const sty = getStatusStyle(trip.status);
+  const driver = drivers.find(d => d.id === trip.driverId || (trip.driverName && d.name === trip.driverName));
+  const ds = driver ? getDriverLiveStatus(driver) : null;
+  const pickup = getAddr(trip.pickup), dropoff = getAddr(trip.dropoff);
+  const dispTime = to12hr(trip.time);
+  const isTerminal = TERMINAL.includes(trip.status);
+  const available = drivers.filter(d => !["Offline","Unavailable"].includes(d.status));
+  const timeParts = trip.time !== "Will Call" ? dispTime.split(" ") : [];
+
+  return (
+    <div className={"bg-white rounded-2xl border border-slate-200 border-l-4 " + sty.border + " shadow-sm overflow-visible transition-all duration-200"}>
+      <button type="button" onClick={onToggle} className="w-full text-left px-4 pt-3.5 pb-3 focus:outline-none">
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 text-center w-[52px]">
+            {trip.time === "Will Call" ? (
+              <span className="text-[10px] font-black text-slate-500 uppercase">WC</span>
+            ) : (
+              <>
+                <p className={"text-base font-black leading-none " + (isLate ? "text-rose-600" : isSoon ? "text-amber-600" : "text-slate-800")}>{timeParts[0]}</p>
+                <p className={"text-[9px] font-black uppercase tracking-wide mt-0.5 " + (isLate ? "text-rose-400" : isSoon ? "text-amber-400" : "text-slate-400")}>{timeParts[1] || ""}</p>
+              </>
+            )}
+            {urgency && <span className={"mt-1 inline-block px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase " + (isLate ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700")}>{urgency}</span>}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-sm font-black text-slate-900 truncate uppercase tracking-wide">{trip.patient || "Unknown"}</h3>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">#{trip.bookingId || trip.id || "—"}</p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className={"px-2 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-wide " + sty.pill}>{trip.status || "Unknown"}</span>
+                <ChevronDown size={13} className={"text-slate-400 transition-transform duration-200 " + (expanded ? "rotate-180" : "")} />
+              </div>
+            </div>
+            <div className="mt-2.5 grid grid-cols-[10px_1fr] gap-x-2.5 gap-y-0.5">
+              <div className="flex flex-col items-center pt-[3px] row-span-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                <span className="w-px flex-1 min-h-[12px] my-0.5 bg-gradient-to-b from-blue-300 to-emerald-400" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              </div>
+              <p className="text-[11px] font-semibold text-slate-600 truncate">{trunc(pickup, 40)}</p>
+              <p className="text-[11px] font-semibold text-slate-600 truncate">{trunc(dropoff, 40)}</p>
+            </div>
+            {driver ? (
+              <div className="mt-2 flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-black text-slate-600 shrink-0 uppercase">{(driver.name||"D")[0]}</div>
+                <span className="text-[11px] font-bold text-slate-700 truncate">{driver.name}</span>
+                {ds && <span className={"px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wide " + ds.color}>{ds.label}</span>}
+              </div>
+            ) : trip.status !== "Completed" && trip.status !== "Cancelled" ? (
+              <div className="mt-2"><span className="text-[10px] font-bold text-rose-500 flex items-center gap-1"><User size={10} /> No driver</span></div>
+            ) : null}
+          </div>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-slate-100 bg-slate-50/80">
+          <div className="px-4 py-3 space-y-2">
+            {trip.notes && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                <p className="text-[9px] font-black uppercase tracking-wider text-amber-600 mb-0.5">Driver Notes</p>
+                <p className="text-[11px] text-amber-800 leading-relaxed">{trip.notes}</p>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              {trip.time && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Scheduled</p><p className="text-sm font-black text-slate-900 mt-0.5">{dispTime}</p></div>}
+              {trip.date && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Date</p><p className="text-sm font-black text-slate-900 mt-0.5">{trip.date}</p></div>}
+              {trip.startOdometer != null && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Start Odo</p><p className="text-sm font-black text-slate-900 mt-0.5">{Number(trip.startOdometer).toLocaleString()}</p></div>}
+              {trip.endOdometer != null && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-rose-600">End Odo</p><p className="text-sm font-black text-slate-900 mt-0.5">{Number(trip.endOdometer).toLocaleString()}</p></div>}
+              {trip.mileage && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Distance</p><p className="text-sm font-black text-slate-900 mt-0.5">{trip.mileage} mi</p></div>}
+              {trip.signature != null && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Signature</p><p className="text-sm font-black text-slate-900 mt-0.5">{trip.signature ? "Yes" : "No"}</p></div>}
+            </div>
+            <div className="bg-white rounded-xl border border-slate-100 px-3 py-2.5 shadow-sm space-y-2">
+              <div className="flex items-start gap-2.5">
+                <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                <div><p className="text-[9px] font-black uppercase tracking-wider text-blue-600">Pickup</p><p className="text-xs font-semibold text-slate-800 leading-relaxed mt-0.5">{pickup||"—"}</p></div>
+              </div>
+              <div className="border-t border-dashed border-slate-100 pt-2 flex items-start gap-2.5">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                <div><p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Dropoff</p><p className="text-xs font-semibold text-slate-800 leading-relaxed mt-0.5">{dropoff||"—"}</p></div>
+              </div>
+            </div>
+            {(trip.patientPhone||trip.pickupPhone||trip.dropoffPhone) && (
+              <div className="bg-white rounded-xl border border-slate-100 px-3 py-2.5 shadow-sm space-y-1.5">
+                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Contacts</p>
+                {trip.patientPhone && <button type="button" onClick={() => makeCall?.(trip.patientPhone,trip.patient)} className="flex items-center gap-2 text-blue-700 active:opacity-70"><Phone size={12}/><span className="text-xs font-bold">{trip.patient}: {trip.patientPhone}</span></button>}
+                {trip.pickupPhone && trip.pickupPhone!==trip.patientPhone && <button type="button" onClick={() => makeCall?.(trip.pickupPhone,"Pickup")} className="flex items-center gap-2 text-emerald-700 active:opacity-70"><Phone size={12}/><span className="text-xs font-bold">Pickup: {trip.pickupPhone}</span></button>}
+                {trip.dropoffPhone && <button type="button" onClick={() => makeCall?.(trip.dropoffPhone,"Dropoff")} className="flex items-center gap-2 text-rose-700 active:opacity-70"><Phone size={12}/><span className="text-xs font-bold">Dropoff: {trip.dropoffPhone}</span></button>}
+              </div>
+            )}
+          </div>
+          <div className="px-4 pb-3.5 space-y-2">
+            {!isTerminal && (
+              <div className="relative">
+                <button type="button" onClick={() => setShowMenu(p=>!p)}
+                  className={"w-full h-11 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all " + (trip.status==="Unassigned" ? "bg-gradient-to-r from-blue-600 to-blue-700 shadow-blue-500/20" : "bg-slate-700")}>
+                  <Users size={15}/> {trip.status==="Unassigned" ? "Assign Driver" : "Re-assign"}
+                  <ChevronDown size={13} className={"transition-transform "+(showMenu?"rotate-180":"")} />
+                </button>
+                {showMenu && (
+                  <div className="absolute bottom-full mb-2 left-0 right-0 bg-white rounded-2xl border border-slate-200 shadow-2xl z-20 overflow-hidden max-h-52 overflow-y-auto">
+                    <div className="px-3 py-2 border-b border-slate-100 sticky top-0 bg-white"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Select Driver</p></div>
+                    {available.length===0 ? <p className="text-xs text-slate-400 text-center py-4">No available drivers</p> : available.map(d=>{
+                      const dss=getDriverLiveStatus(d);
+                      return (
+                        <button key={d.id} type="button" onClick={()=>{assignTripToDriver?.(trip.id,d.id);setShowMenu(false);}}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 active:bg-slate-100 text-left border-b border-slate-50 last:border-0">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black text-xs uppercase shrink-0">{(d.name||"D")[0]}</div>
+                          <div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-900 truncate">{d.name}</p><p className="text-[10px] text-slate-400">{d.vehicle||"No vehicle"}</p></div>
+                          <span className={"text-[9px] font-black uppercase px-2 py-0.5 rounded "+dss.color}>{dss.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button type="button" onClick={()=>onSetTripDetails?.(trip)} className="flex-1 h-9 border border-slate-200 bg-white text-slate-600 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-50 active:scale-95 transition-all"><Edit2 size={12}/>{isTerminal ? "View Details" : "Edit Trip"}</button>
+              {driver?.phone && <button type="button" onClick={()=>makeCall?.(driver.phone,driver.name)} className="h-9 px-3 border border-blue-200 bg-blue-50 text-blue-700 rounded-xl font-bold text-xs flex items-center justify-center active:scale-95 transition-all"><Phone size={12}/></button>}
+              {!isTerminal && requestDeleteTrip && <button type="button" onClick={()=>requestDeleteTrip(trip)} className="h-9 px-3 border border-rose-200 bg-rose-50 text-rose-600 rounded-xl font-bold text-xs flex items-center justify-center active:scale-95 transition-all"><Archive size={12}/></button>}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─── Driver Row ──────────────────────────────────────────────────── */
+const DriverRow = ({ driver, trips }) => {
+  const ds = getDriverLiveStatus(driver);
+  const active = trips.find(t => IN_PROGRESS.includes(t.status) && (t.driverId===driver.id||t.driverName===driver.name));
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 px-3.5 py-3 flex items-center gap-3 shadow-sm">
+      <div className={"w-10 h-10 rounded-full flex items-center justify-center font-black text-sm uppercase shrink-0 "+ds.color}>{(driver.name||"D")[0]}</div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-black text-slate-900 truncate">{driver.name}</p>
+        <p className="text-[10px] text-slate-400 mt-0.5">{driver.vehicle||"No vehicle"}</p>
+        {active && <p className="text-[10px] text-amber-600 font-bold mt-0.5 truncate">→ {trunc(active.patient||"",22)}</p>}
+      </div>
+      <span className={"text-[9px] font-black uppercase px-2.5 py-1 rounded-lg "+ds.color}>{ds.label}</span>
+    </div>
+  );
+};
+
+/* ─── Main Component ──────────────────────────────────────────────── */
+const MobileDispatchView = ({
+  role, currentUser, trips=[], drivers=[], dispatchers=[],
+  assignTripToDriver, bulkAssignTrips, setBulkAssignModal,
+  requestDeleteTrip, updateTrip, makeCall,
+  setTripDetails, setShowAddTripModal, setShowUploadModal,
+  onOpenSequencer, onOpenLiveMap, searchQuery, setSearchQuery,
+  addToast, isOnline, phoneNumbers,
+  onDispatcherStatusUpdate, fallbackAdminOnline, setFallbackAdminOnline,
+}) => {
+  const [filter, setFilter] = useState("all");
+  const [tab, setTab] = useState("trips");
+  const [expandedId, setExpandedId] = useState(null);
+  const [showTools, setShowTools] = useState(false);
+  const [localSearch, setLocalSearch] = useState(searchQuery||"");
+
+  useEffect(()=>{ const t=setTimeout(()=>setSearchQuery?.(localSearch),250); return()=>clearTimeout(t); },[localSearch,setSearchQuery]);
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const todayTrips = useMemo(()=>
+    trips
+      .filter(t=>t.date===todayStr||!t.date)
+      .sort((a,b)=>{
+        const aT=TERMINAL.includes(a.status),bT=TERMINAL.includes(b.status);
+        if(aT&&!bT) return 1; if(!aT&&bT) return -1;
+        return timeToMinutes(a.time)-timeToMinutes(b.time);
+      }),
+    [trips,todayStr]
+  );
+
+  const filtered = useMemo(()=>{
+    let r=todayTrips;
+    if(filter==="unassigned") r=r.filter(t=>t.status==="Unassigned");
+    else if(filter==="active") r=r.filter(t=>IN_PROGRESS.includes(t.status));
+    else if(filter==="completed") r=r.filter(t=>t.status==="Completed");
+    else if(filter==="willcall") r=r.filter(t=>t.time==="Will Call");
+    if(localSearch){const q=localSearch.toLowerCase();r=r.filter(t=>(t.patient||"").toLowerCase().includes(q)||(t.bookingId||"").toLowerCase().includes(q)||getAddr(t.pickup).toLowerCase().includes(q)||getAddr(t.dropoff).toLowerCase().includes(q)||(t.driverName||"").toLowerCase().includes(q));}
+    return r;
+  },[todayTrips,filter,localSearch]);
+
+  const myDispatcher=dispatchers?.find(d=>d.email===currentUser);
+  const amIOnline=myDispatcher?myDispatcher.clockedIn:(fallbackAdminOnline??true);
+  const toggleOnline=()=>{ if(myDispatcher&&onDispatcherStatusUpdate) onDispatcherStatusUpdate(myDispatcher.id,!amIOnline); else if(setFallbackAdminOnline) setFallbackAdminOnline(!amIOnline); };
+
+  const todayFmt=new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+  const unassignedN=todayTrips.filter(t=>t.status==="Unassigned").length;
+  const activeN=todayTrips.filter(t=>IN_PROGRESS.includes(t.status)).length;
+  const doneN=todayTrips.filter(t=>t.status==="Completed").length;
+  const activeDriversN=drivers.filter(d=>!["Offline","Unavailable"].includes(d.status)).length;
+
+  const CHIPS=[
+    {id:"all",label:"All",n:todayTrips.length},
+    {id:"unassigned",label:"Unassigned",n:unassignedN},
+    {id:"active",label:"Active",n:activeN},
+    {id:"willcall",label:"Will Call",n:todayTrips.filter(t=>t.time==="Will Call").length},
+    {id:"completed",label:"Done",n:doneN},
+  ];
+
+  return (
+    <div className="flex flex-col h-full bg-[#f0f4f9] overflow-hidden">
+      {/* Header */}
+      <div className="shrink-0 px-4 pt-4 pb-3" style={{background:"linear-gradient(145deg,#1e3a5f 0%,#274b7c 50%,#1a3355 100%)"}}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-200">Dispatch Board</p>
+            <h1 className="text-xl font-black text-white mt-0.5 leading-none">{todayFmt}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={toggleOnline}
+              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border transition-all active:scale-95 "+(amIOnline?"bg-emerald-500/20 text-emerald-300 border-emerald-500/40":"bg-rose-500/20 text-rose-300 border-rose-500/40")}>
+              {amIOnline?<Wifi size={11}/>:<WifiOff size={11}/>}
+              {amIOnline?"Online":"Offline"}
+            </button>
+            <button type="button" onClick={()=>setShowTools(true)}
+              className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white active:scale-95 transition-all">
+              <SlidersHorizontal size={16}/>
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-2 mb-3">
+          {[{label:"Total",value:todayTrips.length,color:"text-white"},{label:"Unassigned",value:unassignedN,color:unassignedN>0?"text-rose-300":"text-white"},{label:"Active",value:activeN,color:"text-amber-300"},{label:"Done",value:doneN,color:"text-emerald-300"}].map(s=>(
+            <div key={s.label} className="flex-1 bg-white/10 rounded-xl px-2 py-2 text-center border border-white/10">
+              <p className={"text-lg font-black leading-none "+s.color}>{s.value}</p>
+              <p className="text-[8px] font-bold text-blue-200 uppercase tracking-wide mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300 pointer-events-none"/>
+          <input type="text" value={localSearch} onChange={e=>setLocalSearch(e.target.value)}
+            placeholder="Search patient, ID, address…"
+            className="w-full bg-white/10 border border-white/20 rounded-xl pl-8 pr-4 py-2.5 text-sm text-white placeholder-blue-300 focus:outline-none focus:bg-white/15 focus:border-white/40 transition-all"/>
+          {localSearch && <button type="button" onClick={()=>setLocalSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-300 hover:text-white"><X size={13}/></button>}
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div className="shrink-0 flex border-b border-slate-200 bg-white shadow-sm">
+        {[{id:"trips",label:"Trips ("+filtered.length+")"},{id:"drivers",label:"Drivers ("+activeDriversN+" active)"}].map(t=>(
+          <button key={t.id} type="button" onClick={()=>setTab(t.id)}
+            className={"flex-1 py-2.5 text-xs font-black uppercase tracking-wider transition-all "+(tab===t.id?"text-blue-700 border-b-2 border-blue-600":"text-slate-400")}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Filter chips */}
+      {tab==="trips" && (
+        <div className="shrink-0 flex gap-2 px-4 py-2.5 overflow-x-auto bg-white border-b border-slate-100" style={{scrollbarWidth:"none"}}>
+          {CHIPS.map(c=>(
+            <button key={c.id} type="button" onClick={()=>setFilter(c.id)}
+              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-all active:scale-95 "+(filter===c.id?"bg-[#1e3a5f] text-white shadow-sm":"bg-slate-100 text-slate-500 hover:bg-slate-200")}>
+              {c.label}
+              <span className={"text-[9px] px-1 py-0.5 rounded-full font-black "+(filter===c.id?"bg-white/20 text-white":"bg-slate-200 text-slate-500")}>{c.n}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto" style={{paddingBottom:"calc(72px + env(safe-area-inset-bottom,0px))"}}>
+        {tab==="trips" && (
+          <div className="px-4 py-3 space-y-3">
+            {filtered.length===0 && (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4"><Truck size={28} className="opacity-30"/></div>
+                <p className="text-sm font-bold text-slate-500">No trips found</p>
+                <p className="text-xs text-slate-400 mt-1 text-center max-w-[200px]">{localSearch?"Try a different search":"No trips match this filter"}</p>
+              </div>
+            )}
+            {filtered.map(trip=>(
+              <TripCard key={trip.id} trip={trip} drivers={drivers} expanded={expandedId===trip.id}
+                onToggle={()=>setExpandedId(expandedId===trip.id?null:trip.id)}
+                assignTripToDriver={assignTripToDriver} makeCall={makeCall}
+                updateTrip={updateTrip} requestDeleteTrip={requestDeleteTrip}
+                onSetTripDetails={setTripDetails} role={role}/>
+            ))}
+          </div>
+        )}
+        {tab==="drivers" && (
+          <div className="px-4 py-3 space-y-2">
+            {drivers.sort((a,b)=>{
+              const aA=!["Offline","Unavailable"].includes(a.status),bA=!["Offline","Unavailable"].includes(b.status);
+              if(aA&&!bA) return -1; if(!aA&&bA) return 1;
+              return (a.name||"").localeCompare(b.name||"");
+            }).map(d=><DriverRow key={d.id} driver={d} trips={todayTrips}/>)}
+            {drivers.length===0 && (
+              <div className="flex flex-col items-center justify-center py-20"><div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4"><Users size={28} className="opacity-30"/></div><p className="text-sm font-bold text-slate-500">No drivers found</p></div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* FAB */}
+      <button type="button" onClick={()=>setShowAddTripModal?.(true)}
+        className="fixed z-30 right-4 w-14 h-14 rounded-2xl shadow-xl flex items-center justify-center"
+        style={{background:"linear-gradient(145deg,#274b7c,#1e3a5f)",bottom:"calc(80px + env(safe-area-inset-bottom,0px))",boxShadow:"0 8px 24px rgba(30,58,95,0.4)"}}>
+        <Plus size={24} className="text-white"/>
+      </button>
+
+      {/* Tools Sheet */}
+      {showTools && (
+        <div className="fixed inset-0 z-50 flex items-end" onClick={()=>setShowTools(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"/>
+          <div className="relative w-full bg-white rounded-t-3xl shadow-2xl overflow-hidden" onClick={e=>e.stopPropagation()}>
+            <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200"/></div>
+            <div className="px-5 pb-2 pt-2"><h2 className="text-sm font-black text-slate-900">Dispatch Tools</h2><p className="text-xs text-slate-400 mt-0.5">Quick access to all operations</p></div>
+            <div className="px-4 py-3 grid grid-cols-3 gap-3" style={{paddingBottom:"max(1.5rem,env(safe-area-inset-bottom,1.5rem))"}}>
+              {[
+                {label:"Upload Trips",icon:Upload,color:"bg-blue-50 text-blue-700 border-blue-200",action:()=>{setShowUploadModal?.(true);setShowTools(false);}},
+                {label:"Route Sequencer",icon:Route,color:"bg-indigo-50 text-indigo-700 border-indigo-200",action:()=>{onOpenSequencer?.();setShowTools(false);}},
+                {label:"Live Map",icon:MapPin,color:"bg-emerald-50 text-emerald-700 border-emerald-200",action:()=>{onOpenLiveMap?.();setShowTools(false);}},
+                {label:"Bulk Assign",icon:Users,color:"bg-amber-50 text-amber-700 border-amber-200",action:()=>{setBulkAssignModal?.(true);setShowTools(false);}},
+                {label:"Add Trip",icon:Plus,color:"bg-rose-50 text-rose-700 border-rose-200",action:()=>{setShowAddTripModal?.(true);setShowTools(false);}},
+              ].map(item=>(
+                <button key={item.label} type="button" onClick={item.action}
+                  className={"flex flex-col items-center justify-center gap-2 h-20 rounded-2xl border font-black text-xs transition-all active:scale-95 "+item.color}>
+                  <item.icon size={20}/><span className="text-center leading-tight px-1">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default MobileDispatchView;
