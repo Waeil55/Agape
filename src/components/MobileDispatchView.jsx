@@ -163,7 +163,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
             {!isTerminal && (
               <div className="relative">
                 <button type="button" onClick={() => setShowMenu(p=>!p)}
-                  className={"w-full h-11 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all " + (trip.status==="Unassigned" ? "bg-gradient-to-r from-blue-600 to-blue-700 shadow-blue-500/20" : "bg-slate-700")}>
+                  className={"w-full h-11 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all " + (trip.status==="Unassigned" ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-800 hover:bg-gray-900")}>
                   <Users size={15}/> {trip.status==="Unassigned" ? "Assign Driver" : "Re-assign"}
                   <ChevronDown size={13} className={"transition-transform "+(showMenu?"rotate-180":"")} />
                 </button>
@@ -274,40 +274,40 @@ const MobileDispatchView = ({
   ];
 
   return (
-    <div className="flex flex-col h-full bg-[#f0f4f9] overflow-hidden">
+    <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 px-4 pt-4 pb-3" style={{background:"linear-gradient(145deg,#1e3a5f 0%,#274b7c 50%,#1a3355 100%)"}}>
+      <div className="shrink-0 px-4 pt-4 pb-3 bg-white border-b border-gray-200">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-200">Dispatch Board</p>
-            <h1 className="text-xl font-black text-white mt-0.5 leading-none">{todayFmt}</h1>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#2b4c7e]">Dispatch Board</p>
+            <h1 className="text-xl font-extrabold text-gray-900 mt-0.5 leading-none">{todayFmt}</h1>
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={toggleOnline}
-              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border transition-all active:scale-95 "+(amIOnline?"bg-emerald-500/20 text-emerald-300 border-emerald-500/40":"bg-rose-500/20 text-rose-300 border-rose-500/40")}>
+              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all active:scale-95 "+(amIOnline?"bg-emerald-50 text-emerald-700 border-emerald-200":"bg-rose-50 text-rose-700 border-rose-200")}>
               {amIOnline?<Wifi size={11}/>:<WifiOff size={11}/>}
               {amIOnline?"Online":"Offline"}
             </button>
             <button type="button" onClick={()=>setShowTools(true)}
-              className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white active:scale-95 transition-all">
+              className="w-9 h-9 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-600 active:scale-95 transition-all hover:bg-gray-100">
               <SlidersHorizontal size={16}/>
             </button>
           </div>
         </div>
         <div className="flex gap-2 mb-3">
-          {[{label:"Total",value:todayTrips.length,color:"text-white"},{label:"Unassigned",value:unassignedN,color:unassignedN>0?"text-rose-300":"text-white"},{label:"Active",value:activeN,color:"text-amber-300"},{label:"Done",value:doneN,color:"text-emerald-300"}].map(s=>(
-            <div key={s.label} className="flex-1 bg-white/10 rounded-xl px-2 py-2 text-center border border-white/10">
+          {[{label:"Total",value:todayTrips.length,color:"text-gray-900",bg:"bg-gray-50"},{label:"Unassigned",value:unassignedN,color:unassignedN>0?"text-rose-600":"text-gray-900",bg:unassignedN>0?"bg-rose-50":"bg-gray-50"},{label:"Active",value:activeN,color:"text-amber-600",bg:"bg-amber-50"},{label:"Done",value:doneN,color:"text-emerald-600",bg:"bg-emerald-50"}].map(s=>(
+            <div key={s.label} className={"flex-1 rounded-xl px-2 py-2 text-center border border-gray-100 " + s.bg}>
               <p className={"text-lg font-black leading-none "+s.color}>{s.value}</p>
-              <p className="text-[8px] font-bold text-blue-200 uppercase tracking-wide mt-0.5">{s.label}</p>
+              <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wide mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300 pointer-events-none"/>
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"/>
           <input type="text" value={localSearch} onChange={e=>setLocalSearch(e.target.value)}
             placeholder="Search patient, ID, address…"
-            className="w-full bg-white/10 border border-white/20 rounded-xl pl-8 pr-4 py-2.5 text-sm text-white placeholder-blue-300 focus:outline-none focus:bg-white/15 focus:border-white/40 transition-all"/>
-          {localSearch && <button type="button" onClick={()=>setLocalSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-300 hover:text-white"><X size={13}/></button>}
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-[#2b4c7e] focus:ring-1 focus:ring-[#2b4c7e] transition-all"/>
+          {localSearch && <button type="button" onClick={()=>setLocalSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={13}/></button>}
         </div>
       </div>
 
@@ -360,8 +360,8 @@ const MobileDispatchView = ({
 
       {/* FAB */}
       <button type="button" onClick={()=>setShowAddTripModal?.(true)}
-        className="fixed z-30 right-4 w-14 h-14 rounded-2xl shadow-xl flex items-center justify-center"
-        style={{background:"linear-gradient(145deg,#274b7c,#1e3a5f)",bottom:"calc(80px + env(safe-area-inset-bottom,0px))",boxShadow:"0 8px 24px rgba(30,58,95,0.4)"}}>
+        className="fixed z-30 right-4 w-14 h-14 rounded-full shadow-xl flex items-center justify-center bg-[#2b4c7e] active:scale-95 transition-all border border-[#1e3a5f]"
+        style={{bottom:"calc(80px + env(safe-area-inset-bottom,0px))",boxShadow:"0 8px 24px rgba(43,76,126,0.3)"}}>
         <Plus size={24} className="text-white"/>
       </button>
 

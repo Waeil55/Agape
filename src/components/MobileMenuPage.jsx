@@ -11,38 +11,38 @@ const MobileMenuPage = ({ currentUser, role, onSignOut, setSubView }) => {
     {
       title: "Organization",
       items: [
-        { id: 'admin', icon: Users, label: 'User Management', desc: 'Dispatchers & Admins', color: 'text-indigo-400', bg: 'bg-indigo-500/20' },
-        { id: 'billing', icon: Database, label: 'Billing Codes', desc: 'Manage charge codes', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+        { id: 'admin', icon: Users, label: 'User Management', desc: 'Dispatchers & Admins', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { id: 'billing', icon: Database, label: 'Billing Codes', desc: 'Manage charge codes', color: 'text-emerald-600', bg: 'bg-emerald-50' },
       ]
     },
     {
       title: "Data & Records",
       items: [
-        { id: 'reports', icon: FileText, label: 'Reports & Export', desc: 'Trip logs and manifests', color: 'text-amber-400', bg: 'bg-amber-500/20' },
-        { id: 'archives', icon: Clock, label: 'Archives', desc: 'Past records', color: 'text-rose-400', bg: 'bg-rose-500/20' },
+        { id: 'reports', icon: FileText, label: 'Reports & Export', desc: 'Trip logs and manifests', color: 'text-amber-600', bg: 'bg-amber-50' },
+        { id: 'archives', icon: Clock, label: 'Archives', desc: 'Past records', color: 'text-rose-600', bg: 'bg-rose-50' },
       ]
     },
     {
       title: "Preferences",
       items: [
-        { id: 'settings', icon: Settings, label: 'App Settings', desc: 'Theme & notifications', color: 'text-slate-400', bg: 'bg-slate-500/20' },
+        { id: 'settings', icon: Settings, label: 'App Settings', desc: 'Theme & notifications', color: 'text-gray-600', bg: 'bg-gray-100' },
       ]
     }
   ];
 
   return (
-    <div className="w-full h-full bg-[#0f172a] flex flex-col overflow-y-auto">
+    <div className="w-full h-full bg-gray-50 flex flex-col overflow-y-auto">
       {/* Header Profile Section */}
-      <div className="px-6 pt-10 pb-8 bg-slate-800/40 border-b border-slate-700/50">
+      <div className="px-6 pt-10 pb-8 bg-white border-b border-gray-200">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xl font-black text-white shadow-lg">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center text-xl font-black text-blue-600 shadow-sm border border-blue-100">
             {getInitials(currentUser)}
           </div>
           <div>
-            <h2 className="text-xl font-black text-white tracking-wide truncate">{currentUser || 'User'}</h2>
+            <h2 className="text-xl font-extrabold text-gray-900 tracking-wide truncate">{currentUser || 'User'}</h2>
             <div className="flex items-center gap-2 mt-1">
-              <Shield size={12} className="text-blue-400" />
-              <p className="text-xs font-bold text-blue-300 uppercase tracking-widest">{role === 'admin' ? 'Administrator' : 'Dispatcher'}</p>
+              <Shield size={12} className="text-[#2b4c7e]" />
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{role === 'admin' ? 'Administrator' : 'Dispatcher'}</p>
             </div>
           </div>
         </div>
@@ -56,22 +56,22 @@ const MobileMenuPage = ({ currentUser, role, onSignOut, setSubView }) => {
 
           return (
             <div key={idx} className="space-y-2">
-              <h3 className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{section.title}</h3>
-              <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl overflow-hidden shadow-sm">
+              <h3 className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{section.title}</h3>
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
                 {section.items.map((item, i) => (
                   <button
                     key={item.id}
                     onClick={() => setSubView(item.id)}
-                    className={`w-full flex items-center gap-4 px-4 py-3.5 hover:bg-slate-700/30 active:bg-slate-700/50 transition-colors text-left ${i !== section.items.length - 1 ? 'border-b border-slate-700/50' : ''}`}
+                    className={`w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left ${i !== section.items.length - 1 ? 'border-b border-gray-100' : ''}`}
                   >
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${item.bg}`}>
                       <item.icon size={18} className={item.color} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-200">{item.label}</p>
-                      <p className="text-[11px] font-semibold text-slate-400 mt-0.5">{item.desc}</p>
+                      <p className="text-sm font-bold text-gray-900">{item.label}</p>
+                      <p className="text-[11px] font-semibold text-gray-500 mt-0.5">{item.desc}</p>
                     </div>
-                    <ChevronRight size={16} className="text-slate-500 shrink-0" />
+                    <ChevronRight size={16} className="text-gray-400 shrink-0" />
                   </button>
                 ))}
               </div>
@@ -84,7 +84,7 @@ const MobileMenuPage = ({ currentUser, role, onSignOut, setSubView }) => {
       <div className="px-4 pb-24">
         <button
           onClick={onSignOut}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-slate-800 border border-rose-500/20 text-rose-400 font-bold hover:bg-rose-500/10 active:scale-95 transition-all"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-white border border-rose-200 text-rose-600 font-bold hover:bg-rose-50 active:scale-95 transition-all shadow-sm"
         >
           <LogOut size={16} />
           Sign Out
