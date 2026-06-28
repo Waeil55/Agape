@@ -223,9 +223,9 @@ const MobileDispatchView = ({
   onOpenSequencer, onOpenLiveMap, searchQuery, setSearchQuery,
   addToast, isOnline, phoneNumbers,
   onDispatcherStatusUpdate, fallbackAdminOnline, setFallbackAdminOnline,
+  activeTab = "trips" // Controlled by parent bottom nav
 }) => {
   const [filter, setFilter] = useState("all");
-  const [tab, setTab] = useState("trips");
   const [expandedId, setExpandedId] = useState(null);
   const [showTools, setShowTools] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery||"");
@@ -311,18 +311,8 @@ const MobileDispatchView = ({
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="shrink-0 flex border-b border-slate-200 bg-white shadow-sm">
-        {[{id:"trips",label:"Trips ("+filtered.length+")"},{id:"drivers",label:"Drivers ("+activeDriversN+" active)"}].map(t=>(
-          <button key={t.id} type="button" onClick={()=>setTab(t.id)}
-            className={"flex-1 py-2.5 text-xs font-black uppercase tracking-wider transition-all "+(tab===t.id?"text-blue-700 border-b-2 border-blue-600":"text-slate-400")}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
       {/* Filter chips */}
-      {tab==="trips" && (
+      {activeTab==="trips" && (
         <div className="shrink-0 flex gap-2 px-4 py-2.5 overflow-x-auto bg-white border-b border-slate-100" style={{scrollbarWidth:"none"}}>
           {CHIPS.map(c=>(
             <button key={c.id} type="button" onClick={()=>setFilter(c.id)}
@@ -336,7 +326,7 @@ const MobileDispatchView = ({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto" style={{paddingBottom:"calc(72px + env(safe-area-inset-bottom,0px))"}}>
-        {tab==="trips" && (
+        {activeTab==="trips" && (
           <div className="px-4 py-3 space-y-3">
             {filtered.length===0 && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -354,7 +344,7 @@ const MobileDispatchView = ({
             ))}
           </div>
         )}
-        {tab==="drivers" && (
+        {activeTab==="drivers" && (
           <div className="px-4 py-3 space-y-2">
             {drivers.sort((a,b)=>{
               const aA=!["Offline","Unavailable"].includes(a.status),bA=!["Offline","Unavailable"].includes(b.status);
