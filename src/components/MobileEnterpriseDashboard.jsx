@@ -1,10 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  Home, Map, Clock, MessageCircle, Settings,
-  PhoneCall, ChevronLeft, ChevronRight, Search,
-  CheckCircle2, XCircle, AlertTriangle, RefreshCw, User, ChevronDown,
-  Edit2, RotateCcw, Check, Video, Info, PlusCircle, ImageIcon,
-  Camera, Mic, Send, Menu, Users, Truck, List, BarChart2
+  Home, Map, MessageCircle, ChevronLeft, User, Menu, Truck, BarChart2
 } from 'lucide-react';
 import DriverPage from './DriverPage';
 import AdminPage from './AdminPage';
@@ -20,7 +16,7 @@ import { getDriverLiveStatus } from '../constants/statuses';
 
 const MobileEnterpriseDashboard = (props) => {
   const { trips, drivers, dispatchers, currentUser, role, onSignOut } = props;
-  const [currentView, setCurrentView] = useState('trips'); // trips, fleet, map, chat, menu
+  const [currentView, setCurrentView] = useState('trips');
   const [subView, setSubView] = useState(null); // admin, reports, settings, archives
   const driverWorkDrivers = props.driverWorkDrivers?.length ? props.driverWorkDrivers : drivers;
   const driverWorkTrips = props.driverWorkTrips?.length ? props.driverWorkTrips : trips;
@@ -73,14 +69,14 @@ const MobileEnterpriseDashboard = (props) => {
             <ChevronLeft size={20} />
           </button>
         )}
-        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-bold border border-blue-100 shrink-0">
+        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-semibold border border-blue-100 shrink-0">
           <span className="text-xs">{getProfileAbbr()}</span>
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-extrabold text-sm text-gray-900 tracking-wide">{title}</h1>
+            <h1 className="font-bold text-sm text-gray-900">{title}</h1>
           </div>
-          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{currentUser}</p>
+          <p className="text-[10px] text-gray-500 font-medium truncate max-w-[220px]">{currentUser}</p>
         </div>
       </div>
     </div>
@@ -184,7 +180,7 @@ const MobileEnterpriseDashboard = (props) => {
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
                 <Truck size={26} />
               </div>
-              <p className="text-sm font-black text-slate-700">No driver profile available</p>
+              <p className="text-sm font-semibold text-slate-700">No driver profile available</p>
               <p className="mt-1 text-xs font-semibold text-slate-400">Assign drivers to this account to operate driver workflows.</p>
             </div>
           </div>
@@ -197,15 +193,15 @@ const MobileEnterpriseDashboard = (props) => {
           <div className="shrink-0 border-b border-gray-200 bg-white px-3 py-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#2b4c7e]">{role === 'admin' ? 'Admin Driver Work' : 'Dispatcher Driver Work'}</p>
-                <p className="mt-0.5 truncate text-sm font-black text-gray-900">Operate as driver</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2b4c7e]">{role === 'admin' ? 'Admin Driver Work' : 'Dispatcher Driver Work'}</p>
+                <p className="mt-0.5 truncate text-sm font-bold text-gray-900">Operate as driver</p>
               </div>
-              <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-black ${liveStatus.color}`}>{liveStatus.label}</span>
+              <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-semibold ${liveStatus.color}`}>{liveStatus.label}</span>
             </div>
             <select
               value={activeDriverWorkDriver.id}
               onChange={(event) => setDriverWorkDriverId(event.target.value)}
-              className="mt-3 h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 text-sm font-black text-gray-800 outline-none focus:border-[#2b4c7e] focus:ring-2 focus:ring-[#2b4c7e]/15"
+              className="mt-3 h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-800 outline-none focus:border-[#2b4c7e] focus:ring-2 focus:ring-[#2b4c7e]/15"
             >
               {driverWorkDrivers.map((driver) => (
                 <option key={driver.id || driver.email || driver.name} value={driver.id}>
@@ -283,8 +279,8 @@ const MobileEnterpriseDashboard = (props) => {
             onClick={() => handleNavClick('trips')}
             className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[58px] ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <List size={27} strokeWidth={currentView === 'trips' && !subView ? 2.7 : 2} className={`transition-all duration-200 ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[12px] tracking-[0.04em] transition-all leading-none ${currentView === 'trips' && !subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-normal'}`}>Trips</span>
+            <Home size={27} strokeWidth={currentView === 'trips' && !subView ? 2.55 : 1.9} className={`transition-all duration-200 ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[12px] tracking-[0.03em] transition-all leading-none ${currentView === 'trips' && !subView ? 'text-blue-600 font-semibold' : 'text-slate-400 font-normal'}`}>Trips</span>
           </button>
 
           {driverWorkDrivers.length > 0 ? (
@@ -292,16 +288,16 @@ const MobileEnterpriseDashboard = (props) => {
             onClick={() => handleNavClick('drive')}
             className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[58px] ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <User size={27} strokeWidth={currentView === 'drive' && !subView ? 2.7 : 2} className={`transition-all duration-200 ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[12px] tracking-[0.04em] transition-all leading-none ${currentView === 'drive' && !subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-normal'}`}>Drive</span>
+            <User size={27} strokeWidth={currentView === 'drive' && !subView ? 2.55 : 1.9} className={`transition-all duration-200 ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[12px] tracking-[0.03em] transition-all leading-none ${currentView === 'drive' && !subView ? 'text-blue-600 font-semibold' : 'text-slate-400 font-normal'}`}>Drive</span>
           </button>
           ) : (
           <button
             onClick={() => handleNavClick('map')}
             className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[58px] ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <Map size={27} strokeWidth={currentView === 'map' && !subView ? 2.7 : 2} className={`transition-all duration-200 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[12px] tracking-[0.04em] transition-all leading-none ${currentView === 'map' && !subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-normal'}`}>Map</span>
+            <Map size={27} strokeWidth={currentView === 'map' && !subView ? 2.55 : 1.9} className={`transition-all duration-200 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[12px] tracking-[0.03em] transition-all leading-none ${currentView === 'map' && !subView ? 'text-blue-600 font-semibold' : 'text-slate-400 font-normal'}`}>Map</span>
           </button>
           )}
 
@@ -309,24 +305,24 @@ const MobileEnterpriseDashboard = (props) => {
             onClick={() => handleNavClick('reports')}
             className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[58px] ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <BarChart2 size={27} strokeWidth={currentView === 'reports' && !subView ? 2.7 : 2} className={`transition-all duration-200 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[12px] tracking-[0.04em] transition-all leading-none ${currentView === 'reports' && !subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-normal'}`}>Reports</span>
+            <BarChart2 size={27} strokeWidth={currentView === 'reports' && !subView ? 2.55 : 1.9} className={`transition-all duration-200 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[12px] tracking-[0.03em] transition-all leading-none ${currentView === 'reports' && !subView ? 'text-blue-600 font-semibold' : 'text-slate-400 font-normal'}`}>Reports</span>
           </button>
 
           <button
             onClick={() => handleNavClick('chat')}
             className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[58px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <MessageCircle size={27} strokeWidth={currentView === 'chat' && !subView ? 2.7 : 2} className={`transition-all duration-200 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[12px] tracking-[0.04em] transition-all leading-none ${currentView === 'chat' && !subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-normal'}`}>Chat</span>
+            <MessageCircle size={27} strokeWidth={currentView === 'chat' && !subView ? 2.55 : 1.9} className={`transition-all duration-200 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[12px] tracking-[0.03em] transition-all leading-none ${currentView === 'chat' && !subView ? 'text-blue-600 font-semibold' : 'text-slate-400 font-normal'}`}>Chat</span>
           </button>
 
           <button
             onClick={() => handleNavClick('menu')}
             className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[58px] ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <Menu size={27} strokeWidth={currentView === 'menu' || subView ? 2.7 : 2} className={`transition-all duration-200 ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[12px] tracking-[0.04em] transition-all leading-none ${currentView === 'menu' || subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-normal'}`}>More</span>
+            <Menu size={27} strokeWidth={currentView === 'menu' || subView ? 2.55 : 1.9} className={`transition-all duration-200 ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[12px] tracking-[0.03em] transition-all leading-none ${currentView === 'menu' || subView ? 'text-blue-600 font-semibold' : 'text-slate-400 font-normal'}`}>More</span>
           </button>
         </div>
       </nav>

@@ -45,7 +45,23 @@ import { useDriverAssignments } from './hooks/useDriverAssignments';
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v349';
+const APP_VERSION = 'v350';
+const ROLE_CACHE_KEY = 'agape_session_v1';
+const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
+const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const REPAIR_STORAGE_KEYS = [
+  ROLE_CACHE_KEY,
+  APP_VERSION_KEY,
+  'agape_mobileDriverWorkDriverId',
+  'agape_reportsDesktopView',
+];
+
+function removeStorageKeys(storage, keys = []) {
+  if (!storage) return;
+  keys.forEach((key) => {
+    try { storage.removeItem(key); } catch {}
+  });
+}
 
 async function clearAgapeStaticCaches() {
   if (typeof window === 'undefined' || !window.caches) return;
@@ -59,6 +75,8 @@ async function clearAgapeStaticCaches() {
 
 async function repairBrowserStatePreservingAuth() {
   await clearAgapeStaticCaches();
+  try { removeStorageKeys(window.localStorage, REPAIR_STORAGE_KEYS); } catch {}
+  try { removeStorageKeys(window.sessionStorage, REPAIR_STORAGE_KEYS); } catch {}
   if (typeof navigator !== 'undefined' && navigator.serviceWorker?.getRegistrations) {
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(registrations.map((registration) => registration.update().catch(() => null)));
@@ -263,21 +281,29 @@ function getBestDriverProfileForEmail(drivers = [], email = '', trips = []) {
 }
 
 const FIRESTORE_BOOT_TIMEOUT_MS = 8000;
-const AUTH_WATCHDOG_TIMEOUT_MS = 90000;
+const DATA_LOAD_FORCE_TIMEOUT_MS = 20000;
+const AUTH_WATCHDOG_TIMEOUT_MS = 30000;
 
 // --- Role cache: persist role to localStorage so boot is instant for returning users ---
-const ROLE_CACHE_KEY = 'agape_session_v1';
 function readRoleCache(uid) {
   try {
     const raw = localStorage.getItem(ROLE_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed?.uid === uid && parsed?.role) return parsed;
+    const role = String(parsed?.role || '').toLowerCase();
+    const cachedAt = Number(parsed?.cachedAt || 0);
+    const isExpired = !cachedAt || Date.now() - cachedAt > ROLE_CACHE_TTL_MS;
+    if (parsed?.uid === uid && VALID_ROLES.has(role) && !isExpired) return { ...parsed, role };
+    clearRoleCache();
     return null;
   } catch { return null; }
 }
 function writeRoleCache(uid, role, email) {
-  try { localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ uid, role, email, cachedAt: Date.now() })); } catch {}
+  try {
+    const normalizedRole = String(role || '').toLowerCase();
+    if (!uid || !VALID_ROLES.has(normalizedRole)) return;
+    localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ uid, role: normalizedRole, email, cachedAt: Date.now() }));
+  } catch {}
 }
 function clearRoleCache() {
   try { localStorage.removeItem(ROLE_CACHE_KEY); } catch {}
@@ -887,19 +913,23 @@ const App = () => {
     }
   }, [appSettings]);
 
-  // Firestore data timeout — show recovery after 8s
+  // Firestore data timeout: show recovery, then open with best available data.
   useEffect(() => {
     setShowDataLoadingRecovery(false);
     const recoveryT = setTimeout(() => {
       if (dataLoading) setShowDataLoadingRecovery(true);
-    }, 8000);
+    }, FIRESTORE_BOOT_TIMEOUT_MS);
     return () => { clearTimeout(recoveryT); };
   }, [dataLoading]);
-  // Force dataLoading to end after 45s so auth watchdog (90s) never fires
+  // Never block the workspace indefinitely on slow realtime data.
   useEffect(() => {
     setForceDataLoad(false);
     if (!dataLoading) return;
-    const t = setTimeout(() => setForceDataLoad(true), 45000);
+    const t = setTimeout(() => {
+      setForceDataLoad(true);
+      setStartupIssue('Live data is slow. The workspace opened with the latest available data and will keep reconnecting.');
+      requestRealtimeResubscribe('data_timeout');
+    }, DATA_LOAD_FORCE_TIMEOUT_MS);
     return () => clearTimeout(t);
   }, [dataLoading]);
 
@@ -909,12 +939,12 @@ const App = () => {
     let cancelled = false;
     authBootResolvedRef.current = false;
 
-    // Watchdog: if nothing resolves in 90s, unblock loading
+    // Watchdog: if nothing resolves, unblock loading and show recovery.
     const bootWatchdog = setTimeout(() => {
       if (cancelled || authBootResolvedRef.current) return;
       authBootResolvedRef.current = true;
       setIsLoading(false);
-      setStartupIssue('Connection timed out. Please sign in again.');
+      setStartupIssue('Startup took too long. Retry, repair browser files, or return to the Access Portal.');
     }, AUTH_WATCHDOG_TIMEOUT_MS);
 
     // Helper: apply authenticated session state and clear loading immediately

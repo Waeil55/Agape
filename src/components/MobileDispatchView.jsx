@@ -81,23 +81,23 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
         <div className="flex items-start gap-3.5">
           <div className="shrink-0 text-center w-[58px] rounded-2xl bg-slate-50 border border-slate-100 py-2">
             {trip.time === "Will Call" ? (
-              <span className="text-sm font-black text-slate-700 uppercase">WC</span>
+              <span className="text-sm font-bold text-slate-700 uppercase">WC</span>
             ) : (
               <>
-                <p className={"text-lg font-black leading-none " + (isLate ? "text-rose-600" : isSoon ? "text-amber-600" : "text-slate-900")}>{timeParts[0]}</p>
-                <p className={"text-[10px] font-black uppercase tracking-wide mt-1 " + (isLate ? "text-rose-400" : isSoon ? "text-amber-400" : "text-slate-400")}>{timeParts[1] || ""}</p>
+                <p className={"text-lg font-bold leading-none " + (isLate ? "text-rose-600" : isSoon ? "text-amber-600" : "text-slate-900")}>{timeParts[0]}</p>
+                <p className={"text-[10px] font-semibold uppercase tracking-wide mt-1 " + (isLate ? "text-rose-400" : isSoon ? "text-amber-400" : "text-slate-400")}>{timeParts[1] || ""}</p>
               </>
             )}
-            {urgency && <span className={"mt-1.5 inline-block px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase " + (isLate ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700")}>{urgency}</span>}
+            {urgency && <span className={"mt-1.5 inline-block px-1.5 py-0.5 rounded-md text-[9px] font-semibold uppercase " + (isLate ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700")}>{urgency}</span>}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="text-[15px] font-black text-slate-950 leading-tight">{trip.patient || "Unknown"}</h3>
+                <h3 className="text-[15px] font-bold text-slate-950 leading-tight">{trip.patient || "Unknown"}</h3>
                 <p className="text-[10px] font-bold text-slate-400 mt-0.5">#{trip.bookingId || trip.id || "—"}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <span className={"px-2 py-1 rounded-lg border text-[10px] font-black uppercase tracking-wide " + sty.pill}>{trip.status || "Unknown"}</span>
+                <span className={"px-2 py-1 rounded-lg border text-[10px] font-semibold uppercase tracking-wide " + sty.pill}>{trip.status || "Unknown"}</span>
                 <ChevronDown size={13} className={"text-slate-400 transition-transform duration-200 " + (expanded ? "rotate-180" : "")} />
               </div>
             </div>
@@ -109,20 +109,20 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-blue-600">Pickup</p>
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-blue-600">Pickup</p>
                   <p className="text-[12px] font-semibold leading-snug text-slate-800 line-clamp-2">{pickup || "-"}</p>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-600">Dropoff</p>
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-600">Dropoff</p>
                   <p className="text-[12px] font-semibold leading-snug text-slate-800 line-clamp-2">{dropoff || "-"}</p>
                 </div>
               </div>
             </div>
             {driver ? (
               <div className="mt-3 flex items-center gap-2 rounded-xl bg-white border border-slate-100 px-2.5 py-2">
-                <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600 shrink-0 uppercase">{(driver.name||"D")[0]}</div>
+                <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0 uppercase">{(driver.name||"D")[0]}</div>
                 <span className="text-[12px] font-bold text-slate-700 truncate">{driver.name}</span>
-                {ds && <span className={"ml-auto px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide " + ds.color}>{ds.label}</span>}
+                {ds && <span className={"ml-auto px-2 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wide " + ds.color}>{ds.label}</span>}
               </div>
             ) : trip.status !== "Completed" && trip.status !== "Cancelled" ? (
               <div className="mt-3"><span className="text-[11px] font-bold text-rose-500 flex items-center gap-1.5"><User size={12} /> No driver assigned</span></div>
@@ -214,13 +214,13 @@ const DriverRow = ({ driver, trips }) => {
   const activeStatus = active?.status || ds.label;
   return (
     <div className="bg-white rounded-2xl border border-slate-100 px-3.5 py-3 flex items-center gap-3 shadow-sm">
-      <div className={"w-10 h-10 rounded-full flex items-center justify-center font-black text-sm uppercase shrink-0 "+ds.color}>{(driver.name||"D")[0]}</div>
+      <div className={"w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm uppercase shrink-0 "+ds.color}>{(driver.name||"D")[0]}</div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-black text-slate-900 truncate">{driver.name}</p>
+        <p className="text-sm font-bold text-slate-900 truncate">{driver.name}</p>
         <p className="text-[10px] text-slate-400 mt-0.5">{driver.vehicle||"No vehicle"}</p>
         {active && <p className="text-[10px] text-amber-600 font-bold mt-0.5 truncate">→ {trunc(active.patient||"",22)}</p>}
       </div>
-      <span className={"text-[9px] font-black uppercase px-2.5 py-1 rounded-lg text-center shrink-0 "+(active ? "bg-amber-100 text-amber-700" : ds.color)}>{activeStatus}</span>
+      <span className={"text-[9px] font-semibold uppercase px-2.5 py-1 rounded-lg text-center shrink-0 "+(active ? "bg-amber-100 text-amber-700" : ds.color)}>{activeStatus}</span>
     </div>
   );
 };
@@ -290,12 +290,12 @@ const MobileDispatchView = ({
       <div className="shrink-0 px-3 pt-4 pb-3 bg-white border-b border-gray-200 sm:px-4">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#2b4c7e]">Dispatch Board</p>
-            <h1 className="text-xl font-extrabold text-gray-900 mt-0.5 leading-none">{todayFmt}</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2b4c7e]">Dispatch Board</p>
+            <h1 className="text-xl font-bold text-gray-900 mt-0.5 leading-none">{todayFmt}</h1>
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={toggleOnline}
-              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all active:scale-95 "+(amIOnline?"bg-emerald-50 text-emerald-700 border-emerald-200":"bg-rose-50 text-rose-700 border-rose-200")}>
+              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border transition-all active:scale-95 "+(amIOnline?"bg-emerald-50 text-emerald-700 border-emerald-200":"bg-rose-50 text-rose-700 border-rose-200")}>
               {amIOnline?<Wifi size={11}/>:<WifiOff size={11}/>}
               {amIOnline?"Online":"Offline"}
             </button>
@@ -308,7 +308,7 @@ const MobileDispatchView = ({
         <div className="flex gap-2 mb-3">
           {[{label:"Total",value:todayTrips.length,color:"text-gray-900",bg:"bg-gray-50"},{label:"Unassigned",value:unassignedN,color:unassignedN>0?"text-rose-600":"text-gray-900",bg:unassignedN>0?"bg-rose-50":"bg-gray-50"},{label:"Active",value:activeN,color:"text-amber-600",bg:"bg-amber-50"},{label:"Done",value:doneN,color:"text-emerald-600",bg:"bg-emerald-50"}].map(s=>(
             <div key={s.label} className={"flex-1 rounded-xl px-2 py-2 text-center border border-gray-100 " + s.bg}>
-              <p className={"text-lg font-black leading-none "+s.color}>{s.value}</p>
+              <p className={"text-lg font-bold leading-none "+s.color}>{s.value}</p>
               <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wide mt-0.5">{s.label}</p>
             </div>
           ))}
@@ -327,9 +327,9 @@ const MobileDispatchView = ({
         <div className="shrink-0 flex gap-2 px-3 py-2.5 overflow-x-auto bg-white border-b border-slate-100 sm:px-4" style={{scrollbarWidth:"none"}}>
           {CHIPS.map(c=>(
             <button key={c.id} type="button" onClick={()=>setFilter(c.id)}
-              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-all active:scale-95 "+(filter===c.id?"bg-[#1e3a5f] text-white shadow-sm":"bg-slate-100 text-slate-500 hover:bg-slate-200")}>
+              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all active:scale-95 "+(filter===c.id?"bg-[#1e3a5f] text-white shadow-sm":"bg-slate-100 text-slate-500 hover:bg-slate-200")}>
               {c.label}
-              <span className={"text-[9px] px-1 py-0.5 rounded-full font-black "+(filter===c.id?"bg-white/20 text-white":"bg-slate-200 text-slate-500")}>{c.n}</span>
+              <span className={"text-[9px] px-1 py-0.5 rounded-full font-semibold "+(filter===c.id?"bg-white/20 text-white":"bg-slate-200 text-slate-500")}>{c.n}</span>
             </button>
           ))}
         </div>
