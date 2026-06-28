@@ -134,51 +134,46 @@ const MobileEnterpriseDashboard = (props) => {
       {renderContent()}
 
       {/* BOTTOM NAVIGATION */}
-      <div className="absolute bottom-0 w-full bg-white border-t border-gray-200 pb-safe z-[60] shrink-0">
-        <div className="flex justify-around items-center pt-2 pb-6 px-1">
+      <div className="absolute bottom-0 w-full bg-[#0f172a] border-t border-slate-800 pb-safe shadow-[0_-8px_30px_rgba(0,0,0,0.3)] z-[60] shrink-0">
+        <div className="flex items-stretch justify-around px-1">
           <button 
             onClick={() => handleNavClick('trips')}
-            className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentView === 'trips' && !subView ? 'text-[#2b4c7e]' : 'text-gray-400 hover:text-[#2b4c7e]'}`}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${currentView === 'trips' && !subView ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'}`}
           >
-            {currentView === 'trips' && !subView && <List className="w-6 h-6 opacity-20 absolute top-2 left-1/2 -translate-x-1/2" fill="currentColor" />}
-            <List className="w-6 h-6 relative z-10" />
-            <span className="text-[10px] font-bold mt-1">Trips</span>
+            <List size={22} strokeWidth={currentView === 'trips' && !subView ? 2.5 : 1.5} className={`transition-all duration-200 ${currentView === 'trips' && !subView ? 'text-blue-400' : 'text-slate-500'}`} />
+            <span className={`text-[10px] tracking-wide transition-all leading-none ${currentView === 'trips' && !subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>Trips</span>
           </button>
 
           <button 
             onClick={() => handleNavClick('fleet')}
-            className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentView === 'fleet' && !subView ? 'text-[#2b4c7e]' : 'text-gray-400 hover:text-[#2b4c7e]'}`}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${currentView === 'fleet' && !subView ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'}`}
           >
-            {currentView === 'fleet' && !subView && <Truck className="w-6 h-6 opacity-20 absolute top-2 left-1/2 -translate-x-1/2" fill="currentColor" />}
-            <Truck className="w-6 h-6 relative z-10" />
-            <span className="text-[10px] font-bold mt-1">Fleet</span>
+            <Truck size={22} strokeWidth={currentView === 'fleet' && !subView ? 2.5 : 1.5} className={`transition-all duration-200 ${currentView === 'fleet' && !subView ? 'text-blue-400' : 'text-slate-500'}`} />
+            <span className={`text-[10px] tracking-wide transition-all leading-none ${currentView === 'fleet' && !subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>Fleet</span>
           </button>
 
           <button 
             onClick={() => handleNavClick('map')}
-            className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentView === 'map' && !subView ? 'text-[#2b4c7e]' : 'text-gray-400 hover:text-[#2b4c7e]'}`}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${currentView === 'map' && !subView ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'}`}
           >
-            {currentView === 'map' && !subView && <Map className="w-6 h-6 opacity-20 absolute top-2 left-1/2 -translate-x-1/2" fill="currentColor" />}
-            <Map className="w-6 h-6 relative z-10" />
-            <span className="text-[10px] font-bold mt-1">Map</span>
+            <Map size={22} strokeWidth={currentView === 'map' && !subView ? 2.5 : 1.5} className={`transition-all duration-200 ${currentView === 'map' && !subView ? 'text-blue-400' : 'text-slate-500'}`} />
+            <span className={`text-[10px] tracking-wide transition-all leading-none ${currentView === 'map' && !subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>Map</span>
           </button>
 
           <button 
             onClick={() => handleNavClick('chat')}
-            className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentView === 'chat' && !subView ? 'text-[#2b4c7e]' : 'text-gray-400 hover:text-[#2b4c7e]'}`}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${currentView === 'chat' && !subView ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'}`}
           >
-            {currentView === 'chat' && !subView && <MessageCircle className="w-6 h-6 opacity-20 absolute top-2 left-1/2 -translate-x-1/2" fill="currentColor" />}
-            <MessageCircle className="w-6 h-6 relative z-10" />
-            <span className="text-[10px] font-bold mt-1">Chat</span>
+            <MessageCircle size={22} strokeWidth={currentView === 'chat' && !subView ? 2.5 : 1.5} className={`transition-all duration-200 ${currentView === 'chat' && !subView ? 'text-blue-400' : 'text-slate-500'}`} />
+            <span className={`text-[10px] tracking-wide transition-all leading-none ${currentView === 'chat' && !subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>Chat</span>
           </button>
 
           <button 
             onClick={() => handleNavClick('menu')}
-            className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentView === 'menu' || subView ? 'text-[#2b4c7e]' : 'text-gray-400 hover:text-[#2b4c7e]'}`}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${currentView === 'menu' || subView ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'}`}
           >
-            {currentView === 'menu' && !subView && <Menu className="w-6 h-6 opacity-20 absolute top-2 left-1/2 -translate-x-1/2" fill="currentColor" />}
-            <Menu className="w-6 h-6 relative z-10" />
-            <span className="text-[10px] font-bold mt-1">More</span>
+            <Menu size={22} strokeWidth={currentView === 'menu' || subView ? 2.5 : 1.5} className={`transition-all duration-200 ${currentView === 'menu' || subView ? 'text-blue-400' : 'text-slate-500'}`} />
+            <span className={`text-[10px] tracking-wide transition-all leading-none ${currentView === 'menu' || subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>More</span>
           </button>
         </div>
       </div>
