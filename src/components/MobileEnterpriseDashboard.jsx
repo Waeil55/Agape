@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
   Home, Map, Clock, MessageCircle, Settings,
   PhoneCall, ChevronLeft, ChevronRight, Search, 
@@ -13,11 +13,44 @@ import MobileChatPage from './MobileChatPage';
 import LiveMapPage from './LiveMapPage';
 import MobileDispatchView from './MobileDispatchView';
 import MobileMenuPage from './MobileMenuPage';
+import ArchivesPage from './ArchivesPage';
+import SettingsPage from './SettingsPage';
+import DriversVehiclesPage from './DriversVehiclesPage';
+import { getDriverLiveStatus } from '../constants/statuses';
 
 const MobileEnterpriseDashboard = (props) => {
   const { trips, drivers, dispatchers, currentUser, role, onSignOut } = props;
   const [currentView, setCurrentView] = useState('trips'); // trips, fleet, map, chat, menu
   const [subView, setSubView] = useState(null); // admin, reports, settings, archives
+  const driverWorkDrivers = props.driverWorkDrivers?.length ? props.driverWorkDrivers : drivers;
+  const driverWorkTrips = props.driverWorkTrips?.length ? props.driverWorkTrips : trips;
+  const [driverWorkDriverId, setDriverWorkDriverId] = useState(() => localStorage.getItem('agape_mobileDriverWorkDriverId') || '');
+
+  const activeDriverWorkDriver = useMemo(() => {
+    if (!driverWorkDrivers?.length) return null;
+    return driverWorkDrivers.find((driver) => driver.id === driverWorkDriverId) || driverWorkDrivers[0];
+  }, [driverWorkDriverId, driverWorkDrivers]);
+
+  useEffect(() => {
+    if (activeDriverWorkDriver?.id && activeDriverWorkDriver.id !== driverWorkDriverId) {
+      setDriverWorkDriverId(activeDriverWorkDriver.id);
+    }
+  }, [activeDriverWorkDriver?.id, driverWorkDriverId]);
+
+  useEffect(() => {
+    if (driverWorkDriverId) localStorage.setItem('agape_mobileDriverWorkDriverId', driverWorkDriverId);
+  }, [driverWorkDriverId]);
+
+  const activeDriverWorkTrips = useMemo(() => {
+    if (!activeDriverWorkDriver) return [];
+    const driverEmail = String(activeDriverWorkDriver.email || '').trim().toLowerCase();
+    return (driverWorkTrips || []).filter((trip) => (
+      trip.driverId === activeDriverWorkDriver.id ||
+      trip.driverName === activeDriverWorkDriver.name ||
+      String(trip.driverEmail || '').trim().toLowerCase() === driverEmail ||
+      drivers.find((driver) => driver.id === trip.driverId)?.email === activeDriverWorkDriver.email
+    ));
+  }, [activeDriverWorkDriver, driverWorkTrips, drivers]);
 
   const handleNavClick = (view) => {
     setCurrentView(view);
@@ -77,12 +110,34 @@ const MobileEnterpriseDashboard = (props) => {
       );
     }
 
-    if (subView) {
+    if (subView === 'archives') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          {renderTopBar(subView.charAt(0).toUpperCase() + subView.slice(1), true)}
-          <div className="flex-1 flex items-center justify-center">
-            <p className="text-gray-400 font-medium text-sm">Under Construction</p>
+          {renderTopBar('Archives', true)}
+          <div className="flex-1 overflow-hidden">
+            <ArchivesPage {...props} />
+          </div>
+        </div>
+      );
+    }
+
+    if (subView === 'settings') {
+      return (
+        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+          {renderTopBar('Settings', true)}
+          <div className="flex-1 overflow-y-auto px-3 py-3">
+            <SettingsPage {...props} />
+          </div>
+        </div>
+      );
+    }
+
+    if (subView === 'fleet') {
+      return (
+        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+          {renderTopBar('Fleet Management', true)}
+          <div className="flex-1 overflow-y-auto px-3 py-3">
+            <DriversVehiclesPage {...props} />
           </div>
         </div>
       );
@@ -94,6 +149,72 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
           <div className="absolute inset-0">
             <MobileDispatchView {...props} activeTab={currentView === 'trips' ? 'trips' : 'drivers'} />
+          </div>
+        </div>
+      );
+    }
+
+    if (currentView === 'drive') {
+      if (!activeDriverWorkDriver) {
+        return (
+          <div className="flex-1 bg-gray-50 flex items-center justify-center p-8 text-center">
+            <div>
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                <Truck size={26} />
+              </div>
+              <p className="text-sm font-black text-slate-700">No driver profile available</p>
+              <p className="mt-1 text-xs font-semibold text-slate-400">Assign drivers to this account to operate driver workflows.</p>
+            </div>
+          </div>
+        );
+      }
+
+      const liveStatus = getDriverLiveStatus(activeDriverWorkDriver);
+      return (
+        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+          <div className="shrink-0 border-b border-gray-200 bg-white px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#2b4c7e]">{role === 'admin' ? 'Admin Driver Work' : 'Dispatcher Driver Work'}</p>
+                <p className="mt-0.5 truncate text-sm font-black text-gray-900">Operate as driver</p>
+              </div>
+              <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-black ${liveStatus.color}`}>{liveStatus.label}</span>
+            </div>
+            <select
+              value={activeDriverWorkDriver.id}
+              onChange={(event) => setDriverWorkDriverId(event.target.value)}
+              className="mt-3 h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 text-sm font-black text-gray-800 outline-none focus:border-[#2b4c7e] focus:ring-2 focus:ring-[#2b4c7e]/15"
+            >
+              {driverWorkDrivers.map((driver) => (
+                <option key={driver.id || driver.email || driver.name} value={driver.id}>
+                  {driver.name || driver.email || driver.id} - {driver.vehicle || 'No vehicle'}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="min-h-0 flex-1">
+            <DriverPage
+              {...props}
+              currentUser={activeDriverWorkDriver.email || activeDriverWorkDriver.id || currentUser}
+              role="driver"
+              drivers={[activeDriverWorkDriver]}
+              trips={activeDriverWorkTrips}
+              allDrivers={props.allDrivers || drivers}
+              onUpdateTrip={props.onUpdateDriverTrip || props.updateTrip}
+              onCompleteTrip={props.onCompleteTrip}
+              onDriverStatusUpdate={props.onDriverStatusUpdate}
+              onAddAuditLog={props.addAuditLog}
+              onLogout={() => {}}
+              requestAuthAction={props.requestAuthAction}
+              appSettings={props.appSettings}
+              onUpdateAppSettings={props.updateAppSettings}
+              onUpdateDriverLocation={props.handleUpdateDriverLocation}
+              onOpenSettings={() => setSubView('settings')}
+              onAddTrip={props.addTrip}
+              showAddTripModal={props.showAddTripModal}
+              setShowAddTripModal={props.setShowAddTripModal}
+              isEmbedded
+            />
           </div>
         </div>
       );
@@ -129,7 +250,7 @@ const MobileEnterpriseDashboard = (props) => {
   };
 
   return (
-    <div className="w-full h-[100dvh] bg-white flex flex-col relative max-w-md mx-auto shadow-xl overflow-hidden">
+    <div className="w-full h-[100dvh] bg-white flex flex-col relative overflow-hidden">
       {/* Dynamic Content */}
       {renderContent()}
 
@@ -159,6 +280,16 @@ const MobileEnterpriseDashboard = (props) => {
             <Map size={22} strokeWidth={currentView === 'map' && !subView ? 2.5 : 1.5} className={`transition-all duration-200 ${currentView === 'map' && !subView ? 'text-blue-400' : 'text-slate-500'}`} />
             <span className={`text-[10px] tracking-wide transition-all leading-none ${currentView === 'map' && !subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>Map</span>
           </button>
+
+          {driverWorkDrivers.length > 0 && (
+          <button
+            onClick={() => handleNavClick('drive')}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${currentView === 'drive' && !subView ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'}`}
+          >
+            <User size={22} strokeWidth={currentView === 'drive' && !subView ? 2.5 : 1.5} className={`transition-all duration-200 ${currentView === 'drive' && !subView ? 'text-blue-400' : 'text-slate-500'}`} />
+            <span className={`text-[10px] tracking-wide transition-all leading-none ${currentView === 'drive' && !subView ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>Drive</span>
+          </button>
+          )}
 
           <button 
             onClick={() => handleNavClick('chat')}

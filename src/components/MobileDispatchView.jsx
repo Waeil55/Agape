@@ -76,48 +76,56 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
   const timeParts = trip.time !== "Will Call" ? dispTime.split(" ") : [];
 
   return (
-    <div className={"bg-white rounded-2xl border border-slate-200 border-l-4 " + sty.border + " shadow-sm overflow-visible transition-all duration-200"}>
-      <button type="button" onClick={onToggle} className="w-full text-left px-4 pt-3.5 pb-3 focus:outline-none">
-        <div className="flex items-start gap-3">
-          <div className="shrink-0 text-center w-[52px]">
+    <div className={"bg-white rounded-[22px] border border-slate-200 border-l-[5px] " + sty.border + " shadow-sm overflow-visible transition-all duration-200"}>
+      <button type="button" onClick={onToggle} className="w-full text-left px-3.5 pt-3.5 pb-3 focus:outline-none active:bg-slate-50/70 sm:px-4">
+        <div className="flex items-start gap-3.5">
+          <div className="shrink-0 text-center w-[58px] rounded-2xl bg-slate-50 border border-slate-100 py-2">
             {trip.time === "Will Call" ? (
-              <span className="text-[10px] font-black text-slate-500 uppercase">WC</span>
+              <span className="text-sm font-black text-slate-700 uppercase">WC</span>
             ) : (
               <>
-                <p className={"text-base font-black leading-none " + (isLate ? "text-rose-600" : isSoon ? "text-amber-600" : "text-slate-800")}>{timeParts[0]}</p>
-                <p className={"text-[9px] font-black uppercase tracking-wide mt-0.5 " + (isLate ? "text-rose-400" : isSoon ? "text-amber-400" : "text-slate-400")}>{timeParts[1] || ""}</p>
+                <p className={"text-lg font-black leading-none " + (isLate ? "text-rose-600" : isSoon ? "text-amber-600" : "text-slate-900")}>{timeParts[0]}</p>
+                <p className={"text-[10px] font-black uppercase tracking-wide mt-1 " + (isLate ? "text-rose-400" : isSoon ? "text-amber-400" : "text-slate-400")}>{timeParts[1] || ""}</p>
               </>
             )}
-            {urgency && <span className={"mt-1 inline-block px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase " + (isLate ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700")}>{urgency}</span>}
+            {urgency && <span className={"mt-1.5 inline-block px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase " + (isLate ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700")}>{urgency}</span>}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="text-sm font-black text-slate-900 truncate uppercase tracking-wide">{trip.patient || "Unknown"}</h3>
+                <h3 className="text-[15px] font-black text-slate-950 leading-tight">{trip.patient || "Unknown"}</h3>
                 <p className="text-[10px] font-bold text-slate-400 mt-0.5">#{trip.bookingId || trip.id || "—"}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <span className={"px-2 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-wide " + sty.pill}>{trip.status || "Unknown"}</span>
+                <span className={"px-2 py-1 rounded-lg border text-[10px] font-black uppercase tracking-wide " + sty.pill}>{trip.status || "Unknown"}</span>
                 <ChevronDown size={13} className={"text-slate-400 transition-transform duration-200 " + (expanded ? "rotate-180" : "")} />
               </div>
             </div>
-            <div className="mt-2.5 grid grid-cols-[10px_1fr] gap-x-2.5 gap-y-0.5">
-              <div className="flex flex-col items-center pt-[3px] row-span-2">
-                <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                <span className="w-px flex-1 min-h-[12px] my-0.5 bg-gradient-to-b from-blue-300 to-emerald-400" />
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            <div className="mt-3 rounded-2xl bg-slate-50/80 border border-slate-100 px-3 py-2.5">
+              <div className="grid grid-cols-[12px_1fr] gap-x-2.5 gap-y-2">
+                <div className="flex flex-col items-center pt-[5px] row-span-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                  <span className="w-px flex-1 min-h-[20px] my-1 bg-gradient-to-b from-blue-300 to-emerald-400" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-blue-600">Pickup</p>
+                  <p className="text-[12px] font-semibold leading-snug text-slate-800 line-clamp-2">{pickup || "-"}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-600">Dropoff</p>
+                  <p className="text-[12px] font-semibold leading-snug text-slate-800 line-clamp-2">{dropoff || "-"}</p>
+                </div>
               </div>
-              <p className="text-[11px] font-semibold text-slate-600 truncate">{trunc(pickup, 40)}</p>
-              <p className="text-[11px] font-semibold text-slate-600 truncate">{trunc(dropoff, 40)}</p>
             </div>
             {driver ? (
-              <div className="mt-2 flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-black text-slate-600 shrink-0 uppercase">{(driver.name||"D")[0]}</div>
-                <span className="text-[11px] font-bold text-slate-700 truncate">{driver.name}</span>
-                {ds && <span className={"px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wide " + ds.color}>{ds.label}</span>}
+              <div className="mt-3 flex items-center gap-2 rounded-xl bg-white border border-slate-100 px-2.5 py-2">
+                <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600 shrink-0 uppercase">{(driver.name||"D")[0]}</div>
+                <span className="text-[12px] font-bold text-slate-700 truncate">{driver.name}</span>
+                {ds && <span className={"ml-auto px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide " + ds.color}>{ds.label}</span>}
               </div>
             ) : trip.status !== "Completed" && trip.status !== "Cancelled" ? (
-              <div className="mt-2"><span className="text-[10px] font-bold text-rose-500 flex items-center gap-1"><User size={10} /> No driver</span></div>
+              <div className="mt-3"><span className="text-[11px] font-bold text-rose-500 flex items-center gap-1.5"><User size={12} /> No driver assigned</span></div>
             ) : null}
           </div>
         </div>
@@ -125,11 +133,11 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
 
       {expanded && (
         <div className="border-t border-slate-100 bg-slate-50/80">
-          <div className="px-4 py-3 space-y-2">
+          <div className="px-3.5 py-3 space-y-3 sm:px-4">
             {trip.notes && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                <p className="text-[9px] font-black uppercase tracking-wider text-amber-600 mb-0.5">Driver Notes</p>
-                <p className="text-[11px] text-amber-800 leading-relaxed">{trip.notes}</p>
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5">
+                <p className="text-[10px] font-black uppercase tracking-wider text-amber-600 mb-1">Driver Notes</p>
+                <p className="text-[12px] font-semibold text-amber-900 leading-relaxed">{trip.notes}</p>
               </div>
             )}
             <div className="grid grid-cols-2 gap-2">
@@ -159,7 +167,10 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
               </div>
             )}
           </div>
-          <div className="px-4 pb-3.5 space-y-2">
+          <div className="px-3.5 pb-3.5 space-y-2 sm:px-4">
+            <button type="button" onClick={()=>onSetTripDetails?.(trip)} className="w-full h-11 rounded-xl bg-slate-900 text-white font-black text-sm flex items-center justify-center gap-2 shadow-sm active:scale-[0.99] transition-all">
+              <Edit2 size={14}/> Open Trip
+            </button>
             {!isTerminal && (
               <div className="relative">
                 <button type="button" onClick={() => setShowMenu(p=>!p)}
@@ -186,9 +197,8 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
               </div>
             )}
             <div className="flex gap-2">
-              <button type="button" onClick={()=>onSetTripDetails?.(trip)} className="flex-1 h-9 border border-slate-200 bg-white text-slate-600 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-50 active:scale-95 transition-all"><Edit2 size={12}/>{isTerminal ? "View Details" : "Edit Trip"}</button>
-              {driver?.phone && <button type="button" onClick={()=>makeCall?.(driver.phone,driver.name)} className="h-9 px-3 border border-blue-200 bg-blue-50 text-blue-700 rounded-xl font-bold text-xs flex items-center justify-center active:scale-95 transition-all"><Phone size={12}/></button>}
-              {!isTerminal && requestDeleteTrip && <button type="button" onClick={()=>requestDeleteTrip(trip)} className="h-9 px-3 border border-rose-200 bg-rose-50 text-rose-600 rounded-xl font-bold text-xs flex items-center justify-center active:scale-95 transition-all"><Archive size={12}/></button>}
+              {driver?.phone && <button type="button" onClick={()=>makeCall?.(driver.phone,driver.name)} className="flex-1 h-10 px-3 border border-blue-200 bg-blue-50 text-blue-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-[0.99] transition-all"><Phone size={13}/> Driver</button>}
+              {!isTerminal && requestDeleteTrip && <button type="button" onClick={()=>requestDeleteTrip(trip)} className="flex-1 h-10 px-3 border border-rose-200 bg-rose-50 text-rose-600 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-[0.99] transition-all"><Archive size={13}/> Archive</button>}
             </div>
           </div>
         </div>
@@ -201,6 +211,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
 const DriverRow = ({ driver, trips }) => {
   const ds = getDriverLiveStatus(driver);
   const active = trips.find(t => IN_PROGRESS.includes(t.status) && (t.driverId===driver.id||t.driverName===driver.name));
+  const activeStatus = active?.status || ds.label;
   return (
     <div className="bg-white rounded-2xl border border-slate-100 px-3.5 py-3 flex items-center gap-3 shadow-sm">
       <div className={"w-10 h-10 rounded-full flex items-center justify-center font-black text-sm uppercase shrink-0 "+ds.color}>{(driver.name||"D")[0]}</div>
@@ -209,7 +220,7 @@ const DriverRow = ({ driver, trips }) => {
         <p className="text-[10px] text-slate-400 mt-0.5">{driver.vehicle||"No vehicle"}</p>
         {active && <p className="text-[10px] text-amber-600 font-bold mt-0.5 truncate">→ {trunc(active.patient||"",22)}</p>}
       </div>
-      <span className={"text-[9px] font-black uppercase px-2.5 py-1 rounded-lg "+ds.color}>{ds.label}</span>
+      <span className={"text-[9px] font-black uppercase px-2.5 py-1 rounded-lg text-center shrink-0 "+(active ? "bg-amber-100 text-amber-700" : ds.color)}>{activeStatus}</span>
     </div>
   );
 };
@@ -276,7 +287,7 @@ const MobileDispatchView = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 px-4 pt-4 pb-3 bg-white border-b border-gray-200">
+      <div className="shrink-0 px-3 pt-4 pb-3 bg-white border-b border-gray-200 sm:px-4">
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#2b4c7e]">Dispatch Board</p>
@@ -313,7 +324,7 @@ const MobileDispatchView = ({
 
       {/* Filter chips */}
       {activeTab==="trips" && (
-        <div className="shrink-0 flex gap-2 px-4 py-2.5 overflow-x-auto bg-white border-b border-slate-100" style={{scrollbarWidth:"none"}}>
+        <div className="shrink-0 flex gap-2 px-3 py-2.5 overflow-x-auto bg-white border-b border-slate-100 sm:px-4" style={{scrollbarWidth:"none"}}>
           {CHIPS.map(c=>(
             <button key={c.id} type="button" onClick={()=>setFilter(c.id)}
               className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-all active:scale-95 "+(filter===c.id?"bg-[#1e3a5f] text-white shadow-sm":"bg-slate-100 text-slate-500 hover:bg-slate-200")}>
@@ -327,7 +338,7 @@ const MobileDispatchView = ({
       {/* Content */}
       <div className="flex-1 overflow-y-auto" style={{paddingBottom:"calc(72px + env(safe-area-inset-bottom,0px))"}}>
         {activeTab==="trips" && (
-          <div className="px-4 py-3 space-y-3">
+          <div className="px-2.5 py-3 space-y-3 sm:px-4">
             {filtered.length===0 && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4"><Truck size={28} className="opacity-30"/></div>
@@ -345,7 +356,7 @@ const MobileDispatchView = ({
           </div>
         )}
         {activeTab==="drivers" && (
-          <div className="px-4 py-3 space-y-2">
+          <div className="px-2.5 py-3 space-y-2 sm:px-4">
             {drivers.sort((a,b)=>{
               const aA=!["Offline","Unavailable"].includes(a.status),bA=!["Offline","Unavailable"].includes(b.status);
               if(aA&&!bA) return -1; if(!aA&&bA) return 1;

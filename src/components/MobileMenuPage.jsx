@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Settings, Users, Clock, LogOut, FileText, UserCog, Database, Shield } from 'lucide-react';
+import { ChevronRight, Settings, Users, Clock, LogOut, FileText, Database, Shield, Truck } from 'lucide-react';
 
 const MobileMenuPage = ({ currentUser, role, onSignOut, setSubView }) => {
   const getInitials = (email) => {
@@ -12,6 +12,7 @@ const MobileMenuPage = ({ currentUser, role, onSignOut, setSubView }) => {
       title: "Organization",
       items: [
         { id: 'admin', icon: Users, label: 'User Management', desc: 'Dispatchers & Admins', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { id: 'fleet', icon: Truck, label: 'Fleet & Drivers', desc: 'Vehicles, schedules, assignments', color: 'text-blue-600', bg: 'bg-blue-50' },
         { id: 'billing', icon: Database, label: 'Billing Codes', desc: 'Manage charge codes', color: 'text-emerald-600', bg: 'bg-emerald-50' },
       ]
     },
@@ -51,18 +52,18 @@ const MobileMenuPage = ({ currentUser, role, onSignOut, setSubView }) => {
       {/* Menu Links */}
       <div className="px-4 py-6 space-y-6">
         {SECTIONS.map((section, idx) => {
-          // Hide admin section if not admin
-          if (section.title === "Organization" && role !== "admin") return null;
+          const visibleItems = section.items.filter((item) => role === 'admin' || !['billing'].includes(item.id));
+          if (section.title === "Organization" && visibleItems.length === 0) return null;
 
           return (
             <div key={idx} className="space-y-2">
               <h3 className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{section.title}</h3>
               <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                {section.items.map((item, i) => (
+                {visibleItems.map((item, i) => (
                   <button
                     key={item.id}
                     onClick={() => setSubView(item.id)}
-                    className={`w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left ${i !== section.items.length - 1 ? 'border-b border-gray-100' : ''}`}
+                    className={`w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left ${i !== visibleItems.length - 1 ? 'border-b border-gray-100' : ''}`}
                   >
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${item.bg}`}>
                       <item.icon size={18} className={item.color} />
