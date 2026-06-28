@@ -28,7 +28,7 @@ import { isNativeShell } from '../utils/platform';
 import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
 import { normalizeEmail } from '../utils/accessControl';
 import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
-
+import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
@@ -209,7 +209,7 @@ const formatTripDetailOdometer = (value) => {
   const cleaned = s.replace(/,/g, '').replace(/\bmi(?:les)?\b/gi, '').trim();
   if (!/^\d+(\.\d+)?$/.test(cleaned)) return '--';
   const n = Number(cleaned);
-  return Number.isFinite(n) && n > 0 ? `${n.toLocaleString()} mi` : '--';
+  return Number.isFinite(n) && n >= 0 ? `${n.toLocaleString()} mi` : '--';
 };
 const formatTripDistance = (value) => {
   if (value === undefined || value === null || value === '') return '--';
@@ -283,7 +283,7 @@ const getHistoryFinishedSortMs = (trip) => {
 };
 const HistoryTripDetailTable = ({ trip, driver }) => {
   if (!trip) return null;
-  const pickupClock = getFirstTripClock(trip, ['arrivalTime', 'pickupArrival', 'pickupArrivalTime', 'actualPickupTime', 'startTime']);
+  const pickupClock = getFirstTripClock(trip, ['departedPickupTime', 'arrivalTime', 'pickupArrival', 'pickupArrivalTime', 'actualPickupTime', 'startTime']);
   const dropoffClock = getFirstTripClock(trip, ['arrivalDropoffTime', 'dropoffArrival', 'dropoffArrivalTime', 'actualDropoffTime', 'dropoffTime']);
   const pickupOdometer = getFirstTripOdometer(trip, ['pickupOdometer', 'startOdometer', 'startMileage', 'pickupMileage']);
   const dropoffOdometer = getFirstTripOdometer(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'dropoffMileage']);
@@ -488,11 +488,11 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers, dispatchers, chatUnreadCount = 0, driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction }) => {
+const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers, dispatchers, chatUnreadCount = 0, driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false }) => {
   const me = useMemo(
     () =>
-      drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase()) ||
-      (allDrivers || []).find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase()) ||
+      drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase() || String(d.id || '').toLowerCase() === String(currentUser || '').toLowerCase()) ||
+      (allDrivers || []).find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase() || String(d.id || '').toLowerCase() === String(currentUser || '').toLowerCase()) ||
       buildFallbackDriverProfile(currentUser || ''),
     [drivers, allDrivers, currentUser]
   );
@@ -504,7 +504,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const knownProfiles = [...(drivers || []), ...(allDrivers || [])];
     return new Set(
       knownProfiles
-        .filter((driver) => (driver?.email || '').trim().toLowerCase() === normalizedCurrentUserEmail)
+        .filter((driver) => (
+          (driver?.email || '').trim().toLowerCase() === normalizedCurrentUserEmail ||
+          String(driver?.id || '').trim().toLowerCase() === normalizedCurrentUserEmail
+        ))
         .map((driver) => driver.id)
         .concat(me?.id ? [me.id] : [])
         .filter(Boolean)
@@ -585,7 +588,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [aiRideShare, setAiRideShare] = useState([]);
   const [showOdometerPrompt, setShowOdometerPrompt] = useState(null);
   const [odometerValue, setOdometerValue] = useState('');
-  const [lastOdometer, setLastOdometer] = useState(0);
+  const [lastOdometer, setLastOdometer] = useState(() => {
+    try { return Number(localStorage.getItem(`agape_drvOdo_${userKey}`)) || 0; } catch { return 0; }
+  });
+  useEffect(() => {
+    if (lastOdometer > 0) {
+      try { localStorage.setItem(`agape_drvOdo_${userKey}`, String(lastOdometer)); } catch {}
+    }
+  }, [lastOdometer, userKey]);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(null);
   const [arrivalOdometer, setArrivalOdometer] = useState('');
   const [signatureConfirmed, setSignatureConfirmed] = useState(false);
@@ -830,7 +840,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (trip.dropoff && !addressCoordsCache.current[trip.dropoff]) addressesToGeocode.push({ addr: trip.dropoff, type: 'dropoff' });
     for (const { addr, type } of addressesToGeocode) {
       try {
-        const { geocodeAddress } = await import('../config/maps');
         const coords = await geocodeAddress(addr);
         if (coords?.lat && coords?.lng) {
           addressCoordsCache.current[addr] = { lat: coords.lat, lng: coords.lng, type };
@@ -2531,6 +2540,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const getPrimaryTripAction = (trip) => {
     if (!trip) return null;
+    if (!isClockedIn) return null;
     if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
       return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-blue-500/25', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
     }
@@ -2619,7 +2629,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
 
         <div className="px-3 pt-3 space-y-3">
-          <div className="rounded-2xl bg-slate-900 text-white shadow-lg overflow-hidden">
+          <div className="rounded-2xl overflow-hidden shadow-lg" style={{ background: 'linear-gradient(145deg, #1e3a5f 0%, #274b7c 50%, #1a3355 100%)' }}>
             <div className="relative px-4 py-2.5">
               <div className="absolute right-4 top-4 flex gap-1 opacity-10">
                 <span className="w-2 h-2 rounded-full bg-white" />
@@ -2628,8 +2638,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Scheduled Time</p>
-                  <p className="mt-1 text-xl font-black tracking-tight leading-none">{scheduledTime}</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-200">Scheduled Time</p>
+                  <p className="mt-1 text-xl font-black tracking-tight leading-none text-white">{scheduledTime}</p>
                 </div>
                 <span className="mt-0.5 shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-amber-800 shadow-sm">
                   {attentionText}
@@ -2638,34 +2648,34 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
               <div className="mt-2.5 grid grid-cols-[18px_1fr] gap-x-4">
                 <div className="row-span-2 flex flex-col items-center pt-1.5">
-                  <span className="w-3 h-3 rounded-full bg-blue-400 shadow-lg shadow-blue-400/30" />
-                  <span className="w-0.5 flex-1 min-h-[48px] my-0.5 rounded-full bg-gradient-to-b from-blue-400 to-emerald-400" />
-                  <span className="w-3 h-3 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/30" />
+                  <span className="w-3 h-3 rounded-full bg-blue-200 shadow-lg shadow-blue-200/30" />
+                  <span className="w-0.5 flex-1 min-h-[48px] my-0.5 rounded-full bg-gradient-to-b from-blue-200 to-emerald-300" />
+                  <span className="w-3 h-3 rounded-full bg-emerald-300 shadow-lg shadow-emerald-300/30" />
                 </div>
 
                 <div className="pb-2">
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400">From</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-200">From</p>
                   <p className="mt-0.5 text-xs font-bold leading-snug text-white truncate">{pickupAddress || '--'}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer">
+                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
                       <Copy size={12} /> Copy
                     </button>
-                    <span className="text-[10px] font-black text-slate-500">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-2.5 rounded-xl bg-blue-700/70 hover:bg-blue-700 text-blue-100 text-[11px] font-black flex items-center gap-1 cursor-pointer">
+                    <span className="text-[10px] font-black text-blue-200/60">{trip.distance ? `${trip.distance} mi` : ''}</span>
+                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-black flex items-center gap-1 cursor-pointer">
                       <Navigation size={13} /> Navigate
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400">To</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-300">To</p>
                   <p className="mt-0.5 text-xs font-bold leading-snug text-white truncate">{dropoffAddress || '--'}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer">
+                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
                       <Copy size={12} /> Copy
                     </button>
-                    <span className="text-[10px] font-black text-slate-500" />
-                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-2.5 rounded-xl bg-emerald-700/60 hover:bg-emerald-700 text-emerald-100 text-[11px] font-black flex items-center gap-1 cursor-pointer">
+                    <span className="text-[10px] font-black text-blue-200/60" />
+                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-black flex items-center gap-1 cursor-pointer">
                       <Navigation size={13} /> Navigate
                     </button>
                   </div>
@@ -2673,16 +2683,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
 
               <div className="mt-2.5 grid grid-cols-4 gap-1.5">
-                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <Phone size={14} /> Call
                 </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <MessageCircle size={14} /> SMS
                 </button>
-                <button type="button" onClick={() => openContactSelector(trip)} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => openContactSelector(trip)} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <PhoneForwarded size={14} /> Contacts
                 </button>
-                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-9 rounded-xl bg-white/12 hover:bg-white/18 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <MoreHorizontal size={15} /> More
                 </button>
               </div>
@@ -2746,14 +2756,41 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               return <div key={step.key} className={`h-1 flex-1 rounded-full ${isComplete || idx < currentStep ? 'bg-emerald-400' : idx === currentStep ? 'bg-blue-500' : 'bg-slate-200'}`} />;
             })}
           </div>
-          <button
-            type="button"
-            onClick={bottomAction.onClick}
-            disabled={!primary}
-            className={`w-full h-12 ${bottomAction.gradient} text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
-          >
-            {bottomAction.icon} {bottomAction.label}
-          </button>
+          {!isClockedIn ? (
+            <button type="button" disabled className="w-full h-12 bg-slate-200 text-slate-500 rounded-xl font-black text-sm flex items-center justify-center gap-2 cursor-not-allowed shadow-sm">
+              <Clock size={16} /> Clock in to start trips
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={bottomAction.onClick}
+                disabled={!primary}
+                className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-12 ${bottomAction.gradient} text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
+              >
+                {bottomAction.icon} {bottomAction.label}
+              </button>
+              {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
+                skipConfirmTripId === `work-${trip.id}` ? (
+                  <button
+                    type="button"
+                    onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
+                    className="flex-[2] h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <MapPin size={14} /> {trip.status === 'In Progress' ? 'Already here?' : 'At dropoff?'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { impact('medium'); setSkipConfirmTripId(`work-${trip.id}`); }}
+                    className="flex-[2] h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    <Forward size={14} /> Skip Nav
+                  </button>
+                )
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -2762,7 +2799,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const navItems = useMemo(() => {
     const items = [
       { id: 'trips', label: 'Trips', icon: Home },
-      { id: 'tools', label: 'Route', icon: Route },
+      { id: 'tools', label: 'Tools', icon: Zap },
       { id: 'history', label: 'History', icon: Clock },
       { id: 'chat', label: 'Chat', icon: MessageCircle },
       { id: 'settings', label: 'Settings', icon: Settings },
@@ -3245,6 +3282,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const displayStep = activeStepIndex === -1 ? doneKeys.length : activeStepIndex + 1;
                 const routePct = Math.round((index / Math.max(assignedRoutePlanStops.length, 1)) * 100);
                 const nextAction = (() => {
+                  if (!isClockedIn) return { label: 'Clock in to start trips', icon: <Clock size={14} />, className: 'bg-slate-200 text-slate-500 cursor-not-allowed', disabled: true };
                   if (!workflow.startedAt) return { label: 'Start Stop', icon: <Play size={14} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleStartRoutePlanStop(stop) };
                   if (!workflow.navigatingAt) return { label: `Navigate to ${stopType}`, icon: <Navigation size={14} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleNavigateRoutePlanStop(stop) };
                   if (!workflow.arrivedAt) return { label: `Arrive at ${stopType}`, icon: <MapPin size={14} />, className: typeColor === 'orange' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700', onClick: () => handleArriveRoutePlanStop(stop) };
@@ -3317,8 +3355,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           </div>
                           <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); nextAction.onClick(); }}
-                            className={`w-full h-12 rounded-xl text-white text-sm font-black flex items-center justify-center gap-2 transition-all shadow-sm ${nextAction.className}`}
+                            onClick={(e) => { e.stopPropagation(); if (!nextAction.disabled) nextAction.onClick(); }}
+                            disabled={nextAction.disabled}
+                            className={`w-full h-12 rounded-xl text-white text-sm font-black flex items-center justify-center gap-2 transition-all shadow-sm ${nextAction.disabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : nextAction.className}`}
                           >
                             {nextAction.icon} {nextAction.label}
                           </button>
@@ -3499,6 +3538,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                          </div>
 
                           {(() => {
+                            if (!isClockedIn) {
+                              return <button type="button" disabled className="w-full bg-slate-200 text-slate-500 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed"><Clock size={13} /> Clock in to start trips</button>;
+                            }
                             if (step.type === 'PU') {
                               if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
                                 return renderPrimaryBtn('Start Trip', <Play size={14} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); });
@@ -3671,8 +3713,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               )}
                             </div>
                             <div className="flex items-center gap-2 mb-2">
-                              <button type="button" disabled className="flex-[4] h-12 bg-slate-200 text-slate-500 text-sm rounded-xl font-bold flex items-center justify-center gap-2 cursor-not-allowed">
-                                <Clock size={14} /> Clock in to start trips
+                              <button type="button" disabled className="flex-[4] h-14 bg-slate-200 text-slate-500 text-base md:text-lg rounded-2xl font-bold flex items-center justify-center gap-2 cursor-not-allowed shadow-sm">
+                                <Clock size={16} /> Clock in to start trips
                               </button>
                             </div>
                           </div>
@@ -3715,7 +3757,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               </span>
                             </div>
                             <div className="flex items-center gap-2 mb-2">
-                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-12 ${primary.gradient} text-sm text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-14 ${primary.gradient} text-base md:text-lg text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
                                 {primary.icon} {primary.label}
                               </button>
                               {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
@@ -4109,65 +4151,67 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {/* ===== COMPLETE TRIP MODAL ===== */}
       {showCompleteModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="text-center mb-5">
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
-                <Check size={28} className="text-white" />
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative border border-white/20 pointer-events-auto max-h-[85dvh] flex flex-col" style={{ zIndex: 10 }}>
+            <div className="overflow-y-auto hide-scrollbar flex-1 -mx-2 px-2 pb-2">
+              <div className="text-center mb-3 mt-1">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-lg shadow-emerald-600/20">
+                  <Check size={20} className="text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Complete Trip</h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium">{showCompleteModal.patient} - {showCompleteModal.bookingId || ''}</p>
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Complete Trip</h3>
-              <p className="text-sm text-slate-500 mt-1 font-medium">{showCompleteModal.patient} — {showCompleteModal.bookingId || ''}</p>
-            </div>
 
-            <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
-              <div className="flex justify-between">
-                <span className="text-xs text-emerald-600 font-bold uppercase">Pickup Odometer</span>
-                <span className="text-sm font-bold text-emerald-700">{showCompleteModal.pickupOdometer?.toLocaleString() || '—'} mi</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-xs text-slate-400 font-bold uppercase">Started At</span>
-                <span className="text-sm font-bold text-slate-800">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '—'}</span>
-              </div>
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Departed Pickup Time</label>
-                <input type="time" value={departedTime} onChange={(e) => setDepartedTime(e.target.value)}
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5" />
-              </div>
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Arrival Dropoff Time</label>
-                <input type="time" value={arrivalDropoffTime} onChange={(e) => setArrivalDropoffTime(e.target.value)}
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5" />
-              </div>
-              <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-rose-600">Final Odometer (mi)</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={completeOdometer}
-                  onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
-                  placeholder="Enter final odometer"
-                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5"
-                  autoFocus
-                />
-                {!completeOdometer && (
-                  <p className="mt-2 text-center text-[11px] font-semibold text-slate-500">
-                    Enter a final odometer reading to enable completion.
+              <div className="bg-slate-50 rounded-2xl p-4 mb-4 space-y-2.5">
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-xs text-emerald-600 font-bold uppercase">Pickup Odometer</span>
+                  <span className="text-sm font-bold text-emerald-700">{showCompleteModal.pickupOdometer?.toLocaleString() || '-'} mi</span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-xs text-slate-400 font-bold uppercase">Started At</span>
+                  <span className="text-sm font-bold text-slate-800">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '-'}</span>
+                </div>
+                <div>
+                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Departed Pickup Time</label>
+                  <input type="time" value={departedTime} onChange={(e) => setDepartedTime(e.target.value)}
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1" />
+                </div>
+                <div>
+                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Arrival Dropoff Time</label>
+                  <input type="time" value={arrivalDropoffTime} onChange={(e) => setArrivalDropoffTime(e.target.value)}
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1" />
+                </div>
+                <div>
+                  <label className="text-micro font-bold uppercase tracking-wider text-rose-600">Final Odometer (mi)</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={completeOdometer}
+                    onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
+                    placeholder="Enter final odometer"
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5"
+                    autoFocus
+                  />
+                  {!completeOdometer && (
+                    <p className="mt-2 text-center text-[11px] font-semibold text-slate-500">
+                      Enter a final odometer reading to enable completion.
+                    </p>
+                  )}
+                </div>
+                {completeError && (
+                  <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-bold text-rose-700">
+                    {completeError}
                   </p>
                 )}
+                {showCompleteModal.pickupOdometer && completeOdometer && (
+                  <div className="text-center text-sm text-blue-600 font-bold">
+                    Distance: {(parseInt(completeOdometer) - (showCompleteModal.pickupOdometer || 0)).toLocaleString()} mi
+                  </div>
+                )}
               </div>
-              {completeError && (
-                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-bold text-rose-700">
-                  {completeError}
-                </p>
-              )}
-              {showCompleteModal.pickupOdometer && completeOdometer && (
-                <div className="text-center text-sm text-blue-600 font-bold">
-                  Distance: {(parseInt(completeOdometer) - (showCompleteModal.pickupOdometer || 0)).toLocaleString()} mi
-                </div>
-              )}
             </div>
 
-            <div className="flex gap-3">
-              <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+            <div className="flex gap-3 mt-2 shrink-0 pt-2">
+              <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
               <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
             </div>
           </div>
@@ -4676,12 +4720,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 {[
                   ['Vehicle', me?.vehicle || 'N/A'],
                   ['Zone', me?.currentZone || 'N/A'],
-                  ['Status', isClockedIn ? 'Online' : 'Offline'],
+                  ['Status', getDriverLiveStatus(me).label],
                   ['GPS', 'Always On'],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between items-center">
                     <span className="text-slate-500 text-xs font-semibold">{label}</span>
-                    <span className={`font-semibold text-xs ${value === 'Online' || value === 'Active' || value === 'Enabled' ? 'text-emerald-600' : value === 'Offline' || value === 'Inactive' || value === 'Not Available' ? 'text-slate-400' : 'text-slate-800'}`}>{value}</span>
+                    {label === 'Status' ? (
+                      <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${getDriverLiveStatus(me).color}`}>{value}</span>
+                    ) : (
+                      <span className={`font-semibold text-xs ${value === 'Always On' ? 'text-emerald-600' : 'text-slate-800'}`}>{value}</span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -5350,37 +5398,39 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       })()}
 
       {/* ===== BOTTOM NAVIGATION ===== */}
-      <nav className="bottom-nav">
-        <div className="flex items-stretch justify-around px-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActiveTab = activeNav === item.id;
-              return (
-                <button key={item.id} onClick={() => {
-                  if (item.id === 'active-trip') {
-                    setActiveWorkTripId(activeWorkTripId);
-                    setActiveNav('active-trip');
-                    return;
-                  }
-                  setActiveNav(item.id);
-                }}
-                  className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 transition-all duration-200 relative flex-1 min-h-[52px] ${
-                    isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
-                  }`}>
-                  <div className="relative">
-                    <Icon size={22} strokeWidth={isActiveTab ? 2.5 : 1.5}
-                      className={`transition-all duration-200 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}
-                    />
-                    {item.id === 'chat' && chatUnreadCount > 0 && (
-                      <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-bold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>
-                    )}
-                  </div>
-                  <span className={`text-[10px] tracking-wide transition-all leading-none ${isActiveTab ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-      </nav>
+      {!isEmbedded && (
+        <nav className="bottom-nav md:hidden">
+          <div className="flex h-full items-center justify-around gap-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActiveTab = activeNav === item.id;
+                return (
+                  <button key={item.id} onClick={() => {
+                    if (item.id === 'active-trip') {
+                      setActiveWorkTripId(activeWorkTripId);
+                      setActiveNav('active-trip');
+                      return;
+                    }
+                    setActiveNav(item.id);
+                  }}
+                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[58px] ${
+                      isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
+                    }`}>
+                    <div className="relative">
+                      <Icon size={28} strokeWidth={isActiveTab ? 3 : 2.1}
+                        className={`transition-all duration-200 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}
+                      />
+                      {item.id === 'chat' && chatUnreadCount > 0 && (
+                        <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-bold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>
+                      )}
+                    </div>
+                    <span className={`max-w-full truncate text-[12px] tracking-[0.04em] transition-all leading-none ${isActiveTab ? 'text-blue-600 font-black' : 'text-slate-400 font-semibold'}`}>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+        </nav>
+      )}
 
       {/* Offline Queue Indicator */}
       {offlineQueue.length > 0 && (

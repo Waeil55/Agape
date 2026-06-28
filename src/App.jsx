@@ -7,7 +7,7 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   RefreshCcw, X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot, setPersistence, browserLocalPersistence } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -18,9 +18,7 @@ import ChatPage from './components/ChatPage';
 import ArchivesPage from './components/ArchivesPage';
 import DriversVehiclesPage from './components/DriversVehiclesPage';
 import SettingsPage from './components/SettingsPage';
-import DriverPage from './components/DriverPage';
 import UsersPage from './components/UsersPage';
-import EnterpriseDashboard from './components/EnterpriseDashboard';
 import AddTripModal from './components/AddTripModal';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
 import { playMessageSound, playNotificationSound, initAudioContext } from './utils/notificationSound';
@@ -46,22 +44,53 @@ import { useDriverAssignments } from './hooks/useDriverAssignments';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
+const APP_VERSION_KEY = 'agape_app_version';
+const APP_VERSION = 'v349';
+
+async function clearAgapeStaticCaches() {
+  if (typeof window === 'undefined' || !window.caches) return;
+  const cacheNames = await window.caches.keys();
+  await Promise.all(
+    cacheNames
+      .filter((name) => /^agape-|^workbox-|vite/i.test(name))
+      .map((name) => window.caches.delete(name))
+  );
+}
+
+async function repairBrowserStatePreservingAuth() {
+  await clearAgapeStaticCaches();
+  if (typeof navigator !== 'undefined' && navigator.serviceWorker?.getRegistrations) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.update().catch(() => null)));
+  }
+}
+
+// Version changes should refresh stale app assets, never wipe Firebase Auth IndexedDB.
+try {
+  const storedVersion = localStorage.getItem(APP_VERSION_KEY);
+  if (storedVersion && storedVersion !== APP_VERSION) {
+    localStorage.setItem(APP_VERSION_KEY, APP_VERSION);
+    const reloadKey = `${APP_VERSION_KEY}_reload_${APP_VERSION}`;
+    if (!sessionStorage.getItem(reloadKey)) {
+      sessionStorage.setItem(reloadKey, '1');
+      clearAgapeStaticCaches().finally(() => window.location.reload());
+    }
+  } else {
+    localStorage.setItem(APP_VERSION_KEY, APP_VERSION);
+  }
+} catch {
+  // Storage can be unavailable in restricted browser modes; let Firebase handle auth state.
+}
+
 // Lazy-loaded heavy components
 const lazyWithRetry = (componentImport) =>
   lazy(async () => {
-    const pageHasAlreadyBeenForceRefreshed = JSON.parse(
-      window.sessionStorage.getItem('page-has-been-force-refreshed') || 'false'
-    );
     try {
-      const component = await componentImport();
-      window.sessionStorage.setItem('page-has-been-force-refreshed', 'false');
-      return component;
+      return await componentImport();
     } catch (error) {
-      if (!pageHasAlreadyBeenForceRefreshed) {
-        window.sessionStorage.setItem('page-has-been-force-refreshed', 'true');
-        return window.location.reload();
-      }
-      throw error;
+      console.warn('[LazyLoad] Chunk load failed, clearing cache and reloading...', error);
+      caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
+      window.location.reload();
     }
   });
 
@@ -69,6 +98,8 @@ const LiveMapPage = lazyWithRetry(() => import('./components/LiveMapPage'));
 const DispatchAssistant = lazyWithRetry(() => import('./components/DispatchAssistant'));
 const FileUploadTrips = lazyWithRetry(() => import('./components/FileUploadTrips'));
 const ReportsPage = lazyWithRetry(() => import('./components/ReportsPage'));
+const DriverPage = lazyWithRetry(() => import('./components/DriverPage'));
+const EnterpriseDashboard = lazyWithRetry(() => import('./components/EnterpriseDashboard'));
 
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
@@ -369,27 +400,43 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    setIsOffline(!realtimeReliability.isOnline);
-    if (realtimeReliability.isOnline) setRefreshTick(t => t + 1);
-  }, [realtimeReliability.isOnline, realtimeReliability.resubscribeKey]);
+    setIsOffline(isAuthenticated && !realtimeReliability.isOnline);
+    if (isAuthenticated && realtimeReliability.isOnline) setRefreshTick(t => t + 1);
+  }, [isAuthenticated, realtimeReliability.isOnline, realtimeReliability.resubscribeKey]);
 
-  // Handle dynamic import failures (stale chunk hashes after deploy) by reloading
+  // Clear SW reload flag after successful boot to allow future SW updates
   useEffect(() => {
+    if (isAuthenticated) {
+      window.sessionStorage.removeItem('sw-reload-pending');
+    }
+  }, [isAuthenticated]);
+
+  // Handle dynamic import failures (stale chunk hashes after deploy) by clearing cache and reloading once
+  useEffect(() => {
+    let reloaded = false;
     const onError = (event) => {
+      if (reloaded) return;
       if (event.target?.tagName === 'LINK' && event.target?.rel === 'modulepreload') {
         event.preventDefault();
+        reloaded = true;
+        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
         window.location.reload();
         return;
       }
       if (event.target?.tagName === 'SCRIPT' && event.target?.type === 'module' && event.target?.src) {
         if (!event.target.src.includes(location.origin)) return;
         event.preventDefault();
+        reloaded = true;
+        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
         window.location.reload();
       }
     };
     const onRejection = (event) => {
+      if (reloaded) return;
       if (event.reason && typeof event.reason === 'object' && event.reason?.message?.includes('dynamically imported module')) {
         event.preventDefault();
+        reloaded = true;
+        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
         window.location.reload();
       }
     };
@@ -407,7 +454,13 @@ const App = () => {
 
     const onSWUpdate = () => { skipWaiting(); };
     window.addEventListener('swUpdateAvailable', onSWUpdate);
-    const onControllerChange = () => { window.location.reload(); };
+    const onControllerChange = () => {
+      // New SW activated — reload once to pick up fresh assets
+      if (!window.sessionStorage.getItem('sw-reload-pending')) {
+        window.sessionStorage.setItem('sw-reload-pending', 'true');
+        window.location.reload();
+      }
+    };
     window.addEventListener('swControllerChanged', onControllerChange);
 
     (async () => {
@@ -757,34 +810,24 @@ const App = () => {
       setDriverTelemetry([]);
       return undefined;
     }
-    let cancelled = false;
-    const refreshTelemetry = async () => {
-      try {
-        const snap = await getDocsFromServer(collection(db, 'driverTelemetry'));
-        if (cancelled) return;
-        const recentDocs = [];
-        snap.forEach((itemDoc) => {
-          recentDocs.push({ id: itemDoc.id, ...itemDoc.data() });
-        });
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - 10);
-        const cutoffKey = todayLocal(cutoff);
-        const filtered = recentDocs
-          .filter((item) => !item.date || item.date >= cutoffKey)
-          .sort((a, b) => Date.parse(b?.lastPingAt || b?.updatedAtLocal || 0) - Date.parse(a?.lastPingAt || a?.updatedAtLocal || 0));
-        setDriverTelemetry(filtered);
-      } catch (err) {
-        if (!cancelled) console.error('Driver telemetry refresh failed:', err);
-      }
-    };
-    refreshTelemetry();
-    const timer = setInterval(refreshTelemetry, 12000);
-    window.addEventListener('online', refreshTelemetry);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-      window.removeEventListener('online', refreshTelemetry);
-    };
+    
+    const unsubscribe = onSnapshot(collection(db, 'driverTelemetry'), (snap) => {
+      const recentDocs = [];
+      snap.forEach((itemDoc) => {
+        recentDocs.push({ id: itemDoc.id, ...itemDoc.data() });
+      });
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 10);
+      const cutoffKey = todayLocal(cutoff);
+      const filtered = recentDocs
+        .filter((item) => !item.date || item.date >= cutoffKey)
+        .sort((a, b) => Date.parse(b?.lastPingAt || b?.updatedAtLocal || 0) - Date.parse(a?.lastPingAt || a?.updatedAtLocal || 0));
+      setDriverTelemetry(filtered);
+    }, (err) => {
+      console.error('Driver telemetry listener failed:', err);
+    });
+
+    return () => unsubscribe();
   }, [isAuthenticated, realtimeReliability.resubscribeKey]);
 
   useEffect(() => {
@@ -844,16 +887,6 @@ const App = () => {
     }
   }, [appSettings]);
 
-  // Force fail-safe: if loading takes >6s, show login
-  useEffect(() => {
-    const force = setTimeout(() => {
-      if (!isLoading) return;
-      setIsLoading(false);
-      }, 6000);
-    return () => clearTimeout(force);
-  }, [isLoading]);
-  // Ultimate fallback — never stay on loading >10s
-  useEffect(() => { const t = setTimeout(() => { if (isLoading) setIsLoading(false); }, 10000); return () => clearTimeout(t); }, [isLoading]);
   // Firestore data timeout — show recovery after 8s
   useEffect(() => {
     setShowDataLoadingRecovery(false);
@@ -959,7 +992,7 @@ const App = () => {
 
         // ── FAST PATH: use cached role for instant boot ──────────────────────
         const cached = readRoleCache(user.uid);
-        if (cached && cached.role && !requestedPortalRole) {
+        if (cached && cached.role && (!requestedPortalRole || requestedPortalRole === cached.role)) {
           // Apply session immediately — loading clears in milliseconds
           applySession(cached.role, userEmail, null, user);
 
@@ -968,10 +1001,8 @@ const App = () => {
             if (cancelled || !freshDoc.exists()) return;
             const freshRole = String(freshDoc.data()?.role || '').toLowerCase();
             if (freshRole && freshRole !== cached.role) {
-              // Role changed — force re-auth cleanly
-              console.warn('[Auth] Role changed in Firestore — reloading session');
               writeRoleCache(user.uid, freshRole, userEmail);
-              window.location.reload();
+              applySession(freshRole, userEmail, freshDoc, user);
             }
           }).catch(() => { /* background check — ignore network errors */ });
           return;
@@ -1124,19 +1155,24 @@ const App = () => {
           return;
         }
         // If user was already authenticated in this session, this is a token refresh.
-        // Wait briefly for Firebase to restore the session.
+        // Wait longer for Firebase to restore the session — IndexedDB can be slow.
         if (authBootResolvedRef.current) {
-          console.warn('[Auth] Session went null after boot — waiting 3s for token refresh');
-          await new Promise(r => setTimeout(r, 3000));
-          if (cancelled) return;
-          if (auth.currentUser) {
-            return;
+          console.warn('[Auth] Session went null after boot — waiting 5s for token refresh');
+          for (let i = 0; i < 5; i++) {
+            await new Promise(r => setTimeout(r, 1000));
+            if (cancelled) return;
+            if (auth.currentUser) {
+              console.warn('[Auth] Token refreshed successfully');
+              return;
+            }
           }
-          // Session truly lost — show login immediately
-          clearRoleCache();
-          skipNextSignedOutResetRef.current = true;
-          signOut(auth).catch(() => {});
-          resetSessionState({ loginErrorMessage: 'Session expired. Please sign in again.' });
+          // Session truly lost after 5 retries — try one more sign-in attempt
+          console.warn('[Auth] Session lost — attempting silent re-auth');
+          try {
+            await new Promise(r => setTimeout(r, 2000));
+            if (auth.currentUser) return;
+          } catch {}
+          resetSessionState({ loginErrorMessage: 'We could not restore the saved session. Please sign in again.' });
           return;
         }
         // Initial boot with no session — show login IMMEDIATELY.
@@ -1151,8 +1187,6 @@ const App = () => {
         if (authBootResolvedRef.current) {
           return;
         }
-        skipNextSignedOutResetRef.current = true;
-        signOut(auth).catch(() => {});
         resetSessionState({ loginErrorMessage: 'Could not initialize your session. Please sign in again.' });
       }
     });
@@ -1201,14 +1235,12 @@ const App = () => {
 
   useEffect(() => {
     if (!isAuthenticated || !currentUser || !role) return;
-    let cancelled = false;
     let firstSnapshot = true;
-    const refreshChatUnread = async () => {
-      try {
-        const snap = await getDocFromServer(doc(db, 'chatData/conversations'));
-        if (cancelled) return;
+    
+    const unsubscribe = onSnapshot(doc(db, 'chatData/conversations'), (snap) => {
       if (!snap.exists()) { setChatUnreadCount(0); return; }
       const curr = snap.data().conversations || {};
+      
       // Calculate unread count for nav badge
       let totalUnread = 0;
       const normalizedCurrentUser = String(currentUser || '').trim().toLowerCase();
@@ -1223,7 +1255,9 @@ const App = () => {
         }
       }
       setChatUnreadCount(totalUnread);
+      
       if (firstSnapshot) { firstSnapshot = false; prevChatConvsRef.current = curr; return; }
+      
       const prev = prevChatConvsRef.current || {};
       for (const [id, c] of Object.entries(curr)) {
         const prevLast = prev[id]?.lastMessage;
@@ -1234,29 +1268,19 @@ const App = () => {
           if (activeTab !== 'chat') {
             playMessageSound();
             showLocalNotification(
-              `New message from ${currLast.sender.split('@')[0]}`,
+              c?.groupName || 'New Message',
               currLast.text,
-              'message'
+              () => setActiveTab('chat')
             );
-          } else {
-            playMessageSound();
           }
-          break;
         }
       }
       prevChatConvsRef.current = curr;
-      } catch (err) {
-        if (!cancelled) console.error('Chat unread refresh failed:', err);
-      }
-    };
-    refreshChatUnread();
-    const timer = setInterval(refreshChatUnread, 12000);
-    window.addEventListener('online', refreshChatUnread);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-      window.removeEventListener('online', refreshChatUnread);
-    };
+    }, (err) => {
+      console.error('Chat unread listener failed:', err);
+    });
+
+    return () => unsubscribe();
   }, [isAuthenticated, currentUser, role, activeTab]);
 
   const addAuditLog = (title, desc, color, meta = null) => {
@@ -1297,6 +1321,7 @@ const App = () => {
         setLoginError('Enter a valid username using letters, numbers, dot, dash, or underscore.');
         return;
       }
+      await setPersistence(auth, browserLocalPersistence);
       const userCred = await createUserWithEmailAndPassword(auth, authEmail, password);
       await setDoc(
         doc(db, 'users', userCred.user.uid),
@@ -1350,6 +1375,7 @@ const App = () => {
         setLoginError('Enter a valid username.');
         return;
       }
+      await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, authEmail, password);
     } catch (err) {
       loginPortalRoleRef.current = requestedRole;
@@ -2630,7 +2656,7 @@ const App = () => {
       <div className={`offline-banner${isOffline ? ' visible' : ''}`}>
         You are offline — changes will sync when connection returns
       </div>
-      <div className="min-h-screen flex-1 flex flex-col bg-[var(--bg-app)] overflow-visible w-full">
+      <div className="min-h-[100dvh] flex-1 flex flex-col bg-[var(--bg-app)] overflow-visible w-full">
       {/* Header removed: DriverPage handles its own UI */}
       {startupIssue && !isLoading && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-2 text-xs sm:text-sm font-semibold text-amber-800 flex items-center justify-between gap-3">
@@ -2655,7 +2681,7 @@ const App = () => {
             </div>
             {showLoadingRecovery && (
               <div className="w-full border-t border-slate-100 pt-5 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. You can retry the cloud connection or return to the access portal without waiting.</p>
+                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. Retry first, or repair stale browser files without signing out.</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={() => window.location.reload()} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
                     <RefreshCcw size={15} /> Retry
@@ -2668,6 +2694,12 @@ const App = () => {
                     Access Portal
                   </button>
                 </div>
+                <button onClick={async () => {
+                  await repairBrowserStatePreservingAuth().catch(() => {});
+                  window.location.reload();
+                }} className="w-full h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-sm active:scale-95 transition">
+                  Repair Browser & Reload
+                </button>
               </div>
             )}
           </div>
@@ -2691,7 +2723,7 @@ const App = () => {
             )}
             {showDataLoadingRecovery && (
               <div className="w-full border-t border-slate-100 pt-4 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. You can retry the cloud connection.</p>
+                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. Retry first, or repair stale browser files without signing out.</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={() => { requestRealtimeResubscribe('retry'); setShowDataLoadingRecovery(false); setStartupIssue('Reconnecting...'); }} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
                     <RefreshCcw size={15} /> Retry
@@ -2704,6 +2736,12 @@ const App = () => {
                     Access Portal
                   </button>
                 </div>
+                <button onClick={async () => {
+                  await repairBrowserStatePreservingAuth().catch(() => {});
+                  window.location.reload();
+                }} className="w-full h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-sm active:scale-95 transition">
+                  Repair Browser & Reload
+                </button>
               </div>
             )}
           </div>
@@ -2752,7 +2790,7 @@ const App = () => {
             const driverId = myDriver.id;
             const myTrips = currentUserDriverTrips;
             const myDrivers = myDriver ? [myDriver] : [];
-            return <DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
+            return <Suspense fallback={<LazyFallback />}><DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
               allDrivers={drivers}
               dispatchers={dispatchers}
               chatUnreadCount={chatUnreadCount}
@@ -2801,9 +2839,9 @@ const App = () => {
               requestAuthAction={requestAuthAction}
               showAddTripModal={showAddTripModal}
               setShowAddTripModal={setShowAddTripModal}
-            />;
+            /></Suspense>;
           })() : (
-            <EnterpriseDashboard
+            <Suspense fallback={<LazyFallback />}><EnterpriseDashboard
               role={role}
               currentUser={currentUser}
               trips={scopedTrips}
@@ -2869,8 +2907,8 @@ const App = () => {
               addTrip={addTrip}
               showAddTripModal={showAddTripModal}
               setShowAddTripModal={setShowAddTripModal}
-              driverWorkDrivers={currentUserDriverProfile ? [currentUserDriverProfile] : []}
-              driverWorkTrips={currentUserDriverTrips}
+              driverWorkDrivers={role === 'admin' ? drivers : role === 'dispatcher' ? scopedDrivers : currentUserDriverProfile ? [currentUserDriverProfile] : []}
+              driverWorkTrips={role === 'admin' ? trips : role === 'dispatcher' ? scopedTrips : currentUserDriverTrips}
               allDrivers={drivers}
               onUpdateMission={(updatedMission) => {
                 setDrivers(prev => prev.map(d => normalizeEmail(d.email) === normalizeEmail(currentUser) ? { ...d, activeMission: updatedMission } : d));
@@ -2896,7 +2934,7 @@ const App = () => {
               onDriverStatusUpdate={handleDriverStatusUpdate}
               onCompleteTrip={handleCompleteTrip}
               onLogout={handleLogout}
-            />
+            /></Suspense>
           )}
 
           {/* Global Modals */}

@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .js,.jsx",
-    "export-firestore": "node ./tools/export_firestore.js"
+    "cap:sync": "npm run build && npx cap sync"
   },
   "dependencies": {
     "@capacitor/action-sheet": "^8.1.1",
