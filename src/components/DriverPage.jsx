@@ -3421,7 +3421,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 const isCompleted = index < guidedStepIndex;
                 const isUpcoming = index > guidedStepIndex;
-                
+
                 if (isCompleted) {
                   return (
                     <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2">
@@ -3530,7 +3530,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               </div>
                             );
                           })()}
-                          
+
                           <div className="flex items-center gap-2 mt-3 mb-4">
                             <button type="button" onClick={(e) => { e.stopPropagation(); openInNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff, suggestNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff)); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"><Navigation size={12}/> Navigate</button>
                            <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartCall(trip); }} className="w-10 h-8 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-all"><Phone size={14}/></button>
@@ -5417,14 +5417,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
                     }`}>
                     <div className="relative">
-                      <Icon size={28} strokeWidth={isActiveTab ? 3 : 2.1}
+                      <Icon size={27} strokeWidth={isActiveTab ? 2.7 : 2}
                         className={`transition-all duration-200 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}
                       />
                       {item.id === 'chat' && chatUnreadCount > 0 && (
                         <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-bold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>
                       )}
                     </div>
-                    <span className={`max-w-full truncate text-[12px] tracking-[0.04em] transition-all leading-none ${isActiveTab ? 'text-blue-600 font-black' : 'text-slate-400 font-semibold'}`}>{item.label}</span>
+                    <span className={`max-w-full truncate text-[12px] tracking-[0.04em] transition-all leading-none ${isActiveTab ? 'text-blue-600 font-bold' : 'text-slate-400 font-normal'}`}>{item.label}</span>
                   </button>
                 );
               })}

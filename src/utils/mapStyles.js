@@ -1,0 +1,30 @@
+export const lightStyle = [
+  { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text', stylers: [{ color: '#475569' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e0f2fe' }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#f1f5f9' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
+];
+
+export const darkStyle = [
+  { elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#334155' }] },
+  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#475569' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#64748b' }] },
+  { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
+];

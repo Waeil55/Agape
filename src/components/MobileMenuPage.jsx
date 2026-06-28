@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Settings, Users, Clock, LogOut, FileText, Database, Shield, Truck } from 'lucide-react';
+import { ChevronRight, Settings, Users, Clock, LogOut, FileText, Database, Shield, Truck, MapPin } from 'lucide-react';
 
 const MobileMenuPage = ({ currentUser, role, onSignOut, setSubView }) => {
   const getInitials = (email) => {
@@ -19,6 +19,7 @@ const MobileMenuPage = ({ currentUser, role, onSignOut, setSubView }) => {
     {
       title: "Data & Records",
       items: [
+        { id: 'map', icon: MapPin, label: 'Live Map', desc: 'Fleet location and route view', color: 'text-sky-600', bg: 'bg-sky-50' },
         { id: 'reports', icon: FileText, label: 'Reports & Export', desc: 'Trip logs and manifests', color: 'text-amber-600', bg: 'bg-amber-50' },
         { id: 'archives', icon: Clock, label: 'Archives', desc: 'Past records', color: 'text-rose-600', bg: 'bg-rose-50' },
       ]
