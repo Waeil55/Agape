@@ -299,81 +299,7 @@ const [form, setForm] = useState({
 
       {resolvedTab === 'drivers' && (
         <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm">
-          <div className="space-y-3 p-3 sm:hidden">
-            {filteredDrivers.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-                {role === 'dispatcher' ? 'No drivers assigned to you yet.' : 'No drivers yet. Click "Add Driver" to create one.'}
-              </div>
-            ) : (
-              filteredDrivers.map((d) => {
-                const assignedCount = trips.filter(t => tripBelongsToDriver(t, d)).length;
-                return (
-                  <div key={d.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="truncate text-base font-bold text-slate-900">{d.name}</h3>
-                        <p className="mt-0.5 text-xs font-medium text-slate-500">{d.currentZone || 'No zone'} - {d.vehicle || 'No vehicle'}</p>
-                      </div>
-                      <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${d.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>{d.status}</span>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-1 gap-2">
-                      <select value={d.vehicle || ''} onChange={(e) => {
-                        const newV = e.target.value;
-                        if (d.vehicle) {
-                          const prevDriver = drivers.find(x => x.vehicle === d.vehicle && x.id !== d.id);
-                          if (prevDriver) setDrivers(prev => prev.map(x => x.id === prevDriver.id ? { ...x, vehicle: '' } : x));
-                        }
-                        if (newV) {
-                          const currentOccupant = drivers.find(x => x.vehicle === newV && x.id !== d.id);
-                          if (currentOccupant) setDrivers(prev => prev.map(x => x.id === currentOccupant.id ? { ...x, vehicle: '' } : x));
-                        }
-                        setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, vehicle: newV } : x));
-                        addAuditLog('Vehicle Assigned', `${currentUser} assigned ${newV || 'no vehicle'} to ${d.name}.`, 'indigo');
-                      }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
-                        <option value="">No vehicle</option>
-                        {vehicles.filter(v => !drivers.find(x => x.vehicle === v.name && x.id !== d.id) || v.name === d.vehicle).map(v => (
-                          <option key={v.id} value={v.name}>{v.name} {v.plate ? `(${v.plate})` : ''}</option>
-                        ))}
-                      </select>
-                      <select value={d.assignedDispatcher || d.assignedTo || ''} onChange={(e) => {
-                        const newDisp = e.target.value;
-                        setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, assignedDispatcher: newDisp, assignedTo: newDisp } : x));
-                        addAuditLog('Driver Reassigned', `${currentUser} assigned driver ${d.name} to dispatcher ${dispatchers.find(ds => ds.id === newDisp)?.name || 'None'}.`, 'blue');
-                      }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
-                        <option value="">Unassigned dispatcher</option>
-                        {dispatchers.map(ds => (
-                          <option key={ds.id} value={ds.id}>{ds.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <button onClick={() => setAssignDriver(d)} className="rounded-lg bg-blue-100 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-200">
-                        Trips {assignedCount > 0 ? `(${assignedCount})` : ''}
-                      </button>
-                      {onUploadForDriver && (
-                        <button onClick={() => onUploadForDriver(d.id)} className="rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-200">Upload</button>
-                      )}
-                      {d.phone && (
-                        <>
-                          <button onClick={() => makeCall(d.phone, d.name)} className="rounded-lg bg-emerald-50 p-2 text-emerald-600 hover:bg-emerald-100" aria-label="Call driver"><Phone size={14} /></button>
-                          <button onClick={() => sendSMS(d.phone, d.name)} className="rounded-lg bg-blue-50 p-2 text-blue-600 hover:bg-blue-100" aria-label="Send SMS"><MessageSquare size={14} /></button>
-                        </>
-                      )}
-                      <button onClick={() => analyzeDriver(d)} className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50" title="AI Analyze" aria-label="AI Analyze"><BrainCircuit size={14} /></button>
-                      <button onClick={() => openScheduleEditor(d)} className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50" title="Edit Schedule" aria-label="Edit Schedule"><Clock size={14} /></button>
-                      <button onClick={() => openEdit(d)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50" aria-label="Edit driver"><Edit2 size={14} /></button>
-                      {(role === 'admin' || role === 'dispatcher') && (
-                        <button onClick={() => deleteDriver(d)} className="rounded-lg p-2 text-red-600 hover:bg-red-50" aria-label="Delete driver"><Trash2 size={14} /></button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-          <div className="hidden overflow-x-auto sm:block">
+          <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
@@ -479,56 +405,7 @@ const [form, setForm] = useState({
 
       {resolvedTab === 'vehicles' && (
         <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm">
-          <div className="space-y-3 p-3 sm:hidden">
-            {vehicles.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">No vehicles yet. Click "Add Vehicle" to create one.</div>
-            ) : (
-              vehicles.map((v) => {
-                const assignedDriver = drivers.find(d => d.vehicle === v.name);
-                return (
-                  <div key={v.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="truncate text-base font-bold text-slate-900">{v.name}</h3>
-                        <p className="mt-0.5 text-xs font-medium text-slate-500">{v.make || '-'} {v.model || ''} - {v.year || 'No year'} / {v.color || 'No color'}</p>
-                      </div>
-                      <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">{v.plate || 'No plate'}</span>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="font-bold uppercase tracking-wide text-slate-400">VIN</p>
-                        <p className="mt-1 font-mono font-semibold text-slate-700">{v.vin ? v.vin.slice(-6) : '-'}</p>
-                      </div>
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="font-bold uppercase tracking-wide text-slate-400">Odometer</p>
-                        <p className="mt-1 font-semibold text-slate-700">{v.odometer ? Number(v.odometer).toLocaleString() : '0'} mi</p>
-                      </div>
-                    </div>
-                    <select value={assignedDriver?.id || ''} onChange={(e) => {
-                      const driverId = e.target.value;
-                      const oldDriverId = assignedDriver?.id;
-                      if (driverId === oldDriverId) return;
-                      if (oldDriverId) setDrivers(prev => prev.map(d => d.id === oldDriverId ? { ...d, vehicle: '' } : d));
-                      if (driverId) setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, vehicle: v.name } : d));
-                      addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'indigo');
-                    }} className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
-                      <option value="">Unassigned driver</option>
-                      {drivers.map(d => (
-                        <option key={d.id} value={d.id}>{d.name} {d.vehicle && d.vehicle !== v.name ? `(${d.vehicle})` : ''}</option>
-                      ))}
-                    </select>
-                    <div className="mt-3 flex gap-2">
-                      <button onClick={() => openVEdit(v)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50" title="Edit" aria-label="Edit"><Edit2 size={14} /></button>
-                      {(role === 'admin' || role === 'dispatcher') && (
-                        <button onClick={() => deleteVehicle(v)} className="rounded-lg p-2 text-red-600 hover:bg-red-50" title="Delete" aria-label="Delete"><Trash2 size={14} /></button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-          <div className="hidden overflow-x-auto sm:block">
+          <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>

@@ -1,13 +1,4 @@
 dist/
 node_modules/
-functions/node_modules/
-.firebase/
-scratch/
-scratch_*
-
-android/.gradle/
-android/**/build/
-android/app/src/main/assets/public/
-ios/App/App/public/
-
 *.min.js
+scratch_*

@@ -103,22 +103,6 @@ function isCorrupted(trip) {
   return false;
 }
 
-function encodeValue(value) {
-  if (value === null || value === undefined) return { nullValue: null };
-  if (typeof value === 'string') return { stringValue: value };
-  if (typeof value === 'number') return Number.isInteger(value) ? { integerValue: value } : { doubleValue: value };
-  if (typeof value === 'boolean') return { booleanValue: value };
-  if (Array.isArray(value)) return { arrayValue: { values: value.map(encodeValue) } };
-  if (typeof value === 'object') {
-    const fields = {};
-    for (const [k, v] of Object.entries(value)) {
-      if (v !== undefined) fields[k] = encodeValue(v);
-    }
-    return { mapValue: { fields } };
-  }
-  return { stringValue: String(value) };
-}
-
 async function main() {
   const token = await refreshToken();
   const DRY_RUN = process.argv.includes('--dry-run');
@@ -204,6 +188,23 @@ async function main() {
   if ((corruptedApp.length > 0 || corruptedTrashed.length > 0) && !DRY_RUN) {
     const cleanTrips = appTrips.filter(t => !isCorrupted(t));
     const cleanTrashed = appTrashed.filter(t => !isCorrupted(t));
+    
+    function encodeValue(value) {
+      if (value === null || value === undefined) return { nullValue: null };
+      if (typeof value === 'string') return { stringValue: value };
+      if (typeof value === 'number') return Number.isInteger(value) ? { integerValue: value } : { doubleValue: value };
+      if (typeof value === 'boolean') return { booleanValue: value };
+      if (Array.isArray(value)) return { arrayValue: { values: value.map(encodeValue) } };
+      if (typeof value === 'object') {
+        const fields = {};
+        for (const [k, v] of Object.entries(value)) {
+          if (v !== undefined) fields[k] = encodeValue(v);
+        }
+        return { mapValue: { fields } };
+      }
+      return { stringValue: String(value) };
+    }
+
     await apiRequest('PATCH', '/appData/agape?updateMask.fieldPaths=trips&updateMask.fieldPaths=trashedTrips', token, {
       fields: {
         trips: encodeValue(cleanTrips),

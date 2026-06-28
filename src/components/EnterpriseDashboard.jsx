@@ -12,14 +12,12 @@ import {
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 import { openMapLink } from '../utils/nativeActions';
 import { timeToMinutes, isTripLate } from '../utils/tripDate';
-import { getDriverLiveStatus } from '../constants/statuses';
 import ChatPage from './ChatPage';
 import ArchivesPage from './ArchivesPage';
 import DriversVehiclesPage from './DriversVehiclesPage';
 import SettingsPage from './SettingsPage';
 import UsersPage from './UsersPage';
 import OperationsCommandCenter from './OperationsCommandCenter';
-import MobileDispatchView from './MobileDispatchView';
 import AdminPage from './AdminPage';
 import DriverPage from './DriverPage';
 import RoutePlannerPage from './RoutePlannerPage';
@@ -139,17 +137,11 @@ const EnterpriseDashboard = ({
   const [routePlannerSequencerSequence, setRoutePlannerSequencerSequence] = useState(null);
   const [routePlannerSequencerKey, setRoutePlannerSequencerKey] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [driverWorkDriverId, setDriverWorkDriverId] = useState(() => localStorage.getItem('agape_driverWorkDriverId') || '');
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
   // Persist navigation state to localStorage (survives refresh)
   useEffect(() => { localStorage.setItem('agape_activePanel', activePanel); }, [activePanel]);
   useEffect(() => { localStorage.setItem('agape_operationsTab', operationsTab); }, [operationsTab]);
   useEffect(() => { if (rightPanelTab) localStorage.setItem('agape_rightPanelTab', rightPanelTab); else localStorage.removeItem('agape_rightPanelTab'); }, [rightPanelTab]);
-  useEffect(() => {
-    if (driverWorkDriverId) localStorage.setItem('agape_driverWorkDriverId', driverWorkDriverId);
-    else localStorage.removeItem('agape_driverWorkDriverId');
-  }, [driverWorkDriverId]);
   useEffect(() => {
     if (showRightPanel && !rightPanelTab) {
       setRightPanelTab('alerts');
@@ -166,33 +158,6 @@ const EnterpriseDashboard = ({
     }
   }, [activePanel, driverWorkDrivers.length]);
 
-  const activeDriverWorkDriver = useMemo(() => {
-    if (driverWorkDrivers.length === 0) return null;
-    return driverWorkDrivers.find((driver) => driver.id === driverWorkDriverId) || driverWorkDrivers[0];
-  }, [driverWorkDriverId, driverWorkDrivers]);
-
-  useEffect(() => {
-    if (!activeDriverWorkDriver?.id) return;
-    if (driverWorkDriverId !== activeDriverWorkDriver.id) {
-      setDriverWorkDriverId(activeDriverWorkDriver.id);
-    }
-  }, [activeDriverWorkDriver?.id, driverWorkDriverId]);
-
-  const activeDriverWorkTrips = useMemo(() => {
-    if (!activeDriverWorkDriver) return [];
-    const driverEmail = String(activeDriverWorkDriver.email || '').trim().toLowerCase();
-    return driverWorkTrips.filter((trip) => {
-      const tripDriverEmail = String(
-        trip.driverEmail ||
-        allDrivers.find((driver) => driver.id === trip.driverId)?.email ||
-        ''
-      ).trim().toLowerCase();
-      return trip.driverId === activeDriverWorkDriver.id ||
-        (driverEmail && tripDriverEmail === driverEmail) ||
-        (activeDriverWorkDriver.name && trip.driverName === activeDriverWorkDriver.name);
-    });
-  }, [activeDriverWorkDriver, allDrivers, driverWorkTrips]);
-
   // Online/offline listener
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -203,13 +168,6 @@ const EnterpriseDashboard = ({
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
-
-  // Mobile breakpoint listener (< 768px = mobile dispatch view)
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const handleSmartNavigate = useCallback((query) => {
@@ -252,12 +210,14 @@ const EnterpriseDashboard = ({
   const todayStr = new Date().toISOString().split('T')[0];
 
   const sidebarItems = [
-    { id: 'operations', label: 'Dispatch', icon: LayoutDashboard, roles: ['admin', 'dispatcher'] },
+    { id: 'operations', label: 'Operations', icon: LayoutDashboard, roles: ['admin', 'dispatcher'] },
     { id: 'drive', label: 'Drive', icon: Truck, roles: ['admin', 'dispatcher'] },
-    { id: 'liveMap', label: 'Map', icon: MapPin, roles: ['admin', 'dispatcher', 'fleet_manager', 'qa_auditor', 'supervisor'] },
+    { id: 'liveMap', label: 'Live Map', icon: MapPin, roles: ['admin', 'dispatcher', 'fleet_manager', 'qa_auditor', 'supervisor'] },
     { id: 'chat', label: 'Chat', icon: MessageCircle, roles: ['admin', 'dispatcher'] },
+    { id: 'routePlanner', label: 'Routes', icon: Route, roles: ['admin', 'dispatcher'] },
     { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['admin', 'dispatcher', 'billing', 'qa_auditor', 'fleet_manager', 'supervisor'] },
-    { id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, roles: ['admin', 'dispatcher'] },
+    { id: 'archives', label: 'Archives', icon: Archive, roles: ['admin', 'dispatcher'] },
+    { id: 'admin', label: role === 'admin' ? 'Admin' : 'People/Fleet', icon: Users, roles: ['admin', 'dispatcher'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin', 'dispatcher'] },
   ].filter(item => item.roles.includes(role))
     .filter(item => item.id !== 'drive' || driverWorkDrivers.length > 0);
@@ -350,13 +310,15 @@ const EnterpriseDashboard = ({
 
   const topNavItems = useMemo(() => {
     const items = [
-      { id: 'dispatch', label: 'Dispatch', icon: Zap, active: activePanel === 'operations', action: () => openOperationsWorkspace('manifest') },
-      { id: 'schedule', label: 'Routes', icon: Route, active: showSequencerModal, action: () => setShowSequencerModal(true) },
+      { id: 'dispatch', label: 'Dispatch Board', icon: Zap, active: activePanel === 'operations', action: () => openOperationsWorkspace('manifest') },
+      { id: 'schedule', label: 'Schedule', icon: CalendarDays, active: showSequencerModal, action: () => setShowSequencerModal(true) },
       ...(driverWorkDrivers.length > 0 ? [{ id: 'drive', label: 'Drive', icon: Truck, active: activePanel === 'drive', action: () => setActivePanel('drive') }] : []),
-      ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
+      ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'People/Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
       { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => setActivePanel('reports') },
-      { id: 'map', label: 'Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
-      { id: 'messages', label: 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat') },
+      { id: 'map', label: 'Live Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
+      { id: 'messages', label: 'Messages', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat') },
+      { id: 'routes', label: 'Routes', icon: Route, active: activePanel === 'routePlanner', action: () => setActivePanel('routePlanner') },
+      { id: 'archives', label: 'Archives', icon: Archive, active: activePanel === 'archives', action: () => setActivePanel('archives') },
       { id: 'settings', label: 'Settings', icon: Settings, active: activePanel === 'settings', action: () => setActivePanel('settings') },
     ];
     return items;
@@ -669,22 +631,22 @@ const EnterpriseDashboard = ({
 
   // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="bg-gradient-to-r from-[#1e3a5f] via-[#274b7c] to-[#1a3355] text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm shadow-inner">
-        <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain brightness-0 invert" />
+    <header className="bg-[#F3F4F6]/95 backdrop-blur-xl border-b border-slate-200/80 px-3 flex md:hidden items-center gap-2 shrink-0 h-[56px] z-20 relative">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300 bg-white">
+        <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain" />
       </div>
       <div>
-        <h1 className="text-[13px] font-bold tracking-tight leading-none text-white drop-shadow-sm">Agape Care</h1>
-        <p className="text-[10px] font-medium text-blue-200 capitalize drop-shadow-sm">{activeWorkspaceMeta.title}</p>
+        <h1 className="text-[13px] font-bold text-slate-900 tracking-tight leading-none">Agape Care</h1>
+        <p className="text-[10px] font-medium text-slate-500 capitalize">{activeWorkspaceMeta.title}</p>
       </div>
       <div className="flex-1" />
       {/* Online status dot */}
-      <div className={`w-2.5 h-2.5 rounded-full border border-white/20 shadow-sm ${isOnline ? 'bg-emerald-400' : 'bg-rose-400'}`} title={isOnline ? 'Online' : 'Offline'} />
+      <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} title={isOnline ? 'Online' : 'Offline'} />
       {activePanel === 'operations' && (
         <button
           onClick={toggleRightPanel}
-          className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-bold shadow-sm transition-colors ${
-            showRightPanel ? 'bg-white text-[#1e3a5f]' : 'bg-white/10 text-white hover:bg-white/20'
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-bold shadow-sm ${
+            showRightPanel ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
           }`}
         >
           <PanelRight size={11} /> Panel
@@ -693,7 +655,7 @@ const EnterpriseDashboard = ({
       {/* User avatar -> settings */}
       <button
         onClick={() => setActivePanel('settings')}
-        className="w-7 h-7 rounded-full bg-white/20 border border-white/20 shadow-sm flex items-center justify-center text-white text-xs font-black hover:bg-white/30 transition uppercase"
+        className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-black hover:bg-slate-300 transition uppercase"
       >
         {(currentUser || 'U')[0]}
       </button>
@@ -702,7 +664,7 @@ const EnterpriseDashboard = ({
 
   // ==================== BOTTOM NAVIGATION (Mobile only for dispatcher/admin) ====================
   const renderBottomNav = () => (
-    <nav className="md:hidden flex items-stretch bg-[#0f172a] border-t border-slate-800 safe-area-bottom shadow-[0_-8px_30px_rgba(0,0,0,0.3)] relative z-20">
+    <nav className="bottom-nav md:hidden flex items-stretch">
       {sidebarItems.map(item => {
         const Icon = item.icon;
         const isActive = activePanel === item.id;
@@ -711,25 +673,19 @@ const EnterpriseDashboard = ({
           <button
             key={item.id}
             onClick={() => setActivePanel(item.id)}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all relative touch-manipulation ${
-              isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'
+            className={`flex-1 flex flex-col items-center justify-center py-1 gap-0.5 transition-all relative min-h-[52px] ${
+              isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
             }`}
-            style={{ minHeight: '56px', paddingTop: '6px', paddingBottom: 'max(6px, env(safe-area-inset-bottom, 0px))' }}
           >
-            <div className="relative flex items-center justify-center">
-              {isActive && (
-                <span className="absolute -inset-2 bg-blue-500/10 rounded-full animate-in fade-in duration-150" />
-              )}
-              <Icon size={24} strokeWidth={isActive ? 2.5 : 1.8} className="relative" />
+            <div className="relative">
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
               {hasBadge && (
-                <span className="absolute -top-0.5 -right-2 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
+                <span className="absolute -top-1 -right-2 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
                   {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
                 </span>
               )}
             </div>
-            <span className={`text-[10px] tracking-wide leading-none ${
-              isActive ? 'text-blue-400 font-bold' : 'text-slate-500 font-medium'
-            }`}>
+            <span className={`text-[10px] tracking-wide transition-all leading-none ${isActive ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}>
               {item.label}
             </span>
           </button>
@@ -1060,89 +1016,53 @@ const EnterpriseDashboard = ({
   };
 
   // ==================== OPERATIONS PAGE ====================
-  const renderOperationsPage = () => {
-    // On mobile screens (< 768px): show the premium mobile dispatch view
-    if (isMobile) {
-      return (
-        <MobileDispatchView
-          role={role}
-          currentUser={currentUser}
-          trips={trips}
-          drivers={drivers}
-          dispatchers={dispatchers}
-          assignTripToDriver={assignTripToDriver}
-          bulkAssignTrips={bulkAssignTrips}
-          setBulkAssignModal={setBulkAssignModal}
-          requestDeleteTrip={requestDeleteTrip}
-          updateTrip={updateTrip}
-          makeCall={makeCall}
-          sendSMS={sendSMS}
-          setTripDetails={setTripDetails}
-          setShowAddTripModal={setShowAddTripModal}
-          setShowUploadModal={setShowUploadModal}
-          onOpenSequencer={() => setShowSequencerModal(true)}
-          onOpenLiveMap={() => setActivePanel('liveMap')}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          addToast={addToast}
-          isOnline={isOnline}
-          phoneNumbers={phoneNumbers}
-          onDispatcherStatusUpdate={onDispatcherStatusUpdate}
-          fallbackAdminOnline={fallbackAdminOnline}
-          setFallbackAdminOnline={setFallbackAdminOnline}
-        />
-      );
-    }
-    // On desktop: unchanged OperationsCommandCenter
-    return (
-      <OperationsCommandCenter
-        role={role}
-        currentUser={currentUser}
-        trips={trips}
-        drivers={drivers}
-        dispatchers={dispatchers}
-        selectedTasks={selectedTasks}
-        setSelectedTasks={setSelectedTasks}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        operationsTab={operationsTab}
-        setOperationsTab={setOperationsTab}
-        smartAssignTrip={smartAssignTrip}
-        setSmartAssignTrip={setSmartAssignTrip}
-        manualAssignTrip={manualAssignTrip}
-        setManualAssignTrip={setManualAssignTrip}
-        smartAssignResult={smartAssignResult}
-        setSmartAssignResult={setSmartAssignResult}
-        aiAnalyzing={aiAnalyzing}
-        setAiAnalyzing={setAiAnalyzing}
-        addToast={addToast}
-        addAuditLog={addAuditLog}
-        persistState={persistState}
-        hasPermission={hasPermission}
-        requestAuthAction={requestAuthAction}
-        triggerSmartAssign={triggerSmartAssign}
-        triggerFleetOptimization={triggerFleetOptimization}
-        assignTripToDriver={assignTripToDriver}
-        bulkAssignTrips={bulkAssignTrips}
-        setBulkAssignModal={setBulkAssignModal}
-        requestDeleteTrip={requestDeleteTrip}
-        requestBulkDelete={requestBulkDelete}
-        updateTrip={updateTrip}
-        makeCall={makeCall}
-        sendSMS={sendSMS}
-        setTripDetails={setTripDetails}
-        setShowAddTripModal={setShowAddTripModal}
-        setShowUploadModal={setShowUploadModal}
-        onOpenSequencer={() => setShowSequencerModal(true)}
-        onOpenLiveMap={() => setActivePanel('liveMap')}
-        showRightPanel={showRightPanel}
-        onTogglePanel={toggleRightPanel}
-        isOnline={isOnline}
-        phoneNumbers={phoneNumbers}
-      />
-    );
-  };
-
+  const renderOperationsPage = () => (
+    <OperationsCommandCenter
+      role={role}
+      currentUser={currentUser}
+      trips={trips}
+      drivers={drivers}
+      dispatchers={dispatchers}
+      selectedTasks={selectedTasks}
+      setSelectedTasks={setSelectedTasks}
+      searchQuery={searchQuery}
+      setSearchQuery={setSearchQuery}
+      operationsTab={operationsTab}
+      setOperationsTab={setOperationsTab}
+      smartAssignTrip={smartAssignTrip}
+      setSmartAssignTrip={setSmartAssignTrip}
+      manualAssignTrip={manualAssignTrip}
+      setManualAssignTrip={setManualAssignTrip}
+      smartAssignResult={smartAssignResult}
+      setSmartAssignResult={setSmartAssignResult}
+      aiAnalyzing={aiAnalyzing}
+      setAiAnalyzing={setAiAnalyzing}
+      addToast={addToast}
+      addAuditLog={addAuditLog}
+      persistState={persistState}
+      hasPermission={hasPermission}
+      requestAuthAction={requestAuthAction}
+      triggerSmartAssign={triggerSmartAssign}
+      triggerFleetOptimization={triggerFleetOptimization}
+      assignTripToDriver={assignTripToDriver}
+      bulkAssignTrips={bulkAssignTrips}
+      setBulkAssignModal={setBulkAssignModal}
+      requestDeleteTrip={requestDeleteTrip}
+      requestBulkDelete={requestBulkDelete}
+      updateTrip={updateTrip}
+      makeCall={makeCall}
+      sendSMS={sendSMS}
+      setTripDetails={setTripDetails}
+      setShowAddTripModal={setShowAddTripModal}
+      setShowUploadModal={setShowUploadModal}
+      onOpenSequencer={() => setShowSequencerModal(true)}
+      onOpenLiveMap={() => setActivePanel('liveMap')}
+      showRightPanel={showRightPanel}
+      onTogglePanel={toggleRightPanel}
+      isOnline={isOnline}
+      phoneNumbers={phoneNumbers}
+    />
+  );
 
   // ==================== PANEL RENDERER ====================
   const renderPanelContent = () => {
@@ -1197,61 +1117,10 @@ const EnterpriseDashboard = ({
         />
       );
       case 'settings': return (
-        <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} initialSection={activePanel === 'archives' ? 'archives' : undefined} />
+        <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} />
       );
-      case 'drive': return driverWorkDrivers.length > 0 && activeDriverWorkDriver ? (
-        <div className="flex h-full min-h-0 flex-col bg-[#f4f7fa]">
-          <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Driver Workstation</p>
-                <p className="truncate text-sm font-black text-slate-900">
-                  {role === 'admin' ? 'Admin' : 'Dispatcher'} operating driver workflow
-                </p>
-              </div>
-              <div className="flex min-w-0 items-center gap-2">
-                <select
-                  value={activeDriverWorkDriver.id}
-                  onChange={(event) => setDriverWorkDriverId(event.target.value)}
-                  className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 sm:min-w-[240px]"
-                >
-                  {driverWorkDrivers.map((driver) => (
-                    <option key={driver.id || driver.email || driver.name} value={driver.id}>
-                      {driver.name || driver.email || driver.id} - {driver.vehicle || 'No vehicle'}
-                    </option>
-                  ))}
-                </select>
-                <span className={`hidden rounded-lg px-2 py-1 text-[10px] font-black sm:inline-flex ${getDriverLiveStatus(activeDriverWorkDriver).color}`}>
-                  {getDriverLiveStatus(activeDriverWorkDriver).label}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="min-h-0 flex-1">
-            <DriverPage
-              currentUser={activeDriverWorkDriver.email || activeDriverWorkDriver.id || currentUser}
-              role="driver"
-              drivers={[activeDriverWorkDriver]}
-              trips={activeDriverWorkTrips}
-              allDrivers={allDrivers}
-              dispatchers={dispatchers}
-              phoneNumbers={phoneNumbers}
-              onUpdateTrip={onUpdateDriverTrip}
-              onCompleteTrip={onCompleteTrip}
-              onDriverStatusUpdate={onDriverStatusUpdate}
-              onAddAuditLog={addAuditLog}
-              onLogout={() => {}}
-              requestAuthAction={requestAuthAction}
-              appSettings={appSettings}
-              onUpdateAppSettings={updateAppSettings}
-              onUpdateDriverLocation={handleUpdateDriverLocation}
-              onOpenSettings={() => setActivePanel('settings')}
-              onAddTrip={addTrip}
-              showAddTripModal={showAddTripModal}
-              setShowAddTripModal={setShowAddTripModal}
-            />
-          </div>
-        </div>
+      case 'drive': return driverWorkDrivers.length > 0 ? (
+        <DriverPage currentUser={currentUser} role={role} drivers={driverWorkDrivers} trips={driverWorkTrips} allDrivers={allDrivers} dispatchers={dispatchers} phoneNumbers={phoneNumbers} onUpdateTrip={onUpdateDriverTrip} onCompleteTrip={onCompleteTrip} onDriverStatusUpdate={onDriverStatusUpdate} onAddAuditLog={addAuditLog} onLogout={() => {}} requestAuthAction={requestAuthAction} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} onUpdateDriverLocation={handleUpdateDriverLocation} onOpenSettings={() => setActivePanel('settings')} onAddTrip={addTrip} showAddTripModal={showAddTripModal} setShowAddTripModal={setShowAddTripModal} />
       ) : renderOperationsPage();
       default: return renderOperationsPage();
     }
@@ -1259,7 +1128,7 @@ const EnterpriseDashboard = ({
 
   // ==================== MAIN LAYOUT ====================
   return (
-    <div className="h-[100dvh] w-full overflow-hidden bg-[#f4f7fa] font-sans text-slate-900">
+    <div className="h-screen w-full overflow-hidden bg-[#f4f7fa] font-sans text-slate-900">
       <div className="flex h-full min-w-0 flex-col">
         {/* Top Header - Desktop only */}
         {renderEnterpriseTopBar()}
@@ -1269,7 +1138,7 @@ const EnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : activePanel === 'reports' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'chat', 'reports', 'admin', 'drive'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+          <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : activePanel === 'reports' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'chat', 'reports'].includes(activePanel) ? '' : 'p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
@@ -1278,11 +1147,11 @@ const EnterpriseDashboard = ({
               </Suspense>
             ) : (
               <div className={
-                activePanel === 'drive' || activePanel === 'admin'
-                  ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0'
+                activePanel === 'drive'
+                  ? 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm flex flex-col flex-1 min-h-0'
                   : activePanel === 'chat'
-                  ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
-                  : 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm overflow-hidden'
+                  ? 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
+                  : 'rounded-[2rem] border border-slate-200/50 bg-white shadow-sm overflow-hidden'
               }>
                 {renderPanelContent()}
               </div>
@@ -1299,18 +1168,10 @@ const EnterpriseDashboard = ({
       {/* Right panel as mobile drawer */}
       <div className="block md:hidden">
         {showRightPanel && (
-          <div className="fixed inset-0 z-[100] flex">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowRightPanel(false)} />
-            <div className="relative w-full bg-white flex flex-col h-full shadow-2xl z-10 animate-in slide-in-from-right duration-300">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
-                <span className="text-sm font-bold text-slate-900">Command Panel</span>
-                <button onClick={() => setShowRightPanel(false)} className="p-2 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors">
-                  <X size={18} className="text-slate-500" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-hidden">
-                {renderRightPanel()}
-              </div>
+          <div className="fixed inset-0 z-[100] flex items-start justify-end">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setShowRightPanel(false)} />
+            <div className="w-[320px] max-w-full bg-white border-l border-slate-200 flex flex-col h-full shadow-xl z-10 relative">
+              {renderRightPanel()}
             </div>
           </div>
         )}
@@ -1404,7 +1265,7 @@ const EnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs ring-1 ring-blue-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400">{d.vehicle} • <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span></p>
+                      <p className="text-xs text-slate-400">{d.vehicle} • {d.status}</p>
                     </div>
                   </div>
                   <span className="text-blue-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
@@ -1459,7 +1320,7 @@ const EnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs ring-1 ring-slate-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400"><span className={`px-1 py-0.5 rounded text-[9px] font-bold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span> • {d.vehicle}</p>
+                      <p className="text-xs text-slate-400">{d.status} • {d.vehicle}</p>
                     </div>
                   </div>
                   <span className="text-slate-400 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>

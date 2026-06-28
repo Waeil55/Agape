@@ -41,11 +41,11 @@ export default function CommandSidebar({
   const completedTrips = todaysTrips.filter(t => t.status === 'Completed');
 
   return (
-    <div className="w-full max-h-[46dvh] shrink-0 border-b border-slate-200/60 bg-slate-50 flex flex-col z-20 shadow-sm relative font-outfit md:w-[400px] md:max-h-none md:border-b-0 md:border-r md:shadow-2xl xl:w-[450px]">
+    <div className="w-[400px] xl:w-[450px] shrink-0 border-r border-slate-200/60 bg-slate-50 flex flex-col z-20 shadow-2xl relative font-outfit">
       
       {/* TABS HEADER */}
-      <div className="bg-white px-3 pt-3 pb-3 border-b border-slate-200 shrink-0 z-10 md:px-4 md:pt-5 md:pb-4">
-        <h2 className="mb-3 text-lg font-black tracking-tight text-slate-900 md:mb-4 md:text-xl">Command <span className="text-blue-600">Center</span></h2>
+      <div className="bg-white px-4 pt-5 pb-4 border-b border-slate-200 shrink-0 z-10">
+        <h2 className="text-xl font-black tracking-tight text-slate-900 mb-4">Command <span className="text-blue-600">Center</span></h2>
         
         {/* Segmented Control */}
         <div className="flex bg-slate-100 p-1 rounded-xl">
@@ -60,7 +60,7 @@ export default function CommandSidebar({
               <button
                 key={tab.id}
                 onClick={() => setLeftTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[11px] font-bold transition-all duration-300 rounded-lg sm:gap-2 sm:text-[12px] ${
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-[12px] font-bold transition-all duration-300 rounded-lg ${
                   isActive 
                     ? 'bg-white text-blue-600 shadow-sm' 
                     : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
@@ -74,7 +74,7 @@ export default function CommandSidebar({
       </div>
 
       {/* CONTENT REGION */}
-      <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-50/50 p-2 space-y-2 custom-scrollbar md:p-3 md:space-y-3">
+      <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-50/50 p-3 space-y-3 custom-scrollbar">
         
         {/* === DRIVERS TAB === */}
         {leftTab === 'drivers' && (

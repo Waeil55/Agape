@@ -98,8 +98,6 @@ const SettingsPage = ({
   onLogout,
   onResetSystem,
   trashedTrips = [],
-  restoreTrip,
-  updateTrashedTrip,
   appSettings,
   onUpdateAppSettings,
   driverProfile,
@@ -112,18 +110,10 @@ const SettingsPage = ({
   dispatchers = [],
   vehicles = [],
   logs = [],
-  initialSection,
 }) => {
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
-  const resolvedInitialSection = initialSection === 'archives' ? 'archived' : initialSection;
-  const [activeSection, setActiveSection] = useState(() => resolvedInitialSection || localStorage.getItem(`agape_settingsSection_${userKey}`) || 'overview');
+  const [activeSection, setActiveSection] = useState(() => localStorage.getItem(`agape_settingsSection_${userKey}`) || 'overview');
   const [showArchivedTrips, setShowArchivedTrips] = useState(false);
-
-  useEffect(() => {
-    if (resolvedInitialSection && resolvedInitialSection !== activeSection) {
-      setActiveSection(resolvedInitialSection);
-    }
-  }, [resolvedInitialSection]);
 
   useEffect(() => {
     localStorage.setItem(`agape_settingsSection_${userKey}`, activeSection);
@@ -171,7 +161,6 @@ const SettingsPage = ({
     ...(role === 'admin' ? [{ group: 'Administration', items: adminNav }] : []),
     { group: 'Personal', items: personalNav },
   ];
-  const mobileNavItems = navItems.flatMap((group) => group.items);
 
   const activeLabel = [...adminNav, ...personalNav].find(s => s.id === activeSection)?.label || '';
 
@@ -645,7 +634,7 @@ const SettingsPage = ({
   };
 
   return (
-    <div className="flex min-h-0 w-full flex-col gap-3 lg:flex-row lg:gap-6">
+    <div className="flex gap-6">
       {/* Sidebar */}
       <div className="w-56 flex-shrink-0 hidden lg:block">
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm sticky top-4">
@@ -673,14 +662,14 @@ const SettingsPage = ({
       </div>
 
       {/* Mobile nav */}
-      <div className="lg:hidden w-full overflow-x-auto no-scrollbar pb-2 -mx-1 px-1 touch-manipulation">
-        <div className="flex gap-1.5">
-          {mobileNavItems.map(item => {
+      <div className="lg:hidden w-full overflow-x-auto pb-2">
+        <div className="flex gap-1">
+          {[...adminNav, ...personalNav].map(item => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;
             return (
-              <button key={item.id} onClick={() => setActiveSection(item.id)} className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl whitespace-nowrap text-xs font-bold transition-all active:scale-[0.97] touch-manipulation ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 active:bg-slate-300'}`}>
-                <Icon size={14} /> {item.label}
+              <button key={item.id} onClick={() => setActiveSection(item.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap text-xs font-bold transition-all ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                <Icon size={13} /> {item.label}
               </button>
             );
           })}
@@ -688,7 +677,7 @@ const SettingsPage = ({
       </div>
 
       {/* Content */}
-      <div className="w-full flex-1 min-w-0">
+      <div className="flex-1 min-w-0">
         {sectionContent()}
       </div>
     </div>

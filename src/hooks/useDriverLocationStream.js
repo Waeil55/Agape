@@ -4,7 +4,6 @@ import {
   buildLocationFraudSignals,
   metersPerSecondToMph,
 } from '../utils/locationFraud';
-import { haversineMiles } from '../utils/driverTelemetry';
 import { db, doc, setDoc } from '../config/firebase';
 
 const getCapacitorGeolocation = () => {
@@ -123,24 +122,8 @@ export function useDriverLocationStream({
       onTrackingChange?.(true);
       setError('');
 
-      const lastSent = lastSentRef.current;
-      const lastSentMs = Date.parse(lastSent?.capturedAt || 0);
-      const elapsedMs = Date.now() - lastSentMs;
-      
-      let shouldFlush = false;
-      if (!Number.isFinite(lastSentMs) || elapsedMs >= 10000) {
-        shouldFlush = true; // throttle time
-      } else if (lastSent && sample.lat && sample.lng) {
-        const dist = haversineMiles(
-          { lat: lastSent.lat, lng: lastSent.lng },
-          { lat: sample.lat, lng: sample.lng }
-        );
-        if (dist > 0.005) { // ~8 meters
-          shouldFlush = true;
-        }
-      }
-
-      if (shouldFlush && !document.hidden) {
+      const lastSentMs = Date.parse(lastSentRef.current?.capturedAt || 0);
+      if (!Number.isFinite(lastSentMs) || Date.now() - lastSentMs >= LOCATION_STREAM_INTERVAL_MS) {
         flushLatestPosition('gps').catch(() => undefined);
       }
     };
@@ -212,6 +195,10 @@ export function useDriverLocationStream({
 
     startWatching();
 
+    const streamTimer = setInterval(() => {
+      flushLatestPosition('interval').catch(() => undefined);
+    }, LOCATION_STREAM_INTERVAL_MS);
+
     // Visibility change: re-acquire GPS immediately when tab becomes active
     const handleVisibility = () => {
       if (document.hidden) {
@@ -233,6 +220,7 @@ export function useDriverLocationStream({
 
     return () => {
       cancelled = true;
+      clearInterval(streamTimer);
       if (visibilityTimer) clearTimeout(visibilityTimer);
       if (capWatchId !== null) {
         const capGeo = getCapacitorGeolocation();

@@ -4,9 +4,8 @@ import {
   Truck,
   BrainCircuit, Phone, MessageSquare,
   ChevronDown, ChevronUp, AlertTriangle, MapPin,
-  Square, CheckSquare, X, ArrowRight, ArrowUp, ArrowDown, TrendingUp, TrendingDown,
-  Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2, Filter,
-  User, Car, Map as MapIcon, Navigation, UserPlus, Flag
+  Square, CheckSquare, X, ArrowRight, TrendingUp, TrendingDown,
+  Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2
 } from 'lucide-react';
 import { db, doc, getDocFromServer } from '../config/firebase';
 import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
@@ -16,7 +15,6 @@ import { getOperationalRoutes } from '../utils/routePlans';
 import EditTripModal from './EditTripModal';
 import CommandIntelligencePanel from './CommandIntelligencePanel';
 import { aiPrioritizeTrips } from '../config/ai';
-import { getDriverLiveStatus } from '../constants/statuses';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -24,7 +22,6 @@ const TIME_SORT_BOTTOM_STATUSES = ['Cancelled', 'No Show', 'Rerouted'];
 const ACTIVE_PROGRESS_STATUSES = ['In Mission', 'En Route', 'At Pickup', 'At Dropoff', 'Assigned', 'In Progress', 'Navigating Pickup', 'Navigating Dropoff', 'In Transit', 'Arrived'];
 const MANIFEST_VIEW_OPTIONS = [
   { value: 'board', label: 'Board' },
-  { value: 'card', label: 'Card' },
   { value: 'table', label: 'Table' },
 ];
 const SORT_OPTIONS = [
@@ -37,9 +34,6 @@ const SORT_OPTIONS = [
   { value: 'tripId', label: 'Sort Trip ID' },
   { value: 'status', label: 'Sort Status' },
   { value: 'reply', label: 'Sort Reply' },
-  { value: 'vehicle', label: 'Sort Vehicle' },
-  { value: 'distance', label: 'Sort Distance' },
-  { value: 'trips', label: 'Sort Trip Count' },
   { value: 'ai', label: 'AI Smart Sort' },
 ];
 const MANIFEST_GROUP_OPTIONS = [
@@ -431,7 +425,6 @@ const OperationsCommandCenter = ({
   const [routeTemplates, setRouteTemplates] = useState([]);
   const [showIntelligence, setShowIntelligence] = useState(() => localStorage.getItem('agape_opsShowIntelligence') !== 'false');
   const [expandedTripIds, setExpandedTripIds] = useState([]);
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [lastIntelRefresh, setLastIntelRefresh] = useState(() => new Date().toISOString());
   const [aiSortOrder, setAiSortOrder] = useState(null);
   const [aiSortLoading, setAiSortLoading] = useState(false);
@@ -524,25 +517,6 @@ const OperationsCommandCenter = ({
       )
     : todayTrips;
 
-  const routeTripMap = useMemo(() => {
-    const map = {};
-    routeTemplates.forEach(template => {
-      (template.sequence || []).forEach(stop => {
-        if (!stop?.clientId) return;
-      map[stop.clientId] = map[stop.clientId] || [];
-      map[stop.clientId].push({
-        routeName: template.name || 'Route Sequence',
-        assignedDriver: template.assignedDriver || null,
-        type: stop.type,
-        templateId: template.id,
-        time: stop.time || '',
-        statusLabel: template.statusLabel || 'Assigned Today',
-      });
-      });
-    });
-    return map;
-  }, [routeTemplates]);
-
   const filteredTrips = useMemo(() => {
     let baseTrips = operationsTab === 'willcall' ? searchedTrips.filter(t => t.time === 'Will Call') : searchedTrips.filter(t => t.time !== 'Will Call');
 
@@ -627,27 +601,6 @@ const OperationsCommandCenter = ({
         if (diff !== 0) return sortDirection === 'desc' ? -diff : diff;
         return compareTimeThenClient(a, b);
       }
-      if (sortBy === 'vehicle') {
-        const aVehicle = String(drivers.find((d) => d.id === a.driverId)?.vehicle || a.driverName || '').toLowerCase();
-        const bVehicle = String(drivers.find((d) => d.id === b.driverId)?.vehicle || b.driverName || '').toLowerCase();
-        const diff = compareText(aVehicle, bVehicle);
-        if (diff !== 0) return sortDirection === 'desc' ? -diff : diff;
-        return compareTimeThenClient(a, b);
-      }
-      if (sortBy === 'distance') {
-        const aDist = Number(a.directDistance) || 0;
-        const bDist = Number(b.directDistance) || 0;
-        const diff = aDist - bDist;
-        if (diff !== 0) return sortDirection === 'desc' ? -diff : diff;
-        return compareTimeThenClient(a, b);
-      }
-      if (sortBy === 'trips') {
-        const aTrips = (routeTripMap[a.id] || []).length;
-        const bTrips = (routeTripMap[b.id] || []).length;
-        const diff = aTrips - bTrips;
-        if (diff !== 0) return sortDirection === 'desc' ? -diff : diff;
-        return compareTimeThenClient(a, b);
-      }
       if (sortBy === 'ai' && aiSortOrder) {
         const ia = aiSortOrder.indexOf(a.id);
         const ib = aiSortOrder.indexOf(b.id);
@@ -656,7 +609,7 @@ const OperationsCommandCenter = ({
       return (originalOrder.get(a.id) || 0) - (originalOrder.get(b.id) || 0);
     });
     return result;
-  }, [searchedTrips, filterStatus, filterUrgency, driverFilter, serviceFilter, sortBy, sortDirection, timeSortBottomInactive, operationsTab, aiSortOrder, drivers, routeTripMap]);
+  }, [searchedTrips, filterStatus, filterUrgency, driverFilter, serviceFilter, sortBy, sortDirection, timeSortBottomInactive, operationsTab, aiSortOrder, drivers]);
 
   useEffect(() => {
     setManifestLimit(150);
@@ -696,6 +649,25 @@ const OperationsCommandCenter = ({
     };
   }, []);
 
+  const routeTripMap = useMemo(() => {
+    const map = {};
+    routeTemplates.forEach(template => {
+      (template.sequence || []).forEach(stop => {
+        if (!stop?.clientId) return;
+      map[stop.clientId] = map[stop.clientId] || [];
+      map[stop.clientId].push({
+        routeName: template.name || 'Route Sequence',
+        assignedDriver: template.assignedDriver || null,
+        type: stop.type,
+        templateId: template.id,
+        time: stop.time || '',
+        statusLabel: template.statusLabel || 'Assigned Today',
+      });
+      });
+    });
+    return map;
+  }, [routeTemplates]);
+
   const openTripDetails = (trip) => {
     setTripDetails(null);
     setExpandedTripIds((prev) => (
@@ -714,174 +686,6 @@ const OperationsCommandCenter = ({
         : [...prev, tripId]
     ));
   }, []);
-
-  const getTripDriver = useCallback((trip) => (
-    drivers.find((driver) => (
-      driver.id === trip?.driverId ||
-      driver.email === trip?.driverEmail ||
-      (trip?.driverName && driver.name === trip.driverName)
-    ))
-  ), [drivers]);
-
-  const applyTripStatusWithAudit = useCallback((trip, status, extraFields = {}, auditTitle = 'Trip Updated') => {
-    if (!trip?.id || !updateTrip) return;
-    const nowIso = new Date().toISOString();
-    const driver = getTripDriver(trip);
-    const updates = {
-      status,
-      workflowUpdatedAt: nowIso,
-      updatedBy: currentUser,
-      ...extraFields,
-    };
-    if (driver) {
-      updates.driverId = trip.driverId || driver.id;
-      updates.driverName = trip.driverName || driver.name;
-      updates.driverEmail = trip.driverEmail || driver.email || null;
-    }
-    updateTrip(trip.id, updates);
-    const diffs = Object.entries(updates)
-      .filter(([field, value]) => String(trip?.[field] ?? '') !== String(value ?? ''))
-      .map(([field, value]) => ({ field, before: trip?.[field], after: value }));
-    addAuditLog?.(
-      auditTitle,
-      `${currentUser || 'Dispatcher'} updated ${trip.patient || trip.id} to ${status}.`,
-      status === 'Completed' ? 'emerald' : status === 'Cancelled' || status === 'No Show' ? 'rose' : 'blue',
-      {
-        entity: 'trip',
-        id: trip.id,
-        diffs,
-        summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '--'} -> ${diff.after ?? '--'}`).join('; '),
-      }
-    );
-    addToast?.(auditTitle, `${trip.patient || 'Trip'} is now ${status}.`, status === 'Cancelled' || status === 'No Show' ? 'warning' : 'success');
-  }, [addAuditLog, addToast, currentUser, getTripDriver, updateTrip]);
-
-  const markTripException = useCallback((trip, status) => {
-    const run = () => applyTripStatusWithAudit(trip, status, {
-      exceptionAt: new Date().toISOString(),
-      exceptionBy: currentUser,
-      exceptionSource: role,
-    }, `Marked ${status}`);
-    if (requestAuthAction && ['Cancelled', 'No Show', 'Rerouted'].includes(status)) {
-      requestAuthAction(`Mark ${trip.patient || 'trip'} as ${status}`, run);
-      return;
-    }
-    run();
-  }, [applyTripStatusWithAudit, currentUser, requestAuthAction, role]);
-
-  const applyDriverWorkStep = useCallback((trip, step) => {
-    const driver = getTripDriver(trip);
-    if (!driver) {
-      setManualAssignTrip(trip);
-      return;
-    }
-    const nowIso = new Date().toISOString();
-    const base = {
-      driverId: trip.driverId || driver.id,
-      driverName: trip.driverName || driver.name,
-      driverEmail: trip.driverEmail || driver.email || null,
-      driverWorkUpdatedBy: currentUser,
-      driverWorkUpdatedByRole: role,
-    };
-    const stepConfig = {
-      start: {
-        status: 'Navigating Pickup',
-        title: 'Driver Work Started',
-        fields: { ...base, startedAt: trip.startedAt || nowIso },
-      },
-      pickup: {
-        status: 'At Pickup',
-        title: 'Pickup Reached',
-        fields: { ...base, arrivalTime: trip.arrivalTime || nowIso },
-      },
-      transport: {
-        status: 'In Transit',
-        title: 'Transport Started',
-        fields: { ...base, departedPickupTime: trip.departedPickupTime || nowIso },
-      },
-      dropoff: {
-        status: 'At Dropoff',
-        title: 'Dropoff Reached',
-        fields: { ...base, arrivalDropoffTime: trip.arrivalDropoffTime || nowIso },
-      },
-      complete: {
-        status: 'Completed',
-        title: 'Trip Completed',
-        fields: {
-          ...base,
-          completedAt: trip.completedAt || nowIso,
-          completedBy: currentUser,
-          completedVehicle: trip.completedVehicle || driver.vehicle || '',
-          dispatcherCompletionOverride: true,
-        },
-      },
-    };
-    const config = stepConfig[step];
-    if (!config) return;
-    const run = () => applyTripStatusWithAudit(trip, config.status, config.fields, config.title);
-    if (step === 'complete' && requestAuthAction) {
-      requestAuthAction(`Complete driver work for ${trip.patient || 'trip'}`, run);
-      return;
-    }
-    run();
-  }, [applyTripStatusWithAudit, currentUser, getTripDriver, requestAuthAction, role, setManualAssignTrip]);
-
-  const renderDriverWorkActions = (trip) => {
-    const driver = getTripDriver(trip);
-    const terminal = TERMINAL_STATUSES.includes(trip.status);
-    if (!driver) {
-      return (
-        <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-blue-700">Driver Work</p>
-              <p className="text-xs font-semibold text-blue-900">Assign a driver before running workflow steps.</p>
-            </div>
-            <button type="button" onClick={() => setManualAssignTrip(trip)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-700">
-              <UserPlus size={14} /> Assign Driver
-            </button>
-          </div>
-        </div>
-      );
-    }
-    const workButtons = [
-      { id: 'start', label: 'Start', icon: Navigation },
-      { id: 'pickup', label: 'Pickup', icon: MapPin },
-      { id: 'transport', label: 'Transport', icon: Truck },
-      { id: 'dropoff', label: 'Dropoff', icon: Flag },
-      { id: 'complete', label: 'Complete', icon: CheckCircle2 },
-    ];
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-2.5">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Driver Work</p>
-            <p className="text-xs font-semibold text-slate-700 truncate">{driver.name} - {driver.vehicle || 'No vehicle'}</p>
-          </div>
-          <span className={`rounded-lg px-2 py-1 text-[10px] font-black ${getDriverLiveStatus(driver).color}`}>
-            {getDriverLiveStatus(driver).label}
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {workButtons.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              disabled={terminal && id !== 'complete'}
-              onClick={() => applyDriverWorkStep(trip, id)}
-              className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-black transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
-                id === 'complete'
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <Icon size={14} /> {label}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   const renderExpandedTripDetails = (trip, options = {}) => {
     const { compact = false, embeddedInTable = false } = options;
@@ -1230,145 +1034,202 @@ const OperationsCommandCenter = ({
   }, [drivers, manifestGroupBy, visibleTrips]);
 
   // ==================== CONTROL BAR (DEDUPED COMMAND STRIP) ====================
-
   const renderControlBar = () => (
-    <div className="flex flex-col gap-3 px-3 py-3 border-b border-slate-200 bg-white shrink-0 sticky top-0 z-20 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        {/* Main Tabs */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <div className="flex items-center gap-0.5 shrink-0 bg-[#e8eff6] p-1 rounded-full">
-            {['manifest', 'willcall', 'fleet'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setOperationsTab(tab)}
-                className={`px-4 py-1.5 rounded-full text-xs font-black transition-all duration-200 uppercase tracking-wider ${
-                  operationsTab === tab
-                    ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/30'
-                }`}
-              >
-                {tab === 'manifest' ? 'Manifest' : tab === 'willcall' ? 'Will Call' : 'Fleet'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Global Toolbar Actions (Right) */}
-        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-          <button
-            type="button"
-            onClick={() => setShowAddTripModal(true)}
-            className="inline-flex items-center gap-1 rounded-lg bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors"
-          >
-            <Plus size={14} /> Trip
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowUploadModal(true)}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors hidden sm:flex"
-          >
-            <UploadCloud size={14} /> Upload
-          </button>
-          <button
-            type="button"
-            onClick={() => onOpenSequencer?.()}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors hidden sm:flex"
-          >
-            <Route size={14} /> Routes
-          </button>
-          <button
-            type="button"
-            onClick={() => onOpenLiveMap?.()}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            <MapPin size={14} /> Map
-          </button>
-          
-          <div className="hidden lg:flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
-            <Search size={14} className="text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search"
-              className="w-32 bg-transparent text-xs font-medium text-slate-700 placeholder:text-slate-400 outline-none"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Sorting / Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 rounded-xl p-2 border border-slate-100">
-        <div className="flex items-center gap-2 text-slate-500 font-bold text-[11px] uppercase tracking-wider px-2 shrink-0">
-          <Filter size={14} />
-          <span>Sort & Filter:</span>
-        </div>
-        
-        <div className="flex flex-wrap gap-2 flex-1">
-          {[
-            { id: 'time', label: 'Time' },
-            { id: 'assignment', label: 'Driver' },
-            { id: 'status', label: 'Status' },
-            { id: 'patient', label: 'Client' },
-            { id: 'urgency', label: 'Urgency' }
-          ].map(option => (
+    <div className="flex items-center justify-between gap-3 px-2 py-1.5 border-b border-slate-200 bg-white shrink-0 overflow-x-auto no-scrollbar sticky top-0 z-20 shadow-sm">
+      <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-0.5 shrink-0 bg-[#e8eff6] p-1 rounded-full">
+          {['manifest', 'willcall', 'fleet'].map(tab => (
             <button
-              key={option.id}
-              onClick={() => {
-                if (sortBy === option.id) {
-                  setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-                } else {
-                  handleSortSelect(option.id);
-                }
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                sortBy === option.id 
-                  ? 'bg-blue-100 text-blue-800 border-transparent shadow-sm' 
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'
+              key={tab}
+              onClick={() => setOperationsTab(tab)}
+              className={`px-4 py-1.5 rounded-full text-xs font-black transition-all duration-200 uppercase tracking-wider ${
+                operationsTab === tab
+                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/30'
               }`}
             >
-              {option.label}
-              {sortBy === option.id && (
-                sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-              )}
+              {tab === 'manifest' ? 'Manifest' : tab === 'willcall' ? 'Will Call' : 'Fleet'}
             </button>
           ))}
-          
-          <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block"></div>
-          
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer shadow-sm">
-            <option value="all">Status: All</option>
-            <option value="Unassigned">Status: Unassigned</option>
-            <option value="Assigned">Status: Assigned</option>
-            <option value="in-progress">Status: In Progress</option>
-            <option value="Completed">Status: Completed</option>
-          </select>
-          
-          <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer shadow-sm">
-            <option value="all">Driver: All</option>
-            <option value="unassigned">Driver: None</option>
-            {driverOptions.map((driver) => (
-              <option key={driver.id} value={driver.id}>{driver.name}</option>
-            ))}
-          </select>
-
-          <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
-            {MANIFEST_VIEW_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setManifestView(option.value)}
-                className={`h-7 rounded-md px-2.5 text-[10px] font-black uppercase tracking-wide transition-colors ${
-                  manifestView === option.value
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-                }`}
-              >
-                {option.value === 'card' ? 'Cards' : option.value === 'table' ? 'Ledger' : option.label}
-              </button>
-            ))}
-          </div>
         </div>
+
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-xl text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+          <option value="all">All</option>
+          <option value="Unassigned">Unassigned</option>
+          <option value="Assigned">Assigned</option>
+          <option value="in-progress">In Progress</option>
+          <option value="In Mission">In Mission</option>
+          <option value="Completed">Completed</option>
+          <option value="Cancelled">Cancelled</option>
+          <option value="No Show">No Show</option>
+          <option value="Rerouted">Rerouted</option>
+        </select>
+
+        <div className="flex items-center gap-1">
+          <select value={sortBy} onChange={(e) => handleSortSelect(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-xl text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          {sortBy !== 'ai' && (
+            <button
+              type="button"
+              onClick={() => setSortDirection((prev) => prev === 'asc' ? 'desc' : 'asc')}
+              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50"
+              title="Toggle sort direction"
+            >
+              {sortDirection === 'asc' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+              {sortDirection === 'asc' ? 'Asc' : 'Desc'}
+            </button>
+          )}
+          {sortBy === 'time' && (
+            <button
+              type="button"
+              onClick={() => setTimeSortBottomInactive((prev) => !prev)}
+              className={`inline-flex items-center gap-1 rounded-xl border px-2 py-1 text-[10px] font-bold transition-colors ${
+                timeSortBottomInactive
+                  ? 'border-blue-200 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+              title="Keep Cancelled, No Show, and Rerouted trips at the bottom while sorting by schedule"
+            >
+              {timeSortBottomInactive ? <CheckCircle2 size={11} /> : <Square size={11} />}
+              Closed bottom
+            </button>
+          )}
+          {sortBy === 'ai' && aiSortLoading && <Loader2 size={11} className="text-blue-600 animate-spin shrink-0" />}
+        </div>
+        <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-xl text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+          <option value="all">Drivers</option>
+          <option value="unassigned">No Driver</option>
+          {driverOptions.map((driver) => (
+            <option key={driver.id} value={driver.id}>{driver.name}</option>
+          ))}
+        </select>
+
+      </div>
+
+      <div className="flex items-center gap-1 shrink-0 ml-auto">
+        <button
+          type="button"
+          onClick={() => setShowAddTripModal(true)}
+          className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 transition hover:bg-blue-100"
+        >
+          <Plus size={11} /> Trip
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowUploadModal(true)}
+          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-50"
+        >
+          <UploadCloud size={11} /> Upload
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpenSequencer?.()}
+          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-50"
+        >
+          <Route size={11} /> Routes
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpenLiveMap?.()}
+          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-50"
+        >
+          <MapPin size={11} /> Map
+        </button>
+
+        <div className="hidden lg:flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1">
+          <Search size={11} className="text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search"
+            className="w-28 bg-transparent text-[10px] font-medium text-slate-700 placeholder:text-slate-400 outline-none"
+          />
+          {searchQuery && (
+            <button type="button" onClick={() => setSearchQuery('')} className="text-slate-400 transition hover:text-slate-600" title="Clear search">
+              <X size={11} />
+            </button>
+          )}
+        </div>
+        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+          className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer" />
+
+        {operationsTab === 'manifest' && (
+          <>
+            <select value={manifestView} onChange={(e) => setManifestView(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+              {MANIFEST_VIEW_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            {manifestView === 'board' && (
+              <select value={manifestGroupBy} onChange={(e) => setManifestGroupBy(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+                {MANIFEST_GROUP_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowOnlyAttention((prev) => !prev)}
+              className={`rounded-md border px-2 py-1 text-[10px] font-semibold transition-colors ${
+                showOnlyAttention
+                  ? 'border-rose-200 bg-rose-50 text-rose-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              Attention Only
+            </button>
+          </>
+        )}
+
+        <select value={manifestDensity} onChange={(e) => setManifestDensity(e.target.value)} className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer">
+          {DENSITY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+
+        {selectedTasks.length > 0 && (
+          <>
+            <button onClick={() => setBulkAssignModal(true)} className="flex items-center gap-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-semibold transition-colors shrink-0 border border-emerald-200">
+              <Users size={11} /> Assign {selectedTasks.length}
+            </button>
+            <button onClick={() => requestBulkDelete(selectedTasks, () => setSelectedTasks([]))} className="flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-md text-[10px] font-semibold transition-colors shrink-0 border border-rose-200">
+              <Archive size={11} /> Archive {selectedTasks.length}
+            </button>
+            {hasPermission(role, 'canSendSms') && (
+            <button onClick={() => setShowSmsModal(true)} className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-[10px] font-semibold transition-colors shrink-0 border border-blue-200">
+              <MessageSquare size={11} /> SMS {selectedTasks.length}
+            </button>
+            )}
+          </>
+        )}
+
+        <button
+          onClick={() => setShowIntelligence(prev => !prev)}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all shrink-0 border ${
+            showIntelligence
+              ? 'bg-slate-900 text-white border-slate-900'
+              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+          }`}
+          title={showIntelligence ? 'Hide Enterprise Intelligence' : 'Show Enterprise Intelligence'}
+        >
+          <BrainCircuit size={11} /> Intel
+        </button>
+
+        <button
+          type="button"
+          onClick={onTogglePanel}
+          className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold transition ${
+            showRightPanel
+              ? 'border-slate-900 bg-slate-900 text-white'
+              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <PanelRight size={11} /> Panel
+        </button>
       </div>
     </div>
   );
@@ -1379,141 +1240,335 @@ const OperationsCommandCenter = ({
     const urgency = getTripUrgencyLevel(trip);
     const isLate = urgency === 'late';
     const driver = drivers.find((entry) => entry.id === trip.driverId);
-    
-    // Formatting logic
-    const timeDisplay = to12hr(trip.time);
-    const urgencyDisplay = isLate ? 'LATE' : urgency === 'soon' ? 'SOON' : null;
-    const passengerName = trip.patient || 'Unnamed Client';
-    const distanceTop = trip.estMiles ? `${trip.estMiles} mi` : (trip.distance ? `${trip.distance} mi` : '');
-    const legsCount = trip.type || trip.serviceType || 'TRIP';
-    const pickupAddress = trip.pickup || 'Missing pickup address';
-    const dropoffAddress = trip.dropoff || 'Missing dropoff address';
-    const driverName = driver ? driver.name : 'Unassigned';
-    const driverCar = driver ? (driver.vehicle || 'Active') : 'N/A';
-    const etaDisplay = trip.eta || 'Pending';
-    const routeMileage = trip.estMiles ? `${trip.estMiles} mi` : (trip.distance ? `${trip.distance} mi` : 'N/A');
+    const routeAssignments = routeTripMap[trip.id] || [];
+    const bookingReference = getBookingReference(trip);
+    const clientIdentifier = getClientIdentifier(trip);
+    const clientPhone = formatPhoneDisplay(trip.patientPhone || trip.pickupPhone);
+    const pickupPhone = formatPhoneDisplay(trip.pickupPhone);
+    const dropoffPhone = formatPhoneDisplay(trip.dropoffPhone);
+    const pickupFacilityName = getPickupFacilityName(trip);
+    const dropoffFacilityName = getDropoffFacilityName(trip);
+    const serviceLabel = trip.type || trip.serviceType;
+    const clientSummary = [bookingReference, clientIdentifier && `ID ${clientIdentifier}`, serviceLabel].filter(Boolean).join(' • ');
+    const visibleRouteAssignments = routeAssignments.slice(0, densityProfile.routeChipLimit);
+
+    const cardClasses = `rounded-2xl border bg-white transition-all duration-150 ${densityProfile.cardPadding} shadow-sm ${
+      isSelected
+        ? 'border-blue-300 ring-1 ring-blue-500/20'
+        : isExpanded
+          ? 'border-blue-300 ring-1 ring-blue-500/15 shadow-md'
+          : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+    }`;
+
+    if (densityProfile.lineCount === 1) {
+      return (
+        <div key={trip.id} className={cardClasses}>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id]); }} className={`shrink-0 rounded p-0.5 transition-all duration-150 ${isSelected ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`} title={isSelected ? 'Deselect trip' : 'Select trip'}>
+              {isSelected ? <CheckSquare size={12} /> : <Square size={12} />}
+            </button>
+            <span className={`shrink-0 font-mono font-bold text-[10px] ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-emerald-600'}`}>{to12hr(trip.time)}</span>
+            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${getStatusPillClass(trip.status)}`}>{trip.status}</span>
+            <button onClick={(e) => { e.stopPropagation(); setSmsConversationTrip(trip); }} className="shrink-0 rounded p-0.5 hover:bg-slate-100 transition-colors" title="View messages">
+              {trip.clientConfirmation === 'confirmed' ? <CheckCircle2 size={10} className="text-emerald-500" />
+              : trip.clientConfirmation === 'not_coming' ? <XCircle size={10} className="text-rose-500" />
+              : <MessageSquare size={10} className="text-slate-300 hover:text-slate-500" />}
+            </button>
+            <span className="truncate text-[11px] font-black text-slate-900">{trip.patient || 'Unnamed Client'}</span>
+            {routeAssignments.length > 0 && (
+              <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">
+                <Route size={9} /> {routeAssignments[0].routeName}
+              </span>
+            )}
+            <span className="hidden md:inline truncate text-[10px] text-slate-500 font-medium">{trip.pickup || ''}</span>
+            <span className="hidden md:inline text-[10px] text-slate-300">→</span>
+            <span className="hidden md:inline truncate text-[10px] text-slate-500 font-medium">{trip.dropoff || ''}</span>
+            {clientPhone && <span className="shrink-0 text-[9px] font-semibold text-emerald-700">{clientPhone}</span>}
+            {driver && <span className="hidden lg:inline truncate text-[10px] text-slate-500">{driver.name}</span>}
+            <div className="ml-auto flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => toggleTripExpanded(trip.id)}
+                className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                title={isExpanded ? 'Collapse trip details' : 'Expand trip details'}
+              >
+                {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              </button>
+              {!driver && (
+                <>
+                  <button onClick={() => triggerSmartAssign(trip)} className="rounded p-0.5 text-indigo-600 hover:bg-indigo-100" title="AI assign"><BrainCircuit size={12} /></button>
+                  <button onClick={() => setManualAssignTrip(trip)} className="rounded p-0.5 text-blue-600 hover:bg-blue-100" title="Assign driver"><Users size={12} /></button>
+                </>
+              )}
+              <button onClick={() => setEditTrip(trip)} className="rounded p-0.5 text-slate-400 hover:bg-blue-100 hover:text-blue-600" title="Edit trip"><Edit2 size={12} /></button>
+              {hasPermission(role, 'canDeleteTrip') && (
+                <button onClick={() => requestDeleteTrip(trip.id)} className="rounded p-0.5 text-slate-400 hover:bg-rose-100 hover:text-rose-600" title="Archive trip"><Archive size={12} /></button>
+              )}
+            </div>
+          </div>
+          {isExpanded && renderExpandedTripDetails(trip, { compact: true })}
+        </div>
+      );
+    }
+
+    if (densityProfile.lineCount === 2) {
+      return (
+        <div key={trip.id} className={cardClasses}>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id]); }} className={`shrink-0 rounded p-0.5 transition-all duration-150 ${isSelected ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`} title={isSelected ? 'Deselect trip' : 'Select trip'}>
+              {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+            </button>
+            <span className={`shrink-0 font-mono font-bold text-xs ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-emerald-600'}`}>{to12hr(trip.time)}</span>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${getStatusPillClass(trip.status)}`}>{trip.status}</span>
+            <button onClick={(e) => { e.stopPropagation(); setSmsConversationTrip(trip); }} className="shrink-0 rounded p-0.5 hover:bg-slate-100 transition-colors" title="View messages">
+              {trip.clientConfirmation === 'confirmed' ? <CheckCircle2 size={11} className="text-emerald-500" />
+              : trip.clientConfirmation === 'not_coming' ? <XCircle size={11} className="text-rose-500" />
+              : <MessageSquare size={11} className="text-slate-300 hover:text-slate-500" />}
+            </button>
+            {(trip.type || trip.serviceType) && (
+              <span className="shrink-0 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{trip.type || trip.serviceType}</span>
+            )}
+            <span className="truncate text-sm font-black text-slate-900">{trip.patient || 'Unnamed Client'}</span>
+            {routeAssignments.length > 0 && (
+              <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                <Route size={10} /> {routeAssignments[0].routeName}{routeAssignments.length > 1 ? ` +${routeAssignments.length - 1}` : ''}
+              </span>
+            )}
+            {clientPhone && <span className="shrink-0 text-[10px] font-semibold text-emerald-700">{clientPhone}</span>}
+            <div className="ml-auto flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => toggleTripExpanded(trip.id)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                title={isExpanded ? 'Collapse trip details' : 'Expand trip details'}
+              >
+                {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
+              {!driver && (
+                <>
+                  <button onClick={() => triggerSmartAssign(trip)} className="rounded-lg p-1 text-indigo-600 hover:bg-indigo-100" title="AI assign"><BrainCircuit size={13} /></button>
+                  <button onClick={() => setManualAssignTrip(trip)} className="rounded-lg p-1 text-blue-600 hover:bg-blue-100" title="Assign driver"><Users size={13} /></button>
+                </>
+              )}
+              <button onClick={() => setEditTrip(trip)} className="rounded-lg p-1 text-slate-400 hover:bg-blue-100 hover:text-blue-600" title="Edit trip"><Edit2 size={13} /></button>
+              {hasPermission(role, 'canDeleteTrip') && (
+                <button onClick={() => requestDeleteTrip(trip.id)} className="rounded-lg p-1 text-slate-400 hover:bg-rose-100 hover:text-rose-600" title="Archive trip"><Archive size={13} /></button>
+              )}
+            </div>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+            <div className="flex min-w-0 items-center gap-1.5 text-[10px]">
+              <span className="font-medium text-emerald-700">P:</span>
+              <span className="truncate text-slate-700">{trip.pickup || 'Missing pickup address'}</span>
+            </div>
+            <span className="text-slate-300">→</span>
+            <div className="flex min-w-0 items-center gap-1.5 text-[10px]">
+              <span className="font-medium text-rose-700">D:</span>
+              <span className="truncate text-slate-700">{trip.dropoff || 'Missing dropoff address'}</span>
+            </div>
+            {driver && (
+              <span className="text-[10px] text-slate-500">{driver.name}</span>
+            )}
+            {clientPhone && (
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => makeCall(trip.patientPhone || trip.pickupPhone, trip.patient)} className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700 hover:bg-emerald-100"><Phone size={10} /> Call</button>
+                <button onClick={() => openSmsForTrip(trip)} className="inline-flex items-center gap-0.5 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-700 hover:bg-blue-100"><MessageSquare size={10} /> Text</button>
+                {dropoffPhone && <button onClick={() => makeCall(trip.dropoffPhone, trip.dropoff)} className="inline-flex items-center gap-0.5 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[9px] font-bold text-rose-700 hover:bg-rose-100"><Phone size={10} /> Hosp</button>}
+              </div>
+            )}
+          </div>
+          {isExpanded && renderExpandedTripDetails(trip, { compact: true })}
+        </div>
+      );
+    }
 
     return (
-      <div key={trip.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 transition-all duration-200 hover:shadow-md hover:border-slate-300">
-        {/* Top Row */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <button 
-              type="button" 
-              onClick={(e) => { e.stopPropagation(); setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id]); }}
-              className={`shrink-0 transition-colors ${isSelected ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              {isSelected ? <CheckSquare size={20} /> : <Square size={20} />}
-            </button>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <Clock size={16} className={isLate ? 'text-rose-500' : 'text-orange-500'} />
-              <span className={`font-bold text-base md:text-lg ${isLate ? 'text-rose-600' : 'text-orange-600'}`}>{timeDisplay}</span>
-              {urgencyDisplay && (
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${isLate ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>
-                  {urgencyDisplay}
-                </span>
-              )}
-            </div>
-            <span className="hidden md:inline text-slate-300 font-bold mx-1 shrink-0">•</span>
-            <span className="font-bold text-slate-800 uppercase truncate max-w-[120px] md:max-w-none">
-              {passengerName}
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-2 md:gap-3 shrink-0 ml-2">
-            {distanceTop && <span className="hidden md:inline text-xs text-slate-500 font-medium">{distanceTop}</span>}
-            <span className="border border-slate-200 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase bg-slate-50">
-              {legsCount}
-            </span>
-          </div>
-        </div>
-
-        {/* Addresses & Expand Button */}
-        <div className="flex items-start justify-between">
-          <div className="flex-1 space-y-3 min-w-0">
-            <div className="flex items-start gap-3">
-              <div className="mt-1.5 w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 shadow-sm" />
-              <span className="text-slate-600 text-xs md:text-sm leading-relaxed break-words font-medium">{pickupAddress}</span>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="mt-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 shadow-sm" />
-              <span className="text-slate-600 text-xs md:text-sm leading-relaxed break-words font-medium">{dropoffAddress}</span>
-            </div>
-          </div>
-
-          <button 
-            onClick={() => toggleTripExpanded(trip.id)}
-            className="ml-3 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors shrink-0"
+      <div key={trip.id} className={cardClasses}>
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id]);
+            }}
+            className={`mt-0.5 rounded p-0.5 transition-all duration-150 ${isSelected ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+            title={isSelected ? 'Deselect trip' : 'Select trip'}
           >
-            {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
           </button>
-        </div>
 
-        {/* Dispatcher Extra Info Line */}
-        <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50/50 -mx-4 px-4 pb-1">
-          <div className="flex items-center gap-2 min-w-0">
-            <User size={14} className="text-slate-400 shrink-0" />
-            <span className="text-[11px] font-medium text-slate-700 truncate">
-              {driver ? driverName : <span className="text-rose-500 italic">Unassigned</span>}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 min-w-0">
-            <Car size={14} className="text-slate-400 shrink-0" />
-            <span className="text-[11px] font-medium text-slate-700 truncate">{driverCar}</span>
-          </div>
-          <div className="flex items-center gap-2 min-w-0">
-            <Navigation size={14} className="text-slate-400 shrink-0" />
-            <span className="text-[11px] font-medium text-slate-700 truncate">ETA: {etaDisplay}</span>
-          </div>
-          <div className="flex items-center gap-2 min-w-0">
-            <MapIcon size={14} className="text-slate-400 shrink-0" />
-            <span className="text-[11px] font-medium text-slate-700 truncate">{routeMileage}</span>
-          </div>
-        </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className={`font-mono font-bold ${densityProfile.cardTime} ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {to12hr(trip.time)}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${getStatusPillClass(trip.status)}`}>
+                    {trip.status}
+                  </span>
+                  <button onClick={(e) => { e.stopPropagation(); setSmsConversationTrip(trip); }} className="shrink-0 rounded p-0.5 hover:bg-slate-100 transition-colors" title="View messages">
+                    {trip.clientConfirmation === 'confirmed' ? <CheckCircle2 size={11} className="text-emerald-500" />
+                    : trip.clientConfirmation === 'not_coming' ? <XCircle size={11} className="text-rose-500" />
+                    : <MessageSquare size={11} className="text-slate-300 hover:text-slate-500" />}
+                  </button>
+                  {(trip.type || trip.serviceType) && (
+                    <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                      {trip.type || trip.serviceType}
+                    </span>
+                  )}
+                  {bookingReference && (
+                    <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                      {bookingReference}
+                    </span>
+                  )}
+                  {clientIdentifier && (
+                    <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                      {clientIdentifier}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <p className={`truncate font-black text-slate-900 ${densityProfile.cardTitle}`}>{trip.patient || 'Unnamed Client'}</p>
+                  {routeAssignments.length > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                      <Route size={10} /> {routeAssignments[0].routeName}{routeAssignments.length > 1 ? ` +${routeAssignments.length - 1}` : ''}
+                    </span>
+                  )}
+                </div>
+                {clientSummary && (
+                  <div className="mt-1 text-[10px] font-semibold text-slate-500" style={getClampStyle(densityProfile.lineCount)}>
+                    {clientSummary}
+                  </div>
+                )}
+              </div>
 
-        {/* Expanded Actions Panel */}
-        {isExpanded && (
-          <div className="mt-3 space-y-2 border-t border-slate-100 pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-              <button onClick={() => setManualAssignTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-blue-700">
-                <UserPlus size={14} /> {driver ? 'Reassign' : 'Assign'}
-              </button>
-              <button onClick={() => triggerSmartAssign(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-indigo-700">
-                <BrainCircuit size={14} /> Auto
-              </button>
-              <button onClick={() => setEditTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition-colors hover:bg-blue-100">
-                <Edit2 size={14} /> Edit
-              </button>
-              <button onClick={() => markTripException(trip, 'Rerouted')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-amber-600">
-                <MapPin size={14} /> Reroute
-              </button>
-              <button onClick={() => markTripException(trip, 'No Show')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-700 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-slate-800">
-                <AlertCircle size={14} /> No Show
-              </button>
-              <button onClick={() => markTripException(trip, 'Cancelled')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-rose-600">
-                <XCircle size={14} /> Cancel
-              </button>
-              <button onClick={() => requestDeleteTrip(trip.id)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700 transition-colors hover:bg-slate-200">
-                <Archive size={14} /> Archive
-              </button>
-              {(trip.patientPhone || trip.pickupPhone || trip.dropoffPhone) && (
-                <button onClick={() => makeCall(trip.patientPhone || trip.pickupPhone, trip.patient)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-teal-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-teal-600">
-                  <Phone size={14} /> Call
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={() => toggleTripExpanded(trip.id)}
+                  className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  title={isExpanded ? 'Collapse trip details' : 'Expand trip details'}
+                >
+                  {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
-              )}
-              <button onClick={() => setSmsConversationTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-indigo-600">
-                <MessageSquare size={14} /> SMS
-              </button>
+                {!driver && (
+                  <>
+                    <button onClick={() => triggerSmartAssign(trip)} className="rounded-lg p-1.5 text-indigo-600 transition-colors hover:bg-indigo-100" title="AI assign">
+                      <BrainCircuit size={14} />
+                    </button>
+                    <button onClick={() => setManualAssignTrip(trip)} className="rounded-lg p-1.5 text-blue-600 transition-colors hover:bg-blue-100" title="Assign driver">
+                      <Users size={14} />
+                    </button>
+                  </>
+                )}
+                <button onClick={() => setEditTrip(trip)} className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-blue-100 hover:text-blue-600" title="Edit trip">
+                  <Edit2 size={14} />
+                </button>
+                {hasPermission(role, 'canDeleteTrip') && (
+                  <button onClick={() => requestDeleteTrip(trip.id)} className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-100 hover:text-rose-600" title="Archive trip">
+                    <Archive size={14} />
+                  </button>
+                )}
+              </div>
             </div>
-            {renderDriverWorkActions(trip)}
+
+            <div className={`grid ${isReportDensity ? 'mt-2 gap-2' : 'mt-3 gap-3'} ${densityProfile.sectionGrid}`}>
+              <div className={`${isReportDensity ? 'space-y-1.5' : 'space-y-2'} min-w-0`}>
+                <div className={`border border-blue-100 bg-blue-50/70 ${isReportDensity ? 'rounded-lg px-2.5 py-1.5' : 'rounded-xl px-3 py-2'}`}>
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-blue-700">Pickup</div>
+                  {densityProfile.showFacilityNames && pickupFacilityName && (
+                    <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-semibold uppercase tracking-wide text-blue-800`}>
+                      {pickupFacilityName}
+                    </div>
+                  )}
+                  <div className={`${isReportDensity ? 'mt-0.5 text-[11px]' : 'mt-0.5 text-xs'} font-semibold leading-snug text-slate-800 break-words`} style={getClampStyle(densityProfile.lineCount)}>{trip.pickup || 'Missing pickup address'}</div>
+                  {clientPhone && <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-blue-700`}>Client {clientPhone}</div>}
+                  {densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-blue-700`}>Pickup desk {pickupPhone}</div>}
+                </div>
+                <div className={`border border-emerald-100 bg-emerald-50/70 ${isReportDensity ? 'rounded-lg px-2.5 py-1.5' : 'rounded-xl px-3 py-2'}`}>
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Dropoff</div>
+                  {densityProfile.showFacilityNames && dropoffFacilityName && (
+                    <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-semibold uppercase tracking-wide text-emerald-800`}>
+                      {dropoffFacilityName}
+                    </div>
+                  )}
+                  <div className={`${isReportDensity ? 'mt-0.5 text-[11px]' : 'mt-0.5 text-xs'} font-semibold leading-snug text-slate-800 break-words`} style={getClampStyle(densityProfile.lineCount)}>{trip.dropoff || 'Missing dropoff address'}</div>
+                  {densityProfile.showSecondaryPhones && dropoffPhone && <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-emerald-700`}>Hospital {dropoffPhone}</div>}
+                </div>
+              </div>
+
+              <div className={`${isReportDensity ? 'space-y-1.5' : 'space-y-2'} min-w-0`}>
+                <div className={`border border-slate-200 ${isReportDensity ? 'rounded-lg px-2.5 py-1.5' : 'rounded-xl px-3 py-2'} ${densityProfile.showExecutiveAccent ? 'bg-slate-900 text-white' : 'bg-slate-50'}`}>
+                  <div className={`text-[10px] font-bold uppercase tracking-wide ${densityProfile.showExecutiveAccent ? 'text-slate-300' : 'text-slate-500'}`}>Assignment</div>
+                  {driver ? (
+                    <div className={isReportDensity ? 'mt-0.5' : 'mt-1'}>
+                      <div className={`text-xs font-semibold ${densityProfile.showExecutiveAccent ? 'text-white' : 'text-slate-900'}`}>{driver.name}</div>
+                      {densityProfile.showAssignmentMeta && densityProfile.lineCount >= 3 && (
+                        <div className={`text-[10px] font-medium leading-snug ${densityProfile.showExecutiveAccent ? 'text-slate-300' : 'text-slate-500'}`}>{driver.vehicle || driver.status || 'Driver active'}</div>
+                      )}
+                      {densityProfile.showAssignmentMeta && densityProfile.lineCount >= 4 && driver.homeAddress && (
+                        <div className={`mt-0.5 text-[9px] font-medium truncate ${densityProfile.showExecutiveAccent ? 'text-slate-400' : 'text-slate-400'}`}>
+                          <MapPin size={9} className="inline mr-0.5" />{driver.homeAddress}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} text-xs font-semibold text-rose-600`}>Awaiting dispatch assignment</div>
+                  )}
+                </div>
+
+                {densityProfile.showClientDetailBlock && (trip.notes || bookingReference || clientIdentifier || clientPhone || pickupPhone || dropoffPhone || routeAssignments.length > 0) && (
+                  <div className={`border border-slate-200 bg-white ${isReportDensity ? 'rounded-lg px-2.5 py-1.5' : 'rounded-xl px-3 py-2'}`}>
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Client Detail</div>
+                    <div className={`${isReportDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]'} grid gap-1 font-medium leading-snug text-slate-600`}>
+                      {bookingReference && <div>Trip: <span className="font-bold text-slate-900">{bookingReference}</span></div>}
+                      {clientIdentifier && <div>Client ID: <span className="font-bold text-slate-900">{clientIdentifier}</span></div>}
+                      {clientPhone && <div>Client phone: <span className="font-bold text-slate-900">{clientPhone}</span></div>}
+                      {densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && <div>Pickup phone: <span className="font-bold text-slate-900">{pickupPhone}</span></div>}
+                      {densityProfile.showSecondaryPhones && dropoffPhone && <div>Hospital phone: <span className="font-bold text-slate-900">{dropoffPhone}</span></div>}
+                    </div>
+                    {densityProfile.showNotesPreview && trip.notes && (
+                      <div className={`${isReportDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]'} font-medium leading-snug text-amber-700`} style={getClampStyle(densityProfile.noteLines)}>
+                        Notes: {trip.notes}
+                      </div>
+                    )}
+                    {routeAssignments.length > 0 && (
+                      <div className={`${isReportDensity ? 'mt-0.5' : 'mt-1'} flex flex-wrap gap-1`}>
+                        {visibleRouteAssignments.map((route, index) => (
+                          <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                            {route.routeName}{route.time ? ` @ ${route.time}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {(clientPhone || dropoffPhone) && (
+              <div className={`${isReportDensity ? 'mt-2 gap-1.5' : 'mt-3 gap-2'} flex flex-wrap`} onClick={(e) => e.stopPropagation()}>
+                {clientPhone && (
+                  <>
+                    <button onClick={() => makeCall(trip.patientPhone || trip.pickupPhone, trip.patient)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-100">
+                      <Phone size={11} /> Client
+                    </button>
+                    <button onClick={() => openSmsForTrip(trip)} className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-100">
+                      <MessageSquare size={11} /> Text
+                    </button>
+                  </>
+                )}
+                {dropoffPhone && (
+                  <button onClick={() => makeCall(trip.dropoffPhone, trip.dropoff)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">
+                    <Phone size={11} /> Hospital
+                  </button>
+                )}
+              </div>
+            )}
+            {isExpanded && renderExpandedTripDetails(trip)}
           </div>
-        )}
-        {/* Render detailed metadata block inside expanded state as well */}
-        {isExpanded && (
-           <div className="mt-3 pt-3 border-t border-slate-100 animate-in fade-in">
-             {renderExpandedTripDetails(trip, { compact: false })}
-           </div>
-        )}
+        </div>
       </div>
     );
   };
@@ -1581,293 +1636,6 @@ const OperationsCommandCenter = ({
       )}
     </div>
   );
-
-  // ==================== DISPATCH CARDS ====================
-  const renderDispatchCards = () => {
-    const CARD_SORT_OPTIONS = [
-      { value: 'time', label: 'Time' },
-      { value: 'assignment', label: 'Driver' },
-      { value: 'vehicle', label: 'Car' },
-      { value: 'distance', label: 'Distance' },
-      { value: 'trips', label: 'Trips' },
-      { value: 'status', label: 'Availability' },
-    ];
-    const getMinutesUntil = (tripTime) => {
-      if (!tripTime || tripTime === 'Will Call') return null;
-      const mins = timeToMinutes(tripTime);
-      const now = new Date();
-      const scheduled = new Date();
-      scheduled.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
-      const diffMs = scheduled - now;
-      if (diffMs < 0) return null;
-      return Math.round(diffMs / 60000);
-    };
-    return (
-      <div className="flex-1 overflow-y-auto px-3 pb-3">
-        {manifestFeedTrips.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <div className="max-w-sm rounded-3xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
-                <FileText size={28} />
-              </div>
-              <p className="text-base font-black text-slate-900">No trips to dispatch</p>
-              <p className="mt-1.5 text-sm">Try adjusting your filters or upload new trip data.</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Sort Toolbar */}
-            <div className="mb-3 rounded-3xl border border-slate-100/50 bg-white px-3 py-2 shadow-sm">
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                <div className="flex items-center gap-1.5 shrink-0 pr-2 border-r border-slate-200">
-                  {CARD_SORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => {
-                        if (sortBy === opt.value) {
-                          setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-                        } else {
-                          setSortBy(opt.value);
-                          setSortDirection('asc');
-                        }
-                      }}
-                      className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        sortBy === opt.value
-                          ? 'bg-slate-900 text-white shadow-sm'
-                          : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                  className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 flex items-center gap-1"
-                >
-                  {sortDirection === 'asc' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  {sortDirection === 'asc' ? 'Asc' : 'Desc'}
-                </button>
-              </div>
-            </div>
-
-            {/* Trip Cards */}
-            <div className="space-y-3">
-              {visibleTrips.map((trip) => {
-                const isExpanded = isTripExpanded(trip.id);
-                const isSelected = selectedTasks.includes(trip.id);
-                const driver = drivers.find((d) => d.id === trip.driverId);
-                const urgency = getTripUrgencyLevel(trip);
-                const isLate = urgency === 'late';
-                const minsUntil = getMinutesUntil(trip.time);
-                const routeLegs = routeTripMap[trip.id] || [];
-                const distance = trip.directDistance || '—';
-
-                return (
-                  <div
-                    key={trip.id}
-                    className={`rounded-3xl border bg-white shadow-sm overflow-hidden transition-all duration-150 ${
-                      isSelected
-                        ? 'border-blue-300 ring-2 ring-blue-500/20'
-                        : isExpanded
-                          ? 'border-blue-300 ring-1 ring-blue-500/15 shadow-md'
-                          : 'border-slate-100/50 hover:shadow-md'
-                    }`}
-                  >
-                    {/* Header: Time + Urgency + Passenger + Distance */}
-                    <div className="px-4 pt-4 pb-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTasks((prev) =>
-                                prev.includes(trip.id)
-                                  ? prev.filter((id) => id !== trip.id)
-                                  : [...prev, trip.id]
-                              );
-                            }}
-                            className={`rounded p-0.5 shrink-0 transition-all duration-150 ${
-                              isSelected ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
-                            }`}
-                          >
-                            {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
-                          </button>
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Clock size={14} className="text-orange-500 shrink-0" />
-                            <span className={`font-black text-lg shrink-0 ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-500' : 'text-orange-600'}`}>
-                              {to12hr(trip.time)}
-                            </span>
-                            {minsUntil !== null && (
-                              <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md shrink-0">
-                                in {minsUntil} min
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-slate-300 font-bold mx-0.5 shrink-0 hidden sm:inline">•</span>
-                          <span className="font-black text-slate-900 truncate text-sm">
-                            {trip.patient || 'Unnamed Client'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0 ml-2">
-                          <span className="text-[11px] font-semibold text-slate-500">{distance !== '—' ? `${distance} mi` : '—'}</span>
-                          {routeLegs.length > 0 && (
-                            <span className="border border-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                              {routeLegs.length} LEG{routeLegs.length !== 1 ? 'S' : ''}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Addresses */}
-                    <div className="px-4 pb-2 space-y-2">
-                      <div className="flex items-start gap-3">
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-1.5 shadow-sm" />
-                        <span className="text-sm font-medium text-slate-700 leading-relaxed">
-                          {trip.pickup || 'Missing pickup'}
-                        </span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 mt-1.5 shadow-sm" />
-                        <span className="text-sm font-medium text-slate-700 leading-relaxed">
-                          {trip.dropoff || 'Missing dropoff'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Driver Info Row — Always Visible */}
-                    <div className="border-t border-slate-100 px-4 py-2.5 bg-slate-50/50">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <User size={12} className="text-slate-400 shrink-0" />
-                          <span className="text-xs font-semibold text-slate-700 truncate">
-                            {driver?.name || trip.driverName || <span className="text-red-500 italic">Unassigned</span>}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Car size={12} className="text-slate-400 shrink-0" />
-                          <span className="text-xs font-semibold text-slate-700 truncate">
-                            {driver?.vehicle || '—'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {driver ? (
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${getDriverLiveStatus(driver).color}`}>
-                              {getDriverLiveStatus(driver).label}
-                            </span>
-                          ) : (
-                            <span className="text-xs font-semibold text-slate-400">—</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <MapIcon size={12} className="text-slate-400 shrink-0" />
-                          <span className="text-xs font-semibold text-slate-700 truncate">
-                            {distance !== '—' ? `${distance} mi` : '—'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Expandable Actions */}
-                    {isExpanded && (
-                      <div className="space-y-2 border-t border-slate-100 bg-white p-3">
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                          <button
-                            onClick={() => setManualAssignTrip(trip)}
-                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-blue-700"
-                          >
-                            <UserPlus size={14} /> {driver ? 'Reassign' : 'Assign'}
-                          </button>
-                          <button
-                            onClick={() => triggerSmartAssign(trip)}
-                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-indigo-700"
-                          >
-                            <BrainCircuit size={14} /> Auto
-                          </button>
-                          <button
-                            onClick={() => setEditTrip(trip)}
-                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition-colors hover:bg-blue-100"
-                          >
-                            <Edit2 size={14} /> Edit
-                          </button>
-                          {hasPermission(role, 'canDeleteTrip') && (
-                            <>
-                              <button
-                                onClick={() => markTripException(trip, 'Rerouted')}
-                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-amber-600"
-                              >
-                                <MapPin size={14} /> Reroute
-                              </button>
-                              <button
-                                onClick={() => markTripException(trip, 'No Show')}
-                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-700 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-slate-800"
-                              >
-                                <AlertCircle size={14} /> No Show
-                              </button>
-                              <button
-                                onClick={() => markTripException(trip, 'Cancelled')}
-                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-rose-600"
-                              >
-                                <XCircle size={14} /> Cancel
-                              </button>
-                              <button
-                                onClick={() => requestDeleteTrip(trip.id)}
-                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700 transition-colors hover:bg-slate-200"
-                              >
-                                <Archive size={14} /> Archive
-                              </button>
-                            </>
-                          )}
-                          <button
-                            onClick={() => setSmsConversationTrip(trip)}
-                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-indigo-600"
-                          >
-                            <Phone size={14} /> Contacts
-                          </button>
-                        </div>
-                        {renderDriverWorkActions(trip)}
-                      </div>
-                    )}
-
-                    {/* Expand/Collapse Toggle */}
-                    <button
-                      onClick={() => toggleTripExpanded(trip.id)}
-                      className="w-full border-t border-slate-100 py-2.5 flex items-center justify-center text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
-                    >
-                      {isExpanded ? 'Hide Actions' : 'Show Actions'}
-                      {isExpanded ? (
-                        <ChevronUp size={14} className="ml-1.5" />
-                      ) : (
-                        <ChevronDown size={14} className="ml-1.5" />
-                      )}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-3 flex items-center justify-between rounded-3xl border border-slate-100/50 bg-white px-4 py-3 text-[11px] font-medium text-slate-500 shadow-sm">
-              <span>
-                Showing {visibleTrips.length} of {manifestFeedTrips.length} trip
-                {manifestFeedTrips.length !== 1 ? 's' : ''}
-              </span>
-              {manifestFeedTrips.length > visibleTrips.length && (
-                <button
-                  type="button"
-                  onClick={() => setManifestLimit((prev) => prev + 150)}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-100"
-                >
-                  Load 150 More
-                </button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    );
-  };
 
   // ==================== TRIP TABLE ====================
   const renderTripTable = () => (
@@ -2332,9 +2100,15 @@ const OperationsCommandCenter = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${getDriverLiveStatus(d).color}`}>
-                        {getDriverLiveStatus(d).label}
-                      </span>
+                      {d.status === 'Available' ? (
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                        </span>
+                      ) : (
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      )}
+                      <span className="text-micro text-slate-400">{d.status}</span>
                     </div>
                     <div className="p-1 rounded hover:bg-slate-100 transition-colors">
                       {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
@@ -2620,7 +2394,7 @@ const OperationsCommandCenter = ({
       )}
 
       {/* Content */}
-      {operationsTab === 'manifest' && (manifestView === 'card' ? renderDispatchCards() : manifestView === 'board' ? renderManifestBoard() : renderTripTable())}
+      {operationsTab === 'manifest' && (manifestView === 'board' ? renderManifestBoard() : renderTripTable())}
       {operationsTab === 'willcall' && renderWillCall()}
       {operationsTab === 'fleet' && renderFleetMatrix()}
 

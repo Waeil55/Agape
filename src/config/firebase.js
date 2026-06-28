@@ -7,7 +7,6 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { buildOperationalTripRecord } from '../utils/tripLifecycle';
 import { buildLocationFraudSignals } from '../utils/locationFraud';
 import { isCorruptedTripRecord } from '../utils/tripIntegrity';
-import * as firestoreEvents from '../services/firestoreEventEngine';
 const env = import.meta.env;
 
 const firebaseConfig = {
@@ -80,8 +79,9 @@ function getCurrentEventActor(role = 'system') {
 
 async function emitEventsSafely(buildEvents) {
   try {
-    const events = buildEvents(firestoreEvents).filter(Boolean);
-    if (events.length > 0) await firestoreEvents.emitSystemEvents(events);
+    const eventEngine = await import('../services/firestoreEventEngine');
+    const events = buildEvents(eventEngine).filter(Boolean);
+    if (events.length > 0) await eventEngine.emitSystemEvents(events);
   } catch (err) {
     console.error('System event emission failed:', err);
   }

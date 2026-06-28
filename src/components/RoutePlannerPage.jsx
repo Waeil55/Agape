@@ -424,9 +424,9 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
 
   // ─── MAIN LAYOUT (Schedule + Route Builder) ───
   return (
-    <div className={`flex-1 flex min-h-0 flex-col md:flex-row ${bg}`}>
+    <div className={`flex-1 flex min-h-0 ${bg}`}>
       {/* === LEFT: Schedule / Trip List === */}
-      <div className={`w-full max-h-[42dvh] shrink-0 border-b md:w-72 md:max-h-none md:border-b-0 md:border-r xl:w-80 ${dark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} flex flex-col`}>
+      <div className={`w-72 xl:w-80 shrink-0 border-r ${dark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} flex flex-col`}>
         <div className={`sticky top-0 px-3 py-2 border-b ${dark ? 'border-slate-700' : 'border-slate-100'} shrink-0`}>
           <div className="flex items-center justify-between">
             <h3 className={`text-xs font-bold flex items-center gap-1.5 ${dark ? 'text-slate-200' : 'text-slate-700'}`}>
@@ -458,15 +458,15 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
       </div>
 
       {/* === RIGHT: Route Builder === */}
-      <div className="flex-1 flex flex-col min-h-[55dvh] md:min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Top Bar */}
         <div className={`sticky top-0 z-10 ${dark ? 'bg-slate-800' : 'bg-white/95 backdrop-blur-sm'} border-b ${dark ? 'border-slate-700' : 'border-slate-100'} shrink-0`}>
-          <div className="px-3 py-2.5 flex items-center gap-2 flex-wrap sm:px-4">
+          <div className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5">
               <Route size={16} className="text-blue-600" />
               <input value={routeName} onChange={e => setRouteName(e.target.value)} placeholder="Route name..." className={`text-sm font-bold bg-transparent outline-none w-28 placeholder:text-slate-300 ${dark ? 'text-slate-100' : 'text-slate-900'}`} />
             </div>
-            <div className="hidden flex-1 sm:block" />
+            <div className="flex-1" />
             <div className="flex items-center gap-1">
               <input type="date" value={dateStr} onChange={e => setDateStr(e.target.value)} className={`px-1.5 py-1 text-[10px] rounded-lg border outline-none ${inputBg}`} />
               <select value={selectedDriver} onChange={e => setSelectedDriver(e.target.value)} className={`px-1.5 py-1 text-[10px] rounded-lg border outline-none max-w-[90px] ${inputBg}`}>
