@@ -345,15 +345,13 @@ const getWorkflowStepIndex = (trip) => {
 };
 
 const getWorkflowSteps = (trip) => {
-  const idx = getWorkflowStepIndex(trip);
+  const idx = getTripWorkStepIndex(trip);
   return [
-    { key: 'start', label: 'Start Trip', phase: 'pickup', done: idx >= 0 },
-    { key: 'nav-pickup', label: 'Navigate to Pickup', phase: 'pickup', done: idx >= 1 },
-    { key: 'arrive-pickup', label: 'Arrive at Pickup', phase: 'pickup', done: idx >= 2 },
-    { key: 'begin-transport', label: 'Begin Transport', phase: 'pickup', done: idx >= 3 },
-    { key: 'nav-dropoff', label: 'Navigate to Dropoff', phase: 'dropoff', done: idx >= 4 },
-    { key: 'arrive-dropoff', label: 'Arrive at Dropoff', phase: 'dropoff', done: idx >= 5 },
-    { key: 'complete', label: 'Complete Trip', phase: 'dropoff', done: idx >= 6 },
+    { key: 'scheduled', label: 'Scheduled', phase: 'pickup', done: idx >= 0 },
+    { key: 'en-route', label: 'En Route', phase: 'pickup', done: idx >= 1 },
+    { key: 'at-pickup', label: 'At Pickup', phase: 'pickup', done: idx >= 2 },
+    { key: 'in-transit', label: 'In Transit', phase: 'dropoff', done: idx >= 3 },
+    { key: 'complete', label: 'Complete', phase: 'dropoff', done: idx >= 4 },
   ];
 };
 
