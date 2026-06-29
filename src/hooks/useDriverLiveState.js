@@ -258,20 +258,25 @@ export function useDriverLiveState({
     setSessionState({ sessionId, deviceId, valid: true, status: SESSION_STATUSES.ACTIVE });
     invalidateOldSessions()
       .then(() => writeLiveState(true))
+      .then(() => {
+        if (cancelled) return;
+        // Set up the session listener AFTER the session document has been written
+        // with ACTIVE status. If we set it up before, a stale INVALIDATED status
+        // from a previous session would immediately trigger onInvalidSession → sign out.
+        unsubSessionRef.current?.();
+        unsubSessionRef.current = onSnapshot(sessionRef, (snap) => {
+          if (cancelled || !snap.exists()) return;
+          const session = snap.data();
+          if (session.status !== SESSION_STATUSES.ACTIVE) {
+            sessionInvalidRef.current = true;
+            setSessionState((prev) => ({ ...prev, valid: false, status: session.status }));
+            onInvalidSession?.(session);
+          }
+        }, (err) => {
+          console.error('Driver session refresh failed:', err);
+        });
+      })
       .catch((err) => console.error('Driver session initialization failed:', err));
-
-    unsubSessionRef.current?.();
-    unsubSessionRef.current = onSnapshot(sessionRef, (snap) => {
-      if (cancelled || !snap.exists()) return;
-      const session = snap.data();
-      if (session.status !== SESSION_STATUSES.ACTIVE) {
-        sessionInvalidRef.current = true;
-        setSessionState((prev) => ({ ...prev, valid: false, status: session.status }));
-        onInvalidSession?.(session);
-      }
-    }, (err) => {
-      console.error('Driver session refresh failed:', err);
-    });
 
     const heartbeatTimer = setInterval(() => {
       writeLiveState(false).catch((err) => console.error('Driver heartbeat failed:', err));

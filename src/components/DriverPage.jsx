@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
-import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd } from '../utils/tripDate';
+import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateRecent } from '../utils/tripDate';
 import { auth, db, doc, getDocFromServer, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, updateDriverProfile } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
@@ -22,7 +22,7 @@ import {
   Download, Trash2, FileText, AlertTriangle, Info,
   Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal
 } from 'lucide-react';
-import { openNavigation, showNavActionSheet, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
+import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
 import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
@@ -129,7 +129,13 @@ const buildFallbackDriverProfile = (email = '') => ({
 const WORKFLOW_TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted', 'Transferred']);
 const normalizeWorkflowStatus = (status) => String(status || '').trim().toLowerCase();
 const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
-const getTripHistoryDateKey = (trip) => tripCalendarDateKey(trip?.date) || tripCalendarDateKey(trip?.completedAt);
+const getTripHistoryDateKey = (trip) => {
+  const dateKey = tripCalendarDateKey(trip?.date);
+  const completedKey = tripCalendarDateKey(trip?.completedAt);
+  if (!dateKey) return completedKey;
+  if (!completedKey) return dateKey;
+  return dateKey > completedKey ? dateKey : completedKey;
+};
 const addDaysToDateKey = (dateKey, days) => {
   const d = new Date(`${dateKey}T12:00:00`);
   if (Number.isNaN(d.getTime())) return dateKey;
@@ -163,7 +169,7 @@ const HISTORY_STATUS_META = {
   cancelled: { label: 'Cancelled', Icon: XCircle, bg: 'bg-rose-100 text-rose-700', iconBg: 'bg-rose-100 text-rose-700', border: 'border-l-rose-400' },
   rerouted: { label: 'Rerouted', Icon: Repeat, bg: 'bg-purple-100 text-purple-700', iconBg: 'bg-purple-100 text-purple-700', border: 'border-l-purple-400' },
 };
-const getHistoryStatusMeta = (status) => HISTORY_STATUS_META[normalizeWorkflowStatus(status)] || HISTORY_STATUS_META.completed;
+const getHistoryStatusMeta = (status) => HISTORY_STATUS_META[normalizeWorkflowStatus(status)] || { label: status || 'Unknown', Icon: AlertTriangle, bg: 'bg-slate-100 text-slate-700', iconBg: 'bg-slate-100 text-slate-700', border: 'border-l-slate-400' };
 const formatTripDetailClock = (value) => {
   if (!value) return '--';
   if (typeof value === 'object' && typeof value.toDate === 'function') {
@@ -322,6 +328,7 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
 const isWorkflowTerminalTrip = (trip) => {
   if (!trip) return false;
   const status = normalizeWorkflowStatus(trip.status);
+  if (status === 'completed' && trip.completedAt) return true;
   return [...WORKFLOW_TERMINAL_STATUSES].some((terminal) => normalizeWorkflowStatus(terminal) === status);
 };
 
@@ -580,6 +587,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [routePlanStops, setRoutePlanStops] = useState(null);
   const [aiOptimizing, setAiOptimizing] = useState(false);
   const [aiSequence, setAiSequence] = useState(null);
+  const [locStreamDebug, setLocStreamDebug] = useState(null);
+  const [adminDriverFilter, setAdminDriverFilter] = useState('all');
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [guidedMode, setGuidedMode] = useState(false);
   const [guidedStepIndex, setGuidedStepIndex] = useState(0);
@@ -1059,8 +1068,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const getTodayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
-  const myTrips = driverScopedTrips
-    .filter(t => tripMatchesTodayOrTomorrow(t.date))
+  const filteredDriverScopedTrips = useMemo(() => {
+    if (role !== 'admin' && role !== 'dispatcher') return driverScopedTrips;
+    if (adminDriverFilter === 'all') return driverScopedTrips;
+    return driverScopedTrips.filter(t => t.driverId === adminDriverFilter);
+  }, [driverScopedTrips, role, adminDriverFilter]);
+
+  const myTrips = filteredDriverScopedTrips
+    .filter(t => isTripDateRecent(t.date) || !isWorkflowTerminalTrip(t))
     .sort((a, b) => {
       const today = getTodayStr();
       const aToday = a.date === today ? 0 : 1;
@@ -1071,7 +1086,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const historyWindowEnd = localCalendarYmd();
   const historyWindowStart = calendarDateKeyDaysAgo(DRIVER_HISTORY_LOOKBACK_DAYS - 1);
-  const allHistory = driverScopedTrips
+  const allHistory = filteredDriverScopedTrips
     .filter(isWorkflowTerminalTrip)
     .sort((a, b) => {
       const dateCompare = String(getTripHistoryDateKey(b) || '').localeCompare(String(getTripHistoryDateKey(a) || ''));
@@ -1448,7 +1463,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     addToQueue('updateLocation', { lat: latitude, lng: longitude, telemetry });
   }, [addToQueue, onUpdateDriverLocation]);
 
-  const locStreamDebug = useDriverLocationStream({
+  const driverLocStream = useDriverLocationStream({
     enabled: Boolean(me?.id),
     driver: me,
     role,
@@ -1720,11 +1735,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const openInNavApp = async (address, app) => {
     const origin = driverPosition ? `${driverPosition.lat},${driverPosition.lng}` : '';
     const preferredApp = app || navApp;
-    if (isNativeShell()) {
-      await showNavActionSheet(address, origin, preferredApp);
-    } else {
-      await openNavigation(address, preferredApp, origin);
-    }
+    await openNavigation(address, preferredApp, origin);
   };
 
   const buildRoutePlanWorkflow = useCallback((stop, updates = {}) => {
@@ -2873,6 +2884,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </button>
             </div>
           </div>
+          {(role === 'admin' || role === 'dispatcher') && (
+            <div className="px-3 pb-3">
+              <select
+                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm outline-none"
+                value={adminDriverFilter}
+                onChange={(e) => setAdminDriverFilter(e.target.value)}
+              >
+                <option value="all">All Drivers ({driverScopedTrips.length} trips)</option>
+                {allDrivers.map(d => (
+                  <option key={d.id} value={d.id}>{d.name} ({driverScopedTrips.filter(t => t.driverId === d.id).length})</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
@@ -3663,7 +3688,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       activeTrip: isActiveTrip,
                     }}
                     expandedId={expandedTripId}
-                    onToggle={(id) => openTripWorkPage(id)}
+                    onToggle={(id) => setExpandedTripId(prev => prev === id ? null : id)}
                     isSelected={isSelected}
                     onSelect={toggleTripSelect}
                     actions={{
@@ -5673,9 +5698,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <span className="text-slate-400">Age</span>
               <span className="text-yellow-300">{driverPosition?.capturedAt ? `${Math.round((Date.now() - new Date(driverPosition.capturedAt).getTime()) / 1000)}s ago` : '—'}</span>
               <span className="text-slate-400">Interval</span>
-              <span className="text-white">{locStreamDebug?.intervalMs || '—'}ms</span>
+              <span className="text-white">{driverLocStream?.intervalMs || '—'}ms</span>
               <span className="text-slate-400">Err</span>
-              <span className={`truncate ${locStreamDebug?.error ? 'text-rose-400' : 'text-slate-500'}`}>{locStreamDebug?.error || 'none'}</span>
+              <span className={`truncate ${driverLocStream?.error ? 'text-rose-400' : 'text-slate-500'}`}>{driverLocStream?.error || 'none'}</span>
             </div>
           </div>
         </div>

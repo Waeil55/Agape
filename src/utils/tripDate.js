@@ -116,6 +116,23 @@ export function isTripLate(tripTime) {
   return now > scheduled;
 }
 
+/**
+ * True if the trip date is today, tomorrow, yesterday, or missing/unparseable.
+ * Used for the active trip list to exclude stale trips from previous days.
+ */
+export function isTripDateRecent(tripDate) {
+  const key = tripCalendarDateKey(tripDate);
+  if (key === undefined) return true;
+  const now = new Date();
+  const todayKey = localYmd(now);
+  if (key === todayKey) return true;
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  if (key === localYmd(tomorrow)) return true;
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (key === localYmd(yesterday)) return true;
+  return false;
+}
+
 /** If the trip has no usable date key, it matches any manifest day (legacy / incomplete rows). */
 export function tripMatchesCalendarDay(tripDate, dayKey) {
   const key = tripCalendarDateKey(tripDate);

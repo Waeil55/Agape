@@ -149,7 +149,12 @@ async function writeTripsToCollection(trips = []) {
       if (!docId) docId = `trip_${now.replace(/[^0-9]/g, '').slice(0, 10)}_${Math.random().toString(36).slice(2, 8)}`;
       return {
         id: docId,
-        data: sanitizeForFirestore(buildOperationalTripRecord({ ...trip, updatedAtLocal: trip.updatedAtLocal || now })),
+        data: {
+          ...sanitizeForFirestore(
+            buildOperationalTripRecord({ ...trip, updatedAtLocal: trip.updatedAtLocal || now })
+          ),
+          updatedAt: serverTimestamp(),
+        },
       };
     });
 

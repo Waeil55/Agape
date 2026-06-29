@@ -1,6 +1,10 @@
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, collection, getDocs, getDocsFromServer, doc, updateDoc, addDoc, serverTimestamp, writeBatch, setDoc, getDoc, getDocFromServer, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork, onSnapshot } from 'firebase/firestore';
+<<<<<<< HEAD
 import { initializeAuth, getAuth, browserSessionPersistence, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
+=======
+import { getAuth, setPersistence, browserLocalPersistence, browserSessionPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
+>>>>>>> app9
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -38,6 +42,7 @@ try {
 // Note: persistentLocalCache can cause FIRESTORE INTERNAL ASSERTION FAILED errors
 // with many onSnapshot listeners (targetId > 1000). memoryLocalCache avoids this entirely.
 
+<<<<<<< HEAD
 let auth;
 try {
   auth = initializeAuth(app, {
@@ -46,6 +51,19 @@ try {
 } catch (err) {
   auth = getAuth(app);
 }
+=======
+const auth = getAuth(app);
+// Prefer IndexedDB persistence (survives page refresh), but fall back to session
+// storage if IndexedDB is corrupted or unavailable (e.g. PWA storage pressure).
+// Corrupted IndexedDB can cause rapid onAuthStateChanged null→user toggles after
+// page reload, which manifests as "immediately logged out" after sign-in.
+setPersistence(auth, browserLocalPersistence).catch((err) => {
+  console.warn('[Firebase] IndexedDB persistence failed, falling back to session storage:', err);
+  setPersistence(auth, browserSessionPersistence).catch((err2) => {
+    console.warn('[Firebase] Session persistence also failed:', err2);
+  });
+});
+>>>>>>> app9
 const analytics = getAnalytics(app);
 
 let messaging;
@@ -59,7 +77,7 @@ export { app, db, auth, analytics, messaging, deleteApp, initializeApp, firebase
   writeBatch, setDoc, getDoc, getDocFromServer, getDocsFromServer, deleteDoc, deleteField, arrayUnion, query, where, orderBy, limit, runTransaction, enableNetwork, onSnapshot,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
   EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail, setPersistence,
-  browserLocalPersistence, getAuth, getMessaging, getToken, onMessage, logEvent, functions, httpsCallable };
+  browserLocalPersistence, browserSessionPersistence, getAuth, getMessaging, getToken, onMessage, logEvent, functions, httpsCallable };
 
 const _agapeApiKey = env.VITE_GOOGLE_MAPS_API_KEY || "";
 const _agapeGeminiProject = env.VITE_GEMINI_PROJECT_ID || "";

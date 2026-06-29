@@ -7,7 +7,7 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   RefreshCcw, X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot, setPersistence, browserLocalPersistence } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -141,7 +141,13 @@ const todayStr = new Date().toISOString().split('T')[0];
 const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
 const DRIVER_HISTORY_STATUSES = new Set(['completed', 'cancelled', 'no show', 'rerouted']);
 const normalizeTripStatus = (status) => String(status || '').trim().toLowerCase();
-const getTripHistoryDateKey = (trip) => tripCalendarDateKey(trip?.date) || tripCalendarDateKey(trip?.completedAt);
+const getTripHistoryDateKey = (trip) => {
+  const dateKey = tripCalendarDateKey(trip?.date);
+  const completedKey = tripCalendarDateKey(trip?.completedAt);
+  if (!dateKey) return completedKey;
+  if (!completedKey) return dateKey;
+  return dateKey > completedKey ? dateKey : completedKey;
+};
 const isRecentDriverHistoryTrip = (trip) => (
   DRIVER_HISTORY_STATUSES.has(normalizeTripStatus(trip?.status))
   && isCalendarDateKeyWithinLastDays(getTripHistoryDateKey(trip), DRIVER_HISTORY_LOOKBACK_DAYS)
@@ -405,6 +411,8 @@ const App = () => {
   const authBootResolvedRef = useRef(false);
   const prevChatConvsRef = useRef(null);
   const loginPortalRoleRef = useRef(null);
+  const loginInProgressRef = useRef(false);
+  const loginAttemptRef = useRef(0);
   const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
   
@@ -572,6 +580,7 @@ const App = () => {
     };
   }, [drivers, currentUser, role, dataLoading, trips, currentUserEmailTripMatches]);
   const currentUserDriverTrips = useMemo(() => {
+    if (role === 'admin' || role === 'dispatcher') return trips;
     if (role !== 'driver') return [];
     const email = normalizeEmail(currentUserDriverProfile?.email || currentUser);
     if (!email) return [];
@@ -608,6 +617,10 @@ const App = () => {
     const needsProfileProvision = !existingProfile || !normalizeEmail(existingProfile.email) || existingProfile.id !== driverId;
 
     if (!needsProfileProvision && driverProfileBootstrapRef.current === bootstrapKey) return;
+
+    // If drivers haven't loaded yet (empty array), defer profile creation to avoid
+    // overwriting Firestore fields (e.g. vehicle) with synthetic defaults.
+    if (!existingProfile && drivers.length === 0) return;
 
     driverProfileBootstrapRef.current = bootstrapKey;
     const baseProfile = buildDriverProfileFromEmail(normalizedEmail, auth.currentUser.uid);
@@ -1016,6 +1029,12 @@ const App = () => {
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       try {
+      // If a login is actively being processed and we got a null event,
+      // Firebase may be toggling state. Let the login resolve instead of signing out.
+      if (!user && loginInProgressRef.current) {
+        console.warn('[Auth] Null event during active login — ignoring (race guard)');
+        return;
+      }
       if (user) {
         const requestedPortalRole = loginPortalRoleRef.current;
         const userEmail = user.email || '';
@@ -1024,6 +1043,7 @@ const App = () => {
         const cached = readRoleCache(user.uid);
         if (cached && cached.role && (!requestedPortalRole || requestedPortalRole === cached.role)) {
           // Apply session immediately — loading clears in milliseconds
+          loginInProgressRef.current = false;
           applySession(cached.role, userEmail, null, user);
 
           // Then verify role from Firestore in the background (non-blocking)
@@ -1032,7 +1052,15 @@ const App = () => {
             const freshRole = String(freshDoc.data()?.role || '').toLowerCase();
             if (freshRole && freshRole !== cached.role) {
               writeRoleCache(user.uid, freshRole, userEmail);
-              applySession(freshRole, userEmail, freshDoc, user);
+              window.location.reload();
+              return;
+            }
+            // Load user settings from Firestore (theme, nav app, etc.)
+            // so they survive hard refresh even when the role cache is present.
+            const settings = freshDoc.data()?.settings || {};
+            if (Object.keys(settings).length > 0) {
+              setAppSettings(prev => ({ ...prev, ...settings }));
+              setUserSettingsLoaded(true);
             }
           }).catch(() => { /* background check — ignore network errors */ });
           return;
@@ -1087,11 +1115,13 @@ const App = () => {
             userDoc = await getDocFromServer(doc(db, 'users', user.uid)).catch(() => null);
           } else if (!usersSnap.ok) {
             // Firestore completely unreachable — show login so user can retry
+            loginInProgressRef.current = false;
             authBootResolvedRef.current = true;
             setIsLoading(false);
             setStartupIssue('Could not reach the server. Check your connection and sign in again.');
             return;
           } else {
+            loginInProgressRef.current = false;
             skipNextSignedOutResetRef.current = true;
             await signOut(auth).catch(() => {});
             clearRoleCache();
@@ -1104,6 +1134,7 @@ const App = () => {
           }
         }
 
+        loginInProgressRef.current = false;
         applySession(userRole, userEmail, userDoc, user);
         
         try {
@@ -1178,12 +1209,14 @@ const App = () => {
           // User sync complete
         }
       } else {
+        loginInProgressRef.current = false;
         if (skipNextSignedOutResetRef.current) {
           skipNextSignedOutResetRef.current = false;
           authBootResolvedRef.current = true;
           setIsLoading(false);
           return;
         }
+<<<<<<< HEAD
         // If user was already authenticated in this session, this is a token refresh.
         // Wait longer for Firebase to restore the session — IndexedDB can be slow.
         if (authBootResolvedRef.current) {
@@ -1196,13 +1229,34 @@ const App = () => {
               return;
             }
           }
-          // Session truly lost after 5 retries — try one more sign-in attempt
-          console.warn('[Auth] Session lost — attempting silent re-auth');
-          try {
-            await new Promise(r => setTimeout(r, 2000));
-            if (auth.currentUser) return;
-          } catch {}
-          resetSessionState({ loginErrorMessage: 'We could not restore the saved session. Please sign in again.' });
+        // If user was already authenticated in this session, this could be a transient
+        // token refresh or an IndexedDB corruption issue. Wait for session restoration.
+        if (authBootResolvedRef.current) {
+          console.warn('[Auth] Session went null after boot — waiting 3s for token refresh');
+          await new Promise(r => setTimeout(r, 3000));
+          if (cancelled) return;
+          if (auth.currentUser) {
+            loginAttemptRef.current = 0;
+            return;
+          }
+          // Session truly lost — show login immediately
+          // But increment attempt counter: if we've been through this loop too many
+          // times, skip the signOut to prevent an infinite reload cycle.
+          loginAttemptRef.current += 1;
+          if (loginAttemptRef.current > 3) {
+            console.warn('[Auth] Multiple rapid null-state cycles detected — clearing all local state');
+            clearRoleCache();
+            // Attempt to clear Firebase Auth IndexedDB state by signing out forcefully
+            skipNextSignedOutResetRef.current = true;
+            signOut(auth).catch(() => {});
+            resetSessionState({ loginErrorMessage: 'Session expired. Please sign in again.' });
+            loginAttemptRef.current = 0;
+            return;
+          }
+          clearRoleCache();
+          skipNextSignedOutResetRef.current = true;
+          signOut(auth).catch(() => {});
+          resetSessionState({ loginErrorMessage: 'Session expired. Please sign in again.' });
           return;
         }
         // Initial boot with no session — show login IMMEDIATELY.
@@ -1213,6 +1267,7 @@ const App = () => {
       }
       } catch (bootErr) {
         console.error("Auth boot error:", bootErr);
+        loginInProgressRef.current = false;
         setStartupIssue('Startup encountered an error. Please retry.');
         if (authBootResolvedRef.current) {
           return;
@@ -1396,22 +1451,43 @@ const App = () => {
   const executeLogin = async (selectedRole) => {
     const requestedRole = String(selectedRole || '').toLowerCase();
     loginPortalRoleRef.current = requestedRole;
+    // Clear any stale role cache before attempting login — prevents ghost sessions
+    // from interfering when Firebase Auth IndexedDB has stale state.
+    clearRoleCache();
     setLoginError('');
     setIsLoading(true);
+    loginInProgressRef.current = true;
+    loginAttemptRef.current = 0;
     try {
+      // Re-apply persistence before each sign-in attempt for robustness
+      // (handles edge cases where the initial setPersistence failed at boot).
+      // Try IndexedDB first, fall back to session storage.
+      setPersistence(auth, browserLocalPersistence).catch(() => {
+        setPersistence(auth, browserSessionPersistence).catch(() => {});
+      });
       const { authEmail, username } = resolveAuthIdentifier(email);
       if (!authEmail || !username) {
         setIsLoading(false);
         setLoginError('Enter a valid username.');
+        loginInProgressRef.current = false;
         return;
       }
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, authEmail, password);
     } catch (err) {
+      loginInProgressRef.current = false;
       loginPortalRoleRef.current = requestedRole;
       setIsLoading(false);
       setPassword('');
-      setLoginError(err.message.replace('Firebase: ', ''));
+      // If the error mentions persistence or IndexedDB, hint at clearing browser data
+      const msg = String(err?.message || err || '').replace('Firebase: ', '');
+      // Only match Firebase-specific persistence errors — not ReferenceErrors
+      // for variable names that happen to contain "persist".
+      if (/auth.*persist|indexeddb|quota.*exceeded|storage.*unavailable/i.test(msg)) {
+        setLoginError(`${msg} — Try clearing your browser cache or use a private/incognito window.`);
+      } else {
+        setLoginError(msg);
+      }
     }
   };
 
@@ -1419,6 +1495,7 @@ const App = () => {
     try {
       if (role === 'dispatcher') addAuditLog('Dispatcher Logged Out', `Dispatcher ${currentUser} left the system.`, 'slate');
       clearRoleCache();
+      loginInProgressRef.current = false;
       skipNextSignedOutResetRef.current = true;
       await signOut(auth);
     } finally {
@@ -1694,7 +1771,33 @@ const App = () => {
       return;
     }
     const prevTrip = trips.find(t => t.id === updatedTrip.id) || null;
-    const enrichedTrip = enrichTripMetrics(updatedTrip);
+    let nextTripState = { ...updatedTrip };
+    if (nextTripState.driverId) {
+      const driver = drivers.find(d => d.id === nextTripState.driverId);
+      if (driver) {
+        nextTripState.driverEmail = driver.email || nextTripState.driverEmail;
+        // Preserve the existing driverName on the trip — only set from profile
+        // if the trip doesn't already have one. This prevents overwriting a
+        // correctly-stored driver name with stale/mismatched profile data.
+        if (!nextTripState.driverName) {
+          nextTripState.driverName = driver.name || null;
+        }
+      }
+    } else if (nextTripState.driverId === '') {
+      nextTripState.driverEmail = null;
+      nextTripState.driverName = null;
+    }
+    
+    // Auto-complete trip if dropoffOdometer is filled and it's not already terminal
+    const isTerminal = ['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted'].includes(String(nextTripState.status).toLowerCase().trim());
+    if (nextTripState.dropoffOdometer !== undefined && nextTripState.dropoffOdometer !== '' && nextTripState.dropoffOdometer !== null) {
+      if (!isTerminal && !nextTripState.completedAt) {
+        nextTripState.status = 'Completed';
+        nextTripState.completedAt = new Date().toISOString();
+      }
+    }
+
+    const enrichedTrip = enrichTripMetrics(nextTripState);
     setTrips(prev => prev.map(t => t.id === enrichedTrip.id ? enrichedTrip : t));
     // Log detailed before/after changes
     if (prevTrip) {
