@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { db, collection, addDoc, query, where, orderBy, serverTimestamp, doc, setDoc, updateDoc, deleteField, arrayUnion, onSnapshot } from '../config/firebase';
 import { limit } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { MessageCircle, Send, Plus, ArrowLeft, X, Trash2, Search, ChevronDown, ExternalLink, Loader2, Menu, Check, CheckCheck, BrainCircuit, Sparkles } from 'lucide-react';
+import { Search, Plus, Menu, ArrowLeft, Send, Check, CheckCheck, X, Trash2, Loader2, MessageCircle, BrainCircuit, Sparkles } from 'lucide-react';
 import { playMessageSound } from '../utils/notificationSound';
 import { aiSuggestReply, aiAnalyzeSentiment } from '../config/ai';
 
@@ -17,514 +17,132 @@ const normalizePhone = (raw) => {
 const TELNYX_NUMBER = '+18552223330';
 
 const useMobile = () => {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  useEffect(() => {
-    const h = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', h);
-    return () => window.removeEventListener('resize', h);
-  }, []);
-  return isMobile;
+  const [m, setM] = useState(window.innerWidth < 768);
+  useEffect(() => { const h = () => setM(window.innerWidth < 768); window.addEventListener('resize', h); return () => window.removeEventListener('resize', h); }, []);
+  return m;
 };
 
-const formatTime = (ts) => {
+const formatMsgTime = (ts) => {
+  if (!ts) return '';
+  const d = ts?.toMillis ? ts.toDate() : new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+
+const formatConvTime = (ts) => {
   if (!ts) return '';
   const d = ts?.toMillis ? ts.toDate() : new Date(ts);
   if (isNaN(d.getTime())) return '';
   const now = new Date();
   const isToday = d.toDateString() === now.toDateString();
   if (isToday) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], { month: 'numeric', day: 'numeric' });
 };
 
-const formatDate = (ts) => {
+const formatDateHeader = (ts) => {
   if (!ts) return '';
   const d = ts?.toMillis ? ts.toDate() : new Date(ts);
   if (isNaN(d.getTime())) return '';
   const now = new Date();
   const isToday = d.toDateString() === now.toDateString();
-  const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
   if (isToday) return 'Today';
+  const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
   if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 };
+
+const COLORS = ['#1877F2', '#E4405F', '#25D366', '#833AB4', '#00C4CC', '#FF6B35', '#20C997', '#E74C3C', '#3498DB', '#2ECC71'];
+
+const avatarColor = (name) => COLORS[String(name || '').length % COLORS.length];
 
 const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [], onSwitchToDispatch }) => {
-  const [activeTab, setActiveTab] = useState('team');
-  const isMobile = useMobile();
-
-  const switchToDispatch = useCallback((tripId) => {
-    if (onSwitchToDispatch) onSwitchToDispatch(tripId);
-  }, [onSwitchToDispatch]);
-
-  return (
-    <div className="flex flex-1 bg-white overflow-hidden h-full">
-      {isMobile ? (
-        <div className="flex flex-col flex-1 min-h-0">
-          {role !== 'driver' && (
-            <div className="sticky top-0 z-10 bg-white shrink-0 border-b border-slate-100">
-              <div className="flex px-3 py-2 gap-1">
-                <button onClick={() => setActiveTab('team')}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                    activeTab === 'team'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                  }`}>
-                  Team Chat
-                </button>
-                <button onClick={() => setActiveTab('clients')}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                    activeTab === 'clients'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                  }`}>
-                  Clients
-                </button>
-              </div>
-            </div>
-          )}
-          <div className="flex-1 min-h-0">
-            {role === 'driver' || activeTab === 'team' ? (
-              <TeamChatPanel currentUser={currentUser} role={role} />
-            ) : (
-              <ClientChatPanel currentUser={currentUser} role={role} drivers={drivers} dispatchers={dispatchers} trips={trips} onSwitchToDispatch={switchToDispatch} />
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-1 min-w-0">
-          <div className={`${role === 'driver' ? 'w-full' : 'w-1/2'} border-r border-slate-200 flex flex-col min-h-0`}>
-            <TeamChatPanel currentUser={currentUser} role={role} />
-          </div>
-          {role !== 'driver' && (
-            <div className="w-1/2 flex flex-col min-h-0">
-              <ClientChatPanel currentUser={currentUser} role={role} drivers={drivers} dispatchers={dispatchers} trips={trips} onSwitchToDispatch={switchToDispatch} />
-            </div>
-          )}
-        </div>
-      )}
-      
-    </div>
-  );
-};
-
-/* ===================== SIDEBAR WRAPPER ===================== */
-const SidebarLayout = ({ sidebarOpen, onToggle, onClose, isMobile, sidebar, main }) => {
-  if (isMobile) {
-    return (
-      <div className="flex flex-1 h-full min-w-0 relative">
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-20 bg-black/40 animate-fade-in" onClick={onClose} />
-        )}
-        <div className={`fixed inset-y-0 left-0 z-30 w-80 bg-white shadow-2xl transform transition-transform duration-200 ease-out ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}>
-          {sidebar}
-        </div>
-        <div className="flex-1 flex flex-col min-w-0 bg-slate-50 h-full">
-          {main}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-1 h-full min-w-0">
-      <div className={`overflow-hidden transition-all duration-200 ease-out shrink-0 ${sidebarOpen ? 'w-80' : 'w-0'}`}>
-        <div className="w-80 h-full border-r border-slate-100 bg-white">
-          {sidebar}
-        </div>
-      </div>
-      <div className="flex-1 flex flex-col min-w-0 bg-slate-50 h-full">
-        {main}
-      </div>
-    </div>
-  );
-};
-
-/* ===================== TEAM CHAT PANEL ===================== */
-const TeamChatPanel = ({ currentUser, role }) => {
-  const [conversations, setConversations] = useState([]);
-  const [messages, setMessages] = useState([]);
+  const [filterTab, setFilterTab] = useState('all');
+  const [teamConvs, setTeamConvs] = useState([]);
+  const [clientConvs, setClientConvs] = useState([]);
   const [activeConv, setActiveConv] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
-  const [showNew, setShowNew] = useState(false);
-  const [allUsers, setAllUsers] = useState([]);
-  const [selected, setSelected] = useState([]);
-  const [sidebar, setSidebar] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [newSmsPhone, setNewSmsPhone] = useState('');
+  const [newSmsText, setNewSmsText] = useState('');
+  const [newSmsSending, setNewSmsSending] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [sentiments, setSentiments] = useState({});
+  const [aiSuggestedReply, setAiSuggestedReply] = useState(null);
+  const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('team');
+
   const isMobile = useMobile();
-  const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const analyzedRef = useRef(new Set());
+  const pendRef = useRef(new Set());
+  const scrollRef = useRef(null);
+  const prevTeamConvsRef = useRef({});
 
-  useEffect(() => {
-    if (!isMobile) setSidebar(true);
-  }, [isMobile]);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'users'), (snap) => {
-      const arr = [];
-      snap.forEach(d => { const data = d.data(); if (data.email && data.email !== currentUser) arr.push(data.email); });
-      setAllUsers(arr);
-    }, (err) => {
-      console.error('Chat users listener failed:', err);
-    });
-
-    return () => unsubscribe();
-  }, [currentUser]);
-
-  const prevConvsRef = useRef({});
+  /* ============= TEAM CONVERSATIONS LISTENER ============= */
   useEffect(() => {
     let isFirst = true;
-    const unsubscribe = onSnapshot(doc(db, 'chatData/conversations'), (snap) => {
-      if (!snap.exists()) { setDoc(doc(db, 'chatData/conversations'), { conversations: {} }, { merge: true }).catch(() => {}); setConversations([]); return; }
+    const unsub = onSnapshot(doc(db, 'chatData/conversations'), (snap) => {
+      if (!snap.exists()) { setDoc(doc(db, 'chatData/conversations'), { conversations: {} }, { merge: true }).catch(() => {}); setTeamConvs([]); return; }
       const data = snap.data();
       const convs = Object.entries(data.conversations || {})
         .map(([id, c]) => ({ id, ...c }))
         .filter(c => role === 'admin' || c.participants?.includes(currentUser))
-        .sort((a, b) => { const aTime = a.lastMessage?.timestamp?.toMillis?.() || 0; const bTime = b.lastMessage?.timestamp?.toMillis?.() || 0; return bTime - aTime; });
+        .sort((a, b) => (b.lastMessage?.timestamp?.toMillis?.() || 0) - (a.lastMessage?.timestamp?.toMillis?.() || 0));
       if (!isFirst) {
-        convs.forEach(conv => {
-          const prev = prevConvsRef.current[conv.id];
-          if (prev && prev.lastMessage?.text !== conv.lastMessage?.text && conv.lastMessage?.sender !== currentUser && (!activeConv || activeConv.id !== conv.id)) playMessageSound();
-          prevConvsRef.current[conv.id] = { ...conv };
+        convs.forEach(c => {
+          const p = prevTeamConvsRef.current[c.id];
+          if (p && p.lastMessage?.text !== c.lastMessage?.text && c.lastMessage?.sender !== currentUser && activeConv?.id !== c.id) playMessageSound();
+          prevTeamConvsRef.current[c.id] = { ...c };
         });
-      } else { convs.forEach(conv => { prevConvsRef.current[conv.id] = { ...conv }; }); isFirst = false; }
-      const convsWithUnread = convs.map(conv => { const lastMsg = conv.lastMessage || {}; return { ...conv, unreadCount: lastMsg.sender !== currentUser && !(lastMsg.readBy || []).includes(currentUser) ? 1 : 0 }; });
-      setConversations(convsWithUnread);
-    }, (err) => {
-      console.error('Chat conversations listener failed:', err);
-    });
-
-    return () => unsubscribe();
+      } else { convs.forEach(c => { prevTeamConvsRef.current[c.id] = { ...c }; }); isFirst = false; }
+      setTeamConvs(convs);
+    }, () => {});
+    return () => unsub();
   }, [currentUser, role, activeConv?.id]);
 
+  /* ============= USERS LISTENER ============= */
   useEffect(() => {
-    if (!activeConv?.id) { setMessages([]); return; }
-    let firstSnapshot = true;
-    let knownMessageIds = new Set();
-    const q = query(collection(db, 'chat_messages'), where('conversationId', '==', activeConv.id));
-    
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const isInitial = firstSnapshot;
-      const msgs = [];
-      snap.forEach(d => {
-        const msg = { id: d.id, ...d.data() };
-        if (!isInitial && !knownMessageIds.has(msg.id) && msg.sender !== currentUser) playMessageSound();
-        if (msg.sender !== currentUser && (!msg.readBy || !msg.readBy.includes(currentUser))) updateDoc(doc(db, 'chat_messages', d.id), { readBy: [...(msg.readBy || []), currentUser] }).catch(() => {});
-        msgs.push(msg);
-      });
-      knownMessageIds = new Set(msgs.map((msg) => msg.id));
-      msgs.sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));
-      setMessages(msgs);
-      updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${activeConv.id}.lastMessage.readBy`]: arrayUnion(currentUser) }).catch(() => {});
-      firstSnapshot = false;
-    }, (err) => {
-      console.error('Chat messages listener failed:', err);
-    });
+    const unsub = onSnapshot(collection(db, 'users'), (snap) => {
+      const arr = [];
+      snap.forEach(d => { const data = d.data(); if (data.email && data.email !== currentUser) arr.push(data.email); });
+      setAllUsers(arr);
+    }, () => {});
+    return () => unsub();
+  }, [currentUser]);
 
-    return () => unsubscribe();
-  }, [activeConv?.id, currentUser]);
-
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-
-  const send = async (e) => {
-    e.preventDefault();
-    if (!text.trim() || !activeConv) return;
-    const msg = text.trim();
-    setText('');
-    try {
-      await addDoc(collection(db, 'chat_messages'), { conversationId: activeConv.id, text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp() });
-      await updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${activeConv.id}.lastMessage`]: { text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp(), readBy: [currentUser] } });
-    } catch (err) { console.error('Failed to send message:', err); setText(msg); }
-  };
-
-  const createConv = async () => {
-    if (selected.length === 0) return;
-    const participants = [currentUser, ...selected];
-    const id = 'conv_' + Date.now();
-    try {
-      await setDoc(doc(db, 'chatData/conversations'), { [`conversations.${id}`]: { type: selected.length > 1 ? 'group' : 'direct', participants, name: selected.length > 1 ? 'Group ' + (conversations.length + 1) : selected[0].split('@')[0], createdAt: serverTimestamp(), lastMessage: { text: 'Started', sender: currentUser, timestamp: serverTimestamp(), readBy: [currentUser] } } }, { merge: true });
-    } catch (err) { console.error('Failed to create conversation:', err); return; }
-    setShowNew(false); setSelected([]);
-    setActiveConv({ id, participants, type: selected.length > 1 ? 'group' : 'direct', name: selected.length > 1 ? 'Group ' + (conversations.length + 1) : selected[0].split('@')[0] });
-    if (isMobile) setSidebar(false);
-  };
-
-  const deleteConv = async (convId) => {
-    if (!window.confirm('Delete this conversation?')) return;
-    try { await updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${convId}`]: deleteField() }); } catch (err) { console.error('Failed to delete conversation:', err); }
-    if (activeConv?.id === convId) setActiveConv(null);
-  };
-
-  const label = (c) => {
-    if (c.type === 'group') return c.name || 'Group';
-    const other = (c.participants || []).filter(p => p !== currentUser);
-    return other[0]?.split('@')[0] || 'Unknown';
-  };
-
-  const timeStr = (ts) => {
-    if (!ts) return '';
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const filteredConvs = useMemo(() => {
-    if (!search.trim()) return conversations;
-    const q = search.toLowerCase();
-    return conversations.filter(c => label(c).toLowerCase().includes(q));
-  }, [conversations, search]);
-
-  const sidebarContent = (
-    <div className="flex flex-col h-full">
-      <div className="sticky top-0 z-10 bg-white shrink-0">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-          <h2 className="text-base font-bold text-slate-900">Messages</h2>
-          <button onClick={() => setShowNew(true)} className="w-8 h-8 bg-blue-600 text-white rounded-xl flex items-center justify-center hover:bg-blue-700 active:scale-90 transition"><Plus size={16} /></button>
-        </div>
-        <div className="px-3 py-2 border-b border-slate-50">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search conversations..." className="w-full pl-9 pr-3 py-2 bg-slate-100 rounded-xl text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition" />
-          </div>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {filteredConvs.length === 0 ? (
-          <div className="p-8 text-center text-slate-400">
-            <MessageCircle size={28} className="mx-auto mb-3 opacity-20" />
-            <p className="text-sm font-bold">{search ? 'No results' : 'No conversations'}</p>
-            <p className="text-xs mt-1">{search ? 'Try a different search.' : 'Tap + to start a new chat.'}</p>
-          </div>
-        ) : (
-          filteredConvs.map(c => (
-            <button key={c.id} onClick={() => { setActiveConv(c); if (isMobile) setSidebar(false); }}
-              className={`w-full text-left p-3.5 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50 transition ${activeConv?.id === c.id ? 'bg-blue-50' : ''}`}>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 ${c.unreadCount > 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                {label(c).charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <p className={`text-sm truncate ${c.unreadCount > 0 ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>
-                    {label(c)}
-                  </p>
-                  {c.lastMessage?.timestamp && (
-                    <span className="text-[10px] text-slate-400 shrink-0 ml-2">{formatDate(c.lastMessage.timestamp)}</span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between mt-0.5">
-                  <p className="text-xs text-slate-400 truncate flex-1">
-                    {c.lastMessage?.sender === currentUser ? 'You: ' : ''}
-                    {c.lastMessage?.text || 'No messages'}
-                  </p>
-                  {c.unreadCount > 0 && (
-                    <span className="ml-2 min-w-[18px] h-[18px] bg-blue-600 text-[10px] text-white rounded-full flex items-center justify-center font-bold shrink-0 px-1">
-                      {c.unreadCount}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </button>
-          ))
-        )}
-      </div>
-    </div>
-  );
-
-  const mainContent = activeConv ? (
-    <div className="flex flex-col h-full">
-      <div className="sticky top-0 z-10 px-4 py-3 bg-white/95 backdrop-blur-sm border-b border-slate-100 flex items-center gap-3 shrink-0">
-        <button onClick={() => setSidebar(s => !s)} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition">
-          <Menu size={18} />
-        </button>
-        {isMobile && (
-          <button onClick={() => { setActiveConv(null); if (isMobile) setSidebar(false); }} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition">
-            <ArrowLeft size={18} />
-          </button>
-        )}
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
-            {label(activeConv).charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <p className="font-semibold text-sm text-slate-900 truncate">{label(activeConv)}</p>
-            <p className="text-[10px] text-slate-400">
-              {activeConv.type === 'group' ? `${activeConv.participants?.length || 0} members` : 'Direct message'}
-            </p>
-          </div>
-        </div>
-        <button onClick={() => deleteConv(activeConv.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg shrink-0 transition">
-          <Trash2 size={15} />
-        </button>
-      </div>
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2" ref={scrollRef}>
-        {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-400">
-            <div className="text-center">
-              <MessageCircle size={28} className="mx-auto mb-3 opacity-20" />
-              <p className="text-sm font-bold">No messages yet</p>
-              <p className="text-xs mt-1">Say hello!</p>
-            </div>
-          </div>
-        ) : (
-          messages.map((msg, i) => {
-            const me = msg.sender === currentUser;
-            return (
-              <div key={msg.id || i} className={`flex ${me ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                  me
-                    ? 'bg-blue-600 text-white rounded-br-md'
-                    : 'bg-white text-slate-800 rounded-bl-md shadow-sm border border-slate-100'
-                }`}>
-                  {!me && (
-                    <p className="text-[10px] font-bold text-blue-600 mb-0.5">{msg.sender?.split('@')[0]}</p>
-                  )}
-                  <p className="break-words">{msg.text}</p>
-                  <p className={`text-[10px] mt-1 flex items-center gap-1 ${me ? 'text-blue-200 justify-end' : 'text-slate-400'}`}>
-                    {msg.timestamp ? timeStr(msg.timestamp) : ''}
-                    {me && <CheckCheck size={10} />}
-                  </p>
-                </div>
-              </div>
-            );
-          })
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      <div className="sticky bottom-0 z-[60] bg-white/95 backdrop-blur-sm border-t border-slate-100 shrink-0"
-        style={{paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))'}}>
-        <form onSubmit={send} className="flex items-end gap-2 px-3 pt-2.5">
-          <div className="flex-1 bg-slate-100 rounded-2xl px-4 py-2.5 border border-transparent focus-within:bg-white focus-within:border-blue-500 focus-within:shadow-sm transition">
-            <input type="text" placeholder="Type a message..." value={text} onChange={e => setText(e.target.value)}
-              className="w-full text-sm outline-none bg-transparent placeholder:text-slate-400" />
-          </div>
-          <button type="submit" disabled={!text.trim()}
-            className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 active:scale-90 transition disabled:opacity-40 shadow-sm shrink-0">
-            <Send size={16} fill="currentColor" />
-          </button>
-        </form>
-      </div>
-    </div>
-  ) : (
-    <div className="flex-1 flex flex-col">
-      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-slate-100 px-3 py-2.5 shrink-0">
-        <button onClick={() => setSidebar(s => !s)} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition">
-          <Menu size={18} />
-        </button>
-      </div>
-      <div className="flex-1 flex items-center justify-center text-slate-400">
-        <div className="text-center">
-          <MessageCircle size={40} className="mx-auto mb-4 opacity-20" />
-          <p className="text-base font-bold text-slate-700">Select a chat</p>
-          <p className="text-sm mt-1">Choose a conversation or start a new one.</p>
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <>
-      <SidebarLayout
-        sidebarOpen={sidebar}
-        onToggle={() => setSidebar(s => !s)}
-        onClose={() => setSidebar(false)}
-        isMobile={isMobile}
-        sidebar={sidebarContent}
-        main={mainContent}
-      />
-      {showNew && (
-        <div className="fixed inset-0 z-[120] bg-black/40 flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => { setShowNew(false); setSelected([]); }}>
-          <div className="bg-white rounded-2xl w-full max-w-sm p-5 relative z-10 shadow-xl animate-slide-up" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-base font-bold">New Chat</h3>
-              <button onClick={() => { setShowNew(false); setSelected([]); }} className="p-1 text-slate-400 hover:bg-slate-100 rounded-lg transition">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-0.5 max-h-60 overflow-y-auto mb-4 -mx-1 px-1">
-              {allUsers.map(email => {
-                const sel = selected.includes(email);
-                return (
-                  <button key={email} onClick={() => setSelected(prev => prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email])}
-                    className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition ${sel ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${sel ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                      {email.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="text-left min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{email.split('@')[0]}</p>
-                      <p className="text-xs text-slate-400 truncate">{email}</p>
-                    </div>
-                    {sel && <span className="text-blue-600 text-xs font-bold shrink-0">&#x2713;</span>}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => { setShowNew(false); setSelected([]); }}
-                className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-medium text-sm hover:bg-slate-200 transition">Cancel</button>
-              <button onClick={createConv} disabled={selected.length === 0}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-medium text-sm disabled:opacity-40 hover:bg-blue-700 transition">Start</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-};
-
-/* ===================== CLIENT CHAT PANEL ===================== */
-const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], trips = [], onSwitchToDispatch }) => {
-  const [conversations, setConversations] = useState([]);
-  const [activeConv, setActiveConv] = useState(null);
-  const [showSidebar, setShowSidebar] = useState(true);
-  const [search, setSearch] = useState('');
-  const isMobile = useMobile();
-
-  useEffect(() => {
-    if (!isMobile) setShowSidebar(true);
-  }, [isMobile]);
-
-  const [clientMessages, setClientMessages] = useState([]);
-  const [replyText, setReplyText] = useState('');
-  const [sending, setSending] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [aiSuggestedReply, setAiSuggestedReply] = useState(null);
-  const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
-  const [sentiments, setSentiments] = useState({});
-  const [showNewSms, setShowNewSms] = useState(false);
-  const [newSmsPhone, setNewSmsPhone] = useState('');
-  const [newSmsText, setNewSmsText] = useState('');
-  const [newSmsSending, setNewSmsSending] = useState(false);
-  const messagesEndRef = useRef(null);
-
+  /* ============= CLIENT CONVERSATIONS LISTENER ============= */
   const scopeFilter = useCallback((convs) => {
     if (role === 'driver') return [];
     if (role !== 'dispatcher') return convs;
     const disp = dispatchers.find(d => d.email?.toLowerCase() === (currentUser || '').toLowerCase());
     if (!disp) return [];
     const aDrivers = drivers.filter(d => d.assignedDispatcher === disp.id || d.assignedTo === disp.id);
-    const scopedIds = new Set(aDrivers.map(d => d.id));
-    const scopedEmails = new Set(aDrivers.map(d => d.email?.toLowerCase()).filter(Boolean));
-    const allowedPhones = new Set();
+    const ids = new Set(aDrivers.map(d => d.id));
+    const emails = new Set(aDrivers.map(d => d.email?.toLowerCase()).filter(Boolean));
+    const phones = new Set();
     (trips || []).forEach(t => {
-      if (scopedIds.has(t.driverId) || scopedEmails.has(t.driverEmail?.toLowerCase())) {
-        [t.patientPhone, t.pickupPhone, t.dropoffPhone].filter(Boolean).forEach(p => allowedPhones.add(normalizePhone(p)));
+      if (ids.has(t.driverId) || emails.has(t.driverEmail?.toLowerCase())) {
+        [t.patientPhone, t.pickupPhone, t.dropoffPhone].filter(Boolean).forEach(p => phones.add(normalizePhone(p)));
       }
     });
-    return convs.filter(c => allowedPhones.has(c.phone));
+    return convs.filter(c => phones.has(c.phone));
   }, [role, currentUser, dispatchers, drivers, trips]);
 
   const phoneToTrip = useMemo(() => {
     const map = {};
     (trips || []).forEach(t => {
-      const phones = [t.patientPhone, t.pickupPhone, t.dropoffPhone].filter(Boolean);
-      phones.forEach(p => {
+      [t.patientPhone, t.pickupPhone, t.dropoffPhone].filter(Boolean).forEach(p => {
         const norm = normalizePhone(p);
-        const tripTime = t.date && t.time ? new Date(t.date + 'T' + (t.time.includes(':') ? t.time : t.time + ':00')).getTime() : 0;
-        const existing = map[norm];
-        if (!existing || tripTime > (existing._tripTime || 0)) {
-          map[norm] = { ...t, _tripTime: tripTime };
-        }
+        const tTime = t.date && t.time ? new Date(t.date + 'T' + (t.time.includes(':') ? t.time : t.time + ':00')).getTime() : 0;
+        if (!map[norm] || tTime > (map[norm]._t || 0)) map[norm] = { ...t, _t: tTime };
       });
     });
     return map;
@@ -532,23 +150,22 @@ const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], tr
 
   const resolveClient = useCallback((phone) => {
     const norm = normalizePhone(phone);
-    const raw = phone || norm || '';
     const trip = norm ? phoneToTrip[norm] : null;
-    if (trip && trip.patient) return { name: trip.patient, tripId: trip.id || trip.tripId, trip };
+    if (trip?.patient) return { name: trip.patient, tripId: trip.id || trip.tripId, trip };
     if (norm) return { name: norm, tripId: null, trip: null };
-    return { name: raw || 'Unknown', tripId: null, trip: null };
+    return { name: phone || 'Unknown', tripId: null, trip: null };
   }, [phoneToTrip]);
 
   const resolveClientFromMsgs = useCallback((msgs) => {
     for (const m of msgs) {
       const phone = m.direction === 'outbound' ? m.to : m.from;
-      const resolved = resolveClient(phone);
-      if (resolved.trip) return resolved;
+      const r = resolveClient(phone);
+      if (r.trip) return r;
     }
     for (const m of msgs) {
       if (m.tripId) {
-        const trip = (trips || []).find(t => t.id === m.tripId || t.tripId === m.tripId);
-        if (trip && trip.patient) return { name: trip.patient, tripId: m.tripId, trip };
+        const t = (trips || []).find(trip => trip.id === m.tripId || trip.tripId === m.tripId);
+        if (t?.patient) return { name: t.patient, tripId: m.tripId, trip: t };
       }
     }
     for (const m of msgs) {
@@ -558,19 +175,18 @@ const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], tr
     return { name: 'Unknown', tripId: null, trip: null };
   }, [resolveClient, trips]);
 
+  /* ============= SMS SNAPSHOT ============= */
   useEffect(() => {
     setLoading(true);
     const q = query(collection(db, 'smsLogs'), orderBy('timestamp', 'desc'), limit(500));
-    const pendingIds = new Set();
-
-    const unsubscribe = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(q, (snap) => {
       const groups = {};
       snap.forEach(d => {
         const msg = { id: d.id, ...d.data() };
-        if (pendingIds.has(msg.id) || sentPendingRef.current.has(msg.id)) return;
-        const otherPhone = msg.direction === 'outbound' ? msg.to : msg.from;
-        if (!otherPhone) return;
-        const norm = normalizePhone(otherPhone);
+        if (pendRef.current.has(msg.id)) return;
+        const other = msg.direction === 'outbound' ? msg.to : msg.from;
+        if (!other) return;
+        const norm = normalizePhone(other);
         if (norm === normalizePhone(TELNYX_NUMBER)) return;
         if (!groups[norm]) groups[norm] = [];
         groups[norm].push(msg);
@@ -581,374 +197,514 @@ const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], tr
         const resolved = resolveClientFromMsgs(msgs);
         return { phone, clientName: resolved.name, tripId: resolved.tripId, trip: resolved.trip, lastMessage: last, messages: msgs };
       });
-      convs.sort((a, b) => (b.lastMessage.timestamp?.toMillis?.() || 0) - (a.lastMessage.timestamp?.toMillis?.() || 0));
-      setConversations(scopeFilter(convs));
+      convs.sort((a, b) => (b.lastMessage?.timestamp?.toMillis?.() || 0) - (a.lastMessage?.timestamp?.toMillis?.() || 0));
+      setClientConvs(scopeFilter(convs));
       setLoading(false);
-    }, (e) => {
-      console.error('SMS listener failed:', e);
-      setLoading(false);
-    });
-
-    return () => { unsubscribe(); pendingIds.clear(); };
+    }, () => setLoading(false));
+    return () => unsub();
   }, [trips, resolveClientFromMsgs]);
 
-  const analyzedSentimentsRef = useRef(new Set());
-  const sentPendingRef = useRef(new Set());
+  /* ============= TEAM MESSAGES LISTENER ============= */
+  useEffect(() => {
+    if (!activeConv || activeConv.type !== 'team') { setMessages([]); return; }
+    let first = true;
+    let known = new Set();
+    const q = query(collection(db, 'chat_messages'), where('conversationId', '==', activeConv.id));
+    const unsub = onSnapshot(q, (snap) => {
+      const msgs = [];
+      snap.forEach(d => {
+        const msg = { id: d.id, ...d.data() };
+        if (!first && !known.has(msg.id) && msg.sender !== currentUser) playMessageSound();
+        if (msg.sender !== currentUser && (!msg.readBy || !msg.readBy.includes(currentUser))) updateDoc(doc(db, 'chat_messages', d.id), { readBy: [...(msg.readBy || []), currentUser] }).catch(() => {});
+        msgs.push(msg);
+      });
+      known = new Set(msgs.map(m => m.id));
+      msgs.sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));
+      setMessages(msgs);
+      updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${activeConv.id}.lastMessage.readBy`]: arrayUnion(currentUser) }).catch(() => {});
+      first = false;
+    }, () => {});
+    return () => unsub();
+  }, [activeConv?.id, activeConv?.type, currentUser]);
 
-  const openConversation = async (conv) => {
-    setActiveConv(conv);
+  /* ============= SET CLIENT MESSAGES WHEN OPENING ============= */
+  const openClientConv = useCallback((conv) => {
+    setActiveConv({ type: 'client', ...conv });
     const allMsgs = [...(conv.messages || [])];
     allMsgs.sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));
-    setClientMessages(allMsgs);
-  };
+    setMessages(allMsgs);
+  }, []);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [clientMessages]);
-
+  /* ============= SYNC NEW CLIENT MSGS INTO ACTIVE VIEW ============= */
   useEffect(() => {
-    if (!activeConv?.phone) return;
-    const updated = conversations.find(c => c.phone === activeConv.phone);
-    if (!updated || !updated.messages) return;
-    setClientMessages(prev => {
-      const existingIds = new Set(prev.map(m => m.id));
-      const newMsgs = updated.messages.filter(m => !existingIds.has(m.id));
+    if (!activeConv || activeConv.type !== 'client') return;
+    const updated = clientConvs.find(c => c.phone === activeConv.phone);
+    if (!updated?.messages) return;
+    setMessages(prev => {
+      const existing = new Set(prev.map(m => m.id));
+      const newMsgs = updated.messages.filter(m => !existing.has(m.id));
       if (newMsgs.length === 0) return prev;
       const merged = [...prev, ...newMsgs];
       merged.sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));
       return merged;
     });
-  }, [conversations, activeConv?.phone]);
+  }, [clientConvs, activeConv?.phone, activeConv?.type]);
 
+  /* ============= SCROLL TO BOTTOM ============= */
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  /* ============= SENTIMENT ANALYSIS ============= */
   useEffect(() => {
-    const unanalyzed = clientMessages.filter(m => m.direction !== 'outbound' && !analyzedSentimentsRef.current.has(m.id) && m.text);
+    const unanalyzed = messages.filter(m => activeConv?.type === 'client' && m.direction !== 'outbound' && !analyzedRef.current.has(m.id) && m.text);
     unanalyzed.slice(0, 5).forEach(m => {
-      analyzedSentimentsRef.current.add(m.id);
-      aiAnalyzeSentiment(m.text).then(result => {
-        if (result) setSentiments(prev => ({ ...prev, [m.id]: result }));
-      }).catch(() => {});
+      analyzedRef.current.add(m.id);
+      aiAnalyzeSentiment(m.text).then(r => { if (r) setSentiments(prev => ({ ...prev, [m.id]: r })); }).catch(() => {});
     });
-  }, [clientMessages]);
+  }, [messages, activeConv?.type]);
 
-  const filteredConvs = useMemo(() => {
-    if (!search.trim()) return conversations;
-    const q = search.toLowerCase();
-    return conversations.filter(c => c.clientName.toLowerCase().includes(q) || c.phone.includes(q));
-  }, [conversations, search]);
+  /* ============= SEND TEAM MESSAGE ============= */
+  const sendTeamMsg = async (e) => {
+    e.preventDefault();
+    if (!text.trim() || !activeConv) return;
+    const msg = text.trim();
+    setText('');
+    try {
+      await addDoc(collection(db, 'chat_messages'), { conversationId: activeConv.id, text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp() });
+      await updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${activeConv.id}.lastMessage`]: { text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp(), readBy: [currentUser] } });
+    } catch (e) { console.error(e); setText(msg); }
+  };
 
-  const handleSend = async () => {
-    const msg = replyText.trim();
+  /* ============= SEND CLIENT SMS ============= */
+  const sendClientSms = async () => {
+    const msg = text.trim();
     if (!msg || sending || !activeConv) return;
     setSending(true);
     try {
-      const functions = getFunctions();
-      const sendSms = httpsCallable(functions, 'sendSms');
-      const res = await sendSms({ to: activeConv.phone, text: msg, tripId: activeConv.tripId });
+      const fn = getFunctions();
+      const send = httpsCallable(fn, 'sendSms');
+      const res = await send({ to: activeConv.phone, text: msg, tripId: activeConv.tripId });
       if (res.data?.success) {
-        const id = 'pending-' + Date.now();
-        sentPendingRef.current.add(id);
+        const id = 'pend-' + Date.now();
+        pendRef.current.add(id);
         const newMsg = { id, direction: 'outbound', to: activeConv.phone, text: msg, timestamp: new Date().toISOString(), status: 'sent' };
-        setClientMessages(prev => [...prev, newMsg]);
-        setConversations(prev => prev.map(c => c.phone === activeConv.phone ? { ...c, messages: [...(c.messages || []), newMsg], lastMessage: newMsg } : c));
-        setReplyText('');
+        setMessages(prev => [...prev, newMsg]);
+        setClientConvs(prev => prev.map(c => c.phone === activeConv.phone ? { ...c, messages: [...(c.messages || []), newMsg], lastMessage: newMsg } : c));
+        setText('');
       }
-    } catch (err) { console.error('Send failed:', err); }
+    } catch (e) { console.error(e); }
     setSending(false);
+  };
+
+  /* ============= CREATE TEAM CONVERSATION ============= */
+  const createConv = async () => {
+    if (selectedUsers.length === 0) return;
+    const participants = [currentUser, ...selectedUsers];
+    const id = 'conv_' + Date.now();
+    try {
+      await setDoc(doc(db, 'chatData/conversations'), { [`conversations.${id}`]: { type: selectedUsers.length > 1 ? 'group' : 'direct', participants, name: selectedUsers.length > 1 ? 'Group ' + (teamConvs.length + 1) : selectedUsers[0].split('@')[0], createdAt: serverTimestamp(), lastMessage: { text: 'Started', sender: currentUser, timestamp: serverTimestamp(), readBy: [currentUser] } } }, { merge: true });
+    } catch (e) { console.error(e); return; }
+    setShowNewChat(false); setSelectedUsers([]);
+    setActiveConv({ id, participants, type: 'team', name: selectedUsers.length > 1 ? 'Group ' + (teamConvs.length + 1) : selectedUsers[0].split('@')[0] });
+  };
+
+  /* ============= NEW SMS ============= */
+  const sendNewSms = async () => {
+    const phone = newSmsPhone.trim();
+    const text = newSmsText.trim();
+    if (!phone || !text || newSmsSending) return;
+    setNewSmsSending(true);
+    try {
+      const fn = getFunctions();
+      const send = httpsCallable(fn, 'sendSms');
+      await send({ to: phone, text, tripId: null });
+      setShowNewChat(false); setNewSmsPhone(''); setNewSmsText('');
+      const norm = normalizePhone(phone);
+      const id = 'pend-' + Date.now();
+      pendRef.current.add(id);
+      const newMsg = { id, direction: 'outbound', to: norm, from: TELNYX_NUMBER, text, timestamp: new Date().toISOString(), status: 'sent' };
+      setClientConvs(prev => {
+        const existing = prev.find(c => c.phone === norm);
+        if (existing) {
+          const u = { ...existing, messages: [...(existing.messages || []), newMsg], lastMessage: newMsg };
+          return [u, ...prev.filter(c => c.phone !== norm)];
+        }
+        const r = resolveClient(phone);
+        return [{ phone: norm, clientName: r.name, tripId: r.tripId, trip: r.trip, lastMessage: newMsg, messages: [newMsg] }, ...prev];
+      });
+      setActiveConv({ type: 'client', phone: norm, clientName: newSmsPhone, lastMessage: newMsg, messages: [newMsg] });
+      setMessages([newMsg]);
+    } catch (e) { console.error(e); }
+    setNewSmsSending(false);
+  };
+
+  /* ============= DELETE TEAM CONVERSATION ============= */
+  const deleteConv = (convId) => {
+    if (!window.confirm('Delete this conversation?')) return;
+    updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${convId}`]: deleteField() }).catch(() => {});
+    if (activeConv?.id === convId) setActiveConv(null);
+  };
+
+  /* ============= AI SUGGEST REPLY ============= */
+  const handleAiSuggest = useCallback(async () => {
+    if (!activeConv || aiSuggestLoading) return;
+    setAiSuggestLoading(true);
+    setAiSuggestedReply(null);
+    const ctx = activeConv.trip || { patient: activeConv.clientName || activeConv.name, time: '', pickup: '', dropoff: '' };
+    const result = await aiSuggestReply(messages.map(m => ({ direction: m.direction || (m.sender === currentUser ? 'outbound' : 'inbound'), body: m.text, text: m.text })), ctx);
+    setAiSuggestedReply(result);
+    setAiSuggestLoading(false);
+  }, [activeConv, messages, aiSuggestLoading, currentUser]);
+
+  /* ============= MERGED CONVERSATIONS ============= */
+  const mergedConvs = useMemo(() => {
+    const list = [];
+    const label = (c) => {
+      if (c.name) return c.name;
+      const other = (c.participants || []).filter(p => p !== currentUser);
+      return other[0]?.split('@')[0] || 'Unknown';
+    };
+    teamConvs.forEach(c => {
+      const last = c.lastMessage || {};
+      list.push({
+        id: c.id,
+        type: 'team',
+        name: label(c),
+        subtitle: last.sender === currentUser ? `You: ${last.text || ''}` : (last.text || 'No messages'),
+        time: last.timestamp,
+        unread: last.sender !== currentUser && !(last.readBy || []).includes(currentUser),
+        participants: c.participants,
+        raw: c,
+      });
+    });
+    clientConvs.forEach(c => {
+      const isNamed = c.clientName && c.clientName !== c.phone && !c.clientName.startsWith('+');
+      const displayName = isNamed ? c.clientName : c.phone;
+      const initial = isNamed ? c.clientName.charAt(0).toUpperCase() : '?';
+      const last = c.lastMessage || {};
+      list.push({
+        id: c.phone,
+        type: 'client',
+        name: displayName,
+        subtitle: last.direction === 'outbound' ? `You: ${last.text || ''}` : (last.text || 'No messages'),
+        time: last.timestamp,
+        unread: false,
+        phone: c.phone,
+        clientName: c.clientName,
+        tripId: c.tripId,
+        trip: c.trip,
+        messages: c.messages || [],
+        raw: c,
+        initial,
+      });
+    });
+    list.sort((a, b) => ((b.time?.toMillis?.() || 0) - (a.time?.toMillis?.() || 0)));
+    return list;
+  }, [teamConvs, clientConvs, currentUser]);
+
+  const filteredConvs = useMemo(() => {
+    let list = mergedConvs;
+    if (filterTab === 'team') list = list.filter(c => c.type === 'team');
+    else if (filterTab === 'clients') list = list.filter(c => c.type === 'client');
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(c => c.name.toLowerCase().includes(q));
+    }
+    return list;
+  }, [mergedConvs, filterTab, search]);
+
+  const convLabel = (conv) => conv.type === 'team'
+    ? ((conv) => { if (conv.name) return conv.name; const other = (conv.participants || []).filter(p => p !== currentUser); return other[0]?.split('@')[0] || 'Unknown'; })(conv.raw || conv)
+    : (conv.name || conv.phone);
+
+  const unreadCount = useMemo(() => mergedConvs.filter(c => c.unread).length, [mergedConvs]);
+
+  /* ============= SELECT CONVERSATION ============= */
+  const selectConv = (conv) => {
+    if (conv.type === 'team') {
+      setActiveConv({ ...conv.raw, type: 'team' });
+    } else {
+      openClientConv(conv.raw);
+    }
+    if (isMobile) setSidebarOpen(false);
+  };
+
+  /* ============= send handler ============= */
+  const handleSend = (e) => {
+    e?.preventDefault();
+    if (!activeConv) return;
+    if (activeConv.type === 'team') sendTeamMsg(e);
+    else sendClientSms();
   };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  const handleAiSuggestReply = useCallback(async () => {
-    if (!activeConv || aiSuggestLoading) return;
-    setAiSuggestLoading(true);
-    setAiSuggestedReply(null);
-    const tripContext = activeConv.trip || { patient: activeConv.clientName, time: '', pickup: '', dropoff: '' };
-    const result = await aiSuggestReply(
-      clientMessages.map(m => ({ direction: m.direction, body: m.text, text: m.text })),
-      tripContext
-    );
-    setAiSuggestedReply(result);
-    setAiSuggestLoading(false);
-  }, [activeConv, clientMessages, aiSuggestLoading]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 size={20} className="animate-spin text-slate-400" />
-      </div>
-    );
-  }
-
-  const listContent = (
-    <div className="flex flex-col h-full">
-      <div className="sticky top-0 z-10 bg-white shrink-0">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-          <h2 className="text-base font-bold text-slate-900">Clients</h2>
-          <button onClick={() => setShowNewSms(true)} className="w-8 h-8 bg-blue-600 text-white rounded-xl flex items-center justify-center hover:bg-blue-700 active:scale-90 transition"><Plus size={16} /></button>
-        </div>
-        <div className="px-3 py-2 border-b border-slate-50">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search clients..." className="w-full pl-9 pr-3 py-2 bg-slate-100 rounded-xl text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition" />
-          </div>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {filteredConvs.length === 0 ? (
-          <div className="p-8 text-center text-slate-400">
-            <MessageCircle size={28} className="mx-auto mb-3 opacity-20" />
-            <p className="text-sm font-bold">{search ? 'No results' : 'No client conversations'}</p>
-            <p className="text-xs mt-1">{search ? 'Try a different search.' : 'Send an SMS to a client to start a conversation.'}</p>
-          </div>
-        ) : (
-          filteredConvs.map(conv => {
-            const isNamed = conv.clientName && conv.clientName !== conv.phone && !conv.clientName.startsWith('+');
-            const displayName = isNamed ? conv.clientName : conv.phone;
-            const initial = isNamed ? conv.clientName.charAt(0).toUpperCase() : (conv.phone || '').replace(/\D/g, '').slice(-2) || '?';
-            return (
-            <button key={conv.phone} onClick={() => { openConversation(conv); if (isMobile) setShowSidebar(false); }}
-              className={`w-full text-left p-3.5 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50 transition ${activeConv?.phone === conv.phone ? 'bg-blue-50' : ''}`}>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 ${
-                isNamed ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
-              }`}>
-                {initial}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-900 truncate">
-                    {displayName}
-                  </p>
-                  {conv.lastMessage?.timestamp && (
-                    <span className="text-[10px] text-slate-400 shrink-0">{formatDate(conv.lastMessage.timestamp)}</span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between mt-0.5">
-                  <p className="text-xs text-slate-500 truncate flex-1">
-                    {conv.lastMessage?.direction === 'outbound' ? <span className="text-slate-400">You: </span> : ''}
-                    {conv.lastMessage?.text || 'No messages'}
-                  </p>
-                </div>
-                {conv.tripId && (
-                  <p className="text-[10px] text-blue-500 font-medium mt-0.5">Trip #{conv.tripId.replace('trip_', '').replace('trip-', '').substring(0, 8)}</p>
-                )}
-              </div>
-              <ChevronDown size={14} className="text-slate-300 -rotate-90 shrink-0" />
-            </button>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-
-  const convDisplayName = (() => { if (!activeConv) return ''; const n = activeConv.clientName; const p = activeConv.phone; return n && n !== p && !n.startsWith('+') ? n : p; })();
-  const convDisplayInitial = (() => { if (!activeConv) return '?'; const n = activeConv.clientName; const p = activeConv.phone; const named = n && n !== p && !n.startsWith('+'); return named ? n.charAt(0).toUpperCase() : String(p || '').replace(/\D/g, '').slice(-2) || '?'; })();
-  const convContent = activeConv ? (
-    <div className="flex flex-col h-full">
-      <div className="sticky top-0 z-10 px-4 py-3 bg-white/95 backdrop-blur-sm border-b border-slate-100 flex items-center gap-3 shrink-0">
-        <button onClick={() => setShowSidebar(s => !s)} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition">
-          <Menu size={18} />
-        </button>
-        {isMobile && (
-          <button onClick={() => { setActiveConv(null); setClientMessages([]); if (isMobile) setShowSidebar(false); }} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition">
-            <ArrowLeft size={18} />
-          </button>
-        )}
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">
-            {convDisplayInitial}
-          </div>
-          <div className="min-w-0">
-            <p className="font-semibold text-sm text-slate-900 truncate">{convDisplayName}</p>
-            <p className="text-[10px] text-slate-500 flex items-center gap-1">
-              {activeConv.tripId && (
-                <span className="flex items-center gap-1">
-                  <span className="text-blue-500 font-medium">Trip #{activeConv.tripId.replace('trip_', '').replace('trip-', '').substring(0, 8)}</span>
-                  {onSwitchToDispatch && (
-                    <button onClick={() => onSwitchToDispatch(activeConv.tripId)} className="text-blue-600 hover:text-blue-800" title="View in dispatch">
-                      <ExternalLink size={10} />
-                    </button>
-                  )}
-                </span>
-              )}
-              {activeConv.tripId && activeConv.clientName !== activeConv.phone && <span className="text-slate-300">|</span>}
-              <span className="text-slate-400">{activeConv.phone}</span>
-            </p>
-          </div>
-        </div>
-        <button onClick={handleAiSuggestReply} disabled={aiSuggestLoading} className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-lg transition shrink-0" title="AI Suggest Reply">
-          {aiSuggestLoading ? <Loader2 size={16} className="animate-spin" /> : <BrainCircuit size={16} />}
-        </button>
-      </div>
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1.5">
-        {clientMessages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-400">
-            <div className="text-center"><MessageCircle size={24} className="mx-auto mb-2 opacity-20" /><p className="text-sm font-bold">No messages</p></div>
-          </div>
-        ) : (
-          clientMessages.map((m, i) => {
-            const isOutbound = m.direction === 'outbound';
-            const prev = i > 0 ? clientMessages[i - 1] : null;
-            const showDateHeader = !prev || formatDate(prev.timestamp) !== formatDate(m.timestamp);
-            return (
-              <React.Fragment key={m.id || m.messageId || i}>
-                {showDateHeader && <p className="text-[10px] font-bold text-slate-400 text-center pt-2 pb-1">{formatDate(m.timestamp)}</p>}
-                <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${isOutbound ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white text-slate-800 rounded-bl-md shadow-sm border border-slate-100'}`}>
-                    {!isOutbound && (
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <p className="text-[10px] font-bold text-slate-500">{activeConv.clientName}</p>
-                        {sentiments[m.id] && (
-                          <span className={`text-[8px] font-bold px-1 py-0.5 rounded-full ${
-                            sentiments[m.id].sentiment === 'positive' ? 'bg-emerald-100 text-emerald-700' :
-                            sentiments[m.id].sentiment === 'negative' ? 'bg-rose-100 text-rose-700' :
-                            sentiments[m.id].sentiment === 'urgent' ? 'bg-amber-100 text-amber-700' :
-                            'bg-slate-100 text-slate-500'
-                          }`}>
-                            {sentiments[m.id].sentiment === 'positive' ? 'Positive' :
-                             sentiments[m.id].sentiment === 'negative' ? 'Negative' :
-                             sentiments[m.id].sentiment === 'urgent' ? 'Urgent' : 'Neutral'}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <p className="text-xs leading-relaxed whitespace-pre-wrap break-words">{m.text}</p>
-                    <p className={`text-[9px] mt-1 flex items-center gap-1 ${isOutbound ? 'text-blue-200 justify-end' : 'text-slate-400'}`}>
-                      {formatTime(m.timestamp)}
-                      {isOutbound && (m.status === 'queued' ? ' • queued' : m.status === 'sent' ? '' : m.status === 'delivered' ? ' • delivered' : '')}
-                      {isOutbound && (m.status === 'sent' || m.status === 'delivered') && <CheckCheck size={9} />}
-                    </p>
-                  </div>
-                </div>
-              </React.Fragment>
-            );
-          })
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      {aiSuggestedReply && (
-        <div className="px-4 py-2 bg-indigo-50 border-t border-indigo-100">
-          <div className="flex items-start gap-2">
-            <Sparkles size={14} className="text-indigo-600 mt-0.5 shrink-0" />
-            <div className="flex-1">
-              <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1">AI Suggested Reply</p>
-              <p className="text-xs text-slate-700 bg-white rounded-lg p-2.5 border border-indigo-100">{aiSuggestedReply.suggestedReply}</p>
-              <div className="flex gap-2 mt-1.5">
-                <button onClick={() => { setReplyText(aiSuggestedReply.suggestedReply); setAiSuggestedReply(null); }} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold hover:bg-indigo-700 transition">Use Reply</button>
-                <button onClick={() => setAiSuggestedReply(null)} className="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-50 transition">Dismiss</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="sticky bottom-0 z-[60] bg-white/95 backdrop-blur-sm border-t border-slate-100 shrink-0"
-        style={{paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))'}}>
-        <div className="flex items-center gap-2 px-3 pt-2.5">
-          <input value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={handleKeyDown}
-            placeholder="Type a reply..." className="flex-1 bg-slate-100 rounded-2xl px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition" />
-          <button onClick={handleSend} disabled={!replyText.trim() || sending}
-            className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-90 transition disabled:opacity-40 shrink-0 shadow-sm">
-            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          </button>
-        </div>
-      </div>
-    </div>
-  ) : null;
-
-  const handleNewSms = async () => {
-    const rawPhone = newSmsPhone.trim();
-    const text = newSmsText.trim();
-    if (!rawPhone || !text || newSmsSending) return;
-    setNewSmsSending(true);
-    try {
-      const functions = getFunctions();
-      const sendSms = httpsCallable(functions, 'sendSms');
-      await sendSms({ to: rawPhone, text, tripId: null });
-      setShowNewSms(false);
-      setNewSmsPhone('');
-      setNewSmsText('');
-      const norm = normalizePhone(rawPhone);
-      const now = new Date().toISOString();
-      const id = 'pending-' + Date.now();
-      sentPendingRef.current.add(id);
-      const newMsg = { id, direction: 'outbound', to: norm, from: TELNYX_NUMBER, text, timestamp: now, status: 'sent' };
-      setConversations(prev => {
-        const existing = prev.find(c => c.phone === norm);
-        if (existing) {
-          const updated = { ...existing, messages: [...existing.messages, newMsg], lastMessage: newMsg };
-          return [updated, ...prev.filter(c => c.phone !== norm)];
-        }
-        const resolved = resolveClient(rawPhone);
-        const newConv = { phone: norm, clientName: resolved.name, tripId: resolved.tripId, trip: resolved.trip, lastMessage: newMsg, messages: [newMsg] };
-        return [newConv, ...prev];
-      });
-      setClientMessages(prev => {
-        if (activeConv?.phone === norm) return [...prev, newMsg];
-        return prev;
-      });
-      if (isMobile) setShowSidebar(false);
-    } catch (err) { console.error('New SMS failed:', err); }
-    setNewSmsSending(false);
-  };
+  /* ============= RENDER ============= */
+  const sidebarWidth = isMobile ? (sidebarOpen ? 'w-full' : 'w-0') : (sidebarOpen ? 'w-[360px]' : 'w-0');
 
   return (
-    <>
-    <SidebarLayout
-      sidebarOpen={showSidebar}
-      onToggle={() => setShowSidebar(s => !s)}
-      onClose={() => setShowSidebar(false)}
-      isMobile={isMobile}
-      sidebar={listContent}
-      main={activeConv ? convContent : (
-        <div className="flex-1 flex flex-col">
-          <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-slate-100 px-3 py-2.5 shrink-0">
-            <button onClick={() => setShowSidebar(s => !s)} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition">
-              <Menu size={18} />
+    <div className="flex h-full bg-white overflow-hidden">
+      {/* SIDEBAR */}
+      <div className={`${sidebarWidth} flex flex-col border-r border-gray-200 shrink-0 overflow-hidden transition-all duration-200 ${isMobile && sidebarOpen ? 'absolute inset-0 z-10 bg-white' : ''}`}>
+        {/* Header */}
+        <div className="shrink-0 border-b border-gray-200 bg-white">
+          <div className="flex items-center justify-between px-4 h-14">
+            <h1 className="text-xl font-bold text-gray-900">{currentUser?.split('@')[0] || 'Chats'}</h1>
+            <button onClick={() => { setShowNewChat(true); setSelectedUsers([]); setNewSmsPhone(''); setNewSmsText(''); }} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 transition">
+              <Plus size={20} />
             </button>
           </div>
-          <div className="flex-1 flex items-center justify-center text-slate-400">
-            <div className="text-center">
-              <MessageCircle size={40} className="mx-auto mb-4 opacity-20" />
-              <p className="text-base font-bold text-slate-700">Select a conversation</p>
-              <p className="text-sm mt-1">Choose a client conversation or send an SMS.</p>
+          <div className="px-3 pb-2">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search Messenger" className="w-full h-9 pl-9 pr-3 bg-gray-100 rounded-full text-sm text-gray-800 placeholder:text-gray-400 outline-none focus:bg-gray-200 transition" />
             </div>
+          </div>
+          <div className="flex gap-1 px-3 pb-2">
+            {['all', 'team', 'clients'].map(tab => (
+              <button key={tab} onClick={() => setFilterTab(tab)}
+                className={`px-3 h-8 rounded-full text-sm font-semibold transition ${filterTab === tab ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}>
+                {tab === 'all' ? 'All' : tab === 'team' ? 'Team' : 'Clients'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Conversation List */}
+        <div className="flex-1 overflow-y-auto">
+          {loading && mergedConvs.length === 0 ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 size={20} className="animate-spin text-gray-300" />
+            </div>
+          ) : filteredConvs.length === 0 ? (
+            <div className="flex items-center justify-center h-40 text-gray-400 text-sm font-medium">
+              {search ? 'No results' : 'No conversations'}
+            </div>
+          ) : (
+            filteredConvs.map(conv => {
+              const isActive = activeConv && ((conv.type === 'team' && activeConv.id === conv.id) || (conv.type === 'client' && activeConv.phone === conv.id));
+              const initial = conv.type === 'client' ? (conv.initial || conv.name.charAt(0).toUpperCase()) : conv.name.charAt(0).toUpperCase();
+              const color = avatarColor(conv.name);
+              return (
+                <button key={conv.id + conv.type} onClick={() => selectConv(conv)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition border-b border-gray-100 ${isActive ? 'bg-blue-50' : ''}`}>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{ backgroundColor: color }}>
+                    {initial}
+                  </div>
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm truncate ${conv.unread ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>{conv.name}</span>
+                      <span className="text-xs text-gray-400 shrink-0 ml-2">{formatConvTime(conv.time)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`text-sm truncate ${conv.unread ? 'font-semibold text-gray-900' : 'text-gray-500'}`}>{conv.subtitle}</span>
+                      {conv.unread && <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />}
+                    </div>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+      {/* OVERLAY ON MOBILE */}
+      {isMobile && sidebarOpen && <div className="fixed inset-0 z-0" onClick={() => setSidebarOpen(false)} />}
+
+      {/* MAIN CHAT AREA */}
+      {activeConv ? (
+        <div className="flex-1 flex flex-col min-w-0 bg-white">
+          {/* Chat Header */}
+          <div className="shrink-0 flex items-center gap-3 px-4 h-14 border-b border-gray-200 bg-white">
+            {isMobile && (
+              <button onClick={() => { setSidebarOpen(true); }} className="p-1 -ml-1 text-gray-500 hover:bg-gray-100 rounded-full transition">
+                <ArrowLeft size={20} />
+              </button>
+            )}
+            {!isMobile && (
+              <button onClick={() => setSidebarOpen(s => !s)} className="p-1 -ml-1 text-gray-500 hover:bg-gray-100 rounded-full transition">
+                <Menu size={20} />
+              </button>
+            )}
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{ backgroundColor: avatarColor(convLabel(activeConv)) }}>
+              {convLabel(activeConv).charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm text-gray-900 truncate">{convLabel(activeConv)}</p>
+              <p className="text-xs text-gray-400">
+                {activeConv.type === 'team' ? (activeConv.participants?.length > 2 ? `${activeConv.participants?.length} members` : 'Active now') : (activeConv.phone || 'SMS')}
+              </p>
+            </div>
+            {activeConv.type === 'client' && (
+              <button onClick={handleAiSuggest} disabled={aiSuggestLoading} className="p-2 text-indigo-500 hover:bg-indigo-50 rounded-full transition" title="AI suggest reply">
+                {aiSuggestLoading ? <Loader2 size={18} className="animate-spin" /> : <BrainCircuit size={18} />}
+              </button>
+            )}
+            {activeConv.type === 'team' && (
+              <button onClick={() => deleteConv(activeConv.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition">
+                <Trash2 size={16} />
+              </button>
+            )}
+          </div>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-4" ref={scrollRef}>
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                <div className="text-center">
+                  <MessageCircle size={36} className="mx-auto mb-3 opacity-20" />
+                  <p className="text-sm font-semibold">No messages yet</p>
+                  <p className="text-xs mt-1">Say hello!</p>
+                </div>
+              </div>
+            ) : (
+              messages.map((m, i) => {
+                const me = activeConv.type === 'team' ? m.sender === currentUser : m.direction === 'outbound';
+                const prev = i > 0 ? messages[i - 1] : null;
+                const showHeader = !prev || formatDateHeader(prev.timestamp) !== formatDateHeader(m.timestamp);
+                const showTime = !prev || !prev.timestamp || (m.timestamp?.toMillis?.() || new Date(m.timestamp).getTime()) - (prev.timestamp?.toMillis?.() || new Date(prev.timestamp).getTime()) > 300000;
+                return (
+                  <React.Fragment key={m.id || i}>
+                    {showHeader && (
+                      <div className="flex justify-center my-3">
+                        <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-3 py-1 rounded-full">{formatDateHeader(m.timestamp)}</span>
+                      </div>
+                    )}
+                    <div className={`flex mb-1 ${me ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[70%] ${me ? 'items-end' : 'items-start'}`}>
+                        {activeConv.type === 'team' && !me && (
+                          <p className="text-xs font-semibold text-gray-500 mb-0.5 px-1">{m.sender?.split('@')[0]}</p>
+                        )}
+                        <div className={`px-3 py-2 text-[15px] leading-relaxed break-words ${
+                          me
+                            ? 'bg-[#0084ff] text-white rounded-2xl rounded-br-md'
+                            : 'bg-[#E4E6EB] text-gray-900 rounded-2xl rounded-bl-md'
+                        }`}>
+                          <p className="whitespace-pre-wrap">{m.text}</p>
+                        </div>
+                        <div className={`flex items-center gap-1 mt-0.5 px-1 ${me ? 'justify-end' : 'justify-start'}`}>
+                          <span className="text-[11px] text-gray-400">{formatMsgTime(m.timestamp)}</span>
+                          {me && (activeConv.type === 'team' ? <CheckCheck size={12} className="text-blue-400" /> : (m.status === 'sent' || m.status === 'delivered') && <CheckCheck size={12} className="text-blue-400" />)}
+                          {activeConv.type === 'client' && !me && sentiments[m.id] && (
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                              sentiments[m.id].sentiment === 'positive' ? 'bg-green-100 text-green-700' :
+                              sentiments[m.id].sentiment === 'negative' ? 'bg-red-100 text-red-700' :
+                              sentiments[m.id].sentiment === 'urgent' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {sentiments[m.id].sentiment === 'positive' ? 'Positive' :
+                               sentiments[m.id].sentiment === 'negative' ? 'Negative' :
+                               sentiments[m.id].sentiment === 'urgent' ? 'Urgent' : 'Neutral'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+          {/* AI Suggested Reply */}
+          {aiSuggestedReply && (
+            <div className="shrink-0 px-4 py-2 bg-indigo-50 border-t border-indigo-100">
+              <div className="flex items-start gap-2">
+                <Sparkles size={14} className="text-indigo-500 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold text-indigo-600 uppercase mb-1">AI Suggested</p>
+                  <p className="text-sm text-gray-700 bg-white rounded-lg p-2.5 border border-indigo-100">{aiSuggestedReply.suggestedReply}</p>
+                  <div className="flex gap-2 mt-1.5">
+                    <button onClick={() => { setText(aiSuggestedReply.suggestedReply); setAiSuggestedReply(null); }} className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition">Use</button>
+                    <button onClick={() => setAiSuggestedReply(null)} className="px-3 py-1 bg-white border border-gray-200 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-50 transition">Dismiss</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Input */}
+          <div className="shrink-0 border-t border-gray-200 bg-white px-3 py-2" style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))' }}>
+            <form onSubmit={handleSend} className="flex items-end gap-2">
+              <div className="flex-1 bg-gray-100 rounded-3xl px-4 py-2 flex items-center focus-within:bg-white focus-within:border focus-within:border-blue-400 transition">
+                <input value={text} onChange={e => setText(e.target.value)} onKeyDown={handleKeyDown} placeholder="Aa" className="flex-1 bg-transparent text-[15px] text-gray-800 placeholder:text-gray-400 outline-none" />
+              </div>
+              <button type="submit" disabled={!text.trim() || sending}
+                className="w-9 h-9 rounded-full bg-[#0084ff] text-white flex items-center justify-center hover:bg-[#0073e6] active:scale-95 transition disabled:opacity-40 shrink-0">
+                {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} fill="currentColor" />}
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center mx-auto mb-4">
+              <MessageCircle size={32} className="text-gray-400" />
+            </div>
+            <p className="text-lg font-bold text-gray-700">Your messages</p>
+            <p className="text-sm text-gray-500 mt-1">Select a conversation to start chatting</p>
           </div>
         </div>
       )}
-    />
-    {showNewSms && (
-      <div className="fixed inset-0 z-[120] bg-black/40 flex items-center justify-center p-4 animate-fade-in"
-        onClick={() => { setShowNewSms(false); setNewSmsPhone(''); setNewSmsText(''); }}>
-        <div className="bg-white rounded-2xl w-full max-w-sm p-5 relative z-10 shadow-xl animate-slide-up" onClick={e => e.stopPropagation()}>
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-base font-bold">New Message</h3>
-            <button onClick={() => { setShowNewSms(false); setNewSmsPhone(''); setNewSmsText(''); }} className="p-1 text-slate-400 hover:bg-slate-100 rounded-lg transition">
-              <X size={18} />
-            </button>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-bold text-slate-600 block mb-1">Phone Number</label>
-              <input value={newSmsPhone} onChange={e => setNewSmsPhone(e.target.value)} placeholder="+1 (317) 555-1234" className="w-full px-3 py-2.5 bg-slate-100 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition" />
+
+      {/* NEW CHAT / SMS MODAL */}
+      {showNewChat && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => { setShowNewChat(false); setSelectedUsers([]); setNewSmsPhone(''); setNewSmsText(''); }}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">New conversation</h3>
+              <button onClick={() => { setShowNewChat(false); setSelectedUsers([]); setNewSmsPhone(''); setNewSmsText(''); }} className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg transition"><X size={20} /></button>
             </div>
-            <div>
-              <label className="text-xs font-bold text-slate-600 block mb-1">Message</label>
-              <textarea value={newSmsText} onChange={e => setNewSmsText(e.target.value)} rows={3} placeholder="Type your message..." className="w-full px-3 py-2.5 bg-slate-100 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition resize-none" />
+            <div className="flex gap-2 mb-4">
+              <button onClick={() => setActiveTab('team')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${activeTab === 'team' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'}`}>Team</button>
+              <button onClick={() => setActiveTab('sms')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${activeTab === 'sms' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'}`}>SMS</button>
             </div>
-          </div>
-          <div className="flex gap-2 mt-4">
-            <button onClick={() => { setShowNewSms(false); setNewSmsPhone(''); setNewSmsText(''); }}
-              className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-medium text-sm hover:bg-slate-200 transition">Cancel</button>
-            <button onClick={handleNewSms} disabled={!newSmsPhone.trim() || !newSmsText.trim() || newSmsSending}
-              className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-medium text-sm disabled:opacity-40 hover:bg-blue-700 transition flex items-center justify-center gap-1">
-              {newSmsSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={14} />}
-              Send
-            </button>
+            {activeTab === 'team' ? (
+              <>
+                <div className="space-y-0.5 max-h-60 overflow-y-auto -mx-1 px-1 mb-4">
+                  {allUsers.map(email => {
+                    const sel = selectedUsers.includes(email);
+                    return (
+                      <button key={email} onClick={() => setSelectedUsers(p => p.includes(email) ? p.filter(e => e !== email) : [...p, email])}
+                        className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition ${sel ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${sel ? 'bg-blue-500' : 'bg-gray-300'}`} style={sel ? {} : { backgroundColor: avatarColor(email) }}>
+                          {email.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="text-left min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{email.split('@')[0]}</p>
+                          <p className="text-xs text-gray-400 truncate">{email}</p>
+                        </div>
+                        {sel && <Check size={16} className="text-blue-500 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setShowNewChat(false); setSelectedUsers([]); }} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-medium text-sm hover:bg-gray-200 transition">Cancel</button>
+                  <button onClick={createConv} disabled={selectedUsers.length === 0} className="flex-1 py-2.5 bg-blue-500 text-white rounded-xl font-medium text-sm disabled:opacity-40 hover:bg-blue-600 transition">Start</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-1">Phone</label>
+                    <input value={newSmsPhone} onChange={e => setNewSmsPhone(e.target.value)} placeholder="+1 (317) 555-1234" className="w-full px-3 py-2.5 bg-gray-100 rounded-xl text-sm text-gray-800 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-300 focus:bg-white transition" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-1">Message</label>
+                    <textarea value={newSmsText} onChange={e => setNewSmsText(e.target.value)} rows={3} placeholder="Type your message..." className="w-full px-3 py-2.5 bg-gray-100 rounded-xl text-sm text-gray-800 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-300 focus:bg-white transition resize-none" />
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => { setShowNewChat(false); setNewSmsPhone(''); setNewSmsText(''); }} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-medium text-sm hover:bg-gray-200 transition">Cancel</button>
+                  <button onClick={sendNewSms} disabled={!newSmsPhone.trim() || !newSmsText.trim() || newSmsSending} className="flex-1 py-2.5 bg-blue-500 text-white rounded-xl font-medium text-sm disabled:opacity-40 hover:bg-blue-600 transition flex items-center justify-center gap-1">
+                    {newSmsSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={14} />} Send
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
-      </div>
-    )}
-    </>
+      )}
+    </div>
   );
 };
 
