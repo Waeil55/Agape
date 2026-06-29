@@ -1637,10 +1637,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const finishedPriority = getHistoryFinishedPriority(a) - getHistoryFinishedPriority(b);
     if (finishedPriority !== 0) return finishedPriority;
 
-    const finishedTime = getHistoryFinishedSortMs(b) - getHistoryFinishedSortMs(a);
+    const finishedTime = getHistoryFinishedSortMs(a) - getHistoryFinishedSortMs(b);
     if (finishedTime !== 0) return finishedTime;
 
-    return timeToMinutes(b.time) - timeToMinutes(a.time);
+    return timeToMinutes(a.time) - timeToMinutes(b.time);
   });
 
   const toggleTripSelect = (tripId) => {
