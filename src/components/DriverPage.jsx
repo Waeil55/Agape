@@ -2657,51 +2657,51 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
               <div className="mt-2.5 grid grid-cols-[18px_1fr] gap-x-4">
                 <div className="row-span-2 flex flex-col items-center pt-1.5">
-                  <span className="w-3 h-3 rounded-full bg-blue-200 shadow-lg shadow-blue-200/30" />
-                  <span className="w-0.5 flex-1 min-h-[48px] my-0.5 rounded-full bg-gradient-to-b from-blue-200 to-emerald-300" />
-                  <span className="w-3 h-3 rounded-full bg-emerald-300 shadow-lg shadow-emerald-300/30" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-blue-300 shadow-lg shadow-blue-200/30" />
+                  <span className="w-0.5 flex-1 min-h-[56px] my-0.5 rounded-full bg-gradient-to-b from-blue-200 to-emerald-300" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-emerald-300 shadow-lg shadow-emerald-300/30" />
                 </div>
 
-                <div className="pb-2">
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-200">From</p>
-                  <p className="mt-0.5 text-xs font-bold leading-snug text-white truncate">{pickupAddress || '--'}</p>
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
+                <div className="pb-3">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-blue-200">From</p>
+                  <p className="mt-0.5 text-sm md:text-base font-extrabold leading-snug text-white break-words">{pickupAddress || '--'}</p>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-8 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-black text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
                       <Copy size={12} /> Copy
                     </button>
-                    <span className="text-[10px] font-black text-blue-200/60">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-black flex items-center gap-1 cursor-pointer">
-                      <Navigation size={13} /> Navigate
+                    <span className="text-xs font-black text-blue-200/80">{trip.distance ? `${trip.distance} mi` : ''}</span>
+                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-9 px-3.5 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-[12px] font-black flex items-center gap-1.5 cursor-pointer">
+                      <Navigation size={13} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-300">To</p>
-                  <p className="mt-0.5 text-xs font-bold leading-snug text-white truncate">{dropoffAddress || '--'}</p>
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-7 px-1.5 rounded-md text-[10px] font-black text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-emerald-300">To</p>
+                  <p className="mt-0.5 text-sm md:text-base font-extrabold leading-snug text-white break-words">{dropoffAddress || '--'}</p>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-8 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-black text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
                       <Copy size={12} /> Copy
                     </button>
-                    <span className="text-[10px] font-black text-blue-200/60" />
-                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-black flex items-center gap-1 cursor-pointer">
-                      <Navigation size={13} /> Navigate
+                    <span className="text-xs font-black text-blue-200/80" />
+                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-9 px-3.5 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-[12px] font-black flex items-center gap-1.5 cursor-pointer">
+                      <Navigation size={13} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-2.5 grid grid-cols-4 gap-1.5">
-                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+              <div className="mt-3.5 grid grid-cols-4 gap-2">
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-10 rounded-2xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[12px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <Phone size={14} /> Call
                 </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-10 rounded-2xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[12px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <MessageCircle size={14} /> SMS
                 </button>
-                <button type="button" onClick={() => openContactSelector(trip)} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => openContactSelector(trip)} className="h-10 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-[12px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <PhoneForwarded size={14} /> Contacts
                 </button>
-                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-10 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-[12px] font-black flex items-center justify-center gap-1 cursor-pointer">
                   <MoreHorizontal size={15} /> More
                 </button>
               </div>
@@ -2770,7 +2770,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               type="button"
               onClick={bottomAction.onClick}
               disabled={!primary}
-              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-12 ${bottomAction.gradient} text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
+              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-14 ${bottomAction.gradient} text-white rounded-2xl font-black text-base uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
             >
               {bottomAction.icon} {bottomAction.label}
             </button>
@@ -2779,15 +2779,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   type="button"
                   onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
-                  className="flex-[2] h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                  className="flex-[2] h-14 bg-emerald-500 border-2 border-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all text-xs font-black uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1 shadow-sm"
                 >
-                  <MapPin size={14} /> {trip.status === 'In Progress' ? 'Already here?' : 'At dropoff?'}
+                  <MapPin size={14} /> {trip.status === 'In Progress' ? 'Here?' : 'At dropoff?'}
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => { impact('medium'); setSkipConfirmTripId(`work-${trip.id}`); }}
-                  className="flex-[2] h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
+                  className="flex-[2] h-14 bg-white border-2 border-slate-300 text-slate-600 rounded-2xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-black uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1"
                 >
                   <Forward size={14} /> Skip Nav
                 </button>
