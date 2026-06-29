@@ -141,6 +141,7 @@ const ViewButton = ({ active, children, onClick }) => (
 const DesktopReportsPage = ({
   trips = [],
   drivers = [],
+  vehicles = [],
   onUpdateTrip,
   setEditTrip,
   setShowUploadModal,
@@ -152,6 +153,188 @@ const DesktopReportsPage = ({
   const [statusFilter, setStatusFilter] = useState('Completed');
   const [driverFilter, setDriverFilter] = useState('all');
   const [reviewFilter, setReviewFilter] = useState('all');
+
+  const [editingCell, setEditingCell] = useState(null); // { tripId, field }
+  const [editValue, setEditValue] = useState('');
+  const [editingRow, setEditingRow] = useState(null);
+  const [editingRowSnapshot, setEditingRowSnapshot] = useState(null);
+  const inputRef = useRef(null);
+
+  const startRowEdit = useCallback((trip) => {
+    setEditingRow(trip.id);
+    setEditingRowSnapshot({ ...trip });
+    setEditingCell(null);
+    setEditValue('');
+  }, []);
+
+  const finishRowEdit = useCallback(() => {
+    if (editingRowSnapshot && onUpdateTrip) {
+      onUpdateTrip(editingRowSnapshot);
+    }
+    setEditingRow(null);
+    setEditingRowSnapshot(null);
+    setEditingCell(null);
+    setEditValue('');
+  }, [editingRowSnapshot, onUpdateTrip]);
+
+  const revertRowEdit = useCallback(() => {
+    setEditingRow(null);
+    setEditingRowSnapshot(null);
+    setEditingCell(null);
+    setEditValue('');
+  }, []);
+
+  const startCellEdit = useCallback((tripId, colKey, val) => {
+    setEditingCell({ tripId, field: colKey });
+    setEditValue(val);
+  }, []);
+
+  const cancelEdit = useCallback(() => {
+    setEditingCell(null);
+  }, []);
+
+  const saveCell = useCallback((trip, field, val) => {
+    if (editingRow === trip.id) {
+      setEditingRowSnapshot(prev => ({ ...prev, [field]: val }));
+    } else {
+      onUpdateTrip?.({ ...trip, [field]: val });
+    }
+    setEditingCell(null);
+  }, [editingRow, onUpdateTrip]);
+
+  const renderCell = (trip, colKey, displayValue, fieldName, type = 'text') => {
+    const isEditing = editingCell?.tripId === trip.id && editingCell?.field === colKey;
+    
+    if (isEditing) {
+      if (colKey === 'driver') {
+        return (
+          <select
+            ref={inputRef}
+            className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-700"
+            value={editingRowSnapshot?.driverId || ''}
+            onChange={e => saveCell(trip, 'driverId', e.target.value)}
+            onBlur={() => cancelEdit()}
+            autoFocus
+          >
+            <option value="">—</option>
+            {drivers.map(d => (
+              <option key={d.id} value={d.id}>{d.name || d.email}</option>
+            ))}
+          </select>
+        );
+      }
+      
+      if (colKey === 'vehicle') {
+        return (
+          <select
+            ref={inputRef}
+            className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white text-slate-700 font-semibold"
+            value={editingRowSnapshot?.completedVehicle || ''}
+            onChange={e => saveCell(trip, 'completedVehicle', e.target.value)}
+            onBlur={() => cancelEdit()}
+            autoFocus
+          >
+            <option value="">—</option>
+            {vehicles.map(v => (
+              <option key={v.id || v.name || v} value={v.name || v}>{v.name || v}</option>
+            ))}
+          </select>
+        );
+      }
+
+      if (colKey === 'signature') {
+        return (
+          <select
+            ref={inputRef}
+            className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-750"
+            value={String(editingRowSnapshot?.paperSignatureConfirmed ?? false)}
+            onChange={e => saveCell(trip, 'paperSignatureConfirmed', e.target.value === 'true')}
+            onBlur={() => cancelEdit()}
+            autoFocus
+          >
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+        );
+      }
+
+      if (colKey === 'reviewed') {
+        return (
+          <select
+            ref={inputRef}
+            className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-750"
+            value={String(editingRowSnapshot?.reviewed ?? false)}
+            onChange={e => saveCell(trip, 'reviewed', e.target.value === 'true')}
+            onBlur={() => cancelEdit()}
+            autoFocus
+          >
+            <option value="false">Pending</option>
+            <option value="true">Done</option>
+          </select>
+        );
+      }
+
+      return (
+        <input
+          ref={inputRef}
+          className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none font-semibold text-slate-800"
+          type={type}
+          value={editValue}
+          onChange={e => setEditValue(e.target.value)}
+          onBlur={() => saveCell(trip, fieldName, editValue)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') saveCell(trip, fieldName, editValue);
+            if (e.key === 'Escape') cancelEdit();
+          }}
+          autoFocus
+        />
+      );
+    }
+
+    if (editingRow === trip.id) {
+      const currentValue = editingRowSnapshot?.[fieldName] ?? trip[fieldName] ?? '';
+      let displayEditVal = displayValue;
+      if (colKey === 'driver') {
+        const d = drivers.find(drv => drv.id === editingRowSnapshot?.driverId || drv.id === trip.driverId);
+        displayEditVal = d ? d.name : displayValue;
+      }
+      if (colKey === 'vehicle') {
+        displayEditVal = editingRowSnapshot?.completedVehicle || trip.completedVehicle || '—';
+      }
+      return (
+        <span
+          className="cursor-pointer hover:bg-blue-50 hover:text-blue-700 rounded px-1 -mx-1 block leading-5 font-semibold min-h-[1.25rem]"
+          onClick={() => startCellEdit(trip.id, colKey, currentValue)}
+        >
+          {displayEditVal}
+        </span>
+      );
+    }
+
+    if (colKey === 'reviewed') {
+      return (
+        <span
+          className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-bold text-slate-500"
+          onClick={() => saveCell(trip, 'reviewed', !trip.reviewed)}
+          title={trip.reviewed ? 'Mark as pending' : 'Mark as done'}
+        >
+          {displayValue}
+        </span>
+      );
+    }
+    if (colKey === 'signature') {
+      return (
+        <span
+          className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-bold"
+          onClick={() => saveCell(trip, 'paperSignatureConfirmed', !trip.paperSignatureConfirmed)}
+        >
+          {displayValue}
+        </span>
+      );
+    }
+
+    return <span className="block leading-5">{displayValue}</span>;
+  };
 
   const driverOptions = useMemo(() => (
     [...drivers].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
