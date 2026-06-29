@@ -175,7 +175,7 @@ const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [
       snap.forEach(doc => {
         const msg = { id: doc.id, ...doc.data() };
         if (pendRef.current.has(msg.id)) return;
-        const other = msg.direction === 'outbound' ? msg.to : msg.from;
+        const other = msg.direction === 'outbound' ? (msg.to || msg.from) : (msg.from || msg.to);
         if (!other) return;
         const norm = normalizePhone(other);
         if (norm === normalizePhone(TELNYX_NUMBER)) return;
@@ -197,11 +197,12 @@ const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [
         if (norm) return { name: norm, tripId: null, trip: null };
         return { name: phone || 'Unknown', tripId: null, trip: null };
       };
+      const phoneOf = (m) => m.direction === 'outbound' ? (m.to || m.from) : (m.from || m.to);
       const rFromMsgs = (msgs) => {
-        for (const m of msgs) { const p = m.direction === 'outbound' ? m.to : m.from; const r = rCli(p); if (r.trip) return r; }
+        for (const m of msgs) { const p = phoneOf(m); if (p) { const r = rCli(p); if (r.trip) return r; } }
         for (const m of msgs) { if (m.tripId) { const t2 = (t || []).find(trip => trip.id === m.tripId || trip.tripId === m.tripId); if (t2?.patient) return { name: t2.patient, tripId: m.tripId, trip: t2 }; } }
-        for (const m of msgs) { const p = m.direction === 'outbound' ? m.to : m.from; if (p) return { name: p, tripId: null, trip: null }; }
-        return { name: 'Unknown', tripId: null, trip: null };
+        for (const m of msgs) { const p = phoneOf(m); if (p) return { name: p, tripId: null, trip: null }; }
+        return { name: msgs[0]?.to || msgs[0]?.from || 'Unknown', tripId: null, trip: null };
       };
       const sFilter = (convs) => {
         if (cu === 'driver') return [];
@@ -387,8 +388,9 @@ const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [
       });
     });
     clientConvs.forEach(c => {
-      const named = c.clientName && c.clientName !== c.phone && !c.clientName.startsWith('+');
-      const dn = named ? c.clientName : c.phone;
+      const phone = c.phone || c.clientName || '';
+      const named = c.clientName && c.clientName !== phone && !c.clientName.startsWith('+');
+      const dn = named ? c.clientName : phone;
       const last = c.lastMessage || {};
       list.push({
         id: c.phone, type: 'client', name: dn,
