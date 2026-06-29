@@ -1216,19 +1216,6 @@ const App = () => {
           setIsLoading(false);
           return;
         }
-<<<<<<< HEAD
-        // If user was already authenticated in this session, this is a token refresh.
-        // Wait longer for Firebase to restore the session — IndexedDB can be slow.
-        if (authBootResolvedRef.current) {
-          console.warn('[Auth] Session went null after boot — waiting 5s for token refresh');
-          for (let i = 0; i < 5; i++) {
-            await new Promise(r => setTimeout(r, 1000));
-            if (cancelled) return;
-            if (auth.currentUser) {
-              console.warn('[Auth] Token refreshed successfully');
-              return;
-            }
-          }
         // If user was already authenticated in this session, this could be a transient
         // token refresh or an IndexedDB corruption issue. Wait for session restoration.
         if (authBootResolvedRef.current) {
