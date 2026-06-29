@@ -504,19 +504,20 @@ const DesktopReportsPage = ({
   );
 
   const renderInvoiceTable = () => (
-    <div className="min-h-0 flex-1 overflow-auto bg-white">
-      <table className="w-full min-w-[900px] table-fixed text-[12px]">
+    <div className="min-h-0 flex-1 overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full table-fixed text-xs">
         <colgroup>
-          <col className="w-[68px]" />
-          <col className="w-[105px]" />
-          <col className="w-[100px]" />
-          <col className="w-[48px]" />
-          <col className="w-[150px]" />
-          <col className="w-[86px]" />
-          <col className="w-[86px]" />
-          <col className="w-[110px]" />
-          <col className="w-[70px]" />
-          <col className="w-[70px]" />
+          <col className="w-[8%]" />
+          <col className="w-[12%]" />
+          <col className="w-[11%]" />
+          <col className="w-[5%]" />
+          <col className="w-[17%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
+          <col className="w-[12%]" />
+          <col className="w-[8%]" />
+          <col className="w-[7%]" />
         </colgroup>
         <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
           <tr>
@@ -604,30 +605,32 @@ const DesktopReportsPage = ({
           No trips found for this date or filter.
         </div>
       )}
+      </div>
     </div>
   );
 
   const renderReviewTable = () => (
-    <div className="min-h-0 flex-1 overflow-auto bg-white">
-      <table className="w-full min-w-[1500px] table-fixed text-[12px]">
+    <div className="min-h-0 flex-1 overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full table-fixed text-xs">
         <colgroup>
-          <col className="w-[68px]" />
-          <col className="w-[96px]" />
-          <col className="w-[92px]" />
-          <col className="w-[86px]" />
-          <col className="w-[76px]" />
-          <col className="w-[92px]" />
-          <col className="w-[120px]" />
-          <col className="w-[150px]" />
-          <col className="w-[86px]" />
-          <col className="w-[92px]" />
-          <col className="w-[170px]" />
-          <col className="w-[86px]" />
-          <col className="w-[92px]" />
-          <col className="w-[78px]" />
-          <col className="w-[82px]" />
-          <col className="w-[78px]" />
-          <col className="w-[88px]" />
+          <col className="w-[5%]" />
+          <col className="w-[7%]" />
+          <col className="w-[7%]" />
+          <col className="w-[6%]" />
+          <col className="w-[6%]" />
+          <col className="w-[7%]" />
+          <col className="w-[9%]" />
+          <col className="w-[11%]" />
+          <col className="w-[6%]" />
+          <col className="w-[6%]" />
+          <col className="w-[12%]" />
+          <col className="w-[6%]" />
+          <col className="w-[6%]" />
+          <col className="w-[6%]" />
+          <col className="w-[6%]" />
+          <col className="w-[6%]" />
+          <col className="w-[6%]" />
         </colgroup>
         <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
           <tr>
@@ -739,6 +742,7 @@ const DesktopReportsPage = ({
           No trips found for this date or filter.
         </div>
       )}
+      </div>
     </div>
   );
 
