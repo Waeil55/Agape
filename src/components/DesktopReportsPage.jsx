@@ -510,13 +510,14 @@ const DesktopReportsPage = ({
       <table className="w-full table-fixed text-xs">
         <colgroup>
           <col className="w-[8%]" />
-          <col className="w-[12%]" />
-          <col className="w-[11%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
           <col className="w-[5%]" />
-          <col className="w-[17%]" />
+          <col className="w-[14%]" />
           <col className="w-[10%]" />
           <col className="w-[10%]" />
-          <col className="w-[12%]" />
+          <col className="w-[8%]" />
+          <col className="w-[10%]" />
           <col className="w-[8%]" />
           <col className="w-[7%]" />
         </colgroup>
@@ -529,6 +530,7 @@ const DesktopReportsPage = ({
             <th className="px-2 py-2 text-left font-semibold">Client Name</th>
             <th className="px-2 py-2 text-left font-semibold">Pickup</th>
             <th className="px-2 py-2 text-left font-semibold">Dropoff</th>
+            <th className="px-2 py-2 text-left font-semibold">Drop Odo</th>
             <th className="px-2 py-2 text-left font-semibold">Approved Fee</th>
             <th className="px-2 py-2 text-center font-semibold">Signed</th>
             <th className="px-2 py-2 text-center font-semibold rounded-tr-xl">Done</th>
@@ -587,6 +589,9 @@ const DesktopReportsPage = ({
               </td>
               <td className="px-2 py-2 font-mono font-bold text-rose-700">
                 {renderCell(trip, 'arrivalDropoffTime', formatClock(trip.arrivalDropoffTime || trip.completedAt), 'arrivalDropoffTime', 'time')}
+              </td>
+              <td className="px-2 py-2 font-mono font-bold text-slate-600">
+                {renderCell(trip, 'dropoffOdometer', trip.dropoffOdometer ? trip.dropoffOdometer.toLocaleString() : '—', 'dropoffOdometer', 'number')}
               </td>
               <td className="px-2 py-2 font-mono font-bold text-slate-800">
                 {renderCell(trip, 'additionalFee', trip.additionalFee ? `$${trip.additionalFee}` : '$0.00', 'additionalFee', 'number')}
