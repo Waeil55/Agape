@@ -2807,7 +2807,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       { id: 'chat', label: 'Chat', icon: MessageCircle },
       { id: 'settings', label: 'Settings', icon: Settings },
     ];
-    if (activeWorkTripId && activeWorkTrip) {
+    const isTripStarted = activeWorkTrip && !['Assigned', 'Unassigned'].includes(activeWorkTrip.status);
+    if (activeWorkTripId && activeWorkTrip && isTripStarted) {
       items.splice(1, 0, { id: 'active-trip', label: activeWorkTrip.patient || 'Active', icon: Truck });
     }
     return items;
@@ -3671,14 +3672,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       workflowPhase,
                       activeTrip: isActiveTrip,
                     }}
-                    expandedId={expandedTripId}
-                    onToggle={(id) => {
-                      if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
-                        setExpandedTripId(prev => prev === id ? null : id);
-                      } else {
-                        openTripWorkPage(trip.id);
-                      }
-                    }}
+                    onToggle={(id) => openTripWorkPage(id)}
                     isSelected={isSelected}
                     onSelect={toggleTripSelect}
                     actions={{
