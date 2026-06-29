@@ -504,7 +504,8 @@ const DesktopReportsPage = ({
   );
 
   const renderInvoiceTable = () => (
-    <div className="min-h-0 flex-1 overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
+    <div className="flex-1 overflow-y-auto px-3 pb-3">
+    <div className="overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
       <div className="overflow-x-auto">
       <table className="w-full table-fixed text-xs">
         <colgroup>
@@ -607,10 +608,12 @@ const DesktopReportsPage = ({
       )}
       </div>
     </div>
+    </div>
   );
 
   const renderReviewTable = () => (
-    <div className="min-h-0 flex-1 overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
+    <div className="flex-1 overflow-y-auto px-3 pb-3">
+    <div className="overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
       <div className="overflow-x-auto">
       <table className="w-full table-fixed text-xs">
         <colgroup>
@@ -743,6 +746,7 @@ const DesktopReportsPage = ({
         </div>
       )}
       </div>
+    </div>
     </div>
   );
 
