@@ -3646,7 +3646,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       activeTrip: isActiveTrip,
                     }}
                     expandedId={expandedTripId}
-                    onToggle={(id) => openTripWorkPage(id)}
+                    onToggle={(id) => setExpandedTripId(prev => prev === id ? null : id)}
                     isSelected={isSelected}
                     onSelect={toggleTripSelect}
                     actions={{
