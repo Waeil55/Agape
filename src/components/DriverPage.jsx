@@ -1280,7 +1280,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       ))
   ), [routeTemplates, me?.id, me?.email, currentUser]);
 
-  const isClockedIn = me?.clockedIn || false;
+  const isClockedIn = true;
   const [showIdleLogoutPrompt, setShowIdleLogoutPrompt] = useState(false);
   const idlePromptedRef = useRef(false);
   const [showClockOutOffer, setShowClockOutOffer] = useState(false);
@@ -3619,13 +3619,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const doneBarColor = 'bg-emerald-400';
 
                 const getPrimaryAction = () => {
-                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 shadow-teal-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-amber-500 hover:from-emerald-600 hover:to-amber-600 shadow-amber-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-red-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 shadow-teal-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-amber-500 hover:from-emerald-600 hover:to-amber-600 shadow-amber-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-red-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
                   return null;
                 };
                 const primary = getPrimaryAction();
@@ -3688,7 +3688,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       activeTrip: isActiveTrip,
                     }}
                     expandedId={expandedTripId}
-                    onToggle={(id) => setExpandedTripId(prev => prev === id ? null : id)}
+                    onToggle={(id) => {
+                      if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
+                        setExpandedTripId(prev => prev === id ? null : id);
+                      } else {
+                        openTripWorkPage(trip.id);
+                      }
+                    }}
                     isSelected={isSelected}
                     onSelect={toggleTripSelect}
                     actions={{
@@ -4651,17 +4657,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     <p className="text-sm text-white/70 truncate">{displayLoginId}</p>
                     <p className="text-xs text-white/50 mt-0.5">{me?.vehicle || 'No vehicle'} • {me?.currentZone || '—'}</p>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 mt-4">
-                  <button onClick={handleClockToggle} className={`h-9 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border flex items-center gap-1.5 px-4 ${isClockedIn ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-600' : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'}`}>
-                    {isClockedIn ? <LogOut size={13} /> : <Play size={13} />}
-                    {isClockedIn ? 'Clock Out' : 'Clock In'}
-                  </button>
-                  {isClockedIn && (
-                    <span className="text-[10px] font-bold text-white/60">
-                      Since {formatClockTime(me?.clockedInAt || me?.lastUpdate)}
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
