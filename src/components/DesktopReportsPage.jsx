@@ -502,34 +502,94 @@ const DesktopReportsPage = ({
             <tr key={trip.id} className={index % 2 ? 'bg-slate-50/70 hover:bg-blue-50/40' : 'bg-white hover:bg-blue-50/40'}>
               <td className="px-2 py-2">
                 <div className="flex items-center gap-2 text-slate-500">
-                  <input
-                    type="checkbox"
-                    checked={!!trip.reviewed}
-                    onChange={(event) => onUpdateTrip?.(trip.id, { reviewed: event.target.checked })}
-                    className="h-3.5 w-3.5 rounded border-slate-300"
-                    aria-label={`Review ${trip.patient || trip.id}`}
-                  />
-                  <button type="button" onClick={() => setEditTrip?.(trip)} className="text-slate-500 hover:text-blue-700" aria-label={`Edit ${trip.patient || trip.id}`}>
-                    <Edit2 size={13} />
-                  </button>
+                  {editingRow === trip.id ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); finishRowEdit(); }}
+                        className="p-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150"
+                        title="Keep changes"
+                      >
+                        <Check size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); revertRowEdit(); }}
+                        className="p-0.5 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150"
+                        title="Cancel and restore original row"
+                      >
+                        <XCircle size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="checkbox"
+                        checked={!!trip.reviewed}
+                        onChange={(event) => onUpdateTrip?.({ ...trip, reviewed: event.target.checked })}
+                        className="h-3.5 w-3.5 rounded border-slate-300"
+                        aria-label={`Review ${trip.patient || trip.id}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
+                        className="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
+                        title="Edit row"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </td>
-              <td className="px-2 py-2 font-semibold text-slate-900">{formatDateLabel(trip.date)}</td>
-              <td className="px-2 py-2 font-semibold text-slate-700">{truncate(driver?.name || trip.driverName, 14)}</td>
-              <td className="px-2 py-2 text-slate-500">{truncate(trip.completedVehicle || driver?.vehicle || DASH, 12)}</td>
-              <td className="px-2 py-2 font-mono text-slate-900">{formatClock(trip.time)}</td>
-              <td className="px-2 py-2 font-mono text-blue-900">{truncate(trip.bookingId || trip.id, 12)}</td>
-              <td className="px-2 py-2 font-bold text-slate-900">{truncate(trip.patient, 17)}</td>
-              <td className="px-2 py-2 font-mono text-emerald-700">{truncate(trip.pickup, 24)}</td>
-              <td className="px-2 py-2 font-mono font-bold text-emerald-700">{formatClock(trip.arrivalTime || trip.pickupTime)}</td>
-              <td className="px-2 py-2 font-mono text-emerald-700">{trip.pickupOdometer || DASH}</td>
-              <td className="px-2 py-2 font-mono text-rose-700">{truncate(trip.dropoff, 27)}</td>
-              <td className="px-2 py-2 font-mono font-bold text-rose-700">{formatClock(trip.arrivalDropoffTime || trip.completedAt)}</td>
-              <td className="px-2 py-2 font-mono text-rose-700">{trip.dropoffOdometer || DASH}</td>
-              <td className="px-2 py-2 font-mono text-slate-700">{formatMinutes(travelMinutes)}</td>
-              <td className="px-2 py-2 font-mono font-bold text-[#2f5b96]">{calcMiles(trip)}</td>
-              <td className="px-2 py-2 font-bold text-emerald-700">{trip.paperSignatureConfirmed ? 'Yes' : 'No'}</td>
-              <td className="px-2 py-2 font-bold text-slate-500">{trip.reviewed ? 'Done' : 'Pending'}</td>
+              <td className="px-2 py-2 font-semibold text-slate-900">
+                {renderCell(trip, 'date', formatDateLabel(trip.date), 'date', 'date')}
+              </td>
+              <td className="px-2 py-2 font-semibold text-slate-700">
+                {renderCell(trip, 'driver', truncate(driver?.name || trip.driverName, 14), 'driverId')}
+              </td>
+              <td className="px-2 py-2 text-slate-500">
+                {renderCell(trip, 'vehicle', truncate(trip.completedVehicle || driver?.vehicle || DASH, 12), 'completedVehicle')}
+              </td>
+              <td className="px-2 py-2 font-mono text-slate-900">
+                {renderCell(trip, 'time', formatClock(trip.time), 'time', 'time')}
+              </td>
+              <td className="px-2 py-2 font-mono text-blue-900">
+                {renderCell(trip, 'bookingId', truncate(trip.bookingId || trip.id, 12), 'bookingId')}
+              </td>
+              <td className="px-2 py-2 font-bold text-slate-900">
+                {renderCell(trip, 'patient', truncate(trip.patient, 17), 'patient')}
+              </td>
+              <td className="px-2 py-2 font-mono text-emerald-700">
+                {renderCell(trip, 'pickup', truncate(trip.pickup, 24), 'pickup')}
+              </td>
+              <td className="px-2 py-2 font-mono font-bold text-emerald-700">
+                {renderCell(trip, 'arrivalTime', formatClock(trip.arrivalTime || trip.pickupTime), 'arrivalTime', 'time')}
+              </td>
+              <td className="px-2 py-2 font-mono text-emerald-700">
+                {renderCell(trip, 'pickupOdometer', trip.pickupOdometer || DASH, 'pickupOdometer', 'number')}
+              </td>
+              <td className="px-2 py-2 font-mono text-rose-700">
+                {renderCell(trip, 'dropoff', truncate(trip.dropoff, 27), 'dropoff')}
+              </td>
+              <td className="px-2 py-2 font-mono font-bold text-rose-700">
+                {renderCell(trip, 'arrivalDropoffTime', formatClock(trip.arrivalDropoffTime || trip.completedAt), 'arrivalDropoffTime', 'time')}
+              </td>
+              <td className="px-2 py-2 font-mono text-rose-700">
+                {renderCell(trip, 'dropoffOdometer', trip.dropoffOdometer || DASH, 'dropoffOdometer', 'number')}
+              </td>
+              <td className="px-2 py-2 font-mono text-slate-700">
+                {renderCell(trip, 'travelTime', formatMinutes(travelMinutes), 'travelTime')}
+              </td>
+              <td className="px-2 py-2 font-mono font-bold text-[#2f5b96]">
+                {renderCell(trip, 'distance', calcMiles(trip), 'distance', 'number')}
+              </td>
+              <td className="px-2 py-2 font-bold text-emerald-700">
+                {renderCell(trip, 'signature', trip.paperSignatureConfirmed ? 'Yes' : 'No', 'paperSignatureConfirmed')}
+              </td>
+              <td className="px-2 py-2 font-bold text-slate-500">
+                {renderCell(trip, 'reviewed', trip.reviewed ? 'Done' : 'Pending', 'reviewed')}
+              </td>
             </tr>
           ))}
         </tbody>
