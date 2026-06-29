@@ -705,7 +705,14 @@ const App = () => {
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
   const [showDispatcherArchive, setShowDispatcherArchive] = useState(false);
   const [showAddTripModal, setShowAddTripModal] = useState(false);
-  const [appSettings, setAppSettings] = useState(() => ({ ...DEFAULT_APP_SETTINGS }));
+  const [appSettings, setAppSettings] = useState(() => {
+    try {
+      const local = localStorage.getItem('agape_appSettings');
+      return local ? { ...DEFAULT_APP_SETTINGS, ...JSON.parse(local) } : { ...DEFAULT_APP_SETTINGS };
+    } catch {
+      return { ...DEFAULT_APP_SETTINGS };
+    }
+  });
   const [, setUserSettingsLoaded] = useState(false);
 
   const addToast = (title, message, type = 'info') => {
@@ -889,13 +896,13 @@ const App = () => {
   }, [isAuthenticated, dataLoading]);
 
   // Persist activeTab and appSettings to Firestore user document for authenticated users
-  const persistUserSettings = async (overrides = {}) => {
+  const persistUserSettings = async (settingsToPersist) => {
     try {
       if (!auth.currentUser) return;
       const uid = auth.currentUser.uid;
       await setDoc(
         doc(db, 'users', uid),
-        { settings: { ...DEFAULT_APP_SETTINGS, ...appSettings, ...overrides } },
+        { settings: settingsToPersist },
         { merge: true }
       );
     } catch (err) {
@@ -920,9 +927,14 @@ const App = () => {
       document.head.appendChild(themeMeta);
     }
     themeMeta.setAttribute('content', themeColor);
+
+    try {
+      localStorage.setItem('agape_appSettings', JSON.stringify(appSettings));
+    } catch {}
+
     // Persist settings to Firestore for logged in user
     if (isAuthenticated && auth.currentUser) {
-      persistUserSettings();
+      persistUserSettings(appSettings);
     }
   }, [appSettings]);
 

@@ -144,29 +144,26 @@ export async function openNavigation(address, app, origin) {
   await impact('medium');
 
   const urls = buildNavUrls(address, origin);
-  const encoded = encodeURIComponent(address);
-  const originParam = origin ? `&origin=${encodeURIComponent(origin)}` : '';
 
+  let targetUrl = urls.googleWeb;
   if (app === 'apple') {
-    await openMapLink(urls.apple, urls.apple);
+    targetUrl = urls.apple; // Apple Maps universal link is urls.apple
+  } else if (app === 'waze') {
+    targetUrl = urls.wazeWeb; // Waze universal link is urls.wazeWeb
+  } else {
+    targetUrl = urls.googleWeb; // Google Maps universal link is urls.googleWeb
+  }
+
+  if (isNativeShell()) {
+    await openUrlNative(targetUrl);
     return;
   }
 
-  if (app === 'google') {
-    const androidIntent = `intent://maps.google.com/maps/dir/?api=1${originParam}&destination=${encoded}#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=${encodeURIComponent(urls.googleWeb)};end;`;
-    const primary = isAndroid() ? androidIntent : urls.google;
-    await openMapLink(primary, urls.googleWeb);
-    return;
+  if (isIOS() || isAndroid()) {
+    window.location.href = targetUrl;
+  } else {
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
   }
-
-  if (app === 'waze') {
-    const androidWazeIntent = `intent://waze.com/ul?q=${encoded}&navigate=yes#Intent;scheme=https;package=com.waze;S.browser_fallback_url=${encodeURIComponent(urls.wazeWeb)};end;`;
-    const primary = isAndroid() ? androidWazeIntent : urls.waze;
-    await openMapLink(primary, urls.wazeWeb);
-    return;
-  }
-
-  await openMapLink(urls.googleWeb, urls.googleWeb);
 }
 
 export async function showNavActionSheet(address, origin, preferredApp) {
