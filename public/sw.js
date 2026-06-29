@@ -3,7 +3,7 @@
    Firestore onSnapshot listeners own all realtime data delivery.
 */
 
-const CACHE_VERSION = 'agape-v13';
+const CACHE_VERSION = 'agape-v14';
 const RUNTIME_CACHE = CACHE_VERSION + '-assets';
 
 self.addEventListener('install', (event) => {
