@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { db, collection, addDoc, query, where, orderBy, serverTimestamp, getDocs, getDocsFromServer, doc, setDoc, getDoc, getDocFromServer, updateDoc, deleteField, arrayUnion, onSnapshot } from '../config/firebase';
+import { db, collection, addDoc, query, where, orderBy, serverTimestamp, doc, setDoc, updateDoc, deleteField, arrayUnion, onSnapshot } from '../config/firebase';
 import { limit } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { MessageCircle, Send, Plus, ArrowLeft, X, Truck, ShieldCheck, Users, Phone, Trash2, Search, ChevronDown, ExternalLink, Loader2, User, Menu, Check, CheckCheck, BrainCircuit, Sparkles } from 'lucide-react';
+import { MessageCircle, Send, Plus, ArrowLeft, X, Trash2, Search, ChevronDown, ExternalLink, Loader2, Menu, Check, CheckCheck, BrainCircuit, Sparkles } from 'lucide-react';
 import { playMessageSound } from '../utils/notificationSound';
 import { aiSuggestReply, aiAnalyzeSentiment } from '../config/ai';
 
@@ -51,8 +51,6 @@ const formatDate = (ts) => {
 const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [], onSwitchToDispatch }) => {
   const [activeTab, setActiveTab] = useState('team');
   const isMobile = useMobile();
-  const teamSidebarRef = useRef(null);
-  const clientSidebarRef = useRef(null);
 
   const switchToDispatch = useCallback((tripId) => {
     if (onSwitchToDispatch) onSwitchToDispatch(tripId);
@@ -157,23 +155,10 @@ const TeamChatPanel = ({ currentUser, role }) => {
   const isMobile = useMobile();
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const audioCtxRef = useRef(null);
 
   useEffect(() => {
     if (!isMobile) setSidebar(true);
   }, [isMobile]);
-
-  useEffect(() => {
-    const unlockAudio = () => {
-      if (!audioCtxRef.current) {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtx) { audioCtxRef.current = new AudioCtx(); audioCtxRef.current.resume(); }
-      }
-    };
-    document.addEventListener('touchstart', unlockAudio, { once: true });
-    document.addEventListener('click', unlockAudio, { once: true });
-    return () => { document.removeEventListener('touchstart', unlockAudio); document.removeEventListener('click', unlockAudio); };
-  }, []);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'users'), (snap) => {
@@ -248,7 +233,7 @@ const TeamChatPanel = ({ currentUser, role }) => {
     const msg = text.trim();
     setText('');
     try {
-      const msgRef = await addDoc(collection(db, 'chat_messages'), { conversationId: activeConv.id, text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp() });
+      await addDoc(collection(db, 'chat_messages'), { conversationId: activeConv.id, text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp() });
       await updateDoc(doc(db, 'chatData/conversations'), { [`conversations.${activeConv.id}.lastMessage`]: { text: msg, sender: currentUser, senderRole: role, timestamp: serverTimestamp(), readBy: [currentUser] } });
     } catch (err) { console.error('Failed to send message:', err); setText(msg); }
   };
@@ -406,7 +391,7 @@ const TeamChatPanel = ({ currentUser, role }) => {
         <div ref={messagesEndRef} />
       </div>
       <div className="sticky bottom-0 z-[60] bg-white/95 backdrop-blur-sm border-t border-slate-100 shrink-0"
-        style={{paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))'}}>
+        style={{paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))'}}>
         <form onSubmit={send} className="flex items-end gap-2 px-3 pt-2.5">
           <div className="flex-1 bg-slate-100 rounded-2xl px-4 py-2.5 border border-transparent focus-within:bg-white focus-within:border-blue-500 focus-within:shadow-sm transition">
             <input type="text" placeholder="Type a message..." value={text} onChange={e => setText(e.target.value)}
@@ -535,9 +520,9 @@ const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], tr
       const phones = [t.patientPhone, t.pickupPhone, t.dropoffPhone].filter(Boolean);
       phones.forEach(p => {
         const norm = normalizePhone(p);
-        const tripTime = t.date && t.time ? new Date(t.date + 'T' + (t.time.includes(':') ? t.time : t.time + ':00')) : new Date(0);
+        const tripTime = t.date && t.time ? new Date(t.date + 'T' + (t.time.includes(':') ? t.time : t.time + ':00')).getTime() : 0;
         const existing = map[norm];
-        if (!existing || (existing._tripTime && tripTime > existing._tripTime)) {
+        if (!existing || tripTime > (existing._tripTime || 0)) {
           map[norm] = { ...t, _tripTime: tripTime };
         }
       });
@@ -574,34 +559,41 @@ const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], tr
   }, [resolveClient, trips]);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const q = query(collection(db, 'smsLogs'), orderBy('timestamp', 'desc'), limit(500));
-        const snap = await getDocs(q);
-        const groups = {};
-        snap.forEach(d => {
-          const msg = { id: d.id, ...d.data() };
-          const otherPhone = msg.direction === 'outbound' ? msg.to : msg.from;
-          if (!otherPhone) return;
-          const norm = normalizePhone(otherPhone);
-          if (norm === normalizePhone(TELNYX_NUMBER)) return;
-          if (!groups[norm]) groups[norm] = [];
-          groups[norm].push(msg);
-        });
-        const convs = Object.entries(groups).map(([phone, msgs]) => {
-          msgs.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
-          const last = msgs[0];
-          const resolved = resolveClientFromMsgs(msgs);
-          return { phone, clientName: resolved.name, tripId: resolved.tripId, trip: resolved.trip, lastMessage: last, messages: msgs };
-        });
-        convs.sort((a, b) => (b.lastMessage.timestamp?.toMillis?.() || 0) - (a.lastMessage.timestamp?.toMillis?.() || 0));
-        setConversations(scopeFilter(convs));
-      } catch (e) { console.error('Failed to load client conversations:', e); }
+    setLoading(true);
+    const q = query(collection(db, 'smsLogs'), orderBy('timestamp', 'desc'), limit(500));
+    const pendingIds = new Set();
+
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const groups = {};
+      snap.forEach(d => {
+        const msg = { id: d.id, ...d.data() };
+        if (pendingIds.has(msg.id) || sentPendingRef.current.has(msg.id)) return;
+        const otherPhone = msg.direction === 'outbound' ? msg.to : msg.from;
+        if (!otherPhone) return;
+        const norm = normalizePhone(otherPhone);
+        if (norm === normalizePhone(TELNYX_NUMBER)) return;
+        if (!groups[norm]) groups[norm] = [];
+        groups[norm].push(msg);
+      });
+      const convs = Object.entries(groups).map(([phone, msgs]) => {
+        msgs.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
+        const last = msgs[0];
+        const resolved = resolveClientFromMsgs(msgs);
+        return { phone, clientName: resolved.name, tripId: resolved.tripId, trip: resolved.trip, lastMessage: last, messages: msgs };
+      });
+      convs.sort((a, b) => (b.lastMessage.timestamp?.toMillis?.() || 0) - (a.lastMessage.timestamp?.toMillis?.() || 0));
+      setConversations(scopeFilter(convs));
       setLoading(false);
-    };
-    load();
+    }, (e) => {
+      console.error('SMS listener failed:', e);
+      setLoading(false);
+    });
+
+    return () => { unsubscribe(); pendingIds.clear(); };
   }, [trips, resolveClientFromMsgs]);
+
+  const analyzedSentimentsRef = useRef(new Set());
+  const sentPendingRef = useRef(new Set());
 
   const openConversation = async (conv) => {
     setActiveConv(conv);
@@ -611,6 +603,20 @@ const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], tr
   };
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [clientMessages]);
+
+  useEffect(() => {
+    if (!activeConv?.phone) return;
+    const updated = conversations.find(c => c.phone === activeConv.phone);
+    if (!updated || !updated.messages) return;
+    setClientMessages(prev => {
+      const existingIds = new Set(prev.map(m => m.id));
+      const newMsgs = updated.messages.filter(m => !existingIds.has(m.id));
+      if (newMsgs.length === 0) return prev;
+      const merged = [...prev, ...newMsgs];
+      merged.sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));
+      return merged;
+    });
+  }, [conversations, activeConv?.phone]);
 
   useEffect(() => {
     const unanalyzed = clientMessages.filter(m => m.direction !== 'outbound' && !analyzedSentimentsRef.current.has(m.id) && m.text);
@@ -637,9 +643,11 @@ const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], tr
       const sendSms = httpsCallable(functions, 'sendSms');
       const res = await sendSms({ to: activeConv.phone, text: msg, tripId: activeConv.tripId });
       if (res.data?.success) {
-        const newMsg = { id: 'pending-' + Date.now(), direction: 'outbound', to: activeConv.phone, text: msg, timestamp: new Date().toISOString(), status: 'sent' };
+        const id = 'pending-' + Date.now();
+        sentPendingRef.current.add(id);
+        const newMsg = { id, direction: 'outbound', to: activeConv.phone, text: msg, timestamp: new Date().toISOString(), status: 'sent' };
         setClientMessages(prev => [...prev, newMsg]);
-        setConversations(prev => prev.map(c => c.phone === activeConv.phone ? { ...c, lastMessage: newMsg } : c));
+        setConversations(prev => prev.map(c => c.phone === activeConv.phone ? { ...c, messages: [...(c.messages || []), newMsg], lastMessage: newMsg } : c));
         setReplyText('');
       }
     } catch (err) { console.error('Send failed:', err); }
@@ -662,8 +670,6 @@ const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], tr
     setAiSuggestedReply(result);
     setAiSuggestLoading(false);
   }, [activeConv, clientMessages, aiSuggestLoading]);
-
-  const analyzedSentimentsRef = useRef(new Set());
 
   if (loading) {
     return (
@@ -836,7 +842,7 @@ const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], tr
         </div>
       )}
       <div className="sticky bottom-0 z-[60] bg-white/95 backdrop-blur-sm border-t border-slate-100 shrink-0"
-        style={{paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))'}}>
+        style={{paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))'}}>
         <div className="flex items-center gap-2 px-3 pt-2.5">
           <input value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={handleKeyDown}
             placeholder="Type a reply..." className="flex-1 bg-slate-100 rounded-2xl px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition" />
@@ -850,41 +856,37 @@ const ClientChatPanel = ({ currentUser, role, drivers = [], dispatchers = [], tr
   ) : null;
 
   const handleNewSms = async () => {
-    const phone = newSmsPhone.trim();
+    const rawPhone = newSmsPhone.trim();
     const text = newSmsText.trim();
-    if (!phone || !text || newSmsSending) return;
+    if (!rawPhone || !text || newSmsSending) return;
     setNewSmsSending(true);
     try {
       const functions = getFunctions();
       const sendSms = httpsCallable(functions, 'sendSms');
-      await sendSms({ to: phone, text, tripId: null });
+      await sendSms({ to: rawPhone, text, tripId: null });
       setShowNewSms(false);
       setNewSmsPhone('');
       setNewSmsText('');
-      const q = query(collection(db, 'smsLogs'), orderBy('timestamp', 'desc'), limit(500));
-      const snap = await getDocs(q);
-      const groups = {};
-      snap.forEach(d => {
-        const msg = { id: d.id, ...d.data() };
-        const otherPhone = msg.direction === 'outbound' ? msg.to : msg.from;
-        if (!otherPhone) return;
-        const norm = normalizePhone(otherPhone);
-        if (norm === normalizePhone(TELNYX_NUMBER)) return;
-        if (!groups[norm]) groups[norm] = [];
-        groups[norm].push(msg);
+      const norm = normalizePhone(rawPhone);
+      const now = new Date().toISOString();
+      const id = 'pending-' + Date.now();
+      sentPendingRef.current.add(id);
+      const newMsg = { id, direction: 'outbound', to: norm, from: TELNYX_NUMBER, text, timestamp: now, status: 'sent' };
+      setConversations(prev => {
+        const existing = prev.find(c => c.phone === norm);
+        if (existing) {
+          const updated = { ...existing, messages: [...existing.messages, newMsg], lastMessage: newMsg };
+          return [updated, ...prev.filter(c => c.phone !== norm)];
+        }
+        const resolved = resolveClient(rawPhone);
+        const newConv = { phone: norm, clientName: resolved.name, tripId: resolved.tripId, trip: resolved.trip, lastMessage: newMsg, messages: [newMsg] };
+        return [newConv, ...prev];
       });
-      const convs = Object.entries(groups).map(([ph, msgs]) => {
-        msgs.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
-        const last = msgs[0];
-        const resolved = resolveClientFromMsgs(msgs);
-        return { phone: ph, clientName: resolved.name, tripId: resolved.tripId, trip: resolved.trip, lastMessage: last, messages: msgs };
+      setClientMessages(prev => {
+        if (activeConv?.phone === norm) return [...prev, newMsg];
+        return prev;
       });
-      convs.sort((a, b) => (b.lastMessage.timestamp?.toMillis?.() || 0) - (a.lastMessage.timestamp?.toMillis?.() || 0));
-      const filteredConvs = scopeFilter(convs);
-      setConversations(filteredConvs);
-      const norm = normalizePhone(phone);
-      const conv = filteredConvs.find(c => c.phone === norm);
-      if (conv) { openConversation(conv); if (isMobile) setShowSidebar(false); }
+      if (isMobile) setShowSidebar(false);
     } catch (err) { console.error('New SMS failed:', err); }
     setNewSmsSending(false);
   };

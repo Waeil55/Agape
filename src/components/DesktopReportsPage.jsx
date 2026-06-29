@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import {
   BarChart2, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft,
   ChevronRight, Clock, Download, Edit2, FileText, RefreshCw, Search, Upload,
@@ -202,6 +202,10 @@ const DesktopReportsPage = ({
     setEditingCell(null);
   }, [editingRow, onUpdateTrip]);
 
+  useEffect(() => {
+    localStorage.setItem('agape_reportsDesktopView', viewMode);
+  }, [viewMode]);
+
   const renderCell = (trip, colKey, displayValue, fieldName, type = 'text') => {
     const isEditing = editingCell?.tripId === trip.id && editingCell?.field === colKey;
     
@@ -274,6 +278,22 @@ const DesktopReportsPage = ({
         );
       }
 
+      if (colKey === 'aw') {
+        return (
+          <select
+            ref={inputRef}
+            className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-700"
+            value={editingRowSnapshot?.wheelchair ? 'W' : 'A'}
+            onChange={e => saveCell(trip, 'wheelchair', e.target.value === 'W' ? 'Wheelchair' : '')}
+            onBlur={() => cancelEdit()}
+            autoFocus
+          >
+            <option value="A">A</option>
+            <option value="W">W</option>
+          </select>
+        );
+      }
+
       return (
         <input
           ref={inputRef}
@@ -329,6 +349,18 @@ const DesktopReportsPage = ({
           onClick={() => saveCell(trip, 'paperSignatureConfirmed', !trip.paperSignatureConfirmed)}
         >
           {displayValue}
+        </span>
+      );
+    }
+
+    if (colKey === 'aw') {
+      const val = trip.wheelchair ? 'W' : 'A';
+      return (
+        <span
+          className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-bold"
+          onClick={() => startCellEdit(trip.id, colKey, val)}
+        >
+          {val}
         </span>
       );
     }
@@ -468,6 +500,110 @@ const DesktopReportsPage = ({
           );
         })}
       </div>
+    </div>
+  );
+
+  const renderInvoiceTable = () => (
+    <div className="min-h-0 flex-1 overflow-auto bg-white">
+      <table className="w-full min-w-[900px] table-fixed text-[12px]">
+        <colgroup>
+          <col className="w-[68px]" />
+          <col className="w-[105px]" />
+          <col className="w-[100px]" />
+          <col className="w-[48px]" />
+          <col className="w-[150px]" />
+          <col className="w-[86px]" />
+          <col className="w-[86px]" />
+          <col className="w-[110px]" />
+          <col className="w-[70px]" />
+          <col className="w-[70px]" />
+        </colgroup>
+        <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
+          <tr>
+            <th className="rounded-tl-xl px-2 py-2 text-left font-semibold">Edit</th>
+            <th className="px-2 py-2 text-left font-semibold">Date</th>
+            <th className="px-2 py-2 text-left font-semibold">Trip ID</th>
+            <th className="px-2 py-2 text-center font-semibold">A/W</th>
+            <th className="px-2 py-2 text-left font-semibold">Client Name</th>
+            <th className="px-2 py-2 text-left font-semibold">Pickup</th>
+            <th className="px-2 py-2 text-left font-semibold">Dropoff</th>
+            <th className="px-2 py-2 text-left font-semibold">Approved Fee</th>
+            <th className="px-2 py-2 text-center font-semibold">Signed</th>
+            <th className="px-2 py-2 text-center font-semibold rounded-tr-xl">Done</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {reportRows.map(({ trip, driver, travelMinutes }, index) => (
+            <tr key={trip.id} className={index % 2 ? 'bg-slate-50/70 hover:bg-blue-50/40' : 'bg-white hover:bg-blue-50/40'}>
+              <td className="px-2 py-2">
+                <div className="flex items-center gap-2 text-slate-500">
+                  {editingRow === trip.id ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); finishRowEdit(); }}
+                        className="p-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150"
+                        title="Keep changes"
+                      >
+                        <Check size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); revertRowEdit(); }}
+                        className="p-0.5 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150"
+                        title="Cancel and restore original row"
+                      >
+                        <XCircle size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
+                      className="p-0.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
+                      title="Edit row"
+                    >
+                      <Edit2 size={13} />
+                    </button>
+                  )}
+                </div>
+              </td>
+              <td className="px-2 py-2 font-semibold text-slate-900">
+                {renderCell(trip, 'date', formatDateLabel(trip.date), 'date', 'date')}
+              </td>
+              <td className="px-2 py-2 font-mono text-blue-900">
+                {renderCell(trip, 'bookingId', trip.bookingId || trip.id, 'bookingId')}
+              </td>
+              <td className="px-2 py-2 text-center font-bold text-slate-800">
+                {renderCell(trip, 'aw', trip.wheelchair ? 'W' : 'A', 'wheelchair')}
+              </td>
+              <td className="px-2 py-2 font-bold text-slate-900">
+                {renderCell(trip, 'patient', trip.patient, 'patient')}
+              </td>
+              <td className="px-2 py-2 font-mono font-bold text-emerald-700">
+                {renderCell(trip, 'arrivalTime', formatClock(trip.arrivalTime || trip.pickupTime), 'arrivalTime', 'time')}
+              </td>
+              <td className="px-2 py-2 font-mono font-bold text-rose-700">
+                {renderCell(trip, 'arrivalDropoffTime', formatClock(trip.arrivalDropoffTime || trip.completedAt), 'arrivalDropoffTime', 'time')}
+              </td>
+              <td className="px-2 py-2 font-mono font-bold text-slate-800">
+                {renderCell(trip, 'additionalFee', trip.additionalFee ? `$${trip.additionalFee}` : '$0.00', 'additionalFee', 'number')}
+              </td>
+              <td className="px-2 py-2 text-center font-bold text-emerald-700">
+                {renderCell(trip, 'signature', trip.paperSignatureConfirmed ? 'Yes' : 'No', 'paperSignatureConfirmed')}
+              </td>
+              <td className="px-2 py-2 text-center font-semibold text-slate-500">
+                {renderCell(trip, 'reviewed', trip.reviewed ? 'Done' : 'Pending', 'reviewed')}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {reportRows.length === 0 && (
+        <div className="flex h-48 items-center justify-center text-sm font-semibold text-slate-500">
+          No trips found for this date or filter.
+        </div>
+      )}
     </div>
   );
 
@@ -624,8 +760,9 @@ const DesktopReportsPage = ({
           <button className="h-8 min-w-[132px] rounded-xl border border-slate-100 bg-white px-3 text-[12px] font-bold text-slate-800">{formatDateLabel(dateStr)}</button>
           <button onClick={() => shiftDate(1)} className="h-8 w-8 rounded-xl border border-slate-100 bg-white text-slate-500 hover:bg-slate-50"><ChevronRight size={15} className="mx-auto" /></button>
 
-          <ViewButton active={viewMode === 'review'} onClick={() => setMode('review')}>Review Table</ViewButton>
-          <ViewButton active={viewMode === 'cards'} onClick={() => setMode('cards')}>Cards</ViewButton>
+          <ViewButton active={viewMode === 'review'} onClick={() => setViewMode('review')}>Review Table</ViewButton>
+          <ViewButton active={viewMode === 'cards'} onClick={() => setViewMode('cards')}>Cards</ViewButton>
+          <ViewButton active={viewMode === 'invoice'} onClick={() => setViewMode('invoice')}>Invoice</ViewButton>
 
           <CompactSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="all">All statuses</option>
@@ -681,7 +818,7 @@ const DesktopReportsPage = ({
           </div>
         </div>
 
-        {viewMode === 'review' ? renderReviewTable() : renderCards()}
+        {viewMode === 'invoice' ? renderInvoiceTable() : viewMode === 'review' ? renderReviewTable() : renderCards()}
       </div>
     </div>
   );

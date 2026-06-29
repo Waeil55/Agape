@@ -5,7 +5,7 @@ import {
 import DriverPage from './DriverPage';
 import AdminPage from './AdminPage';
 import ReportsPage from './ReportsPage';
-import MobileChatPage from './MobileChatPage';
+import ChatPage from './ChatPage';
 import LiveMapPage from './LiveMapPage';
 import MobileDispatchView from './MobileDispatchView';
 import MobileMenuPage from './MobileMenuPage';
@@ -251,7 +251,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'chat') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          <MobileChatPage {...props} />
+          <ChatPage currentUser={currentUser} role={role} drivers={drivers} dispatchers={dispatchers} trips={trips} onSwitchToDispatch={(tripId) => setCurrentView('trips')} />
         </div>
       );
     }

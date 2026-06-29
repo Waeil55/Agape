@@ -2550,25 +2550,25 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (!trip) return null;
     if (!isClockedIn) return null;
     if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
-      return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-600/25', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
+      return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-600/25', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
     }
     if (trip.status === 'In Progress') {
-      return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 shadow-sky-500/25', onClick: () => handleNavigateToPickup(trip) };
+      return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', onClick: () => handleNavigateToPickup(trip) };
     }
     if (trip.status === 'Navigating Pickup') {
-      return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-blue-500/25', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
+      return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
     }
     if (trip.status === 'At Pickup') {
-      return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 shadow-indigo-500/25', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
+      return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-teal-500/25', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
     }
     if (trip.status === 'In Transit') {
-      return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-blue-500 to-sky-600 hover:from-blue-600 hover:to-sky-700 shadow-blue-500/25', onClick: () => handleNavigateToDropoff(trip) };
+      return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25', onClick: () => handleNavigateToDropoff(trip) };
     }
     if (trip.status === 'Navigating Dropoff') {
-      return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 shadow-sky-500/25', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
+      return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-orange-500/25', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
     }
     if (trip.status === 'At Dropoff' || trip.status === 'Arrived') {
-      return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-blue-600/25', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
+      return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 shadow-rose-500/25', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
     }
     return null;
   };
@@ -3691,13 +3691,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const doneBarColor = 'bg-emerald-400';
 
                 const getPrimaryAction = () => {
-                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-600/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 shadow-sky-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 shadow-indigo-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-sky-600 hover:from-blue-600 hover:to-sky-700 shadow-blue-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 shadow-sky-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-blue-600/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-600/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-teal-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 shadow-rose-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
                   return null;
                 };
                 const primary = getPrimaryAction();
