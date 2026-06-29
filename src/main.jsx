@@ -10,16 +10,16 @@ import './index.css';
 document.addEventListener('click', (e) => {
   const tr = e.target.closest('table tbody tr');
   if (tr) {
-    document.querySelectorAll('table tbody tr.row-selected').forEach(el => {
-      if (el !== tr) el.classList.remove('row-selected');
+    document.querySelectorAll('table tbody tr[data-agape-selected="true"]').forEach(el => {
+      if (el !== tr) el.removeAttribute('data-agape-selected');
     });
-    tr.classList.add('row-selected');
+    tr.setAttribute('data-agape-selected', 'true');
   } else if (!e.target.closest('table')) {
-    document.querySelectorAll('table tbody tr.row-selected').forEach(el => {
-      el.classList.remove('row-selected');
+    document.querySelectorAll('table tbody tr[data-agape-selected="true"]').forEach(el => {
+      el.removeAttribute('data-agape-selected');
     });
   }
-});
+}, true);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

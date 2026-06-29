@@ -1643,13 +1643,13 @@ table th {
 }
 
 /* ===== TABLE ROW SELECTION & FONT FIXES ===== */
-table tbody tr.row-selected,
-table tbody tr.row-selected:hover {
+table tbody tr[data-agape-selected="true"],
+table tbody tr[data-agape-selected="true"]:hover {
   background-color: rgba(59, 130, 246, 0.15) !important;
   box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.5) !important;
 }
-[data-theme="dark"] table tbody tr.row-selected,
-[data-theme="dark"] table tbody tr.row-selected:hover {
+[data-theme="dark"] table tbody tr[data-agape-selected="true"],
+[data-theme="dark"] table tbody tr[data-agape-selected="true"]:hover {
   background-color: rgba(59, 130, 246, 0.25) !important;
 }
 table tbody td {
