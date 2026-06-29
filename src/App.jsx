@@ -2422,16 +2422,16 @@ const App = () => {
             <div className="w-20 h-20 sm:w-24 sm:h-24 mb-4 relative">
               <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain relative z-10" />
             </div>
-            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 mb-2 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
+            <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-slate-900 mb-2 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
               <ShieldCheck size={14} className="text-blue-600" />
-              <p className="text-micro font-black text-blue-800 uppercase tracking-[0.18em]">Enterprise Fleet OS</p>
+              <p className="text-micro font-semibold text-blue-800 uppercase tracking-[0.18em]">Enterprise Fleet OS</p>
             </div>
           </div>
 
           {loginStep === 'role_selection' ? (
             <div className="space-y-4">
-              <h2 className="text-center text-sm font-bold text-slate-500 tracking-wide">Secure Access Portal</h2>
+              <h2 className="text-center text-sm font-semibold text-slate-500 tracking-wide">Secure Access Portal</h2>
               <div className="grid grid-cols-1 gap-3">
                 {[
                   { key: 'admin', Icon: ShieldCheck, label: 'Admin Login', sub: 'CEO / Owner only', color: 'indigo' },
@@ -2469,26 +2469,26 @@ const App = () => {
                   setPassword('');
                   setLoginError('');
                   setLoginStep('role_selection');
-                }} className="p-2.5 bg-white rounded-xl text-slate-400 hover:text-slate-900 shadow-sm active:scale-95 transition-all"><ArrowRight className="rotate-180" size={18} /></button>
+                }} className="p-2.5 bg-white rounded-xl text-slate-500 hover:text-slate-900 shadow-sm active:scale-95 transition-all"><ArrowRight className="rotate-180" size={18} /></button>
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Authenticating as</p>
-                  <p className="text-base font-black text-slate-900 capitalize">{pendingRole}</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-widest leading-none mb-1">Authenticating as</p>
+                  <p className="text-base font-semibold text-slate-900 capitalize">{pendingRole}</p>
                 </div>
               </div>
               
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Username</label>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Username</label>
                 <div className="relative">
                   <input type="text" required autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="waeil.admin" value={email} onChange={(e) => setEmail(e.target.value)} 
-                    className="w-full p-3.5 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
+                    className="w-full p-3.5 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
                 <div className="relative">
                   <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} 
-                    className="w-full p-3.5 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
+                    className="w-full p-3.5 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
 
@@ -2505,7 +2505,7 @@ const App = () => {
         </div>
         
         <div className="mt-5 flex flex-col items-center gap-3 relative z-10">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.3em] text-center opacity-60">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-[0.3em] text-center opacity-60">
             Agape Care Cloud Infrastructure<br />
             Certified Enterprise Environment
           </p>
@@ -2523,7 +2523,7 @@ const App = () => {
           <div className="w-16 h-16 bg-gradient-to-tr from-rose-600 to-rose-400 text-white rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-rose-500/30">
             <Lock size={32} />
           </div>
-          <h3 className="text-xl font-black text-center text-slate-900 mb-2">Security Verification</h3>
+          <h3 className="text-xl font-semibold text-center text-slate-900 mb-2">Security Verification</h3>
           <p className="text-xs text-center text-slate-500 font-medium mb-2">Re-enter your password to authorize: <span className="font-bold text-slate-800">{authActionPayload?.label || 'Action'}</span></p>
           {reAuthError && <p className="text-xs text-center text-rose-600 font-semibold mb-4">{reAuthError}</p>}
           <form onSubmit={submitAuthAction}>
@@ -2545,7 +2545,7 @@ const App = () => {
         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setBulkAssignModal(false)} />
         <div className="bg-white/90 backdrop-blur-xl w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/50 max-h-[85vh] overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+            <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
               <Truck size={24} className="text-emerald-600" /> Bulk Assignment
             </h3>
             <button onClick={() => setBulkAssignModal(false)} className="p-2 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
@@ -2557,7 +2557,7 @@ const App = () => {
           </div>
 
           <div className="space-y-3">
-            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Available Fleet</h4>
+            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-widest px-1">Available Fleet</h4>
             <div className="grid grid-cols-1 gap-2">
               {scopedDrivers.map(d => (
                 <button key={d.id} onClick={() => bulkAssignTrips(d.id)} className="w-full flex items-center justify-between p-4 bg-white/50 border border-slate-200 rounded-2xl hover:bg-white hover:border-blue-300 hover:shadow-md transition-all group text-left">
@@ -2596,17 +2596,17 @@ const App = () => {
                 {aiAnalyzing ? <Activity size={28} /> : <BrainCircuit size={28} />}
               </div>
               <div>
-                <h3 className="text-xl sm:text-2xl font-black text-slate-900">AI Chain-Route</h3>
-                <p className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-widest">Target: {smartAssignTrip.patient}</p>
+                <h3 className="text-xl sm:text-2xl font-semibold text-slate-900">AI Chain-Route</h3>
+                <p className="text-sm font-semibold text-slate-500 mt-1 uppercase tracking-widest">Target: {smartAssignTrip.patient}</p>
               </div>
             </div>
             <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
           </div>
           <div className="bg-slate-50/80 rounded-2xl p-4 mb-6 border border-slate-200/50">
             <div className="grid grid-cols-2 gap-4 text-xs font-bold text-slate-600">
-              <div><span className="text-slate-400 block mb-1">Time</span>{smartAssignTrip.time}</div>
-              <div><span className="text-slate-400 block mb-1">Type</span>{smartAssignTrip.type}</div>
-              <div className="col-span-2"><span className="text-slate-400 block mb-1">Route</span>{smartAssignTrip.pickup} <ArrowRight size={12} className="inline text-slate-300 mx-1" /> {smartAssignTrip.dropoff.split(' ')[0]}</div>
+              <div><span className="text-slate-500 block mb-1">Time</span>{smartAssignTrip.time}</div>
+              <div><span className="text-slate-500 block mb-1">Type</span>{smartAssignTrip.type}</div>
+              <div className="col-span-2"><span className="text-slate-500 block mb-1">Route</span>{smartAssignTrip.pickup} <ArrowRight size={12} className="inline text-slate-300 mx-1" /> {smartAssignTrip.dropoff.split(' ')[0]}</div>
             </div>
           </div>
           {aiAnalyzing ? (
@@ -2623,7 +2623,7 @@ const App = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Target size={14} /> AI Assignment Result</h4>
+              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2"><Target size={14} /> AI Assignment Result</h4>
               {smartAssignResult && smartAssignResult.driverId ? (
                 (() => {
                   const d = scopedDrivers.find(drv => drv.id === smartAssignResult.driverId);
@@ -2638,10 +2638,10 @@ const App = () => {
                       <div className={`absolute top-0 right-0 ${badgeClass} text-white px-3 py-1 rounded-bl-xl font-bold text-xs tracking-wider`}>{smartAssignResult.score}% Match</div>
                       <div className="flex justify-between items-start gap-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-[1rem] bg-slate-200/50 text-slate-700 flex items-center justify-center font-black">{d.name.split(' ').map(n => n[0]).join('')}</div>
+                          <div className="w-12 h-12 rounded-[1rem] bg-slate-200/50 text-slate-700 flex items-center justify-center font-semibold">{d.name.split(' ').map(n => n[0]).join('')}</div>
                           <div>
-                            <h4 className="text-lg font-black text-slate-900">{d.name}</h4>
-                            <p className="text-sm font-bold text-slate-500">{d.vehicle} &bull; {d.dist}</p>
+                            <h4 className="text-lg font-semibold text-slate-900">{d.name}</h4>
+                            <p className="text-sm font-semibold text-slate-500">{d.vehicle} &bull; {d.dist}</p>
                           </div>
                         </div>
                         <button onClick={() => assignTripToDriver(smartAssignTrip.id, d.id)} className={`${btnClass} text-white px-5 py-2.5 rounded-[1rem] font-bold text-sm active:scale-95 transition-all shadow-md`}>Assign</button>
@@ -2685,8 +2685,8 @@ const App = () => {
                 <Users size={24} />
               </div>
               <div>
-                <h3 className="text-xl font-black text-slate-900">Manual Assignment</h3>
-                <p className="text-xs font-bold text-slate-500 mt-0.5 uppercase tracking-widest">Assign: {manualAssignTrip.patient}</p>
+                <h3 className="text-xl font-semibold text-slate-900">Manual Assignment</h3>
+                <p className="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-widest">Assign: {manualAssignTrip.patient}</p>
               </div>
             </div>
             <button onClick={() => setManualAssignTrip(null)} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
@@ -2695,7 +2695,7 @@ const App = () => {
           <div className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-thin">
             {availableDrivers.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5"><CheckCircle2 size={12} /> Available Fleet</h4>
+                <h4 className="text-xs font-semibold text-emerald-600 uppercase tracking-widest flex items-center gap-1.5"><CheckCircle2 size={12} /> Available Fleet</h4>
                 <div className="grid grid-cols-1 gap-2">
                   {availableDrivers.map(d => (
                     <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
@@ -2716,7 +2716,7 @@ const App = () => {
             
             {otherDrivers.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><Clock size={12} /> Other Drivers ({otherDrivers.length})</h4>
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Clock size={12} /> Other Drivers ({otherDrivers.length})</h4>
                 <div className="grid grid-cols-1 gap-2">
                   {otherDrivers.map(d => (
                     <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
@@ -2749,7 +2749,7 @@ const App = () => {
           <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
             <div className="flex items-center gap-3">
               <div className="bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white p-3 rounded-[1rem] shadow-md"><Wand2 size={24} /></div>
-              <h3 className="text-2xl font-black text-slate-900">Fleet AI Optimizer</h3>
+              <h3 className="text-2xl font-semibold text-slate-900">Fleet AI Optimizer</h3>
             </div>
             {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>}
           </div>
@@ -2808,7 +2808,7 @@ const App = () => {
             <img src="/agape.png" alt="Agape Care" className="w-24 h-24 object-contain" />
             <div className="text-center">
               <p className="text-lg font-bold text-slate-700">Loading Agape Care</p>
-              <p className="text-sm font-medium text-slate-400 mt-1">Preparing your workspace...</p>
+              <p className="text-sm font-medium text-slate-500 mt-1">Preparing your workspace...</p>
               {startupIssue && <p className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mt-4">{startupIssue}</p>}
             </div>
             {showLoadingRecovery && (
@@ -2899,7 +2899,7 @@ const App = () => {
                 <div className="flex-1 bg-slate-100 flex items-center justify-center px-4">
                   <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl shadow-sm p-6 text-center">
                     <img src="/agape.png" alt="Agape Care" className="w-20 h-20 object-contain mx-auto mb-4" />
-                    <h2 className="text-lg font-black text-slate-900">Syncing your driver profile...</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">Syncing your driver profile...</h2>
                     <p className="text-sm font-medium text-slate-500 mt-2 leading-relaxed">
                       We are reconnecting your cloud driver record and live trips.
                     </p>

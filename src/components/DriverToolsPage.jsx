@@ -711,7 +711,7 @@ const RoutePlanSection = ({
                 <button onClick={handleClearPlan} className="text-[11px] font-black text-rose-500 hover:text-rose-600 transition-colors flex items-center gap-1">
                   <Trash2 size={13} /> Clear
                 </button>
-                <button onClick={() => setExpanded(false)} className="text-emerald-600 font-black text-[12px] hover:text-emerald-700 transition-colors">
+                <button onClick={() => setExpanded(false)} className="text-emerald-600 font-semibold text-[12px] hover:text-emerald-700 transition-colors">
                   Done
                 </button>
               </div>

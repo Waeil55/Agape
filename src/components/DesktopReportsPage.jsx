@@ -10,7 +10,7 @@ const DASH = '-';
 
 const DetailRow = ({ label, value, valueColor = 'text-slate-900' }) => (
   <div className="grid grid-cols-1 gap-1 py-1.5 items-start sm:grid-cols-[130px_1fr] sm:gap-4">
-    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">{label}</span>
+    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">{label}</span>
     <span className={`text-[13px] font-bold break-words ${valueColor}`}>{value || DASH}</span>
   </div>
 );
@@ -122,7 +122,7 @@ const CompactSelect = ({ value, onChange, children, className = '' }) => (
     >
       {children}
     </select>
-    <ChevronDown size={13} className="pointer-events-none absolute right-2.5 text-slate-400" />
+    <ChevronDown size={13} className="pointer-events-none absolute right-2.5 text-slate-500" />
   </label>
 );
 
@@ -314,7 +314,7 @@ const DesktopReportsPage = ({
     if (colKey === 'reviewed') {
       return (
         <span
-          className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-bold text-slate-500"
+          className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-semibold text-slate-500"
           onClick={() => saveCell(trip, 'reviewed', !trip.reviewed)}
           title={trip.reviewed ? 'Mark as pending' : 'Mark as done'}
         >
@@ -360,7 +360,11 @@ const DesktopReportsPage = ({
           : calcDurationMinutes(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
         return { trip, driver, travelMinutes };
       })
-      .sort((a, b) => String(a.trip.time || '').localeCompare(String(b.trip.time || '')));
+      .sort((a, b) => {
+        const aDone = a.trip.arrivalDropoffTime || a.trip.completedAt || a.trip.time || '';
+        const bDone = b.trip.arrivalDropoffTime || b.trip.completedAt || b.trip.time || '';
+        return String(aDone).localeCompare(String(bDone));
+      });
   }, [trips, drivers, dateStr, searchQuery, statusFilter, driverFilter, reviewFilter]);
 
   const allDayRows = useMemo(() => trips
@@ -533,7 +537,7 @@ const DesktopReportsPage = ({
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
-                        className="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
+                        className="p-0.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
                         title="Edit row"
                       >
                         <Edit2 size={13} />
@@ -587,7 +591,7 @@ const DesktopReportsPage = ({
               <td className="px-2 py-2 font-bold text-emerald-700">
                 {renderCell(trip, 'signature', trip.paperSignatureConfirmed ? 'Yes' : 'No', 'paperSignatureConfirmed')}
               </td>
-              <td className="px-2 py-2 font-bold text-slate-500">
+              <td className="px-2 py-2 font-semibold text-slate-500">
                 {renderCell(trip, 'reviewed', trip.reviewed ? 'Done' : 'Pending', 'reviewed')}
               </td>
             </tr>
@@ -595,7 +599,7 @@ const DesktopReportsPage = ({
         </tbody>
       </table>
       {reportRows.length === 0 && (
-        <div className="flex h-48 items-center justify-center text-sm font-semibold text-slate-400">
+        <div className="flex h-48 items-center justify-center text-sm font-semibold text-slate-500">
           No trips found for this date or filter.
         </div>
       )}
@@ -607,7 +611,7 @@ const DesktopReportsPage = ({
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-slate-100 bg-white px-3">
           <div className="relative w-[220px] shrink-0">
-            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
@@ -657,7 +661,7 @@ const DesktopReportsPage = ({
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <CalendarDays size={15} className="text-slate-500" />
-              <span className="text-lg font-black text-slate-800">{formatDateLabel(dateStr, true)}</span>
+              <span className="text-lg font-semibold text-slate-800">{formatDateLabel(dateStr, true)}</span>
             </div>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">{reportRows.length} trips</span>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">{summary.reviewed}/{reportRows.length} reviewed</span>
@@ -665,7 +669,7 @@ const DesktopReportsPage = ({
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">{formatMinutes(summary.stopped)} stopped</span>
           </div>
 
-          <div className="flex items-center gap-3 text-[10px] font-bold uppercase text-slate-500">
+          <div className="flex items-center gap-3 text-[12px] font-semibold uppercase tracking-wide text-slate-500">
             <button type="button" onClick={() => markRowsReviewed(true)} className="h-8 rounded-xl bg-emerald-100 px-3 text-[11px] font-bold normal-case text-emerald-700 hover:bg-emerald-200">Mark Day Done</button>
             <button type="button" onClick={() => markRowsReviewed(false)} className="h-8 rounded-xl bg-white px-3 text-[11px] font-bold normal-case text-slate-600 hover:bg-slate-100">Reset Review</button>
             <span>Total <b className="text-slate-900">{reportRows.length}</b></span>

@@ -688,7 +688,7 @@ const LiveMapPage = ({
     <div className="h-[100dvh] w-full min-h-0 bg-slate-50 flex flex-col overflow-hidden select-none font-outfit">
       {/* ===== HUD BAR (36px) ===== */}
       <header className="shrink-0 min-h-10 bg-white border-b border-slate-200 shadow-sm flex flex-wrap items-center gap-2 px-3 py-2 z-30 sm:flex-nowrap sm:gap-3 sm:px-4 sm:py-0">
-        <span className="text-[12px] font-black text-slate-800 tracking-widest uppercase">Agape</span>
+        <span className="text-[12px] font-semibold text-slate-700 tracking-wide uppercase">Agape</span>
         <div className="hidden h-4 w-px bg-slate-200 sm:block" />
         <span className="flex items-center gap-1.5 text-[11px] font-bold"><span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" /><span className="text-slate-600">{fleetStats.live}/{drivers.length} live</span></span>
         <span className="hidden items-center gap-1.5 text-[11px] font-bold sm:flex"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-sm" /><span className="text-blue-700">{fleetStats.moving} moving</span></span>

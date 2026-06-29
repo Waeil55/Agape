@@ -314,8 +314,8 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
         <tbody>
           {rows.map((row) => (
             <tr key={row.label} className="align-top border-b border-slate-150 last:border-b-0">
-              <td role="rowheader" className="driver-history-detail-label w-[36%] bg-slate-100/90 px-3 py-1.5 text-[9.5px] font-black uppercase tracking-wider text-slate-600">{row.label}</td>
-              <td className={`px-3 py-1.5 text-xs font-black break-words ${
+              <td role="rowheader" className="driver-history-detail-label w-[36%] bg-slate-100/90 px-3 py-1.5 text-[9.5px] font-semibold uppercase tracking-wide text-slate-600">{row.label}</td>
+              <td className={`px-3 py-1.5 text-xs font-semibold break-words ${
                 row.tone === 'green' ? 'text-emerald-600' : row.tone === 'red' ? 'text-rose-600' : row.tone === 'blue' ? 'text-blue-600' : 'text-slate-950'
               }`}>{row.value}</td>
             </tr>
@@ -1087,7 +1087,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const allHistory = filteredDriverScopedTrips
     .filter(isWorkflowTerminalTrip)
     .sort((a, b) => {
-      const dateCompare = String(getTripHistoryDateKey(b) || '').localeCompare(String(getTripHistoryDateKey(a) || ''));
+      const dateCompare = String(getTripHistoryDateKey(a) || '').localeCompare(String(getTripHistoryDateKey(b) || ''));
       if (dateCompare !== 0) return dateCompare;
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
@@ -1634,9 +1634,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       (t.dropoff || '').toLowerCase().includes(q);
   });
   const sortedFilteredHistory = [...filteredHistory].sort((a, b) => {
-    const finishedPriority = getHistoryFinishedPriority(a) - getHistoryFinishedPriority(b);
-    if (finishedPriority !== 0) return finishedPriority;
-
     const finishedTime = getHistoryFinishedSortMs(a) - getHistoryFinishedSortMs(b);
     if (finishedTime !== 0) return finishedTime;
 
@@ -2622,16 +2619,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </button>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 min-w-0">
-                <h1 className="text-base font-black text-slate-950 leading-tight truncate">{trip.patient || 'Trip'}</h1>
-                 <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-black text-blue-700 border border-blue-100">
+                <h1 className="text-sm font-semibold text-slate-950 leading-tight truncate">{trip.patient || 'Trip'}</h1>
+                 <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 border border-blue-100">
                   #{trip.bookingId || trip.id || '--'}
                 </span>
               </div>
-              <p className="mt-0.5 flex items-center gap-1.5 text-xs font-black text-rose-600">
+              <p className="mt-0.5 flex items-center gap-1.5 text-[11px] font-medium text-rose-600">
                 <Clock size={13} /> {scheduledTime}
               </p>
             </div>
-            <span className={`shrink-0 max-w-[34%] truncate rounded-lg border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-center ${getTripWorkStatusClass(trip.status)}`}>
+            <span className={`shrink-0 max-w-[34%] truncate rounded-lg border px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-center ${getTripWorkStatusClass(trip.status)}`}>
               {trip.status || 'Assigned'}
             </span>
           </div>
@@ -2647,10 +2644,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-200">Scheduled Time</p>
-                  <p className="mt-1 text-xl font-black tracking-tight leading-none text-white">{scheduledTime}</p>
+                  <p className="text-[11px] font-medium uppercase tracking-normal text-blue-200">Scheduled Time</p>
+                  <p className="mt-1 text-lg font-semibold tracking-tight leading-none text-white">{scheduledTime}</p>
                 </div>
-                <span className="mt-0.5 shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-amber-800 shadow-sm">
+                  <span className="mt-0.5 shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-amber-800 shadow-sm">
                   {attentionText}
                 </span>
               </div>
@@ -2663,28 +2660,28 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 </div>
 
                 <div className="pb-3">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-blue-200">From</p>
-                  <p className="mt-0.5 text-sm md:text-base font-extrabold leading-snug text-white break-words">{pickupAddress || '--'}</p>
+                  <p className="text-[11px] font-medium uppercase tracking-normal text-blue-200">From</p>
+                  <p className="mt-0.5 text-xs font-medium leading-snug text-white break-words">{pickupAddress || '--'}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-8 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-black text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
-                      <Copy size={12} /> Copy
+                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-8 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-[11px] font-medium text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
+                      <Copy size={11} /> Copy
                     </button>
-                    <span className="text-xs font-black text-blue-200/80">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-9 px-3.5 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-[12px] font-black flex items-center gap-1.5 cursor-pointer">
+                    <span className="text-[11px] font-medium text-blue-200/80">{trip.distance ? `${trip.distance} mi` : ''}</span>
+                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-3 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-medium flex items-center gap-1.5 cursor-pointer">
                       <Navigation size={13} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-wider text-emerald-300">To</p>
-                  <p className="mt-0.5 text-sm md:text-base font-extrabold leading-snug text-white break-words">{dropoffAddress || '--'}</p>
+                  <p className="text-[11px] font-medium uppercase tracking-normal text-emerald-300">To</p>
+                  <p className="mt-0.5 text-xs font-medium leading-snug text-white break-words">{dropoffAddress || '--'}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-8 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-black text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
-                      <Copy size={12} /> Copy
+                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-8 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-[11px] font-medium text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
+                      <Copy size={11} /> Copy
                     </button>
-                    <span className="text-xs font-black text-blue-200/80" />
-                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-9 px-3.5 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-[12px] font-black flex items-center gap-1.5 cursor-pointer">
+                    <span className="text-[11px] font-medium text-blue-200/80" />
+                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-3 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-medium flex items-center gap-1.5 cursor-pointer">
                       <Navigation size={13} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
@@ -2692,23 +2689,23 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
 
               <div className="mt-3.5 grid grid-cols-4 gap-2">
-                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-10 rounded-2xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[12px] font-black flex items-center justify-center gap-1 cursor-pointer">
-                  <Phone size={14} /> Call
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-9 rounded-2xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
+                  <Phone size={13} /> Call
                 </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-10 rounded-2xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[12px] font-black flex items-center justify-center gap-1 cursor-pointer">
-                  <MessageCircle size={14} /> SMS
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-9 rounded-2xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
+                  <MessageCircle size={13} /> SMS
                 </button>
-                <button type="button" onClick={() => openContactSelector(trip)} className="h-10 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-[12px] font-black flex items-center justify-center gap-1 cursor-pointer">
-                  <PhoneForwarded size={14} /> Contacts
+                <button type="button" onClick={() => openContactSelector(trip)} className="h-9 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
+                  <PhoneForwarded size={13} /> Contacts
                 </button>
-                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-10 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-[12px] font-black flex items-center justify-center gap-1 cursor-pointer">
-                  <MoreHorizontal size={15} /> More
+                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-9 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
+                  <MoreHorizontal size={14} /> More
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl bg-white border border-slate-100 shadow-sm px-4 py-2">
+          <div className="rounded-2xl bg-white border border-slate-200 shadow-sm px-4 py-2">
             <div className="flex items-start gap-2">
               <div className="flex min-w-0 flex-1 items-start">
                 {TRIP_WORK_STEPS.map((label, idx) => {
@@ -2717,16 +2714,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   return (
                     <div key={label} className="flex-1 min-w-0">
                       <div className="flex items-center">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 font-black text-xs shadow-sm ${
-                          isActive ? 'bg-slate-600 text-white border-slate-200' : isDone ? 'bg-emerald-500 text-white border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'
+                         <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 font-medium text-[11px] shadow-sm ${
+                          isActive ? 'bg-slate-600 text-white border-slate-300' : isDone ? 'bg-emerald-500 text-white border-emerald-300' : 'bg-slate-50 text-slate-500 border-slate-200'
                         }`}>
                           {idx + 1}
                         </div>
                         {idx < TRIP_WORK_STEPS.length - 1 && (
-                          <div className={`h-0.5 flex-1 rounded-full mx-1.5 ${idx < workStepIndex ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                          <div className={`h-1 flex-1 rounded-full mx-1.5 ${idx < workStepIndex ? 'bg-slate-700' : 'bg-slate-200'}`} />
                         )}
                       </div>
-                      <p className={`mt-1 text-center -ml-2 text-[10px] font-black leading-tight ${isActive ? 'text-slate-800' : isDone ? 'text-slate-700' : 'text-slate-500'}`}>{label}</p>
+                      <p className={`mt-1 text-center text-[11px] font-medium leading-tight ${isActive ? 'text-slate-800' : isDone ? 'text-slate-700' : 'text-slate-500'}`}>{label}</p>
                     </div>
                   );
                 })}
@@ -2735,7 +2732,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 type="button"
                 onClick={handleStepBack}
                 disabled={!stepBackTarget}
-                className="mt-0 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-700"
+                className="mt-0 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-700"
                 title={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
                 aria-label={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
               >
@@ -2747,12 +2744,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="rounded-2xl border border-amber-200 bg-amber-50 overflow-hidden">
             <div className="px-4 pt-3 pb-1.5 flex items-center gap-2 text-amber-600">
               <AlertCircle size={15} />
-              <span className="text-xs font-black uppercase tracking-[0.1em]">
+              <span className="text-[11px] font-medium uppercase tracking-normal">
                 Driver Notes
               </span>
             </div>
-            <div className="px-4 pb-3.5 text-xs font-semibold text-slate-700 leading-relaxed">
-              {notes || 'No driver notes for this trip.'}
+            <div className="px-4 pb-3.5 text-xs font-medium text-amber-900 leading-relaxed">
+              {notes || <span className="italic text-amber-700">No driver notes for this trip.</span>}
             </div>
           </div>
         </div>
@@ -2770,7 +2767,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               type="button"
               onClick={bottomAction.onClick}
               disabled={!primary}
-              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-14 ${bottomAction.gradient} text-white rounded-2xl font-black text-base uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
+              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-12 ${bottomAction.gradient} text-white rounded-2xl font-semibold text-xs uppercase tracking-normal transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
             >
               {bottomAction.icon} {bottomAction.label}
             </button>
@@ -2779,7 +2776,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   type="button"
                   onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
-                  className="flex-[2] h-14 bg-emerald-500 border-2 border-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all text-xs font-black uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                  className="flex-[2] h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1 shadow-sm"
                 >
                   <MapPin size={14} /> {trip.status === 'In Progress' ? 'Here?' : 'At dropoff?'}
                 </button>
@@ -2787,7 +2784,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   type="button"
                   onClick={() => { impact('medium'); setSkipConfirmTripId(`work-${trip.id}`); }}
-                  className="flex-[2] h-14 bg-white border-2 border-slate-300 text-slate-600 rounded-2xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-black uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1"
+                  className="flex-[2] h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-2xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1"
                 >
                   <Forward size={14} /> Skip Nav
                 </button>
@@ -2823,7 +2820,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="w-20 h-20 bg-white rounded-[2rem] shadow-lg flex items-center justify-center mx-auto mb-6">
             <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
           </div>
-          <h2 className="text-lg font-black text-slate-900">Loading profile...</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Loading profile...</h2>
           <p className="text-slate-500 text-xs font-semibold mt-1">Connecting to your driver account</p>
         </div>
       </div>
@@ -2860,9 +2857,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 onClick={() => handleCall(phoneNumbers?.dispatcher || '', 'Dispatcher')}
                 disabled={!phoneNumbers?.dispatcher}
                 title="Call Dispatcher"
-                className="h-7 px-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 text-[10px] font-bold disabled:opacity-50"
+                className="h-8 px-2.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 text-[12px] font-medium disabled:opacity-50"
+                aria-label="Call Dispatcher"
               >
-                <Phone size={11} />
+                <Phone size={12} />
                 <span className="inline">DISP</span>
               </button>
               <button
@@ -2870,9 +2868,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 onClick={() => handleCall(phoneNumbers?.routing || '', 'Routing')}
                 disabled={!phoneNumbers?.routing}
                 title="Call Routing"
-                className="h-7 px-2 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1 text-[10px] font-bold disabled:opacity-50"
+                className="h-8 px-2.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1.5 text-[12px] font-medium disabled:opacity-50"
+                aria-label="Call Routing"
               >
-                <Phone size={11} />
+                <Phone size={12} />
                 <span className="inline">ROUT</span>
               </button>
             </div>
@@ -2930,28 +2929,28 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 shadow-sm space-y-2">
               <div className="flex items-center gap-2">
                 <Forward size={15} className="text-amber-700" />
-                <h3 className="text-xs font-black uppercase tracking-wider text-amber-900">Incoming Transfer Request</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900">Incoming Transfer Request</h3>
               </div>
               {incomingTransferTrips.map((trip) => (
                 <div key={`incoming-${trip.id}`} className="rounded-xl bg-white border border-amber-100 p-3">
-                  <p className="text-sm font-black text-slate-900">{trip.patient || 'Trip'} · {to12hr(trip.time)}</p>
+                  <p className="text-sm font-semibold text-slate-900">{trip.patient || 'Trip'} · {to12hr(trip.time)}</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {trip.transferRequest?.fromDriverName || 'Driver'}: {trip.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-9 rounded-xl text-xs font-black ${transferDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white'}`}>Accept</button>
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-9 rounded-xl text-xs font-black ${transferDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-[12px] font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 text-white'}`}>Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-[12px] font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
                   </div>
-                  {transferDisabled && <p className="text-[10px] text-amber-600 font-semibold mt-1">Clock in to respond</p>}
+                  {transferDisabled && <p className="text-[12px] text-amber-600 font-medium mt-1">Clock in to respond</p>}
                 </div>
               ))}
               {incomingTransferRoutes.map((route) => (
                 <div key={`incoming-route-${route.id}`} className="rounded-xl bg-white border border-amber-100 p-3">
-                  <p className="text-sm font-black text-slate-900">{route.name || 'Route Plan'} · {(route.sequence || []).length} stops</p>
+                  <p className="text-sm font-semibold text-slate-900">{route.name || 'Route Plan'} · {(route.sequence || []).length} stops</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {route.transferRequest?.fromDriverName || 'Driver'}: {route.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-9 rounded-xl text-xs font-black ${transferDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-0' : 'bg-emerald-600 text-white'}`}>Accept</button>
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-9 rounded-xl text-xs font-black ${transferDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-[12px] font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-emerald-600 text-white'}`}>Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-[12px] font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
                   </div>
-                  {transferDisabled && <p className="text-[10px] text-amber-600 font-semibold mt-1">Clock in to respond</p>}
+                  {transferDisabled && <p className="text-[12px] text-amber-600 font-medium mt-1">Clock in to respond</p>}
                 </div>
               ))}
             </div>
@@ -2968,8 +2967,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <Route size={18} className="text-white" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-black text-purple-900">Assigned Route Plan</h4>
-                      <p className="text-xs font-bold text-purple-700">
+                      <h4 className="text-sm font-semibold text-purple-900">Assigned Route Plan</h4>
+                      <p className="text-xs font-semibold text-purple-700">
                         {(assignedSequence.assignedByRole === 'dispatcher' || assignedSequence.assignedByRole === 'admin')
                           ? `Dispatcher assigned a route plan (${assignedSequence.sequence.length} stops)`
                           : `Your saved route plan (${assignedSequence.sequence.length} stops)`}
@@ -2979,17 +2978,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         const firstTrip = firstStop ? trips.find(trip => trip.id === firstStop.clientId) : null;
                         const firstTime = firstTrip?.time || firstStop?.time;
                         if (!firstTime) return null;
-                        return (
-                          <div className="flex items-center gap-1.5 mt-1.5">
-                            <Clock size={11} className="text-purple-500" />
-                            <span className="text-xs font-black text-purple-800">{to12hr(firstTime)}</span>
-                            {firstStop?.type === 'PU' && <span className="text-[10px] font-bold text-purple-500">Pickup</span>}
-                          </div>
-                        );
-                      })()}
+                          return (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <Clock size={12} className="text-purple-500" />
+                              <span className="text-xs font-semibold text-purple-800">{to12hr(firstTime)}</span>
+                              {firstStop?.type === 'PU' && <span className="text-[12px] font-medium text-purple-600">Pickup</span>}
+                            </div>
+                          );
+                        })()}
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-200 text-purple-800 border border-purple-300 shrink-0">
+                  <span className="px-2.5 py-1 rounded-full text-[12px] font-medium uppercase tracking-wide bg-purple-200 text-purple-800 border border-purple-300 shrink-0">
                     {assignedSequence.statusLabel || 'Assigned Today'}
                   </span>
                 </div>
@@ -3003,32 +3002,32 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           driverAcknowledgedAt: new Date().toISOString(),
                         }, 'Route Accepted', `${currentUser} accepted route "${assignedSequence.name || 'Assigned Route'}".`);
                       }}
-                      className="px-3 py-2 bg-white text-purple-700 text-[10px] font-bold rounded-lg border-2 border-purple-300 shadow-sm hover:bg-purple-50 active:scale-95 transition-all"
+                      className="px-3 py-2 bg-white text-purple-700 text-[12px] font-medium rounded-lg border-2 border-purple-300 shadow-sm hover:bg-purple-50 active:scale-95 transition-all"
                     >
                       Accept
                     </button>
                   )}
                   <button
                     onClick={() => { void startAssignedRoute(); }}
-                    className="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-black rounded-lg shadow-md hover:from-blue-600 hover:to-purple-700 active:scale-95 transition-all"
+                    className="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-[12px] font-medium rounded-lg shadow-md hover:from-blue-600 hover:to-purple-700 active:scale-95 transition-all"
                   >
                     {assignedSequence.statusKey === ROUTE_ASSIGNMENT_STATUS.ACCEPTED ? 'Start Route' : 'Start Guided'}
                   </button>
                   <button
                     onClick={() => setShowAssignedRouteDetails(prev => !prev)}
-                    className="px-3 py-2 bg-white text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 shadow-sm"
+                    className="px-3 py-2 bg-white text-slate-700 text-[12px] font-medium rounded-lg border border-slate-200 shadow-sm"
                   >
                     {showAssignedRouteDetails ? 'Hide Details' : 'Open Details'}
                   </button>
                   <button
                     onClick={() => openTransferPrompt('route', assignedSequence)}
-                    className="px-3 py-2 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-lg border border-amber-200 shadow-sm"
+                    className="px-3 py-2 bg-amber-50 text-amber-700 text-[12px] font-medium rounded-lg border border-amber-200 shadow-sm"
                   >
                     Transfer
                   </button>
                   <button
                     onClick={() => setPasswordPrompt({ type: 'dismiss_route', assignedSequence, trip: {} })}
-                    className="px-3 py-2 bg-white text-rose-700 text-[10px] font-bold rounded-lg border border-rose-200 shadow-sm"
+                    className="px-3 py-2 bg-white text-rose-700 text-[12px] font-medium rounded-lg border border-rose-200 shadow-sm"
                   >
                     Dismiss
                   </button>
@@ -3044,16 +3043,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       return (
                         <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-slate-100 shadow-sm">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">{idx + 1}</span>
+                            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 text-white flex items-center justify-center text-[12px] font-medium shrink-0">{idx + 1}</span>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="text-xs font-bold text-slate-800 truncate">{stopName}</span>
-                                <span className="text-[10px] font-semibold text-slate-500 shrink-0">({s.type === 'PU' ? 'Pickup' : 'Dropoff'})</span>
+                                <span className="text-xs font-medium text-slate-800 truncate">{stopName}</span>
+                                <span className="text-[12px] font-medium text-slate-500 shrink-0">({s.type === 'PU' ? 'Pickup' : 'Dropoff'})</span>
                               </div>
-                              {stopAddress && <p className="text-[10px] font-semibold text-slate-400 truncate">{stopAddress}</p>}
+                              {stopAddress && <p className="text-[12px] font-medium text-slate-500 truncate">{stopAddress}</p>}
                             </div>
                           </div>
-                          {stopTime && <span className="text-sm font-black text-purple-700 shrink-0 ml-2">{to12hr(stopTime)}</span>}
+                          {stopTime && <span className="text-sm font-semibold text-purple-700 shrink-0 ml-2">{to12hr(stopTime)}</span>}
                         </div>
                       );
                     })}
@@ -3078,26 +3077,26 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-3 shadow-md shadow-indigo-200/40 sticky top-0" style={{ zIndex: 10 }}>
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-black text-white">{headerStepIndex + 1}</span>
-                    <span className="text-xs font-bold text-white/80 uppercase tracking-wider">of {headerStepTotal}</span>
+                    <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-semibold text-white">{headerStepIndex + 1}</span>
+                    <span className="text-xs font-semibold text-white/80 uppercase tracking-wide">of {headerStepTotal}</span>
                   </div>
-                  <button onClick={() => { setGuidedMode(false); }} className="text-xs text-white/60 font-bold uppercase hover:text-white/90">Exit</button>
+                  <button onClick={() => { setGuidedMode(false); }} className="text-xs text-white/70 font-medium uppercase hover:text-white/90">Exit</button>
                 </div>
                 <div className="h-1 bg-white/20 rounded-full overflow-hidden mb-1.5">
                   <div className="h-full bg-white rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-white truncate flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.5 rounded bg-white/20 text-[10px] uppercase tracking-wider">{(headerRouteStop?.type || currentStep.type) === 'PU' ? 'Pickup' : 'Dropoff'}</span>
+                  <p className="text-xs font-semibold text-white truncate flex-1 min-w-0 flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded bg-white/20 text-[12px] font-medium uppercase tracking-wide">{(headerRouteStop?.type || currentStep.type) === 'PU' ? 'Pickup' : 'Dropoff'}</span>
                     <span className="truncate">{headerRouteStop?.name || currentTrip?.patient || 'Route stop'}</span>
-                    <span className="text-white/60 font-medium ml-1 text-xs shrink-0">· {headerRouteWorkflow?.status || (currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : 'In route')}</span>
+                    <span className="text-white/70 font-medium ml-1 text-xs shrink-0">· {headerRouteWorkflow?.status || (currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : 'In route')}</span>
                   </p>
                   {hasRoutePlanGuidedStops && currentRoutePlanStopIndex + 1 < assignedRoutePlanStops.length ? (
-                    <span className="text-[10px] text-white/50 font-bold ml-2 shrink-0 uppercase tracking-wider">
+                    <span className="text-[12px] text-white/70 font-medium ml-2 shrink-0 uppercase tracking-wide">
                       Next: {assignedRoutePlanStops[currentRoutePlanStopIndex + 1]?.type || 'PU'} {assignedRoutePlanStops[currentRoutePlanStopIndex + 1]?.name || 'Stop'}
                     </span>
                   ) : nextStep && nextTrip && (
-                    <span className="text-[10px] text-white/50 font-bold ml-2 shrink-0 uppercase tracking-wider">
+                    <span className="text-[12px] text-white/70 font-medium ml-2 shrink-0 uppercase tracking-wide">
                       Next: {nextStep.type === 'PU' ? 'PU' : 'DO'} {nextTrip.patient}
                     </span>
                   )}
@@ -3112,7 +3111,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="flex items-start gap-2">
                 <AlertTriangle size={14} className="text-rose-600 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-rose-800">{conflicts.length} time conflict{conflicts.length > 1 ? 's' : ''}</p>
+                  <p className="text-xs font-semibold text-rose-800">{conflicts.length} time conflict{conflicts.length > 1 ? 's' : ''}</p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {conflicts.map((c, i) => (
                       <span key={i} className="text-xs text-rose-700 bg-white/60 rounded-lg px-2 py-0.5">{c.aName} · {c.bName}</span>
@@ -3129,7 +3128,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="flex items-start gap-2">
                 <Repeat size={14} className="text-emerald-600 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-emerald-800">Ride-share possible</p>
+                  <p className="text-xs font-semibold text-emerald-800">Ride-share possible</p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {aiRideShare.map((r, i) => (
                       <span key={i} className="text-xs text-emerald-700 bg-white/60 rounded-lg px-2 py-0.5">{r.tripA.patient} + {r.tripB.patient}</span>
@@ -3146,7 +3145,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               {onAddTrip && (
                 <button
                   onClick={() => setShowAddTripModal && setShowAddTripModal(true)}
-                  className="h-7 w-[90px] text-[9px] text-white font-bold flex items-center justify-center gap-1 active:scale-95 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg shadow-sm"
+                  className="h-8 w-[100px] text-[12px] text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg shadow-sm"
                 >
                   <Plus size={9} /> Add Trip
                 </button>
@@ -3190,7 +3189,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     setActiveNav('tools');
                     setShowToast({ type: 'success', message: `${stops.length} addresses added to Route Plan.` });
                   }}
-                  className="h-7 w-[90px] text-[9px] text-white font-bold flex items-center justify-center gap-1 active:scale-95 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg shadow-sm"
+                  className="h-8 w-[105px] text-[12px] text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg shadow-sm"
                 >
                   <Route size={9} /> Add to Plan
                 </button>
@@ -3199,18 +3198,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     setSequencerTripFilter(selectedTrips);
                     setShowSequencerModal(true);
                   }}
-                  className="h-7 w-[90px] text-[9px] text-white font-bold flex items-center justify-center gap-1 active:scale-95 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-sm"
+                  className="h-8 w-[100px] text-[12px] text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-sm"
                 >
                   <Route size={9} /> Sequencer
                 </button>
                 </>
               )}
               {activeTrips.length > 0 && (
-                <button onClick={exportDailyLog} className="h-7 w-[90px] text-[9px] text-white font-bold flex items-center justify-center gap-1 active:scale-95 bg-gradient-to-r from-slate-600 to-slate-700 rounded-lg shadow-sm">
-                  <Download size={9} /> Export
+                <button onClick={exportDailyLog} className="h-8 w-[100px] text-[12px] text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-slate-600 to-slate-700 rounded-lg shadow-sm">
+                  <Download size={11} /> Export
                 </button>
               )}
-              <span className="text-[10px] text-slate-300 font-medium ml-0.5">{activeTrips.length} trip{activeTrips.length !== 1 ? 's' : ''}</span>
+              <span className="text-[12px] text-white/70 font-medium ml-0.5">{activeTrips.length} trip{activeTrips.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
 
@@ -3220,7 +3219,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="w-20 h-20 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-[2rem] flex items-center justify-center mx-auto mb-5 shadow-inner">
                 <CheckCircle2 size={36} className="text-emerald-400" />
               </div>
-              <h3 className="text-lg font-black text-slate-900">All Clear</h3>
+              <h3 className="text-lg font-semibold text-slate-900">All Clear</h3>
               <p className="text-slate-500 text-xs font-semibold mt-1.5 max-w-[200px] mx-auto leading-relaxed">No trips assigned. Your manifest is up to date.</p>
             </div>
           ) : hasRoutePlanGuidedStops ? (
@@ -3246,15 +3245,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   return (
                     <div key={`${getRoutePlanStopKey(stop)}-done`} className="relative pl-12 pr-2">
                       <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
-                        <Check size={10} className="text-white font-black" />
+                        <Check size={10} className="text-white font-semibold" />
                       </div>
                       <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl px-3 py-2 opacity-80 flex items-center gap-2">
-                        <span className={`text-xs font-black ${doneClass}`}>{doneLabel}</span>
+                        <span className={`text-xs font-semibold ${doneClass}`}>{doneLabel}</span>
                         <span className="text-sm font-semibold text-slate-600 truncate">{stop.name || `Stop ${index + 1}`}</span>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); undoRoutePlanStopProgress(stop); }}
-                          className="ml-auto h-7 px-2 rounded-lg border border-amber-200 bg-white text-[10px] font-black text-amber-700 flex items-center gap-1 hover:bg-amber-50 transition-all"
+                          className="ml-auto h-8 px-2.5 rounded-lg border border-amber-200 bg-white text-[12px] font-medium text-amber-700 flex items-center gap-1.5 hover:bg-amber-50 transition-all"
+                          aria-label="Undo stop"
                         >
                           <RotateCcw size={11} /> Undo
                         </button>
@@ -3266,18 +3266,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isUpcoming) {
                   return (
                     <div key={`${getRoutePlanStopKey(stop)}-upcoming`} className="relative pl-12 pr-2 opacity-55">
-                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
-                        <span className="text-[9px] font-black text-slate-500">{index + 1}</span>
+                      <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                        <span className="text-[11px] font-medium text-slate-500">{index + 1}</span>
                       </div>
                       <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className={`w-1.5 h-4 rounded-full ${stopType === 'DO' ? 'bg-orange-400' : 'bg-blue-400'}`} />
-                            <span className="text-sm font-bold text-slate-800 truncate">{stop.name || `Stop ${index + 1}`}</span>
+                            <span className="text-sm font-semibold text-slate-900 truncate">{stop.name || `Stop ${index + 1}`}</span>
                           </div>
-                          <p className="text-[11px] font-semibold text-slate-400 truncate mt-0.5">{address || 'Address pending'}</p>
+                          <p className="text-[11px] font-medium text-slate-500 truncate mt-0.5">{address || 'Address pending'}</p>
                         </div>
-                        <span className={`text-xs font-black ${stopType === 'DO' ? 'text-orange-600' : 'text-blue-600'}`}>{stopType}</span>
+                        <span className={`text-xs font-medium ${stopType === 'DO' ? 'text-orange-600' : 'text-blue-600'}`}>{stopType}</span>
                       </div>
                     </div>
                   );
@@ -3305,18 +3305,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 return (
                   <div key={`${getRoutePlanStopKey(stop)}-current`} className="relative pl-12 pr-2 my-4">
                     <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-[#23568E] border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
-                      <span className="text-xs font-black text-white">{index + 1}</span>
+                      <span className="text-xs font-semibold text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200">
                       <div className="bg-[#23568E] px-4 py-3 text-white">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="px-2 py-0.5 rounded-lg bg-white/15 text-[10px] font-black tracking-wider uppercase">{stopType === 'DO' ? 'Dropoff' : 'Pickup'}</span>
-                            <span className="text-sm font-black truncate">{stop.name || `Stop ${index + 1}`}</span>
+                            <span className="px-2 py-0.5 rounded-lg bg-white/15 text-[12px] font-medium tracking-wide uppercase">{stopType === 'DO' ? 'Dropoff' : 'Pickup'}</span>
+                            <span className="text-sm font-semibold truncate">{stop.name || `Stop ${index + 1}`}</span>
                           </div>
                           <div className="shrink-0 text-right">
-                            <span className="block text-[10px] font-black text-blue-100">#{stopTripId || `STOP ${index + 1}`}</span>
-                            <span className="block text-[9px] font-bold text-white/50">STOP {index + 1}/{assignedRoutePlanStops.length}</span>
+                            <span className="block text-[12px] font-medium text-white/80">#{stopTripId || `STOP ${index + 1}`}</span>
+                            <span className="block text-[12px] font-medium text-white/70">STOP {index + 1}/{assignedRoutePlanStops.length}</span>
                           </div>
                         </div>
                         <div className="h-1 bg-white/20 rounded-full overflow-hidden">
@@ -3324,25 +3324,27 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         </div>
                       </div>
                       <div className="p-4">
-                        <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${stopType === 'DO' ? 'text-orange-600' : 'text-blue-600'}`}>
+                        <p className={`text-[12px] font-medium uppercase tracking-wide mb-1 ${stopType === 'DO' ? 'text-orange-600' : 'text-blue-600'}`}>
                           {stopType === 'DO' ? 'Dropoff Address' : 'Pickup Address'}
                         </p>
-                        <p className="text-base font-black leading-tight text-slate-900">{address || 'Address pending'}</p>
+                        <p className="text-base font-semibold leading-tight text-slate-900">{address || 'Address pending'}</p>
                         {stopPhone && (
                           <div className="mt-3 flex items-center gap-2">
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleCall(stopPhone, stop.name || `Stop ${index + 1}`); }}
-                              className="h-10 flex-1 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 text-xs font-black flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all"
+                              className="h-11 flex-1 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 text-[12px] font-medium flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all"
                               title="Call client"
+                              aria-label="Call client"
                             >
                               <Phone size={14} /> Call
                             </button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleSMS(stopPhone, stop.name || `Stop ${index + 1}`); }}
-                              className="h-10 flex-1 rounded-xl border border-blue-100 bg-blue-50 text-blue-700 text-xs font-black flex items-center justify-center gap-2 hover:bg-blue-100 transition-all"
+                              className="h-11 flex-1 rounded-xl border border-blue-100 bg-blue-50 text-blue-700 text-[12px] font-medium flex items-center justify-center gap-2 hover:bg-blue-100 transition-all"
                               title="SMS client"
+                              aria-label="SMS client"
                             >
                               <MessageCircle size={14} /> SMS
                             </button>
@@ -3356,20 +3358,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             ))}
                           </div>
                           <div className="flex items-center justify-between mb-3">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Required Step</span>
-                            <span className="text-[10px] font-black text-slate-500">Step {displayStep} of 5</span>
+                            <span className="text-[12px] font-medium uppercase tracking-wide text-slate-600">Required Step</span>
+                            <span className="text-[12px] font-medium text-slate-600">Step {displayStep} of 5</span>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-500 mb-3">
-                            <div className="rounded-xl bg-white px-2 py-1.5 border border-slate-100">Started: {workflow.startedAt ? new Date(workflow.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Pending'}</div>
-                            <div className="rounded-xl bg-white px-2 py-1.5 border border-slate-100">Arrived: {workflow.arrivedAt ? new Date(workflow.arrivedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Pending'}</div>
-                            <div className="rounded-xl bg-white px-2 py-1.5 border border-slate-100">Odometer: {workflow.odometer ? `${Number(workflow.odometer).toLocaleString()} mi` : 'Pending'}</div>
-                            <div className="rounded-xl bg-white px-2 py-1.5 border border-slate-100">Signature: {workflow.paperSignatureConfirmed ? 'Confirmed' : 'Pending'}</div>
+                          <div className="grid grid-cols-2 gap-3 text-[12px] font-medium text-slate-600 mb-3">
+                            <div className="rounded-xl bg-white px-3 py-2 border border-slate-200">Started: {workflow.startedAt ? new Date(workflow.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Pending'}</div>
+                            <div className="rounded-xl bg-white px-3 py-2 border border-slate-200">Arrived: {workflow.arrivedAt ? new Date(workflow.arrivedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Pending'}</div>
+                            <div className="rounded-xl bg-white px-3 py-2 border border-slate-200">Odometer: {workflow.odometer ? `${Number(workflow.odometer).toLocaleString()} mi` : 'Pending'}</div>
+                            <div className="rounded-xl bg-white px-3 py-2 border border-slate-200">Signature: {workflow.paperSignatureConfirmed ? 'Confirmed' : 'Pending'}</div>
                           </div>
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); if (!nextAction.disabled) nextAction.onClick(); }}
                             disabled={nextAction.disabled}
-                            className={`w-full h-12 rounded-xl text-white text-sm font-black flex items-center justify-center gap-2 transition-all shadow-sm ${nextAction.disabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : nextAction.className}`}
+                            className={`w-full h-12 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm ${nextAction.disabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : nextAction.className}`}
                           >
                             {nextAction.icon} {nextAction.label}
                           </button>
@@ -3377,7 +3379,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleNavigateRoutePlanStop(stop); }}
-                              className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-black flex items-center justify-center gap-2 hover:bg-slate-50 transition-all"
+                              className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-slate-50 transition-all"
                             >
                               <Navigation size={13} /> Open Navigation
                             </button>
@@ -3386,7 +3388,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); undoRoutePlanStopProgress(stop); }}
-                              className="mt-2 w-full h-10 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-xs font-black flex items-center justify-center gap-2 hover:bg-amber-100 transition-all"
+                              className="mt-2 w-full h-10 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-amber-100 transition-all"
                             >
                               <RotateCcw size={13} /> Undo Last Step
                             </button>
@@ -3395,26 +3397,29 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'No Show', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
-                              className="h-10 rounded-xl border border-orange-200 bg-white text-orange-700 text-[10px] font-black flex items-center justify-center gap-1.5 hover:bg-orange-50 transition-all"
+                              className="h-11 rounded-xl border border-orange-200 bg-white text-orange-700 text-[12px] font-medium flex items-center justify-center gap-1.5 hover:bg-orange-50 transition-all"
                               title="No Show"
+                              aria-label="Mark as No Show"
                             >
-                              <AlertCircle size={13} /> No Show
+                              <AlertCircle size={14} /> No Show
                             </button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'Cancelled', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
-                              className="h-10 rounded-xl border border-rose-200 bg-white text-rose-700 text-[10px] font-black flex items-center justify-center gap-1.5 hover:bg-rose-50 transition-all"
+                              className="h-11 rounded-xl border border-rose-200 bg-white text-rose-700 text-[12px] font-medium flex items-center justify-center gap-1.5 hover:bg-rose-50 transition-all"
                               title="Cancel stop"
+                              aria-label="Cancel stop"
                             >
-                              <XCircle size={13} /> Cancel
+                              <XCircle size={14} /> Cancel
                             </button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'Rerouted', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
-                              className="h-10 rounded-xl border border-purple-200 bg-white text-purple-700 text-[10px] font-black flex items-center justify-center gap-1.5 hover:bg-purple-50 transition-all"
+                              className="h-11 rounded-xl border border-purple-200 bg-white text-purple-700 text-[12px] font-medium flex items-center justify-center gap-1.5 hover:bg-purple-50 transition-all"
                               title="Rerouted"
+                              aria-label="Mark as Rerouted"
                             >
-                              <RefreshCw size={13} /> Reroute
+                              <RefreshCw size={14} /> Reroute
                             </button>
                           </div>
                         </div>
@@ -3438,10 +3443,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   return (
                     <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2">
                       <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
-                        <Check size={10} className="text-white font-black" />
+                        <Check size={10} className="text-white font-semibold" />
                       </div>
                       <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl px-3 py-2 opacity-60 flex items-center gap-2">
-                         <span className="text-xs font-bold text-emerald-700">{step.type === 'PU' ? 'Picked Up' : 'Dropped Off'}</span>
+                         <span className="text-xs font-semibold text-emerald-700">{step.type === 'PU' ? 'Picked Up' : 'Dropped Off'}</span>
                          <span className="text-sm font-semibold text-slate-600 truncate">{trip.patient}</span>
                       </div>
                     </div>
@@ -3451,15 +3456,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isUpcoming) {
                   return (
                     <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 opacity-50">
-                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
-                        <span className="text-[9px] font-black text-slate-500">{index + 1}</span>
+                      <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                        <span className="text-[11px] font-medium text-slate-500">{index + 1}</span>
                       </div>
                       <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between">
                          <div className="flex items-center gap-2 min-w-0">
                            <div className={`w-1.5 h-4 rounded-full ${step.type === 'PU' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                           <span className="text-sm font-bold text-slate-800 truncate">{trip.patient}</span>
+                           <span className="text-sm font-semibold text-slate-900 truncate">{trip.patient}</span>
                          </div>
-                         <span className={`text-xs font-bold ${step.type === 'PU' ? 'text-emerald-600' : 'text-rose-600'} opacity-70`}>{to12hr(trip.time)}</span>
+                         <span className={`text-xs font-medium ${step.type === 'PU' ? 'text-emerald-600' : 'text-rose-600'} opacity-70`}>{to12hr(trip.time)}</span>
                       </div>
                     </div>
                   );
@@ -3485,19 +3490,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       ))}
                     </div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider ${labelColor}`}>
+                      <span className={`text-[12px] font-semibold uppercase tracking-wide ${labelColor}`}>
                         {isDropoffPhase ? 'Dropoff Phase' : 'Pickup Phase'}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-500">
+                      <span className="text-[12px] font-medium text-slate-500">
                         Step {Math.min(currentStepIdx + 1, totalGuidedSteps)} of {totalGuidedSteps}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }} className={`flex-1 h-10 ${gradient} text-xs text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }} className={`flex-1 h-11 ${gradient} text-sm text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
                         {icon} {label}
                       </button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="h-10 px-3 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-[10px] font-bold shrink-0 cursor-pointer">No Show</button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="h-10 px-3 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-[10px] font-bold shrink-0 cursor-pointer">Cancel</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="h-11 px-4 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-[12px] font-medium shrink-0 cursor-pointer">No Show</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="h-11 px-4 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-[12px] font-medium shrink-0 cursor-pointer">Cancel</button>
                     </div>
                   </div>
                 );
@@ -3505,24 +3510,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 return (
                   <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 my-4">
                     <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-indigo-500 border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
-                      <span className="text-xs font-black text-white">{index + 1}</span>
+                      <span className="text-xs font-semibold text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
                        <div className={`px-3 py-2 border-b flex items-center justify-between ${step.type === 'PU' ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
-                         <div className="flex items-center gap-2">
-                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider uppercase text-white ${step.type === 'PU' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                             {step.type === 'PU' ? 'Pickup' : 'Dropoff'}
-                           </span>
-                           <span className="text-sm font-black text-slate-800">{trip.patient}</span>
-                         </div>
-                         <span className={`text-xs font-black ${step.type === 'PU' ? 'text-emerald-600' : 'text-rose-600'}`}>{to12hr(trip.time)}</span>
-                       </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2.5 py-1 rounded-md text-[12px] font-medium tracking-wide uppercase text-white ${step.type === 'PU' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                              {step.type === 'PU' ? 'Pickup' : 'Dropoff'}
+                            </span>
+                            <span className="text-sm font-semibold text-slate-900">{trip.patient}</span>
+                          </div>
+                          <span className={`text-sm font-semibold ${step.type === 'PU' ? 'text-emerald-600' : 'text-rose-600'}`}>{to12hr(trip.time)}</span>
+                        </div>
 
-                       <div className="px-3 py-3">
-                         <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${step.type === 'PU' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                           {step.type === 'PU' ? 'Pickup Address' : 'Dropoff Address'}
-                         </p>
-                          <p className={`text-base font-bold leading-tight ${step.type === 'PU' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        <div className="px-3 py-3">
+                          <p className={`text-[12px] font-semibold uppercase tracking-wide mb-1 ${step.type === 'PU' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            {step.type === 'PU' ? 'Pickup Address' : 'Dropoff Address'}
+                          </p>
+                          <p className={`text-base font-semibold leading-tight ${step.type === 'PU' ? 'text-emerald-700' : 'text-rose-700'}`}>
                             {step.type === 'PU' ? trip.pickup : trip.dropoff}
                           </p>
 
@@ -3532,22 +3537,22 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             const ps = getContactRoleIcon(pc.role);
                             return (
                               <div className="flex items-center gap-2 mt-2 mb-1">
-                                <div className={`flex items-center gap-1.5 ${ps.color} text-xs font-bold`}>
-                                  <Phone size={11} /> {pc.label}
+                                <div className={`flex items-center gap-1.5 ${ps.color} text-[12px] font-medium`}>
+                                  <Phone size={12} /> {pc.label}
                                 </div>
-                                <span className="text-sm font-bold text-slate-800">{formatPhoneDisplay(pc.phone)}</span>
-                                <button type="button" onClick={() => navigator.clipboard.writeText(pc.phone)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" title="Copy number">
-                                  <Copy size={11} />
+                                <span className="text-sm font-semibold text-slate-900">{formatPhoneDisplay(pc.phone)}</span>
+                                <button type="button" onClick={() => navigator.clipboard.writeText(pc.phone)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-600 transition-colors" title="Copy number" aria-label="Copy phone number">
+                                  <Copy size={12} />
                                 </button>
                               </div>
                             );
                           })()}
 
                           <div className="flex items-center gap-2 mt-3 mb-4">
-                            <button type="button" onClick={(e) => { e.stopPropagation(); openInNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff, suggestNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff)); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"><Navigation size={12}/> Navigate</button>
-                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartCall(trip); }} className="w-10 h-8 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-all"><Phone size={14}/></button>
-                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="w-10 h-8 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all"><MessageCircle size={14}/></button>
-                         </div>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); openInNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff, suggestNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff)); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[12px] font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all" aria-label="Navigate"><Navigation size={14}/> Navigate</button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartCall(trip); }} className="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-100" aria-label="Call"><Phone size={15}/></button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="w-11 h-11 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all hover:bg-blue-100" aria-label="Send SMS"><MessageCircle size={15}/></button>
+                          </div>
 
                           {(() => {
 
@@ -3575,7 +3580,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                 return renderPrimaryBtn('Complete Trip', <Check size={14} />, 'bg-red-600 hover:bg-red-700', () => { impact('heavy'); openCompleteModal(trip); });
                               }
                             }
-                            return <div className="text-center text-xs text-slate-400 italic bg-slate-50 rounded-xl py-2">No action required for this step.</div>;
+                            return <div className="text-center text-[12px] text-slate-500 italic bg-slate-50 rounded-xl py-2.5">No action required for this step.</div>;
                           })()}
                        </div>
                     </div>
@@ -3621,14 +3626,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     {showInOutHeader && (
                       <div className="flex items-center gap-2 px-1 pt-4 pb-2">
                         <div className="h-px flex-1 bg-emerald-200" />
-                        <span className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">IN/OUT - Stay with client about {IN_OUT_WAIT_MINUTES} min</span>
+                        <span className="text-[12px] font-medium text-emerald-700 uppercase tracking-wide">IN/OUT — Stay with client about {IN_OUT_WAIT_MINUTES} min</span>
                         <div className="h-px flex-1 bg-emerald-200" />
                       </div>
                     )}
                     {showWcHeader && (
                       <div className="flex items-center gap-2 px-1 pt-4 pb-2">
                         <div className="h-px flex-1 bg-slate-200" />
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Will Call / No Time</span>
+                        <span className="text-[12px] font-semibold text-slate-500 uppercase tracking-wide">Will Call / No Time</span>
                         <div className="h-px flex-1 bg-slate-200" />
                       </div>
                     )}
@@ -3715,46 +3720,47 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                       advanceWorkflow(trip, cardStepBackTarget.status, cardStepBackTarget.fields, { allowRegression: true });
                                     }
                                   }}
-                                  className="ml-2 w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-300 text-slate-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-all cursor-pointer shrink-0"
+                                  className="ml-2 w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-300 text-slate-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-all cursor-pointer shrink-0"
                                   title="Undo last step"
+                                  aria-label="Undo last workflow step"
                                 >
                                   <RotateCcw size={12} />
                                 </button>
                               )}
                             </div>
                             <div className="flex items-center justify-between mb-2">
-                              <span className={`text-xs font-bold uppercase tracking-wider ${labelColor}`}>
+                              <span className={`text-[12px] font-semibold uppercase tracking-wide ${labelColor}`}>
                                 {isDropoffPhase ? 'Dropoff Phase' : 'Pickup Phase'}
                               </span>
-                              <span className="text-xs font-bold text-slate-500">
+                              <span className="text-[12px] font-medium text-slate-500">
                                 Step {Math.min(currentStepIdx + 1, totalSteps)} of {totalSteps}
                               </span>
                             </div>
                             <div className="flex items-center gap-2 mb-2">
-                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-14 ${primary.gradient} text-base md:text-lg text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-14 ${primary.gradient} text-base md:text-lg text-white rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
                                 {primary.icon} {primary.label}
                               </button>
                               {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
                                 skipConfirmTripId === trip.id ? (
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); setSkipConfirmTripId(null); handleSkipNav(trip); }} className="flex-1 h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-sm">
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); setSkipConfirmTripId(null); handleSkipNav(trip); }} className="flex-1 h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-[12px] font-medium cursor-pointer flex items-center justify-center gap-1 shadow-sm">
                                     <MapPin size={14} /> {trip.status === 'In Progress' ? 'Arrived to pick up?' : 'Arrived to drop off?'}
                                   </button>
                                 ) : (
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); setSkipConfirmTripId(trip.id); }} className="flex-1 h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); setSkipConfirmTripId(trip.id); }} className="flex-1 h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-[12px] font-medium cursor-pointer flex items-center justify-center gap-1">
                                     <Forward size={14} /> Skip
                                   </button>
                                 )
                               )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="flex-1 h-10 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                <AlertCircle size={12} /> No Show
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="flex-1 h-11 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-[12px] font-medium cursor-pointer flex items-center justify-center gap-1.5">
+                                <AlertCircle size={13} /> No Show
                               </button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="flex-1 h-10 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                <XCircle size={12} /> Cancel
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="flex-1 h-11 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-[12px] font-medium cursor-pointer flex items-center justify-center gap-1.5">
+                                <XCircle size={13} /> Cancel
                               </button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleReroute(trip); }} className="flex-1 h-10 bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1">
-                                <RefreshCw size={12} /> Rerouted
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleReroute(trip); }} className="flex-1 h-11 bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-[12px] font-medium cursor-pointer flex items-center justify-center gap-1.5">
+                                <RefreshCw size={13} /> Rerouted
                               </button>
                             </div>
                           </div>
@@ -3779,7 +3785,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="relative z-10 w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="text-base font-black text-slate-950">Update Trip Time</h3>
+                <h3 className="text-base font-semibold text-slate-950">Update Trip Time</h3>
                 <p className="text-xs font-semibold text-slate-500 truncate">{scheduleEditorTrip.patient} #{scheduleEditorTrip.bookingId || scheduleEditorTrip.id}</p>
               </div>
               <button type="button" onClick={closeScheduleEditor} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center cursor-pointer"><X size={17} /></button>
@@ -3801,7 +3807,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       onClick={() => updateScheduleDraft('mode', mode.id)}
                       className={`rounded-2xl border px-3 py-3 text-left transition-all cursor-pointer ${active ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
                     >
-                      <p className="text-sm font-black uppercase tracking-wide">{mode.label}</p>
+                      <p className="text-sm font-semibold uppercase tracking-wide">{mode.label}</p>
                       <p className="text-[11px] font-semibold opacity-70 mt-0.5">{mode.hint}</p>
                     </button>
                   );
@@ -3810,15 +3816,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
               {(scheduleEditDraft.mode === 'time' || scheduleEditDraft.mode === 'inout' || scheduleEditDraft.mode === 'urgent') && (
                 <div>
-                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Pickup Time</label>
+                  <label className="text-[12px] font-medium uppercase tracking-wide text-slate-500">Pickup Time</label>
                   <input
                     type="time"
                     value={scheduleEditDraft.time || ''}
                     onChange={(e) => updateScheduleDraft('time', e.target.value)}
-                    className="mt-1 w-full h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-black text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+                    className="mt-1 w-full h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base     font-semibold text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
                   />
                   {scheduleEditDraft.mode === 'inout' && (
-                    <p className="mt-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
+                    <p className="mt-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-xs font-semibold text-emerald-700">
                       IN/OUT keeps the related B leg stacked under A leg and tells the driver to stay with the client about {IN_OUT_WAIT_MINUTES} minutes.
                     </p>
                   )}
@@ -3827,7 +3833,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
               {scheduleEditDraft.mode === 'willcall' && (
                 <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3">
-                  <p className="text-sm font-black text-slate-900">This trip will show as Will Call.</p>
+                  <p className="text-sm font-semibold text-slate-900">This trip will show as Will Call.</p>
                   <p className="text-xs font-semibold text-slate-500 mt-1">It will stay separate from timed trips and can be changed back later.</p>
                 </div>
               )}
@@ -3836,38 +3842,38 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 space-y-3">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[11px] font-black uppercase tracking-widest text-rose-600">Deadline Date</label>
+                      <label className="text-[12px] font-medium uppercase tracking-wide text-rose-600">Deadline Date</label>
                       <input
                         type="date"
                         value={scheduleEditDraft.deadlineDate || ''}
                         onChange={(e) => updateScheduleDraft('deadlineDate', e.target.value)}
-                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm font-black text-slate-900 outline-none focus:border-rose-400"
+                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm     font-semibold text-slate-900 outline-none focus:border-rose-400"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-black uppercase tracking-widest text-rose-600">Deadline Time</label>
+                      <label className="text-[12px] font-medium uppercase tracking-wide text-rose-600">Deadline Time</label>
                       <input
                         type="time"
                         value={scheduleEditDraft.deadlineTime || ''}
                         onChange={(e) => updateScheduleDraft('deadlineTime', e.target.value)}
-                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm font-black text-slate-900 outline-none focus:border-rose-400"
+                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm     font-semibold text-slate-900 outline-none focus:border-rose-400"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
                     <div>
-                      <label className="text-[11px] font-black uppercase tracking-widest text-rose-600">Required Within Hours</label>
+                      <label className="text-[12px] font-medium uppercase tracking-wide text-rose-600">Required Within Hours</label>
                       <input
                         type="number"
                         min="1"
                         step="0.5"
                         value={scheduleEditDraft.requiredWithinHours || ''}
                         onChange={(e) => updateScheduleDraft('requiredWithinHours', e.target.value)}
-                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm font-black text-slate-900 outline-none focus:border-rose-400"
+                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm     font-semibold text-slate-900 outline-none focus:border-rose-400"
                         placeholder="3"
                       />
                     </div>
-                    <button type="button" onClick={applyWithinHoursToDeadline} className="h-11 px-4 rounded-xl bg-rose-600 text-white text-xs font-black cursor-pointer">Apply</button>
+                    <button type="button" onClick={applyWithinHoursToDeadline} className="h-11 px-4 rounded-xl bg-rose-600 text-white text-xs font-semibold cursor-pointer">Apply</button>
                   </div>
                   {(() => {
                     const deadline = scheduleEditDraft.deadlineDate && scheduleEditDraft.deadlineTime
@@ -3879,7 +3885,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     const m = Math.abs(diff) % 60;
                     const text = `${h ? `${h}h ` : ''}${m}m`;
                     return (
-                      <p className="rounded-xl bg-white border border-rose-100 px-3 py-2 text-xs font-black text-rose-700">
+                      <p className="rounded-xl bg-white border border-rose-100 px-3 py-2 text-xs font-semibold text-rose-700">
                         Countdown: {diff < 0 ? `${text} late` : `${text} left`} - deadline {to12hrFromTimeInput(scheduleEditDraft.deadlineTime)}
                       </p>
                     );
@@ -3888,7 +3894,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               )}
 
               {scheduleEditError && (
-                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">{scheduleEditError}</p>
+                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{scheduleEditError}</p>
               )}
 
               <p className="text-xs font-semibold text-slate-500">
@@ -3897,8 +3903,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             <div className="px-5 pb-5 flex gap-3">
-              <button type="button" onClick={closeScheduleEditor} className="flex-1 h-12 rounded-2xl bg-white border border-slate-200 text-slate-700 font-bold cursor-pointer">Cancel</button>
-              <button type="button" onClick={saveScheduleEdit} className="flex-1 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black cursor-pointer">Save</button>
+              <button type="button" onClick={closeScheduleEditor} className="flex-1 h-12 rounded-2xl bg-white border border-slate-200 text-slate-700 font-semibold cursor-pointer">Cancel</button>
+              <button type="button" onClick={saveScheduleEdit} className="flex-1 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold cursor-pointer">Save</button>
             </div>
           </div>
         </div>
@@ -3913,24 +3919,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-200/50">
                   <MapPin size={28} className="text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">Arrived at Pickup</h3>
+                <h3 className="text-xl     font-semibold text-slate-900">Arrived at Pickup</h3>
                 <p className="text-sm text-slate-500 mt-1 font-medium">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
                 {lastOdometer > 0 && (
-                  <p className="text-sm text-slate-400 mt-2">Current odometer: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
+                  <p className="text-sm text-slate-500 mt-2">Current odometer: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
                 )}
               </div>
               <button type="button" onClick={() => setShowOdometerPrompt(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Current Odometer (mi)</label>
+                <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Current Odometer (mi)</label>
                 <input
                   type="number"
                   inputMode="numeric"
                   value={odometerValue}
                   onChange={(e) => setOdometerValue(e.target.value)}
                   placeholder='Enter full odometer reading'
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-blue-500 outline-none"
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-xl text-center focus:border-blue-500 outline-none"
                   autoFocus
                 />
                 {lastOdometer > 0 && odometerValue && parseInt(odometerValue, 10) < lastOdometer && (
@@ -3957,24 +3963,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="w-16 h-16 bg-[#23568E] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/20">
                   <Gauge size={28} className="text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">Arrived at Stop</h3>
+                <h3 className="text-xl     font-semibold text-slate-900">Arrived at Stop</h3>
                 <p className="text-sm text-slate-500 mt-1 font-medium">{routeStopOdometerPrompt.name || `Stop ${routeStopOdometerPrompt.sequenceIndex}`}</p>
                 {lastOdometer > 0 && (
-                  <p className="text-sm text-slate-400 mt-2">Current odometer: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
+                  <p className="text-sm text-slate-500 mt-2">Current odometer: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
                 )}
               </div>
               <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Odometer at Arrival</label>
+                <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Odometer at Arrival</label>
                 <input
                   type="number"
                   inputMode="numeric"
                   value={routeStopOdometerValue}
                   onChange={(e) => setRouteStopOdometerValue(e.target.value)}
                   placeholder="Enter odometer reading"
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xl text-center focus:border-blue-500 outline-none"
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-xl text-center focus:border-blue-500 outline-none"
                   autoFocus
                 />
               </div>
@@ -3996,7 +4002,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
                   <Check size={28} className="text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">Confirm Signature</h3>
+                <h3 className="text-xl     font-semibold text-slate-900">Confirm Signature</h3>
                 <p className="text-sm text-slate-500 mt-1 font-medium">{routeStopSignaturePrompt.name || `Stop ${routeStopSignaturePrompt.sequenceIndex}`}</p>
               </div>
               <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
@@ -4026,7 +4032,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
                   <MapPin size={28} className="text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">Arrived at Pickup</h3>
+                <h3 className="text-xl     font-semibold text-slate-900">Arrived at Pickup</h3>
                 <p className="text-sm text-slate-500 mt-1 font-medium">{showArrivalConfirm.patient}</p>
               </div>
               <button type="button" onClick={() => setShowArrivalConfirm(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
@@ -4034,28 +4040,28 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
             <div className="bg-slate-50 rounded-2xl p-5 mb-4 space-y-3">
               <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Odometer at Arrival (mi)</label>
+                <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Odometer at Arrival (mi)</label>
                 <input type="number" inputMode="numeric" value={arrivalOdometer} onChange={e => setArrivalOdometer(e.target.value)}
-                  className="w-full mt-1.5 p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none"
+                  className="w-full mt-1.5 p-3 bg-white border border-slate-200 rounded-xl font-semibold text-base text-center focus:border-blue-500 outline-none"
                 />
               </div>
               {showArrivalConfirm.bookingId && (
                 <div className="flex justify-between">
-                  <span className="text-xs text-slate-400 font-bold uppercase">Booking</span>
-                  <span className="text-sm font-bold text-slate-800">{showArrivalConfirm.bookingId}</span>
+                  <span className="text-xs text-slate-500 font-semibold uppercase">Booking</span>
+                  <span className="text-sm font-semibold text-slate-900">{showArrivalConfirm.bookingId}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-xs text-slate-400 font-bold uppercase">Client</span>
-                <span className="text-sm font-bold text-slate-800">{showArrivalConfirm.patient}</span>
+                <span className="text-xs text-slate-500 font-semibold uppercase">Client</span>
+                <span className="text-sm font-semibold text-slate-900">{showArrivalConfirm.patient}</span>
               </div>
               {showArrivalConfirm.pickupPhone && (() => {
                 const contact = getContactsForTrip(showArrivalConfirm).find(c => cleanPhone(c.phone) === cleanPhone(showArrivalConfirm.pickupPhone));
                 const label = contact ? contact.label : 'Contact';
                 return (
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-400 font-bold uppercase">{label}</span>
-                    <button type="button" onClick={() => handleCall(showArrivalConfirm.pickupPhone, `${label}: ${showArrivalConfirm.patient}`)} className="text-sm font-bold text-blue-600 flex items-center gap-1 hover:underline cursor-pointer">
+                    <span className="text-xs text-slate-500 font-semibold uppercase">{label}</span>
+                    <button type="button" onClick={() => handleCall(showArrivalConfirm.pickupPhone, `${label}: ${showArrivalConfirm.patient}`)} className="text-sm font-medium text-blue-600 flex items-center gap-1 hover:underline cursor-pointer">
                       <Phone size={14} /> {formatPhoneDisplay(showArrivalConfirm.pickupPhone)}
                     </button>
                   </div>
@@ -4063,7 +4069,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               })()}
               {showArrivalConfirm.notes && (
                 <div className="pt-3 border-t border-slate-200">
-                  <p className="text-xs text-slate-400 font-bold uppercase mb-1.5">Notes</p>
+                  <p className="text-xs text-slate-500 font-semibold uppercase mb-1.5">Notes</p>
                   <p className="text-sm text-slate-700">{showArrivalConfirm.notes}</p>
                 </div>
               )}
@@ -4092,7 +4098,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/20">
                   <Check size={28} className="text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">Begin Transport</h3>
+                <h3 className="text-xl     font-semibold text-slate-900">Begin Transport</h3>
                 <p className="text-sm text-slate-500 mt-1 font-medium">{showSignatureConfirm.patient}</p>
               </div>
               <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
@@ -4104,7 +4110,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <span className="font-medium">Obtain client signature before heading to dropoff.</span>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-                <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1.5">Signature Required</p>
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-1.5">Signature Required</p>
                 <button type="button" onClick={() => setSignatureConfirmed(!signatureConfirmed)} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer ${signatureConfirmed ? 'border-green-200 bg-green-50' : 'border-blue-100 bg-white'}`}>
                   <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${signatureConfirmed ? 'bg-green-500 border-green-500' : 'border-slate-300'}`}>
                     {signatureConfirmed && <Check size={12} className="text-white" />}
@@ -4131,38 +4137,38 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="w-12 h-12 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-lg shadow-emerald-600/20">
                   <Check size={20} className="text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">Complete Trip</h3>
+                <h3 className="text-xl     font-semibold text-slate-900">Complete Trip</h3>
                 <p className="text-sm text-slate-500 mt-1 font-medium">{showCompleteModal.patient} - {showCompleteModal.bookingId || ''}</p>
               </div>
 
               <div className="bg-slate-50 rounded-2xl p-4 mb-4 space-y-2.5">
                 <div className="flex justify-between items-center py-1">
-                  <span className="text-xs text-emerald-600 font-bold uppercase">Pickup Odometer</span>
-                  <span className="text-sm font-bold text-emerald-700">{showCompleteModal.pickupOdometer?.toLocaleString() || '-'} mi</span>
+                  <span className="text-xs text-emerald-600 font-semibold uppercase">Pickup Odometer</span>
+                  <span className="text-sm font-semibold text-emerald-700">{showCompleteModal.pickupOdometer?.toLocaleString() || '-'} mi</span>
                 </div>
                 <div className="flex justify-between items-center py-1">
-                  <span className="text-xs text-slate-400 font-bold uppercase">Started At</span>
-                  <span className="text-sm font-bold text-slate-800">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '-'}</span>
+                  <span className="text-xs text-slate-500 font-semibold uppercase">Started At</span>
+                  <span className="text-sm font-semibold text-slate-900">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '-'}</span>
                 </div>
                 <div>
-                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Departed Pickup Time</label>
+                  <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Departed Pickup Time</label>
                   <input type="time" value={departedTime} onChange={(e) => setDepartedTime(e.target.value)}
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1" />
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-base text-center focus:border-blue-500 outline-none mt-1" />
                 </div>
                 <div>
-                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500">Arrival Dropoff Time</label>
+                  <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Arrival Dropoff Time</label>
                   <input type="time" value={arrivalDropoffTime} onChange={(e) => setArrivalDropoffTime(e.target.value)}
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1" />
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-base text-center focus:border-blue-500 outline-none mt-1" />
                 </div>
                 <div>
-                  <label className="text-micro font-bold uppercase tracking-wider text-rose-600">Final Odometer (mi)</label>
+                  <label className="text-micro font-semibold uppercase tracking-wide text-rose-600">Final Odometer (mi)</label>
                   <input
                     type="number"
                     inputMode="numeric"
                     value={completeOdometer}
                     onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
                     placeholder="Enter final odometer"
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-base text-center focus:border-blue-500 outline-none mt-1.5"
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-base text-center focus:border-blue-500 outline-none mt-1.5"
                     autoFocus
                   />
                   {!completeOdometer && (
@@ -4172,12 +4178,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   )}
                 </div>
                 {completeError && (
-                  <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-bold text-rose-700">
+                  <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-semibold text-rose-700">
                     {completeError}
                   </p>
                 )}
                 {showCompleteModal.pickupOdometer && completeOdometer && (
-                  <div className="text-center text-sm text-blue-600 font-bold">
+                  <div className="text-center text-sm text-blue-600 font-medium">
                     Distance: {(parseInt(completeOdometer) - (showCompleteModal.pickupOdometer || 0)).toLocaleString()} mi
                   </div>
                 )}
@@ -4197,14 +4203,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 130 }}>
           <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
             <div className="flex-1">
-              <h2 className="font-bold text-sm text-slate-900 leading-tight">{showTripDetails.patient}</h2>
-              <p className="text-xs text-slate-400">{showTripDetails.bookingId || '—'}</p>
+              <h2 className="font-semibold text-sm text-slate-900 leading-tight">{showTripDetails.patient}</h2>
+              <p className="text-xs text-slate-500">{showTripDetails.bookingId || '—'}</p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => { handleEditTrip(showTripDetails); setShowTripDetails(null); }}
-                className="h-9 px-3 rounded-xl bg-blue-600 text-white text-xs font-bold flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                className="h-9 px-3 rounded-xl bg-blue-600 text-white text-xs font-semibold flex items-center gap-1.5 active:scale-95 cursor-pointer"
               >
                 <Edit2 size={13} /> Edit
               </button>
@@ -4223,11 +4229,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <User size={18} />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-sm font-black text-white uppercase tracking-wide truncate">{showTripDetails.patient || 'Trip'}</h3>
-                          <p className="text-xs font-black text-white/90 truncate">#{showTripDetails.bookingId || showTripDetails.id}</p>
+                          <h3 className="text-sm font-semibold text-white uppercase tracking-wide truncate">{showTripDetails.patient || 'Trip'}</h3>
+                          <p className="text-xs font-semibold text-white/90 truncate">#{showTripDetails.bookingId || showTripDetails.id}</p>
                         </div>
                       </div>
-                      <span className={`shrink-0 rounded-lg px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${statusMeta.bg}`}>
+                      <span className={`shrink-0 rounded-lg px-2.5 py-0.5 text-[12px] font-medium uppercase tracking-wide ${statusMeta.bg}`}>
                         {statusMeta.label}
                       </span>
                     </div>
@@ -4238,14 +4244,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             })()}
 
             <div className="grid grid-cols-3 gap-2">
-              <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Pickup</button>
-              <button type="button" onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Dropoff</button>
-              <button type="button" onClick={() => openContactSelector(showTripDetails)} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><PhoneForwarded size={12} /> Contacts</button>
+              <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Pickup</button>
+              <button type="button" onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Dropoff</button>
+              <button type="button" onClick={() => openContactSelector(showTripDetails)} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><PhoneForwarded size={12} /> Contacts</button>
             </div>
 
             {/* Smart Contacts Section */}
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
-              <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2"><PhoneForwarded size={14} /> Contacts</h3>
+              <h3 className="text-micro font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-2"><PhoneForwarded size={14} /> Contacts</h3>
               {(() => {
                 const contacts = getContactsForTrip(showTripDetails);
                 const warning = getContactWarning(showTripDetails, trips);
@@ -4280,8 +4286,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
-                                  <p className="text-sm font-bold text-slate-900 truncate">{contact.name}</p>
-                                  {contact.isPrimary && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">PRIMARY</span>}
+                                  <p className="text-sm     font-semibold text-slate-900 truncate">{contact.name}</p>
+                                  {contact.isPrimary && <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">PRIMARY</span>}
                                 </div>
                                 <p className="text-xs text-slate-500">{contact.label} · {formatPhoneDisplay(contact.phone)}</p>
                               </div>
@@ -4301,18 +4307,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               })()}
               {showTripDetails.notes && (
                 <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
-                  <p className="text-xs text-amber-600 uppercase font-bold mb-1">Notes</p>
+                  <p className="text-xs text-amber-600 uppercase font-medium mb-1">Notes</p>
                   <p className="text-xs text-amber-800">{showTripDetails.notes}</p>
                 </div>
               )}
             </div>
 
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
-              <h3 className="text-micro font-bold uppercase tracking-wider text-slate-500">Actions</h3>
+              <h3 className="text-micro font-semibold uppercase tracking-wide text-slate-500">Actions</h3>
               <div className="flex gap-2">
-                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={12} /> Google Maps</button>
-                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'waze')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Waze</button>
-                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'apple')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={12} /> Apple</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={12} /> Google Maps</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'waze')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Waze</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'apple')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={12} /> Apple</button>
               </div>
             </div>
           </div>
@@ -4423,8 +4429,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </button>
 
               <div className="h-8 px-2.5 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shrink-0" title={formatHistoryDayLabel(selectedHistoryDate)}>
-                <span className="text-xs font-black text-slate-900">{formatHistoryCompactDayLabel(selectedHistoryDate)}</span>
-                <span className="text-[10px] font-bold text-slate-400">({selectedHistoryDayTrips.length})</span>
+                <span className="text-xs font-semibold text-slate-900">{formatHistoryCompactDayLabel(selectedHistoryDate)}</span>
+                <span className="text-[12px] font-medium text-slate-500">({selectedHistoryDayTrips.length})</span>
               </div>
 
               <button
@@ -4473,7 +4479,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   type="button"
                   onClick={exportDailyLog}
-                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-all flex items-center justify-center shrink-0"
+                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all flex items-center justify-center shrink-0"
                   title="Export"
                   aria-label="Export history"
                 >
@@ -4484,19 +4490,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           </div>
 
           <div className="relative mb-3 px-1">
-            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
             <input type="text" placeholder="Search by patient, booking ID, address..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl font-medium text-xs outline-none focus:border-blue-400" />
-            {historySearch && <button onClick={() => setHistorySearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X size={14} /></button>}
+            {historySearch && <button onClick={() => setHistorySearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"><X size={14} /></button>}
           </div>
 
-          <div className="space-y-5">
+          <div className="space-y-2">
             {filteredHistory.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-12 text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner">
                   <Clock size={28} className="text-slate-300" />
                 </div>
-                <h3 className="text-base font-black text-slate-900">{historySearch ? 'No matching trips' : 'No history'}</h3>
+                <h3 className="text-base font-semibold text-slate-900">{historySearch ? 'No matching trips' : 'No history'}</h3>
                 <p className="text-slate-500 text-xs font-semibold mt-1">{historySearch ? 'Try a different search term.' : `No completed, cancelled, no-show, or rerouted trips found for ${formatHistoryDayLabel(selectedHistoryDate)}.`}</p>
               </div>
             ) : (
@@ -4518,12 +4524,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                 <User size={18} />
                               </div>
                               <div className="min-w-0">
-                                <h3 className="text-sm font-black text-white uppercase tracking-wide truncate">{trip.patient || 'Trip'}</h3>
-                                <p className="text-xs font-black text-white/90 truncate">#{trip.bookingId || trip.id}</p>
+                                <h3 className="text-sm font-semibold text-white uppercase tracking-wide truncate">{trip.patient || 'Trip'}</h3>
+                                <p className="text-xs font-semibold text-white/90 truncate">#{trip.bookingId || trip.id}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className={`rounded-lg px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${statusMeta.bg}`}>
+                              <span className={`rounded-lg px-2.5 py-0.5 text-[12px] font-medium uppercase tracking-wide ${statusMeta.bg}`}>
                                 {statusMeta.label}
                               </span>
                               <ChevronDown size={16} className="text-white/80" />
@@ -4547,11 +4553,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${statusMeta.iconBg}`}>
                             <StatusIcon size={13} />
                           </div>
-                          <span className="text-sm font-bold text-slate-900 truncate">{trip.patient}</span>
+                          <span className="text-sm     font-semibold text-slate-900 truncate">{trip.patient}</span>
                           <span className="text-[11px] font-mono text-blue-600 font-semibold shrink-0">#{trip.bookingId || trip.id}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-sm font-bold text-emerald-600">{to12hr(trip.time)}</span>
+                          <span className="text-sm font-semibold text-emerald-600">{to12hr(trip.time)}</span>
                           <span
                             className={`w-6 h-6 rounded-lg flex items-center justify-center ${statusMeta.bg}`}
                             title={statusMeta.label}
@@ -4559,7 +4565,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           >
                             <StatusIcon size={13} />
                           </span>
-                          {isExpanded ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
+                          {isExpanded ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
                         </div>
                       </div>
                     </div>
@@ -4583,7 +4589,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {activeNav === 'settings' && (
         <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
           <div className="px-1 pt-2 pb-3">
-            <h2 className="text-xl font-black text-slate-900">Settings</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Settings</h2>
             <p className="text-slate-500 text-xs font-semibold mt-0.5">Account and app preferences</p>
           </div>
           <div className="space-y-4 px-1">
@@ -4592,11 +4598,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.1),transparent_60%)]" />
               <div className="relative px-5 py-5">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl font-black text-white shadow-inner border border-white/10">
+                  <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl font-semibold text-white shadow-inner border border-white/10">
                     {String(me?.name || '?').charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-xl font-bold text-white truncate">{me?.name}</h2>
+                    <h2 className="text-xl font-semibold text-white truncate">{me?.name}</h2>
                     <p className="text-sm text-white/70 truncate">{displayLoginId}</p>
                     <p className="text-xs text-white/50 mt-0.5">{me?.vehicle || 'No vehicle'} • {me?.currentZone || '—'}</p>
                   </div>
@@ -4612,7 +4618,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     <BarChart3 size={18} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-900">Today's Analytics</p>
+                    <p className="text-sm     font-semibold text-slate-900">Today's Analytics</p>
                     <p className="text-slate-500 text-xs font-semibold">{analytics.tripsCompleted} trips completed</p>
                   </div>
                 </div>
@@ -4631,14 +4637,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       return (
                         <div key={stat.label} className={`${stat.bg} rounded-xl p-3 text-center`}>
                           <Icon size={16} className={`mx-auto mb-1 ${stat.color}`} />
-                          <p className="text-sm font-black text-slate-900">{stat.value}</p>
-                          <p className="text-micro font-bold uppercase tracking-wider text-slate-500">{stat.label}</p>
+                          <p className="text-sm font-semibold text-slate-900">{stat.value}</p>
+                          <p className="text-micro font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
                         </div>
                       );
                     })}
                   </div>
                   <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                    <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-2">Time Distribution</p>
+                    <p className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-2">Time Distribution</p>
                     <div className="space-y-1.5">
                       <div>
                         <div className="flex justify-between text-xs text-slate-500 mb-0.5">
@@ -4668,8 +4674,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-500">Odometer</p>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">{me?.odometer?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-400">mi</span></p>
+                  <p className="text-micro font-semibold uppercase tracking-wide text-slate-500">Odometer</p>
+                  <p className="text-2xl     font-semibold text-slate-900 mt-1">{me?.odometer?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-500">mi</span></p>
                   <p className="text-slate-500 text-xs font-semibold mt-1">Next service at {me?.nextOilChange?.toLocaleString() || '5,000'} mi</p>
                 </div>
                 <Gauge size={32} className="text-slate-200" />
@@ -4678,7 +4684,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
             {/* Vehicle Info */}
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
-              <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-3">Vehicle Info</p>
+              <p className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-3">Vehicle Info</p>
               <div className="space-y-2.5 text-sm">
                 {[
                   ['Vehicle', me?.vehicle || 'N/A'],
@@ -4689,7 +4695,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <div key={label} className="flex justify-between items-center">
                     <span className="text-slate-500 text-xs font-semibold">{label}</span>
                     {label === 'Status' ? (
-                      <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${getDriverLiveStatus(me).color}`}>{value}</span>
+                      <span className={`px-2 py-0.5 rounded font-medium text-[12px] ${getDriverLiveStatus(me).color}`}>{value}</span>
                     ) : (
                       <span className={`font-semibold text-xs ${value === 'Always On' ? 'text-emerald-600' : 'text-slate-800'}`}>{value}</span>
                     )}
@@ -4704,13 +4710,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               {me?.homeAddress ? (
                 <p className="text-xs text-slate-500 font-semibold mb-2">{me.homeAddress}</p>
               ) : (
-                <p className="text-xs text-slate-400 font-semibold mb-2">Enter your home address for commute time estimates.</p>
+                <p className="text-xs text-slate-500 font-semibold mb-2">Enter your home address for commute time estimates.</p>
               )}
               <div className="space-y-2">
                 <input type="text" value={editHomeAddress}
                   onChange={(e) => setEditHomeAddress(e.target.value)}
                   placeholder="123 Main St, City, State"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -4735,7 +4741,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         setShowToast({ type: 'info', message: 'Could not geocode. Address saved as text.' });
                       }
                     }}
-                    className="flex-1 h-9 rounded-xl bg-blue-600 text-white text-xs font-bold active:scale-95"
+                    className="flex-1 h-9 rounded-xl bg-blue-600 text-white text-xs font-semibold active:scale-95"
                   >
                     Save Address
                   </button>
@@ -4755,7 +4761,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         setShowToast({ type: 'info', message: 'GPS position not available yet.' });
                       }
                     }}
-                    className="h-9 px-3 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold active:scale-95 flex items-center gap-1"
+                    className="h-9 px-3 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold active:scale-95 flex items-center gap-1"
                     title="Use current GPS location"
                   >
                     <MapPin size={12} /> GPS
@@ -4793,35 +4799,35 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       a.href = url; a.download = `clock-history-${new Date().toISOString().slice(0, 10)}.csv`;
                       a.click(); URL.revokeObjectURL(url);
                     }}
-                    className="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                    className="text-[12px] font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1.5"
                   >
                     <Download size={12} /> CSV
                   </button>
                 )}
               </div>
               {clockHistory.days.length === 0 || clockHistory.days.every(d => !d.hasEvents) ? (
-                <p className="text-xs text-slate-400 text-center py-4">No clock in/out history yet.</p>
+                <p className="text-xs text-slate-500 text-center py-4">No clock in/out history yet.</p>
               ) : (
                 <>
                   <div className="overflow-x-auto -mx-1">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-slate-100">
-                          <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">Date</th>
-                          <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">In</th>
-                          <th className="text-left font-bold text-slate-500 pb-1.5 pr-2 uppercase tracking-wider">Out</th>
-                          <th className="text-right font-bold text-slate-500 pb-1.5 uppercase tracking-wider">Hrs</th>
-                          <th className="text-left font-bold text-slate-500 pb-1.5 uppercase tracking-wider">Location</th>
+                          <th className="text-left font-semibold text-slate-500 pb-1.5 pr-2 uppercase tracking-wide">Date</th>
+                          <th className="text-left font-semibold text-slate-500 pb-1.5 pr-2 uppercase tracking-wide">In</th>
+                          <th className="text-left font-semibold text-slate-500 pb-1.5 pr-2 uppercase tracking-wide">Out</th>
+                          <th className="text-right font-semibold text-slate-500 pb-1.5 uppercase tracking-wide">Hrs</th>
+                          <th className="text-left font-semibold text-slate-500 pb-1.5 uppercase tracking-wide">Location</th>
                         </tr>
                       </thead>
                       <tbody>
                         {clockHistory.days.map(day => (
                           <tr key={day.dateKey} className={`border-b border-slate-50 ${!day.hasEvents ? 'opacity-40' : ''}`}>
                             <td className="py-1.5 pr-2 font-semibold text-slate-700 whitespace-nowrap">{formatHistoryCompactDayLabel(day.dateKey)}</td>
-                            <td className="py-1.5 pr-2 font-bold text-slate-800 whitespace-nowrap">{day.clockIn ? formatClockTime(day.clockIn) : '—'}</td>
-                            <td className="py-1.5 pr-2 font-bold text-slate-800 whitespace-nowrap">{day.clockOut ? formatClockTime(day.clockOut) : '—'}</td>
-                            <td className="py-1.5 pr-2 text-right font-bold text-slate-700 whitespace-nowrap">{day.hours ? `${day.hours.toFixed(1)}h` : '—'}</td>
-                            <td className="py-1.5 text-[9px] font-mono text-slate-400 truncate max-w-[80px]">{day.inLocation || day.outLocation || '—'}</td>
+                            <td className="py-1.5 pr-2 font-semibold text-slate-800 whitespace-nowrap">{day.clockIn ? formatClockTime(day.clockIn) : '—'}</td>
+                            <td className="py-1.5 pr-2 font-semibold text-slate-800 whitespace-nowrap">{day.clockOut ? formatClockTime(day.clockOut) : '—'}</td>
+                            <td className="py-1.5 pr-2 text-right font-semibold text-slate-700 whitespace-nowrap">{day.hours ? `${day.hours.toFixed(1)}h` : '—'}</td>
+                            <td className="py-1.5 text-[11px] font-mono text-slate-500 truncate max-w-[80px]">{day.inLocation || day.outLocation || '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -4832,7 +4838,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     <span className={`font-bold ${clockHistory.weeklyOvertime > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
                       {clockHistory.weeklyTotal.toFixed(1)}h
                       {clockHistory.weeklyOvertime > 0 && (
-                        <span className="ml-2 text-[10px] text-rose-500">({clockHistory.weeklyOvertime.toFixed(1)}h OT)</span>
+                        <span className="ml-2 text-[12px] text-rose-500">({clockHistory.weeklyOvertime.toFixed(1)}h OT)</span>
                       )}
                     </span>
                   </div>
@@ -4855,7 +4861,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       onClick={() => onUpdateAppSettings?.({ navigationApp: option.value })}
                       className={`p-3 rounded-xl border text-left transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
                     >
-                      <div className="flex items-center gap-2 font-bold text-sm"><Navigation size={15} /> {option.label}</div>
+                      <div className="flex items-center gap-2 font-semibold text-sm"><Navigation size={15} /> {option.label}</div>
                     </button>
                   );
                 })}
@@ -4877,7 +4883,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       onClick={() => onUpdateAppSettings?.({ theme: option.value })}
                       className={`p-3 rounded-xl border text-left transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
                     >
-                      <div className="flex items-center gap-2 font-bold text-sm"><Icon size={15} /> {option.label}</div>
+                      <div className="flex items-center gap-2 font-semibold text-sm"><Icon size={15} /> {option.label}</div>
                     </button>
                   );
                 })}
@@ -4894,7 +4900,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     return (
                       <button key={option.value}
                         onClick={() => onUpdateAppSettings?.({ fontScale: option.value })}
-                        className={`p-3 rounded-xl border font-bold text-sm transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
+                        className={`p-3 rounded-xl border font-semibold text-sm transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
                       >
                         {option.label}
                       </button>
@@ -4923,7 +4929,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 size={24} className="text-emerald-600" />
             </div>
-            <h3 className="text-lg font-black text-slate-900 text-center">All trips complete!</h3>
+            <h3 className="text-lg font-semibold text-slate-900 text-center">All trips complete!</h3>
             <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
               You've finished all your trips. Would you like to clock out?
             </p>
@@ -4934,14 +4940,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </button>
 
               <div className="border-t border-slate-100 pt-3 mt-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 text-center">Schedule clock-out</p>
+                <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Schedule clock-out</p>
                 <div className="flex items-center gap-2">
                   <input type="time" value={delayedClockOutTarget}
                     onChange={(e) => setDelayedClockOutTarget(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
+                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
                   <button onClick={() => { if (delayedClockOutTarget) scheduleDelayedClockOut(delayedClockOutTarget); else setShowToast({ type: 'info', message: 'Select a time first.' }); }}
                     disabled={!delayedClockOutTarget}
-                    className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs transition active:scale-95">
+                    className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-medium text-[12px] transition active:scale-95">
                     Set Time
                   </button>
                 </div>
@@ -4949,15 +4955,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
               {clockOutEstimate && (
                 <div className="border-t border-slate-100 pt-3 mt-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 text-center">Estimate from home</p>
-                  <button onClick={() => scheduleDelayedClockOut(clockOutEstimate.targetTime)} className="w-full h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition active:scale-95 flex items-center justify-center gap-2">
+                  <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Estimate from home</p>
+                  <button onClick={() => scheduleDelayedClockOut(clockOutEstimate.targetTime)} className="w-full h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-[12px] transition active:scale-95 flex items-center justify-center gap-2">
                     <Navigation size={12} /> Clock out in ~{clockOutEstimate.label}
                   </button>
                 </div>
               )}
             </div>
 
-            <button onClick={() => { setShowClockOutOffer(false); clockOutOfferedRef.current = false; }} className="w-full h-10 text-xs font-bold text-slate-400 hover:text-slate-600 mt-3 transition">
+            <button onClick={() => { setShowClockOutOffer(false); clockOutOfferedRef.current = false; }} className="w-full h-10 text-[12px] font-medium text-slate-500 hover:text-slate-700 mt-3 transition">
               Dismiss
             </button>
           </div>
@@ -4971,7 +4977,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
               <LogOut size={24} className="text-slate-600" />
             </div>
-            <h3 className="text-lg font-black text-slate-900 text-center">No upcoming trips</h3>
+            <h3 className="text-lg font-semibold text-slate-900 text-center">No upcoming trips</h3>
             <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
               You don't have any trips right now. Would you like to clock out?
             </p>
@@ -4979,7 +4985,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <button onClick={() => { setShowIdleLogoutPrompt(false); handleClockToggle(); }} className="h-12 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition active:scale-95">
                 Clock Out
               </button>
-              <button onClick={() => { setShowIdleLogoutPrompt(false); idlePromptedRef.current = true; }} className="h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition active:scale-95">
+              <button onClick={() => { setShowIdleLogoutPrompt(false); idlePromptedRef.current = true; }} className="h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition active:scale-95">
                 Stay On
               </button>
             </div>
@@ -5007,7 +5013,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
               <div className={`px-5 py-4 bg-gradient-to-r ${gradientFrom} text-white flex items-center justify-between`}>
                 <div>
-                  <h3 className="text-base font-bold">{actionLabel} Trip Legs</h3>
+                  <h3 className="text-base font-semibold">{actionLabel} Trip Legs</h3>
                   <p className="text-xs text-white/70 mt-0.5">{cancelPrompt.trip.patient} — {cancelPrompt.legs.length} leg{cancelPrompt.legs.length !== 1 ? 's' : ''}</p>
                 </div>
                 <button type="button" onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
@@ -5017,7 +5023,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${allSelected ? 'bg-rose-500 border-rose-500' : 'border-slate-300'}`}>
                     {allSelected && <Check size={12} className="text-white" />}
                   </div>
-                  <span className="text-sm font-bold text-slate-900">Select All ({cancelPrompt.legs.length})</span>
+                  <span className="text-sm     font-semibold text-slate-900">Select All ({cancelPrompt.legs.length})</span>
                 </button>
                 {cancelPrompt.legs.map((leg, idx) => {
                   const isSelected = selectedLegsForAction.has(leg.id);
@@ -5029,10 +5035,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       </div>
                       <div className="flex-1 min-w-0 text-left">
                         <div className="flex items-center gap-2">
-                          <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black ${cancelPrompt.type === 'noshow' ? 'bg-amber-100 text-amber-600' : cancelPrompt.type === 'reroute' ? 'bg-purple-100 text-purple-600' : 'bg-rose-100 text-rose-600'}`}>L{idx + 1}</span>
-                          <span className="text-sm font-bold text-slate-900 truncate">{leg.patient}</span>
-                          {leg.bookingId && <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-[9px] font-bold shrink-0">{leg.bookingId}</span>}
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
+                          <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-medium ${cancelPrompt.type === 'noshow' ? 'bg-amber-100 text-amber-600' : cancelPrompt.type === 'reroute' ? 'bg-purple-100 text-purple-600' : 'bg-rose-100 text-rose-600'}`}>L{idx + 1}</span>
+                          <span className="text-sm     font-semibold text-slate-900 truncate">{leg.patient}</span>
+                          {leg.bookingId && <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-[11px] font-semibold shrink-0">{leg.bookingId}</span>}
+                          <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
                           <span className="truncate">{leg.pickup}</span>
@@ -5081,7 +5087,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
               <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-bold">Restore Trip Legs</h3>
+                  <h3 className="text-base font-semibold">Restore Trip Legs</h3>
                   <p className="text-xs text-white/70 mt-0.5">{restorePrompt.trip.patient} — {restorePrompt.legs.length} leg{restorePrompt.legs.length !== 1 ? 's' : ''}</p>
                 </div>
                 <button type="button" onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
@@ -5091,7 +5097,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${allSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}>
                     {allSelected && <Check size={12} className="text-white" />}
                   </div>
-                  <span className="text-sm font-bold text-slate-900">Select All ({restorePrompt.legs.length})</span>
+                  <span className="text-sm     font-semibold text-slate-900">Select All ({restorePrompt.legs.length})</span>
                 </button>
                 {restorePrompt.legs.map((leg, idx) => {
                   const isSelected = selectedLegsForAction.has(leg.id);
@@ -5103,10 +5109,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       </div>
                       <div className="flex-1 min-w-0 text-left">
                         <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[9px] font-black">L{idx + 1}</span>
-                          <span className="text-sm font-bold text-slate-900 truncate">{leg.patient}</span>
-                          {leg.bookingId && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-[9px] font-bold shrink-0">{leg.bookingId}</span>}
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
+                          <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[11px] font-medium">L{idx + 1}</span>
+                          <span className="text-sm     font-semibold text-slate-900 truncate">{leg.patient}</span>
+                          {leg.bookingId && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-[11px] font-semibold shrink-0">{leg.bookingId}</span>}
+                          <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
                           <span className="truncate">{leg.pickup}</span>
@@ -5145,7 +5151,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-200">
                   <Forward size={24} className="text-white" />
                 </div>
-                <h3 className="text-lg font-black text-slate-900">Emergency Transfer</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Emergency Transfer</h3>
                 <p className="text-xs font-semibold text-slate-500 mt-1">
                   Send this {transferPrompt.type === 'route' ? 'route plan' : 'trip'} to another driver for acceptance.
                 </p>
@@ -5154,8 +5160,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Send To Driver</label>
-                <select value={transferTargetDriverId} onChange={(e) => setTransferTargetDriverId(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:border-amber-500 outline-none">
+                <label className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">Send To Driver</label>
+                <select value={transferTargetDriverId} onChange={(e) => setTransferTargetDriverId(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-sm focus:border-amber-500 outline-none">
                   <option value="">Select driver</option>
                   {transferTargetDrivers.map((driver) => (
                     <option key={driver.id} value={driver.id}>{driver.name || driver.email || driver.id}</option>
@@ -5163,8 +5169,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 </select>
               </div>
               <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Reason</label>
-                <select value={transferReason} onChange={(e) => setTransferReason(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:border-amber-500 outline-none">
+                <label className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">Reason</label>
+                <select value={transferReason} onChange={(e) => setTransferReason(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-sm focus:border-amber-500 outline-none">
                   <option value="">Select reason</option>
                   <option value="Traffic delay">Traffic delay</option>
                   <option value="Vehicle issue">Vehicle issue</option>
@@ -5178,7 +5184,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setTransferPrompt(null)} className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={() => setPasswordPrompt({ type: 'transfer_send' })} disabled={!transferTargetDriverId} className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-sm disabled:opacity-40 transition-all cursor-pointer">Send</button>
+                <button type="button" onClick={() => setPasswordPrompt({ type: 'transfer_send' })} disabled={!transferTargetDriverId} className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold text-sm disabled:opacity-40 transition-all cursor-pointer">Send</button>
               </div>
             </div>
           </div>
@@ -5194,13 +5200,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="h-1 flex-1 rounded-full bg-emerald-400" />
               <div className={`h-1 flex-1 rounded-full ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-400' : 'bg-rose-400'}`} />
             </div>
-            <p className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-4 text-center">Step 2 of 2</p>
+            <p className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-4 text-center">Step 2 of 2</p>
             <div className="flex items-start justify-between mb-5">
               <div className="text-center flex-1">
                 <div className={`w-14 h-14 bg-gradient-to-br rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'from-blue-600 to-blue-500' : 'from-rose-600 to-rose-500'}`}>
                   <Lock size={24} className="text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">Confirm {passwordPrompt.type === 'route_stop_exception' ? passwordPrompt.status : passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Reroute' : passwordPrompt.type === 'restore' ? 'Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Edit' : passwordPrompt.type === 'transfer_send' ? 'Transfer' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Cancel'}</h3>
+                <h3 className="text-lg     font-semibold text-slate-900">Confirm {passwordPrompt.type === 'route_stop_exception' ? passwordPrompt.status : passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Reroute' : passwordPrompt.type === 'restore' ? 'Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Edit' : passwordPrompt.type === 'transfer_send' ? 'Transfer' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Cancel'}</h3>
                 <p className="text-xs text-slate-500 mt-1">{passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Enter your password to save your trip changes' : String(passwordPrompt.type || '').includes('transfer') ? 'Enter your password to confirm this transfer decision.' : passwordPrompt.type === 'route_stop_exception' ? `Enter your password to mark ${passwordPrompt.trip?.patient || 'this route stop'} as ${passwordPrompt.status}.` : `Enter your password to mark ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Rerouted' : 'Cancelled'}`}</p>
                 {passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 && (
                   <p className="text-xs text-rose-500 font-semibold mt-1">{passwordPrompt.selectedLegIds.length} leg{passwordPrompt.selectedLegIds.length !== 1 ? 's' : ''} will be affected</p>
@@ -5211,7 +5217,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="space-y-4">
               {passwordPrompt.type !== 'restore' && passwordPrompt.type !== 'edittrip' && passwordPrompt.type !== 'edittripcomplete' && !String(passwordPrompt.type || '').includes('transfer') && (
                 <div>
-                  <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Reason</label>
+                  <label className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">Reason</label>
                   <select value={passwordPrompt.reason || ''} onChange={(e) => setPasswordPrompt(prev => ({ ...prev, reason: e.target.value }))}
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm focus:border-rose-500 outline-none">
                     <option value="">Select reason (optional)</option>
@@ -5226,14 +5232,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 </div>
               )}
               <div>
-                <label className="text-micro font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Password</label>
+                <label className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">Password</label>
                 <input
                   type="password"
                   value={passwordValue}
                   onChange={(e) => setPasswordValue(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && verifyPasswordAndProceed()}
                   placeholder="Enter password"
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-center focus:border-rose-500 outline-none"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-rose-500 outline-none"
                   autoFocus
                 />
                 {passwordError && <p className="text-xs text-rose-600 font-semibold mt-1 text-center">{passwordError}</p>}
@@ -5273,7 +5279,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-base font-bold">Contact for Trip</h3>
+                    <h3 className="text-base font-semibold">Contact for Trip</h3>
                     <p className="text-xs text-white/70 mt-0.5">{showContactSelector.patient} · {to12hr(showContactSelector.time)}</p>
                   </div>
                   <button type="button" onClick={() => setShowContactSelector(null)} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
@@ -5298,7 +5304,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     <button
                       type="button"
                       onClick={() => { handleCall(primary.phone, `${primary.label}: ${primary.name}`); setShowContactSelector(null); }}
-                      className={`w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer shadow-sm ${ps.bg} ${ps.color} border ${ps.border}`}>
+                      className={`w-full h-12 rounded-xl font-semibold text-sm flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer shadow-sm ${ps.bg} ${ps.color} border ${ps.border}`}>
                       <IconComp size={18} /> Call {primary.label} — {formatPhoneDisplay(primary.phone)}
                     </button>
                   </div>
@@ -5319,8 +5325,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-slate-900 truncate">{contact.name}</span>
-                            {contact.isPrimary && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">PRIMARY</span>}
+                            <span className="text-sm     font-semibold text-slate-900 truncate">{contact.name}</span>
+                            {contact.isPrimary && <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">PRIMARY</span>}
                           </div>
                           <p className="text-xs text-slate-500">{contact.label} · {formatPhoneDisplay(contact.phone)}</p>
                         </div>
@@ -5329,14 +5335,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <button
                           type="button"
                           onClick={() => { handleCall(contact.phone, `${contact.label}: ${contact.name}`); setShowContactSelector(null); }}
-                          className="flex-1 h-8 bg-emerald-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
+                          className="flex-1 h-9 bg-emerald-600 text-white rounded-lg text-[12px] font-medium flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
                           <Phone size={12} /> {actions.callLabel}
                         </button>
                         {actions.smsLabel && (
                           <button
                             type="button"
                             onClick={() => { handleSMS(contact.phone, contact.name); setShowContactSelector(null); }}
-                            className="flex-1 h-8 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
+                            className="flex-1 h-8 bg-blue-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
                             <MessageCircle size={12} /> {actions.smsLabel}
                           </button>
                         )}
@@ -5351,7 +5357,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   type="button"
                   onClick={() => { handleSmartCall(showContactSelector); setShowContactSelector(null); }}
-                  className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer">
+                  className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer">
                   <Phone size={14} /> Quick Call Primary Contact
                 </button>
               </div>
@@ -5384,10 +5390,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         className={`transition-all duration-200 ${isActiveTab ? 'text-[#1b5cb7]' : 'text-[#94a3b8]'}`}
                       />
                       {item.id === 'chat' && chatUnreadCount > 0 && (
-                        <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-bold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>
+                        <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-semibold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>
                       )}
                     </div>
-                    <span className={`max-w-full truncate text-[10px] tracking-[0.04em] transition-all leading-none ${isActiveTab ? 'text-[#1b5cb7] font-bold' : 'text-[#94a3b8] font-medium'}`}>{item.label}</span>
+                    <span className={`max-w-full truncate text-[12px] tracking-wide transition-all leading-none ${isActiveTab ? 'text-[#1b5cb7] font-semibold' : 'text-[#94a3b8] font-medium'}`}>{item.label}</span>
                   </button>
                 );
               })}
@@ -5397,7 +5403,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* Offline Queue Indicator */}
       {offlineQueue.length > 0 && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-amber-600 text-white px-4 py-2 rounded-2xl shadow-lg text-xs font-bold flex items-center gap-2" style={{ zIndex: 100 }}>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-amber-600 text-white px-4 py-2 rounded-2xl shadow-lg text-xs font-semibold flex items-center gap-2" style={{ zIndex: 100 }}>
           <WifiOff size={12} />
           {offlineQueue.length} pending sync
         </div>
@@ -5409,7 +5415,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
             <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
-              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <h2 className="text-sm     font-semibold text-slate-900 flex items-center gap-2">
                 <Route size={16} className="text-indigo-700" /> Route Sequencer
               </h2>
               <button onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); setRoutePlanSequencerOrigin(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
@@ -5464,7 +5470,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
             <div className="bg-white w-full max-w-lg rounded-3xl p-5 relative shadow-2xl max-h-[85vh] overflow-y-auto pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-slate-900">{patientName}</h3>
+                <h3 className="text-lg     font-semibold text-slate-900">{patientName}</h3>
                 <button type="button" onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200 cursor-pointer"><X size={16} /></button>
               </div>
               <p className="text-slate-500 text-xs font-semibold mb-4">{legs.length} leg{legs.length !== 1 ? 's' : ''}</p>
@@ -5472,23 +5478,23 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 {legs.map((leg, idx) => (
                   <div key={leg.id} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-micro font-bold uppercase tracking-wider text-slate-500">Leg {idx + 1}</span>
-                      <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${leg.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : leg.status === 'In Transit' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{leg.status}</span>
+                      <span className="text-micro font-semibold uppercase tracking-wide text-slate-500">Leg {idx + 1}</span>
+                      <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${leg.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : leg.status === 'In Transit' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{leg.status}</span>
                     </div>
                     <p className="text-slate-500 text-xs font-semibold mb-1">Booking: {leg.bookingId || '—'}</p>
                     <div className="space-y-1.5">
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-600">Pickup</p>
+                          <p className="text-xs font-medium text-slate-600">Pickup</p>
                           <p className="text-sm text-slate-500 truncate">{leg.pickup}</p>
-                          <p className="text-xs text-slate-400">{leg.time ? to12hr(leg.time) : ''}</p>
+                          <p className="text-xs text-slate-500">{leg.time ? to12hr(leg.time) : ''}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
                         <div className="w-3 h-3 rounded-full bg-rose-500 shrink-0 mt-0.5" />
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-600">Dropoff</p>
+                          <p className="text-xs font-medium text-slate-600">Dropoff</p>
                           <p className="text-sm text-slate-500 truncate">{leg.dropoff}</p>
                         </div>
                       </div>
@@ -5499,8 +5505,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       const label = contact ? contact.label : 'Contact';
                       return (
                         <div className="mt-1.5 flex items-center gap-2">
-                          <span className="text-micro font-bold uppercase tracking-wider text-slate-500">{label}</span>
-                          <button type="button" onClick={() => handleCall(leg.pickupPhone, `${label}: ${leg.patient}`)} className="text-xs text-blue-600 font-bold flex items-center gap-1 hover:underline cursor-pointer">
+                          <span className="text-micro font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+                          <button type="button" onClick={() => handleCall(leg.pickupPhone, `${label}: ${leg.patient}`)} className="text-xs text-blue-600 font-medium flex items-center gap-1 hover:underline cursor-pointer">
                             <Phone size={10} /> {formatPhoneDisplay(leg.pickupPhone)}
                           </button>
                         </div>
@@ -5527,7 +5533,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="bg-white rounded-3xl w-full max-w-lg max-h-[80vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
               <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between rounded-t-3xl z-10">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">{showLegsModal[0]?.patient || 'Trip Legs'}</h3>
+                  <h3 className="text-base     font-semibold text-slate-900">{showLegsModal[0]?.patient || 'Trip Legs'}</h3>
                   <p className="text-xs text-slate-500 mt-0.5">{showLegsModal.length} leg{showLegsModal.length !== 1 ? 's' : ''} today</p>
                 </div>
                 <button type="button" onClick={() => setShowLegsModal(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-all cursor-pointer shrink-0">
@@ -5539,12 +5545,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <div key={leg.id} className="border border-slate-100 rounded-xl p-3 hover:border-slate-200 transition-colors">
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-400 font-mono">#{leg.bookingId || leg.id}</span>
+                        <span className="text-xs font-medium text-slate-600 font-mono">#{leg.bookingId || leg.id}</span>
                         {leg.wheelchair && leg.wheelchair !== 'WLK' && (
-                          <span className="text-[9px] font-bold bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded">{leg.wheelchair}</span>
+                          <span className="text-[11px] font-semibold bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded">{leg.wheelchair}</span>
                         )}
                       </div>
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${statusColor(leg.status)}`}>{leg.status}</span>
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${statusColor(leg.status)}`}>{leg.status}</span>
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-start gap-2 text-xs">
@@ -5552,7 +5558,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="flex-1 min-w-0">
                           <p className="text-slate-900 font-semibold leading-tight">{leg.pickupSite || 'Pickup'}</p>
                           <p className="text-slate-500 truncate leading-tight">{leg.pickup}</p>
-                          {leg.pickupPhone && <p className="text-slate-400 text-[9px] font-mono mt-0.5">{leg.pickupPhone}</p>}
+                          {leg.pickupPhone && <p className="text-slate-500 text-[11px] font-mono mt-0.5">{leg.pickupPhone}</p>}
                         </div>
                       </div>
                       <div className="flex items-start gap-2 text-xs">
@@ -5560,11 +5566,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="flex-1 min-w-0">
                           <p className="text-slate-900 font-semibold leading-tight">{leg.dropoffSite || 'Dropoff'}</p>
                           <p className="text-slate-500 truncate leading-tight">{leg.dropoff}</p>
-                          {leg.dropoffPhone && <p className="text-slate-400 text-[9px] font-mono mt-0.5">{leg.dropoffPhone}</p>}
+                          {leg.dropoffPhone && <p className="text-slate-500 text-[11px] font-mono mt-0.5">{leg.dropoffPhone}</p>}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-1.5 text-[9px] text-slate-400">
+                    <div className="flex items-center gap-2 mt-1.5 text-[11px] text-slate-500">
                       {leg.time && <span>{leg.time}</span>}
                       {leg.distance && <><span>•</span><span>{leg.distance} mi</span></>}
                     </div>
@@ -5584,20 +5590,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <MapPin size={20} className="text-blue-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold">{showToast.message}</p>
+              <p className="text-sm font-medium">{showToast.message}</p>
             </div>
             {showToast.action === 'arrive-pickup' && (
-              <button type="button" onClick={() => { setShowToast(null); handleArrivePickup(showToast.trip); }} className="px-4 py-2 bg-blue-500 rounded-xl text-xs font-bold hover:bg-blue-400 transition-all shrink-0 cursor-pointer">
+              <button type="button" onClick={() => { setShowToast(null); handleArrivePickup(showToast.trip); }} className="px-4 py-2 bg-blue-500 rounded-xl text-xs font-semibold hover:bg-blue-400 transition-all shrink-0 cursor-pointer">
                 Arrive
               </button>
             )}
             {showToast.action === 'arrive-dropoff' && (
-              <button type="button" onClick={() => { setShowToast(null); handleArriveDropoff(showToast.trip); }} className="px-4 py-2 bg-orange-500 rounded-xl text-xs font-bold hover:bg-orange-400 transition-all shrink-0 cursor-pointer">
+              <button type="button" onClick={() => { setShowToast(null); handleArriveDropoff(showToast.trip); }} className="px-4 py-2 bg-orange-500 rounded-xl text-xs font-semibold hover:bg-orange-400 transition-all shrink-0 cursor-pointer">
                 Arrive
               </button>
             )}
             {showToast.action === 'geofence-clockout' && (
-              <button type="button" onClick={() => { setShowToast(null); handleClockToggle(); }} className="px-4 py-2 bg-rose-500 rounded-xl text-xs font-bold hover:bg-rose-400 transition-all shrink-0 cursor-pointer">
+              <button type="button" onClick={() => { setShowToast(null); handleClockToggle(); }} className="px-4 py-2 bg-rose-500 rounded-xl text-xs font-semibold hover:bg-rose-400 transition-all shrink-0 cursor-pointer">
                 Clock Out
               </button>
             )}
@@ -5621,23 +5627,23 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         <div className="fixed bottom-32 left-2 z-[60] min-w-[200px] max-w-[220px] rounded-lg border border-slate-300 bg-slate-950/90 p-2.5 text-[10px] font-mono text-white shadow-xl backdrop-blur">
           <div className="space-y-1">
             <div className="flex items-center justify-between border-b border-white/10 pb-1 mb-1">
-              <span className="font-bold text-[9px] uppercase tracking-wider text-slate-400">GPS Debug</span>
+              <span className="font-bold text-[9px] uppercase tracking-wider text-slate-500">GPS Debug</span>
               <button type="button" onClick={() => setShowDebugPanel(false)} className="text-white/50 hover:text-white"><X size={10} /></button>
             </div>
             <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
-              <span className="text-slate-400">Status</span>
+              <span className="text-slate-500">Status</span>
               <span className={isGpsTracking ? 'text-emerald-400' : 'text-rose-400'}>{isGpsTracking ? 'Tracking' : 'Idle'}</span>
-              <span className="text-slate-400">Online</span>
+              <span className="text-slate-500">Online</span>
               <span className={isOnline ? 'text-emerald-400' : 'text-rose-400'}>{isOnline ? 'Yes' : 'No'}</span>
-              <span className="text-slate-400">Lat</span>
+              <span className="text-slate-500">Lat</span>
               <span className="text-blue-300 truncate">{driverPosition?.lat?.toFixed(5) || '—'}</span>
-              <span className="text-slate-400">Lng</span>
+              <span className="text-slate-500">Lng</span>
               <span className="text-blue-300 truncate">{driverPosition?.lng?.toFixed(5) || '—'}</span>
-              <span className="text-slate-400">Age</span>
+              <span className="text-slate-500">Age</span>
               <span className="text-yellow-300">{driverPosition?.capturedAt ? `${Math.round((Date.now() - new Date(driverPosition.capturedAt).getTime()) / 1000)}s ago` : '—'}</span>
-              <span className="text-slate-400">Interval</span>
+              <span className="text-slate-500">Interval</span>
               <span className="text-white">{driverLocStream?.intervalMs || '—'}ms</span>
-              <span className="text-slate-400">Err</span>
+              <span className="text-slate-500">Err</span>
               <span className={`truncate ${driverLocStream?.error ? 'text-rose-400' : 'text-slate-500'}`}>{driverLocStream?.error || 'none'}</span>
             </div>
           </div>
