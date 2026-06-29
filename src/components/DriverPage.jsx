@@ -2765,41 +2765,35 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               return <div key={step.key} className={`h-1 flex-1 rounded-full ${isComplete || idx < currentStep ? 'bg-emerald-400' : idx === currentStep ? 'bg-blue-500' : 'bg-slate-200'}`} />;
             })}
           </div>
-          {!isClockedIn ? (
-            <button type="button" disabled className="w-full h-12 bg-slate-200 text-slate-500 rounded-xl font-black text-sm flex items-center justify-center gap-2 cursor-not-allowed shadow-sm">
-              <Clock size={16} /> Clock in to start trips
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={bottomAction.onClick}
+              disabled={!primary}
+              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-12 ${bottomAction.gradient} text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
+            >
+              {bottomAction.icon} {bottomAction.label}
             </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={bottomAction.onClick}
-                disabled={!primary}
-                className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-12 ${bottomAction.gradient} text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
-              >
-                {bottomAction.icon} {bottomAction.label}
-              </button>
-              {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
-                skipConfirmTripId === `work-${trip.id}` ? (
-                  <button
-                    type="button"
-                    onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
-                    className="flex-[2] h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-sm"
-                  >
-                    <MapPin size={14} /> {trip.status === 'In Progress' ? 'Already here?' : 'At dropoff?'}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => { impact('medium'); setSkipConfirmTripId(`work-${trip.id}`); }}
-                    className="flex-[2] h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
-                  >
-                    <Forward size={14} /> Skip Nav
-                  </button>
-                )
-              )}
-            </div>
-          )}
+            {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
+              skipConfirmTripId === `work-${trip.id}` ? (
+                <button
+                  type="button"
+                  onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
+                  className="flex-[2] h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                >
+                  <MapPin size={14} /> {trip.status === 'In Progress' ? 'Already here?' : 'At dropoff?'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { impact('medium'); setSkipConfirmTripId(`work-${trip.id}`); }}
+                  className="flex-[2] h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <Forward size={14} /> Skip Nav
+                </button>
+              )
+            )}
+          </div>
         </div>
       </div>
     );
@@ -2927,12 +2921,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <p className="text-xs font-semibold text-amber-800">You're offline. Changes will sync when connection returns.</p>
             </div>
           )}
-          {!isClockedIn && (
-            <div className="rounded-xl border border-amber-200 bg-amber-100 px-4 py-3 flex items-center gap-2">
-              <Clock size={14} className="text-amber-700 shrink-0" />
-              <p className="text-xs font-bold text-amber-800">Clocked out — clock in to start trips and share live updates.</p>
-            </div>
-          )}
+
 
           {(incomingTransferTrips.length > 0 || incomingTransferRoutes.length > 0) && (() => {
             const transferDisabled = !isClockedIn;
@@ -3305,7 +3294,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const displayStep = activeStepIndex === -1 ? doneKeys.length : activeStepIndex + 1;
                 const routePct = Math.round((index / Math.max(assignedRoutePlanStops.length, 1)) * 100);
                 const nextAction = (() => {
-                  if (!isClockedIn) return { label: 'Clock in to start trips', icon: <Clock size={14} />, className: 'bg-slate-200 text-slate-500 cursor-not-allowed', disabled: true };
                   if (!workflow.startedAt) return { label: 'Start Stop', icon: <Play size={14} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleStartRoutePlanStop(stop) };
                   if (!workflow.navigatingAt) return { label: `Navigate to ${stopType}`, icon: <Navigation size={14} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleNavigateRoutePlanStop(stop) };
                   if (!workflow.arrivedAt) return { label: `Arrive at ${stopType}`, icon: <MapPin size={14} />, className: typeColor === 'orange' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700', onClick: () => handleArriveRoutePlanStop(stop) };
@@ -3561,9 +3549,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                          </div>
 
                           {(() => {
-                            if (!isClockedIn) {
-                              return <button type="button" disabled className="w-full bg-slate-200 text-slate-500 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed"><Clock size={13} /> Clock in to start trips</button>;
-                            }
+
                             if (step.type === 'PU') {
                               if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
                                 return renderPrimaryBtn('Start Trip', <Play size={14} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); });
@@ -3713,42 +3699,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         onTransfer: () => openTransferPrompt('trip', trip),
                       } : {}),
                       renderWorkflow: !isTerminal && primary && isClockedIn ? () => {
-                        const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
-                        const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
-                        const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
-                        const cardStepBackTarget = getTripWorkStepBackTarget(trip);
-                        const canUndo = !!cardStepBackTarget;
-                        return (
-                          <div className={`rounded-xl border ${borderColor} ${bgColor} p-3 w-full`}>
-                            <div className="flex items-center gap-0.5 mb-2">
-                              {workflowSteps.map((step, idx) => (
-                                <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
-                              ))}
-                              {canUndo && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (cardStepBackTarget && window.confirm(`Go back to "${cardStepBackTarget.label}"?`)) {
-                                      impact('medium');
-                                      advanceWorkflow(trip, cardStepBackTarget.status, cardStepBackTarget.fields, { allowRegression: true });
-                                    }
-                                  }}
-                                  className="ml-2 w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-300 text-slate-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-all cursor-pointer shrink-0"
-                                  title="Undo last step"
-                                >
-                                  <RotateCcw size={12} />
-                                </button>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <button type="button" disabled className="flex-[4] h-14 bg-slate-200 text-slate-500 text-base md:text-lg rounded-2xl font-bold flex items-center justify-center gap-2 cursor-not-allowed shadow-sm">
-                                <Clock size={16} /> Clock in to start trips
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      } : !isTerminal && primary ? () => {
                         const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
                         const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
                         const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
