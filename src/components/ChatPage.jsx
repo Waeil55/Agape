@@ -162,57 +162,18 @@ const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [
   }, [currentUser]);
 
   /* ============= CLIENT CONVERSATIONS ============= */
-  const scopeFilter = useCallback((convs) => {
-    if (role === 'driver') return [];
-    if (role !== 'dispatcher') return convs;
-    const disp = dispatchers.find(d => d.email?.toLowerCase() === (currentUser || '').toLowerCase());
-    if (!disp) return [];
-    const aDrivers = drivers.filter(d => d.assignedDispatcher === disp.id || d.assignedTo === disp.id);
-    const ids = new Set(aDrivers.map(d => d.id));
-    const emails = new Set(aDrivers.map(d => d.email?.toLowerCase()).filter(Boolean));
-    const phones = new Set();
-    (trips || []).forEach(t => {
-      if (ids.has(t.driverId) || emails.has(t.driverEmail?.toLowerCase())) {
-        [t.patientPhone, t.pickupPhone, t.dropoffPhone].filter(Boolean).forEach(p => phones.add(normalizePhone(p)));
-      }
-    });
-    return convs.filter(c => phones.has(c.phone));
-  }, [role, currentUser, dispatchers, drivers, trips]);
-
-  const phoneToTrip = useMemo(() => {
-    const map = {};
-    (trips || []).forEach(t => {
-      [t.patientPhone, t.pickupPhone, t.dropoffPhone].filter(Boolean).forEach(p => {
-        const norm = normalizePhone(p);
-        const tt = t.date && t.time ? new Date(t.date + 'T' + (t.time.includes(':') ? t.time : t.time + ':00')).getTime() : 0;
-        if (!map[norm] || tt > (map[norm]._t || 0)) map[norm] = { ...t, _t: tt };
-      });
-    });
-    return map;
-  }, [trips]);
-
-  const resolveClient = useCallback((phone) => {
-    const norm = normalizePhone(phone);
-    const trip = norm ? phoneToTrip[norm] : null;
-    if (trip?.patient) return { name: trip.patient, tripId: trip.id || trip.tripId, trip };
-    if (norm) return { name: norm, tripId: null, trip: null };
-    return { name: phone || 'Unknown', tripId: null, trip: null };
-  }, [phoneToTrip]);
-
-  const resolveClientFromMsgs = useCallback((msgs) => {
-    for (const m of msgs) { const p = m.direction === 'outbound' ? m.to : m.from; const r = resolveClient(p); if (r.trip) return r; }
-    for (const m of msgs) { if (m.tripId) { const t = (trips || []).find(trip => trip.id === m.tripId || trip.tripId === m.tripId); if (t?.patient) return { name: t.patient, tripId: m.tripId, trip: t }; } }
-    for (const m of msgs) { const p = m.direction === 'outbound' ? m.to : m.from; if (p) return { name: p, tripId: null, trip: null }; }
-    return { name: 'Unknown', tripId: null, trip: null };
-  }, [resolveClient, trips]);
-
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     const q = query(collection(db, 'smsLogs'), orderBy('timestamp', 'desc'), limit(500));
     const unsub = onSnapshot(q, (snap) => {
+      if (cancelled) return;
+      const t = tripsRef.current;
+      const d = dispatchRef.current;
+      const dr = driversRef.current;
+      const cu = currentUserRef.current;
       const groups = {};
-      snap.forEach(d => {
-        const msg = { id: d.id, ...d.data() };
+      snap.forEach(doc => {
+        const msg = { id: doc.id, ...doc.data() };
         if (pendRef.current.has(msg.id)) return;
         const other = msg.direction === 'outbound' ? msg.to : msg.from;
         if (!other) return;
@@ -221,18 +182,54 @@ const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [
         if (!groups[norm]) groups[norm] = [];
         groups[norm].push(msg);
       });
+      const map = {};
+      (t || []).forEach(trip => {
+        [trip.patientPhone, trip.pickupPhone, trip.dropoffPhone].filter(Boolean).forEach(p => {
+          const norm = normalizePhone(p);
+          const tt = trip.date && trip.time ? new Date(trip.date + 'T' + (trip.time.includes(':') ? trip.time : trip.time + ':00')).getTime() : 0;
+          if (!map[norm] || tt > (map[norm]._t || 0)) map[norm] = { ...trip, _t: tt };
+        });
+      });
+      const rCli = (phone) => {
+        const norm = normalizePhone(phone);
+        const trip = norm ? map[norm] : null;
+        if (trip?.patient) return { name: trip.patient, tripId: trip.id || trip.tripId, trip };
+        if (norm) return { name: norm, tripId: null, trip: null };
+        return { name: phone || 'Unknown', tripId: null, trip: null };
+      };
+      const rFromMsgs = (msgs) => {
+        for (const m of msgs) { const p = m.direction === 'outbound' ? m.to : m.from; const r = rCli(p); if (r.trip) return r; }
+        for (const m of msgs) { if (m.tripId) { const t2 = (t || []).find(trip => trip.id === m.tripId || trip.tripId === m.tripId); if (t2?.patient) return { name: t2.patient, tripId: m.tripId, trip: t2 }; } }
+        for (const m of msgs) { const p = m.direction === 'outbound' ? m.to : m.from; if (p) return { name: p, tripId: null, trip: null }; }
+        return { name: 'Unknown', tripId: null, trip: null };
+      };
+      const sFilter = (convs) => {
+        if (cu === 'driver') return [];
+        const disp = d.find(dd => dd.email?.toLowerCase() === (cu || '').toLowerCase());
+        if (cu !== 'dispatcher' || !disp) return convs;
+        const aDr = dr.filter(dd => dd.assignedDispatcher === disp.id || dd.assignedTo === disp.id);
+        const ids = new Set(aDr.map(dd => dd.id));
+        const emails = new Set(aDr.map(dd => dd.email?.toLowerCase()).filter(Boolean));
+        const phones = new Set();
+        (t || []).forEach(trip => {
+          if (ids.has(trip.driverId) || emails.has(trip.driverEmail?.toLowerCase())) {
+            [trip.patientPhone, trip.pickupPhone, trip.dropoffPhone].filter(Boolean).forEach(p => phones.add(normalizePhone(p)));
+          }
+        });
+        return convs.filter(c => phones.has(c.phone));
+      };
       const convs = Object.entries(groups).map(([phone, msgs]) => {
         msgs.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
         const last = msgs[0];
-        const r = resolveClientFromMsgs(msgs);
+        const r = rFromMsgs(msgs);
         return { phone, clientName: r.name, tripId: r.tripId, trip: r.trip, lastMessage: last, messages: msgs };
       });
       convs.sort((a, b) => (b.lastMessage?.timestamp?.toMillis?.() || 0) - (a.lastMessage?.timestamp?.toMillis?.() || 0));
-      setClientConvs(scopeFilter(convs));
+      setClientConvs(sFilter(convs));
       setLoading(false);
-    }, () => setLoading(false));
-    return () => unsub();
-  }, [trips, resolveClientFromMsgs]);
+    }, () => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; unsub(); };
+  }, []);
 
   useEffect(() => {
     if (!activeConv || activeConv.type !== 'team') { setMessages([]); return; }
@@ -290,7 +287,7 @@ const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [
 
   /* ============= SEND ============= */
   const sendTeamMsg = async (e) => {
-    e.preventDefault();
+    if (e?.preventDefault) e.preventDefault();
     if (!text.trim() || !activeConv) return;
     const msg = text.trim();
     setText('');
@@ -347,7 +344,7 @@ const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [
       setClientConvs(p => {
         const ex = p.find(c => c.phone === norm);
         if (ex) { const u = { ...ex, messages: [...(ex.messages || []), newMsg], lastMessage: newMsg }; return [u, ...p.filter(c => c.phone !== norm)]; }
-        const r = resolveClient(phone);
+        const r = (() => { const t = tripsRef.current; const norm = normalizePhone(phone); const trip = norm ? (() => { const map = {}; (t || []).forEach(trip => { [trip.patientPhone, trip.pickupPhone, trip.dropoffPhone].filter(Boolean).forEach(p => { const n = normalizePhone(p); const tt = trip.date && trip.time ? new Date(trip.date + 'T' + (trip.time.includes(':') ? trip.time : trip.time + ':00')).getTime() : 0; if (!map[n] || tt > (map[n]._t || 0)) map[n] = { ...trip, _t: tt }; }); }); return map[norm]; })() : null; return { name: trip?.patient || norm || 'Unknown', tripId: trip?.id || trip?.tripId || null, trip: trip || null }; })();
         return [{ phone: norm, clientName: r.name, tripId: r.tripId, trip: r.trip, lastMessage: newMsg, messages: [newMsg] }, ...p];
       });
       setActiveConv({ type: 'client', phone: norm, clientName: newSmsPhone, lastMessage: newMsg, messages: [newMsg] });
@@ -415,9 +412,15 @@ const ChatPage = ({ currentUser, role, drivers = [], dispatchers = [], trips = [
     return list;
   }, [mergedConvs, filterTab, search]);
 
-  const convLabel = (conv) => conv.type === 'team'
-    ? ((c) => { if (c.name) return c.name; const other = (c.participants || []).filter(p => p !== currentUser); return other[0]?.split('@')[0] || 'Unknown'; })(conv.raw || conv)
-    : (conv.name || conv.phone);
+  const convLabel = useCallback((conv) => {
+    if (!conv) return '';
+    if (conv.type === 'team') {
+      if (conv.name) return conv.name;
+      const other = (conv.participants || []).filter(p => p !== currentUser);
+      return other[0]?.split('@')[0] || 'Unknown';
+    }
+    return conv.name || conv.phone || '';
+  }, [currentUser]);
 
   const unreadTotal = useMemo(() => mergedConvs.filter(c => c.unread).length, [mergedConvs]);
 
