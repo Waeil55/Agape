@@ -644,6 +644,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }, [userKey]);
   const [workNotesOpen, setWorkNotesOpen] = useState(false);
   const [showTripDetails, setShowTripDetails] = useState(null);
+  const [showMoreOptions, setShowMoreOptions] = useState(null);
+  const [sendingQuickSms, setSendingQuickSms] = useState(false);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
   const [showToast, setShowToast] = useState(null);
   useEffect(() => {
@@ -2548,27 +2550,66 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (!trip) return null;
     if (!isClockedIn) return null;
     if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
-      return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-blue-500/25', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
+      return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-600/25', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
     }
     if (trip.status === 'In Progress') {
-      return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 shadow-teal-500/25', onClick: () => handleNavigateToPickup(trip) };
+      return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 shadow-sky-500/25', onClick: () => handleNavigateToPickup(trip) };
     }
     if (trip.status === 'Navigating Pickup') {
-      return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-emerald-500/25', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
+      return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-blue-500/25', onClick: () => { impact('heavy'); handleArrivePickup(trip); } };
     }
     if (trip.status === 'At Pickup') {
-      return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
+      return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 shadow-indigo-500/25', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); } };
     }
     if (trip.status === 'In Transit') {
-      return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-amber-500 hover:from-emerald-600 hover:to-amber-600 shadow-amber-500/25', onClick: () => handleNavigateToDropoff(trip) };
+      return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-blue-500 to-sky-600 hover:from-blue-600 hover:to-sky-700 shadow-blue-500/25', onClick: () => handleNavigateToDropoff(trip) };
     }
     if (trip.status === 'Navigating Dropoff') {
-      return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-orange-500/25', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
+      return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 shadow-sky-500/25', onClick: () => { impact('heavy'); handleArriveDropoff(trip); } };
     }
     if (trip.status === 'At Dropoff' || trip.status === 'Arrived') {
-      return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-red-500/25', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
+      return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-blue-600/25', onClick: () => { impact('heavy'); openCompleteModal(trip); } };
     }
     return null;
+  };
+
+  const sendSMSWithBody = async (phone, body) => {
+    if (!phone || !body) return;
+    await impact('medium');
+    const cleaned = (phone || '').replace(/[^0-9+]/g, '');
+    if (!cleaned) return;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile || isNativeShell()) {
+      const encoded = encodeURIComponent(body);
+      const url = /Android/i.test(navigator.userAgent) ? `sms:${cleaned}?body=${encoded}` : `sms:${cleaned}&body=${encoded}`;
+      window.location.href = url;
+    } else {
+      try { await navigator.clipboard.writeText(body); } catch {}
+      setShowToast({ message: 'Message copied to clipboard' });
+    }
+  };
+
+  const getQuickSmsText = async (trip, destination) => {
+    const patientName = (trip.patient || '').split(' ')[0] || 'there';
+    const greeting = `Hi ${patientName}, this is Agape Care transportation. I'm on my way.`;
+    let etaText = '';
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: true });
+      });
+      const origin = `${pos.coords.latitude},${pos.coords.longitude}`;
+      const duration = await getTravelDuration(origin, destination);
+      if (duration?.durationText) {
+        etaText = ` My ETA is ${duration.durationText}.`;
+      }
+    } catch {
+      try {
+        const destEnc = encodeURIComponent(destination || '');
+        const mapsLink = `https://www.google.com/maps/dir/?api=1&destination=${destEnc}`;
+        etaText = ` Check my ETA: ${mapsLink}`;
+      } catch {}
+    }
+    return greeting + etaText;
   };
 
   const renderTripWorkPage = (trip) => {
@@ -2586,7 +2627,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       workTripIsInOut ? `IN/OUT ${trip.inOutLeg ? `${trip.inOutLeg} leg` : 'trip'}: stay with the client about ${trip.inOutWaitMinutes || IN_OUT_WAIT_MINUTES} minutes between A and B legs.` : '',
       trip.notes || trip.driverNotes || trip.specialInstructions || trip.instructions || '',
     ].filter(Boolean).join(' ');
-    const attentionText = trip.urgentTrip ? 'URGENT' : workTripIsInOut ? 'IN/OUT STAY' : notes || trip.wheelchair || trip.mobility ? 'ATTENTION REQ.' : 'READY';
     const copyText = (text, label) => {
       if (!text) return;
       navigator.clipboard?.writeText(text);
@@ -2606,7 +2646,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     };
 
     return (
-      <div className="min-h-full bg-[#f4f7fb] pb-32">
+      <><div className="min-h-full bg-[#f4f7fb] pb-32">
         <div className="sticky top-0 z-30 bg-white border-b-2 border-amber-400" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
           <div className="px-3 py-2.5 flex items-center gap-2.5">
             <button
@@ -2618,19 +2658,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <ChevronLeft size={22} strokeWidth={2.2} />
             </button>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 min-w-0">
-                <h1 className="text-sm font-semibold text-slate-950 leading-tight truncate">{trip.patient || 'Trip'}</h1>
-                 <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 border border-blue-100">
-                  #{trip.bookingId || trip.id || '--'}
-                </span>
-              </div>
+              <h1 className="text-base font-semibold text-slate-950 leading-tight truncate">{trip.patient || 'Trip'}</h1>
               <p className="mt-0.5 flex items-center gap-1.5 text-[11px] font-medium text-rose-600">
                 <Clock size={13} /> {scheduledTime}
               </p>
             </div>
-            <span className={`shrink-0 max-w-[34%] truncate rounded-lg border px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-center ${getTripWorkStatusClass(trip.status)}`}>
-              {trip.status || 'Assigned'}
+            <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-100">
+              Trip: {trip.bookingId || trip.id || '--'}
             </span>
+
           </div>
         </div>
 
@@ -2647,8 +2683,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-[11px] font-medium uppercase tracking-normal text-blue-200">Scheduled Time</p>
                   <p className="mt-1 text-lg font-semibold tracking-tight leading-none text-white">{scheduledTime}</p>
                 </div>
-                  <span className="mt-0.5 shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-amber-800 shadow-sm">
-                  {attentionText}
+                  <span className={`shrink-0 max-w-[40%] truncate rounded-lg border px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-center shadow-sm ${getTripWorkStatusClass(trip.status)}`}>
+                  {trip.status || 'Assigned'}
                 </span>
               </div>
 
@@ -2667,7 +2703,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <Copy size={11} /> Copy
                     </button>
                     <span className="text-[11px] font-medium text-blue-200/80">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-3 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-medium flex items-center gap-1.5 cursor-pointer">
+                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-3 rounded-2xl bg-sky-500/70 hover:bg-sky-500 text-white text-[11px] font-medium flex items-center gap-1.5 cursor-pointer">
                       <Navigation size={13} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
@@ -2681,7 +2717,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <Copy size={11} /> Copy
                     </button>
                     <span className="text-[11px] font-medium text-blue-200/80" />
-                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-3 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-medium flex items-center gap-1.5 cursor-pointer">
+                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-3 rounded-2xl bg-sky-500/70 hover:bg-sky-500 text-white text-[11px] font-medium flex items-center gap-1.5 cursor-pointer">
                       <Navigation size={13} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
@@ -2689,16 +2725,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
 
               <div className="mt-3.5 grid grid-cols-4 gap-2">
-                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-9 rounded-2xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-9 rounded-2xl bg-emerald-500/70 hover:bg-emerald-500 disabled:opacity-40 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
                   <Phone size={13} /> Call
                 </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-9 rounded-2xl bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-9 rounded-2xl bg-blue-500/70 hover:bg-blue-500 disabled:opacity-40 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
                   <MessageCircle size={13} /> SMS
                 </button>
-                <button type="button" onClick={() => openContactSelector(trip)} className="h-9 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => openContactSelector(trip)} className="h-9 rounded-2xl bg-violet-500/70 hover:bg-violet-500 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
                   <PhoneForwarded size={13} /> Contacts
                 </button>
-                <button type="button" onClick={() => setShowTripDetails(trip)} className="h-9 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => setShowMoreOptions(trip)} className="h-9 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
                   <MoreHorizontal size={14} /> More
                 </button>
               </div>
@@ -2776,7 +2812,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   type="button"
                   onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
-                  className="flex-[2] h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                  className="flex-[2] h-12 bg-blue-600 border-2 border-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1 shadow-sm"
                 >
                   <MapPin size={14} /> {trip.status === 'In Progress' ? 'Here?' : 'At dropoff?'}
                 </button>
@@ -2793,6 +2829,52 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           </div>
         </div>
       </div>
+    {showMoreOptions?.id === trip.id && (() => {
+      const onClose = () => { setSendingQuickSms(false); setShowMoreOptions(null); };
+      const pickupAddr = pickupAddress;
+      const dropoffAddr = dropoffAddress;
+      const handleQuickSms = async () => {
+        setSendingQuickSms(true);
+        const primary = getPrimaryContactForTrip(trip);
+        const destination = ['In Transit', 'Navigating Dropoff', 'In Progress'].includes(trip.status) ? dropoffAddr : pickupAddr;
+        const body = await getQuickSmsText(trip, destination);
+        if (primary) await sendSMSWithBody(primary.phone, body);
+        setSendingQuickSms(false);
+        onClose();
+      };
+      const moreActions = [
+        { label: 'Quick SMS', icon: sendingQuickSms ? <div className="w-4 h-4 border-2 border-blue-400 border-t-blue-600 rounded-full animate-spin" /> : <MessageCircle size={16} />, color: 'text-blue-600 bg-blue-50 hover:bg-blue-100', onClick: handleQuickSms, disabled: sendingQuickSms },
+        { label: 'Cancel', icon: <XCircle size={16} />, color: 'text-rose-600 bg-rose-50 hover:bg-rose-100', onClick: () => { onClose(); handleCancel(trip); } },
+        { label: 'No Show', icon: <AlertCircle size={16} />, color: 'text-orange-600 bg-orange-50 hover:bg-orange-100', onClick: () => { onClose(); handleNoShow(trip); } },
+        { label: 'Reroute', icon: <Route size={16} />, color: 'text-purple-600 bg-purple-50 hover:bg-purple-100', onClick: () => { onClose(); handleReroute(trip); } },
+        { label: 'Transfer', icon: <ArrowRight size={16} />, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100', onClick: () => { onClose(); openTransferPrompt('trip', trip); } },
+        { label: 'Trip Details', icon: <FileText size={16} />, color: 'text-slate-600 bg-slate-50 hover:bg-slate-100', onClick: () => { onClose(); setShowTripDetails(trip); } },
+      ];
+      return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-3xl rounded-b-none w-full max-w-lg pb-6 px-4 pt-2 animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-center mb-3">
+              <span className="w-10 h-1 rounded-full bg-slate-300" />
+            </div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-900">{trip.patient || 'Trip'}</h3>
+              <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-1">
+              {moreActions.map((action, idx) => (
+                <button key={idx} type="button" onClick={action.onClick} disabled={action.disabled} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl ${action.color} transition-all text-sm font-medium cursor-pointer disabled:opacity-50`}>
+                  {action.icon} {action.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    })()}
+    </>
     );
   };
 
@@ -3609,13 +3691,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const doneBarColor = 'bg-emerald-400';
 
                 const getPrimaryAction = () => {
-                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 shadow-teal-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-amber-500 hover:from-emerald-600 hover:to-amber-600 shadow-amber-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-red-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-600/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 shadow-sky-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-blue-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 shadow-indigo-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-blue-500 to-sky-600 hover:from-blue-600 hover:to-sky-700 shadow-blue-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 shadow-sky-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-blue-600/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
                   return null;
                 };
                 const primary = getPrimaryAction();
