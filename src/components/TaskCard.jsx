@@ -86,7 +86,7 @@ const getSiteIcon = (name) => {
 
 const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions }) => {
   const isExpanded = expandedId === task.id;
-  const isAnotherExpanded = expandedId !== null && expandedId !== task.id;
+  const isAnotherExpanded = expandedId !== null && expandedId !== undefined && expandedId !== task.id;
   const [copiedId, setCopiedId] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);

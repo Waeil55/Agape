@@ -3672,6 +3672,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       workflowPhase,
                       activeTrip: isActiveTrip,
                     }}
+                    expandedId={null}
                     onToggle={(id) => openTripWorkPage(id)}
                     isSelected={isSelected}
                     onSelect={toggleTripSelect}
