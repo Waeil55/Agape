@@ -198,7 +198,10 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   });
   const [hiddenCols, setHiddenCols] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('agape_rptHiddenCols') || '[]'); } catch { return []; }
+    try { 
+      const saved = localStorage.getItem('agape_rptHiddenCols_v2');
+      return saved ? JSON.parse(saved) : ['departedPickupTime'];
+    } catch { return ['departedPickupTime']; }
   });
   const datePickerRef = useRef(null);
   const PAGE_SIZE = 100;
@@ -217,7 +220,7 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
     localStorage.setItem('agape_rptSortCol', sortColumn);
     localStorage.setItem('agape_rptSortDir', sortDirection);
     localStorage.setItem('agape_rptCollapsedDays', JSON.stringify(collapsedDays));
-    localStorage.setItem('agape_rptHiddenCols', JSON.stringify(hiddenCols));
+    localStorage.setItem('agape_rptHiddenCols_v2', JSON.stringify(hiddenCols));
   }, [startDate, endDate, statusFilter, driverFilter, reviewedFilter, searchQuery, sortColumn, sortDirection, collapsedDays, hiddenCols]);
 
   // ===== RESIZABLE COLUMNS =====
@@ -345,8 +348,8 @@ const ReportsPage = ({ trips = [], drivers = [], vehicles = [], driverTelemetry 
       case 'arrivalTime': return formatClock24(trip.arrivalTime);
       case 'departedPickupTime': return formatClock24(trip.departedPickupTime);
       case 'arrivalDropoffTime': return formatClock24(trip.arrivalDropoffTime || trip.completedAt);
-      case 'pickupOdometer': return trip.pickupOdometer || '';
-      case 'dropoffOdometer': return trip.dropoffOdometer || '';
+      case 'pickupOdometer': return trip.pickupOdometer || '—';
+      case 'dropoffOdometer': return trip.dropoffOdometer || '—';
       case 'travelTime': return trip.travelTime || calcDuration(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt);
       case 'distance': return calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance);
       case 'signature': {

@@ -74,7 +74,7 @@ export const hasRealTripAddress = (trip = {}) => {
 };
 
 export const hasTripServiceDate = (trip = {}) => Boolean(textValue(
-  trip.date || trip.scheduleDate || trip.tripDate || trip.serviceDate || trip.appointmentDate
+  trip.date || trip.scheduleDate || trip.tripDate || trip.serviceDate || trip.appointmentDate || trip.completedAt
 ));
 
 export const isCorruptedTripRecord = (trip = {}) => {
@@ -92,6 +92,8 @@ export const isCorruptedTripRecord = (trip = {}) => {
   ].some(isRouteKeyIdentifier)) return true;
   if (!hasRealTripPatient(trip)) return true;
   if (!hasRealTripAddress(trip)) return true;
+  // Completed trips with a completion timestamp are always valid
+  if (trip.completedAt) return false;
   if (!hasTripServiceDate(trip)) return true;
   return false;
 };
