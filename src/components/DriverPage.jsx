@@ -5376,18 +5376,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     }
                     setActiveNav(item.id);
                   }}
-                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[58px] ${
-                      isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
+                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1 py-1 transition-all duration-200 min-h-[58px] ${
+                      isActiveTab ? 'text-[#1b5cb7]' : 'text-[#94a3b8]'
                     }`}>
                     <div className="relative">
-                      <Icon size={27} strokeWidth={isActiveTab ? 2.7 : 2}
-                        className={`transition-all duration-200 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}
+                      <Icon size={24} strokeWidth={2}
+                        className={`transition-all duration-200 ${isActiveTab ? 'text-[#1b5cb7]' : 'text-[#94a3b8]'}`}
                       />
                       {item.id === 'chat' && chatUnreadCount > 0 && (
                         <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-bold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>
                       )}
                     </div>
-                    <span className={`max-w-full truncate text-[12px] tracking-[0.04em] transition-all leading-none ${isActiveTab ? 'text-blue-600 font-bold' : 'text-slate-400 font-normal'}`}>{item.label}</span>
+                    <span className={`max-w-full truncate text-[11px] tracking-[0.04em] transition-all leading-none ${isActiveTab ? 'text-[#1b5cb7] font-bold' : 'text-[#94a3b8] font-medium'}`}>{item.label}</span>
                   </button>
                 );
               })}
