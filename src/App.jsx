@@ -1959,6 +1959,10 @@ const App = () => {
             
             return dedupTrips([...currentTrips, tripToRestore]);
           });
+
+          setDoc(doc(db, 'trips', tripId), { archiveState: null }, { merge: true }).catch(err => {
+            console.error('Failed to clear archiveState in Firestore:', err);
+          });
           
           addAuditLog('Trip Restored', `${currentUser || 'Admin'} restored trip ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'archived', after: 'active' }] });
         }
