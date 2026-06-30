@@ -5451,7 +5451,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {/* ===== BOTTOM NAVIGATION ===== */}
       {!isEmbedded && (
         <nav className="bottom-nav md:hidden">
-          <div className="flex h-full items-center justify-around gap-1">
+          <div className="flex h-full items-center justify-between gap-1 px-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActiveTab = activeNav === item.id;
@@ -5464,18 +5464,22 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     }
                     setActiveNav(item.id);
                   }}
-                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1 py-1 transition-all duration-200 min-h-[48px] ${
-                      isActiveTab ? 'text-[#1b5cb7]' : 'text-[#94a3b8]'
+                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-[4px] rounded-full px-1 py-1 transition-all duration-200 min-h-[56px] ${
+                      isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8] hover:text-[#64748b]'
                     }`}>
                     <div className="relative">
-                      <Icon size={22} strokeWidth={2}
-                        className={`transition-all duration-200 ${isActiveTab ? 'text-[#1b5cb7]' : 'text-[#94a3b8]'}`}
+                      <Icon size={26} strokeWidth={isActiveTab ? 2.5 : 2}
+                        className={`transition-all duration-200 ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}
                       />
                       {item.id === 'chat' && chatUnreadCount > 0 && (
-                        <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-xs font-semibold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>
+                        <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm ring-2 ring-white">
+                          {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                        </span>
                       )}
                     </div>
-                    <span className={`max-w-full truncate text-xs tracking-wide transition-all leading-none ${isActiveTab ? 'text-[#1b5cb7] font-semibold' : 'text-[#94a3b8] font-medium'}`}>{item.label}</span>
+                    <span className={`max-w-full truncate text-[11px] tracking-wide transition-all leading-none ${isActiveTab ? 'text-[#2563eb] font-bold' : 'text-[#94a3b8] font-medium'}`}>
+                      {item.label}
+                    </span>
                   </button>
                 );
               })}
