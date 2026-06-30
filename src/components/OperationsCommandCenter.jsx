@@ -1043,14 +1043,14 @@ const OperationsCommandCenter = ({
             <span className="font-semibold text-blue-600">Pickup: </span>
             <span className="text-slate-800 truncate">{trip.pickup || '—'}</span>
             {clientPhone && <><br /><span className="text-slate-500">Phone: </span><span className="text-slate-700">{clientPhone}</span></>}
-            {(trip.arrivalTime || trip.pickupTime) && <><br /><span className="text-slate-500">PU time: </span><span className="text-slate-700">{formatClock(trip.arrivalTime || trip.pickupTime)}</span></>}
+            {(trip.arrivalTime || trip.pickupTime) && <><br /><span className="text-slate-500">PU time: </span><span className="text-slate-700">{to12hr(trip.arrivalTime || trip.pickupTime)}</span></>}
             {trip.pickupOdometer && <><br /><span className="text-slate-500">PU odo: </span><span className="text-slate-700">{trip.pickupOdometer}</span></>}
           </div>
           <div className="min-w-0">
             <span className="font-semibold text-emerald-600">Dropoff: </span>
             <span className="text-slate-800 truncate">{trip.dropoff || '—'}</span>
             {dropoffPhone && <><br /><span className="text-slate-500">Hospital: </span><span className="text-slate-700">{dropoffPhone}</span></>}
-            {(trip.arrivalDropoffTime || trip.completedAt) && <><br /><span className="text-slate-500">DO time: </span><span className="text-slate-700">{formatClock(trip.arrivalDropoffTime || trip.completedAt)}</span></>}
+            {(trip.arrivalDropoffTime || trip.completedAt) && <><br /><span className="text-slate-500">DO time: </span><span className="text-slate-700">{to12hr(trip.arrivalDropoffTime || trip.completedAt)}</span></>}
             {(trip.dropoffOdometer || trip.endOdometer) && <><br /><span className="text-slate-500">DO odo: </span><span className="text-slate-700">{trip.dropoffOdometer || trip.endOdometer}</span></>}
           </div>
           <div className="min-w-0 space-y-0.5">
