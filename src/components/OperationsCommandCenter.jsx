@@ -1023,7 +1023,7 @@ const OperationsCommandCenter = ({
       .map(([key, value]) => [key, formatManifestValue(value)]);
 
     return (
-      <div className="mt-2 rounded-3xl border border-slate-100/50 bg-slate-50/80 p-4 shadow-sm space-y-3">
+      <div className="w-full border-t border-slate-200 bg-slate-50 px-4 py-3 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700">
@@ -1057,6 +1057,21 @@ const OperationsCommandCenter = ({
                 {spaceTypes}
               </span>
             )}
+            {driver && (
+              <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                {driver.name || driver.driverName}
+              </span>
+            )}
+            {directDistance && (
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
+                {directDistance}
+              </span>
+            )}
+            {routeAssignments.map((route, i) => (
+              <span key={i} className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">
+                {route.routeName}
+              </span>
+            ))}
           </div>
           <button
             type="button"
@@ -1067,105 +1082,80 @@ const OperationsCommandCenter = ({
           </button>
         </div>
 
-        <div className={`grid gap-3 ${compact ? 'xl:grid-cols-[1.1fr_1.1fr_0.9fr]' : 'xl:grid-cols-[1.15fr_1.15fr_0.95fr]'}`}>
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
-            <p className="text-xs uppercase tracking-widest text-blue-700">Pickup</p>
-            <div className="mt-2 space-y-2">
-              {pickupItems.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
-                  <span className="font-bold uppercase tracking-wide text-blue-700">{label}</span>
-                  <span className="break-words text-slate-900">{value}</span>
-                </div>
-              ))}
-            </div>
+        <div className="grid grid-cols-12 gap-x-4 gap-y-1 text-xs">
+          <div className="col-span-5 space-y-1">
+            <p className="font-semibold text-blue-600 uppercase tracking-wider text-[11px] mb-1">Pickup</p>
+            {pickupItems.map(([label, value]) => (
+              <div key={label} className="flex gap-2">
+                <span className="w-20 shrink-0 text-slate-500 font-medium">{label}</span>
+                <span className="text-slate-900 break-words">{value}</span>
+              </div>
+            ))}
           </div>
-
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
-            <p className="text-xs uppercase tracking-widest text-emerald-700">Dropoff</p>
-            <div className="mt-2 space-y-2">
-              {dropoffItems.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
-                  <span className="font-bold uppercase tracking-wide text-emerald-700">{label}</span>
-                  <span className="break-words text-slate-900">{value}</span>
-                </div>
-              ))}
-            </div>
+          <div className="col-span-5 space-y-1">
+            <p className="font-semibold text-emerald-600 uppercase tracking-wider text-[11px] mb-1">Dropoff</p>
+            {dropoffItems.map(([label, value]) => (
+              <div key={label} className="flex gap-2">
+                <span className="w-20 shrink-0 text-slate-500 font-medium">{label}</span>
+                <span className="text-slate-900 break-words">{value}</span>
+              </div>
+            ))}
           </div>
-
-          <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-            <p className="text-xs uppercase tracking-widest text-slate-500">Manifest Summary</p>
-            <div className="mt-2 space-y-2">
-              {manifestSummaryItems.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[110px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
-                  <span className="font-bold uppercase tracking-wide text-slate-500">{label}</span>
-                  <span className="break-words text-slate-900">{value}</span>
-                </div>
-              ))}
-            </div>
+          <div className="col-span-2 space-y-1">
+            <p className="font-semibold text-slate-500 uppercase tracking-wider text-[11px] mb-1">Manifest</p>
+            {manifestSummaryItems.map(([label, value]) => (
+              <div key={label} className="flex gap-2">
+                <span className="shrink-0 text-slate-500 font-medium">{label}</span>
+                <span className="text-slate-900 break-words">{value}</span>
+              </div>
+            ))}
           </div>
         </div>
 
         {(routeAssignments.length > 0 || noteItems.length > 0 || mobility.length > 0 || mobilityAids) && (
-          <div className="grid gap-3 xl:grid-cols-[0.95fr_1.25fr]">
-            <div className="rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm">
-              <p className="text-xs uppercase tracking-widest text-indigo-700">Route & Transport</p>
-              {routeAssignments.length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {routeAssignments.map((route, index) => (
-                    <span
-                      key={`${route.templateId || route.routeName}-${index}`}
-                      className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700"
-                    >
-                      <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` - ${route.statusLabel}` : ''}
-                    </span>
-                  ))}
+          <div className="grid grid-cols-12 gap-x-4 gap-y-1 text-xs border-t border-slate-200 pt-2">
+            <div className="col-span-6">
+              {routeAssignments.length > 0 && (
+                <div className="flex gap-2">
+                  <span className="w-20 shrink-0 text-slate-500 font-medium">Routes</span>
+                  <div className="flex flex-wrap gap-1">
+                    {routeAssignments.map((route, index) => (
+                      <span key={index} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">
+                        <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <p className="mt-2 text-xs font-medium text-slate-500">Not assigned to a saved route plan.</p>
               )}
               {(mobility.length > 0 || mobilityAids) && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {mobilityAids && (
-                    <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-                      {mobilityAids}
-                    </span>
-                  )}
-                  {mobility.map((tag) => (
-                    <span key={tag} className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-                      {tag}
-                    </span>
-                  ))}
+                <div className="flex gap-2 mt-1">
+                  <span className="w-20 shrink-0 text-slate-500 font-medium">Mobility</span>
+                  <div className="flex flex-wrap gap-1">
+                    {mobilityAids && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{mobilityAids}</span>}
+                    {mobility.map((tag) => <span key={tag} className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{tag}</span>)}
+                  </div>
                 </div>
               )}
             </div>
-
-            <div className="rounded-2xl border border-amber-100 bg-white p-3 shadow-sm">
-              <p className="text-xs uppercase tracking-widest text-amber-700">Comments, Message & Notes</p>
-              <div className="mt-2 space-y-2">
-                {noteItems.length > 0 ? noteItems.map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-amber-100 bg-amber-50 p-2">
-                    <p className="text-xs uppercase tracking-wide text-amber-700">{label}</p>
-                    <p className="mt-1 text-xs font-medium leading-relaxed text-slate-700 break-words">{value}</p>
-                  </div>
-                )) : (
-                  <p className="text-xs font-medium text-slate-500">No trip notes recorded.</p>
-                )}
-              </div>
+            <div className="col-span-6">
+              {noteItems.length > 0 ? noteItems.map(([label, value]) => (
+                <div key={label} className="flex gap-2 mb-1">
+                  <span className="w-20 shrink-0 text-slate-500 font-medium">{label}</span>
+                  <span className="text-slate-700 break-words">{value}</span>
+                </div>
+              )) : null}
             </div>
           </div>
         )}
 
         {extraUploadedFields.length > 0 && (
-          <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-            <p className="text-xs uppercase tracking-widest text-slate-500">Additional Uploaded Fields</p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {extraUploadedFields.map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-2">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-                  <p className="mt-1 text-xs font-medium break-words text-slate-800">{value}</p>
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-4 gap-x-4 gap-y-1 text-xs border-t border-slate-200 pt-2">
+            {extraUploadedFields.map(([label, value]) => (
+              <div key={label} className="flex gap-2">
+                <span className="shrink-0 text-slate-500 font-medium">{label}</span>
+                <span className="text-slate-900 break-words">{value}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
