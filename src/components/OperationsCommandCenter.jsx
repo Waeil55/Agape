@@ -436,6 +436,7 @@ const OperationsCommandCenter = ({
   const [aiSortOrder, setAiSortOrder] = useState(null);
   const [aiSortLoading, setAiSortLoading] = useState(false);
   const [editTrip, setEditTrip] = useState(null);
+  const [activeTripRow, setActiveTripRow] = useState(null);
   const [selectedDate, setSelectedDate] = useState(() => localCalendarYmd());
   const todayTrips = trips.filter(t => { const dk = tripCalendarDateKey(t.date); return dk === undefined || dk === selectedDate; });
   const unassignedTrips = todayTrips.filter(t => t.status === 'Unassigned');
@@ -834,10 +835,10 @@ const OperationsCommandCenter = ({
         <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-700">Driver Work</p>
-              <p className="text-xs font-semibold text-blue-900">Assign a driver before running workflow steps.</p>
+              <p className="text-[10px] uppercase tracking-widest text-blue-700">Driver Work</p>
+              <p className="text-xs text-blue-900">Assign a driver before running workflow steps.</p>
             </div>
-            <button type="button" onClick={() => setManualAssignTrip(trip)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">
+            <button type="button" onClick={() => setManualAssignTrip(trip)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs text-white hover:bg-blue-700">
               <UserPlus size={14} /> Assign Driver
             </button>
           </div>
@@ -855,10 +856,10 @@ const OperationsCommandCenter = ({
       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-2.5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Driver Work</p>
-            <p className="text-xs font-semibold text-slate-700 truncate">{driver.name} - {driver.vehicle || 'No vehicle'}</p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-500">Driver Work</p>
+            <p className="text-xs text-slate-700 truncate">{driver.name} - {driver.vehicle || 'No vehicle'}</p>
           </div>
-          <span className={`rounded-lg px-2 py-1 text-[10px] font-semibold ${getDriverLiveStatus(driver).color}`}>
+          <span className={`rounded-lg px-2 py-1 text-[10px] ${getDriverLiveStatus(driver).color}`}>
             {getDriverLiveStatus(driver).label}
           </span>
         </div>
@@ -869,7 +870,7 @@ const OperationsCommandCenter = ({
               type="button"
               disabled={terminal && id !== 'complete'}
               onClick={() => applyDriverWorkStep(trip, id)}
-              className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+              className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-2.5 py-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                 id === 'complete'
                   ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                   : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
@@ -1012,34 +1013,34 @@ const OperationsCommandCenter = ({
       <div className={`${embeddedInTable ? 'rounded-3xl border border-slate-100/50 bg-slate-50/80 p-4 shadow-sm' : 'mt-2 rounded-3xl border border-slate-100/50 bg-slate-50/80 p-4 shadow-sm'} space-y-3`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700">
               {to12hr(trip.time)}
             </span>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getStatusPillClass(trip.status)}`}>
+            <span className={`rounded-full px-2 py-0.5 text-xs ${getStatusPillClass(trip.status)}`}>
               {trip.status}
             </span>
             {bookingReference && (
-              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
                 {bookingReference}
               </span>
             )}
             {clientIdentifier && (
-              <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+              <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-[10px] text-violet-700">
                 {clientIdentifier}
               </span>
             )}
             {serviceLabel && (
-              <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+              <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
                 {serviceLabel}
               </span>
             )}
             {passengerTypes && (
-              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
                 {passengerTypes}
               </span>
             )}
             {spaceTypes && spaceTypes !== passengerTypes && (
-              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-600">
                 {spaceTypes}
               </span>
             )}
@@ -1047,7 +1048,7 @@ const OperationsCommandCenter = ({
           <button
             type="button"
             onClick={() => toggleTripExpanded(trip.id)}
-            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
+            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-[10px] text-slate-600 hover:bg-slate-50"
           >
             Collapse
           </button>
@@ -1055,7 +1056,7 @@ const OperationsCommandCenter = ({
 
         <div className={`grid gap-3 ${compact ? 'xl:grid-cols-[1.1fr_1.1fr_0.9fr]' : 'xl:grid-cols-[1.15fr_1.15fr_0.95fr]'}`}>
           <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
-            <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">Pickup</p>
+            <p className="text-xs uppercase tracking-widest text-blue-700">Pickup</p>
             <div className="mt-2 space-y-2">
               {pickupItems.map(([label, value]) => (
                 <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-[10px] font-medium text-slate-600">
@@ -1067,7 +1068,7 @@ const OperationsCommandCenter = ({
           </div>
 
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
-            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Dropoff</p>
+            <p className="text-xs uppercase tracking-widest text-emerald-700">Dropoff</p>
             <div className="mt-2 space-y-2">
               {dropoffItems.map(([label, value]) => (
                 <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-[10px] font-medium text-slate-600">
@@ -1079,7 +1080,7 @@ const OperationsCommandCenter = ({
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Manifest Summary</p>
+            <p className="text-xs uppercase tracking-widest text-slate-500">Manifest Summary</p>
             <div className="mt-2 space-y-2">
               {manifestSummaryItems.map(([label, value]) => (
                 <div key={label} className="grid grid-cols-[110px_minmax(0,1fr)] gap-2 text-[10px] font-medium text-slate-600">
@@ -1094,13 +1095,13 @@ const OperationsCommandCenter = ({
         {(routeAssignments.length > 0 || noteItems.length > 0 || mobility.length > 0 || mobilityAids) && (
           <div className="grid gap-3 xl:grid-cols-[0.95fr_1.25fr]">
             <div className="rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-indigo-700">Route & Transport</p>
+              <p className="text-xs uppercase tracking-widest text-indigo-700">Route & Transport</p>
               {routeAssignments.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {routeAssignments.map((route, index) => (
                     <span
                       key={`${route.templateId || route.routeName}-${index}`}
-                      className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700"
+                      className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700"
                     >
                       <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` - ${route.statusLabel}` : ''}
                     </span>
@@ -1112,12 +1113,12 @@ const OperationsCommandCenter = ({
               {(mobility.length > 0 || mobilityAids) && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {mobilityAids && (
-                    <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                    <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700">
                       {mobilityAids}
                     </span>
                   )}
                   {mobility.map((tag) => (
-                    <span key={tag} className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                    <span key={tag} className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700">
                       {tag}
                     </span>
                   ))}
@@ -1126,11 +1127,11 @@ const OperationsCommandCenter = ({
             </div>
 
             <div className="rounded-2xl border border-amber-100 bg-white p-3 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">Comments, Message & Notes</p>
+              <p className="text-xs uppercase tracking-widest text-amber-700">Comments, Message & Notes</p>
               <div className="mt-2 space-y-2">
                 {noteItems.length > 0 ? noteItems.map(([label, value]) => (
                   <div key={label} className="rounded-lg border border-amber-100 bg-amber-50 p-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">{label}</p>
+                    <p className="text-xs uppercase tracking-wide text-amber-700">{label}</p>
                     <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-700 break-words">{value}</p>
                   </div>
                 )) : (
@@ -1143,11 +1144,11 @@ const OperationsCommandCenter = ({
 
         {extraUploadedFields.length > 0 && (
           <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Additional Uploaded Fields</p>
+            <p className="text-xs uppercase tracking-widest text-slate-500">Additional Uploaded Fields</p>
             <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {extraUploadedFields.map(([label, value]) => (
                 <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
                   <p className="mt-1 text-[11px] font-medium break-words text-slate-800">{value}</p>
                 </div>
               ))}
@@ -1239,7 +1240,7 @@ const OperationsCommandCenter = ({
           <button
             key={tab}
             onClick={() => setOperationsTab(tab)}
-            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all duration-200 uppercase tracking-wider whitespace-nowrap ${
+            className={`px-2.5 py-1 rounded-full text-[10px] transition-all duration-200 uppercase tracking-wider whitespace-nowrap ${
               operationsTab === tab
                 ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
                 : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/30'
@@ -1253,16 +1254,16 @@ const OperationsCommandCenter = ({
       <div className="w-px h-5 bg-slate-200 shrink-0"></div>
 
       {/* Trip / Upload / Routes / Map */}
-      <button onClick={() => setShowAddTripModal(true)} className="inline-flex items-center gap-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-2 py-1 text-[10px] font-semibold text-white transition-colors shrink-0 whitespace-nowrap">
+      <button onClick={() => setShowAddTripModal(true)} className="inline-flex items-center gap-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-2 py-1 text-[10px] text-white transition-colors shrink-0 whitespace-nowrap">
         <Plus size={12} /> Trip
       </button>
-      <button onClick={() => setShowUploadModal(true)} className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
+      <button onClick={() => setShowUploadModal(true)} className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
         <UploadCloud size={12} /> Upload
       </button>
-      <button onClick={() => onOpenSequencer?.()} className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
+      <button onClick={() => onOpenSequencer?.()} className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
         <Route size={12} /> Routes
       </button>
-      <button onClick={() => onOpenLiveMap?.()} className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
+      <button onClick={() => onOpenLiveMap?.()} className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
         <MapPin size={12} /> Map
       </button>
 
@@ -1276,7 +1277,7 @@ const OperationsCommandCenter = ({
 
       {/* Sort & Filter: Time, Driver, Status, Client, Urgency */}
       <div className="flex items-center gap-0.5 shrink-0">
-        <span className="text-[12px] font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap mr-1">Sort:</span>
+        <span className="text-[12px] text-slate-500 uppercase tracking-wide whitespace-nowrap mr-1">Sort:</span>
         {[
           { id: 'time', label: 'Time' },
           { id: 'assignment', label: 'Driver' },
@@ -1293,7 +1294,7 @@ const OperationsCommandCenter = ({
                 handleSortSelect(option.id);
               }
             }}
-            className={`flex items-center gap-0.5 px-1.5 py-1 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+            className={`flex items-center gap-0.5 px-1.5 py-1 rounded-lg text-xs transition-colors whitespace-nowrap ${
               sortBy === option.id 
                 ? 'bg-blue-100 text-blue-800 shadow-sm' 
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'
@@ -1306,7 +1307,7 @@ const OperationsCommandCenter = ({
       </div>
 
       {/* Status: All */}
-      <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-1.5 py-1 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer shadow-sm shrink-0">
+      <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-1.5 py-1 text-xs bg-white border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer shadow-sm shrink-0">
         <option value="all">Status: All</option>
         <option value="Unassigned">Unassigned</option>
         <option value="Assigned">Assigned</option>
@@ -1315,7 +1316,7 @@ const OperationsCommandCenter = ({
       </select>
 
       {/* Driver: All */}
-      <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-1.5 py-1 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer shadow-sm shrink-0">
+      <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-1.5 py-1 text-xs bg-white border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-slate-50 cursor-pointer shadow-sm shrink-0">
         <option value="all">Driver: All</option>
         <option value="unassigned">None</option>
         {driverOptions.map((driver) => (
@@ -1330,7 +1331,7 @@ const OperationsCommandCenter = ({
             key={option.value}
             type="button"
             onClick={() => setManifestView(option.value)}
-            className={`h-6 rounded-md px-2 text-[9px] font-semibold uppercase tracking-wide transition-colors whitespace-nowrap ${
+            className={`h-6 rounded-md px-2 text-[9px] uppercase tracking-wide transition-colors whitespace-nowrap ${
               manifestView === option.value
                 ? 'bg-slate-900 text-white'
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
@@ -1379,12 +1380,12 @@ const OperationsCommandCenter = ({
               <Clock size={16} className={isLate ? 'text-rose-500' : 'text-orange-500'} />
               <span className={`font-bold text-base md:text-lg ${isLate ? 'text-rose-600' : 'text-orange-600'}`}>{timeDisplay}</span>
               {urgencyDisplay && (
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${isLate ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-md ${isLate ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>
                   {urgencyDisplay}
                 </span>
               )}
             </div>
-            <span className="hidden md:inline text-slate-300 font-bold mx-1 shrink-0">•</span>
+            <span className="hidden md:inline text-slate-300 mx-1 shrink-0">•</span>
             <span className="font-bold text-slate-800 uppercase truncate max-w-[120px] md:max-w-none">
               {passengerName}
             </span>
@@ -1392,7 +1393,7 @@ const OperationsCommandCenter = ({
           
           <div className="flex items-center gap-2 md:gap-3 shrink-0 ml-2">
             {distanceTop && <span className="hidden md:inline text-xs text-slate-500 font-medium">{distanceTop}</span>}
-            <span className="border border-slate-200 text-slate-600 text-xs font-semibold px-1.5 py-0.5 rounded uppercase bg-slate-50">
+            <span className="border border-slate-200 text-slate-600 text-xs px-1.5 py-0.5 rounded uppercase bg-slate-50">
               {legsCount}
             </span>
           </div>
@@ -1445,33 +1446,33 @@ const OperationsCommandCenter = ({
         {isExpanded && (
           <div className="mt-3 space-y-2 border-t border-slate-100 pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-              <button onClick={() => setManualAssignTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">
+              <button onClick={() => setManualAssignTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs text-white transition-colors hover:bg-blue-700">
                 <UserPlus size={14} /> {driver ? 'Reassign' : 'Assign'}
               </button>
-              <button onClick={() => triggerSmartAssign(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700">
+              <button onClick={() => triggerSmartAssign(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs text-white transition-colors hover:bg-indigo-700">
                 <BrainCircuit size={14} /> Auto
               </button>
-              <button onClick={() => setEditTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100">
+              <button onClick={() => setEditTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700 transition-colors hover:bg-blue-100">
                 <Edit2 size={14} /> Edit
               </button>
-              <button onClick={() => markTripException(trip, 'Rerouted')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600">
+              <button onClick={() => markTripException(trip, 'Rerouted')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-xs text-white transition-colors hover:bg-amber-600">
                 <MapPin size={14} /> Reroute
               </button>
-              <button onClick={() => markTripException(trip, 'No Show')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-700 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-800">
+              <button onClick={() => markTripException(trip, 'No Show')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-700 px-3 py-2 text-xs text-white transition-colors hover:bg-slate-800">
                 <AlertCircle size={14} /> No Show
               </button>
-              <button onClick={() => markTripException(trip, 'Cancelled')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-rose-600">
+              <button onClick={() => markTripException(trip, 'Cancelled')} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-xs text-white transition-colors hover:bg-rose-600">
                 <XCircle size={14} /> Cancel
               </button>
-              <button onClick={() => requestDeleteTrip(trip.id)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200">
+              <button onClick={() => requestDeleteTrip(trip.id)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-700 transition-colors hover:bg-slate-200">
                 <Archive size={14} /> Archive
               </button>
               {(trip.patientPhone || trip.pickupPhone || trip.dropoffPhone) && (
-                <button onClick={() => makeCall(trip.patientPhone || trip.pickupPhone, trip.patient)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-teal-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-teal-600">
+                <button onClick={() => makeCall(trip.patientPhone || trip.pickupPhone, trip.patient)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-teal-500 px-3 py-2 text-xs text-white transition-colors hover:bg-teal-600">
                   <Phone size={14} /> Call
                 </button>
               )}
-              <button onClick={() => setSmsConversationTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-600">
+              <button onClick={() => setSmsConversationTrip(trip)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-xs text-white transition-colors hover:bg-indigo-600">
                 <MessageSquare size={14} /> SMS
               </button>
             </div>
@@ -1496,7 +1497,7 @@ const OperationsCommandCenter = ({
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
               <FileText size={28} />
             </div>
-            <p className="text-base font-semibold text-slate-900">Dispatch board is clear</p>
+            <p className="text-base text-slate-900">Dispatch board is clear</p>
             <p className="mt-1.5 text-sm">Try another view, reset the filters, or upload more trips.</p>
           </div>
         </div>
@@ -1507,24 +1508,24 @@ const OperationsCommandCenter = ({
               <section key={section.key} className="rounded-3xl border border-slate-100/50 bg-white shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
                 <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 bg-slate-50/70">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-900">{section.label}</div>
+                    <div className="truncate text-sm text-slate-900">{section.label}</div>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
                         {section.trips.length} trip{section.trips.length !== 1 ? 's' : ''}
                       </span>
                       {section.lateCount > 0 && (
-                        <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                        <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] text-rose-700">
                           {section.lateCount} late
                         </span>
                       )}
                       {section.unassignedCount > 0 && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-700">
                           {section.unassignedCount} open
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <div className="text-xs uppercase tracking-wide text-slate-500">
                     {manifestGroupBy}
                   </div>
                 </div>
@@ -1541,7 +1542,7 @@ const OperationsCommandCenter = ({
               <button
                 type="button"
                 onClick={() => setManifestLimit((prev) => prev + 150)}
-                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-100"
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-700 hover:bg-slate-100"
               >
                 Load 150 More
               </button>
@@ -1580,7 +1581,7 @@ const OperationsCommandCenter = ({
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
                 <FileText size={28} />
               </div>
-              <p className="text-base font-semibold text-slate-900">No trips to dispatch</p>
+              <p className="text-base text-slate-900">No trips to dispatch</p>
               <p className="mt-1.5 text-sm">Try adjusting your filters or upload new trip data.</p>
             </div>
           </div>
@@ -1601,7 +1602,7 @@ const OperationsCommandCenter = ({
                           setSortDirection('asc');
                         }
                       }}
-                      className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      className={`shrink-0 px-3 py-1.5 rounded-xl text-xs transition-all ${
                         sortBy === opt.value
                           ? 'bg-slate-900 text-white shadow-sm'
                           : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
@@ -1613,7 +1614,7 @@ const OperationsCommandCenter = ({
                 </div>
                 <button
                   onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                  className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 flex items-center gap-1"
+                  className="shrink-0 px-3 py-1.5 rounded-xl text-xs bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 flex items-center gap-1"
                 >
                   {sortDirection === 'asc' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                   {sortDirection === 'asc' ? 'Asc' : 'Desc'}
@@ -1670,20 +1671,20 @@ const OperationsCommandCenter = ({
                               {to12hr(trip.time)}
                             </span>
                             {minsUntil !== null && (
-                              <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md shrink-0">
+                              <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md shrink-0">
                                 in {minsUntil} min
                               </span>
                             )}
                           </div>
-                          <span className="text-slate-300 font-bold mx-0.5 shrink-0 hidden sm:inline">•</span>
+                          <span className="text-slate-300 mx-0.5 shrink-0 hidden sm:inline">•</span>
                           <span className="font-semibold text-slate-900 truncate text-sm">
                             {trip.patient || 'Unnamed Client'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
-                          <span className="text-[11px] font-semibold text-slate-500">{distance !== '—' ? `${distance} mi` : '—'}</span>
+                          <span className="text-[11px] text-slate-500">{distance !== '—' ? `${distance} mi` : '—'}</span>
                           {routeLegs.length > 0 && (
-                            <span className="border border-slate-200 text-slate-600 text-xs font-semibold px-2 py-0.5 rounded-md">
+                            <span className="border border-slate-200 text-slate-600 text-xs px-2 py-0.5 rounded-md">
                               {routeLegs.length} LEG{routeLegs.length !== 1 ? 'S' : ''}
                             </span>
                           )}
@@ -1712,28 +1713,28 @@ const OperationsCommandCenter = ({
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                         <div className="flex items-center gap-1.5">
                           <User size={12} className="text-slate-500 shrink-0" />
-                          <span className="text-xs font-semibold text-slate-700 truncate">
+                          <span className="text-xs text-slate-700 truncate">
                             {driver?.name || trip.driverName || <span className="text-red-500 italic">Unassigned</span>}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <Car size={12} className="text-slate-500 shrink-0" />
-                          <span className="text-xs font-semibold text-slate-700 truncate">
+                          <span className="text-xs text-slate-700 truncate">
                             {driver?.vehicle || '—'}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           {driver ? (
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold ${getDriverLiveStatus(driver).color}`}>
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-xs ${getDriverLiveStatus(driver).color}`}>
                               {getDriverLiveStatus(driver).label}
                             </span>
                           ) : (
-                            <span className="text-xs font-semibold text-slate-500">—</span>
+                            <span className="text-xs text-slate-500">—</span>
                           )}
                         </div>
                         <div className="flex items-center gap-1.5">
                           <MapIcon size={12} className="text-slate-500 shrink-0" />
-                          <span className="text-xs font-semibold text-slate-700 truncate">
+                          <span className="text-xs text-slate-700 truncate">
                             {distance !== '—' ? `${distance} mi` : '—'}
                           </span>
                         </div>
@@ -1746,19 +1747,19 @@ const OperationsCommandCenter = ({
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                           <button
                             onClick={() => setManualAssignTrip(trip)}
-                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs text-white transition-colors hover:bg-blue-700"
                           >
                             <UserPlus size={14} /> {driver ? 'Reassign' : 'Assign'}
                           </button>
                           <button
                             onClick={() => triggerSmartAssign(trip)}
-                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs text-white transition-colors hover:bg-indigo-700"
                           >
                             <BrainCircuit size={14} /> Auto
                           </button>
                           <button
                             onClick={() => setEditTrip(trip)}
-                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700 transition-colors hover:bg-blue-100"
                           >
                             <Edit2 size={14} /> Edit
                           </button>
@@ -1766,25 +1767,25 @@ const OperationsCommandCenter = ({
                             <>
                               <button
                                 onClick={() => markTripException(trip, 'Rerouted')}
-                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600"
+                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-xs text-white transition-colors hover:bg-amber-600"
                               >
                                 <MapPin size={14} /> Reroute
                               </button>
                               <button
                                 onClick={() => markTripException(trip, 'No Show')}
-                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-700 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
+                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-700 px-3 py-2 text-xs text-white transition-colors hover:bg-slate-800"
                               >
                                 <AlertCircle size={14} /> No Show
                               </button>
                               <button
                                 onClick={() => markTripException(trip, 'Cancelled')}
-                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-rose-600"
+                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-xs text-white transition-colors hover:bg-rose-600"
                               >
                                 <XCircle size={14} /> Cancel
                               </button>
                               <button
                                 onClick={() => requestDeleteTrip(trip.id)}
-                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200"
+                                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-700 transition-colors hover:bg-slate-200"
                               >
                                 <Archive size={14} /> Archive
                               </button>
@@ -1792,7 +1793,7 @@ const OperationsCommandCenter = ({
                           )}
                           <button
                             onClick={() => setSmsConversationTrip(trip)}
-                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-600"
+                            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-xs text-white transition-colors hover:bg-indigo-600"
                           >
                             <Phone size={14} /> Contacts
                           </button>
@@ -1804,7 +1805,7 @@ const OperationsCommandCenter = ({
                     {/* Expand/Collapse Toggle */}
                     <button
                       onClick={() => toggleTripExpanded(trip.id)}
-                      className="w-full border-t border-slate-100 py-2.5 flex items-center justify-center text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+                      className="w-full border-t border-slate-100 py-2.5 flex items-center justify-center text-xs text-slate-500 hover:bg-slate-50 transition-colors"
                     >
                       {isExpanded ? 'Hide Actions' : 'Show Actions'}
                       {isExpanded ? (
@@ -1827,7 +1828,7 @@ const OperationsCommandCenter = ({
                 <button
                   type="button"
                   onClick={() => setManifestLimit((prev) => prev + 150)}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-100"
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-700 hover:bg-slate-100"
                 >
                   Load 150 More
                 </button>
@@ -1848,7 +1849,7 @@ const OperationsCommandCenter = ({
             <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500">
               <FileText size={28} />
             </div>
-            <p className="text-base font-semibold text-slate-900">No trips found</p>
+            <p className="text-base text-slate-900">No trips found</p>
             <p className="text-sm mt-1.5">Try adjusting your filters or upload new trip data</p>
           </div>
         </div>
@@ -1857,14 +1858,14 @@ const OperationsCommandCenter = ({
           <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-slate-900">Dispatch Ledger</p>
+                <p className="text-sm text-slate-900">Dispatch Ledger</p>
                 <p className="text-[11px] font-medium text-slate-500">
                   Structured manifest view with richer client detail, routing context, and driver assignment controls.
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600">{densityProfile.label} view</span>
-                <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">{visibleTrips.length} visible</span>
+                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] text-slate-600">{densityProfile.label} view</span>
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] text-blue-700">{visibleTrips.length} visible</span>
               </div>
             </div>
           </div>
@@ -1901,12 +1902,12 @@ const OperationsCommandCenter = ({
                     </button>
                   </th>
                   {MANIFEST_TABLE_COLUMNS.map(({ label, sortKey }) => (
-                    <th key={label} className={`${densityProfile.tableHead} text-left text-xs font-semibold uppercase tracking-widest text-slate-200 align-middle`}>
+                    <th key={label} className={`${densityProfile.tableHead} text-left text-xs uppercase tracking-widest text-slate-200 align-middle`}>
                       {sortKey ? (
                         <button
                           type="button"
                           onClick={() => handleColumnSort(sortKey)}
-                          className={`group inline-flex w-full items-center gap-1.5 rounded-lg px-1.5 py-1 text-left font-semibold uppercase tracking-widest transition-colors ${
+                          className={`group inline-flex w-full items-center gap-1.5 rounded-lg px-1.5 py-1 text-left uppercase tracking-widest transition-colors ${
                             sortBy === sortKey ? 'bg-white/12 text-white' : 'text-blue-50/90 hover:bg-white/10 hover:text-white'
                           }`}
                           title={`Sort by ${label}`}
@@ -1956,7 +1957,8 @@ const OperationsCommandCenter = ({
                   return (
                     <React.Fragment key={trip.id}>
                     <tr
-                      className={`${rowBg} transition-colors hover:bg-blue-50/50`}
+                      className={`${activeTripRow === trip.id ? 'bg-blue-100' : rowBg} transition-colors hover:bg-blue-50/70 cursor-pointer`}
+                      onClick={() => setActiveTripRow(trip.id)}
                     >
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-start pt-1`}>
@@ -1974,21 +1976,21 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-center`}>
-                          <span className="text-[10px] font-mono font-semibold text-slate-500">{trip.bookingId || trip.id || '—'}</span>
+                          <span className="text-[10px] font-mono text-slate-500">{trip.bookingId || trip.id || '—'}</span>
                         </div>
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} flex-col ${densityProfile.lineCount >= 3 ? 'justify-between' : 'justify-center'}`}>
-                          <div className={`font-mono font-semibold ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-emerald-600'} ${manifestDensity === 'executive' ? 'text-lg' : manifestDensity === 'dense' ? 'text-[13px]' : densityProfile.lineCount <= 2 ? 'text-[13px]' : 'text-base'}`}>
+                          <div className={`font-mono ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-emerald-600'} ${manifestDensity === 'executive' ? 'text-lg' : manifestDensity === 'dense' ? 'text-[13px]' : densityProfile.lineCount <= 2 ? 'text-[13px]' : 'text-base'}`}>
                             {to12hr(trip.time)}
                           </div>
                           {densityProfile.lineCount >= 2 && densityProfile.showStatusMeta && (
-                            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            <div className="text-[10px] uppercase tracking-wide text-slate-500">
                               {urgency === 'late' ? 'Late risk' : urgency === 'soon' ? 'Starts soon' : 'On schedule'}
                             </div>
                           )}
                           {densityProfile.lineCount >= 3 && densityProfile.showStatusMeta && routeAssignments.length > 0 && (
-                            <div className="text-[10px] font-semibold text-indigo-700">
+                            <div className="text-[10px] text-indigo-700">
                               {routeAssignments.length} routed stop{routeAssignments.length !== 1 ? 's' : ''}
                             </div>
                           )}
@@ -1996,27 +1998,27 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} flex-col ${densityProfile.lineCount >= 3 ? 'justify-between' : 'justify-center'} ${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'gap-1.5' : 'gap-2') : 'gap-0.5'}`}>
-                          <div className={`font-bold leading-snug text-slate-900 ${manifestDensity === 'executive' ? 'text-[11px]' : densityProfile.lineCount <= 2 ? 'text-[10px]' : 'text-[11px]'}`}>
+                          <div className={`leading-snug text-slate-900 ${manifestDensity === 'executive' ? 'text-[11px]' : densityProfile.lineCount <= 2 ? 'text-[10px]' : 'text-[11px]'}`}>
                             {trip.patient || 'Unnamed Client'}
                           </div>
                           {densityProfile.lineCount <= 2 ? (
                             densityProfile.lineCount === 2 && clientSummary && (
-                              <div className="text-[10px] font-semibold text-slate-500 truncate">{clientSummary}</div>
+                              <div className="text-[10px] text-slate-500 truncate">{clientSummary}</div>
                             )
                           ) : (
                             <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} flex flex-wrap gap-1`}>
                               {bookingReference && (
-                                <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                                <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
                                   {bookingReference}
                                 </span>
                               )}
                               {clientIdentifier && (
-                                <span className="inline-flex items-center rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+                                <span className="inline-flex items-center rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-[10px] text-violet-700">
                                   {clientIdentifier}
                                 </span>
                               )}
                               {(trip.type || trip.serviceType) && (
-                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
                                   {trip.type || trip.serviceType}
                                 </span>
                               )}
@@ -2025,13 +2027,13 @@ const OperationsCommandCenter = ({
                           {densityProfile.lineCount >= 3 && (
                             <div className={isLeanDensity ? 'space-y-0.5' : 'space-y-1'}>
                               {clientPhone && (
-                                <div className="text-[10px] font-semibold text-emerald-700">Client {clientPhone}</div>
+                                <div className="text-[10px] text-emerald-700">Client {clientPhone}</div>
                               )}
                               {densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && (
-                                <div className="text-[10px] font-semibold text-emerald-700">Pickup desk {pickupPhone}</div>
+                                <div className="text-[10px] text-emerald-700">Pickup desk {pickupPhone}</div>
                               )}
                               {densityProfile.showSecondaryPhones && dropoffPhone && (
-                                <div className="text-[10px] font-semibold text-rose-700">Hospital {dropoffPhone}</div>
+                                <div className="text-[10px] text-rose-700">Hospital {dropoffPhone}</div>
                               )}
                               {densityProfile.showNotesPreview && trip.notes && (
                                 <div className="text-[10px] font-medium leading-relaxed text-amber-700" style={getClampStyle(densityProfile.noteLines)}>
@@ -2044,16 +2046,16 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] font-semibold text-slate-700 truncate`}>
+                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] text-slate-700 truncate`}>
                             {trip.pickup || '—'}
                           </div>
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-blue-100 bg-blue-50/70 rounded-lg px-2 py-1' : 'border border-blue-100 bg-blue-50/70 rounded-2xl px-3 py-2'}`}>
-                            {densityProfile.lineCount >= 3 && <div className="text-xs font-semibold uppercase tracking-wide text-blue-700 truncate">Pickup</div>}
+                            {densityProfile.lineCount >= 3 && <div className="text-xs uppercase tracking-wide text-blue-700 truncate">Pickup</div>}
                             {densityProfile.lineCount >= 3 && densityProfile.showFacilityNames && pickupFacilityName && (
-                              <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-800 truncate">{pickupFacilityName}</div>
+                              <div className="text-[10px] uppercase tracking-wide text-blue-800 truncate">{pickupFacilityName}</div>
                             )}
-                            <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} font-semibold leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
+                            <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
                               {trip.pickup || 'Missing pickup address'}
                             </div>
                             {densityProfile.lineCount >= 3 && clientPhone && (
@@ -2067,16 +2069,16 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] font-semibold text-slate-700 truncate`}>
+                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] text-slate-700 truncate`}>
                             {trip.dropoff || '—'}
                           </div>
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-emerald-100 bg-emerald-50/70 rounded-lg px-2 py-1' : 'border border-emerald-100 bg-emerald-50/70 rounded-2xl px-3 py-2'}`}>
-                            {densityProfile.lineCount >= 3 && <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700 truncate">Dropoff</div>}
+                            {densityProfile.lineCount >= 3 && <div className="text-xs uppercase tracking-wide text-emerald-700 truncate">Dropoff</div>}
                             {densityProfile.lineCount >= 3 && densityProfile.showFacilityNames && dropoffFacilityName && (
-                              <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 truncate">{dropoffFacilityName}</div>
+                              <div className="text-[10px] uppercase tracking-wide text-emerald-800 truncate">{dropoffFacilityName}</div>
                             )}
-                            <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} font-semibold leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
+                            <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
                               {trip.dropoff || 'Missing dropoff address'}
                             </div>
                             {densityProfile.lineCount >= 3 && densityProfile.showSecondaryPhones && dropoffPhone && (
@@ -2087,7 +2089,7 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] font-semibold truncate`}>
+                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] truncate`}>
                             {driver ? (
                               <span className="text-slate-800">{driver.name}</span>
                             ) : (
@@ -2097,13 +2099,13 @@ const OperationsCommandCenter = ({
                         ) : densityProfile.lineCount === 2 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-center ${isLeanDensity ? 'border border-slate-200 bg-slate-50 rounded-lg px-2 py-1' : 'rounded-2xl px-3 py-2'} ${densityProfile.showExecutiveAccent ? 'bg-slate-900 text-white' : 'bg-slate-50'}`}>
                             {driver ? (
-                              <div className="text-[11px] font-bold text-slate-900 truncate">{driver.name}</div>
+                              <div className="text-[11px] text-slate-900 truncate">{driver.name}</div>
                             ) : (
-                              <div className="text-[11px] font-bold text-rose-600 truncate">Awaiting assignment</div>
+                              <div className="text-[11px] text-rose-600 truncate">Awaiting assignment</div>
                             )}
                             {routeAssignments.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-0.5">
-                                <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">
+                                <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] text-indigo-700">
                                   {routeAssignments[0].routeName}{routeAssignments.length > 1 ? ` +${routeAssignments.length - 1}` : ''}
                                 </span>
                               </div>
@@ -2112,10 +2114,10 @@ const OperationsCommandCenter = ({
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between border border-slate-200 ${isLeanDensity ? 'rounded-lg px-2.5 py-1.5' : 'rounded-2xl px-3 py-2'} ${densityProfile.showExecutiveAccent ? 'bg-slate-900 text-white' : 'bg-slate-50'}`}>
                             <div>
-                              <div className={`text-xs font-semibold uppercase tracking-wide ${densityProfile.showExecutiveAccent ? 'text-slate-300' : 'text-slate-500'}`}>Driver</div>
+                              <div className={`text-xs uppercase tracking-wide ${densityProfile.showExecutiveAccent ? 'text-slate-300' : 'text-slate-500'}`}>Driver</div>
                               {driver ? (
                                 <>
-                                  <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[11px] font-bold ${densityProfile.showExecutiveAccent ? 'text-white' : 'text-slate-900'}`}>{driver.name}</div>
+                                  <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[11px] ${densityProfile.showExecutiveAccent ? 'text-white' : 'text-slate-900'}`}>{driver.name}</div>
                                   {densityProfile.showAssignmentMeta && densityProfile.lineCount >= 3 && (
                                     <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium leading-snug ${densityProfile.showExecutiveAccent ? 'text-slate-300' : 'text-slate-500'}`}>{driver.vehicle || driver.status || 'Driver active'}</div>
                                   )}
@@ -2126,13 +2128,13 @@ const OperationsCommandCenter = ({
                                   )}
                                 </>
                               ) : (
-                                <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[11px] font-bold text-rose-600`}>Awaiting assignment</div>
+                                <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[11px] text-rose-600`}>Awaiting assignment</div>
                               )}
                             </div>
                             {routeAssignments.length > 0 && (
                               <div className={`${isLeanDensity ? 'mt-1' : 'mt-2'} flex flex-wrap gap-1`}>
                                 {visibleRouteAssignments.map((route, routeIndex) => (
-                                  <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                  <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700">
                                     {route.routeName}{route.time ? ` @ ${route.time}` : ''}
                                   </span>
                                 ))}
@@ -2144,13 +2146,13 @@ const OperationsCommandCenter = ({
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center`}>
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold ${getStatusPillClass(trip.status)}`}>
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] ${getStatusPillClass(trip.status)}`}>
                               {trip.status}
                             </span>
                           </div>
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between`}>
-                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusPillClass(trip.status)}`}>
+                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs ${getStatusPillClass(trip.status)}`}>
                               {trip.status}
                             </span>
                             {densityProfile.lineCount >= 3 && densityProfile.showStatusMeta && ACTIVE_PROGRESS_STATUSES.includes(trip.status) && (
@@ -2165,7 +2167,7 @@ const OperationsCommandCenter = ({
                               </div>
                             )}
                             {densityProfile.lineCount >= 2 && (
-                              <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-1' : 'mt-2') : 'mt-0.5'} text-[10px] font-semibold text-slate-500 truncate`}>
+                              <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-1' : 'mt-2') : 'mt-0.5'} text-[10px] text-slate-500 truncate`}>
                                 {bookingReference
                                   ? `${bookingReference}`
                                   : clientIdentifier
@@ -2241,7 +2243,7 @@ const OperationsCommandCenter = ({
                 <button
                   type="button"
                   onClick={() => setManifestLimit((prev) => prev + 150)}
-                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-[10px] text-slate-600 hover:bg-slate-50"
                 >
                   Load 150 More
                 </button>
@@ -2259,20 +2261,20 @@ const OperationsCommandCenter = ({
     <div className="flex-1 overflow-y-auto p-3">
       <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <div className="rounded-3xl border border-slate-100/50 bg-white px-4 py-3 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Drivers</div>
-          <div className="mt-1 text-2xl font-semibold text-slate-900">{fleetDrivers.length}</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">Drivers</div>
+          <div className="mt-1 text-2xl text-slate-900">{fleetDrivers.length}</div>
         </div>
         <div className="rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-3 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Available</div>
-          <div className="mt-1 text-2xl font-semibold text-emerald-800">{availableDrivers.length}</div>
+          <div className="text-xs uppercase tracking-wide text-emerald-700">Available</div>
+          <div className="mt-1 text-2xl text-emerald-800">{availableDrivers.length}</div>
         </div>
         <div className="rounded-3xl border border-amber-100 bg-amber-50 px-4 py-3 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Busy</div>
-          <div className="mt-1 text-2xl font-semibold text-amber-800">{busyDrivers.length}</div>
+          <div className="text-xs uppercase tracking-wide text-amber-700">Busy</div>
+          <div className="mt-1 text-2xl text-amber-800">{busyDrivers.length}</div>
         </div>
         <div className="rounded-3xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">Active Trips</div>
-          <div className="mt-1 text-2xl font-semibold text-blue-800">{inProgressTrips.length}</div>
+          <div className="text-xs uppercase tracking-wide text-blue-700">Active Trips</div>
+          <div className="mt-1 text-2xl text-blue-800">{inProgressTrips.length}</div>
         </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -2288,7 +2290,7 @@ const OperationsCommandCenter = ({
               <div className="p-4 cursor-pointer select-none" onClick={() => setExpandedDriver(isExpanded ? null : d.id)}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm bg-gradient-to-br ${
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm bg-gradient-to-br ${
                       d.status === 'Available'
                         ? 'from-emerald-500 to-teal-600 shadow-emerald-500/20'
                         : 'from-amber-500 to-orange-600 shadow-amber-500/20'
@@ -2296,13 +2298,13 @@ const OperationsCommandCenter = ({
                       {String(d?.name || '?').charAt(0)}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{d.name || 'Unknown Driver'}</p>
+                      <p className="text-sm text-slate-900">{d.name || 'Unknown Driver'}</p>
                       <p className="text-micro text-slate-500">{d.vehicle}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-semibold ${getDriverLiveStatus(d).color}`}>
+                      <span className={`px-2 py-0.5 rounded text-[9px] ${getDriverLiveStatus(d).color}`}>
                         {getDriverLiveStatus(d).label}
                       </span>
                     </div>
@@ -2316,7 +2318,7 @@ const OperationsCommandCenter = ({
                   <span className="opacity-50">|</span>
                   <span>{d.odometer?.toLocaleString()} mi</span>
                   {isMaintenanceDue && (
-                    <span className="text-rose-600 font-semibold flex items-center gap-1">
+                    <span className="text-rose-600 flex items-center gap-1">
                       <AlertTriangle size={10} /> Service Due
                     </span>
                   )}
@@ -2328,7 +2330,7 @@ const OperationsCommandCenter = ({
                 <div className="animate-scale-in bg-slate-50 border-t border-slate-100">
                   {driverTrips.length > 0 ? (
                     <div className="p-3 space-y-1.5">
-                      <p className="text-micro font-semibold uppercase tracking-wide text-slate-500 px-1">Active Trips ({driverTrips.length})</p>
+                      <p className="text-micro uppercase tracking-wide text-slate-500 px-1">Active Trips ({driverTrips.length})</p>
                       {driverTrips.map(t => {
                         const isTripCardExpanded = isTripExpanded(t.id);
                         const bookingReference = getBookingReference(t);
@@ -2345,23 +2347,23 @@ const OperationsCommandCenter = ({
                             <div className="min-w-0">
                               <p className="text-xs font-medium text-slate-900 truncate">{t.patient}</p>
                               {densityProfile.lineCount <= 2 ? (
-                                <div className="mt-0.5 text-[10px] font-semibold text-slate-500" style={getClampStyle(densityProfile.lineCount)}>
+                                <div className="mt-0.5 text-[10px] text-slate-500" style={getClampStyle(densityProfile.lineCount)}>
                                   {[bookingReference, clientIdentifier && `ID ${clientIdentifier}`, (t.type || t.serviceType)].filter(Boolean).join(' • ')}
                                 </div>
                               ) : (
                               <div className="mt-1 flex flex-wrap gap-1">
                                 {bookingReference && (
-                                  <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                                  <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700">
                                     {bookingReference}
                                   </span>
                                 )}
                                 {clientIdentifier && (
-                                  <span className="inline-flex items-center rounded-full border border-violet-100 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                                  <span className="inline-flex items-center rounded-full border border-violet-100 bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700">
                                     {clientIdentifier}
                                   </span>
                                 )}
                                 {(t.type || t.serviceType) && (
-                                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
                                     {t.type || t.serviceType}
                                   </span>
                                 )}
@@ -2435,7 +2437,7 @@ const OperationsCommandCenter = ({
           <button
             type="button"
             onClick={() => setFleetLimit((prev) => prev + 30)}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-700 hover:bg-slate-50"
           >
             Load 30 More Drivers
           </button>
@@ -2453,7 +2455,7 @@ const OperationsCommandCenter = ({
             <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500">
               <Phone size={28} />
             </div>
-            <p className="text-base font-semibold text-slate-900">No will call trips</p>
+            <p className="text-base text-slate-900">No will call trips</p>
             <p className="text-sm mt-1.5">All pending trips are assigned</p>
           </div>
         </div>
@@ -2476,43 +2478,43 @@ const OperationsCommandCenter = ({
                 <div className={`flex items-start justify-between gap-3 ${isLeanDensity ? 'mb-2.5' : 'mb-4'}`}>
                   <div className="flex-1 min-w-0">
                     {densityProfile.lineCount <= 2 ? (
-                      <div className="text-[10px] font-semibold text-slate-500" style={getClampStyle(densityProfile.lineCount)}>
+                      <div className="text-[10px] text-slate-500" style={getClampStyle(densityProfile.lineCount)}>
                         {['Will Call', bookingReference, clientIdentifier && `ID ${clientIdentifier}`, (t.type || t.serviceType)].filter(Boolean).join(' • ')}
                       </div>
                     ) : (
                     <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                      <span className="px-2 py-0.5 rounded-md text-micro font-semibold uppercase tracking-wide bg-slate-100 text-slate-700">Will Call</span>
+                      <span className="px-2 py-0.5 rounded-md text-micro uppercase tracking-wide bg-slate-100 text-slate-700">Will Call</span>
                       {bookingReference && (
-                        <span className="px-2 py-0.5 rounded-md text-micro font-bold bg-blue-50 text-blue-700 border border-blue-100">{bookingReference}</span>
+                        <span className="px-2 py-0.5 rounded-md text-micro bg-blue-50 text-blue-700 border border-blue-100">{bookingReference}</span>
                       )}
                       {clientIdentifier && (
-                        <span className="px-2 py-0.5 rounded-md text-micro font-bold bg-violet-50 text-violet-700 border border-violet-100">{clientIdentifier}</span>
+                        <span className="px-2 py-0.5 rounded-md text-micro bg-violet-50 text-violet-700 border border-violet-100">{clientIdentifier}</span>
                       )}
                       {(t.type || t.serviceType) && (
-                        <span className="px-2 py-0.5 rounded-md text-micro font-bold bg-slate-100 text-slate-600 border border-slate-200">{t.type || t.serviceType}</span>
+                        <span className="px-2 py-0.5 rounded-md text-micro bg-slate-100 text-slate-600 border border-slate-200">{t.type || t.serviceType}</span>
                       )}
                     </div>
                     )}
-                    <h3 className={`text-slate-900 font-semibold ${isLeanDensity ? 'text-base' : 'text-lg'} truncate leading-tight`}>{t.patient}</h3>
+                    <h3 className={`text-slate-900 ${isLeanDensity ? 'text-base' : 'text-lg'} truncate leading-tight`}>{t.patient}</h3>
                     {(clientPhone || pickupPhone || dropoffPhone || routeAssignments.length > 0) && (
                       <div className={`${isLeanDensity ? 'mt-1' : 'mt-2'} flex flex-wrap gap-1`}>
                         {clientPhone && (
-                          <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                          <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
                             Client {clientPhone}
                           </span>
                         )}
                         {densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && (
-                          <span className="inline-flex items-center rounded-full border border-cyan-100 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">
+                          <span className="inline-flex items-center rounded-full border border-cyan-100 bg-cyan-50 px-2 py-0.5 text-[10px] text-cyan-700">
                             Pickup desk {pickupPhone}
                           </span>
                         )}
                         {densityProfile.showSecondaryPhones && dropoffPhone && (
-                          <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                          <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-700">
                             Hospital {dropoffPhone}
                           </span>
                         )}
                         {visibleRouteAssignments.map((route, routeIndex) => (
-                          <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                          <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">
                             <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}
                           </span>
                         ))}
@@ -2533,9 +2535,9 @@ const OperationsCommandCenter = ({
                       <MapPin size={16} className="text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
-                      <p className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-0.5">Pickup</p>
-                      <p className="text-blue-600 font-bold text-sm" style={getClampStyle(densityProfile.lineCount)}>{t.pickup}</p>
-                      {densityProfile.showFacilityNames && getPickupFacilityName(t) && <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-blue-700">{getPickupFacilityName(t)}</p>}
+                      <p className="text-micro uppercase tracking-wide text-slate-500 mb-0.5">Pickup</p>
+                      <p className="text-blue-600 text-sm" style={getClampStyle(densityProfile.lineCount)}>{t.pickup}</p>
+                      {densityProfile.showFacilityNames && getPickupFacilityName(t) && <p className="mt-1 text-[10px] uppercase tracking-wide text-blue-700">{getPickupFacilityName(t)}</p>}
                     </div>
                   </div>
                   <div className={`bg-white rounded-xl border border-slate-200 ${isLeanDensity ? 'p-2' : 'p-2.5'} shadow-sm flex items-start gap-3`}>
@@ -2543,15 +2545,15 @@ const OperationsCommandCenter = ({
                       <MapPin size={16} className="text-emerald-600" />
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
-                      <p className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-0.5">Dropoff</p>
-                      <p className="text-emerald-600 font-bold text-sm" style={getClampStyle(densityProfile.lineCount)}>{t.dropoff}</p>
-                      {densityProfile.showFacilityNames && getDropoffFacilityName(t) && <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">{getDropoffFacilityName(t)}</p>}
+                      <p className="text-micro uppercase tracking-wide text-slate-500 mb-0.5">Dropoff</p>
+                      <p className="text-emerald-600 text-sm" style={getClampStyle(densityProfile.lineCount)}>{t.dropoff}</p>
+                      {densityProfile.showFacilityNames && getDropoffFacilityName(t) && <p className="mt-1 text-[10px] uppercase tracking-wide text-emerald-700">{getDropoffFacilityName(t)}</p>}
                     </div>
                   </div>
                 </div>
                 {densityProfile.showNotesPreview && t.notes && (
                   <div className={`${isLeanDensity ? 'mt-2' : 'mt-3'} rounded-xl border border-amber-200 bg-amber-50 p-2.5`}>
-                    <p className="text-micro font-semibold uppercase tracking-wide text-amber-700">Notes</p>
+                    <p className="text-micro uppercase tracking-wide text-amber-700">Notes</p>
                     <p className="mt-1 text-xs font-medium leading-relaxed text-amber-800" style={getClampStyle(densityProfile.noteLines)}>{t.notes}</p>
                   </div>
                 )}

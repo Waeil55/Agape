@@ -158,6 +158,7 @@ const DesktopReportsPage = ({
   const [editValue, setEditValue] = useState('');
   const [editingRow, setEditingRow] = useState(null);
   const [editingRowSnapshot, setEditingRowSnapshot] = useState(null);
+  const [activeRow, setActiveRow] = useState(null);
   const inputRef = useRef(null);
 
   const startRowEdit = useCallback((trip) => {
@@ -538,7 +539,7 @@ const DesktopReportsPage = ({
         </thead>
         <tbody className="divide-y divide-slate-100">
           {reportRows.map(({ trip, driver, travelMinutes }, index) => (
-            <tr key={trip.id} className={index % 2 ? 'bg-slate-50/70 hover:bg-blue-50/40' : 'bg-white hover:bg-blue-50/40'}>
+            <tr key={trip.id} className={`${activeRow === trip.id ? 'bg-blue-100' : index % 2 ? 'bg-slate-50/70' : 'bg-white'} hover:bg-blue-50/70 transition-colors cursor-pointer`} onClick={() => setActiveRow(trip.id)}>
               <td className="px-2 py-2">
                 <div className="flex items-center gap-2 text-slate-500">
                   {editingRow === trip.id ? (
@@ -572,34 +573,31 @@ const DesktopReportsPage = ({
                   )}
                 </div>
               </td>
-              <td className="px-2 py-2 font-semibold text-slate-900">
+              <td className="px-2 py-2 text-slate-900">
                 {renderCell(trip, 'date', formatDateLabel(trip.date), 'date', 'date')}
               </td>
               <td className="px-2 py-2 font-mono text-blue-900">
                 {renderCell(trip, 'bookingId', trip.bookingId || trip.id, 'bookingId')}
               </td>
-              <td className="px-2 py-2 text-center font-bold text-slate-800">
+              <td className="px-2 py-2 text-center text-slate-800">
                 {renderCell(trip, 'aw', trip.wheelchair ? 'W' : 'A', 'wheelchair')}
               </td>
-              <td className="px-2 py-2 font-bold text-slate-900">
+              <td className="px-2 py-2 text-slate-900">
                 {renderCell(trip, 'patient', trip.patient, 'patient')}
               </td>
-              <td className="px-2 py-2 font-mono font-bold text-emerald-700">
+              <td className="px-2 py-2 font-mono text-emerald-700">
                 {renderCell(trip, 'arrivalTime', formatClock(trip.arrivalTime || trip.pickupTime), 'arrivalTime', 'time')}
               </td>
-              <td className="px-2 py-2 font-mono font-bold text-rose-700">
+              <td className="px-2 py-2 font-mono text-rose-700">
                 {renderCell(trip, 'arrivalDropoffTime', formatClock(trip.arrivalDropoffTime || trip.completedAt), 'arrivalDropoffTime', 'time')}
               </td>
-              <td className="px-2 py-2 font-mono font-bold text-slate-600">
-                {renderCell(trip, 'dropoffOdometer', trip.dropoffOdometer ? trip.dropoffOdometer.toLocaleString() : '—', 'dropoffOdometer', 'number')}
-              </td>
-              <td className="px-2 py-2 font-mono font-bold text-slate-800">
+              <td className="px-2 py-2 font-mono text-slate-800">
                 {renderCell(trip, 'additionalFee', trip.additionalFee ? `$${trip.additionalFee}` : '$0.00', 'additionalFee', 'number')}
               </td>
-              <td className="px-2 py-2 text-center font-bold text-emerald-700">
+              <td className="px-2 py-2 text-center text-emerald-700">
                 {renderCell(trip, 'signature', trip.paperSignatureConfirmed ? 'Yes' : 'No', 'paperSignatureConfirmed')}
               </td>
-              <td className="px-2 py-2 text-center font-semibold text-slate-500">
+              <td className="px-2 py-2 text-center text-slate-500">
                 {renderCell(trip, 'reviewed', trip.reviewed ? 'Done' : 'Pending', 'reviewed')}
               </td>
             </tr>
@@ -650,7 +648,7 @@ const DesktopReportsPage = ({
         </thead>
         <tbody className="divide-y divide-slate-100">
           {reportRows.map(({ trip, driver, travelMinutes }, index) => (
-            <tr key={trip.id} className={index % 2 ? 'bg-slate-50/70 hover:bg-blue-50/40' : 'bg-white hover:bg-blue-50/40'}>
+            <tr key={trip.id} className={`${activeRow === trip.id ? 'bg-blue-100' : index % 2 ? 'bg-slate-50/70' : 'bg-white'} hover:bg-blue-50/70 transition-colors cursor-pointer`} onClick={() => setActiveRow(trip.id)}>
               <td className="px-2 py-2">
                 <div className="flex items-center gap-2 text-slate-500">
                   {editingRow === trip.id ? (
@@ -693,10 +691,10 @@ const DesktopReportsPage = ({
                   )}
                 </div>
               </td>
-              <td className="px-2 py-2 font-semibold text-slate-900">
+              <td className="px-2 py-2 text-slate-900">
                 {renderCell(trip, 'date', formatDateLabel(trip.date), 'date', 'date')}
               </td>
-              <td className="px-2 py-2 font-semibold text-slate-700">
+              <td className="px-2 py-2 text-slate-700">
                 {renderCell(trip, 'driver', truncate(driver?.name || trip.driverName, 14), 'driverId')}
               </td>
               <td className="px-2 py-2 text-slate-500">
@@ -708,13 +706,13 @@ const DesktopReportsPage = ({
               <td className="px-2 py-2 font-mono text-blue-900">
                 {renderCell(trip, 'bookingId', truncate(trip.bookingId || trip.id, 12), 'bookingId')}
               </td>
-              <td className="px-2 py-2 font-bold text-slate-900">
+              <td className="px-2 py-2 text-slate-900">
                 {renderCell(trip, 'patient', truncate(trip.patient, 17), 'patient')}
               </td>
               <td className="px-2 py-2 font-mono text-emerald-700">
                 {renderCell(trip, 'pickup', truncate(trip.pickup, 24), 'pickup')}
               </td>
-              <td className="px-2 py-2 font-mono font-bold text-emerald-700">
+              <td className="px-2 py-2 font-mono text-emerald-700">
                 {renderCell(trip, 'arrivalTime', formatClock(trip.arrivalTime || trip.pickupTime), 'arrivalTime', 'time')}
               </td>
               <td className="px-2 py-2 font-mono text-emerald-700">
@@ -723,7 +721,7 @@ const DesktopReportsPage = ({
               <td className="px-2 py-2 font-mono text-rose-700">
                 {renderCell(trip, 'dropoff', truncate(trip.dropoff, 27), 'dropoff')}
               </td>
-              <td className="px-2 py-2 font-mono font-bold text-rose-700">
+              <td className="px-2 py-2 font-mono text-rose-700">
                 {renderCell(trip, 'arrivalDropoffTime', formatClock(trip.arrivalDropoffTime || trip.completedAt), 'arrivalDropoffTime', 'time')}
               </td>
               <td className="px-2 py-2 font-mono text-rose-700">
@@ -732,13 +730,13 @@ const DesktopReportsPage = ({
               <td className="px-2 py-2 font-mono text-slate-700">
                 {renderCell(trip, 'travelTime', formatMinutes(travelMinutes), 'travelTime')}
               </td>
-              <td className="px-2 py-2 font-mono font-bold text-[#2f5b96]">
+              <td className="px-2 py-2 font-mono text-[#2f5b96]">
                 {renderCell(trip, 'distance', calcMiles(trip), 'distance', 'number')}
               </td>
-              <td className="px-2 py-2 font-bold text-emerald-700">
+              <td className="px-2 py-2 text-emerald-700">
                 {renderCell(trip, 'signature', trip.paperSignatureConfirmed ? 'Yes' : 'No', 'paperSignatureConfirmed')}
               </td>
-              <td className="px-2 py-2 font-semibold text-slate-500">
+              <td className="px-2 py-2 text-slate-500">
                 {renderCell(trip, 'reviewed', trip.reviewed ? 'Done' : 'Pending', 'reviewed')}
               </td>
             </tr>
