@@ -55,6 +55,42 @@ const COLUMN_ALIASES = {
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 
+const FACILITY_KEYWORDS = [
+  'center', 'centre', 'clinic', 'hospital', 'care', 'treatment',
+  'medical', 'health', 'therapy', 'academy', 'school', 'facility',
+  'llc', 'inc', 'llp', 'corp', 'ltd', 'pharmacy', 'pharm',
+  'dialysis', 'rehab', 'rehabilitation', 'mental health',
+  'behavioral', 'paediatric', 'pediatric', 'dental', 'lab',
+  'imaging', 'radiology', 'urgent care', 'er ', 'emergency',
+  'surgery', 'surgical', 'ortho', 'cardio', 'neuro',
+];
+
+function isFacilitySiteName(name) {
+  const lower = (name || '').toLowerCase().trim();
+  if (!lower) return false;
+  return FACILITY_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function isHomeSiteName(name) {
+  const lower = (name || '').toLowerCase().trim();
+  if (!lower) return false;
+  return ['home', 'house', 'residence', 'apartment', 'apt', 'mother', 'father',
+    'grandmother', 'grandfather', 'parent', 'mom', 'dad', 'guardian',
+    'foster', 'shelter', 'group home', 'group-home'].some(kw => lower.includes(kw));
+}
+
+function isLikelyResidentialAddress(address, siteName) {
+  const lower = (address || '').toLowerCase().trim();
+  const site = (siteName || '').toLowerCase().trim();
+  if (!lower && !site) return false;
+  if (isFacilitySiteName(siteName)) return false;
+  if (isHomeSiteName(siteName)) return true;
+  const streetPatterns = /\b\d+\s+\w+\s+(st|street|dr|drive|rd|road|ave|avenue|blvd|boulevard|ln|lane|way|ct|court|pl|place|cir|circle)\b/i;
+  if (streetPatterns.test(lower) || streetPatterns.test(site)) return true;
+  if (site === 'wrk' || site === 'work') return false;
+  return false;
+}
+
 const cleanOdometer = (value) => {
   if (value === undefined || value === null || value === '') return '';
   const s = String(value).trim();
@@ -479,58 +515,120 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       };
       const today = getTodayStr();
 
-      // First pass: group by patient and phone to identify facility numbers and determine the "Earliest Leg" phone
-      const patientData = {};
-      const phoneToPatients = {}; // phone -> Set of patient names
-      
-      // Temporary sort to find earliest trip per patient
-      const sortedByTime = [...rows].sort((a, b) => {
-        const m1 = mapColumns(a);
-        const m2 = mapColumns(b);
-        return timeToMinutes(m1.time) - timeToMinutes(m2.time);
+      // First pass: determine client phone per patient using site-name facility detection
+      // The client phone is the one at the HOME/residential location, NOT the facility
+      const patientClientPhone = {}; // patientKey -> resolved client phone (digits only)
+
+      const getSiteName = (row, m, side) => {
+        if (side === 'pickup') {
+          return m.pickupSiteName || row[colMap.pickupSite] || m.pickup || '';
+        }
+        return m.dropoffSiteName || row[colMap.dropoffSite] || m.dropoff || '';
+      };
+
+      const isLocationFacility = (row, m, side) => {
+        const siteName = getSiteName(row, m, side);
+        const address = side === 'pickup' ? m.pickup : m.dropoff;
+        if (isFacilitySiteName(siteName)) return true;
+        if (isFacilitySiteName(address)) return true;
+        return false;
+      };
+
+      const isLocationHome = (row, m, side) => {
+        const siteName = getSiteName(row, m, side);
+        const address = side === 'pickup' ? m.pickup : m.dropoff;
+        if (isHomeSiteName(siteName)) return true;
+        if (isLikelyResidentialAddress(address, siteName)) return true;
+        return false;
+      };
+
+      rows.forEach(row => {
+        const m = mapColumns(row);
+        const p = (m.patient || '').trim().toLowerCase();
+        if (!p || patientClientPhone[p]) return;
+
+        const puDigits = cleanPhone(m.pickupPhone);
+        const doDigits = cleanPhone(m.dropoffPhone);
+        if (!puDigits && !doDigits) return;
+
+        const puIsFac = isLocationFacility(row, m, 'pickup');
+        const doIsFac = isLocationFacility(row, m, 'dropoff');
+        const puIsHomeLoc = isLocationHome(row, m, 'pickup');
+        const doIsHomeLoc = isLocationHome(row, m, 'dropoff');
+
+        if (puIsHomeLoc && !doIsHomeLoc && puDigits) {
+          patientClientPhone[p] = puDigits;
+        } else if (doIsHomeLoc && !puIsHomeLoc && doDigits) {
+          patientClientPhone[p] = doDigits;
+        } else if (puIsFac && !doIsFac && doDigits) {
+          patientClientPhone[p] = doDigits;
+        } else if (doIsFac && !puIsFac && puDigits) {
+          patientClientPhone[p] = puDigits;
+        }
       });
 
-      sortedByTime.forEach(row => {
+      // Second pass: for patients still unresolved, use phone frequency across all trips
+      // (the phone that appears most often at non-facility sites for this patient)
+      const unresolvedPatients = new Set();
+      rows.forEach(row => {
+        const m = mapColumns(row);
+        const p = (m.patient || '').trim().toLowerCase();
+        if (p && !patientClientPhone[p]) unresolvedPatients.add(p);
+      });
+
+      if (unresolvedPatients.size > 0) {
+        const phoneFreq = {};
+        rows.forEach(row => {
+          const m = mapColumns(row);
+          const p = (m.patient || '').trim().toLowerCase();
+          if (!p || !unresolvedPatients.has(p)) return;
+          const puDigits = cleanPhone(m.pickupPhone);
+          const doDigits = cleanPhone(m.dropoffPhone);
+          if (!phoneFreq[p]) phoneFreq[p] = {};
+          if (puDigits && !isLocationFacility(row, m, 'pickup')) {
+            phoneFreq[p][puDigits] = (phoneFreq[p][puDigits] || 0) + 1;
+          }
+          if (doDigits && !isLocationFacility(row, m, 'dropoff')) {
+            phoneFreq[p][doDigits] = (phoneFreq[p][doDigits] || 0) + 1;
+          }
+        });
+        Object.entries(phoneFreq).forEach(([p, freq]) => {
+          if (patientClientPhone[p]) return;
+          const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+          if (sorted.length > 0) patientClientPhone[p] = sorted[0][0];
+        });
+      }
+
+      // Final fallback: for any still unresolved patients, pick the phone that is NOT
+      // shared across multiple patients (shared = facility)
+      const phoneToPatients = {};
+      rows.forEach(row => {
         const m = mapColumns(row);
         const p = (m.patient || '').trim().toLowerCase();
         if (!p) return;
-        if (!patientData[p]) {
-          patientData[p] = { 
-            homePhones: new Set(), 
-            allPhones: new Set(),
-            earliestPhone: m.pickupPhone || m.dropoffPhone || '' 
-          };
+        const puDigits = cleanPhone(m.pickupPhone);
+        const doDigits = cleanPhone(m.dropoffPhone);
+        if (puDigits) {
+          if (!phoneToPatients[puDigits]) phoneToPatients[puDigits] = new Set();
+          phoneToPatients[puDigits].add(p);
         }
-        
-        const pickupPhone = cleanPhone(m.pickupPhone);
-        const dropoffPhone = cleanPhone(m.dropoffPhone);
-        
-        if (pickupPhone) {
-          if (!phoneToPatients[pickupPhone]) phoneToPatients[pickupPhone] = new Set();
-          phoneToPatients[pickupPhone].add(p);
-        }
-        if (dropoffPhone) {
-          if (!phoneToPatients[dropoffPhone]) phoneToPatients[dropoffPhone] = new Set();
-          phoneToPatients[dropoffPhone].add(p);
-        }
-
-        const isPickupHome = (m.pickup || '').toLowerCase().includes('home') || (row[colMap.pickupSite] || '').toLowerCase().includes('home');
-        const isDropoffHome = (m.dropoff || '').toLowerCase().includes('home') || (row[colMap.dropoffSite] || '').toLowerCase().includes('home');
-        
-        if (m.pickupPhone) {
-          patientData[p].allPhones.add(m.pickupPhone);
-          if (isPickupHome) patientData[p].homePhones.add(m.pickupPhone);
-        }
-        if (m.dropoffPhone) {
-          patientData[p].allPhones.add(m.dropoffPhone);
-          if (isDropoffHome) patientData[p].homePhones.add(m.dropoffPhone);
+        if (doDigits) {
+          if (!phoneToPatients[doDigits]) phoneToPatients[doDigits] = new Set();
+          phoneToPatients[doDigits].add(p);
         }
       });
-
-      // Identify shared numbers (used by > 1 patient) as facility numbers
-      const facilityPhones = new Set();
-      Object.entries(phoneToPatients).forEach(([phone, patients]) => {
-        if (patients.size > 1) facilityPhones.add(phone);
+      rows.forEach(row => {
+        const m = mapColumns(row);
+        const p = (m.patient || '').trim().toLowerCase();
+        if (!p || patientClientPhone[p]) return;
+        const puDigits = cleanPhone(m.pickupPhone);
+        const doDigits = cleanPhone(m.dropoffPhone);
+        const puShared = puDigits && phoneToPatients[puDigits] && phoneToPatients[puDigits].size > 1;
+        const doShared = doDigits && phoneToPatients[doDigits] && phoneToPatients[doDigits].size > 1;
+        if (puDigits && !puShared) patientClientPhone[p] = puDigits;
+        else if (doDigits && !doShared) patientClientPhone[p] = doDigits;
+        else if (puDigits) patientClientPhone[p] = puDigits;
+        else if (doDigits) patientClientPhone[p] = doDigits;
       });
 
       // Parse a distance string like "5.2mi" or "5.2 mi" or "5.2" into a number
@@ -544,23 +642,12 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       const mapped = rows.map((row, idx) => {
         const m = mapColumns(row);
         const pKey = (m.patient || '').trim().toLowerCase();
-        const pInfo = patientData[pKey];
         
-        let patientPhone = '';
-        if (pInfo) {
-          const homePhonesList = Array.from(pInfo.homePhones);
-          const nonFacHome = homePhonesList.find(ph => !facilityPhones.has(cleanPhone(ph)));
-          if (nonFacHome) {
-            patientPhone = nonFacHome;
-          } else if (pInfo.earliestPhone && !facilityPhones.has(cleanPhone(pInfo.earliestPhone))) {
-            patientPhone = pInfo.earliestPhone;
-          } else if (homePhonesList.length > 0) {
-            patientPhone = homePhonesList[0];
-          } else {
-            const allPhonesList = Array.from(pInfo.allPhones);
-            const nonFacAny = allPhonesList.find(ph => !facilityPhones.has(cleanPhone(ph)));
-            patientPhone = nonFacAny || m.pickupPhone || m.dropoffPhone || '';
-          }
+        let patientPhone = patientClientPhone[pKey] || m.pickupPhone || m.dropoffPhone || '';
+        if (patientPhone && !patientClientPhone[pKey]) {
+          const digits = cleanPhone(patientPhone);
+          const isShared = phoneToPatients[digits] && phoneToPatients[digits].size > 1;
+          if (isShared) patientPhone = '';
         }
 
         const notes = [m.notes, row['Pickup Comments'], row['Dropoff Comments'], row['Comments'], row['Message']]
