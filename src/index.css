@@ -1537,6 +1537,10 @@ table tbody td {
   max-width: 20rem;
 }
 
+table tbody td[colspan] {
+  max-width: none;
+}
+
 table thead th *,
 table tbody td * {
   min-width: 0;
