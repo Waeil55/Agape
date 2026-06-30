@@ -1023,31 +1023,35 @@ const OperationsCommandCenter = ({
       .map(([key, value]) => [key, formatManifestValue(value)]);
 
     return (
-      <div className="w-full border-t border-slate-200 bg-slate-50 px-4 py-2 text-xs space-y-1.5">
+      <div className="w-full border-t border-slate-200 bg-slate-50 px-4 py-2.5 text-sm space-y-1.5">
         <div className="flex items-center justify-between">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-700">{to12hr(trip.time)}</span>
-            <span className={`rounded-full px-2 py-0.5 ${getStatusPillClass(trip.status)}`}>{trip.status}</span>
-            {bookingReference && <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-blue-700">{bookingReference}</span>}
-            {clientIdentifier && <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-violet-700">{clientIdentifier}</span>}
-            {spaceTypes && <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-600">{spaceTypes}</span>}
-            {driver && <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-emerald-700">{driver.name || driver.driverName}</span>}
-            {directDistance && <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-600">{directDistance}</span>}
-            {routeAssignments.map((route, i) => <span key={i} className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-indigo-700">{route.routeName}</span>)}
+            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-sm text-slate-700">{to12hr(trip.time)}</span>
+            <span className={`rounded-full px-2 py-0.5 text-sm ${getStatusPillClass(trip.status)}`}>{trip.status}</span>
+            {bookingReference && <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-sm text-blue-700">{bookingReference}</span>}
+            {clientIdentifier && <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-sm text-violet-700">{clientIdentifier}</span>}
+            {spaceTypes && <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-sm text-slate-600">{spaceTypes}</span>}
+            {driver && <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-sm text-emerald-700">{driver.name || driver.driverName}</span>}
+            {directDistance && <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-sm text-slate-600">{directDistance}</span>}
+            {routeAssignments.map((route, i) => <span key={i} className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-sm text-indigo-700">{route.routeName}</span>)}
           </div>
-          <button type="button" onClick={() => toggleTripExpanded(trip.id)} className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-slate-500 hover:bg-slate-100 text-[11px]">Collapse</button>
+          <button type="button" onClick={() => toggleTripExpanded(trip.id)} className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-slate-500 hover:bg-slate-100 text-xs">Collapse</button>
         </div>
 
-        <div className="grid grid-cols-3 gap-x-6 text-[11px] leading-relaxed">
+        <div className="grid grid-cols-3 gap-x-6 text-sm leading-relaxed">
           <div className="min-w-0">
             <span className="font-semibold text-blue-600">Pickup: </span>
             <span className="text-slate-800 truncate">{trip.pickup || '—'}</span>
             {clientPhone && <><br /><span className="text-slate-500">Phone: </span><span className="text-slate-700">{clientPhone}</span></>}
+            {(trip.arrivalTime || trip.pickupTime) && <><br /><span className="text-slate-500">PU time: </span><span className="text-slate-700">{formatClock(trip.arrivalTime || trip.pickupTime)}</span></>}
+            {trip.pickupOdometer && <><br /><span className="text-slate-500">PU odo: </span><span className="text-slate-700">{trip.pickupOdometer}</span></>}
           </div>
           <div className="min-w-0">
             <span className="font-semibold text-emerald-600">Dropoff: </span>
             <span className="text-slate-800 truncate">{trip.dropoff || '—'}</span>
             {dropoffPhone && <><br /><span className="text-slate-500">Hospital: </span><span className="text-slate-700">{dropoffPhone}</span></>}
+            {(trip.arrivalDropoffTime || trip.completedAt) && <><br /><span className="text-slate-500">DO time: </span><span className="text-slate-700">{formatClock(trip.arrivalDropoffTime || trip.completedAt)}</span></>}
+            {(trip.dropoffOdometer || trip.endOdometer) && <><br /><span className="text-slate-500">DO odo: </span><span className="text-slate-700">{trip.dropoffOdometer || trip.endOdometer}</span></>}
           </div>
           <div className="min-w-0 space-y-0.5">
             {trip.patient && <div><span className="text-slate-500">Client: </span><span className="text-slate-800 font-medium">{trip.patient}</span></div>}
@@ -1058,7 +1062,7 @@ const OperationsCommandCenter = ({
         </div>
 
         {(generalComments || manifestMessage || trip.notes || trip.specialInstructions || trip.comment) && (
-          <div className="text-[11px] truncate max-w-full">
+          <div className="text-sm truncate max-w-full">
             <span className="font-semibold text-amber-600">Notes: </span>
             <span className="text-slate-600">{generalComments || manifestMessage || trip.notes || trip.specialInstructions || trip.comment}</span>
           </div>
