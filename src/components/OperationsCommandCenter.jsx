@@ -1023,150 +1023,170 @@ const OperationsCommandCenter = ({
       .map(([key, value]) => [key, formatManifestValue(value)]);
 
     return (
-      <div className={`${embeddedInTable ? 'rounded-3xl border border-slate-100/50 bg-slate-50/80 p-4 shadow-sm' : 'mt-2 rounded-3xl border border-slate-100/50 bg-slate-50/80 p-4 shadow-sm'} space-y-3`}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700">
-              {to12hr(trip.time)}
-            </span>
-            <span className={`rounded-full px-2 py-0.5 text-xs ${getStatusPillClass(trip.status)}`}>
-              {trip.status}
-            </span>
-            {bookingReference && (
-              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-                {bookingReference}
-              </span>
-            )}
-            {clientIdentifier && (
-              <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
-                {clientIdentifier}
-              </span>
-            )}
-            {serviceLabel && (
-              <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                {serviceLabel}
-              </span>
-            )}
-            {passengerTypes && (
-              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-                {passengerTypes}
-              </span>
-            )}
-            {spaceTypes && spaceTypes !== passengerTypes && (
-              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
-                {spaceTypes}
-              </span>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => toggleTripExpanded(trip.id)}
-            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
-          >
-            Collapse
-          </button>
-        </div>
-
-        <div className={`grid gap-3 ${compact ? 'xl:grid-cols-[1.1fr_1.1fr_0.9fr]' : 'xl:grid-cols-[1.15fr_1.15fr_0.95fr]'}`}>
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
-            <p className="text-xs uppercase tracking-widest text-blue-700">Pickup</p>
-            <div className="mt-2 space-y-2">
-              {pickupItems.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
-                  <span className="font-bold uppercase tracking-wide text-blue-700">{label}</span>
-                  <span className="break-words text-slate-900">{value}</span>
-                </div>
+      <div className={`${embeddedInTable ? 'rounded-2xl border border-slate-200 bg-white p-3' : 'mt-2 rounded-3xl border border-slate-100/50 bg-slate-50/80 p-4 shadow-sm'} space-y-2`}>
+        {embeddedInTable ? (
+          <>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700">{to12hr(trip.time)}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs ${getStatusPillClass(trip.status)}`}>{trip.status}</span>
+              {bookingReference && <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{bookingReference}</span>}
+              {clientIdentifier && <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-xs text-violet-700">{clientIdentifier}</span>}
+              {serviceLabel && <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{serviceLabel}</span>}
+              {spaceTypes && spaceTypes !== passengerTypes && <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">{spaceTypes}</span>}
+              {directDistance && <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">{directDistance}</span>}
+              {driver && <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">{driver.name || driver.driverName}</span>}
+              {routeAssignments.length > 0 && routeAssignments.map((route, i) => (
+                <span key={i} className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">{route.routeName}</span>
               ))}
+              <button type="button" onClick={() => toggleTripExpanded(trip.id)} className="ml-auto rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-50">Collapse</button>
             </div>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
-            <p className="text-xs uppercase tracking-widest text-emerald-700">Dropoff</p>
-            <div className="mt-2 space-y-2">
-              {dropoffItems.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
-                  <span className="font-bold uppercase tracking-wide text-emerald-700">{label}</span>
-                  <span className="break-words text-slate-900">{value}</span>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              <div className="flex gap-1.5">
+                <span className="shrink-0 font-semibold text-blue-600">Pickup:</span>
+                <span className="truncate text-slate-800">{trip.pickup || '—'}</span>
+              </div>
+              <div className="flex gap-1.5">
+                <span className="shrink-0 font-semibold text-emerald-600">Dropoff:</span>
+                <span className="truncate text-slate-800">{trip.dropoff || '—'}</span>
+              </div>
+              {clientPhone && (
+                <div className="flex gap-1.5">
+                  <span className="shrink-0 font-semibold text-slate-500">Client:</span>
+                  <span className="text-slate-700">{clientPhone}</span>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-            <p className="text-xs uppercase tracking-widest text-slate-500">Manifest Summary</p>
-            <div className="mt-2 space-y-2">
-              {manifestSummaryItems.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[110px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
-                  <span className="font-bold uppercase tracking-wide text-slate-500">{label}</span>
-                  <span className="break-words text-slate-900">{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {(routeAssignments.length > 0 || noteItems.length > 0 || mobility.length > 0 || mobilityAids) && (
-          <div className="grid gap-3 xl:grid-cols-[0.95fr_1.25fr]">
-            <div className="rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm">
-              <p className="text-xs uppercase tracking-widest text-indigo-700">Route & Transport</p>
-              {routeAssignments.length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {routeAssignments.map((route, index) => (
-                    <span
-                      key={`${route.templateId || route.routeName}-${index}`}
-                      className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700"
-                    >
-                      <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` - ${route.statusLabel}` : ''}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-2 text-xs font-medium text-slate-500">Not assigned to a saved route plan.</p>
               )}
-              {(mobility.length > 0 || mobilityAids) && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {mobilityAids && (
-                    <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-                      {mobilityAids}
-                    </span>
-                  )}
-                  {mobility.map((tag) => (
-                    <span key={tag} className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-                      {tag}
-                    </span>
-                  ))}
+              {dropoffPhone && (
+                <div className="flex gap-1.5">
+                  <span className="shrink-0 font-semibold text-slate-500">Hospital:</span>
+                  <span className="text-slate-700">{dropoffPhone}</span>
+                </div>
+              )}
+              {mobility.length > 0 && (
+                <div className="flex gap-1.5">
+                  <span className="shrink-0 font-semibold text-amber-600">Mobility:</span>
+                  <span className="text-slate-700">{mobility.join(', ')}</span>
+                </div>
+              )}
+              {requestedPickup && requestedPickup !== to12hr(trip.time) && (
+                <div className="flex gap-1.5">
+                  <span className="shrink-0 font-semibold text-slate-500">Req pickup:</span>
+                  <span className="text-slate-700">{requestedPickup}</span>
+                </div>
+              )}
+              {requestedDropoff && (
+                <div className="flex gap-1.5">
+                  <span className="shrink-0 font-semibold text-slate-500">Req dropoff:</span>
+                  <span className="text-slate-700">{requestedDropoff}</span>
                 </div>
               )}
             </div>
-
-            <div className="rounded-2xl border border-amber-100 bg-white p-3 shadow-sm">
-              <p className="text-xs uppercase tracking-widest text-amber-700">Comments, Message & Notes</p>
-              <div className="mt-2 space-y-2">
-                {noteItems.length > 0 ? noteItems.map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-amber-100 bg-amber-50 p-2">
-                    <p className="text-xs uppercase tracking-wide text-amber-700">{label}</p>
-                    <p className="mt-1 text-xs font-medium leading-relaxed text-slate-700 break-words">{value}</p>
-                  </div>
-                )) : (
-                  <p className="text-xs font-medium text-slate-500">No trip notes recorded.</p>
-                )}
+            {(generalComments || manifestMessage || trip.notes || trip.specialInstructions || trip.comment) && (
+              <div className="rounded-lg bg-amber-50 border border-amber-100 px-2.5 py-1.5 text-xs">
+                <span className="font-semibold text-amber-700">Notes: </span>
+                <span className="text-slate-700">{generalComments || manifestMessage || trip.notes || trip.specialInstructions || trip.comment}</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700">{to12hr(trip.time)}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs ${getStatusPillClass(trip.status)}`}>{trip.status}</span>
+                {bookingReference && <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{bookingReference}</span>}
+                {clientIdentifier && <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-xs text-violet-700">{clientIdentifier}</span>}
+                {serviceLabel && <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{serviceLabel}</span>}
+                {passengerTypes && <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{passengerTypes}</span>}
+                {spaceTypes && spaceTypes !== passengerTypes && <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">{spaceTypes}</span>}
+              </div>
+              <button type="button" onClick={() => toggleTripExpanded(trip.id)} className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Collapse</button>
+            </div>
+            <div className={`grid gap-3 ${compact ? 'xl:grid-cols-[1.1fr_1.1fr_0.9fr]' : 'xl:grid-cols-[1.15fr_1.15fr_0.95fr]'}`}>
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
+                <p className="text-xs uppercase tracking-widest text-blue-700">Pickup</p>
+                <div className="mt-2 space-y-2">
+                  {pickupItems.map(([label, value]) => (
+                    <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
+                      <span className="font-bold uppercase tracking-wide text-blue-700">{label}</span>
+                      <span className="break-words text-slate-900">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
+                <p className="text-xs uppercase tracking-widest text-emerald-700">Dropoff</p>
+                <div className="mt-2 space-y-2">
+                  {dropoffItems.map(([label, value]) => (
+                    <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
+                      <span className="font-bold uppercase tracking-wide text-emerald-700">{label}</span>
+                      <span className="break-words text-slate-900">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+                <p className="text-xs uppercase tracking-widest text-slate-500">Manifest Summary</p>
+                <div className="mt-2 space-y-2">
+                  {manifestSummaryItems.map(([label, value]) => (
+                    <div key={label} className="grid grid-cols-[110px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
+                      <span className="font-bold uppercase tracking-wide text-slate-500">{label}</span>
+                      <span className="break-words text-slate-900">{value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {extraUploadedFields.length > 0 && (
-          <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-            <p className="text-xs uppercase tracking-widest text-slate-500">Additional Uploaded Fields</p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {extraUploadedFields.map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-2">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-                  <p className="mt-1 text-xs font-medium break-words text-slate-800">{value}</p>
+            {(routeAssignments.length > 0 || noteItems.length > 0 || mobility.length > 0 || mobilityAids) && (
+              <div className="grid gap-3 xl:grid-cols-[0.95fr_1.25fr]">
+                <div className="rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm">
+                  <p className="text-xs uppercase tracking-widest text-indigo-700">Route & Transport</p>
+                  {routeAssignments.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {routeAssignments.map((route, index) => (
+                        <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">
+                          <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` - ${route.statusLabel}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs font-medium text-slate-500">Not assigned to a saved route plan.</p>
+                  )}
+                  {(mobility.length > 0 || mobilityAids) && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {mobilityAids && <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{mobilityAids}</span>}
+                      {mobility.map((tag) => <span key={tag} className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{tag}</span>)}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="rounded-2xl border border-amber-100 bg-white p-3 shadow-sm">
+                  <p className="text-xs uppercase tracking-widest text-amber-700">Comments, Message & Notes</p>
+                  <div className="mt-2 space-y-2">
+                    {noteItems.length > 0 ? noteItems.map(([label, value]) => (
+                      <div key={label} className="rounded-lg border border-amber-100 bg-amber-50 p-2">
+                        <p className="text-xs uppercase tracking-wide text-amber-700">{label}</p>
+                        <p className="mt-1 text-xs font-medium leading-relaxed text-slate-700 break-words">{value}</p>
+                      </div>
+                    )) : (
+                      <p className="text-xs font-medium text-slate-500">No trip notes recorded.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            {extraUploadedFields.length > 0 && (
+              <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+                <p className="text-xs uppercase tracking-widest text-slate-500">Additional Uploaded Fields</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {extraUploadedFields.map(([label, value]) => (
+                    <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-2">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+                      <p className="mt-1 text-xs font-medium break-words text-slate-800">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     );
