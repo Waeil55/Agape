@@ -2652,7 +2652,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <button
               type="button"
               onClick={() => { setActiveWorkTripId(null); setWorkNotesOpen(false); }}
-              className="w-11 h-11 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer"
+              className="w-8 h-11 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer"
               aria-label="Back to trips"
             >
               <ChevronLeft size={22} strokeWidth={2.2} />
@@ -2699,11 +2699,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-xs font-medium uppercase tracking-normal text-blue-200">From</p>
                   <p className="mt-0.5 text-xs font-medium leading-snug text-white break-words">{pickupAddress || '--'}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-10 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-medium text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
+                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-7 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-medium text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
                       <Copy size={14} /> Copy
                     </button>
                     <span className="text-xs font-medium text-blue-200/80">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-3 rounded-2xl bg-sky-500/70 hover:bg-sky-500 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-7 px-3 rounded-2xl bg-sky-500/70 hover:bg-sky-500 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer">
                       <Navigation size={16} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
@@ -2713,11 +2713,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-xs font-medium uppercase tracking-normal text-emerald-300">To</p>
                   <p className="mt-0.5 text-xs font-medium leading-snug text-white break-words">{dropoffAddress || '--'}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-10 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-medium text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
+                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-7 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-medium text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
                       <Copy size={14} /> Copy
                     </button>
                     <span className="text-xs font-medium text-blue-200/80" />
-                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-3 rounded-2xl bg-sky-500/70 hover:bg-sky-500 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-7 px-3 rounded-2xl bg-sky-500/70 hover:bg-sky-500 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer">
                       <Navigation size={16} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
@@ -2725,16 +2725,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
 
               <div className="mt-3.5 grid grid-cols-4 gap-2">
-                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-8 rounded-2xl bg-emerald-500/70 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-7 rounded-2xl bg-emerald-500/70 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
                   <Phone size={16} /> Call
                 </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-8 rounded-2xl bg-blue-500/70 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-7 rounded-2xl bg-blue-500/70 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
                   <MessageCircle size={16} /> SMS
                 </button>
-                <button type="button" onClick={() => openContactSelector(trip)} className="h-8 rounded-2xl bg-violet-500/70 hover:bg-violet-500 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => openContactSelector(trip)} className="h-7 rounded-2xl bg-violet-500/70 hover:bg-violet-500 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
                   <PhoneForwarded size={16} /> Contacts
                 </button>
-                <button type="button" onClick={() => setShowMoreOptions(trip)} className="h-8 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
+                <button type="button" onClick={() => setShowMoreOptions(trip)} className="h-7 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
                   <MoreHorizontal size={16} /> More
                 </button>
               </div>
@@ -2768,7 +2768,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 type="button"
                 onClick={handleStepBack}
                 disabled={!stepBackTarget}
-                className="mt-0 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-700"
+                className="mt-0 flex h-7 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-700"
                 title={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
                 aria-label={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
               >
@@ -2803,7 +2803,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               type="button"
               onClick={bottomAction.onClick}
               disabled={!primary}
-              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-12 ${bottomAction.gradient} text-white rounded-2xl font-semibold text-xs uppercase tracking-normal transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
+              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-10 ${bottomAction.gradient} text-white rounded-2xl font-semibold text-xs uppercase tracking-normal transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
             >
               {bottomAction.icon} {bottomAction.label}
             </button>
@@ -2812,7 +2812,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   type="button"
                   onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
-                  className="flex-[2] h-8 bg-blue-600 border-2 border-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                  className="flex-[2] h-7 bg-blue-600 border-2 border-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1 shadow-sm"
                 >
                   <MapPin size={16} /> {trip.status === 'In Progress' ? 'Here?' : 'At dropoff?'}
                 </button>
@@ -2820,7 +2820,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   type="button"
                   onClick={() => { impact('medium'); setSkipConfirmTripId(`work-${trip.id}`); }}
-                  className="flex-[2] h-8 bg-white border-2 border-slate-300 text-slate-600 rounded-2xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1"
+                  className="flex-[2] h-7 bg-white border-2 border-slate-300 text-slate-600 rounded-2xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1"
                 >
                   <Forward size={16} /> Skip Nav
                 </button>
@@ -3018,8 +3018,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-sm font-semibold text-slate-900">{trip.patient || 'Trip'} · {to12hr(trip.time)}</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {trip.transferRequest?.fromDriverName || 'Driver'}: {trip.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 text-white'}`}>Accept</button>
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-7 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 text-white'}`}>Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-7 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
                   </div>
                   {transferDisabled && <p className="text-xs text-amber-600 font-medium mt-1">Clock in to respond</p>}
                 </div>
@@ -3029,8 +3029,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-sm font-semibold text-slate-900">{route.name || 'Route Plan'} · {(route.sequence || []).length} stops</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {route.transferRequest?.fromDriverName || 'Driver'}: {route.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-emerald-600 text-white'}`}>Accept</button>
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-7 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-emerald-600 text-white'}`}>Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-7 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
                   </div>
                   {transferDisabled && <p className="text-xs text-amber-600 font-medium mt-1">Clock in to respond</p>}
                 </div>
@@ -3335,7 +3335,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); undoRoutePlanStopProgress(stop); }}
-                           className="ml-auto h-10 px-2.5 rounded-lg border border-amber-200 bg-white text-xs font-medium text-amber-700 flex items-center gap-1.5 hover:bg-amber-50 transition-all"
+                           className="ml-auto h-7 px-2.5 rounded-lg border border-amber-200 bg-white text-xs font-medium text-amber-700 flex items-center gap-1.5 hover:bg-amber-50 transition-all"
                           aria-label="Undo stop"
                         >
                           <RotateCcw size={16} /> Undo
@@ -3453,7 +3453,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             type="button"
                             onClick={(e) => { e.stopPropagation(); if (!nextAction.disabled) nextAction.onClick(); }}
                             disabled={nextAction.disabled}
-                            className={`w-full h-12 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm ${nextAction.disabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : nextAction.className}`}
+                            className={`w-full h-7 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm ${nextAction.disabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : nextAction.className}`}
                           >
                             {nextAction.icon} {nextAction.label}
                           </button>
@@ -3461,7 +3461,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleNavigateRoutePlanStop(stop); }}
-                              className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-slate-50 transition-all"
+                              className="mt-2 w-full h-7 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-slate-50 transition-all"
                             >
                               <Navigation size={16} /> Open Navigation
                             </button>
@@ -3470,7 +3470,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); undoRoutePlanStopProgress(stop); }}
-                              className="mt-2 w-full h-10 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-amber-100 transition-all"
+                              className="mt-2 w-full h-7 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-amber-100 transition-all"
                             >
                               <RotateCcw size={16} /> Undo Last Step
                             </button>
@@ -3479,7 +3479,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'No Show', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
-                              className="h-11 rounded-xl border border-orange-200 bg-white text-orange-700 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-orange-50 transition-all"
+                              className="h-7 rounded-xl border border-orange-200 bg-white text-orange-700 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-orange-50 transition-all"
                               title="No Show"
                               aria-label="Mark as No Show"
                             >
@@ -3488,7 +3488,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'Cancelled', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
-                              className="h-11 rounded-xl border border-rose-200 bg-white text-rose-700 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-rose-50 transition-all"
+                              className="h-7 rounded-xl border border-rose-200 bg-white text-rose-700 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-rose-50 transition-all"
                               title="Cancel stop"
                               aria-label="Cancel stop"
                             >
@@ -3497,7 +3497,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'Rerouted', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
-                              className="h-11 rounded-xl border border-purple-200 bg-white text-purple-700 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-purple-50 transition-all"
+                              className="h-7 rounded-xl border border-purple-200 bg-white text-purple-700 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-purple-50 transition-all"
                               title="Rerouted"
                               aria-label="Mark as Rerouted"
                             >
@@ -3583,8 +3583,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }} className={`flex-1 h-9 ${gradient} text-sm text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
                         {icon} {label}
                       </button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="h-11 px-4 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-medium shrink-0 cursor-pointer">No Show</button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="h-11 px-4 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-medium shrink-0 cursor-pointer">Cancel</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="h-7 px-4 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-medium shrink-0 cursor-pointer">No Show</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="h-7 px-4 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-medium shrink-0 cursor-pointer">Cancel</button>
                     </div>
                   </div>
                 );
@@ -3819,29 +3819,29 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               </span>
                             </div>
                             <div className="flex items-center gap-2 mb-2">
-                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-10 ${primary.gradient} text-base md:text-lg text-white rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-8 ${primary.gradient} text-sm md:text-base text-white rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
                                 {primary.icon} {primary.label}
                               </button>
                               {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
                                 skipConfirmTripId === trip.id ? (
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); setSkipConfirmTripId(null); handleSkipNav(trip); }} className="flex-1 h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1 shadow-sm">
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); setSkipConfirmTripId(null); handleSkipNav(trip); }} className="flex-1 h-8 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1 shadow-sm">
                                      <MapPin size={16} /> {trip.status === 'In Progress' ? 'Arrived to pick up?' : 'Arrived to drop off?'}
                                   </button>
                                 ) : (
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); setSkipConfirmTripId(trip.id); }} className="flex-1 h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1">
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); setSkipConfirmTripId(trip.id); }} className="flex-1 h-8 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1">
                                      <Forward size={16} /> Skip
                                   </button>
                                 )
                               )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="flex-1 h-11 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5">
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="flex-1 h-7 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5">
                                 <AlertCircle size={16} /> No Show
                               </button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="flex-1 h-11 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5">
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="flex-1 h-7 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5">
                                 <XCircle size={16} /> Cancel
                               </button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleReroute(trip); }} className="flex-1 h-11 bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5">
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleReroute(trip); }} className="flex-1 h-7 bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5">
                                 <RefreshCw size={16} /> Rerouted
                               </button>
                             </div>
@@ -3955,7 +3955,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         placeholder="3"
                       />
                     </div>
-                    <button type="button" onClick={applyWithinHoursToDeadline} className="h-11 px-4 rounded-xl bg-rose-600 text-white text-xs font-semibold cursor-pointer">Apply</button>
+                    <button type="button" onClick={applyWithinHoursToDeadline} className="h-7 px-4 rounded-xl bg-rose-600 text-white text-xs font-semibold cursor-pointer">Apply</button>
                   </div>
                   {(() => {
                     const deadline = scheduleEditDraft.deadlineDate && scheduleEditDraft.deadlineTime
@@ -3985,8 +3985,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             <div className="px-5 pb-5 flex gap-3">
-              <button type="button" onClick={closeScheduleEditor} className="flex-1 h-12 rounded-2xl bg-white border border-slate-200 text-slate-700 font-semibold cursor-pointer">Cancel</button>
-              <button type="button" onClick={saveScheduleEdit} className="flex-1 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold cursor-pointer">Save</button>
+              <button type="button" onClick={closeScheduleEditor} className="flex-1 h-7 rounded-2xl bg-white border border-slate-200 text-slate-700 font-semibold cursor-pointer">Cancel</button>
+              <button type="button" onClick={saveScheduleEdit} className="flex-1 h-7 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold cursor-pointer">Save</button>
             </div>
           </div>
         </div>
@@ -4029,7 +4029,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm Arrival</button>
+                <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm Arrival</button>
               </div>
             </div>
           </div>
@@ -4068,7 +4068,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-[#23568E] hover:bg-[#1B4471] text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
+                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-2 bg-[#23568E] hover:bg-[#1B4471] text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
               </div>
             </div>
           </div>
@@ -4099,7 +4099,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
             <div className="flex gap-3">
               <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmRoutePlanStopSignature} disabled={!routeStopSignatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm</button>
+              <button type="button" onClick={confirmRoutePlanStopSignature} disabled={!routeStopSignatureConfirmed} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm</button>
             </div>
           </div>
         </div>
@@ -4165,7 +4165,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
             <div className="flex gap-3">
               <button type="button" onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmArrival} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Confirm Arrival</button>
+              <button type="button" onClick={confirmArrival} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Confirm Arrival</button>
             </div>
           </div>
         </div>
@@ -4204,7 +4204,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
             <div className="flex gap-3">
               <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmSignatureAndBegin} disabled={!signatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm & Begin</button>
+              <button type="button" onClick={confirmSignatureAndBegin} disabled={!signatureConfirmed} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm & Begin</button>
             </div>
           </div>
         </div>
@@ -4274,7 +4274,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
             <div className="flex gap-3 mt-2 shrink-0 pt-2">
               <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-              <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
+              <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
             </div>
           </div>
         </div>
@@ -4326,9 +4326,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             })()}
 
             <div className="grid grid-cols-3 gap-2">
-              <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={16} /> Pickup</button>
-              <button type="button" onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={16} /> Dropoff</button>
-              <button type="button" onClick={() => openContactSelector(showTripDetails)} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><PhoneForwarded size={16} /> Contacts</button>
+              <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="h-7 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={16} /> Pickup</button>
+              <button type="button" onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="h-7 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={16} /> Dropoff</button>
+              <button type="button" onClick={() => openContactSelector(showTripDetails)} className="h-7 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><PhoneForwarded size={16} /> Contacts</button>
             </div>
 
             {/* Smart Contacts Section */}
@@ -4349,7 +4349,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     {contacts.length > 0 && (
                       <button type="button"
                         onClick={() => { const p = getPrimaryContactForTrip(showTripDetails); if (p) handleCall(p.phone, `${p.label}: ${p.name}`); }}
-                        className="w-full h-10 bg-emerald-600 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-sm">
+                        className="w-full h-7 bg-emerald-600 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-sm">
                         <Phone size={16} /> Call {contacts.find(c => c.isPrimary)?.label || 'Primary Contact'} — {formatPhoneDisplay(contacts.find(c => c.isPrimary)?.phone || contacts[0]?.phone)}
                       </button>
                     )}
@@ -4398,9 +4398,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
               <h3 className="text-micro font-semibold uppercase tracking-wide text-slate-500">Actions</h3>
               <div className="flex gap-2">
-                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={16} /> Google Maps</button>
-                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'waze')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={16} /> Waze</button>
-                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'apple')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={16} /> Apple</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-7 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={16} /> Google Maps</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'waze')} className="flex-1 h-7 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={16} /> Waze</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'apple')} className="flex-1 h-7 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={16} /> Apple</button>
               </div>
             </div>
           </div>
@@ -4621,8 +4621,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <HistoryTripDetailTable trip={trip} driver={me} />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <button type="button" onClick={() => handleEditTrip(trip)} className="h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><Edit2 size={16} /> Edit</button>
-                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><RotateCcw size={14} /> Restore</button>
+                        <button type="button" onClick={() => handleEditTrip(trip)} className="h-7 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><Edit2 size={16} /> Edit</button>
+                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="h-7 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><RotateCcw size={14} /> Restore</button>
                       </div>
                     </div>
                   );
@@ -5017,7 +5017,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </p>
 
             <div className="mt-5 space-y-2">
-              <button onClick={() => { setShowClockOutOffer(false); handleClockToggle(); }} className="w-full h-11 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition active:scale-95 flex items-center justify-center gap-2">
+              <button onClick={() => { setShowClockOutOffer(false); handleClockToggle(); }} className="w-full h-7 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition active:scale-95 flex items-center justify-center gap-2">
                 <LogOut size={16} /> Clock Out Now
               </button>
 
@@ -5029,7 +5029,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
                   <button onClick={() => { if (delayedClockOutTarget) scheduleDelayedClockOut(delayedClockOutTarget); else setShowToast({ type: 'info', message: 'Select a time first.' }); }}
                     disabled={!delayedClockOutTarget}
-                    className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-medium text-xs transition active:scale-95">
+                    className="h-7 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-medium text-xs transition active:scale-95">
                     Set Time
                   </button>
                 </div>
@@ -5038,14 +5038,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               {clockOutEstimate && (
                 <div className="border-t border-slate-100 pt-3 mt-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Estimate from home</p>
-                  <button onClick={() => scheduleDelayedClockOut(clockOutEstimate.targetTime)} className="w-full h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs transition active:scale-95 flex items-center justify-center gap-2">
+                  <button onClick={() => scheduleDelayedClockOut(clockOutEstimate.targetTime)} className="w-full h-7 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs transition active:scale-95 flex items-center justify-center gap-2">
                     <Navigation size={16} /> Clock out in ~{clockOutEstimate.label}
                   </button>
                 </div>
               )}
             </div>
 
-            <button onClick={() => { setShowClockOutOffer(false); clockOutOfferedRef.current = false; }} className="w-full h-10 text-xs font-medium text-slate-500 hover:text-slate-700 mt-3 transition">
+            <button onClick={() => { setShowClockOutOffer(false); clockOutOfferedRef.current = false; }} className="w-full h-7 text-xs font-medium text-slate-500 hover:text-slate-700 mt-3 transition">
               Dismiss
             </button>
           </div>
@@ -5064,10 +5064,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               You don't have any trips right now. Would you like to clock out?
             </p>
             <div className="grid grid-cols-2 gap-3 mt-6">
-              <button onClick={() => { setShowIdleLogoutPrompt(false); handleClockToggle(); }} className="h-12 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition active:scale-95">
+              <button onClick={() => { setShowIdleLogoutPrompt(false); handleClockToggle(); }} className="h-7 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition active:scale-95">
                 Clock Out
               </button>
-              <button onClick={() => { setShowIdleLogoutPrompt(false); idlePromptedRef.current = true; }} className="h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition active:scale-95">
+              <button onClick={() => { setShowIdleLogoutPrompt(false); idlePromptedRef.current = true; }} className="h-7 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition active:scale-95">
                 Stay On
               </button>
             </div>
@@ -5424,7 +5424,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <button
                             type="button"
                             onClick={() => { handleSMS(contact.phone, contact.name); setShowContactSelector(null); }}
-                            className="flex-1 h-10 bg-blue-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
+                            className="flex-1 h-7 bg-blue-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
                             <MessageCircle size={16} /> {actions.smsLabel}
                           </button>
                         )}
