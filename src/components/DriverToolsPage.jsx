@@ -542,14 +542,14 @@ const RoutePlanSection = ({
             <MapIcon size={17} />
           </div>
           <div className="text-left min-w-0">
-            <span className="block text-sm font-black text-slate-900">Route Plan</span>
-            <span className="block text-[11px] font-semibold text-slate-400 truncate">
+            <span className="block text-sm font-bold text-slate-900">Route Plan</span>
+            <span className="block text-xs font-semibold text-slate-400 truncate">
               {routeValidation.routeStops.length} stops / {routeValidation.tripCount} trips / {isCalculating ? 'calculating' : routeSummary.duration}
             </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`hidden sm:inline-flex px-2 py-1 rounded-lg text-[10px] font-black border ${routeValidation.ready ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}>
+          <span className={`hidden sm:inline-flex px-2 py-1 rounded-lg text-xs font-bold border ${routeValidation.ready ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}>
             {routeValidation.ready ? 'Ready' : 'Needs info'}
           </span>
           {expanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
@@ -565,8 +565,8 @@ const RoutePlanSection = ({
               ['Miles', routeSummary.distance],
             ].map(([label, value]) => (
               <div key={label} className="rounded-2xl bg-slate-50 border border-slate-100 px-2 py-2">
-                <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">{label}</div>
-                <div className="text-xs font-black text-slate-900 truncate">{value}</div>
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</div>
+                <div className="text-xs font-bold text-slate-900 truncate">{value}</div>
               </div>
             ))}
           </div>
@@ -618,11 +618,11 @@ const RoutePlanSection = ({
                     <div className="w-6 flex justify-center items-center">
                       {stop.type === 'origin' ? (
                         <div className="w-[22px] h-[22px] border border-blue-200 rounded-full bg-blue-50 flex items-center justify-center">
-                          <span className="text-[10px] font-black text-blue-700 leading-none">O</span>
+                          <span className="text-xs font-bold text-blue-700 leading-none">O</span>
                         </div>
                       ) : (
                         <div className="w-[22px] h-[22px] border border-slate-300 rounded-full bg-white flex items-center justify-center">
-                          <span className="text-[11px] font-black text-slate-800 leading-none">{stop.letter}</span>
+                          <span className="text-xs font-bold text-slate-800 leading-none">{stop.letter}</span>
                         </div>
                       )}
                     </div>
@@ -631,12 +631,12 @@ const RoutePlanSection = ({
                     {(stop.clientName || stop.stopTime || stop.stopType) && (
                       <div className="flex items-center gap-1.5 mb-1 min-w-0">
                         {stop.stopType && stop.stopType !== 'ORIGIN' && (
-                          <span className={`text-[9px] font-black px-1.5 py-[1px] rounded-lg ${stop.stopType === 'PU' ? 'bg-blue-100 text-blue-700' : stop.stopType === 'DO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                          <span className={`text-xs font-bold px-1.5 py-[1px] rounded-lg ${stop.stopType === 'PU' ? 'bg-blue-100 text-blue-700' : stop.stopType === 'DO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
                             {stop.stopType}
                           </span>
                         )}
-                        {stop.clientName && <span className="text-[11px] font-black text-slate-800 truncate">{stop.clientName}</span>}
-                        {stop.stopTime && <span className="text-[10px] font-semibold text-slate-400">{to12hr(stop.stopTime)}</span>}
+                        {stop.clientName && <span className="text-xs font-bold text-slate-800 truncate">{stop.clientName}</span>}
+                        {stop.stopTime && <span className="text-xs font-semibold text-slate-400">{to12hr(stop.stopTime)}</span>}
                       </div>
                     )}
                     <input
@@ -659,31 +659,31 @@ const RoutePlanSection = ({
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
                 onClick={handleAddStop}
-                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl active:scale-95 transition hover:bg-emerald-100"
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl active:scale-95 transition hover:bg-emerald-100"
               >
                 <span className="text-base leading-none">+</span> Add stop
               </button>
               <button
                 onClick={handleUseCurrentLocation}
                 disabled={gettingLocation}
-                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-black text-blue-700 bg-blue-50 border border-blue-100 rounded-xl active:scale-95 transition hover:bg-blue-100 disabled:opacity-50"
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 rounded-xl active:scale-95 transition hover:bg-blue-100 disabled:opacity-50"
               >
                 <Navigation size={13} /> {gettingLocation ? 'Getting...' : 'Use GPS'}
               </button>
               <button
                 onClick={handleSmartSort}
                 disabled={routeValidation.routeStops.length < 2}
-                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl active:scale-95 transition hover:bg-indigo-100 disabled:opacity-40"
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl active:scale-95 transition hover:bg-indigo-100 disabled:opacity-40"
               >
                 <Zap size={13} /> Smart sort
               </button>
-              <button onClick={handleReverseStops} disabled={routeValidation.routeStops.length < 2} className="flex-shrink-0 px-3 py-2 text-xs font-black text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40">
+              <button onClick={handleReverseStops} disabled={routeValidation.routeStops.length < 2} className="flex-shrink-0 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40">
                 Reverse
               </button>
-              <button onClick={handleRemoveDuplicates} className="flex-shrink-0 px-3 py-2 text-xs font-black text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50">
+              <button onClick={handleRemoveDuplicates} className="flex-shrink-0 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50">
                 Clean
               </button>
-              <button onClick={handleCopyPlan} className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-black text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50">
+              <button onClick={handleCopyPlan} className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50">
                 <Copy size={13} /> Copy
               </button>
             </div>
@@ -691,27 +691,27 @@ const RoutePlanSection = ({
               <button
                 onClick={openFullRoute}
                 disabled={!routeValidation.ready}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-black text-white bg-slate-900 rounded-xl active:scale-95 transition hover:bg-slate-800 shadow-sm disabled:opacity-40"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-bold text-white bg-slate-900 rounded-xl active:scale-95 transition hover:bg-slate-800 shadow-sm disabled:opacity-40"
               >
                 <Navigation size={14} /> Navigate All
               </button>
               <button
                 type="button"
                 onClick={sendToSequencer}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-black text-white bg-[#23568E] rounded-xl active:scale-95 transition hover:bg-[#1B4471] shadow-sm"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-bold text-white bg-[#23568E] rounded-xl active:scale-95 transition hover:bg-[#1B4471] shadow-sm"
               >
                 <Route size={14} /> Send {routeValidation.routeStops.length} to Sequencer
               </button>
             </div>
             <div className="flex justify-between items-center mt-3 px-1">
-              <div className="text-[12px] text-slate-500 font-semibold">
+              <div className="text-xs text-slate-500 font-semibold">
                 {routeValidation.pickupCount} pickups / {routeValidation.dropoffCount} dropoffs
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={handleClearPlan} className="text-[11px] font-black text-rose-500 hover:text-rose-600 transition-colors flex items-center gap-1">
+                <button onClick={handleClearPlan} className="text-xs font-bold text-rose-500 hover:text-rose-600 transition-colors flex items-center gap-1">
                   <Trash2 size={13} /> Clear
                 </button>
-                <button onClick={() => setExpanded(false)} className="text-emerald-600 font-semibold text-[12px] hover:text-emerald-700 transition-colors">
+                <button onClick={() => setExpanded(false)} className="text-emerald-600 font-semibold text-xs hover:text-emerald-700 transition-colors">
                   Done
                 </button>
               </div>
@@ -755,7 +755,7 @@ const DriverToolsPage = ({
           <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-3 shadow-md shadow-indigo-200/40 sticky top-0 z-10">
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
-                <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-black text-white">{guidedStepIndex + 1}</span>
+                <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-bold text-white">{guidedStepIndex + 1}</span>
                 <span className="text-xs font-bold text-white/80 uppercase tracking-wider">of {aiSequence.length}</span>
               </div>
               <button onClick={() => { onSetGuidedMode(false); }} className="text-xs text-white/60 font-bold uppercase hover:text-white/90">Exit</button>
@@ -846,7 +846,7 @@ const DriverToolsPage = ({
             </div>
             <div className="text-left">
               <h3 className="text-sm font-bold text-slate-800">Route Sequencer</h3>
-              <p className="text-micro font-semibold text-slate-400">Advanced multi-load engine & templates</p>
+              <p className="text-xs font-semibold text-slate-400">Advanced multi-load engine & templates</p>
             </div>
           </div>
           <ChevronRight size={16} className="text-slate-300" />
@@ -945,12 +945,12 @@ const DriverToolsPage = ({
                       <span className="block truncate text-xs font-bold text-slate-800">{trip.patient}</span>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {trip.bookingId && (
-                          <span className="rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
+                          <span className="rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-xs font-bold text-blue-700">
                             {trip.bookingId}
                           </span>
                         )}
                         {(trip.type || trip.serviceType) && (
-                          <span className="rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                          <span className="rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">
                             {trip.type || trip.serviceType}
                           </span>
                         )}
@@ -1002,7 +1002,7 @@ const DriverToolsPage = ({
                     <div className="min-w-0">
                       <span className="block truncate text-xs font-medium text-slate-700">{trip.patient}</span>
                       {trip.bookingId && (
-                        <span className="mt-1 inline-flex rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
+                        <span className="mt-1 inline-flex rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-xs font-bold text-blue-700">
                           {trip.bookingId}
                         </span>
                       )}

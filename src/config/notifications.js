@@ -1,19 +1,20 @@
 import app, { getMessaging, getToken, onMessage } from './firebase';
 
-const VAPID_KEY = 'BMA5e1UV1qoZ1TDxp4FQ5Q4qCAKVdsGD8yFGvqYpZ9DgF-1FMPQeHNdH7FsqTGEcHl-zUDRWZ0j3EL0tQ8PvBzM';
+const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
 const TOKEN_KEY = 'agape_fcm_token';
 
 export async function requestNotificationPermission(retries = 3) {
   if (!('Notification' in window) || !('serviceWorker' in navigator)) return null;
+  if (!VAPID_KEY) {
+    console.warn('[FCM] VITE_FIREBASE_VAPID_KEY is not set — push notifications disabled');
+    return null;
+  }
 
-  // Check existing permission
   if (Notification.permission === 'denied') return null;
   if (Notification.permission === 'granted') {
-    // Token already registered — try to get fresh token
     return getFcmToken(retries);
   }
 
-  // Permission default — request it
   try {
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return null;
@@ -24,7 +25,6 @@ export async function requestNotificationPermission(retries = 3) {
 }
 
 async function getFcmToken(retries = 3) {
-  // Check localStorage for cached token
   const cached = localStorage.getItem(TOKEN_KEY);
   
   for (let i = 0; i < retries; i++) {
@@ -36,13 +36,13 @@ async function getFcmToken(retries = 3) {
         return token;
       }
     } catch (err) {
+      console.warn(`[FCM] Token registration attempt ${i + 1} failed:`, err?.message || err);
       if (i < retries - 1) {
         await new Promise(r => setTimeout(r, 1000 * (i + 1)));
       }
     }
   }
   
-  // Return cached token if all retries failed
   return cached || null;
 }
 

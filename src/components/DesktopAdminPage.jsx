@@ -54,7 +54,7 @@ const statusColor = (status) => {
 };
 
 const SectionTab = ({ title, count, isActive, onClick }) => (
-  <button onClick={onClick} className={`px-3 py-2 rounded-xl text-[11px] font-bold transition-all shrink-0 border ${isActive ? 'bg-slate-900 text-white shadow-sm border-slate-900' : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'}`}>
+  <button onClick={onClick} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 border ${isActive ? 'bg-slate-900 text-white shadow-sm border-slate-900' : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'}`}>
     {title}
     {count !== undefined && <span className={`ml-1 ${isActive ? 'text-blue-200' : 'text-slate-400'}`}>({count})</span>}
   </button>
@@ -79,7 +79,7 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
               <p className="font-bold text-slate-900 truncate">{driver.name}</p>
               <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${getDriverLiveStatus(driver).color}`}>{getDriverLiveStatus(driver).label}</span>
             </div>
-            <p className="text-[11px] text-slate-500">{driver.vehicle || 'No vehicle'} {driver.phone ? `- ${driver.phone}` : ''}</p>
+            <p className="text-xs text-slate-500">{driver.vehicle || 'No vehicle'} {driver.phone ? `- ${driver.phone}` : ''}</p>
           </div>
           <DriverPerformanceCard driver={driver} trips={trips} compact />
         </div>
@@ -125,7 +125,7 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Recent Completed</p>
             <div className="space-y-1">
               {completedTrips.map((trip, i) => (
-                <div key={i} className="flex items-center gap-2 text-[11px] bg-emerald-50/50 rounded-lg px-2.5 py-1.5">
+                <div key={i} className="flex items-center gap-2 text-xs bg-emerald-50/50 rounded-lg px-2.5 py-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                   <span className="font-semibold text-slate-700 min-w-[80px]">{trip.time}</span>
                   <span className="text-slate-600 truncate">{trip.patient}</span>
@@ -145,7 +145,7 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
               {driverLogs.map((log, i) => (
                 <div key={i} className="flex items-center gap-2 text-[10px] text-slate-500">
                   <span className={`w-1 h-1 rounded-full shrink-0 ${log.c === 'emerald' ? 'bg-emerald-500' : log.c === 'rose' ? 'bg-rose-500' : log.c === 'amber' ? 'bg-amber-500' : 'bg-blue-500'}`} />
-                  <span className="font-semibold text-slate-600 capitalize shrink-0">{log.t}</span>
+                  <span className="font-bold text-slate-600 capitalize shrink-0">{log.t}</span>
                   <span className="truncate">{log.meta?.summary || log.d}</span>
                   <span className="ml-auto text-slate-400 shrink-0">{fmtTime(log.time)}</span>
                 </div>
@@ -528,11 +528,11 @@ const DesktopAdminPage = ({
             <table className="w-full">
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">User</th>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Email</th>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Role</th>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Status</th>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-bold text-slate-600 uppercase tracking-wider">Actions</th>
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">User</th>
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Email</th>
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Role</th>
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -557,7 +557,7 @@ const DesktopAdminPage = ({
                             handleRoleChange(user, newRole);
                           }
                         }}
-                        className="px-2 py-1 rounded-lg border border-slate-200 text-[11px] font-bold bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       >
                         <option value="admin">Admin</option>
                         <option value="dispatcher">Dispatcher</option>

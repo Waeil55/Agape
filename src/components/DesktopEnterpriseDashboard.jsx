@@ -33,7 +33,7 @@ const LazyFallback = () => (
   <div className="flex items-center justify-center h-full">
     <div className="flex flex-col items-center gap-3">
       <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-      <p className="text-xs text-slate-400 font-medium">Loading module...</p>
+      <p className="text-xs text-slate-500 font-medium">Loading module...</p>
     </div>
   </div>
 );
@@ -454,7 +454,7 @@ const DesktopEnterpriseDashboard = ({
         <div className="flex items-center gap-1.5">
           <div className="hidden lg:block">
             <h1 className="text-caption font-black text-slate-900 tracking-tight leading-none">Agape Care</h1>
-            <p className="text-[8px] font-bold text-blue-600 uppercase tracking-widest">Enterprise</p>
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">Enterprise</p>
           </div>
           <span title={isOnline ? 'Realtime connected' : 'Offline / not realtime'} className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'} shrink-0 hidden lg:inline-block`} />
         </div>
@@ -472,13 +472,13 @@ const DesktopEnterpriseDashboard = ({
               key={item.id}
               onClick={() => setActivePanel(item.id)}
               title={item.label}
-              className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-bold transition-all duration-150 whitespace-nowrap ${
+              className={`flex items-center gap-1 px-2 py-1 min-h-[40px] rounded-md text-xs font-bold transition-all duration-150 whitespace-nowrap ${
                 isActive
                   ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                  : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'
               }`}
             >
-              <Icon size={12} className={isActive ? 'text-white' : 'text-slate-400'} />
+              <Icon size={16} className={isActive ? 'text-white' : 'text-slate-500'} />
               <span className="hidden sm:inline">{item.label}</span>
             </button>
           );
@@ -493,21 +493,21 @@ const DesktopEnterpriseDashboard = ({
           {selectedTasks.length > 0 && (
             <button
               onClick={() => setBulkAssignModal(true)}
-              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-micro font-bold transition flex items-center gap-1 shadow-sm"
+              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold transition flex items-center gap-1 shadow-sm"
             >
-              <Users size={11} /> Assign {selectedTasks.length}
+              <Users size={16} /> Assign {selectedTasks.length}
             </button>
           )}
           <button
             onClick={toggleRightPanel}
             title={showRightPanel ? 'Close command panel' : 'Open command panel'}
-            className={`p-1 rounded-md transition flex items-center gap-1 text-micro font-bold shadow-sm ${
+            className={`p-1 rounded-md transition flex items-center gap-1 text-xs font-bold shadow-sm ${
               showRightPanel
                 ? 'bg-slate-900 text-white'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
             }`}
           >
-            <PanelRight size={12} />
+            <PanelRight size={16} />
           </button>
         </div>
       )}
@@ -531,7 +531,7 @@ const DesktopEnterpriseDashboard = ({
             }`}
             title={amIOnline ? "Click to go Offline" : "Click to go Online"}
           >
-            {amIOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+            {amIOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
             {amIOnline ? 'Online' : 'Offline'}
           </button>
         );
@@ -541,7 +541,7 @@ const DesktopEnterpriseDashboard = ({
       <button
         onClick={() => setActivePanel('settings')}
         title={displayLoginId}
-        className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-black hover:bg-slate-300 transition shrink-0 uppercase"
+        className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold hover:bg-slate-300 transition shrink-0 uppercase"
       >
         {(displayLoginId || 'U')[0]}
       </button>
@@ -556,7 +556,7 @@ const DesktopEnterpriseDashboard = ({
         </div>
         <div className="min-w-0">
           <p className="truncate text-base font-black text-slate-900 leading-none">Agape Care</p>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600 mt-1">Enterprise Fleet OS</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 mt-1">Enterprise Fleet OS</p>
         </div>
       </div>
 
@@ -569,10 +569,10 @@ const DesktopEnterpriseDashboard = ({
                 key={item.id}
                 type="button"
                 onClick={item.action}
-                className={`inline-flex h-9 items-center gap-2 rounded-full px-4 text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                className={`inline-flex h-9 items-center gap-2 rounded-full px-4 text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
                   item.active
                     ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
-                    : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                 }`}
                 title={item.label}
               >
@@ -599,12 +599,12 @@ const DesktopEnterpriseDashboard = ({
                   setFallbackAdminOnline(!fallbackAdminOnline);
                 }
               }}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider border shadow-sm transition-all hover:scale-105 active:scale-95 ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border shadow-sm transition-all hover:scale-105 active:scale-95 ${
                 amIOnline ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80' : 'bg-rose-50 text-rose-700 border-rose-200/80'
               }`}
               title={amIOnline ? "Click to go Offline" : "Click to go Online"}
             >
-              {amIOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+              {amIOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
               {amIOnline ? 'Online' : 'Offline'}
             </button>
           );
@@ -617,7 +617,7 @@ const DesktopEnterpriseDashboard = ({
                 onClick={() => setBulkAssignModal(true)}
                 className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-bold transition flex items-center gap-1 shadow-sm animate-in fade-in slide-in-from-top-1"
               >
-                <Users size={12} /> Assign {selectedTasks.length}
+                <Users size={16} /> Assign {selectedTasks.length}
               </button>
             )}
             <button
@@ -644,7 +644,7 @@ const DesktopEnterpriseDashboard = ({
               openRightPanel('alerts');
             }
           }}
-          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 shadow-sm"
+          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-700 shadow-sm"
           title="Notifications"
         >
           <Bell size={16} />
@@ -656,12 +656,12 @@ const DesktopEnterpriseDashboard = ({
           title={displayLoginId}
           className="flex h-10 min-w-[108px] items-center gap-2 rounded-full border border-slate-200 bg-white px-2 text-left shadow-sm transition hover:bg-slate-50"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold uppercase text-white shadow-sm shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold uppercase text-white shadow-sm shrink-0">
             {(currentUser || 'U')[0]}
           </div>
           <div className="min-w-0 pr-1.5">
-            <p className="truncate text-[11px] font-black text-slate-900 leading-none">{displayLoginId || 'Account'}</p>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mt-1">{role}</p>
+            <p className="truncate text-xs font-bold text-slate-900 leading-none">{displayLoginId || 'Account'}</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mt-1">{role}</p>
           </div>
         </button>
       </div>
@@ -676,7 +676,7 @@ const DesktopEnterpriseDashboard = ({
       </div>
       <div>
         <h1 className="text-[13px] font-bold tracking-tight leading-none text-white drop-shadow-sm">Agape Care</h1>
-        <p className="text-[10px] font-medium text-blue-200 capitalize drop-shadow-sm">{activeWorkspaceMeta.title}</p>
+        <p className="text-xs font-medium text-blue-200 capitalize drop-shadow-sm">{activeWorkspaceMeta.title}</p>
       </div>
       <div className="flex-1" />
       {/* Online status dot */}
@@ -684,17 +684,17 @@ const DesktopEnterpriseDashboard = ({
       {activePanel === 'operations' && (
         <button
           onClick={toggleRightPanel}
-          className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-bold shadow-sm transition-colors ${
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold shadow-sm transition-colors ${
             showRightPanel ? 'bg-white text-[#1e3a5f]' : 'bg-white/10 text-white hover:bg-white/20'
           }`}
         >
-          <PanelRight size={11} /> Panel
+          <PanelRight size={16} /> Panel
         </button>
       )}
       {/* User avatar -> settings */}
       <button
         onClick={() => setActivePanel('settings')}
-        className="w-7 h-7 rounded-full bg-white/20 border border-white/20 shadow-sm flex items-center justify-center text-white text-xs font-black hover:bg-white/30 transition uppercase"
+        className="w-9 h-9 rounded-full bg-white/20 border border-white/20 shadow-sm flex items-center justify-center text-white text-xs font-bold hover:bg-white/30 transition uppercase"
       >
         {(currentUser || 'U')[0]}
       </button>
@@ -713,7 +713,7 @@ const DesktopEnterpriseDashboard = ({
             key={item.id}
             onClick={() => setActivePanel(item.id)}
             className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all relative touch-manipulation ${
-              isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'
+              isActive ? 'text-blue-400' : 'text-slate-600 hover:text-slate-500'
             }`}
             style={{ minHeight: '56px', paddingTop: '6px', paddingBottom: 'max(6px, env(safe-area-inset-bottom, 0px))' }}
           >
@@ -723,13 +723,13 @@ const DesktopEnterpriseDashboard = ({
               )}
               <Icon size={24} strokeWidth={isActive ? 2.5 : 1.8} className="relative" />
               {hasBadge && (
-                <span className="absolute -top-0.5 -right-2 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
+                <span className="absolute -top-0.5 -right-2 min-w-[16px] h-4 bg-rose-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
                   {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
                 </span>
               )}
             </div>
-            <span className={`text-[10px] tracking-wide leading-none ${
-              isActive ? 'text-blue-400 font-bold' : 'text-slate-500 font-medium'
+            <span className={`text-xs tracking-wide leading-none ${
+              isActive ? 'text-blue-400 font-bold' : 'text-slate-600 font-medium'
             }`}>
               {item.label}
             </span>
@@ -757,10 +757,10 @@ const DesktopEnterpriseDashboard = ({
             className={`relative flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-all duration-200 ${
               rightPanelTab === tab.id
                 ? 'text-blue-700'
-                : 'text-slate-400 hover:text-slate-700'
+                : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <tab.icon size={12} />
+            <tab.icon size={16} />
             {tab.label}
             {rightPanelTab === tab.id && (
               <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-blue-500 rounded-full" />
@@ -785,19 +785,19 @@ const DesktopEnterpriseDashboard = ({
                   }`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-slate-700">{log.t}</p>
-                    <p className="text-micro text-slate-400 mt-0.5 leading-relaxed">{log.d}</p>
-                    {log.timestamp && <p className="text-micro text-slate-500 mt-1">{log.timestamp}</p>}
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{log.d}</p>
+                    {log.timestamp && <p className="text-xs text-slate-600 mt-1">{log.timestamp}</p>}
                   </div>
                 </div>
               </div>
             ))}
             {logs.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+              <div className="flex flex-col items-center justify-center py-10 text-slate-600">
                 <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-3">
                   <Bell size={18} className="opacity-40" />
                 </div>
                 <p className="text-xs font-medium">No alerts</p>
-                <p className="text-micro text-slate-500 mt-1">All clear — no issues detected</p>
+                <p className="text-xs text-slate-600 mt-1">All clear — no issues detected</p>
               </div>
             )}
           </div>
@@ -808,17 +808,17 @@ const DesktopEnterpriseDashboard = ({
             {tripDetails ? (
               <div className="space-y-2">
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Patient</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Patient</p>
                   <p className="text-sm font-bold text-slate-900">{tripDetails.patient}</p>
-                  {getBookingReference(tripDetails) && <p className="text-xs text-slate-400 mt-0.5">Booking ID: {getBookingReference(tripDetails)}</p>}
-                  {getClientIdentifier(tripDetails) && <p className="text-xs text-slate-400 mt-0.5">Client ID: {getClientIdentifier(tripDetails)}</p>}
-                  {(tripDetails.type || tripDetails.serviceType) && <p className="text-xs text-slate-400 mt-0.5">Service: {tripDetails.type || tripDetails.serviceType}</p>}
+                  {getBookingReference(tripDetails) && <p className="text-xs text-slate-500 mt-0.5">Booking ID: {getBookingReference(tripDetails)}</p>}
+                  {getClientIdentifier(tripDetails) && <p className="text-xs text-slate-500 mt-0.5">Client ID: {getClientIdentifier(tripDetails)}</p>}
+                  {(tripDetails.type || tripDetails.serviceType) && <p className="text-xs text-slate-500 mt-0.5">Service: {tripDetails.type || tripDetails.serviceType}</p>}
                   {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone)}</p>}
                   {formatPhoneDisplay(tripDetails.pickupPhone) && formatPhoneDisplay(tripDetails.pickupPhone) !== formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700">Pickup phone: {formatPhoneDisplay(tripDetails.pickupPhone)}</p>}
                   {formatPhoneDisplay(tripDetails.dropoffPhone) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.dropoffPhone)}</p>}
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Status</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Status</p>
                   <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-bold ${
                     tripDetails.status === 'Unassigned' ? 'bg-rose-100 text-rose-700' :
                     tripDetails.status === 'Assigned' ? 'bg-blue-100 text-blue-700' :
@@ -827,34 +827,34 @@ const DesktopEnterpriseDashboard = ({
                   }`}>{tripDetails.status}</span>
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Time</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Time</p>
                   <p className="text-sm font-bold text-slate-900">{tripDetails.time || '—'}</p>
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Route</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Route</p>
                   <div className="space-y-1.5">
                     <div className="flex items-start gap-2.5">
                       <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0 ring-1 ring-emerald-500/20" />
                       <div>
                         <p className="text-xs text-slate-700">{tripDetails.pickup || '—'}</p>
-                        {tripDetails.pickupSiteName && <p className="text-[11px] text-emerald-700 mt-0.5">{tripDetails.pickupSiteName}</p>}
+                        {tripDetails.pickupSiteName && <p className="text-xs text-emerald-700 mt-0.5">{tripDetails.pickupSiteName}</p>}
                       </div>
                     </div>
                     <div className="flex items-start gap-2.5">
                       <div className="w-2 h-2 rounded-full bg-rose-500 mt-1.5 shrink-0 ring-1 ring-rose-500/20" />
                       <div>
                         <p className="text-xs text-slate-700">{tripDetails.dropoff || '—'}</p>
-                        {tripDetails.dropoffSiteName && <p className="text-[11px] text-rose-700 mt-0.5">{tripDetails.dropoffSiteName}</p>}
+                        {tripDetails.dropoffSiteName && <p className="text-xs text-rose-700 mt-0.5">{tripDetails.dropoffSiteName}</p>}
                       </div>
                     </div>
                   </div>
                 </div>
                 {tripDetails.routeAssignments?.length > 0 && (
                   <div className="bg-white rounded-xl border border-indigo-100 p-2.5 shadow-sm">
-                    <p className="text-micro font-bold uppercase tracking-wider text-indigo-500 mb-1">Route Plans</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-1">Route Plans</p>
                     <div className="flex flex-wrap gap-1.5">
                       {tripDetails.routeAssignments.map((route, index) => (
-                        <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 border border-indigo-100">
+                        <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 border border-indigo-100">
                           {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` • ${route.statusLabel}` : ''}
                         </span>
                       ))}
@@ -863,44 +863,44 @@ const DesktopEnterpriseDashboard = ({
                 )}
                 {(tripDetails.driverName || tripDetails.driverId) && (
                   <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                    <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-1">Driver</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Driver</p>
                     <p className="text-sm font-medium text-slate-900">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || '—'}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
                   </div>
                 )}
                 {tripDetails.notes && (
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5">
-                    <p className="text-micro font-bold uppercase tracking-wider text-amber-700">Notes</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Notes</p>
                     <p className="text-xs text-amber-800 mt-0.5">{tripDetails.notes}</p>
                   </div>
                 )}
                 <button
                   onClick={() => setShowTripLocations(prev => !prev)}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-[10px] font-bold text-slate-600 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-600 transition-colors"
                 >
-                  <Search size={11} /> Find This Trip
+                  <Search size={16} /> Find This Trip
                 </button>
                 {showTripLocations && (() => {
                   const locs = findTripLocations(tripDetails, trips, trashedTrips, logs);
                   return locs.length > 0 ? (
                     <div className="space-y-1">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Found in</p>
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Found in</p>
                       {locs.map((loc, i) => (
                         <button
                           key={i}
                           onClick={() => { setActivePanel(loc.panel); setTripDetails(null); setShowRightPanel(false); setShowTripLocations(false); }}
                           className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-colors text-left"
                         >
-                          {loc.icon === 'Zap' && <Zap size={12} className="text-indigo-600" />}
-                          {loc.icon === 'Archive' && <Archive size={12} className="text-indigo-600" />}
-                          {loc.icon === 'BarChart2' && <BarChart2 size={12} className="text-indigo-600" />}
-                          {loc.icon === 'Route' && <Route size={12} className="text-indigo-600" />}
-                          <span className="text-[10px] font-semibold text-indigo-700">{loc.label}</span>
+                          {loc.icon === 'Zap' && <Zap size={16} className="text-indigo-600" />}
+                          {loc.icon === 'Archive' && <Archive size={16} className="text-indigo-600" />}
+                          {loc.icon === 'BarChart2' && <BarChart2 size={16} className="text-indigo-600" />}
+                          {loc.icon === 'Route' && <Route size={16} className="text-indigo-600" />}
+                          <span className="text-xs font-semibold text-indigo-700">{loc.label}</span>
                         </button>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-[10px] text-slate-400 text-center py-1.5">No other references found.</p>
+                    <p className="text-xs text-slate-500 text-center py-1.5">No other references found.</p>
                   );
                 })()}
               </div>
@@ -908,33 +908,33 @@ const DesktopEnterpriseDashboard = ({
               <div className="space-y-3">
                 <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                       <Eye size={15} />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-slate-900">Select a Trip</p>
-                      <p className="text-micro text-slate-500">Click any trip card to load the full client details here.</p>
+                      <p className="text-xs text-slate-600">Click any trip card to load the full client details here.</p>
                     </div>
                   </div>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-2">Live Summary</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Live Summary</p>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="rounded-lg bg-slate-50 px-2.5 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Today</p>
-                      <p className="mt-1 text-sm font-black text-slate-900">{todayTrips.length}</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Today</p>
+                      <p className="mt-1 text-sm font-bold text-slate-900">{todayTrips.length}</p>
                     </div>
                     <div className="rounded-lg bg-rose-50 px-2.5 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-rose-600">Unassigned</p>
-                      <p className="mt-1 text-sm font-black text-rose-700">{unassignedTrips.length}</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-rose-600">Unassigned</p>
+                      <p className="mt-1 text-sm font-bold text-rose-700">{unassignedTrips.length}</p>
                     </div>
                     <div className="rounded-lg bg-amber-50 px-2.5 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Late</p>
-                      <p className="mt-1 text-sm font-black text-amber-700">{lateTrips.length}</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-amber-600">Late</p>
+                      <p className="mt-1 text-sm font-bold text-amber-700">{lateTrips.length}</p>
                     </div>
                     <div className="rounded-lg bg-blue-50 px-2.5 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Will Call</p>
-                      <p className="mt-1 text-sm font-black text-blue-700">{willCallTrips.length}</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-blue-600">Will Call</p>
+                      <p className="mt-1 text-sm font-bold text-blue-700">{willCallTrips.length}</p>
                     </div>
                   </div>
                 </div>
@@ -959,10 +959,10 @@ const DesktopEnterpriseDashboard = ({
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-indigo-700">AI Dispatch</p>
-                  <p className="text-micro text-indigo-500/60">Powered by smart routing</p>
+                  <p className="text-xs text-indigo-500/60">Powered by smart routing</p>
                 </div>
               </div>
-              <p className="text-micro text-slate-500 leading-relaxed">
+              <p className="text-xs text-slate-600 leading-relaxed">
                 {unassignedTrips.length > 0
                   ? `${unassignedTrips.length} trip${unassignedTrips.length > 1 ? 's' : ''} waiting for assignment. Run optimization to auto-assign.`
                   : 'All trips are assigned. System running optimally.'}
@@ -972,31 +972,31 @@ const DesktopEnterpriseDashboard = ({
                   onClick={() => setShowOptimizeModal(true)}
                   className="mt-2.5 w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-1.5"
                 >
-                  <Wand2 size={12} /> Run Optimization
+                  <Wand2 size={16} /> Run Optimization
                 </button>
               )}
             </div>
 
             {/* Quick stats */}
             <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-              <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-2.5">Fleet Insights</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">Fleet Insights</p>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">Completion</span>
+                  <span className="text-slate-600">Completion</span>
                   <span className="text-emerald-700 font-medium tabular-nums">{todayTrips.length > 0 ? Math.round((completedToday / todayTrips.length) * 100) : 0}%</span>
                 </div>
                 <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
                   <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${todayTrips.length > 0 ? Math.round((completedToday / todayTrips.length) * 100) : 0}%` }} />
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">On-time rate</span>
+                  <span className="text-slate-600">On-time rate</span>
                   <span className="text-blue-700 font-medium tabular-nums">{activeTrips.length > 0 ? Math.round(((activeTrips.length - lateTrips.length) / activeTrips.length) * 100) : 100}%</span>
                 </div>
                 <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
                   <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${activeTrips.length > 0 ? Math.round(((activeTrips.length - lateTrips.length) / activeTrips.length) * 100) : 100}%` }} />
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">Utilization</span>
+                  <span className="text-slate-600">Utilization</span>
                   <span className="text-amber-700 font-medium tabular-nums">{drivers.length > 0 ? Math.round(((drivers.length - availableDrivers) / drivers.length) * 100) : 0}%</span>
                 </div>
                 <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
@@ -1018,7 +1018,7 @@ const DesktopEnterpriseDashboard = ({
         <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
         <div className="w-full max-w-lg bg-white backdrop-blur-xl border border-slate-200 rounded-3xl shadow-sm overflow-hidden relative z-10 animate-in fade-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100">
-            <Search size={16} className="text-slate-400" />
+            <Search size={16} className="text-slate-500" />
             <input
               type="text"
               placeholder="Type a command or search..."
@@ -1028,8 +1028,8 @@ const DesktopEnterpriseDashboard = ({
               autoFocus
             />
             <div className="flex items-center gap-1.5">
-              <kbd className="text-micro bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-400">⌘K</kbd>
-              <kbd className="text-micro bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-400">ESC</kbd>
+              <kbd className="text-xs bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-500">⌘K</kbd>
+              <kbd className="text-xs bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-500">ESC</kbd>
             </div>
           </div>
           <div className="max-h-72 overflow-y-auto p-1.5">
@@ -1040,18 +1040,18 @@ const DesktopEnterpriseDashboard = ({
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition-all duration-150 group"
               >
                 <div className="w-7 h-7 rounded-md bg-slate-50 flex items-center justify-center group-hover:bg-slate-100 transition-colors">
-                  <cmd.icon size={13} className="text-slate-500" />
+                  <cmd.icon size={13} className="text-slate-600" />
                 </div>
                 <span className="text-sm text-slate-700 flex-1">{cmd.label}</span>
-                <span className="text-micro text-slate-500 font-mono">⌘{idx + 1}</span>
+                <span className="text-xs text-slate-600 font-mono">⌘{idx + 1}</span>
               </button>
             ))}
             {filteredCommands.length === 0 && (
               <div className="px-4 py-6 text-center">
                 <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-2">
-                  <Search size={14} className="text-slate-500" />
+                  <Search size={14} className="text-slate-600" />
                 </div>
-                <p className="text-xs text-slate-500">No commands found</p>
+                <p className="text-xs text-slate-600">No commands found</p>
               </div>
             )}
           </div>
@@ -1205,8 +1205,8 @@ const DesktopEnterpriseDashboard = ({
           <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Driver Workstation</p>
-                <p className="truncate text-sm font-black text-slate-900">
+                <p className="text-xs font-bold uppercase tracking-widest text-blue-600">Driver Workstation</p>
+                <p className="truncate text-sm font-bold text-slate-900">
                   {role === 'admin' ? 'Admin' : 'Dispatcher'} operating driver workflow
                 </p>
               </div>
@@ -1214,7 +1214,7 @@ const DesktopEnterpriseDashboard = ({
                 <select
                   value={activeDriverWorkDriver.id}
                   onChange={(event) => setDriverWorkDriverId(event.target.value)}
-                  className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 sm:min-w-[240px]"
+                  className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 sm:min-w-[240px]"
                 >
                   {driverWorkDrivers.map((driver) => (
                     <option key={driver.id || driver.email || driver.name} value={driver.id}>
@@ -1222,7 +1222,7 @@ const DesktopEnterpriseDashboard = ({
                     </option>
                   ))}
                 </select>
-                <span className={`hidden rounded-lg px-2 py-1 text-[10px] font-black sm:inline-flex ${getDriverLiveStatus(activeDriverWorkDriver).color}`}>
+                <span className={`hidden rounded-lg px-2 py-1 text-xs font-bold sm:inline-flex ${getDriverLiveStatus(activeDriverWorkDriver).color}`}>
                   {getDriverLiveStatus(activeDriverWorkDriver).label}
                 </span>
               </div>
@@ -1306,7 +1306,7 @@ const DesktopEnterpriseDashboard = ({
               <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
                 <span className="text-sm font-bold text-slate-900">Command Panel</span>
                 <button onClick={() => setShowRightPanel(false)} className="p-2 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors">
-                  <X size={18} className="text-slate-500" />
+                  <X size={18} className="text-slate-600" />
                 </button>
               </div>
               <div className="flex-1 overflow-hidden">
@@ -1332,7 +1332,7 @@ const DesktopEnterpriseDashboard = ({
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Upload size={16} className="text-blue-700" /> Upload Trips
               </h2>
-              <button onClick={() => setShowUploadModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setShowUploadModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-600" /></button>
             </div>
             <div className="p-6">
               <Suspense fallback={<LazyFallback />}>
@@ -1392,7 +1392,7 @@ const DesktopEnterpriseDashboard = ({
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Users size={16} className="text-emerald-700" /> Assign {selectedTasks.length} Trips
               </h2>
-              <button onClick={() => setBulkAssignModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setBulkAssignModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-600" /></button>
             </div>
             <div className="p-4 space-y-1.5">
               {drivers.map(d => (
@@ -1405,7 +1405,7 @@ const DesktopEnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs ring-1 ring-blue-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400">{d.vehicle} • <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span></p>
+                      <p className="text-xs text-slate-500">{d.vehicle} • <span className={`px-1 py-0.5 rounded text-xs font-bold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span></p>
                     </div>
                   </div>
                   <span className="text-blue-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
@@ -1424,10 +1424,10 @@ const DesktopEnterpriseDashboard = ({
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Users size={16} className="text-emerald-700" /> Assign: {manualAssignTrip.patient}
               </h2>
-              <button onClick={() => setManualAssignTrip(null)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setManualAssignTrip(null)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-600" /></button>
             </div>
             <div className="p-4 space-y-1.5">
-              <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">Available Drivers</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 px-1">Available Drivers</p>
               {drivers.filter(d => d.status === 'Available').map(d => (
                 <button
                   key={d.id}
@@ -1438,7 +1438,7 @@ const DesktopEnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs ring-1 ring-emerald-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400">{d.vehicle} • Available</p>
+                      <p className="text-xs text-slate-500">{d.vehicle} • Available</p>
                     </div>
                   </div>
                   <span className="text-emerald-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
@@ -1447,7 +1447,7 @@ const DesktopEnterpriseDashboard = ({
               {drivers.filter(d => d.status !== 'Available').length > 0 && (
                 <>
                   <div className="border-t border-slate-200 my-2" />
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">Other Drivers</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 px-1">Other Drivers</p>
                 </>
               )}
               {drivers.filter(d => d.status !== 'Available').map(d => (
@@ -1460,10 +1460,10 @@ const DesktopEnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs ring-1 ring-slate-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-400"><span className={`px-1 py-0.5 rounded text-[9px] font-bold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span> • {d.vehicle}</p>
+                      <p className="text-xs text-slate-500"><span className={`px-1 py-0.5 rounded text-xs font-bold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span> • {d.vehicle}</p>
                     </div>
                   </div>
-                  <span className="text-slate-400 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
+                  <span className="text-slate-500 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
                 </button>
               ))}
             </div>
@@ -1479,13 +1479,13 @@ const DesktopEnterpriseDashboard = ({
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <BrainCircuit size={16} className="text-indigo-700" /> AI Assignment
               </h2>
-              <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-600" /></button>
             </div>
             <div className="p-5">
               {aiAnalyzing ? (
                 <div className="flex flex-col items-center justify-center py-8">
                   <div className="w-10 h-10 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3" />
-                  <p className="text-sm font-medium text-slate-500">Analyzing routes...</p>
+                  <p className="text-sm font-medium text-slate-600">Analyzing routes...</p>
                 </div>
               ) : smartAssignResult?.driverId ? (
                 (() => {
@@ -1498,17 +1498,17 @@ const DesktopEnterpriseDashboard = ({
                           <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold ring-1 ring-indigo-200">{String(d?.name || '?').charAt(0)}</div>
                           <div>
                             <p className="font-medium text-slate-900">{d.name}</p>
-                            <p className="text-xs text-slate-400">{d.vehicle}</p>
+                            <p className="text-xs text-slate-500">{d.vehicle}</p>
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="text-lg font-bold text-indigo-700 tabular-nums">{smartAssignResult.score}%</div>
-                          <p className="text-micro text-slate-400">match</p>
+                          <p className="text-xs text-slate-500">match</p>
                         </div>
                       </div>
                       {smartAssignResult.reason && (
                         <div className="mt-3 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
-                          <p className="text-micro text-slate-500 leading-relaxed">{smartAssignResult.reason}</p>
+                          <p className="text-xs text-slate-600 leading-relaxed">{smartAssignResult.reason}</p>
                         </div>
                       )}
                       <button
@@ -1523,9 +1523,9 @@ const DesktopEnterpriseDashboard = ({
               ) : (
                 <div className="py-6 text-center">
                   <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-3">
-                    <BrainCircuit size={18} className="text-slate-500" />
+                    <BrainCircuit size={18} className="text-slate-600" />
                   </div>
-                  <p className="text-sm text-slate-400">{smartAssignResult?.reason || 'No suitable driver found'}</p>
+                  <p className="text-sm text-slate-500">{smartAssignResult?.reason || 'No suitable driver found'}</p>
                 </div>
               )}
             </div>
@@ -1541,18 +1541,18 @@ const DesktopEnterpriseDashboard = ({
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Wand2 size={16} className="text-indigo-700" /> Fleet Optimization
               </h2>
-              {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>}
+              {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-600" /></button>}
             </div>
             <div className="p-5">
               {aiAnalyzing ? (
                 <div className="flex flex-col items-center justify-center py-8">
                   <div className="w-10 h-10 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3" />
-                  <p className="text-sm font-medium text-slate-500">Optimizing fleet...</p>
+                  <p className="text-sm font-medium text-slate-600">Optimizing fleet...</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                    <p className="text-xs text-slate-500">Optimize driver routes and assignments for maximum efficiency.</p>
+                    <p className="text-xs text-slate-600">Optimize driver routes and assignments for maximum efficiency.</p>
                   </div>
                   <button
                     onClick={() => { triggerFleetOptimization(); setTimeout(() => setShowOptimizeModal(false), 3000); }}
@@ -1577,15 +1577,15 @@ const DesktopEnterpriseDashboard = ({
                 <div className="w-2 h-2 rounded-full bg-blue-500" />
                 <h3 className="text-sm font-bold text-slate-900">Trip Details</h3>
               </div>
-              <button onClick={() => setTripDetails(null)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => setTripDetails(null)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-600" /></button>
             </div>
             <div className="p-5 space-y-3">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-base font-bold text-slate-900">{tripDetails.patient}</p>
-                  {getBookingReference(tripDetails) && <p className="text-xs text-slate-400 mt-0.5">Booking ID: {getBookingReference(tripDetails)}</p>}
-                  {getClientIdentifier(tripDetails) && <p className="text-xs text-slate-400 mt-0.5">Client ID: {getClientIdentifier(tripDetails)}</p>}
-                  {(tripDetails.type || tripDetails.serviceType) && <p className="text-xs text-slate-400 mt-0.5">Service: {tripDetails.type || tripDetails.serviceType}</p>}
+                  {getBookingReference(tripDetails) && <p className="text-xs text-slate-500 mt-0.5">Booking ID: {getBookingReference(tripDetails)}</p>}
+                  {getClientIdentifier(tripDetails) && <p className="text-xs text-slate-500 mt-0.5">Client ID: {getClientIdentifier(tripDetails)}</p>}
+                  {(tripDetails.type || tripDetails.serviceType) && <p className="text-xs text-slate-500 mt-0.5">Service: {tripDetails.type || tripDetails.serviceType}</p>}
                 </div>
                 <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
                   tripDetails.status === 'Unassigned' ? 'bg-rose-100 text-rose-700' :
@@ -1597,11 +1597,11 @@ const DesktopEnterpriseDashboard = ({
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Time</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Time</p>
                   <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.time || '—'}</p>
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Date</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Date</p>
                   <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.date || '—'}</p>
                 </div>
               </div>
@@ -1609,10 +1609,10 @@ const DesktopEnterpriseDashboard = ({
               <div className="space-y-2">
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-emerald-500/20">
-                    <span className="text-[8px] font-black text-white">P</span>
+                    <span className="text-xs font-bold text-white">P</span>
                   </div>
                   <div className="flex-1">
-                    <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Pickup</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Pickup</p>
                     <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.pickup || '—'}</p>
                     {tripDetails.pickupSiteName && <p className="text-xs text-emerald-700 mt-1">{tripDetails.pickupSiteName}</p>}
                     {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone)}</p>}
@@ -1621,10 +1621,10 @@ const DesktopEnterpriseDashboard = ({
                 </div>
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-rose-500/20">
-                    <span className="text-[8px] font-black text-white">D</span>
+                    <span className="text-xs font-bold text-white">D</span>
                   </div>
                   <div className="flex-1">
-                    <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Dropoff</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Dropoff</p>
                     <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.dropoff || '—'}</p>
                     {tripDetails.dropoffSiteName && <p className="text-xs text-rose-700 mt-1">{tripDetails.dropoffSiteName}</p>}
                     {formatPhoneDisplay(tripDetails.dropoffPhone) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.dropoffPhone)}</p>}
@@ -1634,10 +1634,10 @@ const DesktopEnterpriseDashboard = ({
 
               {tripDetails.routeAssignments?.length > 0 && (
                 <div className="bg-white rounded-xl border border-indigo-100 p-3 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-indigo-500">Route Plans</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-indigo-500">Route Plans</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {tripDetails.routeAssignments.map((route, index) => (
-                      <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700">
+                      <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
                         {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` • ${route.statusLabel}` : ''}
                       </span>
                     ))}
@@ -1647,15 +1647,15 @@ const DesktopEnterpriseDashboard = ({
 
               {(tripDetails.driverName || tripDetails.driverId) && (
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                  <p className="text-micro font-bold uppercase tracking-wider text-slate-400">Driver</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Driver</p>
                   <p className="text-sm font-bold text-slate-900 mt-0.5">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || '—'}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
                 </div>
               )}
 
               {tripDetails.notes && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                  <p className="text-micro font-bold uppercase tracking-wider text-amber-700">Notes</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Notes</p>
                   <p className="text-xs text-amber-700 mt-0.5">{tripDetails.notes}</p>
                 </div>
               )}
@@ -1671,7 +1671,7 @@ const DesktopEnterpriseDashboard = ({
                 const locs = findTripLocations(tripDetails, trips, trashedTrips, logs);
                 return locs.length > 0 ? (
                   <div className="space-y-1.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Found in</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Found in</p>
                     {locs.map((loc, i) => (
                       <button
                         key={i}
@@ -1687,7 +1687,7 @@ const DesktopEnterpriseDashboard = ({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-400 text-center py-2">No other references found.</p>
+                  <p className="text-xs text-slate-500 text-center py-2">No other references found.</p>
                 );
               })()}
             </div>
@@ -1707,7 +1707,7 @@ const DesktopEnterpriseDashboard = ({
             </div>
             <form onSubmit={submitAuthAction} className="p-5">
               <div className="space-y-1 mb-2">
-                <p className="text-xs text-slate-400">Enter your password to confirm this action.</p>
+                <p className="text-xs text-slate-500">Enter your password to confirm this action.</p>
               </div>
               <input
                 type="password"
@@ -1736,7 +1736,7 @@ const DesktopEnterpriseDashboard = ({
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Route size={16} className="text-indigo-700" /> Route Sequencer
               </h2>
-              <button onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
+              <button onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-600" /></button>
             </div>
             <div className="flex-1 overflow-hidden">
               <Suspense fallback={<LazyFallback />}>

@@ -10,8 +10,8 @@ const DASH = '-';
 
 const DetailRow = ({ label, value, valueColor = 'text-slate-900' }) => (
   <div className="grid grid-cols-1 gap-1 py-1.5 items-start sm:grid-cols-[130px_1fr] sm:gap-4">
-    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">{label}</span>
-    <span className={`text-[13px] font-bold break-words ${valueColor}`}>{value || DASH}</span>
+    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-0.5">{label}</span>
+    <span className={`text-xs font-semibold break-words ${valueColor}`}>{value || DASH}</span>
   </div>
 );
 
@@ -114,15 +114,15 @@ const exportReviewCsv = (rows) => {
 };
 
 const CompactSelect = ({ value, onChange, children, className = '' }) => (
-  <label className={`relative inline-flex h-8 items-center ${className}`}>
+  <label className={`relative inline-flex min-h-[40px] items-center ${className}`}>
     <select
       value={value}
       onChange={onChange}
-      className="h-8 appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 text-[11px] font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+      className="min-h-[40px] appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
     >
       {children}
     </select>
-    <ChevronDown size={13} className="pointer-events-none absolute right-2.5 text-slate-500" />
+    <ChevronDown size={16} className="pointer-events-none absolute right-2.5 text-slate-500" />
   </label>
 );
 
@@ -130,7 +130,7 @@ const ViewButton = ({ active, children, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`h-8 rounded-xl px-3 text-[11px] font-bold transition ${
+    className={`min-h-[40px] rounded-xl px-3 text-xs font-semibold transition ${
       active ? 'bg-[#2b568f] text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
     }`}
   >
@@ -150,7 +150,7 @@ const DesktopReportsPage = ({
   const [expandedTripId, setExpandedTripId] = useState(null);
   const [dateStr, setDateStr] = useState(localCalendarYmd());
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('agape_reportsDesktopView') || 'review');
-  const [statusFilter, setStatusFilter] = useState('Completed');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [driverFilter, setDriverFilter] = useState('all');
   const [reviewFilter, setReviewFilter] = useState('all');
 
@@ -215,7 +215,7 @@ const DesktopReportsPage = ({
         return (
           <select
             ref={inputRef}
-            className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-700"
+            className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-700"
             value={editingRowSnapshot?.driverId || ''}
             onChange={e => saveCell(trip, 'driverId', e.target.value)}
             onBlur={() => cancelEdit()}
@@ -233,7 +233,7 @@ const DesktopReportsPage = ({
         return (
           <select
             ref={inputRef}
-            className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white text-slate-700 font-semibold"
+            className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none bg-white text-slate-700 font-semibold"
             value={editingRowSnapshot?.completedVehicle || ''}
             onChange={e => saveCell(trip, 'completedVehicle', e.target.value)}
             onBlur={() => cancelEdit()}
@@ -251,7 +251,7 @@ const DesktopReportsPage = ({
         return (
           <select
             ref={inputRef}
-            className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-750"
+            className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-750"
             value={String(editingRowSnapshot?.paperSignatureConfirmed ?? false)}
             onChange={e => saveCell(trip, 'paperSignatureConfirmed', e.target.value === 'true')}
             onBlur={() => cancelEdit()}
@@ -267,7 +267,7 @@ const DesktopReportsPage = ({
         return (
           <select
             ref={inputRef}
-            className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-750"
+            className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-750"
             value={String(editingRowSnapshot?.reviewed ?? false)}
             onChange={e => saveCell(trip, 'reviewed', e.target.value === 'true')}
             onBlur={() => cancelEdit()}
@@ -283,7 +283,7 @@ const DesktopReportsPage = ({
         return (
           <select
             ref={inputRef}
-            className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-700"
+            className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-700"
             value={editingRowSnapshot?.wheelchair ? 'W' : 'A'}
             onChange={e => saveCell(trip, 'wheelchair', e.target.value === 'W' ? 'Wheelchair' : '')}
             onBlur={() => cancelEdit()}
@@ -298,7 +298,7 @@ const DesktopReportsPage = ({
       return (
         <input
           ref={inputRef}
-          className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none font-semibold text-slate-800"
+          className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none font-semibold text-slate-800"
           type={type}
           value={editValue}
           onChange={e => setEditValue(e.target.value)}
@@ -346,7 +346,7 @@ const DesktopReportsPage = ({
     if (colKey === 'signature') {
       return (
         <span
-          className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-bold"
+          className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-semibold"
           onClick={() => saveCell(trip, 'paperSignatureConfirmed', !trip.paperSignatureConfirmed)}
         >
           {displayValue}
@@ -358,7 +358,7 @@ const DesktopReportsPage = ({
       const val = trip.wheelchair ? 'W' : 'A';
       return (
         <span
-          className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-bold"
+          className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5 font-semibold"
           onClick={() => startCellEdit(trip.id, colKey, val)}
         >
           {val}
@@ -458,7 +458,7 @@ const DesktopReportsPage = ({
                   <p className="text-blue-200 text-xs font-semibold truncate">#{trip.bookingId || trip.id}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                  <span className={`text-[10px] font-extrabold px-2 py-1 rounded uppercase tracking-wider shadow-sm ${trip.status === 'Completed' ? 'bg-[#c2f0d9] text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>
+                  <span className={`text-xs font-extrabold px-2 py-1 rounded uppercase tracking-wider shadow-sm ${trip.status === 'Completed' ? 'bg-[#c2f0d9] text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>
                     {trip.status || 'Scheduled'}
                   </span>
                   <ChevronDown className={`w-5 h-5 text-blue-200 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -485,14 +485,14 @@ const DesktopReportsPage = ({
                   <DetailRow label="Signature" value={trip.paperSignatureConfirmed ? 'Yes' : 'No'} />
                   <DetailRow label="Review Status" value={trip.reviewed ? 'Reviewed' : 'Pending'} valueColor={trip.reviewed ? 'text-emerald-600' : 'text-amber-600'} />
                   <div className="mt-4 pt-4 border-t border-slate-300/50 flex gap-2">
-                    <button onClick={() => setEditTrip?.(trip)} className="flex-1 bg-white border border-slate-300 text-slate-700 rounded-lg py-2 text-xs font-bold hover:bg-slate-50 transition-colors flex justify-center items-center gap-1.5 shadow-sm">
-                      <Edit2 size={14} /> Edit Data
+                    <button onClick={() => setEditTrip?.(trip)} className="flex-1 bg-white border border-slate-300 text-slate-700 rounded-lg py-2 min-h-[40px] text-xs font-semibold hover:bg-slate-50 transition-colors flex justify-center items-center gap-1.5 shadow-sm">
+                      <Edit2 size={16} /> Edit Data
                     </button>
                     <button
-                      className={`flex-1 rounded-lg py-2 text-xs font-bold transition-colors flex justify-center items-center gap-1.5 shadow-sm ${trip.reviewed ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                      className={`flex-1 rounded-lg py-2 min-h-[40px] text-xs font-semibold transition-colors flex justify-center items-center gap-1.5 shadow-sm ${trip.reviewed ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
                       onClick={() => onUpdateTrip?.(trip.id, { reviewed: !trip.reviewed })}
                     >
-                      <CheckCircle2 size={14} /> {trip.reviewed ? 'Un-review' : 'Review'}
+                      <CheckCircle2 size={16} /> {trip.reviewed ? 'Un-review' : 'Review'}
                     </button>
                   </div>
                 </div>
@@ -524,86 +524,86 @@ const DesktopReportsPage = ({
         </colgroup>
         <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
           <tr>
-            <th className="rounded-tl-xl px-2 py-2 text-left font-semibold">Edit</th>
-            <th className="px-2 py-2 text-left font-semibold">Date</th>
-            <th className="px-2 py-2 text-left font-semibold">Trip ID</th>
-            <th className="px-2 py-2 text-center font-semibold">A/W</th>
-            <th className="px-2 py-2 text-left font-semibold">Client Name</th>
-            <th className="px-2 py-2 text-left font-semibold">Pickup</th>
-            <th className="px-2 py-2 text-left font-semibold">Dropoff</th>
-            <th className="px-2 py-2 text-left font-semibold">Drop Odo</th>
-            <th className="px-2 py-2 text-left font-semibold">Approved Fee</th>
-            <th className="px-2 py-2 text-center font-semibold">Signed</th>
-            <th className="px-2 py-2 text-center font-semibold rounded-tr-xl">Done</th>
+            <th className="rounded-tl-xl px-3 py-1.5 text-left font-semibold">Edit</th>
+            <th className="px-3 py-1.5 text-left font-semibold">Date</th>
+            <th className="px-3 py-1.5 text-left font-semibold">Trip ID</th>
+            <th className="px-3 py-1.5 text-center font-semibold">A/W</th>
+            <th className="px-3 py-1.5 text-left font-semibold">Client Name</th>
+            <th className="px-3 py-1.5 text-left font-semibold">Pickup</th>
+            <th className="px-3 py-1.5 text-left font-semibold">Dropoff</th>
+            <th className="px-3 py-1.5 text-left font-semibold">Drop Odo</th>
+            <th className="px-3 py-1.5 text-left font-semibold">Approved Fee</th>
+            <th className="px-3 py-1.5 text-center font-semibold">Signed</th>
+            <th className="px-3 py-1.5 text-center font-semibold rounded-tr-xl">Done</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {reportRows.map(({ trip, driver, travelMinutes }, index) => (
             <tr key={trip.id} className={`${activeRow === trip.id ? 'bg-blue-100' : index % 2 ? 'bg-slate-50/70' : 'bg-white'} hover:bg-blue-50/70 transition-colors cursor-pointer`} onClick={() => setActiveRow(trip.id)}>
-              <td className="px-2 py-2">
+              <td className="px-3 py-1.5">
                 <div className="flex items-center gap-2 text-slate-500">
                   {editingRow === trip.id ? (
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); finishRowEdit(); }}
-                        className="p-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150"
+                        className="min-h-[40px] min-w-[40px] rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150 flex items-center justify-center"
                         title="Keep changes"
                       >
-                        <Check size={13} />
+                        <Check size={16} />
                       </button>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); revertRowEdit(); }}
-                        className="p-0.5 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150"
+                        className="min-h-[40px] min-w-[40px] rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150 flex items-center justify-center"
                         title="Cancel and restore original row"
                       >
-                        <XCircle size={13} />
+                        <XCircle size={16} />
                       </button>
                     </div>
                   ) : (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
-                      className="p-0.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
+                      className="min-h-[40px] min-w-[40px] rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150 flex items-center justify-center"
                       title="Edit row"
                     >
-                      <Edit2 size={13} />
+                      <Edit2 size={16} />
                     </button>
                   )}
                 </div>
               </td>
-              <td className="px-2 py-2 text-slate-900">
+              <td className="px-3 py-1.5 text-slate-900">
                 {renderCell(trip, 'date', formatDateLabel(trip.date), 'date', 'date')}
               </td>
-              <td className="px-2 py-2 font-mono text-blue-900">
+              <td className="px-3 py-1.5 font-mono text-blue-900">
                 {renderCell(trip, 'bookingId', trip.bookingId || trip.id, 'bookingId')}
               </td>
-              <td className="px-2 py-2 text-center text-slate-800">
+              <td className="px-3 py-1.5 text-center text-slate-800">
                 {renderCell(trip, 'aw', trip.wheelchair ? 'W' : 'A', 'wheelchair')}
               </td>
-              <td className="px-2 py-2 text-slate-900">
+              <td className="px-3 py-1.5 text-slate-900">
                 {renderCell(trip, 'patient', trip.patient, 'patient')}
               </td>
-              <td className="px-2 py-2 font-mono text-emerald-700">
+              <td className="px-3 py-1.5 font-mono text-emerald-700">
                 {renderCell(trip, 'arrivalTime', formatClock(trip.arrivalTime || trip.pickupTime), 'arrivalTime', 'time')}
               </td>
-              <td className="px-2 py-2 font-mono text-rose-700">
+              <td className="px-3 py-1.5 font-mono text-rose-700">
                 {renderCell(trip, 'arrivalDropoffTime', formatClock(trip.arrivalDropoffTime || trip.completedAt), 'arrivalDropoffTime', 'time')}
               </td>
-              <td className="px-2 py-2 font-mono text-slate-600">
+              <td className="px-3 py-1.5 font-mono text-slate-600">
                 {(() => {
                   const odo = trip.dropoffOdometer ?? trip.endOdometer ?? trip.endMileage ?? trip.dropoffMileage;
                   return renderCell(trip, 'dropoffOdometer', (odo != null && odo !== '') ? Number(odo).toLocaleString() : '—', 'dropoffOdometer', 'number');
                 })()}
               </td>
-              <td className="px-2 py-2 font-mono text-slate-800">
+              <td className="px-3 py-1.5 font-mono text-slate-800">
                 {renderCell(trip, 'additionalFee', trip.additionalFee ? `$${trip.additionalFee}` : '$0.00', 'additionalFee', 'number')}
               </td>
-              <td className="px-2 py-2 text-center text-emerald-700">
+              <td className="px-3 py-1.5 text-center text-emerald-700">
                 {renderCell(trip, 'signature', trip.paperSignatureConfirmed ? 'Yes' : 'No', 'paperSignatureConfirmed')}
               </td>
-              <td className="px-2 py-2 text-center text-slate-500">
+              <td className="px-3 py-1.5 text-center text-slate-500">
                 {renderCell(trip, 'reviewed', trip.reviewed ? 'Done' : 'Pending', 'reviewed')}
               </td>
             </tr>
@@ -646,34 +646,34 @@ const DesktopReportsPage = ({
         </colgroup>
         <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
           <tr>
-            <th className="rounded-tl-xl px-2 py-2 text-left font-semibold">Edit</th>
+            <th className="rounded-tl-xl px-3 py-1.5 text-left font-semibold">Edit</th>
             {['Date', 'Driver', 'Vehicle', 'Sche...', 'Trip ID', 'Passenger', 'Pickup Address', 'Pickup ...', 'Start Od...', 'Dropoff Address', 'Dropoff ...', 'End Od...', 'Travel Ti...', 'Distance...', 'Sign...', 'Revi...'].map((label) => (
-              <th key={label} className="px-2 py-2 text-left font-semibold">{label}</th>
+              <th key={label} className="px-3 py-1.5 text-left font-semibold">{label}</th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {reportRows.map(({ trip, driver, travelMinutes }, index) => (
             <tr key={trip.id} className={`${activeRow === trip.id ? 'bg-blue-100' : index % 2 ? 'bg-slate-50/70' : 'bg-white'} hover:bg-blue-50/70 transition-colors cursor-pointer`} onClick={() => setActiveRow(trip.id)}>
-              <td className="px-2 py-2">
+              <td className="px-3 py-1.5">
                 <div className="flex items-center gap-2 text-slate-500">
                   {editingRow === trip.id ? (
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); finishRowEdit(); }}
-                        className="p-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150"
+                        className="min-h-[40px] min-w-[40px] rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150 flex items-center justify-center"
                         title="Keep changes"
                       >
-                        <Check size={13} />
+                        <Check size={16} />
                       </button>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); revertRowEdit(); }}
-                        className="p-0.5 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150"
+                        className="min-h-[40px] min-w-[40px] rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150 flex items-center justify-center"
                         title="Cancel and restore original row"
                       >
-                        <XCircle size={13} />
+                        <XCircle size={16} />
                       </button>
                     </div>
                   ) : (
@@ -682,67 +682,67 @@ const DesktopReportsPage = ({
                         type="checkbox"
                         checked={!!trip.reviewed}
                         onChange={(event) => onUpdateTrip?.({ ...trip, reviewed: event.target.checked })}
-                        className="h-3.5 w-3.5 rounded border-slate-300"
+                        className="w-5 h-5 rounded border-slate-300"
                         aria-label={`Review ${trip.patient || trip.id}`}
                       />
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
-                        className="p-0.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
+                        className="min-h-[40px] min-w-[40px] rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150 flex items-center justify-center"
                         title="Edit row"
                       >
-                        <Edit2 size={13} />
+                        <Edit2 size={16} />
                       </button>
                     </>
                   )}
                 </div>
               </td>
-              <td className="px-2 py-2 text-slate-900">
+              <td className="px-3 py-1.5 text-slate-900">
                 {renderCell(trip, 'date', formatDateLabel(trip.date), 'date', 'date')}
               </td>
-              <td className="px-2 py-2 text-slate-700">
+              <td className="px-3 py-1.5 text-slate-700">
                 {renderCell(trip, 'driver', truncate(driver?.name || trip.driverName, 14), 'driverId')}
               </td>
-              <td className="px-2 py-2 text-slate-500">
+              <td className="px-3 py-1.5 text-slate-500">
                 {renderCell(trip, 'vehicle', truncate(trip.completedVehicle || driver?.vehicle || DASH, 12), 'completedVehicle')}
               </td>
-              <td className="px-2 py-2 font-mono text-slate-900">
+              <td className="px-3 py-1.5 font-mono text-slate-900">
                 {renderCell(trip, 'time', formatClock(trip.time), 'time', 'time')}
               </td>
-              <td className="px-2 py-2 font-mono text-blue-900">
+              <td className="px-3 py-1.5 font-mono text-blue-900">
                 {renderCell(trip, 'bookingId', truncate(trip.bookingId || trip.id, 12), 'bookingId')}
               </td>
-              <td className="px-2 py-2 text-slate-900">
+              <td className="px-3 py-1.5 text-slate-900">
                 {renderCell(trip, 'patient', truncate(trip.patient, 17), 'patient')}
               </td>
-              <td className="px-2 py-2 font-mono text-emerald-700">
+              <td className="px-3 py-1.5 font-mono text-emerald-700">
                 {renderCell(trip, 'pickup', truncate(trip.pickup, 24), 'pickup')}
               </td>
-              <td className="px-2 py-2 font-mono text-emerald-700">
+              <td className="px-3 py-1.5 font-mono text-emerald-700">
                 {renderCell(trip, 'arrivalTime', formatClock(trip.arrivalTime || trip.pickupTime), 'arrivalTime', 'time')}
               </td>
-              <td className="px-2 py-2 font-mono text-emerald-700">
+              <td className="px-3 py-1.5 font-mono text-emerald-700">
                 {renderCell(trip, 'pickupOdometer', trip.pickupOdometer || DASH, 'pickupOdometer', 'number')}
               </td>
-              <td className="px-2 py-2 font-mono text-rose-700">
+              <td className="px-3 py-1.5 font-mono text-rose-700">
                 {renderCell(trip, 'dropoff', truncate(trip.dropoff, 27), 'dropoff')}
               </td>
-              <td className="px-2 py-2 font-mono text-rose-700">
+              <td className="px-3 py-1.5 font-mono text-rose-700">
                 {renderCell(trip, 'arrivalDropoffTime', formatClock(trip.arrivalDropoffTime || trip.completedAt), 'arrivalDropoffTime', 'time')}
               </td>
-              <td className="px-2 py-2 font-mono text-rose-700">
+              <td className="px-3 py-1.5 font-mono text-rose-700">
                 {renderCell(trip, 'dropoffOdometer', trip.dropoffOdometer || DASH, 'dropoffOdometer', 'number')}
               </td>
-              <td className="px-2 py-2 font-mono text-slate-700">
+              <td className="px-3 py-1.5 font-mono text-slate-700">
                 {renderCell(trip, 'travelTime', formatMinutes(travelMinutes), 'travelTime')}
               </td>
-              <td className="px-2 py-2 font-mono text-[#2f5b96]">
+              <td className="px-3 py-1.5 font-mono text-[#2f5b96]">
                 {renderCell(trip, 'distance', calcMiles(trip), 'distance', 'number')}
               </td>
-              <td className="px-2 py-2 text-emerald-700">
+              <td className="px-3 py-1.5 text-emerald-700">
                 {renderCell(trip, 'signature', trip.paperSignatureConfirmed ? 'Yes' : 'No', 'paperSignatureConfirmed')}
               </td>
-              <td className="px-2 py-2 text-slate-500">
+              <td className="px-3 py-1.5 text-slate-500">
                 {renderCell(trip, 'reviewed', trip.reviewed ? 'Done' : 'Pending', 'reviewed')}
               </td>
             </tr>
@@ -764,18 +764,18 @@ const DesktopReportsPage = ({
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-slate-100 bg-white px-3">
           <div className="relative w-[220px] shrink-0">
-            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search..."
-              className="h-8 w-full rounded-xl border border-slate-100 bg-slate-50 pl-8 pr-3 text-[12px] font-medium text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              className="min-h-[40px] w-full rounded-xl border border-slate-100 bg-slate-50 pl-8 pr-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
-          <button onClick={() => shiftDate(-1)} className="h-8 w-8 rounded-xl border border-slate-100 bg-white text-slate-500 hover:bg-slate-50"><ChevronLeft size={15} className="mx-auto" /></button>
-          <button className="h-8 min-w-[132px] rounded-xl border border-slate-100 bg-white px-3 text-[12px] font-bold text-slate-800">{formatDateLabel(dateStr)}</button>
-          <button onClick={() => shiftDate(1)} className="h-8 w-8 rounded-xl border border-slate-100 bg-white text-slate-500 hover:bg-slate-50"><ChevronRight size={15} className="mx-auto" /></button>
+          <button onClick={() => shiftDate(-1)} className="min-h-[40px] min-w-[40px] rounded-xl border border-slate-100 bg-white text-slate-500 hover:bg-slate-50"><ChevronLeft size={16} className="mx-auto" /></button>
+          <button className="min-h-[40px] min-w-[132px] rounded-xl border border-slate-100 bg-white px-3 text-xs font-semibold text-slate-800">{formatDateLabel(dateStr)}</button>
+          <button onClick={() => shiftDate(1)} className="min-h-[40px] min-w-[40px] rounded-xl border border-slate-100 bg-white text-slate-500 hover:bg-slate-50"><ChevronRight size={16} className="mx-auto" /></button>
 
           <ViewButton active={viewMode === 'review'} onClick={() => setViewMode('review')}>Review Table</ViewButton>
           <ViewButton active={viewMode === 'cards'} onClick={() => setViewMode('cards')}>Cards</ViewButton>
@@ -800,21 +800,21 @@ const DesktopReportsPage = ({
             <option value="pending">Pending only</option>
           </CompactSelect>
 
-          <button type="button" onClick={() => setShowUploadModal?.(true)} className="ml-auto h-8 rounded-xl bg-[#2f5b96] px-3 text-[11px] font-bold text-white shadow-sm flex items-center gap-1.5">
-            <Upload size={13} /> Upload
+          <button type="button" onClick={() => setShowUploadModal?.(true)} className="ml-auto min-h-[40px] rounded-xl bg-[#2f5b96] px-3 text-xs font-semibold text-white shadow-sm flex items-center gap-1.5">
+            <Upload size={16} /> Upload
           </button>
-          <button type="button" onClick={() => exportReviewCsv(reportRows)} className="h-8 rounded-xl bg-[#2f5b96] px-3 text-[11px] font-bold text-white shadow-sm flex items-center gap-1.5">
-            <Download size={13} /> CSV
+          <button type="button" onClick={() => exportReviewCsv(reportRows)} className="min-h-[40px] rounded-xl bg-[#2f5b96] px-3 text-xs font-semibold text-white shadow-sm flex items-center gap-1.5">
+            <Download size={16} /> CSV
           </button>
-          <button type="button" className="h-8 rounded-xl bg-indigo-600 px-3 text-[11px] font-bold text-white shadow-sm flex items-center gap-1.5">
-            <Wand2 size={13} /> AI
+          <button type="button" className="min-h-[40px] rounded-xl bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm flex items-center gap-1.5">
+            <Wand2 size={16} /> AI
           </button>
         </div>
 
         <div className="flex h-11 shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <CalendarDays size={15} className="text-slate-500" />
+              <CalendarDays size={16} className="text-slate-500" />
               <span className="text-lg font-semibold text-slate-800">{formatDateLabel(dateStr, true)}</span>
             </div>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">{reportRows.length} trips</span>
@@ -823,9 +823,9 @@ const DesktopReportsPage = ({
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">{formatMinutes(summary.stopped)} stopped</span>
           </div>
 
-          <div className="flex items-center gap-3 text-[12px] font-semibold uppercase tracking-wide text-slate-500">
-            <button type="button" onClick={() => markRowsReviewed(true)} className="h-8 rounded-xl bg-emerald-100 px-3 text-[11px] font-bold normal-case text-emerald-700 hover:bg-emerald-200">Mark Day Done</button>
-            <button type="button" onClick={() => markRowsReviewed(false)} className="h-8 rounded-xl bg-white px-3 text-[11px] font-bold normal-case text-slate-600 hover:bg-slate-100">Reset Review</button>
+          <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <button type="button" onClick={() => markRowsReviewed(true)} className="min-h-[40px] rounded-xl bg-emerald-100 px-3 text-xs font-semibold normal-case text-emerald-700 hover:bg-emerald-200">Mark Day Done</button>
+            <button type="button" onClick={() => markRowsReviewed(false)} className="min-h-[40px] rounded-xl bg-white px-3 text-xs font-semibold normal-case text-slate-600 hover:bg-slate-100">Reset Review</button>
             <span>Total <b className="text-slate-900">{reportRows.length}</b></span>
             <span>Done <b className="text-emerald-700">{summary.done}</b></span>
             <span>RW <b className="text-slate-900">{summary.reviewed}</b></span>

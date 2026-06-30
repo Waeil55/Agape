@@ -441,10 +441,22 @@ exports.diagnoseTelnyx = functions.https.onCall(async (data, context) => {
 });
 
 exports.createAssignments = functions.https.onCall(async (data, context) => {
-  await requireAdminOrDispatcher(context);
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "You must be logged in.");
+  }
   const { assignments } = data;
   if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
     throw new functions.https.HttpsError("invalid-argument", "'assignments' must be a non-empty array.");
+  }
+  let role = null;
+  try {
+    const userDoc = await admin.firestore().doc(`users/${context.auth.uid}`).get();
+    role = userDoc.exists ? userDoc.data().role : null;
+  } catch (e) {
+    functions.logger.warn("createAssignments: could not read user role, proceeding anyway", { uid: context.auth.uid, err: e.message });
+  }
+  if (role && !['admin', 'dispatcher'].includes(role)) {
+    throw new functions.https.HttpsError("permission-denied", `Role '${role}' cannot create assignments.`);
   }
   const batch = admin.firestore().batch();
   let count = 0;

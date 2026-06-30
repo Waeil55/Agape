@@ -4,6 +4,7 @@ import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit,
 import { GEMINI_API_CONFIG } from '../config/firebase';
 import { annotateInOutPairs, hasInOutMarker, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
 import { isCorruptedTripRecord } from '../utils/tripIntegrity';
+import { normalizeDateValue } from '../utils/normalizeDate';
 
 const timeToMinutes = (t) => {
   if (!t) return 1440;
@@ -61,21 +62,6 @@ const cleanOdometer = (value) => {
   const cleaned = s.replace(/,/g, '').replace(/\bmi(?:les)?\b/gi, '').trim();
   return /^\d+(\.\d+)?$/.test(cleaned) && Number(cleaned) > 0 ? cleaned : '';
 };
-
-function normalizeDateValue(value) {
-  if (!value) return '';
-  const raw = String(value).trim();
-  const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) {
-    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
-  }
-  const simple = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (!simple) return '';
-  const month = String(simple[1]).padStart(2, '0');
-  const day = String(simple[2]).padStart(2, '0');
-  const year = simple[3].length === 2 ? `20${simple[3]}` : simple[3];
-  return `${year}-${month}-${day}`;
-}
 
 function findColumn(headers, aliases) {
   const lower = headers.map(h => h.toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
@@ -299,52 +285,90 @@ function mapColumns(row) {
   };
 }
 
+const AI_BATCH_SIZE = 5;
+const AI_MAX_RETRIES = 3;
+const AI_BASE_DELAY_MS = 1000;
+const AI_429_BASE_DELAY_MS = 5000;
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 async function aiValidate(rows, onProgress) {
   const results = [];
-  const batchSize = 10;
   const geminiConfig = GEMINI_API_CONFIG();
   if (!geminiConfig.apiKey) {
     return rows.map(() => ({ issues: [], confidence: 100 }));
   }
 
-  for (let i = 0; i < rows.length; i += batchSize) {
-    const batch = rows.slice(i, i + batchSize);
-    onProgress(`AI validating batch ${Math.min(i + batchSize, rows.length)} of ${rows.length}...`, Math.round((i / rows.length) * 70) + 15);
+  for (let i = 0; i < rows.length; i += AI_BATCH_SIZE) {
+    const batch = rows.slice(i, i + AI_BATCH_SIZE);
+    const batchNum = Math.floor(i / AI_BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(rows.length / AI_BATCH_SIZE);
+    let succeeded = false;
 
-    const prompt = `You are a data validation AI. For each trip below, check if the pickup and dropoff look like valid addresses, the time looks valid, and the client name is present. Return a JSON array of objects, one per input row, with fields: "issues" (array of strings describing problems, empty if none), "correctedPickup" (fix obvious typos or leave as-is), "correctedDropoff", "correctedTime", "confidence" (0-100). If all looks good, "issues" should be [].
+    for (let attempt = 0; attempt <= AI_MAX_RETRIES; attempt++) {
+      const retryLabel = attempt > 0 ? ` (retry ${attempt}/${AI_MAX_RETRIES})` : '';
+      onProgress(`AI validating batch ${batchNum}/${totalBatches}${retryLabel}...`, Math.round((i / rows.length) * 70) + 15);
+
+      const prompt = `You are a data validation AI. For each trip below, check if the pickup and dropoff look like valid addresses, the time looks valid, and the client name is present. Return a JSON array of objects, one per input row, with fields: "issues" (array of strings describing problems, empty if none), "correctedPickup" (fix obvious typos or leave as-is), "correctedDropoff", "correctedTime", "confidence" (0-100). If all looks good, "issues" should be [].
 
 Input rows:
 ${JSON.stringify(batch.map((r, idx) => ({ idx: i + idx, patient: r.patient, pickup: r.pickup, dropoff: r.dropoff, time: r.time })), null, 2)}
 
 Return ONLY valid JSON array. No markdown. No explanation.`;
 
-    try {
-      const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiConfig.apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
-          }),
-        }
-      );
-      const data = await resp.json();
-      let aiOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-      aiOutput = aiOutput.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
-      const parsed = JSON.parse(aiOutput);
-      if (Array.isArray(parsed)) {
-        parsed.forEach((p, j) => {
-          const origIdx = i + j;
-          if (origIdx < rows.length) {
-            results[origIdx] = { issues: p.issues || [], confidence: p.confidence || 100 };
+      try {
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiConfig.apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
+            }),
           }
-        });
+        );
+
+        if (resp.status === 429) {
+          const delay = AI_429_BASE_DELAY_MS * Math.pow(2, attempt);
+          console.warn(`[aiValidate] Rate limited (429) on batch ${batchNum}, waiting ${delay}ms before retry...`);
+          onProgress(`Rate limited — waiting ${Math.round(delay / 1000)}s before retry...`, Math.round((i / rows.length) * 70) + 15);
+          await sleep(delay);
+          continue;
+        }
+
+        if (!resp.ok) {
+          const errText = await resp.text().catch(() => '');
+          throw new Error(`HTTP ${resp.status}: ${errText.slice(0, 100)}`);
+        }
+
+        const data = await resp.json();
+        let aiOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+        aiOutput = aiOutput.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
+        const parsed = JSON.parse(aiOutput);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((p, j) => {
+            const origIdx = i + j;
+            if (origIdx < rows.length) {
+              results[origIdx] = { issues: p.issues || [], confidence: p.confidence || 100 };
+            }
+          });
+        }
+        succeeded = true;
+        break;
+      } catch (err) {
+        if (attempt < AI_MAX_RETRIES) {
+          const delay = AI_BASE_DELAY_MS * Math.pow(2, attempt);
+          console.warn(`[aiValidate] Batch ${batchNum} attempt ${attempt + 1} failed: ${err.message}. Retrying in ${delay}ms...`);
+          await sleep(delay);
+        }
       }
-    } catch {
+    }
+
+    if (!succeeded) {
+      console.error(`[aiValidate] Batch ${batchNum} failed after ${AI_MAX_RETRIES + 1} attempts — marking as unvalidated`);
       for (let j = 0; j < batch.length && i + j < rows.length; j++) {
-        if (!results[i + j]) results[i + j] = { issues: [], confidence: 100 };
+        if (!results[i + j]) results[i + j] = { issues: ['AI validation unavailable'], confidence: 50 };
       }
     }
   }
@@ -772,19 +796,18 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         }
       }
 
-      // Derive dateKey from trip date fields
-      let dateKey = null;
-      const dateFields = ['date', 'scheduledDate', 'scheduleDate', 'tripDate'];
-      for (const field of dateFields) {
-        if (trip[field]) {
-          const d = new Date(trip[field]);
-          if (!isNaN(d.getTime())) {
-            dateKey = d.toISOString().split('T')[0];
-            break;
+      const dateKey = trip.date || (() => {
+        for (const field of ['scheduledDate', 'scheduleDate', 'tripDate']) {
+          if (trip[field]) {
+            const d = new Date(trip[field]);
+            if (!isNaN(d.getTime())) {
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
           }
         }
-      }
-      if (!dateKey) dateKey = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      })();
 
       const baseTrip = {
         ...trip,
@@ -816,6 +839,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   const avgConfidence = mappedTrips.length > 0
     ? Math.round(mappedTrips.reduce((s, t) => s + (t._confidence || 100), 0) / mappedTrips.length)
     : 100;
+  const uniqueDates = [...new Set(mappedTrips.map(t => t.date).filter(Boolean))].sort();
 
   return (
     <div className="space-y-6">
@@ -912,6 +936,11 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                   {mappedTrips.length} trip{ mappedTrips.length !== 1 ? 's' : '' } extracted
                   {withIssues > 0 ? ` — ${withIssues} with warnings` : ' — all clean' }
                 </p>
+                {uniqueDates.length > 0 && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Service date{uniqueDates.length !== 1 ? 's' : ''}: {uniqueDates.join(', ')}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -968,6 +997,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                   <tr>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">#</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Client</th>
+                    <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Date</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Pickup</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600">Dropoff</th>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-left font-semibold text-slate-600 hidden sm:table-cell">Time</th>
@@ -981,6 +1011,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                     <tr key={idx} className={`border-b border-slate-100 hover:bg-slate-50 ${trip._hasIssues ? 'bg-amber-50/50' : ''}`}>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 font-mono text-slate-500">{idx + 1}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs font-semibold text-slate-900 whitespace-nowrap">{trip.patient}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 whitespace-nowrap">{trip.date || <span className="text-rose-400 italic">missing</span>}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.pickup}>{trip.pickup || <span className="text-rose-400 italic">missing</span>}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.dropoff}>{trip.dropoff || <span className="text-rose-400 italic">missing</span>}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 hidden sm:table-cell">{trip.time}</td>

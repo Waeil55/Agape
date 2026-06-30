@@ -12,7 +12,7 @@ const ActivityRow = ({ index, log }) => {
   const [open, setOpen] = useState(false);
   const colorClass = log.c === 'rose' ? 'bg-rose-500' : log.c === 'emerald' ? 'bg-emerald-500' : log.c === 'blue' ? 'bg-blue-500' : log.c === 'amber' ? 'bg-amber-500' : 'bg-slate-400';
   return (
-    <div className="px-4 sm:px-6 py-3 hover:bg-slate-50">
+    <div className="px-3 sm:px-4 py-1.5 hover:bg-slate-50">
       <div className="flex items-start gap-3 cursor-pointer" onClick={() => setOpen(o => !o)}>
         <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${colorClass}`} />
         <div className="flex-1 min-w-0">
@@ -224,27 +224,27 @@ const SettingsPage = ({
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="px-4 py-3 text-left font-bold text-slate-600">Name</th>
-                      <th className="px-4 py-3 text-left font-bold text-slate-600">Email</th>
-                      <th className="px-4 py-3 text-left font-bold text-slate-600">Role</th>
-                      <th className="px-4 py-3 text-left font-bold text-slate-600">Status</th>
+                      <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600">Name</th>
+                      <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600">Email</th>
+                      <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600">Role</th>
+                      <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {dispatchers.map((d, i) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-4 py-3 font-bold text-slate-900">{d.name || '—'}</td>
-                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
-                        <td className="px-4 py-3"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${ROLE_COLORS[d.role] || 'bg-slate-100 text-slate-600'}`}>{ROLE_LABELS[d.role] || d.role}</span></td>
-                        <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 text-xs font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
+                        <td className="px-3 py-1.5 font-bold text-slate-900">{d.name || '—'}</td>
+                        <td className="px-3 py-1.5 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
+                        <td className="px-3 py-1.5"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${ROLE_COLORS[d.role] || 'bg-slate-100 text-slate-600'}`}>{ROLE_LABELS[d.role] || d.role}</span></td>
+                        <td className="px-3 py-1.5"><span className={`inline-flex items-center gap-1 text-xs font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
                       </tr>
                     ))}
                     {drivers.map((d, i) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-4 py-3 font-bold text-slate-900">{d.name || '—'}</td>
-                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
-                        <td className="px-4 py-3"><span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Driver</span></td>
-                        <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 text-xs font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
+                        <td className="px-3 py-1.5 font-bold text-slate-900">{d.name || '—'}</td>
+                        <td className="px-3 py-1.5 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
+                        <td className="px-3 py-1.5"><span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Driver</span></td>
+                        <td className="px-3 py-1.5"><span className={`inline-flex items-center gap-1 text-xs font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
                       </tr>
                     ))}
                     {(dispatchers.length + drivers.length) === 0 && (
@@ -295,20 +295,20 @@ const SettingsPage = ({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="px-3 py-3 text-left font-bold text-slate-700 whitespace-nowrap">Permission</th>
+                      <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-700 whitespace-nowrap">Permission</th>
                       {Object.keys(ROLE_LABELS).map(r => (
-                        <th key={r} className="px-3 py-3 text-center font-bold text-slate-700 whitespace-nowrap">{ROLE_LABELS[r]}</th>
+                        <th key={r} className="px-3 py-1.5 text-center text-xs font-semibold text-slate-700 whitespace-nowrap">{ROLE_LABELS[r]}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {Object.keys(PERMISSION_LABELS).map(pkey => (
                       <tr key={pkey} className="border-b border-slate-100 hover:bg-slate-50/50">
-                        <td className="px-3 py-3 font-bold text-slate-800 whitespace-nowrap">{PERMISSION_LABELS[pkey]}</td>
+                        <td className="px-3 py-1.5 font-bold text-slate-800 whitespace-nowrap">{PERMISSION_LABELS[pkey]}</td>
                         {Object.keys(ROLE_LABELS).map(r => {
                           const allowed = hasPermission ? hasPermission(r, pkey) : false;
                           return (
-                            <td key={r} className="px-3 py-3 text-center">
+                            <td key={r} className="px-3 py-1.5 text-center">
                               {allowed ? <CheckCircle2 size={18} className="inline text-emerald-600" /> : <XCircle size={18} className="inline text-slate-300" />}
                             </td>
                           );
@@ -342,11 +342,11 @@ const SettingsPage = ({
                     <table className="w-full">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
-                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600">Booking ID</th>
-                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600">Patient</th>
-                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600 hidden sm:table-cell">Pickup</th>
-                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600 hidden sm:table-cell">Dropoff</th>
-                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-bold text-slate-600">Time</th>
+                          <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600">Booking ID</th>
+                          <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600">Patient</th>
+                          <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600 hidden sm:table-cell">Pickup</th>
+                          <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600 hidden sm:table-cell">Dropoff</th>
+                          <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600">Time</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -355,11 +355,11 @@ const SettingsPage = ({
                         ) : (
                           trashedTrips.map((trip) => (
                             <tr key={trip.id} className="border-b border-slate-100 hover:bg-slate-50">
-                              <td className="px-4 sm:px-6 py-3 font-mono text-sm text-slate-600">{trip.bookingId || '—'}</td>
-                              <td className="px-4 sm:px-6 py-3 text-sm font-bold text-slate-900">{trip.patient}</td>
-                              <td className="px-4 sm:px-6 py-3 text-sm text-emerald-600 hidden sm:table-cell">{trip.pickup}</td>
-                              <td className="px-4 sm:px-6 py-3 text-sm text-rose-600 hidden sm:table-cell">{trip.dropoff}</td>
-                              <td className="px-4 sm:px-6 py-3 text-sm text-slate-600">{trip.time}</td>
+                              <td className="px-3 sm:px-4 py-1.5 font-mono text-xs text-slate-600">{trip.bookingId || '—'}</td>
+                              <td className="px-3 sm:px-4 py-1.5 text-xs font-bold text-slate-900">{trip.patient}</td>
+                              <td className="px-3 sm:px-4 py-1.5 text-xs text-emerald-600 hidden sm:table-cell">{trip.pickup}</td>
+                              <td className="px-3 sm:px-4 py-1.5 text-xs text-rose-600 hidden sm:table-cell">{trip.dropoff}</td>
+                              <td className="px-3 sm:px-4 py-1.5 text-xs text-slate-600">{trip.time}</td>
                             </tr>
                           ))
                         )}
@@ -411,11 +411,11 @@ const SettingsPage = ({
               <div className="space-y-5 max-w-3xl">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Username</label>
-                  <input type="text" value={String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '')} readOnly className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-600 text-base" />
+                  <input type="text" value={String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '')} readOnly className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-600 text-base" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Role</label>
-                  <input type="text" value={role || ''} readOnly className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-600 uppercase font-bold text-base" />
+                  <input type="text" value={role || ''} readOnly className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-600 uppercase font-bold text-base" />
                 </div>
                 {(role === 'admin' || role === 'dispatcher') && (
                   <div className="bg-blue-50/30 border border-blue-100 rounded-2xl p-5 space-y-4">
@@ -623,13 +623,13 @@ const SettingsPage = ({
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2">New Password</label>
                       <div className="relative">
-                        <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
+                        <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="w-full px-3 py-1.5 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
                         <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-600" aria-label="Toggle password visibility">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2">Confirm Password</label>
-                      <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
+                      <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="w-full px-3 py-1.5 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
                     </div>
                     {pwMsg && <p className={`text-sm font-bold ${pwMsg.includes('successfully') ? 'text-emerald-600' : 'text-rose-600'}`}>{pwMsg}</p>}
                     <button onClick={handlePasswordChange} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-base"><Save size={18} /> Update Password</button>

@@ -381,7 +381,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
   };
 
   const renderSortIcon = (column) => {
-    if (sortColumn !== column) return <ArrowUpDown size={12} className="text-slate-400 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />;
+    if (sortColumn !== column) return <ArrowUpDown size={12} className="text-slate-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />;
     return sortDirection === 'asc'
       ? <ArrowUp size={12} className="text-blue-500 ml-1" />
       : <ArrowDown size={12} className="text-blue-500 ml-1" />;
@@ -390,7 +390,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
   const renderSortableHeader = (column, children, className = '') => (
     <th onClick={() => handleSort(column)}
       className={`p-2 text-left whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors ${className}`}>
-      <div className="flex items-center"><span className="text-[10px]">{children}</span>{renderSortIcon(column)}</div>
+      <div className="flex items-center"><span className="text-xs">{children}</span>{renderSortIcon(column)}</div>
     </th>
   );
 
@@ -411,19 +411,19 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-xl bg-slate-50 p-3">
-          <p className="font-bold uppercase tracking-wide text-slate-400">Driver</p>
+          <p className="font-bold uppercase tracking-wide text-slate-500">Driver</p>
           <p className="mt-1 font-semibold text-slate-700">{renderCellValue(trip, { key: 'driver' })}</p>
         </div>
         <div className="rounded-xl bg-slate-50 p-3">
-          <p className="font-bold uppercase tracking-wide text-slate-400">Vehicle</p>
+          <p className="font-bold uppercase tracking-wide text-slate-500">Vehicle</p>
           <p className="mt-1 font-semibold text-slate-700">{renderCellValue(trip, { key: 'vehicle' })}</p>
         </div>
         <div className="rounded-xl bg-slate-50 p-3">
-          <p className="font-bold uppercase tracking-wide text-slate-400">Miles</p>
+          <p className="font-bold uppercase tracking-wide text-slate-500">Miles</p>
           <p className="mt-1 font-semibold text-slate-700">{renderCellValue(trip, { key: 'distance' })}</p>
         </div>
         <div className="rounded-xl bg-slate-50 p-3">
-          <p className="font-bold uppercase tracking-wide text-slate-400">Signature</p>
+          <p className="font-bold uppercase tracking-wide text-slate-500">Signature</p>
           <p className="mt-1 font-semibold text-slate-700">{renderCellValue(trip, { key: 'signature' })}</p>
         </div>
       </div>
@@ -441,26 +441,26 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
       <div className="bg-white border-b border-slate-200 px-3 py-1.5 flex flex-col lg:flex-row lg:items-center shrink-0 gap-1.5 sticky top-0 z-20">
         <div className="flex items-center gap-1.5 flex-wrap">
           <div className="flex items-center gap-1 bg-slate-100 rounded px-2 py-1 min-w-[140px] max-w-[240px]">
-            <Search size={11} className="text-slate-400 shrink-0" />
+            <Search size={11} className="text-slate-500 shrink-0" />
             <input type="text" placeholder="Search..." value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent text-xs outline-none w-full placeholder:text-slate-400" />
-            {searchQuery && <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600"><X size={11} /></button>}
+              className="bg-transparent text-xs outline-none w-full placeholder:text-slate-500" />
+            {searchQuery && <button onClick={() => setSearchQuery('')} className="text-slate-500 hover:text-slate-600"><X size={11} /></button>}
           </div>
           <div className="flex items-center gap-1 bg-slate-100 rounded px-2 py-1">
-            <Calendar size={11} className="text-slate-400" />
+            <Calendar size={11} className="text-slate-500" />
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-              className="px-1 py-0.5 border border-slate-200 rounded text-[10px] outline-none focus:border-blue-500 w-[110px]" />
-            <span className="text-[9px] text-slate-400">to</span>
+              className="px-1 py-0.5 border border-slate-200 rounded text-xs outline-none focus:border-blue-500 w-[110px]" />
+            <span className="text-xs text-slate-500">to</span>
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-              className="px-1 py-0.5 border border-slate-200 rounded text-[10px] outline-none focus:border-blue-500 w-[110px]" />
+              className="px-1 py-0.5 border border-slate-200 rounded text-xs outline-none focus:border-blue-500 w-[110px]" />
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {grouped.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-slate-400">
+          <div className="flex flex-col items-center justify-center h-full text-slate-500">
             <Archive size={40} className="mb-3 opacity-40" />
             <p className="text-sm font-medium">No archived trips found</p>
           </div>
@@ -476,7 +476,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                 {isExpanded ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
                 <Calendar size={13} className="text-slate-500" />
                 <span className="text-sm font-bold text-slate-700">{formatDateLabel(dateLabel)}</span>
-                <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">{dayTrips.length} trips</span>
+                <span className="text-xs text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">{dayTrips.length} trips</span>
               </div>
 
               {isExpanded && (
@@ -504,7 +504,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                             className="flex items-center justify-between cursor-pointer group hover:bg-slate-700 transition-colors px-2 py-2 h-full"
                             onClick={() => handleSort(col.key)}
                           >
-                            <span className="text-[10px] font-semibold truncate">{col.label}</span>
+                            <span className="text-xs font-semibold truncate">{col.label}</span>
                             <span className="ml-1 shrink-0">{renderSortIcon(col.key)}</span>
                           </div>
                           {/* Resize handle */}
@@ -515,7 +515,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                           />
                         </th>
                       ))}
-                      <th className="resizable-th p-2 text-left text-[10px] font-semibold">Actions</th>
+                      <th className="resizable-th p-2 text-left text-xs font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
@@ -536,7 +536,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                             const isEditing = isEditingCell(trip.id, cellKey);
 
                             return (
-                              <td key={cellKey} className={`p-2 whitespace-nowrap ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600' : ''} ${cellKey === 'distance' && displayValue !== '—' ? 'text-blue-600 bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'text-slate-900' : ''} ${cellKey === 'driver' ? 'text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600' : ''} ${cellKey === 'vehicle' ? 'text-slate-400 text-[10px] font-mono tracking-wider uppercase' : ''}`}
+                              <td key={cellKey} className={`p-2 whitespace-nowrap ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600' : ''} ${cellKey === 'distance' && displayValue !== '—' ? 'text-blue-600 bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'text-slate-900' : ''} ${cellKey === 'driver' ? 'text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600' : ''} ${cellKey === 'vehicle' ? 'text-slate-500 text-xs font-mono tracking-wider uppercase' : ''}`}
                                 title={cellKey === 'pickup' || cellKey === 'dropoff' ? displayValue : undefined}
                               >
                                 {isEditing ? (

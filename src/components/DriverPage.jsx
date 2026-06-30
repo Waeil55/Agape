@@ -314,7 +314,7 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
         <tbody>
           {rows.map((row) => (
             <tr key={row.label} className="align-top border-b border-slate-150 last:border-b-0">
-              <td role="rowheader" className="driver-history-detail-label w-[36%] bg-slate-100/90 px-3 py-1.5 text-[9.5px] font-semibold uppercase tracking-wide text-slate-600">{row.label}</td>
+              <td role="rowheader" className="driver-history-detail-label w-[36%] bg-slate-100/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600">{row.label}</td>
               <td className={`px-3 py-1.5 text-xs font-semibold break-words ${
                 row.tone === 'green' ? 'text-emerald-600' : row.tone === 'red' ? 'text-rose-600' : row.tone === 'blue' ? 'text-blue-600' : 'text-slate-950'
               }`}>{row.value}</td>
@@ -2659,8 +2659,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </button>
             <div className="min-w-0 flex-1">
               <h1 className="text-base font-semibold text-slate-950 leading-tight truncate">{trip.patient || 'Trip'}</h1>
-              <p className="mt-0.5 flex items-center gap-1.5 text-[11px] font-medium text-rose-600">
-                <Clock size={13} /> {scheduledTime}
+              <p className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-rose-600">
+                <Clock size={16} /> {scheduledTime}
               </p>
             </div>
             <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-100">
@@ -2680,10 +2680,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-normal text-blue-200">Scheduled Time</p>
+                  <p className="text-xs font-medium uppercase tracking-normal text-blue-200">Scheduled Time</p>
                   <p className="mt-1 text-lg font-semibold tracking-tight leading-none text-white">{scheduledTime}</p>
                 </div>
-                  <span className={`shrink-0 max-w-[40%] truncate rounded-lg border px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-center shadow-sm ${getTripWorkStatusClass(trip.status)}`}>
+                  <span className={`shrink-0 max-w-[40%] truncate rounded-lg border px-2 py-1 text-xs font-medium uppercase tracking-wide text-center shadow-sm ${getTripWorkStatusClass(trip.status)}`}>
                   {trip.status || 'Assigned'}
                 </span>
               </div>
@@ -2696,46 +2696,46 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 </div>
 
                 <div className="pb-3">
-                  <p className="text-[11px] font-medium uppercase tracking-normal text-blue-200">From</p>
+                  <p className="text-xs font-medium uppercase tracking-normal text-blue-200">From</p>
                   <p className="mt-0.5 text-xs font-medium leading-snug text-white break-words">{pickupAddress || '--'}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-8 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-[11px] font-medium text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
-                      <Copy size={11} /> Copy
+                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-10 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-medium text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
+                      <Copy size={14} /> Copy
                     </button>
-                    <span className="text-[11px] font-medium text-blue-200/80">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-3 rounded-2xl bg-sky-500/70 hover:bg-sky-500 text-white text-[11px] font-medium flex items-center gap-1.5 cursor-pointer">
-                      <Navigation size={13} strokeWidth={2.5} /> Navigate
+                    <span className="text-xs font-medium text-blue-200/80">{trip.distance ? `${trip.distance} mi` : ''}</span>
+                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-8 px-3 rounded-2xl bg-sky-500/70 hover:bg-sky-500 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+                      <Navigation size={16} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-normal text-emerald-300">To</p>
+                  <p className="text-xs font-medium uppercase tracking-normal text-emerald-300">To</p>
                   <p className="mt-0.5 text-xs font-medium leading-snug text-white break-words">{dropoffAddress || '--'}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-8 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-[11px] font-medium text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
-                      <Copy size={11} /> Copy
+                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-10 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-medium text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer">
+                      <Copy size={14} /> Copy
                     </button>
-                    <span className="text-[11px] font-medium text-blue-200/80" />
-                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-3 rounded-2xl bg-sky-500/70 hover:bg-sky-500 text-white text-[11px] font-medium flex items-center gap-1.5 cursor-pointer">
-                      <Navigation size={13} strokeWidth={2.5} /> Navigate
+                    <span className="text-xs font-medium text-blue-200/80" />
+                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-8 px-3 rounded-2xl bg-sky-500/70 hover:bg-sky-500 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+                      <Navigation size={16} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
                 </div>
               </div>
 
               <div className="mt-3.5 grid grid-cols-4 gap-2">
-                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-9 rounded-2xl bg-emerald-500/70 hover:bg-emerald-500 disabled:opacity-40 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
-                  <Phone size={13} /> Call
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-8 rounded-2xl bg-emerald-500/70 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
+                  <Phone size={16} /> Call
                 </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-9 rounded-2xl bg-blue-500/70 hover:bg-blue-500 disabled:opacity-40 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
-                  <MessageCircle size={13} /> SMS
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-8 rounded-2xl bg-blue-500/70 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
+                  <MessageCircle size={16} /> SMS
                 </button>
-                <button type="button" onClick={() => openContactSelector(trip)} className="h-9 rounded-2xl bg-violet-500/70 hover:bg-violet-500 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
-                  <PhoneForwarded size={13} /> Contacts
+                <button type="button" onClick={() => openContactSelector(trip)} className="h-8 rounded-2xl bg-violet-500/70 hover:bg-violet-500 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
+                  <PhoneForwarded size={16} /> Contacts
                 </button>
-                <button type="button" onClick={() => setShowMoreOptions(trip)} className="h-9 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer">
-                  <MoreHorizontal size={14} /> More
+                <button type="button" onClick={() => setShowMoreOptions(trip)} className="h-8 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
+                  <MoreHorizontal size={16} /> More
                 </button>
               </div>
             </div>
@@ -2750,7 +2750,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   return (
                     <div key={label} className="flex-1 min-w-0">
                       <div className="flex items-center">
-                         <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 font-medium text-[11px] shadow-sm ${
+                         <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 font-medium text-xs shadow-sm ${
                           isActive ? 'bg-slate-600 text-white border-slate-300' : isDone ? 'bg-emerald-500 text-white border-emerald-300' : 'bg-slate-50 text-slate-500 border-slate-200'
                         }`}>
                           {idx + 1}
@@ -2759,7 +2759,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <div className={`h-1 flex-1 rounded-full mx-1.5 ${idx < workStepIndex ? 'bg-slate-700' : 'bg-slate-200'}`} />
                         )}
                       </div>
-                      <p className={`mt-1 text-center text-[11px] font-medium leading-tight ${isActive ? 'text-slate-800' : isDone ? 'text-slate-700' : 'text-slate-500'}`}>{label}</p>
+                      <p className={`mt-1 text-center text-xs font-medium leading-tight ${isActive ? 'text-slate-800' : isDone ? 'text-slate-700' : 'text-slate-500'}`}>{label}</p>
                     </div>
                   );
                 })}
@@ -2768,11 +2768,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 type="button"
                 onClick={handleStepBack}
                 disabled={!stepBackTarget}
-                className="mt-0 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-700"
+                className="mt-0 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-700"
                 title={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
                 aria-label={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
               >
-                <Undo2 size={13} strokeWidth={2.5} />
+                <Undo2 size={16} strokeWidth={2.5} />
               </button>
             </div>
           </div>
@@ -2780,7 +2780,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="rounded-2xl border border-amber-200 bg-amber-50 overflow-hidden">
             <div className="px-4 pt-3 pb-1.5 flex items-center gap-2 text-amber-600">
               <AlertCircle size={15} />
-              <span className="text-[11px] font-medium uppercase tracking-normal">
+              <span className="text-xs font-medium uppercase tracking-normal">
                 Driver Notes
               </span>
             </div>
@@ -2812,17 +2812,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   type="button"
                   onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
-                  className="flex-[2] h-12 bg-blue-600 border-2 border-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                  className="flex-[2] h-8 bg-blue-600 border-2 border-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1 shadow-sm"
                 >
-                  <MapPin size={14} /> {trip.status === 'In Progress' ? 'Here?' : 'At dropoff?'}
+                  <MapPin size={16} /> {trip.status === 'In Progress' ? 'Here?' : 'At dropoff?'}
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => { impact('medium'); setSkipConfirmTripId(`work-${trip.id}`); }}
-                  className="flex-[2] h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-2xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1"
+                  className="flex-[2] h-8 bg-white border-2 border-slate-300 text-slate-600 rounded-2xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1"
                 >
-                  <Forward size={14} /> Skip Nav
+                  <Forward size={16} /> Skip Nav
                 </button>
               )
             )}
@@ -2931,7 +2931,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <p className="text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">Agape Care Driver</p>
                 <span title={isOnline ? 'Realtime connected' : 'Offline / not realtime'} className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'} inline-block`} />
               </div>
-              <p className="mt-1 text-[11px] font-medium text-slate-500 truncate">{me?.name || currentUser}</p>
+              <p className="mt-1 text-xs font-medium text-slate-500 truncate">{me?.name || currentUser}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
@@ -2939,10 +2939,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 onClick={() => handleCall(phoneNumbers?.dispatcher || '', 'Dispatcher')}
                 disabled={!phoneNumbers?.dispatcher}
                 title="Call Dispatcher"
-                className="h-8 px-2.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 text-[12px] font-medium disabled:opacity-50"
+                className="h-7 px-2.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 text-xs font-medium disabled:opacity-50"
                 aria-label="Call Dispatcher"
               >
-                <Phone size={12} />
+                <Phone size={16} />
                 <span className="inline">DISP</span>
               </button>
               <button
@@ -2950,10 +2950,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 onClick={() => handleCall(phoneNumbers?.routing || '', 'Routing')}
                 disabled={!phoneNumbers?.routing}
                 title="Call Routing"
-                className="h-8 px-2.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1.5 text-[12px] font-medium disabled:opacity-50"
+                className="h-7 px-2.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1.5 text-xs font-medium disabled:opacity-50"
                 aria-label="Call Routing"
               >
-                <Phone size={12} />
+                <Phone size={16} />
                 <span className="inline">ROUT</span>
               </button>
             </div>
@@ -2999,7 +2999,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           {/* Offline Banner */}
           {!isOnline && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 flex items-center gap-2">
-              <WifiOff size={14} className="text-amber-600 shrink-0" />
+              <WifiOff size={16} className="text-amber-600 shrink-0" />
               <p className="text-xs font-semibold text-amber-800">You're offline. Changes will sync when connection returns.</p>
             </div>
           )}
@@ -3018,10 +3018,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-sm font-semibold text-slate-900">{trip.patient || 'Trip'} · {to12hr(trip.time)}</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {trip.transferRequest?.fromDriverName || 'Driver'}: {trip.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-[12px] font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 text-white'}`}>Accept</button>
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-[12px] font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 text-white'}`}>Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
                   </div>
-                  {transferDisabled && <p className="text-[12px] text-amber-600 font-medium mt-1">Clock in to respond</p>}
+                  {transferDisabled && <p className="text-xs text-amber-600 font-medium mt-1">Clock in to respond</p>}
                 </div>
               ))}
               {incomingTransferRoutes.map((route) => (
@@ -3029,10 +3029,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-sm font-semibold text-slate-900">{route.name || 'Route Plan'} · {(route.sequence || []).length} stops</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {route.transferRequest?.fromDriverName || 'Driver'}: {route.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-[12px] font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-emerald-600 text-white'}`}>Accept</button>
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-[12px] font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-emerald-600 text-white'}`}>Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-10 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
                   </div>
-                  {transferDisabled && <p className="text-[12px] text-amber-600 font-medium mt-1">Clock in to respond</p>}
+                  {transferDisabled && <p className="text-xs text-amber-600 font-medium mt-1">Clock in to respond</p>}
                 </div>
               ))}
             </div>
@@ -3064,13 +3064,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <div className="flex items-center gap-1.5 mt-1.5">
                               <Clock size={12} className="text-purple-500" />
                               <span className="text-xs font-semibold text-purple-800">{to12hr(firstTime)}</span>
-                              {firstStop?.type === 'PU' && <span className="text-[12px] font-medium text-purple-600">Pickup</span>}
+                              {firstStop?.type === 'PU' && <span className="text-xs font-medium text-purple-600">Pickup</span>}
                             </div>
                           );
                         })()}
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[12px] font-medium uppercase tracking-wide bg-purple-200 text-purple-800 border border-purple-300 shrink-0">
+                  <span className="px-2.5 py-1 rounded-full text-xs font-medium uppercase tracking-wide bg-purple-200 text-purple-800 border border-purple-300 shrink-0">
                     {assignedSequence.statusLabel || 'Assigned Today'}
                   </span>
                 </div>
@@ -3084,32 +3084,32 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           driverAcknowledgedAt: new Date().toISOString(),
                         }, 'Route Accepted', `${currentUser} accepted route "${assignedSequence.name || 'Assigned Route'}".`);
                       }}
-                      className="px-3 py-2 bg-white text-purple-700 text-[12px] font-medium rounded-lg border-2 border-purple-300 shadow-sm hover:bg-purple-50 active:scale-95 transition-all"
+                      className="px-3 py-2 bg-white text-purple-700 text-xs font-medium rounded-lg border-2 border-purple-300 shadow-sm hover:bg-purple-50 active:scale-95 transition-all"
                     >
                       Accept
                     </button>
                   )}
                   <button
                     onClick={() => { void startAssignedRoute(); }}
-                    className="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-[12px] font-medium rounded-lg shadow-md hover:from-blue-600 hover:to-purple-700 active:scale-95 transition-all"
+                    className="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-medium rounded-lg shadow-md hover:from-blue-600 hover:to-purple-700 active:scale-95 transition-all"
                   >
                     {assignedSequence.statusKey === ROUTE_ASSIGNMENT_STATUS.ACCEPTED ? 'Start Route' : 'Start Guided'}
                   </button>
                   <button
                     onClick={() => setShowAssignedRouteDetails(prev => !prev)}
-                    className="px-3 py-2 bg-white text-slate-700 text-[12px] font-medium rounded-lg border border-slate-200 shadow-sm"
+                    className="px-3 py-2 bg-white text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-sm"
                   >
                     {showAssignedRouteDetails ? 'Hide Details' : 'Open Details'}
                   </button>
                   <button
                     onClick={() => openTransferPrompt('route', assignedSequence)}
-                    className="px-3 py-2 bg-amber-50 text-amber-700 text-[12px] font-medium rounded-lg border border-amber-200 shadow-sm"
+                    className="px-3 py-2 bg-amber-50 text-amber-700 text-xs font-medium rounded-lg border border-amber-200 shadow-sm"
                   >
                     Transfer
                   </button>
                   <button
                     onClick={() => setPasswordPrompt({ type: 'dismiss_route', assignedSequence, trip: {} })}
-                    className="px-3 py-2 bg-white text-rose-700 text-[12px] font-medium rounded-lg border border-rose-200 shadow-sm"
+                    className="px-3 py-2 bg-white text-rose-700 text-xs font-medium rounded-lg border border-rose-200 shadow-sm"
                   >
                     Dismiss
                   </button>
@@ -3125,13 +3125,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       return (
                         <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-slate-100 shadow-sm">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 text-white flex items-center justify-center text-[12px] font-medium shrink-0">{idx + 1}</span>
+                            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 text-white flex items-center justify-center text-xs font-medium shrink-0">{idx + 1}</span>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <span className="text-xs font-medium text-slate-800 truncate">{stopName}</span>
-                                <span className="text-[12px] font-medium text-slate-500 shrink-0">({s.type === 'PU' ? 'Pickup' : 'Dropoff'})</span>
+                                <span className="text-xs font-medium text-slate-500 shrink-0">({s.type === 'PU' ? 'Pickup' : 'Dropoff'})</span>
                               </div>
-                              {stopAddress && <p className="text-[12px] font-medium text-slate-500 truncate">{stopAddress}</p>}
+                              {stopAddress && <p className="text-xs font-medium text-slate-500 truncate">{stopAddress}</p>}
                             </div>
                           </div>
                           {stopTime && <span className="text-sm font-semibold text-purple-700 shrink-0 ml-2">{to12hr(stopTime)}</span>}
@@ -3169,16 +3169,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-white truncate flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.5 rounded bg-white/20 text-[12px] font-medium uppercase tracking-wide">{(headerRouteStop?.type || currentStep.type) === 'PU' ? 'Pickup' : 'Dropoff'}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white/20 text-xs font-medium uppercase tracking-wide">{(headerRouteStop?.type || currentStep.type) === 'PU' ? 'Pickup' : 'Dropoff'}</span>
                     <span className="truncate">{headerRouteStop?.name || currentTrip?.patient || 'Route stop'}</span>
                     <span className="text-white/70 font-medium ml-1 text-xs shrink-0">· {headerRouteWorkflow?.status || (currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : 'In route')}</span>
                   </p>
                   {hasRoutePlanGuidedStops && currentRoutePlanStopIndex + 1 < assignedRoutePlanStops.length ? (
-                    <span className="text-[12px] text-white/70 font-medium ml-2 shrink-0 uppercase tracking-wide">
+                    <span className="text-xs text-white/70 font-medium ml-2 shrink-0 uppercase tracking-wide">
                       Next: {assignedRoutePlanStops[currentRoutePlanStopIndex + 1]?.type || 'PU'} {assignedRoutePlanStops[currentRoutePlanStopIndex + 1]?.name || 'Stop'}
                     </span>
                   ) : nextStep && nextTrip && (
-                    <span className="text-[12px] text-white/70 font-medium ml-2 shrink-0 uppercase tracking-wide">
+                    <span className="text-xs text-white/70 font-medium ml-2 shrink-0 uppercase tracking-wide">
                       Next: {nextStep.type === 'PU' ? 'PU' : 'DO'} {nextTrip.patient}
                     </span>
                   )}
@@ -3227,7 +3227,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               {onAddTrip && (
                 <button
                   onClick={() => setShowAddTripModal && setShowAddTripModal(true)}
-                  className="h-8 w-[100px] text-[12px] text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg shadow-sm"
+                  className="h-7 w-[100px] text-xs text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg shadow-sm"
                 >
                   <Plus size={9} /> Add Trip
                 </button>
@@ -3271,7 +3271,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     setActiveNav('tools');
                     setShowToast({ type: 'success', message: `${stops.length} addresses added to Route Plan.` });
                   }}
-                  className="h-8 w-[105px] text-[12px] text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg shadow-sm"
+                  className="h-7 w-[105px] text-xs text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg shadow-sm"
                 >
                   <Route size={9} /> Add to Plan
                 </button>
@@ -3280,18 +3280,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     setSequencerTripFilter(selectedTrips);
                     setShowSequencerModal(true);
                   }}
-                  className="h-8 w-[100px] text-[12px] text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-sm"
+                  className="h-7 w-[100px] text-xs text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-sm"
                 >
                   <Route size={9} /> Sequencer
                 </button>
                 </>
               )}
               {activeTrips.length > 0 && (
-                <button onClick={exportDailyLog} className="h-8 w-[100px] text-[12px] text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-slate-600 to-slate-700 rounded-lg shadow-sm">
-                  <Download size={11} /> Export
+                <button onClick={exportDailyLog} className="h-7 w-[100px] text-xs text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-slate-600 to-slate-700 rounded-lg shadow-sm">
+                  <Download size={16} /> Export
                 </button>
               )}
-              <span className="text-[12px] text-white/70 font-medium ml-0.5">{activeTrips.length} trip{activeTrips.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-white/70 font-medium ml-0.5">{activeTrips.length} trip{activeTrips.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
 
@@ -3335,10 +3335,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); undoRoutePlanStopProgress(stop); }}
-                          className="ml-auto h-8 px-2.5 rounded-lg border border-amber-200 bg-white text-[12px] font-medium text-amber-700 flex items-center gap-1.5 hover:bg-amber-50 transition-all"
+                           className="ml-auto h-10 px-2.5 rounded-lg border border-amber-200 bg-white text-xs font-medium text-amber-700 flex items-center gap-1.5 hover:bg-amber-50 transition-all"
                           aria-label="Undo stop"
                         >
-                          <RotateCcw size={11} /> Undo
+                          <RotateCcw size={16} /> Undo
                         </button>
                       </div>
                     </div>
@@ -3349,7 +3349,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   return (
                     <div key={`${getRoutePlanStopKey(stop)}-upcoming`} className="relative pl-12 pr-2 opacity-55">
                       <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
-                        <span className="text-[11px] font-medium text-slate-500">{index + 1}</span>
+                        <span className="text-xs font-medium text-slate-500">{index + 1}</span>
                       </div>
                       <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between gap-3">
                         <div className="min-w-0">
@@ -3357,7 +3357,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <span className={`w-1.5 h-4 rounded-full ${stopType === 'DO' ? 'bg-orange-400' : 'bg-blue-400'}`} />
                             <span className="text-sm font-semibold text-slate-900 truncate">{stop.name || `Stop ${index + 1}`}</span>
                           </div>
-                          <p className="text-[11px] font-medium text-slate-500 truncate mt-0.5">{address || 'Address pending'}</p>
+                          <p className="text-xs font-medium text-slate-500 truncate mt-0.5">{address || 'Address pending'}</p>
                         </div>
                         <span className={`text-xs font-medium ${stopType === 'DO' ? 'text-orange-600' : 'text-blue-600'}`}>{stopType}</span>
                       </div>
@@ -3377,11 +3377,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const displayStep = activeStepIndex === -1 ? doneKeys.length : activeStepIndex + 1;
                 const routePct = Math.round((index / Math.max(assignedRoutePlanStops.length, 1)) * 100);
                 const nextAction = (() => {
-                  if (!workflow.startedAt) return { label: 'Start Stop', icon: <Play size={14} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleStartRoutePlanStop(stop) };
-                  if (!workflow.navigatingAt) return { label: `Navigate to ${stopType}`, icon: <Navigation size={14} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleNavigateRoutePlanStop(stop) };
-                  if (!workflow.arrivedAt) return { label: `Arrive at ${stopType}`, icon: <MapPin size={14} />, className: typeColor === 'orange' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700', onClick: () => handleArriveRoutePlanStop(stop) };
-                  if (!workflow.paperSignatureConfirmed) return { label: 'Confirm Signature', icon: <CheckSquare size={14} />, className: 'bg-emerald-600 hover:bg-emerald-700', onClick: () => handleRoutePlanStopSignature(stop) };
-                  return { label: 'Complete Stop', icon: <Check size={14} />, className: 'bg-slate-900 hover:bg-slate-800', onClick: () => completeRoutePlanStop(stop) };
+                  if (!workflow.startedAt) return { label: 'Start Stop', icon: <Play size={16} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleStartRoutePlanStop(stop) };
+                  if (!workflow.navigatingAt) return { label: `Navigate to ${stopType}`, icon: <Navigation size={16} />, className: 'bg-blue-600 hover:bg-blue-700', onClick: () => handleNavigateRoutePlanStop(stop) };
+                  if (!workflow.arrivedAt) return { label: `Arrive at ${stopType}`, icon: <MapPin size={16} />, className: typeColor === 'orange' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700', onClick: () => handleArriveRoutePlanStop(stop) };
+                  if (!workflow.paperSignatureConfirmed) return { label: 'Confirm Signature', icon: <CheckSquare size={16} />, className: 'bg-emerald-600 hover:bg-emerald-700', onClick: () => handleRoutePlanStopSignature(stop) };
+                  return { label: 'Complete Stop', icon: <Check size={16} />, className: 'bg-slate-900 hover:bg-slate-800', onClick: () => completeRoutePlanStop(stop) };
                 })();
 
                 return (
@@ -3393,12 +3393,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <div className="bg-[#23568E] px-4 py-3 text-white">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="px-2 py-0.5 rounded-lg bg-white/15 text-[12px] font-medium tracking-wide uppercase">{stopType === 'DO' ? 'Dropoff' : 'Pickup'}</span>
+                            <span className="px-2 py-0.5 rounded-lg bg-white/15 text-xs font-medium tracking-wide uppercase">{stopType === 'DO' ? 'Dropoff' : 'Pickup'}</span>
                             <span className="text-sm font-semibold truncate">{stop.name || `Stop ${index + 1}`}</span>
                           </div>
                           <div className="shrink-0 text-right">
-                            <span className="block text-[12px] font-medium text-white/80">#{stopTripId || `STOP ${index + 1}`}</span>
-                            <span className="block text-[12px] font-medium text-white/70">STOP {index + 1}/{assignedRoutePlanStops.length}</span>
+                            <span className="block text-xs font-medium text-white/80">#{stopTripId || `STOP ${index + 1}`}</span>
+                            <span className="block text-xs font-medium text-white/70">STOP {index + 1}/{assignedRoutePlanStops.length}</span>
                           </div>
                         </div>
                         <div className="h-1 bg-white/20 rounded-full overflow-hidden">
@@ -3406,7 +3406,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         </div>
                       </div>
                       <div className="p-4">
-                        <p className={`text-[12px] font-medium uppercase tracking-wide mb-1 ${stopType === 'DO' ? 'text-orange-600' : 'text-blue-600'}`}>
+                        <p className={`text-xs font-medium uppercase tracking-wide mb-1 ${stopType === 'DO' ? 'text-orange-600' : 'text-blue-600'}`}>
                           {stopType === 'DO' ? 'Dropoff Address' : 'Pickup Address'}
                         </p>
                         <p className="text-base font-semibold leading-tight text-slate-900">{address || 'Address pending'}</p>
@@ -3415,20 +3415,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleCall(stopPhone, stop.name || `Stop ${index + 1}`); }}
-                              className="h-11 flex-1 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 text-[12px] font-medium flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all"
+                              className="h-8 flex-1 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 text-xs font-medium flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all"
                               title="Call client"
                               aria-label="Call client"
                             >
-                              <Phone size={14} /> Call
+                              <Phone size={16} /> Call
                             </button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleSMS(stopPhone, stop.name || `Stop ${index + 1}`); }}
-                              className="h-11 flex-1 rounded-xl border border-blue-100 bg-blue-50 text-blue-700 text-[12px] font-medium flex items-center justify-center gap-2 hover:bg-blue-100 transition-all"
+                              className="h-8 flex-1 rounded-xl border border-blue-100 bg-blue-50 text-blue-700 text-xs font-medium flex items-center justify-center gap-2 hover:bg-blue-100 transition-all"
                               title="SMS client"
                               aria-label="SMS client"
                             >
-                              <MessageCircle size={14} /> SMS
+                              <MessageCircle size={16} /> SMS
                             </button>
                           </div>
                         )}
@@ -3440,10 +3440,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             ))}
                           </div>
                           <div className="flex items-center justify-between mb-3">
-                            <span className="text-[12px] font-medium uppercase tracking-wide text-slate-600">Required Step</span>
-                            <span className="text-[12px] font-medium text-slate-600">Step {displayStep} of 5</span>
+                            <span className="text-xs font-medium uppercase tracking-wide text-slate-600">Required Step</span>
+                            <span className="text-xs font-medium text-slate-600">Step {displayStep} of 5</span>
                           </div>
-                          <div className="grid grid-cols-2 gap-3 text-[12px] font-medium text-slate-600 mb-3">
+                          <div className="grid grid-cols-2 gap-3 text-xs font-medium text-slate-600 mb-3">
                             <div className="rounded-xl bg-white px-3 py-2 border border-slate-200">Started: {workflow.startedAt ? new Date(workflow.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Pending'}</div>
                             <div className="rounded-xl bg-white px-3 py-2 border border-slate-200">Arrived: {workflow.arrivedAt ? new Date(workflow.arrivedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Pending'}</div>
                             <div className="rounded-xl bg-white px-3 py-2 border border-slate-200">Odometer: {workflow.odometer ? `${Number(workflow.odometer).toLocaleString()} mi` : 'Pending'}</div>
@@ -3463,7 +3463,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               onClick={(e) => { e.stopPropagation(); handleNavigateRoutePlanStop(stop); }}
                               className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-slate-50 transition-all"
                             >
-                              <Navigation size={13} /> Open Navigation
+                              <Navigation size={16} /> Open Navigation
                             </button>
                           )}
                           {canUndoRouteStop && (
@@ -3472,36 +3472,36 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               onClick={(e) => { e.stopPropagation(); undoRoutePlanStopProgress(stop); }}
                               className="mt-2 w-full h-10 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-amber-100 transition-all"
                             >
-                              <RotateCcw size={13} /> Undo Last Step
+                              <RotateCcw size={16} /> Undo Last Step
                             </button>
                           )}
                           <div className="mt-2 grid grid-cols-3 gap-2">
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'No Show', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
-                              className="h-11 rounded-xl border border-orange-200 bg-white text-orange-700 text-[12px] font-medium flex items-center justify-center gap-1.5 hover:bg-orange-50 transition-all"
+                              className="h-11 rounded-xl border border-orange-200 bg-white text-orange-700 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-orange-50 transition-all"
                               title="No Show"
                               aria-label="Mark as No Show"
                             >
-                              <AlertCircle size={14} /> No Show
+                              <AlertCircle size={16} /> No Show
                             </button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'Cancelled', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
-                              className="h-11 rounded-xl border border-rose-200 bg-white text-rose-700 text-[12px] font-medium flex items-center justify-center gap-1.5 hover:bg-rose-50 transition-all"
+                              className="h-11 rounded-xl border border-rose-200 bg-white text-rose-700 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-rose-50 transition-all"
                               title="Cancel stop"
                               aria-label="Cancel stop"
                             >
-                              <XCircle size={14} /> Cancel
+                              <XCircle size={16} /> Cancel
                             </button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setPasswordPrompt({ type: 'route_stop_exception', stop, status: 'Rerouted', trip: { patient: stop.name || `Stop ${stop.sequenceIndex}` } }); }}
-                              className="h-11 rounded-xl border border-purple-200 bg-white text-purple-700 text-[12px] font-medium flex items-center justify-center gap-1.5 hover:bg-purple-50 transition-all"
+                              className="h-11 rounded-xl border border-purple-200 bg-white text-purple-700 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-purple-50 transition-all"
                               title="Rerouted"
                               aria-label="Mark as Rerouted"
                             >
-                              <RefreshCw size={14} /> Reroute
+                              <RefreshCw size={16} /> Reroute
                             </button>
                           </div>
                         </div>
@@ -3539,7 +3539,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   return (
                     <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 opacity-50">
                       <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
-                        <span className="text-[11px] font-medium text-slate-500">{index + 1}</span>
+                        <span className="text-xs font-medium text-slate-500">{index + 1}</span>
                       </div>
                       <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between">
                          <div className="flex items-center gap-2 min-w-0">
@@ -3572,19 +3572,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       ))}
                     </div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className={`text-[12px] font-semibold uppercase tracking-wide ${labelColor}`}>
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${labelColor}`}>
                         {isDropoffPhase ? 'Dropoff Phase' : 'Pickup Phase'}
                       </span>
-                      <span className="text-[12px] font-medium text-slate-500">
+                      <span className="text-xs font-medium text-slate-500">
                         Step {Math.min(currentStepIdx + 1, totalGuidedSteps)} of {totalGuidedSteps}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }} className={`flex-1 h-11 ${gradient} text-sm text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }} className={`flex-1 h-9 ${gradient} text-sm text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
                         {icon} {label}
                       </button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="h-11 px-4 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-[12px] font-medium shrink-0 cursor-pointer">No Show</button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="h-11 px-4 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-[12px] font-medium shrink-0 cursor-pointer">Cancel</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="h-11 px-4 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-medium shrink-0 cursor-pointer">No Show</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="h-11 px-4 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-medium shrink-0 cursor-pointer">Cancel</button>
                     </div>
                   </div>
                 );
@@ -3597,7 +3597,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
                        <div className={`px-3 py-2 border-b flex items-center justify-between ${step.type === 'PU' ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
                           <div className="flex items-center gap-2">
-                            <span className={`px-2.5 py-1 rounded-md text-[12px] font-medium tracking-wide uppercase text-white ${step.type === 'PU' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                            <span className={`px-2.5 py-1 rounded-md text-xs font-medium tracking-wide uppercase text-white ${step.type === 'PU' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
                               {step.type === 'PU' ? 'Pickup' : 'Dropoff'}
                             </span>
                             <span className="text-sm font-semibold text-slate-900">{trip.patient}</span>
@@ -3606,7 +3606,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         </div>
 
                         <div className="px-3 py-3">
-                          <p className={`text-[12px] font-semibold uppercase tracking-wide mb-1 ${step.type === 'PU' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${step.type === 'PU' ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {step.type === 'PU' ? 'Pickup Address' : 'Dropoff Address'}
                           </p>
                           <p className={`text-base font-semibold leading-tight ${step.type === 'PU' ? 'text-emerald-700' : 'text-rose-700'}`}>
@@ -3619,50 +3619,50 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             const ps = getContactRoleIcon(pc.role);
                             return (
                               <div className="flex items-center gap-2 mt-2 mb-1">
-                                <div className={`flex items-center gap-1.5 ${ps.color} text-[12px] font-medium`}>
-                                  <Phone size={12} /> {pc.label}
+                                <div className={`flex items-center gap-1.5 ${ps.color} text-xs font-medium`}>
+                                  <Phone size={16} /> {pc.label}
                                 </div>
                                 <span className="text-sm font-semibold text-slate-900">{formatPhoneDisplay(pc.phone)}</span>
                                 <button type="button" onClick={() => navigator.clipboard.writeText(pc.phone)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-600 transition-colors" title="Copy number" aria-label="Copy phone number">
-                                  <Copy size={12} />
+                                  <Copy size={16} />
                                 </button>
                               </div>
                             );
                           })()}
 
                           <div className="flex items-center gap-2 mt-3 mb-4">
-                            <button type="button" onClick={(e) => { e.stopPropagation(); openInNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff, suggestNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff)); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[12px] font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all" aria-label="Navigate"><Navigation size={14}/> Navigate</button>
-                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartCall(trip); }} className="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-100" aria-label="Call"><Phone size={15}/></button>
-                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="w-11 h-11 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all hover:bg-blue-100" aria-label="Send SMS"><MessageCircle size={15}/></button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); openInNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff, suggestNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff)); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium py-1.5 rounded-xl flex items-center justify-center gap-2 transition-all" aria-label="Navigate"><Navigation size={16}/> Navigate</button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartCall(trip); }} className="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-100" aria-label="Call"><Phone size={16}/></button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all hover:bg-blue-100" aria-label="Send SMS"><MessageCircle size={16}/></button>
                           </div>
 
                           {(() => {
 
                             if (step.type === 'PU') {
                               if (trip.status === 'Assigned' || trip.status === 'Unassigned') {
-                                return renderPrimaryBtn('Start Trip', <Play size={14} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); });
+                                return renderPrimaryBtn('Start Trip', <Play size={16} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); });
                               }
                               if (trip.status === 'In Progress') {
-                                return renderPrimaryBtn('Navigate to Pickup', <Navigation size={14} />, 'bg-blue-600 hover:bg-blue-700', () => handleNavigateToPickup(trip));
+                                return renderPrimaryBtn('Navigate to Pickup', <Navigation size={16} />, 'bg-blue-600 hover:bg-blue-700', () => handleNavigateToPickup(trip));
                               }
                               if (trip.status === 'Navigating Pickup') {
-                                return renderPrimaryBtn('Arrive at Pickup', <MapPin size={14} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); handleArrivePickup(trip); });
+                                return renderPrimaryBtn('Arrive at Pickup', <MapPin size={16} />, 'bg-blue-600 hover:bg-blue-700', () => { impact('heavy'); handleArrivePickup(trip); });
                               }
                               if (trip.status === 'At Pickup') {
-                                return renderPrimaryBtn('Begin Transport', <Play size={14} />, 'bg-emerald-600 hover:bg-emerald-700', () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); });
+                                return renderPrimaryBtn('Begin Transport', <Play size={16} />, 'bg-emerald-600 hover:bg-emerald-700', () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); });
                               }
                             } else {
                               if (trip.status === 'In Transit') {
-                                return renderPrimaryBtn('Navigate to Dropoff', <Navigation size={14} />, 'bg-orange-600 hover:bg-orange-700', () => handleNavigateToDropoff(trip));
+                                return renderPrimaryBtn('Navigate to Dropoff', <Navigation size={16} />, 'bg-orange-600 hover:bg-orange-700', () => handleNavigateToDropoff(trip));
                               }
                               if (trip.status === 'Navigating Dropoff') {
-                                return renderPrimaryBtn('Arrive at Dropoff', <MapPin size={14} />, 'bg-orange-600 hover:bg-orange-700', () => { impact('heavy'); handleArriveDropoff(trip); });
+                                return renderPrimaryBtn('Arrive at Dropoff', <MapPin size={16} />, 'bg-orange-600 hover:bg-orange-700', () => { impact('heavy'); handleArriveDropoff(trip); });
                               }
                               if (trip.status === 'At Dropoff' || trip.status === 'Arrived') {
-                                return renderPrimaryBtn('Complete Trip', <Check size={14} />, 'bg-red-600 hover:bg-red-700', () => { impact('heavy'); openCompleteModal(trip); });
+                                return renderPrimaryBtn('Complete Trip', <Check size={16} />, 'bg-red-600 hover:bg-red-700', () => { impact('heavy'); openCompleteModal(trip); });
                               }
                             }
-                            return <div className="text-center text-[12px] text-slate-500 italic bg-slate-50 rounded-xl py-2.5">No action required for this step.</div>;
+                            return <div className="text-center text-xs text-slate-500 italic bg-slate-50 rounded-xl py-2.5">No action required for this step.</div>;
                           })()}
                        </div>
                     </div>
@@ -3691,13 +3691,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const doneBarColor = 'bg-emerald-400';
 
                 const getPrimaryAction = () => {
-                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-600/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={14} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-teal-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={14} />, gradient: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={14} />, gradient: 'bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={14} />, gradient: 'bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 shadow-rose-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-600/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-teal-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 shadow-rose-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
                   return null;
                 };
                 const primary = getPrimaryAction();
@@ -3708,14 +3708,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     {showInOutHeader && (
                       <div className="flex items-center gap-2 px-1 pt-4 pb-2">
                         <div className="h-px flex-1 bg-emerald-200" />
-                        <span className="text-[12px] font-medium text-emerald-700 uppercase tracking-wide">IN/OUT — Stay with client about {IN_OUT_WAIT_MINUTES} min</span>
+                        <span className="text-xs font-medium text-emerald-700 uppercase tracking-wide">IN/OUT — Stay with client about {IN_OUT_WAIT_MINUTES} min</span>
                         <div className="h-px flex-1 bg-emerald-200" />
                       </div>
                     )}
                     {showWcHeader && (
                       <div className="flex items-center gap-2 px-1 pt-4 pb-2">
                         <div className="h-px flex-1 bg-slate-200" />
-                        <span className="text-[12px] font-semibold text-slate-500 uppercase tracking-wide">Will Call / No Time</span>
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Will Call / No Time</span>
                         <div className="h-px flex-1 bg-slate-200" />
                       </div>
                     )}
@@ -3806,43 +3806,43 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                   title="Undo last step"
                                   aria-label="Undo last workflow step"
                                 >
-                                  <RotateCcw size={12} />
+<RotateCcw size={16} />                                       
                                 </button>
                               )}
                             </div>
                             <div className="flex items-center justify-between mb-2">
-                              <span className={`text-[12px] font-semibold uppercase tracking-wide ${labelColor}`}>
+                              <span className={`text-xs font-semibold uppercase tracking-wide ${labelColor}`}>
                                 {isDropoffPhase ? 'Dropoff Phase' : 'Pickup Phase'}
                               </span>
-                              <span className="text-[12px] font-medium text-slate-500">
+                              <span className="text-xs font-medium text-slate-500">
                                 Step {Math.min(currentStepIdx + 1, totalSteps)} of {totalSteps}
                               </span>
                             </div>
                             <div className="flex items-center gap-2 mb-2">
-                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-14 ${primary.gradient} text-base md:text-lg text-white rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-10 ${primary.gradient} text-base md:text-lg text-white rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
                                 {primary.icon} {primary.label}
                               </button>
                               {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
                                 skipConfirmTripId === trip.id ? (
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); setSkipConfirmTripId(null); handleSkipNav(trip); }} className="flex-1 h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-[12px] font-medium cursor-pointer flex items-center justify-center gap-1 shadow-sm">
-                                    <MapPin size={14} /> {trip.status === 'In Progress' ? 'Arrived to pick up?' : 'Arrived to drop off?'}
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); setSkipConfirmTripId(null); handleSkipNav(trip); }} className="flex-1 h-12 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1 shadow-sm">
+                                     <MapPin size={16} /> {trip.status === 'In Progress' ? 'Arrived to pick up?' : 'Arrived to drop off?'}
                                   </button>
                                 ) : (
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); setSkipConfirmTripId(trip.id); }} className="flex-1 h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-[12px] font-medium cursor-pointer flex items-center justify-center gap-1">
-                                    <Forward size={14} /> Skip
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); setSkipConfirmTripId(trip.id); }} className="flex-1 h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1">
+                                     <Forward size={16} /> Skip
                                   </button>
                                 )
                               )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="flex-1 h-11 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-[12px] font-medium cursor-pointer flex items-center justify-center gap-1.5">
-                                <AlertCircle size={13} /> No Show
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleNoShow(trip); }} className="flex-1 h-11 bg-white border border-orange-200 text-orange-700 rounded-xl hover:bg-orange-50 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5">
+                                <AlertCircle size={16} /> No Show
                               </button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="flex-1 h-11 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-[12px] font-medium cursor-pointer flex items-center justify-center gap-1.5">
-                                <XCircle size={13} /> Cancel
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleCancel(trip); }} className="flex-1 h-11 bg-white border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5">
+                                <XCircle size={16} /> Cancel
                               </button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleReroute(trip); }} className="flex-1 h-11 bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-[12px] font-medium cursor-pointer flex items-center justify-center gap-1.5">
-                                <RefreshCw size={13} /> Rerouted
+                              <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleReroute(trip); }} className="flex-1 h-11 bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5">
+                                <RefreshCw size={16} /> Rerouted
                               </button>
                             </div>
                           </div>
@@ -3890,7 +3890,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       className={`rounded-2xl border px-3 py-3 text-left transition-all cursor-pointer ${active ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
                     >
                       <p className="text-sm font-semibold uppercase tracking-wide">{mode.label}</p>
-                      <p className="text-[11px] font-semibold opacity-70 mt-0.5">{mode.hint}</p>
+                      <p className="text-xs font-semibold opacity-70 mt-0.5">{mode.hint}</p>
                     </button>
                   );
                 })}
@@ -3898,7 +3898,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
               {(scheduleEditDraft.mode === 'time' || scheduleEditDraft.mode === 'inout' || scheduleEditDraft.mode === 'urgent') && (
                 <div>
-                  <label className="text-[12px] font-medium uppercase tracking-wide text-slate-500">Pickup Time</label>
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Pickup Time</label>
                   <input
                     type="time"
                     value={scheduleEditDraft.time || ''}
@@ -3924,7 +3924,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 space-y-3">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[12px] font-medium uppercase tracking-wide text-rose-600">Deadline Date</label>
+                      <label className="text-xs font-medium uppercase tracking-wide text-rose-600">Deadline Date</label>
                       <input
                         type="date"
                         value={scheduleEditDraft.deadlineDate || ''}
@@ -3933,7 +3933,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       />
                     </div>
                     <div>
-                      <label className="text-[12px] font-medium uppercase tracking-wide text-rose-600">Deadline Time</label>
+                      <label className="text-xs font-medium uppercase tracking-wide text-rose-600">Deadline Time</label>
                       <input
                         type="time"
                         value={scheduleEditDraft.deadlineTime || ''}
@@ -3944,7 +3944,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   </div>
                   <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
                     <div>
-                      <label className="text-[12px] font-medium uppercase tracking-wide text-rose-600">Required Within Hours</label>
+                      <label className="text-xs font-medium uppercase tracking-wide text-rose-600">Required Within Hours</label>
                       <input
                         type="number"
                         min="1"
@@ -4029,7 +4029,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm Arrival</button>
+                <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm Arrival</button>
               </div>
             </div>
           </div>
@@ -4068,7 +4068,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-[#23568E] hover:bg-[#1B4471] text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
+                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-3.5 bg-[#23568E] hover:bg-[#1B4471] text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
               </div>
             </div>
           </div>
@@ -4099,7 +4099,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
             <div className="flex gap-3">
               <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmRoutePlanStopSignature} disabled={!routeStopSignatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm</button>
+              <button type="button" onClick={confirmRoutePlanStopSignature} disabled={!routeStopSignatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm</button>
             </div>
           </div>
         </div>
@@ -4144,7 +4144,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-slate-500 font-semibold uppercase">{label}</span>
                     <button type="button" onClick={() => handleCall(showArrivalConfirm.pickupPhone, `${label}: ${showArrivalConfirm.patient}`)} className="text-sm font-medium text-blue-600 flex items-center gap-1 hover:underline cursor-pointer">
-                      <Phone size={14} /> {formatPhoneDisplay(showArrivalConfirm.pickupPhone)}
+                      <Phone size={16} /> {formatPhoneDisplay(showArrivalConfirm.pickupPhone)}
                     </button>
                   </div>
                 );
@@ -4165,7 +4165,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
             <div className="flex gap-3">
               <button type="button" onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmArrival} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all cursor-pointer">Confirm Arrival</button>
+              <button type="button" onClick={confirmArrival} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Confirm Arrival</button>
             </div>
           </div>
         </div>
@@ -4204,7 +4204,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
             <div className="flex gap-3">
               <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmSignatureAndBegin} disabled={!signatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Confirm & Begin</button>
+              <button type="button" onClick={confirmSignatureAndBegin} disabled={!signatureConfirmed} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm & Begin</button>
             </div>
           </div>
         </div>
@@ -4254,7 +4254,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     autoFocus
                   />
                   {!completeOdometer && (
-                    <p className="mt-2 text-center text-[11px] font-semibold text-slate-500">
+                    <p className="mt-2 text-center text-xs font-semibold text-slate-500">
                       Enter a final odometer reading to enable completion.
                     </p>
                   )}
@@ -4274,7 +4274,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
             <div className="flex gap-3 mt-2 shrink-0 pt-2">
               <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-              <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
+              <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
             </div>
           </div>
         </div>
@@ -4294,7 +4294,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 onClick={() => { handleEditTrip(showTripDetails); setShowTripDetails(null); }}
                 className="h-9 px-3 rounded-xl bg-blue-600 text-white text-xs font-semibold flex items-center gap-1.5 active:scale-95 cursor-pointer"
               >
-                <Edit2 size={13} /> Edit
+                <Edit2 size={16} /> Edit
               </button>
               <button type="button" onClick={() => setShowTripDetails(null)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90 cursor-pointer"><X size={18} /></button>
             </div>
@@ -4315,7 +4315,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <p className="text-xs font-semibold text-white/90 truncate">#{showTripDetails.bookingId || showTripDetails.id}</p>
                         </div>
                       </div>
-                      <span className={`shrink-0 rounded-lg px-2.5 py-0.5 text-[12px] font-medium uppercase tracking-wide ${statusMeta.bg}`}>
+                      <span className={`shrink-0 rounded-lg px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide ${statusMeta.bg}`}>
                         {statusMeta.label}
                       </span>
                     </div>
@@ -4326,14 +4326,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             })()}
 
             <div className="grid grid-cols-3 gap-2">
-              <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Pickup</button>
-              <button type="button" onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Dropoff</button>
-              <button type="button" onClick={() => openContactSelector(showTripDetails)} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><PhoneForwarded size={12} /> Contacts</button>
+              <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, suggestNavApp(showTripDetails.pickup))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={16} /> Pickup</button>
+              <button type="button" onClick={() => openInNavApp(showTripDetails.dropoff, suggestNavApp(showTripDetails.dropoff))} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={16} /> Dropoff</button>
+              <button type="button" onClick={() => openContactSelector(showTripDetails)} className="h-10 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><PhoneForwarded size={16} /> Contacts</button>
             </div>
 
             {/* Smart Contacts Section */}
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
-              <h3 className="text-micro font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-2"><PhoneForwarded size={14} /> Contacts</h3>
+              <h3 className="text-micro font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-2"><PhoneForwarded size={16} /> Contacts</h3>
               {(() => {
                 const contacts = getContactsForTrip(showTripDetails);
                 const warning = getContactWarning(showTripDetails, trips);
@@ -4349,8 +4349,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     {contacts.length > 0 && (
                       <button type="button"
                         onClick={() => { const p = getPrimaryContactForTrip(showTripDetails); if (p) handleCall(p.phone, `${p.label}: ${p.name}`); }}
-                        className="w-full h-10 bg-emerald-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-sm">
-                        <Phone size={14} /> Call {contacts.find(c => c.isPrimary)?.label || 'Primary Contact'} — {formatPhoneDisplay(contacts.find(c => c.isPrimary)?.phone || contacts[0]?.phone)}
+                        className="w-full h-10 bg-emerald-600 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-sm">
+                        <Phone size={16} /> Call {contacts.find(c => c.isPrimary)?.label || 'Primary Contact'} — {formatPhoneDisplay(contacts.find(c => c.isPrimary)?.phone || contacts[0]?.phone)}
                       </button>
                     )}
                     <div className="space-y-2">
@@ -4369,15 +4369,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm     font-semibold text-slate-900 truncate">{contact.name}</p>
-                                  {contact.isPrimary && <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">PRIMARY</span>}
+                                  {contact.isPrimary && <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">PRIMARY</span>}
                                 </div>
                                 <p className="text-xs text-slate-500">{contact.label} · {formatPhoneDisplay(contact.phone)}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                              <button type="button" onClick={() => handleCall(contact.phone, `${contact.label}: ${contact.name}`)} className="w-8 h-8 rounded-lg bg-white text-emerald-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer" title={roleActions.callLabel}><Phone size={14} /></button>
+                              <button type="button" onClick={() => handleCall(contact.phone, `${contact.label}: ${contact.name}`)} className="w-8 h-8 rounded-lg bg-white text-emerald-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer" title={roleActions.callLabel}><Phone size={16} /></button>
                               {roleActions.smsLabel && (
-                                <button type="button" onClick={() => handleSMS(contact.phone, contact.name)} className="w-8 h-8 rounded-lg bg-white text-blue-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer" title={roleActions.smsLabel}><MessageCircle size={14} /></button>
+                                <button type="button" onClick={() => handleSMS(contact.phone, contact.name)} className="w-8 h-8 rounded-lg bg-white text-blue-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer" title={roleActions.smsLabel}><MessageCircle size={16} /></button>
                               )}
                             </div>
                           </div>
@@ -4398,9 +4398,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
               <h3 className="text-micro font-semibold uppercase tracking-wide text-slate-500">Actions</h3>
               <div className="flex gap-2">
-                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={12} /> Google Maps</button>
-                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'waze')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={12} /> Waze</button>
-                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'apple')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={12} /> Apple</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={16} /> Google Maps</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'waze')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Navigation size={16} /> Waze</button>
+                <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'apple')} className="flex-1 h-10 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={16} /> Apple</button>
               </div>
             </div>
           </div>
@@ -4512,7 +4512,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
               <div className="h-8 px-2.5 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shrink-0" title={formatHistoryDayLabel(selectedHistoryDate)}>
                 <span className="text-xs font-semibold text-slate-900">{formatHistoryCompactDayLabel(selectedHistoryDate)}</span>
-                <span className="text-[12px] font-medium text-slate-500">({selectedHistoryDayTrips.length})</span>
+                <span className="text-xs font-medium text-slate-500">({selectedHistoryDayTrips.length})</span>
               </div>
 
               <button
@@ -4611,7 +4611,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className={`rounded-lg px-2.5 py-0.5 text-[12px] font-medium uppercase tracking-wide ${statusMeta.bg}`}>
+                              <span className={`rounded-lg px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide ${statusMeta.bg}`}>
                                 {statusMeta.label}
                               </span>
                               <ChevronDown size={16} className="text-white/80" />
@@ -4621,8 +4621,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <HistoryTripDetailTable trip={trip} driver={me} />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <button type="button" onClick={() => handleEditTrip(trip)} className="h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><Edit2 size={14} /> Edit</button>
-                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="h-9 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><RotateCcw size={14} /> Restore</button>
+                        <button type="button" onClick={() => handleEditTrip(trip)} className="h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><Edit2 size={16} /> Edit</button>
+                        <button type="button" onClick={() => restoreHistoryTrip(trip)} className="h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><RotateCcw size={14} /> Restore</button>
                       </div>
                     </div>
                   );
@@ -4636,7 +4636,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <StatusIcon size={13} />
                           </div>
                           <span className="text-sm     font-semibold text-slate-900 truncate">{trip.patient}</span>
-                          <span className="text-[11px] font-mono text-blue-600 font-semibold shrink-0">#{trip.bookingId || trip.id}</span>
+                          <span className="text-xs font-mono text-blue-600 font-semibold shrink-0">#{trip.bookingId || trip.id}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-sm font-semibold text-emerald-600">{to12hr(trip.time)}</span>
@@ -4777,7 +4777,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <div key={label} className="flex justify-between items-center">
                     <span className="text-slate-500 text-xs font-semibold">{label}</span>
                     {label === 'Status' ? (
-                      <span className={`px-2 py-0.5 rounded font-medium text-[12px] ${getDriverLiveStatus(me).color}`}>{value}</span>
+                      <span className={`px-2 py-0.5 rounded font-medium text-xs ${getDriverLiveStatus(me).color}`}>{value}</span>
                     ) : (
                       <span className={`font-semibold text-xs ${value === 'Always On' ? 'text-emerald-600' : 'text-slate-800'}`}>{value}</span>
                     )}
@@ -4846,7 +4846,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     className="h-9 px-3 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold active:scale-95 flex items-center gap-1"
                     title="Use current GPS location"
                   >
-                    <MapPin size={12} /> GPS
+                    <MapPin size={16} /> GPS
                   </button>
                 </div>
               </div>
@@ -4881,9 +4881,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       a.href = url; a.download = `clock-history-${new Date().toISOString().slice(0, 10)}.csv`;
                       a.click(); URL.revokeObjectURL(url);
                     }}
-                    className="text-[12px] font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1.5"
+                    className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1.5"
                   >
-                    <Download size={12} /> CSV
+                    <Download size={16} /> CSV
                   </button>
                 )}
               </div>
@@ -4909,7 +4909,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <td className="py-1.5 pr-2 font-semibold text-slate-800 whitespace-nowrap">{day.clockIn ? formatClockTime(day.clockIn) : '—'}</td>
                             <td className="py-1.5 pr-2 font-semibold text-slate-800 whitespace-nowrap">{day.clockOut ? formatClockTime(day.clockOut) : '—'}</td>
                             <td className="py-1.5 pr-2 text-right font-semibold text-slate-700 whitespace-nowrap">{day.hours ? `${day.hours.toFixed(1)}h` : '—'}</td>
-                            <td className="py-1.5 text-[11px] font-mono text-slate-500 truncate max-w-[80px]">{day.inLocation || day.outLocation || '—'}</td>
+                            <td className="py-1.5 text-xs font-mono text-slate-500 truncate max-w-[80px]">{day.inLocation || day.outLocation || '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -4917,10 +4917,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   </div>
                   <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                     <span className="font-semibold text-slate-600">This week total</span>
-                    <span className={`font-bold ${clockHistory.weeklyOvertime > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                    <span className={`font-semibold ${clockHistory.weeklyOvertime > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
                       {clockHistory.weeklyTotal.toFixed(1)}h
                       {clockHistory.weeklyOvertime > 0 && (
-                        <span className="ml-2 text-[12px] text-rose-500">({clockHistory.weeklyOvertime.toFixed(1)}h OT)</span>
+                        <span className="ml-2 text-xs text-rose-500">({clockHistory.weeklyOvertime.toFixed(1)}h OT)</span>
                       )}
                     </span>
                   </div>
@@ -5017,19 +5017,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </p>
 
             <div className="mt-5 space-y-2">
-              <button onClick={() => { setShowClockOutOffer(false); handleClockToggle(); }} className="w-full h-11 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition active:scale-95 flex items-center justify-center gap-2">
-                <LogOut size={14} /> Clock Out Now
+              <button onClick={() => { setShowClockOutOffer(false); handleClockToggle(); }} className="w-full h-11 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition active:scale-95 flex items-center justify-center gap-2">
+                <LogOut size={16} /> Clock Out Now
               </button>
 
               <div className="border-t border-slate-100 pt-3 mt-3">
-                <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Schedule clock-out</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Schedule clock-out</p>
                 <div className="flex items-center gap-2">
                   <input type="time" value={delayedClockOutTarget}
                     onChange={(e) => setDelayedClockOutTarget(e.target.value)}
                     className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
                   <button onClick={() => { if (delayedClockOutTarget) scheduleDelayedClockOut(delayedClockOutTarget); else setShowToast({ type: 'info', message: 'Select a time first.' }); }}
                     disabled={!delayedClockOutTarget}
-                    className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-medium text-[12px] transition active:scale-95">
+                    className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-medium text-xs transition active:scale-95">
                     Set Time
                   </button>
                 </div>
@@ -5037,15 +5037,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
               {clockOutEstimate && (
                 <div className="border-t border-slate-100 pt-3 mt-3">
-                  <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Estimate from home</p>
-                  <button onClick={() => scheduleDelayedClockOut(clockOutEstimate.targetTime)} className="w-full h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-[12px] transition active:scale-95 flex items-center justify-center gap-2">
-                    <Navigation size={12} /> Clock out in ~{clockOutEstimate.label}
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Estimate from home</p>
+                  <button onClick={() => scheduleDelayedClockOut(clockOutEstimate.targetTime)} className="w-full h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs transition active:scale-95 flex items-center justify-center gap-2">
+                    <Navigation size={16} /> Clock out in ~{clockOutEstimate.label}
                   </button>
                 </div>
               )}
             </div>
 
-            <button onClick={() => { setShowClockOutOffer(false); clockOutOfferedRef.current = false; }} className="w-full h-10 text-[12px] font-medium text-slate-500 hover:text-slate-700 mt-3 transition">
+            <button onClick={() => { setShowClockOutOffer(false); clockOutOfferedRef.current = false; }} className="w-full h-10 text-xs font-medium text-slate-500 hover:text-slate-700 mt-3 transition">
               Dismiss
             </button>
           </div>
@@ -5064,7 +5064,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               You don't have any trips right now. Would you like to clock out?
             </p>
             <div className="grid grid-cols-2 gap-3 mt-6">
-              <button onClick={() => { setShowIdleLogoutPrompt(false); handleClockToggle(); }} className="h-12 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition active:scale-95">
+              <button onClick={() => { setShowIdleLogoutPrompt(false); handleClockToggle(); }} className="h-12 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition active:scale-95">
                 Clock Out
               </button>
               <button onClick={() => { setShowIdleLogoutPrompt(false); idlePromptedRef.current = true; }} className="h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition active:scale-95">
@@ -5117,10 +5117,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       </div>
                       <div className="flex-1 min-w-0 text-left">
                         <div className="flex items-center gap-2">
-                          <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-medium ${cancelPrompt.type === 'noshow' ? 'bg-amber-100 text-amber-600' : cancelPrompt.type === 'reroute' ? 'bg-purple-100 text-purple-600' : 'bg-rose-100 text-rose-600'}`}>L{idx + 1}</span>
+                          <span className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-medium ${cancelPrompt.type === 'noshow' ? 'bg-amber-100 text-amber-600' : cancelPrompt.type === 'reroute' ? 'bg-purple-100 text-purple-600' : 'bg-rose-100 text-rose-600'}`}>L{idx + 1}</span>
                           <span className="text-sm     font-semibold text-slate-900 truncate">{leg.patient}</span>
-                          {leg.bookingId && <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-[11px] font-semibold shrink-0">{leg.bookingId}</span>}
-                          <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
+                          {leg.bookingId && <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-xs font-semibold shrink-0">{leg.bookingId}</span>}
+                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
                           <span className="truncate">{leg.pickup}</span>
@@ -5142,7 +5142,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     setSelectedLegsForAction(new Set());
                   }}
                   disabled={selectedLegsForAction.size === 0}
-                  className={`w-full py-3 text-white rounded-xl font-bold text-sm transition disabled:opacity-40 cursor-pointer ${cancelPrompt.type === 'noshow' ? 'bg-orange-600 hover:bg-orange-700' : cancelPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
+                  className={`w-full py-3 text-white rounded-xl font-semibold text-sm transition disabled:opacity-40 cursor-pointer ${cancelPrompt.type === 'noshow' ? 'bg-orange-600 hover:bg-orange-700' : cancelPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
                   {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `${actionLabel} ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
                 </button>
               </div>
@@ -5191,10 +5191,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       </div>
                       <div className="flex-1 min-w-0 text-left">
                         <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[11px] font-medium">L{idx + 1}</span>
+                          <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-medium">L{idx + 1}</span>
                           <span className="text-sm     font-semibold text-slate-900 truncate">{leg.patient}</span>
-                          {leg.bookingId && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-[11px] font-semibold shrink-0">{leg.bookingId}</span>}
-                          <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
+                          {leg.bookingId && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs font-semibold shrink-0">{leg.bookingId}</span>}
+                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
                           <span className="truncate">{leg.pickup}</span>
@@ -5215,7 +5215,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     setPasswordPrompt({ type: 'restore', trip: restorePrompt.trip, selectedLegIds: [...selectedLegsForAction] });
                   }}
                   disabled={selectedLegsForAction.size === 0}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition disabled:opacity-40 cursor-pointer">
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm transition disabled:opacity-40 cursor-pointer">
                   {selectedLegsForAction.size === 0 ? 'Select at least one leg' : `Restore ${selectedLegsForAction.size} Leg${selectedLegsForAction.size > 1 ? 's' : ''}`}
                 </button>
               </div>
@@ -5330,7 +5330,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">
                   Back
                 </button>
-                <button type="button" onClick={verifyPasswordAndProceed} disabled={!passwordValue || passwordVerifying} className={`flex-1 py-3 text-white rounded-xl font-bold text-sm disabled:opacity-40 transition-all cursor-pointer ${passwordPrompt.type === 'restore' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-600 hover:bg-blue-700' : passwordPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
+                <button type="button" onClick={verifyPasswordAndProceed} disabled={!passwordValue || passwordVerifying} className={`flex-1 py-3 text-white rounded-xl font-semibold text-sm disabled:opacity-40 transition-all cursor-pointer ${passwordPrompt.type === 'restore' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-600 hover:bg-blue-700' : passwordPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
                   {passwordVerifying ? 'Verifying...' : passwordPrompt.type === 'route_stop_exception' ? `Confirm ${passwordPrompt.status}` : passwordPrompt.type === 'noshow' ? 'Confirm No Show' : passwordPrompt.type === 'reroute' ? 'Confirm Reroute' : passwordPrompt.type === 'restore' ? 'Confirm Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Confirm & Save Changes' : passwordPrompt.type === 'transfer_send' ? 'Send Transfer' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Confirm Cancel'}
                 </button>
               </div>
@@ -5408,7 +5408,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm     font-semibold text-slate-900 truncate">{contact.name}</span>
-                            {contact.isPrimary && <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">PRIMARY</span>}
+                            {contact.isPrimary && <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">PRIMARY</span>}
                           </div>
                           <p className="text-xs text-slate-500">{contact.label} · {formatPhoneDisplay(contact.phone)}</p>
                         </div>
@@ -5417,15 +5417,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <button
                           type="button"
                           onClick={() => { handleCall(contact.phone, `${contact.label}: ${contact.name}`); setShowContactSelector(null); }}
-                          className="flex-1 h-9 bg-emerald-600 text-white rounded-lg text-[12px] font-medium flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
-                          <Phone size={12} /> {actions.callLabel}
+                          className="flex-1 h-9 bg-emerald-600 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
+                          <Phone size={16} /> {actions.callLabel}
                         </button>
                         {actions.smsLabel && (
                           <button
                             type="button"
                             onClick={() => { handleSMS(contact.phone, contact.name); setShowContactSelector(null); }}
-                            className="flex-1 h-8 bg-blue-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
-                            <MessageCircle size={12} /> {actions.smsLabel}
+                            className="flex-1 h-10 bg-blue-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
+                            <MessageCircle size={16} /> {actions.smsLabel}
                           </button>
                         )}
                       </div>
@@ -5439,8 +5439,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   type="button"
                   onClick={() => { handleSmartCall(showContactSelector); setShowContactSelector(null); }}
-                  className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer">
-                  <Phone size={14} /> Quick Call Primary Contact
+                  className="w-full h-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer">
+                  <Phone size={16} /> Quick Call Primary Contact
                 </button>
               </div>
             </div>
@@ -5472,10 +5472,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         className={`transition-all duration-200 ${isActiveTab ? 'text-[#1b5cb7]' : 'text-[#94a3b8]'}`}
                       />
                       {item.id === 'chat' && chatUnreadCount > 0 && (
-                        <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-semibold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>
+                        <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-xs font-semibold min-w-[14px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm">{chatUnreadCount > 99 ? '99+' : chatUnreadCount}</span>
                       )}
                     </div>
-                    <span className={`max-w-full truncate text-[12px] tracking-wide transition-all leading-none ${isActiveTab ? 'text-[#1b5cb7] font-semibold' : 'text-[#94a3b8] font-medium'}`}>{item.label}</span>
+                    <span className={`max-w-full truncate text-xs tracking-wide transition-all leading-none ${isActiveTab ? 'text-[#1b5cb7] font-semibold' : 'text-[#94a3b8] font-medium'}`}>{item.label}</span>
                   </button>
                 );
               })}
@@ -5486,7 +5486,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {/* Offline Queue Indicator */}
       {offlineQueue.length > 0 && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-amber-600 text-white px-4 py-2 rounded-2xl shadow-lg text-xs font-semibold flex items-center gap-2" style={{ zIndex: 100 }}>
-          <WifiOff size={12} />
+          <WifiOff size={16} />
           {offlineQueue.length} pending sync
         </div>
       )}
@@ -5589,7 +5589,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="mt-1.5 flex items-center gap-2">
                           <span className="text-micro font-semibold uppercase tracking-wide text-slate-500">{label}</span>
                           <button type="button" onClick={() => handleCall(leg.pickupPhone, `${label}: ${leg.patient}`)} className="text-xs text-blue-600 font-medium flex items-center gap-1 hover:underline cursor-pointer">
-                            <Phone size={10} /> {formatPhoneDisplay(leg.pickupPhone)}
+                            <Phone size={16} /> {formatPhoneDisplay(leg.pickupPhone)}
                           </button>
                         </div>
                       );
@@ -5629,10 +5629,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-medium text-slate-600 font-mono">#{leg.bookingId || leg.id}</span>
                         {leg.wheelchair && leg.wheelchair !== 'WLK' && (
-                          <span className="text-[11px] font-semibold bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded">{leg.wheelchair}</span>
+                          <span className="text-xs font-semibold bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded">{leg.wheelchair}</span>
                         )}
                       </div>
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${statusColor(leg.status)}`}>{leg.status}</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${statusColor(leg.status)}`}>{leg.status}</span>
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-start gap-2 text-xs">
@@ -5640,7 +5640,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="flex-1 min-w-0">
                           <p className="text-slate-900 font-semibold leading-tight">{leg.pickupSite || 'Pickup'}</p>
                           <p className="text-slate-500 truncate leading-tight">{leg.pickup}</p>
-                          {leg.pickupPhone && <p className="text-slate-500 text-[11px] font-mono mt-0.5">{leg.pickupPhone}</p>}
+                          {leg.pickupPhone && <p className="text-slate-500 text-xs font-mono mt-0.5">{leg.pickupPhone}</p>}
                         </div>
                       </div>
                       <div className="flex items-start gap-2 text-xs">
@@ -5648,11 +5648,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="flex-1 min-w-0">
                           <p className="text-slate-900 font-semibold leading-tight">{leg.dropoffSite || 'Dropoff'}</p>
                           <p className="text-slate-500 truncate leading-tight">{leg.dropoff}</p>
-                          {leg.dropoffPhone && <p className="text-slate-500 text-[11px] font-mono mt-0.5">{leg.dropoffPhone}</p>}
+                          {leg.dropoffPhone && <p className="text-slate-500 text-xs font-mono mt-0.5">{leg.dropoffPhone}</p>}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-1.5 text-[11px] text-slate-500">
+                    <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500">
                       {leg.time && <span>{leg.time}</span>}
                       {leg.distance && <><span>•</span><span>{leg.distance} mi</span></>}
                     </div>
@@ -5701,15 +5701,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         <button
           type="button"
           onClick={() => setShowDebugPanel(prev => !prev)}
-          className="w-7 h-7 rounded-full bg-black/40 text-white flex items-center justify-center text-[10px] font-mono font-bold hover:bg-black/60 transition-colors"
+          className="w-7 h-7 rounded-full bg-black/40 text-white flex items-center justify-center text-xs font-mono font-semibold hover:bg-black/60 transition-colors"
           title="Toggle debug panel"
         >Dbg</button>
       </div>
       {showDebugPanel && (
-        <div className="fixed bottom-32 left-2 z-[60] min-w-[200px] max-w-[220px] rounded-lg border border-slate-300 bg-slate-950/90 p-2.5 text-[10px] font-mono text-white shadow-xl backdrop-blur">
+        <div className="fixed bottom-32 left-2 z-[60] min-w-[200px] max-w-[220px] rounded-lg border border-slate-300 bg-slate-950/90 p-2.5 text-xs font-mono text-white shadow-xl backdrop-blur">
           <div className="space-y-1">
             <div className="flex items-center justify-between border-b border-white/10 pb-1 mb-1">
-              <span className="font-bold text-[9px] uppercase tracking-wider text-slate-500">GPS Debug</span>
+              <span className="font-semibold text-xs uppercase tracking-wider text-slate-500">GPS Debug</span>
               <button type="button" onClick={() => setShowDebugPanel(false)} className="text-white/50 hover:text-white"><X size={10} /></button>
             </div>
             <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">

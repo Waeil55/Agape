@@ -20,7 +20,7 @@ export function AppTableHead({ children, className = '', ...props }) {
 
 export function AppTableHeadCell({ children, className = '', ...props }) {
   return (
-    <th className="px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider" {...props}>
+    <th className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider" {...props}>
       {children}
     </th>
   );
@@ -51,7 +51,7 @@ export function AppTableRow({ children, className = '', onClick, hover = true, .
 
 export function AppTableCell({ children, className = '', ...props }) {
   return (
-    <td className="px-3 py-2.5 text-xs text-slate-700" {...props}>
+    <td className="px-3 py-1.5 text-xs text-slate-700" {...props}>
       {children}
     </td>
   );

@@ -2436,7 +2436,7 @@ const App = () => {
             <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-slate-900 mb-2 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
               <ShieldCheck size={14} className="text-blue-600" />
-              <p className="text-micro font-semibold text-blue-800 uppercase tracking-[0.18em]">Enterprise Fleet OS</p>
+              <p className="text-xs font-semibold text-blue-800 uppercase tracking-[0.18em]">Enterprise Fleet OS</p>
             </div>
           </div>
 

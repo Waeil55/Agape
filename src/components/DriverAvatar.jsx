@@ -6,8 +6,8 @@ export default function DriverAvatar({ driver, size = 'md', showUpload = false, 
   const fileInputRef = useRef(null);
 
   const sizes = {
-    xs: 'w-6 h-6 text-[9px]',
-    sm: 'w-8 h-8 text-[10px]',
+    xs: 'w-6 h-6 text-xs',
+    sm: 'w-8 h-8 text-xs',
     md: 'w-10 h-10 text-sm',
     lg: 'w-14 h-14 text-lg',
     xl: 'w-20 h-20 text-2xl',
@@ -49,7 +49,7 @@ export default function DriverAvatar({ driver, size = 'md', showUpload = false, 
 
   return (
     <div className="relative inline-block">
-      <div className={`${sizeClass} rounded-full overflow-hidden flex items-center justify-center font-black uppercase shrink-0 ${
+      <div className={`${sizeClass} rounded-full overflow-hidden flex items-center justify-center font-bold uppercase shrink-0 ${
         photoUrl ? '' : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white'
       }`}>
         {photoUrl ? (

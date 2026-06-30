@@ -263,9 +263,16 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       if (cancelled) return;
       const liveTrips = [];
       const corruptedIds = [];
+      const todayKey = new Date().toISOString().slice(0, 10);
       snap.forEach((tripDoc) => {
         const trip = { ...tripDoc.data(), id: tripDoc.id };
         if (trip.source === 'dispatch_upload' || trip.source === 'report_upload') {
+          if (trip.date && trip.date !== todayKey) {
+            const created = trip.createdAt || trip.updatedAtLocal || '';
+            if (String(created).includes(todayKey) && trip.status !== 'Completed') {
+              console.warn(`[DATE CHECK] Trip ${trip.id} created today but date="${trip.date}" (expected "${todayKey}"). Check for UTC date shift.`);
+            }
+          }
           liveTrips.push(normalizeTrip(trip));
           return;
         }

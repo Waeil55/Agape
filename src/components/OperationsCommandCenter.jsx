@@ -214,13 +214,13 @@ const getManifestDensityProfile = (density) => {
         label: '1 Line',
         lineCount: 1,
         cardPadding: 'p-1.5',
-        cardText: 'text-[10px]',
+        cardText: 'text-xs',
         cardTitle: 'text-sm',
         cardTime: 'text-xs',
         sectionGrid: 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]',
-        tableHead: 'px-2 py-1.5',
-        tableCell: 'px-2 py-1.5',
-        tableRowMinHeight: 'min-h-[32px]',
+        tableHead: 'px-3 py-1',
+        tableCell: 'px-3 py-1',
+        tableRowMinHeight: 'min-h-[28px]',
         showPhones: true,
         showNotes: true,
         showRoutes: true,
@@ -239,13 +239,13 @@ const getManifestDensityProfile = (density) => {
         label: '2 Lines',
         lineCount: 2,
         cardPadding: 'p-2',
-        cardText: 'text-[11px]',
+        cardText: 'text-xs',
         cardTitle: 'text-sm',
-        cardTime: 'text-[13px]',
+        cardTime: 'text-xs',
         sectionGrid: 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]',
-        tableHead: 'px-2.5 py-1.5',
-        tableCell: 'px-2.5 py-2',
-        tableRowMinHeight: 'min-h-[48px]',
+        tableHead: 'px-3 py-1',
+        tableCell: 'px-3 py-1',
+        tableRowMinHeight: 'min-h-[32px]',
         showPhones: true,
         showNotes: true,
         showRoutes: true,
@@ -264,13 +264,13 @@ const getManifestDensityProfile = (density) => {
         label: '3 Lines',
         lineCount: 3,
         cardPadding: 'p-2',
-        cardText: 'text-[11px]',
+        cardText: 'text-xs',
         cardTitle: 'text-sm',
-        cardTime: 'text-[13px]',
+        cardTime: 'text-xs',
         sectionGrid: 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]',
-        tableHead: 'px-3 py-2',
-        tableCell: 'px-3 py-2',
-        tableRowMinHeight: 'min-h-[60px]',
+        tableHead: 'px-3 py-1',
+        tableCell: 'px-3 py-1',
+        tableRowMinHeight: 'min-h-[36px]',
         showPhones: true,
         showNotes: true,
         showRoutes: true,
@@ -293,9 +293,9 @@ const getManifestDensityProfile = (density) => {
         cardTitle: 'text-sm',
         cardTime: 'text-sm',
         sectionGrid: 'lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]',
-        tableHead: 'px-3 py-2.5',
-        tableCell: 'px-3 py-2.5',
-        tableRowMinHeight: 'min-h-[72px]',
+        tableHead: 'px-3 py-1',
+        tableCell: 'px-3 py-1',
+        tableRowMinHeight: 'min-h-[40px]',
         showPhones: true,
         showNotes: true,
         showRoutes: true,
@@ -318,9 +318,9 @@ const getManifestDensityProfile = (density) => {
         cardTitle: 'text-sm',
         cardTime: 'text-sm',
         sectionGrid: 'lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]',
-        tableHead: 'px-4 py-3',
-        tableCell: 'px-4 py-3.5',
-        tableRowMinHeight: 'min-h-[104px]',
+        tableHead: 'px-3 py-1',
+        tableCell: 'px-3 py-1',
+        tableRowMinHeight: 'min-h-[44px]',
         showPhones: true,
         showNotes: true,
         showRoutes: true,
@@ -343,9 +343,9 @@ const getManifestDensityProfile = (density) => {
         cardTitle: 'text-sm',
         cardTime: 'text-base',
         sectionGrid: 'lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]',
-        tableHead: 'px-5 py-3.5',
-        tableCell: 'px-5 py-4',
-        tableRowMinHeight: 'min-h-[132px]',
+        tableHead: 'px-3 py-1',
+        tableCell: 'px-3 py-1',
+        tableRowMinHeight: 'min-h-[48px]',
         showPhones: true,
         showNotes: true,
         showRoutes: true,
@@ -369,9 +369,9 @@ const getManifestDensityProfile = (density) => {
         cardTitle: 'text-sm',
         cardTime: 'text-sm',
         sectionGrid: 'lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]',
-        tableHead: 'px-4 py-3',
-        tableCell: 'px-4 py-3',
-        tableRowMinHeight: 'min-h-[88px]',
+        tableHead: 'px-3 py-1',
+        tableCell: 'px-3 py-1',
+        tableRowMinHeight: 'min-h-[40px]',
         showPhones: true,
         showNotes: true,
         showRoutes: true,
@@ -835,7 +835,7 @@ const OperationsCommandCenter = ({
         <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-blue-700">Driver Work</p>
+              <p className="text-xs uppercase tracking-widest text-blue-700">Driver Work</p>
               <p className="text-xs text-blue-900">Assign a driver before running workflow steps.</p>
             </div>
             <button type="button" onClick={() => setManualAssignTrip(trip)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs text-white hover:bg-blue-700">
@@ -856,10 +856,10 @@ const OperationsCommandCenter = ({
       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-2.5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-[10px] uppercase tracking-widest text-slate-500">Driver Work</p>
+            <p className="text-xs uppercase tracking-widest text-slate-500">Driver Work</p>
             <p className="text-xs text-slate-700 truncate">{driver.name} - {driver.vehicle || 'No vehicle'}</p>
           </div>
-          <span className={`rounded-lg px-2 py-1 text-[10px] ${getDriverLiveStatus(driver).color}`}>
+          <span className={`rounded-lg px-2 py-1 text-xs ${getDriverLiveStatus(driver).color}`}>
             {getDriverLiveStatus(driver).label}
           </span>
         </div>
@@ -1013,34 +1013,34 @@ const OperationsCommandCenter = ({
       <div className={`${embeddedInTable ? 'rounded-3xl border border-slate-100/50 bg-slate-50/80 p-4 shadow-sm' : 'mt-2 rounded-3xl border border-slate-100/50 bg-slate-50/80 p-4 shadow-sm'} space-y-3`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700">
+            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700">
               {to12hr(trip.time)}
             </span>
             <span className={`rounded-full px-2 py-0.5 text-xs ${getStatusPillClass(trip.status)}`}>
               {trip.status}
             </span>
             {bookingReference && (
-              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
+              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
                 {bookingReference}
               </span>
             )}
             {clientIdentifier && (
-              <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-[10px] text-violet-700">
+              <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
                 {clientIdentifier}
               </span>
             )}
             {serviceLabel && (
-              <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
+              <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
                 {serviceLabel}
               </span>
             )}
             {passengerTypes && (
-              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
+              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
                 {passengerTypes}
               </span>
             )}
             {spaceTypes && spaceTypes !== passengerTypes && (
-              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-600">
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
                 {spaceTypes}
               </span>
             )}
@@ -1048,7 +1048,7 @@ const OperationsCommandCenter = ({
           <button
             type="button"
             onClick={() => toggleTripExpanded(trip.id)}
-            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-[10px] text-slate-600 hover:bg-slate-50"
+            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
           >
             Collapse
           </button>
@@ -1059,7 +1059,7 @@ const OperationsCommandCenter = ({
             <p className="text-xs uppercase tracking-widest text-blue-700">Pickup</p>
             <div className="mt-2 space-y-2">
               {pickupItems.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-[10px] font-medium text-slate-600">
+                <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
                   <span className="font-bold uppercase tracking-wide text-blue-700">{label}</span>
                   <span className="break-words text-slate-900">{value}</span>
                 </div>
@@ -1071,7 +1071,7 @@ const OperationsCommandCenter = ({
             <p className="text-xs uppercase tracking-widest text-emerald-700">Dropoff</p>
             <div className="mt-2 space-y-2">
               {dropoffItems.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-[10px] font-medium text-slate-600">
+                <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
                   <span className="font-bold uppercase tracking-wide text-emerald-700">{label}</span>
                   <span className="break-words text-slate-900">{value}</span>
                 </div>
@@ -1083,7 +1083,7 @@ const OperationsCommandCenter = ({
             <p className="text-xs uppercase tracking-widest text-slate-500">Manifest Summary</p>
             <div className="mt-2 space-y-2">
               {manifestSummaryItems.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[110px_minmax(0,1fr)] gap-2 text-[10px] font-medium text-slate-600">
+                <div key={label} className="grid grid-cols-[110px_minmax(0,1fr)] gap-2 text-xs font-medium text-slate-600">
                   <span className="font-bold uppercase tracking-wide text-slate-500">{label}</span>
                   <span className="break-words text-slate-900">{value}</span>
                 </div>
@@ -1101,24 +1101,24 @@ const OperationsCommandCenter = ({
                   {routeAssignments.map((route, index) => (
                     <span
                       key={`${route.templateId || route.routeName}-${index}`}
-                      className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700"
+                      className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700"
                     >
                       <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` - ${route.statusLabel}` : ''}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="mt-2 text-[10px] font-medium text-slate-500">Not assigned to a saved route plan.</p>
+                <p className="mt-2 text-xs font-medium text-slate-500">Not assigned to a saved route plan.</p>
               )}
               {(mobility.length > 0 || mobilityAids) && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {mobilityAids && (
-                    <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700">
+                    <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
                       {mobilityAids}
                     </span>
                   )}
                   {mobility.map((tag) => (
-                    <span key={tag} className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700">
+                    <span key={tag} className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
                       {tag}
                     </span>
                   ))}
@@ -1132,10 +1132,10 @@ const OperationsCommandCenter = ({
                 {noteItems.length > 0 ? noteItems.map(([label, value]) => (
                   <div key={label} className="rounded-lg border border-amber-100 bg-amber-50 p-2">
                     <p className="text-xs uppercase tracking-wide text-amber-700">{label}</p>
-                    <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-700 break-words">{value}</p>
+                    <p className="mt-1 text-xs font-medium leading-relaxed text-slate-700 break-words">{value}</p>
                   </div>
                 )) : (
-                  <p className="text-[10px] font-medium text-slate-500">No trip notes recorded.</p>
+                  <p className="text-xs font-medium text-slate-500">No trip notes recorded.</p>
                 )}
               </div>
             </div>
@@ -1149,7 +1149,7 @@ const OperationsCommandCenter = ({
               {extraUploadedFields.map(([label, value]) => (
                 <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-2">
                   <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-                  <p className="mt-1 text-[11px] font-medium break-words text-slate-800">{value}</p>
+                  <p className="mt-1 text-xs font-medium break-words text-slate-800">{value}</p>
                 </div>
               ))}
             </div>
@@ -1240,7 +1240,7 @@ const OperationsCommandCenter = ({
           <button
             key={tab}
             onClick={() => setOperationsTab(tab)}
-            className={`px-2.5 py-1 rounded-full text-[10px] transition-all duration-200 uppercase tracking-wider whitespace-nowrap ${
+            className={`px-2.5 py-1 rounded-full text-xs transition-all duration-200 uppercase tracking-wider whitespace-nowrap ${
               operationsTab === tab
                 ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
                 : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/30'
@@ -1254,30 +1254,30 @@ const OperationsCommandCenter = ({
       <div className="w-px h-5 bg-slate-200 shrink-0"></div>
 
       {/* Trip / Upload / Routes / Map */}
-      <button onClick={() => setShowAddTripModal(true)} className="inline-flex items-center gap-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-2 py-1 text-[10px] text-white transition-colors shrink-0 whitespace-nowrap">
-        <Plus size={12} /> Trip
+      <button onClick={() => setShowAddTripModal(true)} className="inline-flex min-h-[40px] items-center gap-1 rounded-lg bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 text-xs text-white transition-colors shrink-0 whitespace-nowrap">
+        <Plus size={16} /> Trip
       </button>
-      <button onClick={() => setShowUploadModal(true)} className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
-        <UploadCloud size={12} /> Upload
+      <button onClick={() => setShowUploadModal(true)} className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
+        <UploadCloud size={16} /> Upload
       </button>
-      <button onClick={() => onOpenSequencer?.()} className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
-        <Route size={12} /> Routes
+      <button onClick={() => onOpenSequencer?.()} className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
+        <Route size={16} /> Routes
       </button>
-      <button onClick={() => onOpenLiveMap?.()} className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
-        <MapPin size={12} /> Map
+      <button onClick={() => onOpenLiveMap?.()} className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap">
+        <MapPin size={16} /> Map
       </button>
 
       {/* Search */}
       <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 shrink-0">
         <Search size={12} className="text-slate-500" />
-        <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search" className="w-20 bg-transparent text-[10px] font-medium text-slate-700 placeholder:text-slate-500 outline-none" />
+        <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search" className="w-20 bg-transparent text-xs font-medium text-slate-700 placeholder:text-slate-500 outline-none" />
       </div>
 
       <div className="w-px h-5 bg-slate-200 shrink-0"></div>
 
       {/* Sort & Filter: Time, Driver, Status, Client, Urgency */}
       <div className="flex items-center gap-0.5 shrink-0">
-        <span className="text-[12px] text-slate-500 uppercase tracking-wide whitespace-nowrap mr-1">Sort:</span>
+        <span className="text-xs text-slate-500 uppercase tracking-wide whitespace-nowrap mr-1">Sort:</span>
         {[
           { id: 'time', label: 'Time' },
           { id: 'assignment', label: 'Driver' },
@@ -1301,7 +1301,7 @@ const OperationsCommandCenter = ({
             }`}
           >
             {option.label}
-            {sortBy === option.id && (sortDirection === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+            {sortBy === option.id && (sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
           </button>
         ))}
       </div>
@@ -1331,7 +1331,7 @@ const OperationsCommandCenter = ({
             key={option.value}
             type="button"
             onClick={() => setManifestView(option.value)}
-            className={`h-6 rounded-md px-2 text-[9px] uppercase tracking-wide transition-colors whitespace-nowrap ${
+            className={`min-h-[40px] rounded-md px-2 text-xs uppercase tracking-wide transition-colors whitespace-nowrap ${
               manifestView === option.value
                 ? 'bg-slate-900 text-white'
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
@@ -1424,21 +1424,21 @@ const OperationsCommandCenter = ({
         <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50/50 -mx-4 px-4 pb-1">
           <div className="flex items-center gap-2 min-w-0">
             <User size={14} className="text-slate-500 shrink-0" />
-            <span className="text-[11px] font-medium text-slate-700 truncate">
+            <span className="text-xs font-medium text-slate-700 truncate">
               {driver ? driverName : <span className="text-rose-500 italic">Unassigned</span>}
             </span>
           </div>
           <div className="flex items-center gap-2 min-w-0">
             <Car size={14} className="text-slate-500 shrink-0" />
-            <span className="text-[11px] font-medium text-slate-700 truncate">{driverCar}</span>
+            <span className="text-xs font-medium text-slate-700 truncate">{driverCar}</span>
           </div>
           <div className="flex items-center gap-2 min-w-0">
             <Navigation size={14} className="text-slate-500 shrink-0" />
-            <span className="text-[11px] font-medium text-slate-700 truncate">ETA: {etaDisplay}</span>
+            <span className="text-xs font-medium text-slate-700 truncate">ETA: {etaDisplay}</span>
           </div>
           <div className="flex items-center gap-2 min-w-0">
             <MapIcon size={14} className="text-slate-500 shrink-0" />
-            <span className="text-[11px] font-medium text-slate-700 truncate">{routeMileage}</span>
+            <span className="text-xs font-medium text-slate-700 truncate">{routeMileage}</span>
           </div>
         </div>
 
@@ -1510,16 +1510,16 @@ const OperationsCommandCenter = ({
                   <div className="min-w-0">
                     <div className="truncate text-sm text-slate-900">{section.label}</div>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
                         {section.trips.length} trip{section.trips.length !== 1 ? 's' : ''}
                       </span>
                       {section.lateCount > 0 && (
-                        <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] text-rose-700">
+                        <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
                           {section.lateCount} late
                         </span>
                       )}
                       {section.unassignedCount > 0 && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-700">
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
                           {section.unassignedCount} open
                         </span>
                       )}
@@ -1536,13 +1536,13 @@ const OperationsCommandCenter = ({
             ))}
           </div>
 
-          <div className="mt-3 flex items-center justify-between rounded-3xl border border-slate-100/50 bg-white px-4 py-3 text-[11px] font-medium text-slate-500 shadow-sm">
+          <div className="mt-3 flex items-center justify-between rounded-3xl border border-slate-100/50 bg-white px-4 py-3 text-xs font-medium text-slate-500 shadow-sm">
             <span>Showing {visibleTrips.length} of {manifestFeedTrips.length} manifest trips</span>
             {manifestFeedTrips.length > visibleTrips.length && (
               <button
                 type="button"
                 onClick={() => setManifestLimit((prev) => prev + 150)}
-                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-700 hover:bg-slate-100"
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
               >
                 Load 150 More
               </button>
@@ -1671,7 +1671,7 @@ const OperationsCommandCenter = ({
                               {to12hr(trip.time)}
                             </span>
                             {minsUntil !== null && (
-                              <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md shrink-0">
+                              <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md shrink-0">
                                 in {minsUntil} min
                               </span>
                             )}
@@ -1682,7 +1682,7 @@ const OperationsCommandCenter = ({
                           </span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
-                          <span className="text-[11px] text-slate-500">{distance !== '—' ? `${distance} mi` : '—'}</span>
+                          <span className="text-xs text-slate-500">{distance !== '—' ? `${distance} mi` : '—'}</span>
                           {routeLegs.length > 0 && (
                             <span className="border border-slate-200 text-slate-600 text-xs px-2 py-0.5 rounded-md">
                               {routeLegs.length} LEG{routeLegs.length !== 1 ? 'S' : ''}
@@ -1819,7 +1819,7 @@ const OperationsCommandCenter = ({
               })}
             </div>
 
-            <div className="mt-3 flex items-center justify-between rounded-3xl border border-slate-100/50 bg-white px-4 py-3 text-[11px] font-medium text-slate-500 shadow-sm">
+            <div className="mt-3 flex items-center justify-between rounded-3xl border border-slate-100/50 bg-white px-4 py-3 text-xs font-medium text-slate-500 shadow-sm">
               <span>
                 Showing {visibleTrips.length} of {manifestFeedTrips.length} trip
                 {manifestFeedTrips.length !== 1 ? 's' : ''}
@@ -1828,7 +1828,7 @@ const OperationsCommandCenter = ({
                 <button
                   type="button"
                   onClick={() => setManifestLimit((prev) => prev + 150)}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-700 hover:bg-slate-100"
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
                 >
                   Load 150 More
                 </button>
@@ -1859,13 +1859,13 @@ const OperationsCommandCenter = ({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm text-slate-900">Dispatch Ledger</p>
-                <p className="text-[11px] font-medium text-slate-500">
+                <p className="text-xs font-medium text-slate-500">
                   Structured manifest view with richer client detail, routing context, and driver assignment controls.
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] text-slate-600">{densityProfile.label} view</span>
-                <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] text-blue-700">{visibleTrips.length} visible</span>
+                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600">{densityProfile.label} view</span>
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs text-blue-700">{visibleTrips.length} visible</span>
               </div>
             </div>
           </div>
@@ -1976,21 +1976,21 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-center`}>
-                          <span className="text-[10px] font-mono text-slate-500">{trip.bookingId || trip.id || '—'}</span>
+                          <span className="text-xs font-mono text-slate-500">{trip.bookingId || trip.id || '—'}</span>
                         </div>
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} flex-col ${densityProfile.lineCount >= 3 ? 'justify-between' : 'justify-center'}`}>
-                          <div className={`font-mono ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-emerald-600'} ${manifestDensity === 'executive' ? 'text-lg' : manifestDensity === 'dense' ? 'text-[13px]' : densityProfile.lineCount <= 2 ? 'text-[13px]' : 'text-base'}`}>
+                          <div className={`font-mono ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-emerald-600'} ${manifestDensity === 'executive' ? 'text-lg' : manifestDensity === 'dense' ? 'text-xs' : densityProfile.lineCount <= 2 ? 'text-xs' : 'text-base'}`}>
                             {to12hr(trip.time)}
                           </div>
                           {densityProfile.lineCount >= 2 && densityProfile.showStatusMeta && (
-                            <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                            <div className="text-xs uppercase tracking-wide text-slate-500">
                               {urgency === 'late' ? 'Late risk' : urgency === 'soon' ? 'Starts soon' : 'On schedule'}
                             </div>
                           )}
                           {densityProfile.lineCount >= 3 && densityProfile.showStatusMeta && routeAssignments.length > 0 && (
-                            <div className="text-[10px] text-indigo-700">
+                            <div className="text-xs text-indigo-700">
                               {routeAssignments.length} routed stop{routeAssignments.length !== 1 ? 's' : ''}
                             </div>
                           )}
@@ -1998,27 +1998,27 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} flex-col ${densityProfile.lineCount >= 3 ? 'justify-between' : 'justify-center'} ${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'gap-1.5' : 'gap-2') : 'gap-0.5'}`}>
-                          <div className={`leading-snug text-slate-900 ${manifestDensity === 'executive' ? 'text-[11px]' : densityProfile.lineCount <= 2 ? 'text-[10px]' : 'text-[11px]'}`}>
+                          <div className={`leading-snug text-slate-900 ${manifestDensity === 'executive' ? 'text-xs' : densityProfile.lineCount <= 2 ? 'text-xs' : 'text-xs'}`}>
                             {trip.patient || 'Unnamed Client'}
                           </div>
                           {densityProfile.lineCount <= 2 ? (
                             densityProfile.lineCount === 2 && clientSummary && (
-                              <div className="text-[10px] text-slate-500 truncate">{clientSummary}</div>
+                              <div className="text-xs text-slate-500 truncate">{clientSummary}</div>
                             )
                           ) : (
                             <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} flex flex-wrap gap-1`}>
                               {bookingReference && (
-                                <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
+                                <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
                                   {bookingReference}
                                 </span>
                               )}
                               {clientIdentifier && (
-                                <span className="inline-flex items-center rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-[10px] text-violet-700">
+                                <span className="inline-flex items-center rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
                                   {clientIdentifier}
                                 </span>
                               )}
                               {(trip.type || trip.serviceType) && (
-                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
+                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
                                   {trip.type || trip.serviceType}
                                 </span>
                               )}
@@ -2027,16 +2027,16 @@ const OperationsCommandCenter = ({
                           {densityProfile.lineCount >= 3 && (
                             <div className={isLeanDensity ? 'space-y-0.5' : 'space-y-1'}>
                               {clientPhone && (
-                                <div className="text-[10px] text-emerald-700">Client {clientPhone}</div>
+                                <div className="text-xs text-emerald-700">Client {clientPhone}</div>
                               )}
                               {densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && (
-                                <div className="text-[10px] text-emerald-700">Pickup desk {pickupPhone}</div>
+                                <div className="text-xs text-emerald-700">Pickup desk {pickupPhone}</div>
                               )}
                               {densityProfile.showSecondaryPhones && dropoffPhone && (
-                                <div className="text-[10px] text-rose-700">Hospital {dropoffPhone}</div>
+                                <div className="text-xs text-rose-700">Hospital {dropoffPhone}</div>
                               )}
                               {densityProfile.showNotesPreview && trip.notes && (
-                                <div className="text-[10px] font-medium leading-relaxed text-amber-700" style={getClampStyle(densityProfile.noteLines)}>
+                                <div className="text-xs font-medium leading-relaxed text-amber-700" style={getClampStyle(densityProfile.noteLines)}>
                                   Notes: {trip.notes}
                                 </div>
                               )}
@@ -2046,50 +2046,50 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] text-slate-700 truncate`}>
+                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-xs text-slate-700 truncate`}>
                             {trip.pickup || '—'}
                           </div>
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-blue-100 bg-blue-50/70 rounded-lg px-2 py-1' : 'border border-blue-100 bg-blue-50/70 rounded-2xl px-3 py-2'}`}>
                             {densityProfile.lineCount >= 3 && <div className="text-xs uppercase tracking-wide text-blue-700 truncate">Pickup</div>}
                             {densityProfile.lineCount >= 3 && densityProfile.showFacilityNames && pickupFacilityName && (
-                              <div className="text-[10px] uppercase tracking-wide text-blue-800 truncate">{pickupFacilityName}</div>
+                              <div className="text-xs uppercase tracking-wide text-blue-800 truncate">{pickupFacilityName}</div>
                             )}
-                            <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
+                            <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-xs' : 'mt-1 text-xs') : 'text-xs'} leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
                               {trip.pickup || 'Missing pickup address'}
                             </div>
                             {densityProfile.lineCount >= 3 && clientPhone && (
-                              <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-blue-700`}>{clientPhone}</div>
+                              <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-xs font-medium text-blue-700`}>{clientPhone}</div>
                             )}
                             {densityProfile.lineCount >= 3 && densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && (
-                              <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-blue-700`}>Desk {pickupPhone}</div>
+                              <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-xs font-medium text-blue-700`}>Desk {pickupPhone}</div>
                             )}
                           </div>
                         )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] text-slate-700 truncate`}>
+                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-xs text-slate-700 truncate`}>
                             {trip.dropoff || '—'}
                           </div>
                         ) : (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-emerald-100 bg-emerald-50/70 rounded-lg px-2 py-1' : 'border border-emerald-100 bg-emerald-50/70 rounded-2xl px-3 py-2'}`}>
                             {densityProfile.lineCount >= 3 && <div className="text-xs uppercase tracking-wide text-emerald-700 truncate">Dropoff</div>}
                             {densityProfile.lineCount >= 3 && densityProfile.showFacilityNames && dropoffFacilityName && (
-                              <div className="text-[10px] uppercase tracking-wide text-emerald-800 truncate">{dropoffFacilityName}</div>
+                              <div className="text-xs uppercase tracking-wide text-emerald-800 truncate">{dropoffFacilityName}</div>
                             )}
-                            <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]') : 'text-[10px]'} leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
+                            <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-0.5 text-xs' : 'mt-1 text-xs') : 'text-xs'} leading-snug text-slate-800 truncate`} style={getClampStyle(densityProfile.lineCount)}>
                               {trip.dropoff || 'Missing dropoff address'}
                             </div>
                             {densityProfile.lineCount >= 3 && densityProfile.showSecondaryPhones && dropoffPhone && (
-                              <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium text-emerald-700`}>Hospital {dropoffPhone}</div>
+                              <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-xs font-medium text-emerald-700`}>Hospital {dropoffPhone}</div>
                             )}
                           </div>
                         )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-[10px] truncate`}>
+                          <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-xs truncate`}>
                             {driver ? (
                               <span className="text-slate-800">{driver.name}</span>
                             ) : (
@@ -2099,13 +2099,13 @@ const OperationsCommandCenter = ({
                         ) : densityProfile.lineCount === 2 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-center ${isLeanDensity ? 'border border-slate-200 bg-slate-50 rounded-lg px-2 py-1' : 'rounded-2xl px-3 py-2'} ${densityProfile.showExecutiveAccent ? 'bg-slate-900 text-white' : 'bg-slate-50'}`}>
                             {driver ? (
-                              <div className="text-[11px] text-slate-900 truncate">{driver.name}</div>
+                              <div className="text-xs text-slate-900 truncate">{driver.name}</div>
                             ) : (
-                              <div className="text-[11px] text-rose-600 truncate">Awaiting assignment</div>
+                              <div className="text-xs text-rose-600 truncate">Awaiting assignment</div>
                             )}
                             {routeAssignments.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-0.5">
-                                <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] text-indigo-700">
+                                <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700">
                                   {routeAssignments[0].routeName}{routeAssignments.length > 1 ? ` +${routeAssignments.length - 1}` : ''}
                                 </span>
                               </div>
@@ -2117,24 +2117,24 @@ const OperationsCommandCenter = ({
                               <div className={`text-xs uppercase tracking-wide ${densityProfile.showExecutiveAccent ? 'text-slate-300' : 'text-slate-500'}`}>Driver</div>
                               {driver ? (
                                 <>
-                                  <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[11px] ${densityProfile.showExecutiveAccent ? 'text-white' : 'text-slate-900'}`}>{driver.name}</div>
+                                  <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-xs ${densityProfile.showExecutiveAccent ? 'text-white' : 'text-slate-900'}`}>{driver.name}</div>
                                   {densityProfile.showAssignmentMeta && densityProfile.lineCount >= 3 && (
-                                    <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[10px] font-medium leading-snug ${densityProfile.showExecutiveAccent ? 'text-slate-300' : 'text-slate-500'}`}>{driver.vehicle || driver.status || 'Driver active'}</div>
+                                    <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-xs font-medium leading-snug ${densityProfile.showExecutiveAccent ? 'text-slate-300' : 'text-slate-500'}`}>{driver.vehicle || driver.status || 'Driver active'}</div>
                                   )}
                                   {densityProfile.lineCount >= 4 && driver.homeAddress && (
-                                    <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[9px] font-medium truncate text-slate-500`}>
+                                    <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-xs font-medium truncate text-slate-500`}>
                                       <MapPin size={9} className="inline mr-0.5" />{driver.homeAddress}
                                     </div>
                                   )}
                                 </>
                               ) : (
-                                <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-[11px] text-rose-600`}>Awaiting assignment</div>
+                                <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} text-xs text-rose-600`}>Awaiting assignment</div>
                               )}
                             </div>
                             {routeAssignments.length > 0 && (
                               <div className={`${isLeanDensity ? 'mt-1' : 'mt-2'} flex flex-wrap gap-1`}>
                                 {visibleRouteAssignments.map((route, routeIndex) => (
-                                  <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700">
+                                  <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700">
                                     {route.routeName}{route.time ? ` @ ${route.time}` : ''}
                                   </span>
                                 ))}
@@ -2146,7 +2146,7 @@ const OperationsCommandCenter = ({
                       <td className={`${densityProfile.tableCell} align-top`}>
                         {densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center`}>
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] ${getStatusPillClass(trip.status)}`}>
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs ${getStatusPillClass(trip.status)}`}>
                               {trip.status}
                             </span>
                           </div>
@@ -2167,7 +2167,7 @@ const OperationsCommandCenter = ({
                               </div>
                             )}
                             {densityProfile.lineCount >= 2 && (
-                              <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-1' : 'mt-2') : 'mt-0.5'} text-[10px] text-slate-500 truncate`}>
+                              <div className={`${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'mt-1' : 'mt-2') : 'mt-0.5'} text-xs text-slate-500 truncate`}>
                                 {bookingReference
                                   ? `${bookingReference}`
                                   : clientIdentifier
@@ -2180,13 +2180,13 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-center justify-center`}>
-                          <button onClick={(e) => { e.stopPropagation(); setSmsConversationTrip(trip); }} className="rounded-lg p-1 hover:bg-slate-100 transition-colors" title="View messages">
+                          <button onClick={(e) => { e.stopPropagation(); setSmsConversationTrip(trip); }} className="min-h-[40px] rounded-lg p-2 hover:bg-slate-100 transition-colors" title="View messages">
                             {trip.clientConfirmation === 'confirmed' ? (
-                              <CheckCircle2 size={14} className="text-emerald-500" />
+                              <CheckCircle2 size={16} className="text-emerald-500" />
                             ) : trip.clientConfirmation === 'not_coming' ? (
-                              <XCircle size={14} className="text-rose-500" />
+                              <XCircle size={16} className="text-rose-500" />
                             ) : (
-                              <MessageSquare size={14} className="text-slate-300 hover:text-slate-500" />
+                              <MessageSquare size={16} className="text-slate-300 hover:text-slate-500" />
                             )}
                           </button>
                         </div>
@@ -2195,29 +2195,29 @@ const OperationsCommandCenter = ({
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-center gap-1`} onClick={(e) => e.stopPropagation()}>
                           {clientPhone && (
                             <button onClick={() => makeCall(trip.patientPhone || trip.pickupPhone, trip.patient)}
-                              className="rounded-lg p-1 text-emerald-600 hover:bg-emerald-100"
+                              className="min-h-[40px] rounded-lg p-2 text-emerald-600 hover:bg-emerald-100"
                               title="Call client">
-                              <Phone size={12} />
+                              <Phone size={16} />
                             </button>
                           )}
                           {clientPhone && (
-                            <button onClick={() => openSmsForTrip(trip)} className="rounded-lg p-1 text-blue-600 hover:bg-blue-100" title="Text client"><MessageSquare size={12} /></button>
+                            <button onClick={() => openSmsForTrip(trip)} className="min-h-[40px] rounded-lg p-2 text-blue-600 hover:bg-blue-100" title="Text client"><MessageSquare size={16} /></button>
                           )}
                           <>
-                            <button onClick={() => triggerSmartAssign(trip)} className="rounded-lg p-1 text-indigo-600 hover:bg-indigo-100" title="AI assign"><BrainCircuit size={12} /></button>
-                            <button onClick={() => setManualAssignTrip(trip)} className="rounded-lg p-1 text-blue-600 hover:bg-blue-100" title="Assign driver"><Users size={12} /></button>
+                            <button onClick={() => triggerSmartAssign(trip)} className="min-h-[40px] rounded-lg p-2 text-indigo-600 hover:bg-indigo-100" title="AI assign"><BrainCircuit size={16} /></button>
+                            <button onClick={() => setManualAssignTrip(trip)} className="min-h-[40px] rounded-lg p-2 text-blue-600 hover:bg-blue-100" title="Assign driver"><Users size={16} /></button>
                           </>
-                          <button onClick={() => setEditTrip(trip)} className="rounded-lg p-1 text-slate-500 hover:bg-blue-100 hover:text-blue-600" title="Edit trip"><Edit2 size={12} /></button>
+                          <button onClick={() => setEditTrip(trip)} className="min-h-[40px] rounded-lg p-2 text-slate-500 hover:bg-blue-100 hover:text-blue-600" title="Edit trip"><Edit2 size={16} /></button>
                           {hasPermission(role, 'canDeleteTrip') && (
-                            <button onClick={() => requestDeleteTrip(trip.id)} className="rounded-lg p-1 text-slate-500 hover:bg-rose-100 hover:text-rose-600" title="Archive trip"><Archive size={12} /></button>
+                            <button onClick={() => requestDeleteTrip(trip.id)} className="min-h-[40px] rounded-lg p-2 text-slate-500 hover:bg-rose-100 hover:text-rose-600" title="Archive trip"><Archive size={16} /></button>
                           )}
                           <button
                             type="button"
                             onClick={() => toggleTripExpanded(trip.id)}
-                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                            className="min-h-[40px] rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                             title={isExpanded ? 'Collapse trip details' : 'Expand trip details'}
                           >
-                            {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                           </button>
                         </div>
                       </td>
@@ -2236,14 +2236,14 @@ const OperationsCommandCenter = ({
             </table>
           </div>
 
-          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-4 py-2 text-micro text-slate-500">
+          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-500">
             <div className="flex items-center gap-3">
               <span>Showing {visibleTrips.length} of {manifestFeedTrips.length} trip{manifestFeedTrips.length !== 1 ? 's' : ''}</span>
               {manifestFeedTrips.length > visibleTrips.length && (
                 <button
                   type="button"
                   onClick={() => setManifestLimit((prev) => prev + 150)}
-                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-[10px] text-slate-600 hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
                 >
                   Load 150 More
                 </button>
@@ -2299,12 +2299,12 @@ const OperationsCommandCenter = ({
                     </div>
                     <div>
                       <p className="text-sm text-slate-900">{d.name || 'Unknown Driver'}</p>
-                      <p className="text-micro text-slate-500">{d.vehicle}</p>
+                      <p className="text-xs text-slate-500">{d.vehicle}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5">
-                      <span className={`px-2 py-0.5 rounded text-[9px] ${getDriverLiveStatus(d).color}`}>
+                      <span className={`px-2 py-0.5 rounded text-xs ${getDriverLiveStatus(d).color}`}>
                         {getDriverLiveStatus(d).label}
                       </span>
                     </div>
@@ -2313,7 +2313,7 @@ const OperationsCommandCenter = ({
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 mt-2.5 text-micro text-slate-500">
+                <div className="flex items-center gap-3 mt-2.5 text-xs text-slate-500">
                   <span className="flex items-center gap-1"><MapPin size={10} /> {d.currentZone}</span>
                   <span className="opacity-50">|</span>
                   <span>{d.odometer?.toLocaleString()} mi</span>
@@ -2330,7 +2330,7 @@ const OperationsCommandCenter = ({
                 <div className="animate-scale-in bg-slate-50 border-t border-slate-100">
                   {driverTrips.length > 0 ? (
                     <div className="p-3 space-y-1.5">
-                      <p className="text-micro uppercase tracking-wide text-slate-500 px-1">Active Trips ({driverTrips.length})</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-500 px-1">Active Trips ({driverTrips.length})</p>
                       {driverTrips.map(t => {
                         const isTripCardExpanded = isTripExpanded(t.id);
                         const bookingReference = getBookingReference(t);
@@ -2347,32 +2347,32 @@ const OperationsCommandCenter = ({
                             <div className="min-w-0">
                               <p className="text-xs font-medium text-slate-900 truncate">{t.patient}</p>
                               {densityProfile.lineCount <= 2 ? (
-                                <div className="mt-0.5 text-[10px] text-slate-500" style={getClampStyle(densityProfile.lineCount)}>
+                                <div className="mt-0.5 text-xs text-slate-500" style={getClampStyle(densityProfile.lineCount)}>
                                   {[bookingReference, clientIdentifier && `ID ${clientIdentifier}`, (t.type || t.serviceType)].filter(Boolean).join(' • ')}
                                 </div>
                               ) : (
                               <div className="mt-1 flex flex-wrap gap-1">
                                 {bookingReference && (
-                                  <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700">
+                                  <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700">
                                     {bookingReference}
                                   </span>
                                 )}
                                 {clientIdentifier && (
-                                  <span className="inline-flex items-center rounded-full border border-violet-100 bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700">
+                                  <span className="inline-flex items-center rounded-full border border-violet-100 bg-violet-50 px-1.5 py-0.5 text-xs text-violet-700">
                                     {clientIdentifier}
                                   </span>
                                 )}
                                 {(t.type || t.serviceType) && (
-                                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
                                     {t.type || t.serviceType}
                                   </span>
                                 )}
                               </div>
                               )}
                             </div>
-                            <span className="text-micro font-mono text-emerald-600 font-semibold">{to12hr(t.time)}</span>
+                            <span className="text-xs font-mono text-emerald-600 font-semibold">{to12hr(t.time)}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 mt-1.5 text-micro">
+                          <div className="flex items-center gap-1.5 mt-1.5 text-xs">
                             <span className="truncate text-blue-600" style={getClampStyle(1)}>{t.pickup}</span>
                             <ArrowRight size={8} className="shrink-0 text-slate-500 opacity-50" />
                             <span className="truncate text-emerald-600" style={getClampStyle(1)}>{t.dropoff}</span>
@@ -2381,27 +2381,27 @@ const OperationsCommandCenter = ({
                             <div className="mt-1.5 space-y-1">
                               <div className="flex flex-wrap gap-1">
                               {clientPhone && (
-                                <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                                <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700">
                                   Client {clientPhone}
                                 </span>
                               )}
                               {densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && (
-                                <span className="inline-flex items-center rounded-full border border-cyan-100 bg-cyan-50 px-1.5 py-0.5 text-[10px] font-medium text-cyan-700">
+                                <span className="inline-flex items-center rounded-full border border-cyan-100 bg-cyan-50 px-1.5 py-0.5 text-xs font-medium text-cyan-700">
                                   Pickup desk {pickupPhone}
                                 </span>
                               )}
                               {densityProfile.showSecondaryPhones && dropoffPhone && (
-                                <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                                <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
                                   Hospital {dropoffPhone}
                                 </span>
                               )}
                               {visibleRouteAssignments.map((route, routeIndex) => (
-                                <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">
+                                <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-700">
                                   <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}
                                 </span>
                               ))}
                               </div>
-                              {densityProfile.showNotesPreview && t.notes && <div className="text-[10px] font-medium leading-relaxed text-amber-700" style={getClampStyle(densityProfile.noteLines)}>Notes: {t.notes}</div>}
+                              {densityProfile.showNotesPreview && t.notes && <div className="text-xs font-medium leading-relaxed text-amber-700" style={getClampStyle(densityProfile.noteLines)}>Notes: {t.notes}</div>}
                             </div>
                           )}
                           </div>
@@ -2418,11 +2418,11 @@ const OperationsCommandCenter = ({
                   )}
                   {d.phone && (
                     <div className="px-3 pb-3 flex gap-2">
-                      <button onClick={() => makeCall(d.phone, d.name)} className="flex-1 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-medium transition-all duration-200 flex items-center justify-center gap-1.5 hover:bg-emerald-100">
-                        <Phone size={12} /> Call
+                      <button onClick={() => makeCall(d.phone, d.name)} className="flex-1 min-h-[40px] py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-medium transition-all duration-200 flex items-center justify-center gap-1.5 hover:bg-emerald-100">
+                        <Phone size={16} /> Call
                       </button>
-                      <button onClick={() => sendSMS(d.phone, d.name)} className="flex-1 py-2 bg-blue-50 border border-blue-100 text-blue-700 rounded-xl text-xs font-medium transition-all duration-200 flex items-center justify-center gap-1.5 hover:bg-blue-100">
-                        <MessageSquare size={12} /> SMS
+                      <button onClick={() => sendSMS(d.phone, d.name)} className="flex-1 min-h-[40px] py-2 bg-blue-50 border border-blue-100 text-blue-700 rounded-xl text-xs font-medium transition-all duration-200 flex items-center justify-center gap-1.5 hover:bg-blue-100">
+                        <MessageSquare size={16} /> SMS
                       </button>
                     </div>
                   )}
@@ -2478,20 +2478,20 @@ const OperationsCommandCenter = ({
                 <div className={`flex items-start justify-between gap-3 ${isLeanDensity ? 'mb-2.5' : 'mb-4'}`}>
                   <div className="flex-1 min-w-0">
                     {densityProfile.lineCount <= 2 ? (
-                      <div className="text-[10px] text-slate-500" style={getClampStyle(densityProfile.lineCount)}>
+                      <div className="text-xs text-slate-500" style={getClampStyle(densityProfile.lineCount)}>
                         {['Will Call', bookingReference, clientIdentifier && `ID ${clientIdentifier}`, (t.type || t.serviceType)].filter(Boolean).join(' • ')}
                       </div>
                     ) : (
                     <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                      <span className="px-2 py-0.5 rounded-md text-micro uppercase tracking-wide bg-slate-100 text-slate-700">Will Call</span>
+                      <span className="px-2 py-0.5 rounded-md text-xs uppercase tracking-wide bg-slate-100 text-slate-700">Will Call</span>
                       {bookingReference && (
-                        <span className="px-2 py-0.5 rounded-md text-micro bg-blue-50 text-blue-700 border border-blue-100">{bookingReference}</span>
+                        <span className="px-2 py-0.5 rounded-md text-xs bg-blue-50 text-blue-700 border border-blue-100">{bookingReference}</span>
                       )}
                       {clientIdentifier && (
-                        <span className="px-2 py-0.5 rounded-md text-micro bg-violet-50 text-violet-700 border border-violet-100">{clientIdentifier}</span>
+                        <span className="px-2 py-0.5 rounded-md text-xs bg-violet-50 text-violet-700 border border-violet-100">{clientIdentifier}</span>
                       )}
                       {(t.type || t.serviceType) && (
-                        <span className="px-2 py-0.5 rounded-md text-micro bg-slate-100 text-slate-600 border border-slate-200">{t.type || t.serviceType}</span>
+                        <span className="px-2 py-0.5 rounded-md text-xs bg-slate-100 text-slate-600 border border-slate-200">{t.type || t.serviceType}</span>
                       )}
                     </div>
                     )}
@@ -2499,22 +2499,22 @@ const OperationsCommandCenter = ({
                     {(clientPhone || pickupPhone || dropoffPhone || routeAssignments.length > 0) && (
                       <div className={`${isLeanDensity ? 'mt-1' : 'mt-2'} flex flex-wrap gap-1`}>
                         {clientPhone && (
-                          <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
+                          <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
                             Client {clientPhone}
                           </span>
                         )}
                         {densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && (
-                          <span className="inline-flex items-center rounded-full border border-cyan-100 bg-cyan-50 px-2 py-0.5 text-[10px] text-cyan-700">
+                          <span className="inline-flex items-center rounded-full border border-cyan-100 bg-cyan-50 px-2 py-0.5 text-xs text-cyan-700">
                             Pickup desk {pickupPhone}
                           </span>
                         )}
                         {densityProfile.showSecondaryPhones && dropoffPhone && (
-                          <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-700">
+                          <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
                             Hospital {dropoffPhone}
                           </span>
                         )}
                         {visibleRouteAssignments.map((route, routeIndex) => (
-                          <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">
+                          <span key={`${route.templateId || route.routeName}-${routeIndex}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">
                             <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}
                           </span>
                         ))}
@@ -2522,9 +2522,9 @@ const OperationsCommandCenter = ({
                     )}
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => setEditTrip(t)} className="p-1.5 rounded hover:bg-blue-100 text-slate-500 hover:text-blue-600 transition-colors" title="Edit"><Edit2 size={14} /></button>
+                    <button onClick={() => setEditTrip(t)} className="min-h-[40px] p-2 rounded hover:bg-blue-100 text-slate-500 hover:text-blue-600 transition-colors" title="Edit"><Edit2 size={16} /></button>
                     {hasPermission(role, 'canDeleteTrip') && (
-                      <button onClick={() => requestDeleteTrip(t.id)} className="p-1.5 rounded hover:bg-rose-100 text-slate-500 hover:text-rose-600 transition-colors" title="Archive Trip"><Archive size={14} /></button>
+                      <button onClick={() => requestDeleteTrip(t.id)} className="min-h-[40px] p-2 rounded hover:bg-rose-100 text-slate-500 hover:text-rose-600 transition-colors" title="Archive Trip"><Archive size={16} /></button>
                     )}
                   </div>
                 </div>
@@ -2535,9 +2535,9 @@ const OperationsCommandCenter = ({
                       <MapPin size={16} className="text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
-                      <p className="text-micro uppercase tracking-wide text-slate-500 mb-0.5">Pickup</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-500 mb-0.5">Pickup</p>
                       <p className="text-blue-600 text-sm" style={getClampStyle(densityProfile.lineCount)}>{t.pickup}</p>
-                      {densityProfile.showFacilityNames && getPickupFacilityName(t) && <p className="mt-1 text-[10px] uppercase tracking-wide text-blue-700">{getPickupFacilityName(t)}</p>}
+                      {densityProfile.showFacilityNames && getPickupFacilityName(t) && <p className="mt-1 text-xs uppercase tracking-wide text-blue-700">{getPickupFacilityName(t)}</p>}
                     </div>
                   </div>
                   <div className={`bg-white rounded-xl border border-slate-200 ${isLeanDensity ? 'p-2' : 'p-2.5'} shadow-sm flex items-start gap-3`}>
@@ -2545,15 +2545,15 @@ const OperationsCommandCenter = ({
                       <MapPin size={16} className="text-emerald-600" />
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
-                      <p className="text-micro uppercase tracking-wide text-slate-500 mb-0.5">Dropoff</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-500 mb-0.5">Dropoff</p>
                       <p className="text-emerald-600 text-sm" style={getClampStyle(densityProfile.lineCount)}>{t.dropoff}</p>
-                      {densityProfile.showFacilityNames && getDropoffFacilityName(t) && <p className="mt-1 text-[10px] uppercase tracking-wide text-emerald-700">{getDropoffFacilityName(t)}</p>}
+                      {densityProfile.showFacilityNames && getDropoffFacilityName(t) && <p className="mt-1 text-xs uppercase tracking-wide text-emerald-700">{getDropoffFacilityName(t)}</p>}
                     </div>
                   </div>
                 </div>
                 {densityProfile.showNotesPreview && t.notes && (
                   <div className={`${isLeanDensity ? 'mt-2' : 'mt-3'} rounded-xl border border-amber-200 bg-amber-50 p-2.5`}>
-                    <p className="text-micro uppercase tracking-wide text-amber-700">Notes</p>
+                    <p className="text-xs uppercase tracking-wide text-amber-700">Notes</p>
                     <p className="mt-1 text-xs font-medium leading-relaxed text-amber-800" style={getClampStyle(densityProfile.noteLines)}>{t.notes}</p>
                   </div>
                 )}

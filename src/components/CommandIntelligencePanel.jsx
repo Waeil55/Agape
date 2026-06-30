@@ -38,12 +38,12 @@ const MetricCard = ({ icon: Icon, label, value, detail, tone = 'slate' }) => {
   return (
     <div className={`rounded-lg border ${tc.border} ${tc.bg} px-3 py-2.5 min-w-0`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 truncate">{label}</span>
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-500 truncate">{label}</span>
         <Icon size={14} className={tc.text} />
       </div>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className={`text-xl font-black tabular-nums ${tc.text}`}>{value}</span>
-        <span className="text-[10px] font-semibold text-slate-500 truncate">{detail}</span>
+        <span className={`text-xl font-bold tabular-nums ${tc.text}`}>{value}</span>
+        <span className="text-xs font-semibold text-slate-500 truncate">{detail}</span>
       </div>
     </div>
   );
@@ -197,14 +197,14 @@ const CommandIntelligencePanel = ({
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
+              <span className={`px-2 py-0.5 rounded-md border text-xs font-bold uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
                 {aiInsights ? 'AI Intelligence' : 'Operations Monitor'}
               </span>
-              <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
+              <span className={`px-2 py-0.5 rounded-md border text-xs font-bold uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
                 {riskLabel} {heuristic.score}
               </span>
             </div>
-            <p className="text-[10px] font-semibold text-slate-500 mt-0.5">
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">
               {aiInsights ? aiInsights.summary.substring(0, 80) + (aiInsights.summary.length > 80 ? '...' : '') : `Live ops updated ${updatedAt}`}
             </p>
           </div>
@@ -217,7 +217,7 @@ const CommandIntelligencePanel = ({
           <div className="flex items-start gap-2.5 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-lg px-3 py-2.5">
             <Sparkles size={14} className="text-indigo-600 mt-0.5 shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-0.5">AI Recommendation</p>
+              <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-0.5">AI Recommendation</p>
               <p className="text-xs text-indigo-800 leading-relaxed">{aiInsights.aiRecommendedAction}</p>
             </div>
           </div>
@@ -240,9 +240,9 @@ const CommandIntelligencePanel = ({
             <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <AlertTriangle size={14} className="text-amber-600" />
-                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Exception Queue</h3>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Exception Queue</h3>
               </div>
-              <span className="text-[10px] font-black text-slate-400 tabular-nums">{exceptions.length} active</span>
+              <span className="text-xs font-bold text-slate-500 tabular-nums">{exceptions.length} active</span>
             </div>
             <div className="divide-y divide-slate-100">
               {exceptions.length === 0 ? (
@@ -261,12 +261,12 @@ const CommandIntelligencePanel = ({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-slate-900 truncate">{item.title}</span>
-                        <span className={`text-[10px] font-black tabular-nums ${tone.text}`}>{item.count}</span>
+                        <span className="text-xs font-bold text-slate-900 truncate">{item.title}</span>
+                        <span className={`text-xs font-bold tabular-nums ${tone.text}`}>{item.count}</span>
                       </div>
-                      <p className="text-[10px] font-semibold text-slate-500 truncate mt-0.5">{item.detail}</p>
+                      <p className="text-xs font-semibold text-slate-500 truncate mt-0.5">{item.detail}</p>
                     </div>
-                    <span className="text-[10px] font-black text-slate-400">{item.action}</span>
+                    <span className="text-xs font-bold text-slate-500">{item.action}</span>
                   </button>
                 );
               })}
@@ -278,9 +278,9 @@ const CommandIntelligencePanel = ({
             <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Truck size={14} className="text-blue-700" />
-                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Driver Load</h3>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Driver Load</h3>
               </div>
-              <span className="text-[10px] font-black text-slate-400">{capacityPressure} trips/driver</span>
+              <span className="text-xs font-bold text-slate-500">{capacityPressure} trips/driver</span>
             </div>
             <div className="divide-y divide-slate-100">
               {driverLoads.length === 0 ? (
@@ -292,20 +292,20 @@ const CommandIntelligencePanel = ({
                   <div key={d.id || d.name} className="px-3 py-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-xs font-black text-slate-900 truncate">{d.name}</p>
-                        <p className="text-[10px] font-semibold text-slate-500 truncate">
+                        <p className="text-xs font-bold text-slate-900 truncate">{d.name}</p>
+                        <p className="text-xs font-semibold text-slate-500 truncate">
                           {d.assignedCount} active — {d.vehicle}
                           {proximity != null ? ` — ${Math.round(proximity)} mi` : ''}
                         </p>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black ${tone.bg} ${tone.border} ${tone.text}`}>
+                      <span className={`px-2 py-0.5 rounded-md border text-xs font-bold ${tone.bg} ${tone.border} ${tone.text}`}>
                         {d.status}
                       </span>
                     </div>
                     <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                       <div className={`h-full ${tone.fill}`} style={{ width: `${d.utilization}%` }} />
                     </div>
-                    <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-500">
+                    <div className="mt-1.5 flex items-center justify-between gap-2 text-xs font-semibold text-slate-500">
                       <span className="truncate">{d.nextTrip ? `${d.nextTrip.patient || 'Next'} at ${d.nextTrip.time || 'soon'}` : 'No scheduled pickup'}</span>
                     </div>
                   </div>
@@ -321,13 +321,13 @@ const CommandIntelligencePanel = ({
             <button key={zone.zone} onClick={onFocusUnassigned}
               className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left hover:bg-white hover:border-blue-200 transition">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                   <MapPin size={11} /> Hotspot
                 </span>
-                <span className="text-[10px] font-black text-slate-400">{zone.count}</span>
+                <span className="text-xs font-bold text-slate-500">{zone.count}</span>
               </div>
-              <p className="mt-1 text-xs font-black text-slate-800 truncate">{zone.zone}</p>
-              <p className="text-[10px] font-semibold text-slate-500 mt-0.5">{zone.unassigned} unassigned — {zone.late} late</p>
+              <p className="mt-1 text-xs font-bold text-slate-800 truncate">{zone.zone}</p>
+              <p className="text-xs font-semibold text-slate-500 mt-0.5">{zone.unassigned} unassigned — {zone.late} late</p>
             </button>
           )) : (
             <div className="md:col-span-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 flex items-center gap-2 text-xs font-bold text-slate-500">
@@ -341,7 +341,7 @@ const CommandIntelligencePanel = ({
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5">
             <div className="flex items-center gap-2 mb-1.5">
               <AlertTriangle size={13} className="text-rose-600" />
-              <span className="text-[10px] font-black text-rose-800 uppercase tracking-wider">AI Flagged Issues</span>
+              <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">AI Flagged Issues</span>
             </div>
             {aiInsights.mistakes.slice(0, 3).map((m, i) => (
               <p key={i} className="text-xs text-rose-700 leading-relaxed ml-5">{m}</p>
