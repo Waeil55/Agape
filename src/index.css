@@ -25,9 +25,9 @@
   --font-normal: 400;
   --font-medium: 500;
   --font-semibold: 600;
-  --font-bold: 700;
-  --font-extrabold: 800;
-  --font-black: 900;
+  --font-bold: 600;
+  --font-extrabold: 700;
+  --font-black: 700;
 
   /* ===== LINE HEIGHTS ===== */
   --leading-tight: 1.15;
@@ -295,9 +295,9 @@
   --font-normal: 500;
   --font-medium: 600;
   --font-semibold: 700;
-  --font-bold: 800;
-  --font-extrabold: 900;
-  --font-black: 900;
+  --font-bold: 700;
+  --font-extrabold: 700;
+  --font-black: 800;
   --leading-tight: 1.2;
   --leading-snug: 1.4;
   --leading-normal: 1.6;
@@ -365,7 +365,8 @@ body {
 .text-2xl { font-size: var(--text-2xl); line-height: 1.75rem; }
 .text-3xl { font-size: var(--text-3xl); line-height: 2rem; }
 .text-4xl { font-size: var(--text-4xl); line-height: 2.35rem; }
-.font-black { font-weight: 900; }
+.font-black { font-weight: 700; }
+.font-extrabold { font-weight: 700; }
 
 #root {
   min-height: 100dvh;
@@ -764,7 +765,7 @@ table thead th,
 table thead th[class] {
   color: #ffffff !important;
   border-color: rgba(255, 255, 255, 0.10) !important;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.02em;
 }
 
@@ -826,7 +827,7 @@ table tbody tr:hover {
   background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   color: white;
   border-radius: 0.875rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.01em;
   box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
   transition: all 0.2s ease;
@@ -923,7 +924,7 @@ table tbody tr:hover {
   padding: 6px 14px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
   opacity: 0;
   pointer-events: none;
@@ -1323,7 +1324,7 @@ table thead tr[class] {
 table th {
   color: #334155 !important;
   font-size: 0.8rem !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   line-height: 1.25;
   text-transform: none !important;
   border-bottom: 1px solid var(--enterprise-border-soft);
@@ -1436,7 +1437,7 @@ table th {
   border-color: rgba(255, 255, 255, 0.16) !important;
   border-bottom-color: rgba(15, 23, 42, 0.18) !important;
   font-size: 0.8rem !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   line-height: 1.15;
   text-transform: none !important;
   white-space: nowrap !important;
@@ -1610,7 +1611,7 @@ table th {
 
 .driver-history-detail-table .driver-history-detail-label {
   background-color: #e2e8f0 !important;
-  font-weight: 900 !important;
+  font-weight: 700 !important;
 }
 
 /* ===== Mobile Touch & Safe Area Utilities ===== */
