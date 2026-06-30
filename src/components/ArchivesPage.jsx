@@ -485,86 +485,78 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                 {dayTrips.map(renderMobileArchiveCard)}
               </div>
               <div className="hidden w-full overflow-x-auto sm:block">
-                <table className="resizable-table text-xs" style={{ tableLayout: 'fixed', width: '100%', minWidth: Object.values(colWidths).reduce((a, b) => a + b, 0) + 100 }}>
+                <table className="w-full table-fixed text-xs">
                   <colgroup>
-                    {Columns.map(col => (
-                      <col key={col.key} style={{ width: colWidths[col.key] || 100 }} />
-                    ))}
-                    <col style={{ width: 80 }} />
+                    <col className="w-[7%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-20" />
                   </colgroup>
-                  <thead className="bg-slate-800 text-slate-100 border-b border-slate-200">
+                  <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
                     <tr>
-                      {Columns.map(col => (
-                        <th
-                          key={col.key}
-                          className="resizable-th p-0 text-left select-none"
-                          style={{ width: colWidths[col.key] || 100 }}
-                        >
-                          <div
-                            className="flex items-center justify-between cursor-pointer group hover:bg-slate-700 transition-colors px-2 py-2 h-full"
-                            onClick={() => handleSort(col.key)}
-                          >
-                            <span className="text-xs font-semibold truncate">{col.label}</span>
-                            <span className="ml-1 shrink-0">{renderSortIcon(col.key)}</span>
-                          </div>
-                          {/* Resize handle */}
-                          <div
-                            className="col-resize-handle"
-                            onMouseDown={(e) => startColResize(e, col.key)}
-                            title="Drag to resize column"
-                          />
-                        </th>
-                      ))}
-                      <th className="resizable-th p-2 text-left text-xs font-semibold">Actions</th>
+                      <th className="rounded-tl-xl px-3 py-1.5 text-left font-semibold">Date</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Driver</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Time</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Trip ID</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Passenger</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Pickup</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Dropoff</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">PU Time</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">DO Time</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">PU Odo</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">DO Odo</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Vehicle</th>
+                      <th className="rounded-tr-xl px-3 py-1.5 text-left font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {dayTrips.map((trip) => {
                       const driverName = getDriverLabel(trip, drivers);
+                      const keyVal = (key) => {
+                        switch (key) {
+                          case 'date': return formatDateLabel(trip.date || 'No Date');
+                          case 'driver': return driverName;
+                          case 'time': return formatClock24(trip.time) !== '—' ? formatClock24(trip.time) : formatClock24(trip.arrivalTime);
+                          case 'bookingId': return trip.bookingId || trip.id || '—';
+                          case 'patient': return trip.patient || '—';
+                          case 'pickup': return trip.pickup || '—';
+                          case 'dropoff': return trip.dropoff || '—';
+                          case 'arrivalTime': return formatClock24(trip.arrivalTime);
+                          case 'arrivalDropoffTime': return formatClock24(trip.arrivalDropoffTime || trip.completedAt);
+                          case 'pickupOdometer': return trip.pickupOdometer || '—';
+                          case 'dropoffOdometer': return trip.dropoffOdometer || '—';
+                          case 'vehicle': return trip.completedVehicle || '—';
+                          default: return '—';
+                        }
+                      };
 
                       return (
-                        <tr key={trip.id} className={`${activeRow === trip.id ? 'bg-blue-100' : ''} hover:bg-blue-50/50 transition-colors ${canEdit ? 'cursor-pointer' : ''}`}
-                          onClick={(e) => {
-                            if (!canEdit) return;
-                            const interactiveTags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'SVG', 'PATH'];
-                            if (interactiveTags.includes(e.target.tagName)) return;
-                            setActiveRow(trip.id);
-                          }}>
-                          {Columns.map(col => {
-                            const cellKey = col.key;
-                            const displayValue = renderCellValue(trip, col);
-                            const isEditing = isEditingCell(trip.id, cellKey);
-
-                            return (
-                              <td key={cellKey} className={`p-2 whitespace-nowrap ${cellKey === 'pickup' ? 'max-w-[200px] truncate text-emerald-600' : ''} ${cellKey === 'dropoff' ? 'max-w-[200px] truncate text-rose-600' : ''} ${cellKey === 'signature' && displayValue === 'Yes' ? 'text-emerald-600' : ''} ${cellKey === 'distance' && displayValue !== '—' ? 'text-blue-600 bg-blue-50/30' : ''} ${cellKey === 'arrivalTime' ? 'text-emerald-600 bg-emerald-50/30' : ''} ${cellKey === 'departedPickupTime' ? 'text-amber-600 bg-amber-50/30' : ''} ${cellKey === 'arrivalDropoffTime' ? 'text-rose-600 bg-rose-50/30' : ''} ${cellKey === 'date' || cellKey === 'patient' ? 'text-slate-900' : ''} ${cellKey === 'driver' ? 'text-slate-700' : ''} ${cellKey === 'time' || cellKey === 'arrivalTime' || cellKey === 'departedPickupTime' || cellKey === 'arrivalDropoffTime' ? 'font-mono' : ''} ${cellKey === 'bookingId' ? 'font-mono text-blue-600' : ''} ${cellKey === 'pickupOdometer' ? 'font-mono text-emerald-600' : ''} ${cellKey === 'dropoffOdometer' ? 'font-mono text-rose-600' : ''} ${cellKey === 'travelTime' ? 'text-slate-600' : ''} ${cellKey === 'vehicle' ? 'text-slate-500 text-xs font-mono tracking-wider uppercase' : ''}`}
-                                title={cellKey === 'pickup' || cellKey === 'dropoff' ? displayValue : undefined}
-                              >
-                                {isEditing ? (
-                                  renderCellEditor(trip, col)
-                                ) : canEdit && cellKey !== 'signature' ? (
-                                  <span
-                                    className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
-                                    onClick={() => startCellEdit(trip.id, cellKey, (trip[FIELD_FOR_COL[cellKey]] ?? ''))}
-                                  >
-                                    {displayValue}
-                                  </span>
-                                ) : cellKey === 'signature' && canEdit ? (
-                                  <span
-                                    className="cursor-pointer hover:bg-blue-50 rounded px-1 -mx-1 block leading-5"
-                                    onClick={() => saveCell(trip, 'paperSignatureConfirmed', !trip.paperSignatureConfirmed)}
-                                  >
-                                    {displayValue}
-                                  </span>
-                                ) : (
-                                  <span className="block leading-5">{displayValue}</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                          <td className="p-2 whitespace-nowrap">
+                        <tr key={trip.id} className={`${activeRow === trip.id ? 'bg-blue-100' : ''} hover:bg-blue-50/50 transition-colors`}>
+                          <td className="px-3 py-1.5 text-slate-900">{keyVal('date')}</td>
+                          <td className="px-3 py-1.5 text-slate-700">{keyVal('driver')}</td>
+                          <td className="px-3 py-1.5 font-mono text-slate-900">{keyVal('time')}</td>
+                          <td className="px-3 py-1.5 font-mono text-blue-600">{keyVal('bookingId')}</td>
+                          <td className="px-3 py-1.5 text-slate-900">{keyVal('patient')}</td>
+                          <td className="px-3 py-1.5 font-mono text-emerald-700 truncate" title={trip.pickup}>{keyVal('pickup')}</td>
+                          <td className="px-3 py-1.5 font-mono text-rose-700 truncate" title={trip.dropoff}>{keyVal('dropoff')}</td>
+                          <td className="px-3 py-1.5 font-mono text-emerald-600">{keyVal('arrivalTime')}</td>
+                          <td className="px-3 py-1.5 font-mono text-rose-600">{keyVal('arrivalDropoffTime')}</td>
+                          <td className="px-3 py-1.5 font-mono text-emerald-600">{keyVal('pickupOdometer')}</td>
+                          <td className="px-3 py-1.5 font-mono text-rose-600">{keyVal('dropoffOdometer')}</td>
+                          <td className="px-3 py-1.5 font-mono text-slate-500 text-[11px] uppercase">{keyVal('vehicle')}</td>
+                          <td className="px-3 py-1.5 whitespace-nowrap">
                             {restoreTrip && (
                               <button onClick={() => restoreTrip(trip.id)}
-                                className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-bold hover:bg-slate-200 transition-colors">
+                                className="flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition-colors">
                                 <RefreshCcw size={12} /> Restore
                               </button>
                             )}

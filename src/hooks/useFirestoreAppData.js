@@ -262,10 +262,15 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
     const applyTripsSnapshot = (snap) => {
       if (cancelled) return;
       const liveTrips = [];
+      const archivedTrips = [];
       const corruptedIds = [];
       const todayKey = new Date().toISOString().slice(0, 10);
       snap.forEach((tripDoc) => {
         const trip = { ...tripDoc.data(), id: tripDoc.id };
+        if (trip.archiveState === 'archived') {
+          archivedTrips.push(normalizeTrip(trip));
+          return;
+        }
         if (trip.source === 'dispatch_upload' || trip.source === 'report_upload') {
           if (trip.date && trip.date !== todayKey) {
             const created = trip.createdAt || trip.updatedAtLocal || '';
@@ -304,8 +309,8 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
         }),
       ]);
       const mergedTrips = mergedTripsBase.filter((t) => !trashedIds.has(t.id));
-      dataRef.current = { ...baseData, trips: mergedTrips };
-      setState(prev => ({ ...prev, trips: mergedTrips, loading: false, initialized: true, error: null }));
+      dataRef.current = { ...baseData, trips: mergedTrips, trashedTrips: archivedTrips };
+      setState(prev => ({ ...prev, trips: mergedTrips, trashedTrips: archivedTrips, loading: false, initialized: true, error: null }));
 
       const prevCount = prevTripCountRef.current;
       const currentCount = mergedTrips.length;
