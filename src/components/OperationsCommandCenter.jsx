@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   FileText, Users, AlertCircle, Clock, CheckCircle2, XCircle,
   Truck,
@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, AlertTriangle, MapPin,
   Square, CheckSquare, X, ArrowRight, ArrowUp, ArrowDown, TrendingUp, TrendingDown,
   Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2, Filter,
-  User, Car, Map as MapIcon, Navigation, UserPlus, Flag
+  User, Car, Map as MapIcon, Navigation, UserPlus, Flag, MoreVertical
 } from 'lucide-react';
 import { db, doc, getDocFromServer } from '../config/firebase';
 import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
@@ -437,6 +437,8 @@ const OperationsCommandCenter = ({
   const [aiSortLoading, setAiSortLoading] = useState(false);
   const [editTrip, setEditTrip] = useState(null);
   const [activeTripRow, setActiveTripRow] = useState(null);
+  const [actionsMenuTripId, setActionsMenuTripId] = useState(null);
+  const actionsMenuRef = useRef(null);
   const [selectedDate, setSelectedDate] = useState(() => localCalendarYmd());
   const todayTrips = trips.filter(t => { const dk = tripCalendarDateKey(t.date); return dk === undefined || dk === selectedDate; });
   const unassignedTrips = todayTrips.filter(t => t.status === 'Unassigned');
@@ -696,6 +698,17 @@ const OperationsCommandCenter = ({
       window.removeEventListener('online', refreshRoutes);
     };
   }, []);
+
+  useEffect(() => {
+    if (!actionsMenuTripId) return;
+    const handleClickOutside = (e) => {
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(e.target)) {
+        setActionsMenuTripId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [actionsMenuTripId]);
 
   const openTripDetails = (trip) => {
     setTripDetails(null);
@@ -1874,15 +1887,15 @@ const OperationsCommandCenter = ({
             <table className="w-full table-fixed text-xs">
               <colgroup>
                 <col className="w-8" />
-                <col className="w-[6%]" />
                 <col className="w-[7%]" />
-                <col className="w-[19%]" />
-                <col className="w-[15%]" />
-                <col className="w-[15%]" />
-                <col className="w-[11%]" />
                 <col className="w-[8%]" />
-                <col className="w-[5%]" />
-                <col className="w-[11%]" />
+                <col className="w-[18%]" />
+                <col className="w-[17%]" />
+                <col className="w-[17%]" />
+                <col className="w-[12%]" />
+                <col className="w-[7%]" />
+                <col className="w-[4%]" />
+                <col className="w-[8%]" />
               </colgroup>
               <thead className="sticky top-0 z-10 border-b border-blue-900/20 text-slate-100">
                 <tr>
@@ -2192,32 +2205,60 @@ const OperationsCommandCenter = ({
                         </div>
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        <div className={`flex ${densityProfile.tableRowMinHeight} items-center gap-1`} onClick={(e) => e.stopPropagation()}>
-                          {clientPhone && (
-                            <button onClick={() => makeCall(trip.patientPhone || trip.pickupPhone, trip.patient)}
-                              className="min-h-[40px] rounded-lg p-2 text-emerald-600 hover:bg-emerald-100"
-                              title="Call client">
-                              <Phone size={16} />
+                        <div className={`flex ${densityProfile.tableRowMinHeight} items-center gap-0.5`} onClick={(e) => e.stopPropagation()}>
+                          <button onClick={() => setManualAssignTrip(trip)} className="h-7 w-7 flex items-center justify-center rounded-lg text-blue-600 hover:bg-blue-100 transition-colors" title="Assign / Reassign driver">
+                            <Users size={14} />
+                          </button>
+                          <div className="relative" ref={actionsMenuTripId === trip.id ? actionsMenuRef : undefined}>
+                            <button
+                              type="button"
+                              onClick={() => setActionsMenuTripId(actionsMenuTripId === trip.id ? null : trip.id)}
+                              className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                              title="More actions"
+                            >
+                              <MoreVertical size={14} />
                             </button>
-                          )}
-                          {clientPhone && (
-                            <button onClick={() => openSmsForTrip(trip)} className="min-h-[40px] rounded-lg p-2 text-blue-600 hover:bg-blue-100" title="Text client"><MessageSquare size={16} /></button>
-                          )}
-                          <>
-                            <button onClick={() => triggerSmartAssign(trip)} className="min-h-[40px] rounded-lg p-2 text-indigo-600 hover:bg-indigo-100" title="AI assign"><BrainCircuit size={16} /></button>
-                            <button onClick={() => setManualAssignTrip(trip)} className="min-h-[40px] rounded-lg p-2 text-blue-600 hover:bg-blue-100" title="Assign driver"><Users size={16} /></button>
-                          </>
-                          <button onClick={() => setEditTrip(trip)} className="min-h-[40px] rounded-lg p-2 text-slate-500 hover:bg-blue-100 hover:text-blue-600" title="Edit trip"><Edit2 size={16} /></button>
-                          {hasPermission(role, 'canDeleteTrip') && (
-                            <button onClick={() => requestDeleteTrip(trip.id)} className="min-h-[40px] rounded-lg p-2 text-slate-500 hover:bg-rose-100 hover:text-rose-600" title="Archive trip"><Archive size={16} /></button>
-                          )}
+                            {actionsMenuTripId === trip.id && (
+                              <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                                <button onClick={() => { setActionsMenuTripId(null); triggerSmartAssign(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700">
+                                  <BrainCircuit size={13} className="text-indigo-500" /> AI Assign
+                                </button>
+                                <button onClick={() => { setActionsMenuTripId(null); setEditTrip(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-blue-50 hover:text-blue-700">
+                                  <Edit2 size={13} className="text-blue-500" /> Edit Trip
+                                </button>
+                                <button onClick={() => { setActionsMenuTripId(null); makeCall(trip.patientPhone || trip.pickupPhone, trip.patient); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
+                                  <Phone size={13} className="text-emerald-500" /> Call Client
+                                </button>
+                                <button onClick={() => { setActionsMenuTripId(null); openSmsForTrip(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-blue-50 hover:text-blue-700">
+                                  <MessageSquare size={13} className="text-blue-500" /> SMS Client
+                                </button>
+                                <div className="my-1 border-t border-slate-100" />
+                                {hasPermission(role, 'canDeleteTrip') && (
+                                  <>
+                                    <button onClick={() => { setActionsMenuTripId(null); markTripException(trip, 'Rerouted'); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700">
+                                      <MapPin size={13} className="text-amber-500" /> Reroute
+                                    </button>
+                                    <button onClick={() => { setActionsMenuTripId(null); markTripException(trip, 'No Show'); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-800">
+                                      <AlertCircle size={13} className="text-slate-500" /> No Show
+                                    </button>
+                                    <button onClick={() => { setActionsMenuTripId(null); markTripException(trip, 'Cancelled'); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-rose-50 hover:text-rose-700">
+                                      <XCircle size={13} className="text-rose-500" /> Cancel
+                                    </button>
+                                    <button onClick={() => { setActionsMenuTripId(null); requestDeleteTrip(trip.id); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-800">
+                                      <Archive size={13} className="text-slate-500" /> Archive
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           <button
                             type="button"
                             onClick={() => toggleTripExpanded(trip.id)}
-                            className="min-h-[40px] rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                            title={isExpanded ? 'Collapse trip details' : 'Expand trip details'}
+                            className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                            title={isExpanded ? 'Collapse' : 'Expand'}
                           >
-                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           </button>
                         </div>
                       </td>
