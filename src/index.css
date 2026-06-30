@@ -1401,10 +1401,6 @@ tbody tr:hover {
     font-size: var(--text-xs);
   }
 
-  button, a[role="button"], .btn {
-    min-height: var(--touch-min);
-  }
-
   input, select, textarea {
     min-height: var(--touch-min);
   }
