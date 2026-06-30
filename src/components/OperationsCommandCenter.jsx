@@ -1023,139 +1023,44 @@ const OperationsCommandCenter = ({
       .map(([key, value]) => [key, formatManifestValue(value)]);
 
     return (
-      <div className="w-full border-t border-slate-200 bg-slate-50 px-4 py-3 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="w-full border-t border-slate-200 bg-slate-50 px-4 py-2 text-xs space-y-1.5">
+        <div className="flex items-center justify-between">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700">
-              {to12hr(trip.time)}
-            </span>
-            <span className={`rounded-full px-2 py-0.5 text-xs ${getStatusPillClass(trip.status)}`}>
-              {trip.status}
-            </span>
-            {bookingReference && (
-              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-                {bookingReference}
-              </span>
-            )}
-            {clientIdentifier && (
-              <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
-                {clientIdentifier}
-              </span>
-            )}
-            {serviceLabel && (
-              <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                {serviceLabel}
-              </span>
-            )}
-            {passengerTypes && (
-              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-                {passengerTypes}
-              </span>
-            )}
-            {spaceTypes && spaceTypes !== passengerTypes && (
-              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
-                {spaceTypes}
-              </span>
-            )}
-            {driver && (
-              <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                {driver.name || driver.driverName}
-              </span>
-            )}
-            {directDistance && (
-              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
-                {directDistance}
-              </span>
-            )}
-            {routeAssignments.map((route, i) => (
-              <span key={i} className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">
-                {route.routeName}
-              </span>
-            ))}
+            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-700">{to12hr(trip.time)}</span>
+            <span className={`rounded-full px-2 py-0.5 ${getStatusPillClass(trip.status)}`}>{trip.status}</span>
+            {bookingReference && <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-blue-700">{bookingReference}</span>}
+            {clientIdentifier && <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-violet-700">{clientIdentifier}</span>}
+            {spaceTypes && <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-600">{spaceTypes}</span>}
+            {driver && <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-emerald-700">{driver.name || driver.driverName}</span>}
+            {directDistance && <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-600">{directDistance}</span>}
+            {routeAssignments.map((route, i) => <span key={i} className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-indigo-700">{route.routeName}</span>)}
           </div>
-          <button
-            type="button"
-            onClick={() => toggleTripExpanded(trip.id)}
-            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
-          >
-            Collapse
-          </button>
+          <button type="button" onClick={() => toggleTripExpanded(trip.id)} className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-slate-500 hover:bg-slate-100 text-[11px]">Collapse</button>
         </div>
 
-        <div className="grid grid-cols-12 gap-x-4 gap-y-1 text-xs">
-          <div className="col-span-5 space-y-1">
-            <p className="font-semibold text-blue-600 uppercase tracking-wider text-[11px] mb-1">Pickup</p>
-            {pickupItems.map(([label, value]) => (
-              <div key={label} className="flex gap-2">
-                <span className="w-20 shrink-0 text-slate-500 font-medium">{label}</span>
-                <span className="text-slate-900 break-words">{value}</span>
-              </div>
-            ))}
+        <div className="grid grid-cols-3 gap-x-6 text-[11px] leading-relaxed">
+          <div className="min-w-0">
+            <span className="font-semibold text-blue-600">Pickup: </span>
+            <span className="text-slate-800 truncate">{trip.pickup || '—'}</span>
+            {clientPhone && <><br /><span className="text-slate-500">Phone: </span><span className="text-slate-700">{clientPhone}</span></>}
           </div>
-          <div className="col-span-5 space-y-1">
-            <p className="font-semibold text-emerald-600 uppercase tracking-wider text-[11px] mb-1">Dropoff</p>
-            {dropoffItems.map(([label, value]) => (
-              <div key={label} className="flex gap-2">
-                <span className="w-20 shrink-0 text-slate-500 font-medium">{label}</span>
-                <span className="text-slate-900 break-words">{value}</span>
-              </div>
-            ))}
+          <div className="min-w-0">
+            <span className="font-semibold text-emerald-600">Dropoff: </span>
+            <span className="text-slate-800 truncate">{trip.dropoff || '—'}</span>
+            {dropoffPhone && <><br /><span className="text-slate-500">Hospital: </span><span className="text-slate-700">{dropoffPhone}</span></>}
           </div>
-          <div className="col-span-2 space-y-1">
-            <p className="font-semibold text-slate-500 uppercase tracking-wider text-[11px] mb-1">Manifest</p>
-            {manifestSummaryItems.map(([label, value]) => (
-              <div key={label} className="flex gap-2">
-                <span className="shrink-0 text-slate-500 font-medium">{label}</span>
-                <span className="text-slate-900 break-words">{value}</span>
-              </div>
-            ))}
+          <div className="min-w-0 space-y-0.5">
+            {trip.patient && <div><span className="text-slate-500">Client: </span><span className="text-slate-800 font-medium">{trip.patient}</span></div>}
+            {requestedPickup && <div><span className="text-slate-500">Req pickup: </span><span className="text-slate-700">{requestedPickup}</span></div>}
+            {requestedDropoff && <div><span className="text-slate-500">Req dropoff: </span><span className="text-slate-700">{requestedDropoff}</span></div>}
+            {mobility.length > 0 && <div><span className="text-slate-500">Mobility: </span><span className="text-slate-700">{mobility.join(', ')}</span></div>}
           </div>
         </div>
 
-        {(routeAssignments.length > 0 || noteItems.length > 0 || mobility.length > 0 || mobilityAids) && (
-          <div className="grid grid-cols-12 gap-x-4 gap-y-1 text-xs border-t border-slate-200 pt-2">
-            <div className="col-span-6">
-              {routeAssignments.length > 0 && (
-                <div className="flex gap-2">
-                  <span className="w-20 shrink-0 text-slate-500 font-medium">Routes</span>
-                  <div className="flex flex-wrap gap-1">
-                    {routeAssignments.map((route, index) => (
-                      <span key={index} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">
-                        <Route size={10} /> {route.routeName}{route.time ? ` @ ${route.time}` : ''}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {(mobility.length > 0 || mobilityAids) && (
-                <div className="flex gap-2 mt-1">
-                  <span className="w-20 shrink-0 text-slate-500 font-medium">Mobility</span>
-                  <div className="flex flex-wrap gap-1">
-                    {mobilityAids && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{mobilityAids}</span>}
-                    {mobility.map((tag) => <span key={tag} className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{tag}</span>)}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="col-span-6">
-              {noteItems.length > 0 ? noteItems.map(([label, value]) => (
-                <div key={label} className="flex gap-2 mb-1">
-                  <span className="w-20 shrink-0 text-slate-500 font-medium">{label}</span>
-                  <span className="text-slate-700 break-words">{value}</span>
-                </div>
-              )) : null}
-            </div>
-          </div>
-        )}
-
-        {extraUploadedFields.length > 0 && (
-          <div className="grid grid-cols-4 gap-x-4 gap-y-1 text-xs border-t border-slate-200 pt-2">
-            {extraUploadedFields.map(([label, value]) => (
-              <div key={label} className="flex gap-2">
-                <span className="shrink-0 text-slate-500 font-medium">{label}</span>
-                <span className="text-slate-900 break-words">{value}</span>
-              </div>
-            ))}
+        {(generalComments || manifestMessage || trip.notes || trip.specialInstructions || trip.comment) && (
+          <div className="text-[11px] truncate max-w-full">
+            <span className="font-semibold text-amber-600">Notes: </span>
+            <span className="text-slate-600">{generalComments || manifestMessage || trip.notes || trip.specialInstructions || trip.comment}</span>
           </div>
         )}
       </div>
