@@ -153,6 +153,8 @@ const DesktopReportsPage = ({
   const [statusFilter, setStatusFilter] = useState('all');
   const [driverFilter, setDriverFilter] = useState('all');
   const [reviewFilter, setReviewFilter] = useState('all');
+  const [hiddenColumns, setHiddenColumns] = useState(['travelTime', 'distance']);
+  const toggleColumn = (col) => setHiddenColumns(prev => prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]);
 
   const [editingCell, setEditingCell] = useState(null); // { tripId, field }
   const [editValue, setEditValue] = useState('');
@@ -625,126 +627,78 @@ const DesktopReportsPage = ({
     <div className="overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
       <div className="overflow-x-auto">
       <table className="w-full table-fixed text-xs">
-        <colgroup>
-          <col className="w-[5%]" />
-          <col className="w-[7%]" />
-          <col className="w-[7%]" />
-          <col className="w-[6%]" />
-          <col className="w-[6%]" />
-          <col className="w-[7%]" />
-          <col className="w-[9%]" />
-          <col className="w-[11%]" />
-          <col className="w-[6%]" />
-          <col className="w-[6%]" />
-          <col className="w-[12%]" />
-          <col className="w-[6%]" />
-          <col className="w-[6%]" />
-          <col className="w-[6%]" />
-          <col className="w-[6%]" />
-          <col className="w-[6%]" />
-          <col className="w-[6%]" />
-        </colgroup>
-        <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
-          <tr>
-            <th className="rounded-tl-xl px-3 py-1.5 text-left font-semibold">Edit</th>
-            {['Date', 'Driver', 'Vehicle', 'Sche...', 'Trip ID', 'Passenger', 'Pickup Address', 'Pickup ...', 'Start Od...', 'Dropoff Address', 'Dropoff ...', 'End Od...', 'Travel Ti...', 'Distance...', 'Sign...', 'Revi...'].map((label) => (
-              <th key={label} className="px-3 py-1.5 text-left font-semibold">{label}</th>
-            ))}
-          </tr>
-        </thead>
+        {(() => {
+          const allCols = [
+            { key: 'edit', label: 'Edit', w: 'w-[5%]' },
+            { key: 'date', label: 'Date', w: 'w-[7%]' },
+            { key: 'driver', label: 'Driver', w: 'w-[7%]' },
+            { key: 'vehicle', label: 'Vehicle', w: 'w-[6%]' },
+            { key: 'schedule', label: 'Sche...', w: 'w-[6%]' },
+            { key: 'tripId', label: 'Trip ID', w: 'w-[7%]' },
+            { key: 'passenger', label: 'Passenger', w: 'w-[9%]' },
+            { key: 'pickupAddr', label: 'Pickup Address', w: 'w-[13%]' },
+            { key: 'pickupTime', label: 'Pickup ...', w: 'w-[7%]' },
+            { key: 'startOdo', label: 'Start Od...', w: 'w-[6%]' },
+            { key: 'dropoffAddr', label: 'Dropoff Address', w: 'w-[14%]' },
+            { key: 'dropoffTime', label: 'Dropoff ...', w: 'w-[7%]' },
+            { key: 'endOdo', label: 'End Od...', w: 'w-[6%]' },
+            { key: 'travelTime', label: 'Travel Time', w: 'w-[7%]' },
+            { key: 'distance', label: 'Distance', w: 'w-[7%]' },
+            { key: 'signature', label: 'Sign...', w: 'w-[6%]' },
+            { key: 'review', label: 'Revi...', w: 'w-[6%]' },
+          ];
+          const cols = allCols.filter(c => !hiddenColumns.includes(c.key));
+          return (
+            <>
+              <colgroup>
+                {cols.map(c => <col key={c.key} className={c.w} />)}
+              </colgroup>
+              <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
+                <tr>
+                  {cols.map((c, i) => (
+                    <th key={c.key} className={`px-3 py-1.5 text-left font-semibold ${i === 0 ? 'rounded-tl-xl' : ''} ${i === cols.length - 1 ? 'rounded-tr-xl' : ''}`}>{c.label}</th>
+                  ))}
+                </tr>
+              </thead>
+            </>
+          );
+        })()}
         <tbody className="divide-y divide-slate-100">
           {reportRows.map(({ trip, driver, travelMinutes }, index) => (
             <tr key={trip.id} className={`${activeRow === trip.id ? 'bg-blue-100' : index % 2 ? 'bg-slate-50/70' : 'bg-white'} hover:bg-blue-50/70 transition-colors cursor-pointer`} onClick={() => setActiveRow(trip.id)}>
-              <td className="px-3 py-1.5">
-                <div className="flex items-center gap-2 text-slate-500">
-                  {editingRow === trip.id ? (
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); finishRowEdit(); }}
-                        className="min-h-[40px] min-w-[40px] rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150 flex items-center justify-center"
-                        title="Keep changes"
-                      >
-                        <Check size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); revertRowEdit(); }}
-                        className="min-h-[40px] min-w-[40px] rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150 flex items-center justify-center"
-                        title="Cancel and restore original row"
-                      >
-                        <XCircle size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <input
-                        type="checkbox"
-                        checked={!!trip.reviewed}
-                        onChange={(event) => onUpdateTrip?.({ ...trip, reviewed: event.target.checked })}
-                        className="w-5 h-5 rounded border-slate-300"
-                        aria-label={`Review ${trip.patient || trip.id}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }}
-                        className="min-h-[40px] min-w-[40px] rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150 flex items-center justify-center"
-                        title="Edit row"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </td>
-              <td className="px-3 py-1.5 text-slate-900">
-                {renderCell(trip, 'date', formatDateLabel(trip.date), 'date', 'date')}
-              </td>
-              <td className="px-3 py-1.5 text-slate-700">
-                {renderCell(trip, 'driver', truncate(driver?.name || trip.driverName, 14), 'driverId')}
-              </td>
-              <td className="px-3 py-1.5 text-slate-500">
-                {renderCell(trip, 'vehicle', truncate(trip.completedVehicle || driver?.vehicle || DASH, 12), 'completedVehicle')}
-              </td>
-              <td className="px-3 py-1.5 font-mono text-slate-900">
-                {renderCell(trip, 'time', formatClock(trip.time), 'time', 'time')}
-              </td>
-              <td className="px-3 py-1.5 font-mono text-blue-900">
-                {renderCell(trip, 'bookingId', truncate(trip.bookingId || trip.id, 12), 'bookingId')}
-              </td>
-              <td className="px-3 py-1.5 text-slate-900">
-                {renderCell(trip, 'patient', truncate(trip.patient, 17), 'patient')}
-              </td>
-              <td className="px-3 py-1.5 font-mono text-emerald-700">
-                {renderCell(trip, 'pickup', truncate(trip.pickup, 24), 'pickup')}
-              </td>
-              <td className="px-3 py-1.5 font-mono text-emerald-700">
-                {renderCell(trip, 'arrivalTime', formatClock(trip.arrivalTime || trip.pickupTime), 'arrivalTime', 'time')}
-              </td>
-              <td className="px-3 py-1.5 font-mono text-emerald-700">
-                {renderCell(trip, 'pickupOdometer', trip.pickupOdometer || DASH, 'pickupOdometer', 'number')}
-              </td>
-              <td className="px-3 py-1.5 font-mono text-rose-700">
-                {renderCell(trip, 'dropoff', truncate(trip.dropoff, 27), 'dropoff')}
-              </td>
-              <td className="px-3 py-1.5 font-mono text-rose-700">
-                {renderCell(trip, 'arrivalDropoffTime', formatClock(trip.arrivalDropoffTime || trip.completedAt), 'arrivalDropoffTime', 'time')}
-              </td>
-              <td className="px-3 py-1.5 font-mono text-rose-700">
-                {renderCell(trip, 'dropoffOdometer', trip.dropoffOdometer || DASH, 'dropoffOdometer', 'number')}
-              </td>
-              <td className="px-3 py-1.5 font-mono text-slate-700">
-                {renderCell(trip, 'travelTime', formatMinutes(travelMinutes), 'travelTime')}
-              </td>
-              <td className="px-3 py-1.5 font-mono text-[#2f5b96]">
-                {renderCell(trip, 'distance', calcMiles(trip), 'distance', 'number')}
-              </td>
-              <td className="px-3 py-1.5 text-emerald-700">
-                {renderCell(trip, 'signature', trip.paperSignatureConfirmed ? 'Yes' : 'No', 'paperSignatureConfirmed')}
-              </td>
-              <td className="px-3 py-1.5 text-slate-500">
-                {renderCell(trip, 'reviewed', trip.reviewed ? 'Done' : 'Pending', 'reviewed')}
-              </td>
+              {!hiddenColumns.includes('edit') && (
+                <td className="px-3 py-1.5">
+                  <div className="flex items-center gap-2 text-slate-500">
+                    {editingRow === trip.id ? (
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); finishRowEdit(); }} className="min-h-[40px] min-w-[40px] rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all duration-150 flex items-center justify-center" title="Keep changes"><Check size={16} /></button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); revertRowEdit(); }} className="min-h-[40px] min-w-[40px] rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all duration-150 flex items-center justify-center" title="Cancel"><XCircle size={16} /></button>
+                      </div>
+                    ) : (
+                      <>
+                        <input type="checkbox" checked={!!trip.reviewed} onChange={(event) => onUpdateTrip?.({ ...trip, reviewed: event.target.checked })} className="w-5 h-5 rounded border-slate-300" aria-label={`Review ${trip.patient || trip.id}`} />
+                        <button type="button" onClick={(e) => { e.stopPropagation(); startRowEdit(trip); }} className="min-h-[40px] min-w-[40px] rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150 flex items-center justify-center" title="Edit row"><Edit2 size={16} /></button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              )}
+              {!hiddenColumns.includes('date') && <td className="px-3 py-1.5 text-slate-900">{renderCell(trip, 'date', formatDateLabel(trip.date), 'date', 'date')}</td>}
+              {!hiddenColumns.includes('driver') && <td className="px-3 py-1.5 text-slate-700">{renderCell(trip, 'driver', truncate(driver?.name || trip.driverName, 14), 'driverId')}</td>}
+              {!hiddenColumns.includes('vehicle') && <td className="px-3 py-1.5 text-slate-500">{renderCell(trip, 'vehicle', truncate(trip.completedVehicle || driver?.vehicle || DASH, 12), 'completedVehicle')}</td>}
+              {!hiddenColumns.includes('schedule') && <td className="px-3 py-1.5 font-mono text-slate-900">{renderCell(trip, 'time', formatClock(trip.time), 'time', 'time')}</td>}
+              {!hiddenColumns.includes('tripId') && <td className="px-3 py-1.5 font-mono text-blue-900">{renderCell(trip, 'bookingId', truncate(trip.bookingId || trip.id, 12), 'bookingId')}</td>}
+              {!hiddenColumns.includes('passenger') && <td className="px-3 py-1.5 text-slate-900">{renderCell(trip, 'patient', truncate(trip.patient, 17), 'patient')}</td>}
+              {!hiddenColumns.includes('pickupAddr') && <td className="px-3 py-1.5 font-mono text-emerald-700">{renderCell(trip, 'pickup', truncate(trip.pickup, 24), 'pickup')}</td>}
+              {!hiddenColumns.includes('pickupTime') && <td className="px-3 py-1.5 font-mono text-emerald-700">{renderCell(trip, 'arrivalTime', formatClock(trip.arrivalTime || trip.pickupTime), 'arrivalTime', 'time')}</td>}
+              {!hiddenColumns.includes('startOdo') && <td className="px-3 py-1.5 font-mono text-emerald-700">{renderCell(trip, 'pickupOdometer', trip.pickupOdometer || DASH, 'pickupOdometer', 'number')}</td>}
+              {!hiddenColumns.includes('dropoffAddr') && <td className="px-3 py-1.5 font-mono text-rose-700">{renderCell(trip, 'dropoff', truncate(trip.dropoff, 27), 'dropoff')}</td>}
+              {!hiddenColumns.includes('dropoffTime') && <td className="px-3 py-1.5 font-mono text-rose-700">{renderCell(trip, 'arrivalDropoffTime', formatClock(trip.arrivalDropoffTime || trip.completedAt), 'arrivalDropoffTime', 'time')}</td>}
+              {!hiddenColumns.includes('endOdo') && <td className="px-3 py-1.5 font-mono text-rose-700">{renderCell(trip, 'dropoffOdometer', trip.dropoffOdometer || DASH, 'dropoffOdometer', 'number')}</td>}
+              {!hiddenColumns.includes('travelTime') && <td className="px-3 py-1.5 font-mono text-slate-700">{renderCell(trip, 'travelTime', formatMinutes(travelMinutes), 'travelTime')}</td>}
+              {!hiddenColumns.includes('distance') && <td className="px-3 py-1.5 font-mono text-[#2f5b96]">{renderCell(trip, 'distance', calcMiles(trip), 'distance', 'number')}</td>}
+              {!hiddenColumns.includes('signature') && <td className="px-3 py-1.5 text-emerald-700">{renderCell(trip, 'signature', trip.paperSignatureConfirmed ? 'Yes' : 'No', 'paperSignatureConfirmed')}</td>}
+              {!hiddenColumns.includes('review') && <td className="px-3 py-1.5 text-slate-500">{renderCell(trip, 'reviewed', trip.reviewed ? 'Done' : 'Pending', 'reviewed')}</td>}
             </tr>
           ))}
         </tbody>
@@ -799,6 +753,20 @@ const DesktopReportsPage = ({
             <option value="reviewed">Reviewed only</option>
             <option value="pending">Pending only</option>
           </CompactSelect>
+
+          {viewMode === 'review' && (
+            <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase">Cols:</span>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" checked={!hiddenColumns.includes('travelTime')} onChange={() => toggleColumn('travelTime')} className="w-3.5 h-3.5 rounded border-slate-300" />
+                <span className="text-[10px] font-medium text-slate-600">Time</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" checked={!hiddenColumns.includes('distance')} onChange={() => toggleColumn('distance')} className="w-3.5 h-3.5 rounded border-slate-300" />
+                <span className="text-[10px] font-medium text-slate-600">Distance</span>
+              </label>
+            </div>
+          )}
 
           <button type="button" onClick={() => setShowUploadModal?.(true)} className="ml-auto min-h-[40px] rounded-xl bg-[#2f5b96] px-3 text-xs font-semibold text-white shadow-sm flex items-center gap-1.5">
             <Upload size={16} /> Upload
