@@ -591,6 +591,12 @@ const DesktopReportsPage = ({
               <td className="px-2 py-2 font-mono text-rose-700">
                 {renderCell(trip, 'arrivalDropoffTime', formatClock(trip.arrivalDropoffTime || trip.completedAt), 'arrivalDropoffTime', 'time')}
               </td>
+              <td className="px-2 py-2 font-mono text-slate-600">
+                {(() => {
+                  const odo = trip.dropoffOdometer ?? trip.endOdometer ?? trip.endMileage ?? trip.dropoffMileage;
+                  return renderCell(trip, 'dropoffOdometer', (odo != null && odo !== '') ? Number(odo).toLocaleString() : '—', 'dropoffOdometer', 'number');
+                })()}
+              </td>
               <td className="px-2 py-2 font-mono text-slate-800">
                 {renderCell(trip, 'additionalFee', trip.additionalFee ? `$${trip.additionalFee}` : '$0.00', 'additionalFee', 'number')}
               </td>
