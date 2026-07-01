@@ -692,21 +692,24 @@ body {
 .bottom-nav {
   position: fixed;
   bottom: calc(24px + env(safe-area-inset-bottom, 0px));
-  left: max(20px, env(safe-area-inset-left, 0px));
-  right: max(20px, env(safe-area-inset-right, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
   z-index: 50;
-  min-height: 68px;
-  background: #ffffff;
-  border: 1px solid rgba(226, 232, 240, 0.6);
-  border-radius: 9999px;
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.08), 0 4px 12px -4px rgba(0, 0, 0, 0.04);
+  min-height: 70px;
+  width: auto;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 35px;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.12), 0 4px 12px -4px rgba(0, 0, 0, 0.06);
   padding: 6px 16px;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 [data-theme="dark"] .bottom-nav {
-  background: #1e293b;
-  border-color: rgba(51, 65, 85, 0.6);
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.2), 0 4px 12px -4px rgba(0, 0, 0, 0.1);
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.3), 0 4px 12px -4px rgba(0, 0, 0, 0.15);
 }
 
 

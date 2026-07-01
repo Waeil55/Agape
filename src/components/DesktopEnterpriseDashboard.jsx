@@ -703,39 +703,37 @@ const DesktopEnterpriseDashboard = ({
 
   // ==================== BOTTOM NAVIGATION (Mobile only for dispatcher/admin) ====================
   const renderBottomNav = () => (
-    <nav className="md:hidden flex items-stretch bg-[#0f172a] border-t border-slate-800 safe-area-bottom shadow-[0_-8px_30px_rgba(0,0,0,0.3)] relative z-20">
-      {sidebarItems.map(item => {
-        const Icon = item.icon;
-        const isActive = activePanel === item.id;
-        const hasBadge = item.id === 'chat' && chatUnreadCount > 0;
-        return (
-          <button
-            key={item.id}
-            onClick={() => setActivePanel(item.id)}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all relative touch-manipulation ${
-              isActive ? 'text-blue-400' : 'text-slate-600 hover:text-slate-500'
-            }`}
-            style={{ minHeight: '56px', paddingTop: '6px', paddingBottom: 'max(6px, env(safe-area-inset-bottom, 0px))' }}
-          >
-            <div className="relative flex items-center justify-center">
-              {isActive && (
-                <span className="absolute -inset-2 bg-blue-500/10 rounded-full animate-in fade-in duration-150" />
-              )}
-              <Icon size={22} strokeWidth={isActive ? 2.2 : 1.6} className="relative" />
-              {hasBadge && (
-                <span className="absolute -top-0.5 -right-2 min-w-[16px] h-4 bg-rose-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
-                  {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
-                </span>
-              )}
-            </div>
-            <span className={`text-[10px] font-medium leading-none truncate max-w-full px-0.5 ${
-              isActive ? 'text-blue-400' : 'text-slate-600'
-            }`}>
-              {item.label}
-            </span>
-          </button>
-        );
-      })}
+    <nav className="bottom-nav md:hidden">
+      <div className="flex h-full items-center justify-around gap-1">
+        {sidebarItems.map(item => {
+          const Icon = item.icon;
+          const isActive = activePanel === item.id;
+          const hasBadge = item.id === 'chat' && chatUnreadCount > 0;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActivePanel(item.id)}
+              className={`flex-1 flex flex-col items-center justify-center rounded-full px-1 py-1.5 transition-all relative touch-manipulation min-h-[56px] ${
+                isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
+              }`}
+            >
+              <div className="relative flex items-center justify-center">
+                <Icon size={22} strokeWidth={isActive ? 2 : 1.5} className="relative" />
+                {hasBadge && (
+                  <span className="absolute -top-0.5 -right-2 min-w-[16px] h-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
+                    {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                  </span>
+                )}
+              </div>
+              <span className={`text-[10px] font-medium leading-none mt-1 truncate max-w-full px-0.5 ${
+                isActive ? 'text-blue-600' : 'text-slate-400'
+              }`}>
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </nav>
   );
 

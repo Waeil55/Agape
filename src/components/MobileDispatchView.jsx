@@ -242,10 +242,13 @@ const MobileDispatchView = ({
   onOpenSequencer, onOpenLiveMap, searchQuery, setSearchQuery,
   addToast, isOnline, phoneNumbers,
   onDispatcherStatusUpdate, fallbackAdminOnline, setFallbackAdminOnline,
-  activeTab = "trips" // Controlled by parent bottom nav
+  activeTab = "trips", // Controlled by parent bottom nav
+  expandedId: expandedIdProp, setExpandedId: setExpandedIdProp
 }) => {
   const [filter, setFilter] = useState("all");
-  const [expandedId, setExpandedId] = useState(null);
+  const [localExpandedId, setLocalExpandedId] = useState(null);
+  const expandedId = expandedIdProp !== undefined ? expandedIdProp : localExpandedId;
+  const setExpandedId = setExpandedIdProp || setLocalExpandedId;
   const [showTools, setShowTools] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery||"");
 
