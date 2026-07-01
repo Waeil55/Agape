@@ -5464,11 +5464,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     }
                     setActiveNav(item.id);
                   }}
-                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-[4px] rounded-full px-1 py-1 transition-all duration-200 min-h-[56px] ${
+                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${
                       isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8] hover:text-[#64748b]'
                     }`}>
                     <div className="relative">
-                      <Icon size={20} strokeWidth={isActiveTab ? 2.2 : 1.8}
+                      <Icon size={24} strokeWidth={isActiveTab ? 2.2 : 1.8}
                         className={`transition-all duration-200 ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}
                       />
                       {item.id === 'chat' && chatUnreadCount > 0 && (
@@ -5477,7 +5477,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         </span>
                       )}
                     </div>
-                    <span className={`max-w-full truncate text-[8px] tracking-wide transition-all leading-none ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}>
+                    <span className={`max-w-full truncate text-[11px] font-medium tracking-wide transition-all leading-none ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}>
                       {item.label}
                     </span>
                   </button>

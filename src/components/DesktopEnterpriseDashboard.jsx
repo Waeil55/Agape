@@ -721,14 +721,14 @@ const DesktopEnterpriseDashboard = ({
               {isActive && (
                 <span className="absolute -inset-2 bg-blue-500/10 rounded-full animate-in fade-in duration-150" />
               )}
-              <Icon size={18} strokeWidth={isActive ? 2.2 : 1.6} className="relative" />
+              <Icon size={22} strokeWidth={isActive ? 2.2 : 1.6} className="relative" />
               {hasBadge && (
                 <span className="absolute -top-0.5 -right-2 min-w-[16px] h-4 bg-rose-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
                   {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
                 </span>
               )}
             </div>
-            <span className={`text-[8px] leading-none truncate max-w-full px-0.5 ${
+            <span className={`text-[10px] font-medium leading-none truncate max-w-full px-0.5 ${
               isActive ? 'text-blue-400' : 'text-slate-600'
             }`}>
               {item.label}
