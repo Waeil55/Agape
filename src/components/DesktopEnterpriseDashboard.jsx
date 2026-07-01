@@ -13,7 +13,7 @@ import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config
 import { openMapLink } from '../utils/nativeActions';
 import { timeToMinutes, isTripLate } from '../utils/tripDate';
 import { getDriverLiveStatus } from '../constants/statuses';
-import ChatPage from './ChatPage';
+import ChatPage from './chat/ChatPage';
 import ArchivesPage from './ArchivesPage';
 import DriversVehiclesPage from './DriversVehiclesPage';
 import SettingsPage from './SettingsPage';

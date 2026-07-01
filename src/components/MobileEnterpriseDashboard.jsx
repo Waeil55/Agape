@@ -5,7 +5,7 @@ import {
 import DriverPage from './DriverPage';
 import AdminPage from './AdminPage';
 import ReportsPage from './ReportsPage';
-import ChatPage from './ChatPage';
+import ChatPage from './chat/ChatPage';
 import LiveMapPage from './LiveMapPage';
 import MobileDispatchView from './MobileDispatchView';
 import MobileMenuPage from './MobileMenuPage';
