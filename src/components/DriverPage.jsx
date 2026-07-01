@@ -5468,7 +5468,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8] hover:text-[#64748b]'
                     }`}>
                     <div className="relative">
-                      <Icon size={26} strokeWidth={isActiveTab ? 2.5 : 2}
+                      <Icon size={20} strokeWidth={isActiveTab ? 2.2 : 1.8}
                         className={`transition-all duration-200 ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}
                       />
                       {item.id === 'chat' && chatUnreadCount > 0 && (
@@ -5477,7 +5477,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         </span>
                       )}
                     </div>
-                    <span className={`max-w-full truncate text-[11px] tracking-wide transition-all leading-none ${isActiveTab ? 'text-[#2563eb] font-bold' : 'text-[#94a3b8] font-medium'}`}>
+                    <span className={`max-w-full truncate text-[8px] tracking-wide transition-all leading-none ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}>
                       {item.label}
                     </span>
                   </button>
