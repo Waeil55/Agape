@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronRight, Settings, Users, Clock, LogOut, FileText, Database, Shield, Truck, MapPin } from 'lucide-react';
 
-const MobileMenuPage = ({ currentUser, role, onSignOut, setSubView }) => {
+const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
   const getInitials = (email) => {
     if (!email) return 'U';
     return email.split('@')[0].slice(0, 2).toUpperCase();
@@ -85,7 +85,7 @@ const MobileMenuPage = ({ currentUser, role, onSignOut, setSubView }) => {
       {/* Logout */}
       <div className="px-4 pb-24">
         <button
-          onClick={onSignOut}
+          onClick={onLogout}
           className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-white border border-rose-200 text-rose-600 font-bold hover:bg-rose-50 active:scale-95 transition-all shadow-sm"
         >
           <LogOut size={16} />

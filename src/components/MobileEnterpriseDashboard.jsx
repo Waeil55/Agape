@@ -15,7 +15,7 @@ import DriversVehiclesPage from './DriversVehiclesPage';
 import { getDriverLiveStatus } from '../constants/statuses';
 
 const MobileEnterpriseDashboard = (props) => {
-  const { trips, drivers, dispatchers, currentUser, role, onSignOut } = props;
+  const { trips, drivers, dispatchers, currentUser, role, onLogout } = props;
   const [currentView, setCurrentView] = useState('trips');
   const [subView, setSubView] = useState(null); // admin, reports, settings, archives
   const driverWorkDrivers = props.driverWorkDrivers?.length ? props.driverWorkDrivers : drivers;
@@ -222,7 +222,7 @@ const MobileEnterpriseDashboard = (props) => {
               onCompleteTrip={props.onCompleteTrip}
               onDriverStatusUpdate={props.onDriverStatusUpdate}
               onAddAuditLog={props.addAuditLog}
-              onLogout={() => {}}
+              onLogout={onLogout}
               requestAuthAction={props.requestAuthAction}
               appSettings={props.appSettings}
               onUpdateAppSettings={props.updateAppSettings}

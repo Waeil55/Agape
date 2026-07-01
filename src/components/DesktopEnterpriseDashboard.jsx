@@ -1198,7 +1198,7 @@ const DesktopEnterpriseDashboard = ({
         />
       );
       case 'settings': return (
-        <SettingsPage currentUser={currentUser} role={role} onLogout={() => window.location.reload()} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} initialSection={activePanel === 'archives' ? 'archives' : undefined} />
+        <SettingsPage currentUser={currentUser} role={role} onLogout={onLogout} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} initialSection={activePanel === 'archives' ? 'archives' : undefined} />
       );
       case 'drive': return driverWorkDrivers.length > 0 && activeDriverWorkDriver ? (
         <div className="flex h-full min-h-0 flex-col bg-[#f4f7fa]">
@@ -1241,7 +1241,7 @@ const DesktopEnterpriseDashboard = ({
               onCompleteTrip={onCompleteTrip}
               onDriverStatusUpdate={onDriverStatusUpdate}
               onAddAuditLog={addAuditLog}
-              onLogout={() => {}}
+              onLogout={onLogout}
               requestAuthAction={requestAuthAction}
               appSettings={appSettings}
               onUpdateAppSettings={updateAppSettings}
