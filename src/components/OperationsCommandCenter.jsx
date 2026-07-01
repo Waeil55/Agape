@@ -3,7 +3,7 @@ import {
   FileText, Users, AlertCircle, Clock, CheckCircle2, XCircle,
   Truck,
   BrainCircuit, Phone, MessageSquare,
-  ChevronDown, ChevronUp, AlertTriangle, MapPin,
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, AlertTriangle, MapPin,
   Square, CheckSquare, X, ArrowRight, ArrowUp, ArrowDown, TrendingUp, TrendingDown,
   Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2, Filter,
   User, Car, Map as MapIcon, Navigation, UserPlus, Flag, MoreVertical
@@ -434,6 +434,16 @@ const OperationsCommandCenter = ({
   const [actionsMenuTripId, setActionsMenuTripId] = useState(null);
   const actionsMenuRef = useRef(null);
   const [selectedDate, setSelectedDate] = useState(() => localCalendarYmd());
+  const shiftDate = (days) => {
+    const d = new Date(selectedDate + 'T12:00:00');
+    d.setDate(d.getDate() + days);
+    setSelectedDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  };
+  const isToday = selectedDate === localCalendarYmd();
+  const formatDateLabel = (dateStr) => {
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
   const todayTrips = trips.filter(t => { const dk = tripCalendarDateKey(t.date); return dk === undefined || dk === selectedDate; });
   const unassignedTrips = todayTrips.filter(t => t.status === 'Unassigned');
   const inProgressTrips = todayTrips.filter(t => ACTIVE_PROGRESS_STATUSES.includes(t.status));
@@ -1155,6 +1165,22 @@ const OperationsCommandCenter = ({
             {tab === 'manifest' ? 'Manifest' : tab === 'willcall' ? 'Will Call' : 'Fleet'}
           </button>
         ))}
+      </div>
+
+      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
+
+      {/* Date Nav */}
+      <div className="flex items-center gap-0.5 shrink-0">
+        <button onClick={() => shiftDate(-1)} className="min-h-[28px] min-w-[28px] rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center transition-colors">
+          <ChevronLeft size={14} />
+        </button>
+        <button onClick={() => setSelectedDate(localCalendarYmd())} className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+          {formatDateLabel(selectedDate)}
+          {isToday && <span className="ml-1 text-[9px] opacity-80">Today</span>}
+        </button>
+        <button onClick={() => shiftDate(1)} className="min-h-[28px] min-w-[28px] rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center transition-colors">
+          <ChevronRight size={14} />
+        </button>
       </div>
 
       <div className="w-px h-4 bg-slate-200 shrink-0"></div>
