@@ -1,4 +1,4 @@
-import app, { getMessaging, getToken, onMessage } from './firebase';
+import app, { getMessaging, getToken, onMessage, db, auth, doc, updateDoc, collection, query, where, getDocs } from './firebase';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
 const TOKEN_KEY = 'agape_fcm_token';
@@ -33,6 +33,7 @@ async function getFcmToken(retries = 3) {
       const token = await getToken(messaging, { vapidKey: VAPID_KEY });
       if (token) {
         localStorage.setItem(TOKEN_KEY, token);
+        saveTokenToFirestore(token);
         return token;
       }
     } catch (err) {
@@ -43,7 +44,18 @@ async function getFcmToken(retries = 3) {
     }
   }
   
+  if (cached) saveTokenToFirestore(cached);
   return cached || null;
+}
+
+async function saveTokenToFirestore(token) {
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+    const q = query(collection(db, 'users'), where('email', '==', user.email));
+    const snap = await getDocs(q);
+    snap.forEach(d => updateDoc(doc(db, 'users', d.id), { fcmToken: token }).catch(() => {}));
+  } catch { /* best effort */ }
 }
 
 export function onForegroundMessage(callback) {

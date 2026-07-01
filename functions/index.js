@@ -512,9 +512,67 @@ exports.migrateTripDateKeys = functions.https.onCall(async (data, context) => {
 });
 
 exports.sendPushNotification = functions.https.onCall(async (data, context) => {
-  functions.logger.warn("sendPushNotification stub called — notifications not implemented", { data });
-  return { success: false, message: "Push notifications not implemented" };
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in.');
+  const { title, body, tokens, type } = data;
+  if (!tokens || !tokens.length) return { success: false, message: 'No tokens' };
+  const payload = {
+    notification: { title: title || 'Agape Care', body: body || '' },
+    data: { type: type || 'notification' },
+  };
+  try {
+    const response = await admin.messaging().sendEachForMulticast({ tokens, ...payload });
+    return { success: true, sent: response.successCount, failed: response.failureCount };
+  } catch (e) {
+    functions.logger.error('sendPushNotification failed', e);
+    return { success: false, error: e.message };
+  }
 });
+
+exports.onChatMessage = functions.firestore.document('chat_messages/{messageId}')
+  .onCreate(async (snap) => {
+    const msg = snap.data();
+    if (!msg || !msg.conversationId || !msg.sender) return null;
+
+    try {
+      const convDoc = await admin.firestore().doc('chatData/conversations').get();
+      const conv = convDoc.data()?.conversations?.[msg.conversationId];
+      if (!conv) return null;
+
+      const participants = (conv.participants || []).filter(p => p !== msg.sender);
+      if (participants.length === 0) return null;
+
+      const tokens = [];
+      for (const email of participants) {
+        const userSnap = await admin.firestore().collection('users').where('email', '==', email).get();
+        userSnap.forEach(d => {
+          const data = d.data();
+          if (data.fcmToken) tokens.push(data.fcmToken);
+        });
+      }
+
+      if (tokens.length === 0) return null;
+
+      const senderName = msg.sender.split('@')[0];
+      const convName = conv.name || senderName;
+
+      await admin.messaging().sendEachForMulticast({
+        tokens,
+        notification: {
+          title: convName,
+          body: `${senderName}: ${msg.text || ''}`.slice(0, 250),
+        },
+        data: {
+          type: 'chat',
+          conversationId: msg.conversationId,
+        },
+      });
+
+      functions.logger.info(`Chat push sent: ${tokens.length} tokens, conversation ${msg.conversationId}`);
+    } catch (e) {
+      functions.logger.error('onChatMessage push failed', e);
+    }
+    return null;
+  });
 
 exports.systemHealthCheck = functions.https.onRequest(async (req, res) => {
   const checks = { firestore: false, auth: false };

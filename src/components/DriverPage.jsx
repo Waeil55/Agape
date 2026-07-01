@@ -2936,10 +2936,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
-                onClick={() => handleCall(phoneNumbers?.dispatcher || '', 'Dispatcher')}
-                disabled={!phoneNumbers?.dispatcher}
+                onClick={() => {
+                  if (!phoneNumbers?.dispatcher) { alert('No dispatcher number saved. Add it in Settings.'); return; }
+                  handleCall(phoneNumbers.dispatcher, 'Dispatcher');
+                }}
                 title="Call Dispatcher"
-                className="h-7 px-2.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 text-xs font-medium disabled:opacity-50"
+                className="min-h-[44px] px-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 text-xs font-semibold active:bg-blue-100 transition-colors"
                 aria-label="Call Dispatcher"
               >
                 <Phone size={16} />
@@ -2947,10 +2949,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </button>
               <button
                 type="button"
-                onClick={() => handleCall(phoneNumbers?.routing || '', 'Routing')}
-                disabled={!phoneNumbers?.routing}
+                onClick={() => {
+                  if (!phoneNumbers?.routing) { alert('No routing number saved. Add it in Settings.'); return; }
+                  handleCall(phoneNumbers.routing, 'Routing');
+                }}
                 title="Call Routing"
-                className="h-7 px-2.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1.5 text-xs font-medium disabled:opacity-50"
+                className="min-h-[44px] px-3 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1.5 text-xs font-semibold active:bg-indigo-100 transition-colors"
                 aria-label="Call Routing"
               >
                 <Phone size={16} />
