@@ -5450,8 +5450,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== BOTTOM NAVIGATION ===== */}
       {!isEmbedded && (
-        <nav className="bg-white/60 backdrop-blur-xl border-t border-white/30 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] relative z-20 md:hidden safe-area-bottom" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}>
-          <div className="flex h-full items-center justify-between gap-1 px-2">
+        <nav className="bg-white/60 backdrop-blur-xl border-t border-white/30 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] relative z-20 md:hidden safe-area-bottom px-2 py-1" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 6px)' }}>
+          <div className="flex items-center justify-between gap-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActiveTab = activeNav === item.id;
@@ -5464,13 +5464,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     }
                     setActiveNav(item.id);
                   }}
-                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full transition-all duration-200 min-h-[44px] ${
-                      isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
+                    className={`flex flex-col items-center justify-center rounded-2xl transition-all duration-200 min-w-[52px] min-h-[44px] px-2 py-1.5 ${
+                      isActiveTab ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-slate-500'
                     }`}>
                     <div className="relative">
-                      <Icon size={22} strokeWidth={isActiveTab ? 2 : 1.5}
-                        className={`transition-all duration-200 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}
-                      />
+                      <Icon size={22} strokeWidth={isActiveTab ? 2 : 1.5} />
                       {item.id === 'chat' && chatUnreadCount > 0 && (
                         <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm ring-2 ring-white">
                           {chatUnreadCount > 99 ? '99+' : chatUnreadCount}

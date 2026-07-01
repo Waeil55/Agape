@@ -703,7 +703,7 @@ const DesktopEnterpriseDashboard = ({
 
   // ==================== BOTTOM NAVIGATION (Mobile only for dispatcher/admin) ====================
   const renderBottomNav = () => (
-    <nav className="md:hidden flex items-stretch bg-white/60 backdrop-blur-xl border-t border-white/30 safe-area-bottom shadow-[0_-8px_30px_rgba(0,0,0,0.08)] relative z-20" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}>
+    <nav className="md:hidden flex items-center justify-around bg-white/60 backdrop-blur-xl border-t border-white/30 safe-area-bottom shadow-[0_-8px_30px_rgba(0,0,0,0.08)] relative z-20 px-2 py-1" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 6px)' }}>
       {sidebarItems.map(item => {
         const Icon = item.icon;
         const isActive = activePanel === item.id;
@@ -712,14 +712,11 @@ const DesktopEnterpriseDashboard = ({
           <button
             key={item.id}
             onClick={() => setActivePanel(item.id)}
-            className={`flex-1 flex flex-col items-center justify-center rounded-full transition-all relative touch-manipulation min-h-[44px] ${
-              isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
+            className={`flex flex-col items-center justify-center rounded-2xl transition-all relative touch-manipulation min-w-[52px] min-h-[44px] px-2 py-1.5 ${
+              isActive ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-slate-500'
             }`}
           >
             <div className="relative flex items-center justify-center">
-              {isActive && (
-                <span className="absolute -inset-2 bg-blue-500/10 rounded-full animate-in fade-in duration-150" />
-              )}
               <Icon size={22} strokeWidth={isActive ? 2 : 1.5} className="relative" />
               {hasBadge && (
                 <span className="absolute -top-1 -right-2 min-w-[16px] h-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
