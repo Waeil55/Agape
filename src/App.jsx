@@ -14,7 +14,6 @@ import { hasPermission } from './constants/roles';
 import { timeToMinutes, tripCalendarDateKey, tripMatchesTodayOrTomorrow, isCalendarDateKeyWithinLastDays } from './utils/tripDate';
 import { cleanPhone } from './utils/smartContacts';
 import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, isDriverAssignedToDispatcher, isTripInDispatcherScope, normalizeEmail } from './utils/accessControl';
-import ChatPage from './components/chat/ChatPage';
 import ArchivesPage from './components/ArchivesPage';
 import DriversVehiclesPage from './components/DriversVehiclesPage';
 import SettingsPage from './components/SettingsPage';

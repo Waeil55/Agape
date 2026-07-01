@@ -5,7 +5,6 @@ import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
 import { playNotificationSound } from '../utils/notificationSound';
-import ChatPage from './chat/ChatPage';
 import DriverToolsPage from './DriverToolsPage';
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
@@ -4667,7 +4666,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {/* ===== CHAT PAGE ===== */}
       {activeNav === 'chat' && (
         <div className="flex-1 flex flex-col bg-white">
-          <ChatPage currentUser={currentUser} role={role} drivers={allDrivers || drivers} dispatchers={dispatchers} />
+          <div className="flex items-center justify-center h-full text-slate-400 text-sm">Chat coming soon</div>
         </div>
       )}
 

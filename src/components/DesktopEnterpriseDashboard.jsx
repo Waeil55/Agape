@@ -13,7 +13,6 @@ import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config
 import { openMapLink } from '../utils/nativeActions';
 import { timeToMinutes, isTripLate } from '../utils/tripDate';
 import { getDriverLiveStatus } from '../constants/statuses';
-import ChatPage from './chat/ChatPage';
 import ArchivesPage from './ArchivesPage';
 import DriversVehiclesPage from './DriversVehiclesPage';
 import SettingsPage from './SettingsPage';
@@ -1157,7 +1156,7 @@ const DesktopEnterpriseDashboard = ({
           <DispatchAssistant drivers={drivers} trips={trips} onAssignTrip={assignTripToDriver} addAuditLog={addAuditLog} currentUser={currentUser} />
         </Suspense>
       );
-      case 'chat': return <ChatPage currentUser={currentUser} role={role} drivers={drivers} dispatchers={dispatchers} trips={trips} onSwitchToDispatch={(tripId) => setActivePanel('operations')} />;
+      case 'chat': return <div className="flex items-center justify-center h-full text-slate-400 text-sm">Chat coming soon</div>;
       case 'routePlanner': return (
         <RoutePlannerPage
           trips={trips}
