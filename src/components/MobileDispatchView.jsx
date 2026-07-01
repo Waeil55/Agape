@@ -77,15 +77,15 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
 
   return (
     <div className={"bg-white rounded-[22px] border border-slate-200 border-l-[5px] " + sty.border + " shadow-sm overflow-visible transition-all duration-200"}>
-      <button type="button" onClick={onToggle} className="w-full text-left px-3.5 pt-3.5 pb-3 focus:outline-none active:bg-slate-50/70 sm:px-4">
-        <div className="flex items-start gap-3.5">
-          <div className="shrink-0 text-center w-[58px] rounded-2xl bg-slate-50 border border-slate-100 py-2">
+      <button type="button" onClick={onToggle} className="w-full text-left px-3 pt-2.5 pb-2 focus:outline-none active:bg-slate-50/70 sm:px-3.5">
+        <div className="flex items-start gap-2.5">
+          <div className="shrink-0 text-center w-[50px] rounded-2xl bg-slate-50 border border-slate-100 py-1.5">
             {trip.time === "Will Call" ? (
               <span className="text-sm font-bold text-slate-700 uppercase">WC</span>
             ) : (
               <>
-                <p className={"text-lg font-bold leading-none " + (isLate ? "text-rose-600" : isSoon ? "text-amber-600" : "text-slate-900")}>{timeParts[0]}</p>
-                <p className={"text-[10px] font-semibold uppercase tracking-wide mt-1 " + (isLate ? "text-rose-400" : isSoon ? "text-amber-400" : "text-slate-400")}>{timeParts[1] || ""}</p>
+                <p className={"text-base font-bold leading-none " + (isLate ? "text-rose-600" : isSoon ? "text-amber-600" : "text-slate-900")}>{timeParts[0]}</p>
+                <p className={"text-[9px] font-semibold uppercase tracking-wide mt-0.5 " + (isLate ? "text-rose-400" : isSoon ? "text-amber-400" : "text-slate-400")}>{timeParts[1] || ""}</p>
               </>
             )}
             {urgency && <span className={"mt-1.5 inline-block px-1.5 py-0.5 rounded-md text-[9px] font-semibold uppercase " + (isLate ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700")}>{urgency}</span>}
@@ -93,7 +93,15 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="text-[15px] font-bold text-slate-950 leading-tight">{trip.patient || "Unknown"}</h3>
+                {(() => {
+                  const parts = (trip.patient || "Unknown").trim().split(/\s+/);
+                  return (
+                    <>
+                      <h3 className="text-[17px] font-extrabold text-slate-950 leading-tight">{parts[0]}</h3>
+                      {parts.length > 1 && <h3 className="text-[13px] font-bold text-slate-600 leading-tight">{parts.slice(1).join(' ')}</h3>}
+                    </>
+                  );
+                })()}
                 <p className="text-[10px] font-bold text-slate-400 mt-0.5">#{trip.bookingId || trip.id || "—"}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
@@ -101,7 +109,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                 <ChevronDown size={13} className={"text-slate-400 transition-transform duration-200 " + (expanded ? "rotate-180" : "")} />
               </div>
             </div>
-            <div className="mt-3 rounded-2xl bg-slate-50/80 border border-slate-100 px-3 py-2.5">
+            <div className="mt-2 rounded-2xl bg-slate-50/80 border border-slate-100 px-2.5 py-2">
               <div className="grid grid-cols-[12px_1fr] gap-x-2.5 gap-y-2">
                 <div className="flex flex-col items-center pt-[5px] row-span-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
@@ -109,23 +117,23 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-blue-600">Pickup</p>
-                  <p className="text-[12px] font-semibold leading-snug text-slate-800 line-clamp-2">{pickup || "-"}</p>
+                  <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-blue-600">Pickup</p>
+                  <p className="text-[11px] font-semibold leading-snug text-slate-800 line-clamp-2">{pickup || "-"}</p>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-600">Dropoff</p>
-                  <p className="text-[12px] font-semibold leading-snug text-slate-800 line-clamp-2">{dropoff || "-"}</p>
+                  <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-emerald-600">Dropoff</p>
+                  <p className="text-[11px] font-semibold leading-snug text-slate-800 line-clamp-2">{dropoff || "-"}</p>
                 </div>
               </div>
             </div>
             {driver ? (
-              <div className="mt-3 flex items-center gap-2 rounded-xl bg-white border border-slate-100 px-2.5 py-2">
-                <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0 uppercase">{(driver.name||"D")[0]}</div>
-                <span className="text-[12px] font-bold text-slate-700 truncate">{driver.name}</span>
-                {ds && <span className={"ml-auto px-2 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wide " + ds.color}>{ds.label}</span>}
+              <div className="mt-2 flex items-center gap-2 rounded-xl bg-white border border-slate-100 px-2.5 py-1.5">
+                <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 shrink-0 uppercase">{(driver.name||"D")[0]}</div>
+                <span className="text-[11px] font-bold text-slate-700 truncate">{driver.name}</span>
+                {ds && <span className={"ml-auto px-1.5 py-0.5 rounded-md text-[8px] font-semibold uppercase tracking-wide " + ds.color}>{ds.label}</span>}
               </div>
             ) : trip.status !== "Completed" && trip.status !== "Cancelled" ? (
-              <div className="mt-3"><span className="text-[11px] font-bold text-rose-500 flex items-center gap-1.5"><User size={12} /> No driver assigned</span></div>
+              <div className="mt-2"><span className="text-[10px] font-bold text-rose-500 flex items-center gap-1.5"><User size={11} /> No driver assigned</span></div>
             ) : null}
           </div>
         </div>

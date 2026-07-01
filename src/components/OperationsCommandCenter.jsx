@@ -214,7 +214,7 @@ const getManifestDensityProfile = (density) => {
         sectionGrid: 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]',
         tableHead: 'px-3 py-1',
         tableCell: 'px-3 py-1',
-        tableRowMinHeight: 'min-h-[28px]',
+        tableRowMinHeight: 'min-h-[24px]',
         showPhones: true,
         showNotes: true,
         showRoutes: true,
