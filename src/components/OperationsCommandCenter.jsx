@@ -50,12 +50,6 @@ const MANIFEST_GROUP_OPTIONS = [
 ];
 const DENSITY_OPTIONS = [
   { value: 'minimal', label: '1 Line' },
-  { value: 'sparse', label: '2 Lines' },
-  { value: 'dense', label: '3 Lines' },
-  { value: 'compact', label: '4 Lines' },
-  { value: 'comfortable', label: '5 Lines' },
-  { value: 'detailed', label: '6 Lines' },
-  { value: 'executive', label: 'Full' },
 ];
 const MANIFEST_TABLE_COLUMNS = [
   { label: 'Trip #', sortKey: 'tripId' },
@@ -423,7 +417,7 @@ const OperationsCommandCenter = ({
   const [expandedDriver, setExpandedDriver] = useState(() => localStorage.getItem('agape_opsExpandedDriver') || null);
   const [manifestView, setManifestView] = useState(() => localStorage.getItem('agape_opsManifestView') || 'board');
   const [manifestGroupBy, setManifestGroupBy] = useState(() => localStorage.getItem('agape_opsManifestGroupBy') || 'driver');
-  const [manifestDensity, setManifestDensity] = useState(() => localStorage.getItem('agape_opsManifestDensity') || 'comfortable');
+  const [manifestDensity, setManifestDensity] = useState(() => 'minimal');
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [smsConversationTrip, setSmsConversationTrip] = useState(null);
   const openSmsForTrip = (trip) => { setSelectedTasks([trip.id]); setShowSmsModal(true); };
@@ -1776,7 +1770,6 @@ const OperationsCommandCenter = ({
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600">{densityProfile.label} view</span>
                 <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs text-blue-700">{visibleTrips.length} visible</span>
               </div>
             </div>
