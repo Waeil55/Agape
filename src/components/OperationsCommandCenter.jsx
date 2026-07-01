@@ -1139,136 +1139,127 @@ const OperationsCommandCenter = ({
   // ==================== CONTROL BAR (DEDUPED COMMAND STRIP) ====================
 
   const renderControlBar = () => (
-    <div className="border-b border-slate-200 bg-white shrink-0 sticky top-0 z-20 shadow-sm">
-      {/* Row 1: Tabs + Actions + View */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 overflow-x-auto">
-        {/* Main Tabs */}
-        <div className="flex items-center gap-0.5 shrink-0 bg-slate-100 p-0.5 rounded-lg">
-          {['manifest', 'willcall', 'fleet'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setOperationsTab(tab)}
-              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap ${
-                operationsTab === tab
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-white'
-              }`}
-            >
-              {tab === 'manifest' ? 'Manifest' : tab === 'willcall' ? 'Will Call' : 'Fleet'}
-            </button>
-          ))}
-        </div>
-
-        <div className="w-px h-4 bg-slate-200 shrink-0"></div>
-
-        {/* Quick Actions */}
-        <div className="flex items-center gap-1 shrink-0">
-          <button onClick={() => setShowAddTripModal(true)} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors whitespace-nowrap">
-            <Plus size={14} /> Trip
-          </button>
-          <button onClick={() => setShowUploadModal(true)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap">
-            <UploadCloud size={14} /> Upload
-          </button>
-          <button onClick={() => onOpenSequencer?.()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap">
-            <Route size={14} /> Routes
-          </button>
-          <button onClick={() => onOpenLiveMap?.()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap">
-            <MapPin size={14} /> Map
-          </button>
-        </div>
-
-        <div className="flex-1"></div>
-
-        {/* View + AI */}
-        <div className="flex items-center gap-1 shrink-0">
-          <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
-            {MANIFEST_VIEW_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setManifestView(option.value)}
-                className={`rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide transition-colors whitespace-nowrap ${
-                  manifestView === option.value
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-                }`}
-              >
-                {option.value === 'card' ? 'Cards' : option.value === 'table' ? 'Ledger' : option.label}
-              </button>
-            ))}
-          </div>
+    <div className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-200 bg-white shrink-0 sticky top-0 z-20 shadow-sm overflow-x-auto">
+      {/* Main Tabs */}
+      <div className="flex items-center gap-0.5 shrink-0 bg-slate-100 p-0.5 rounded-lg">
+        {['manifest', 'willcall', 'fleet'].map(tab => (
           <button
-            onClick={() => setShowIntelligence(prev => !prev)}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all whitespace-nowrap ${
-              showIntelligence
-                ? 'bg-purple-600 text-white shadow-sm'
-                : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            key={tab}
+            onClick={() => setOperationsTab(tab)}
+            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap ${
+              operationsTab === tab
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-white'
             }`}
           >
-            <BrainCircuit size={14} /> AI
+            {tab === 'manifest' ? 'Manifest' : tab === 'willcall' ? 'Will Call' : 'Fleet'}
           </button>
-        </div>
+        ))}
       </div>
 
-      {/* Row 2: Search + Sort + Filters */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-slate-100 overflow-x-auto">
-        {/* Search */}
-        <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 shrink-0 min-w-[160px]">
-          <Search size={13} className="text-slate-400" />
-          <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search trips..." className="w-full bg-transparent text-xs font-medium text-slate-700 placeholder:text-slate-400 outline-none" />
-        </div>
+      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
-        <div className="w-px h-4 bg-slate-200 shrink-0"></div>
+      {/* Quick Actions */}
+      <button onClick={() => setShowAddTripModal(true)} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 hover:bg-blue-700 px-2 py-1 text-[11px] font-semibold text-white transition-colors whitespace-nowrap shrink-0">
+        <Plus size={13} /> Trip
+      </button>
+      <button onClick={() => setShowUploadModal(true)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0">
+        <UploadCloud size={13} /> Upload
+      </button>
+      <button onClick={() => onOpenSequencer?.()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0">
+        <Route size={13} /> Routes
+      </button>
+      <button onClick={() => onOpenLiveMap?.()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0">
+        <MapPin size={13} /> Map
+      </button>
 
-        {/* Sort */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          {[
-            { id: 'time', label: 'Time' },
-            { id: 'assignment', label: 'Driver' },
-            { id: 'status', label: 'Status' },
-            { id: 'patient', label: 'Client' },
-            { id: 'urgency', label: 'Urgency' }
-          ].map(option => (
-            <button
-              key={option.id}
-              onClick={() => {
-                if (sortBy === option.id) {
-                  setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-                } else {
-                  handleSortSelect(option.id);
-                }
-              }}
-              className={`flex items-center gap-0.5 px-2 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
-                sortBy === option.id 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-              }`}
-            >
-              {option.label}
-              {sortBy === option.id && (sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
-            </button>
-          ))}
-        </div>
+      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
-        <div className="w-px h-4 bg-slate-200 shrink-0"></div>
-
-        {/* Filters */}
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-2 py-1.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white cursor-pointer shrink-0">
-          <option value="all">All Status</option>
-          <option value="Unassigned">Unassigned</option>
-          <option value="Assigned">Assigned</option>
-          <option value="in-progress">In Progress</option>
-          <option value="Completed">Completed</option>
-        </select>
-
-        <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-2 py-1.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white cursor-pointer shrink-0 max-w-[160px]">
-          <option value="all">All Drivers</option>
-          <option value="unassigned">Unassigned</option>
-          {driverOptions.map((driver) => (
-            <option key={driver.id} value={driver.id}>{driver.name}</option>
-          ))}
-        </select>
+      {/* Search */}
+      <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 shrink-0 min-w-[120px]">
+        <Search size={11} className="text-slate-400" />
+        <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="w-full bg-transparent text-[11px] font-medium text-slate-700 placeholder:text-slate-400 outline-none" />
       </div>
+
+      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
+
+      {/* Sort */}
+      {[
+        { id: 'time', label: 'Time' },
+        { id: 'assignment', label: 'Driver' },
+        { id: 'status', label: 'Status' },
+        { id: 'patient', label: 'Client' },
+        { id: 'urgency', label: 'Urgency' }
+      ].map(option => (
+        <button
+          key={option.id}
+          onClick={() => {
+            if (sortBy === option.id) {
+              setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+            } else {
+              handleSortSelect(option.id);
+            }
+          }}
+          className={`flex items-center gap-0.5 px-1.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap shrink-0 ${
+            sortBy === option.id 
+              ? 'bg-blue-100 text-blue-700' 
+              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+          }`}
+        >
+          {option.label}
+          {sortBy === option.id && (sortDirection === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+        </button>
+      ))}
+
+      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
+
+      {/* Filters */}
+      <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-1.5 py-1 text-[11px] font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white cursor-pointer shrink-0">
+        <option value="all">All Status</option>
+        <option value="Unassigned">Unassigned</option>
+        <option value="Assigned">Assigned</option>
+        <option value="in-progress">In Progress</option>
+        <option value="Completed">Completed</option>
+      </select>
+
+      <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-1.5 py-1 text-[11px] font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white cursor-pointer shrink-0 max-w-[130px]">
+        <option value="all">All Drivers</option>
+        <option value="unassigned">Unassigned</option>
+        {driverOptions.map((driver) => (
+          <option key={driver.id} value={driver.id}>{driver.name}</option>
+        ))}
+      </select>
+
+      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
+
+      {/* View + AI */}
+      <div className="flex items-center gap-0.5 shrink-0">
+        {MANIFEST_VIEW_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => setManifestView(option.value)}
+            className={`rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors whitespace-nowrap ${
+              manifestView === option.value
+                ? 'bg-slate-900 text-white'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+            }`}
+          >
+            {option.value === 'card' ? 'Cards' : option.value === 'table' ? 'Ledger' : option.label}
+          </button>
+        ))}
+      </div>
+
+      <button
+        onClick={() => setShowIntelligence(prev => !prev)}
+        className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition-all whitespace-nowrap shrink-0 ${
+          showIntelligence
+            ? 'bg-purple-600 text-white shadow-sm'
+            : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+        }`}
+      >
+        <BrainCircuit size={12} /> AI
+      </button>
     </div>
   );
 
