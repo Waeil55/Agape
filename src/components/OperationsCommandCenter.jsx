@@ -1941,13 +1941,20 @@ const OperationsCommandCenter = ({
                         </div>
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        <div className={`flex ${densityProfile.tableRowMinHeight} flex-col ${densityProfile.lineCount >= 3 ? 'justify-between' : 'justify-center'} ${densityProfile.lineCount >= 3 ? (isLeanDensity ? 'gap-1.5' : 'gap-2') : 'gap-0.5'}`}>
-                          <div className={`leading-snug text-slate-900 ${manifestDensity === 'executive' ? 'text-xs' : densityProfile.lineCount <= 2 ? 'text-xs' : 'text-xs'}`}>
-                            {trip.patient || 'Unnamed Client'}
+                        <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-center gap-0.5`}>
+                          <div className="leading-tight text-slate-900 text-[13px] font-bold">
+                            {(trip.patient || 'Unnamed Client').split(' ').length > 1
+                              ? (trip.patient || 'Unnamed Client').split(' ')[0]
+                              : (trip.patient || 'Unnamed Client')}
                           </div>
+                          {(trip.patient || '').split(' ').length > 1 && (
+                            <div className="leading-tight text-slate-500 text-[10px]">
+                              {(trip.patient || '').split(' ').slice(1).join(' ')}
+                            </div>
+                          )}
                           {densityProfile.lineCount <= 2 ? (
                             densityProfile.lineCount === 2 && clientSummary && (
-                              <div className="text-xs text-slate-500 truncate">{clientSummary}</div>
+                              <div className="text-[10px] text-slate-400 truncate">{clientSummary}</div>
                             )
                           ) : (
                             <div className={`${isLeanDensity ? 'mt-0.5' : 'mt-1'} flex flex-wrap gap-1`}>
