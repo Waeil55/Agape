@@ -1247,6 +1247,17 @@ const OperationsCommandCenter = ({
           </button>
         ))}
       </div>
+
+      <button
+        onClick={() => setShowIntelligence(prev => !prev)}
+        className={`inline-flex min-h-[40px] items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all shrink-0 whitespace-nowrap ${
+          showIntelligence
+            ? 'bg-purple-600 text-white shadow-sm'
+            : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+        }`}
+      >
+        <BrainCircuit size={14} /> AI
+      </button>
     </div>
   );
 
