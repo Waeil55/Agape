@@ -102,13 +102,11 @@ export default function ChatPage({ currentUser, role, drivers = [], dispatchers 
         const data = d.data();
         const id = d.id;
         const email = (data.email || '').toLowerCase().trim();
-        const name = data.displayName || data.name || [data.firstName, data.lastName].filter(Boolean).join(' ');
-        const label = name || (email ? email.split('@')[0] : null) || data.phoneNumber || null;
-        if (label) {
-          p[id] = label;
-          if (email) p[email] = label;
-          if (data.phoneNumber) p[data.phoneNumber] = label;
-        }
+        const fullName = data.displayName || data.name || [data.firstName, data.lastName].filter(Boolean).join(' ');
+        const label = fullName || (email ? email.split('@')[0] : null) || data.phoneNumber || id.slice(0, 8);
+        p[id] = label;
+        if (email) p[email] = label;
+        if (data.phone) p[data.phone] = label;
       });
       setProfiles(p);
     });
@@ -144,17 +142,26 @@ export default function ChatPage({ currentUser, role, drivers = [], dispatchers 
     return () => box.removeEventListener('scroll', h);
   }, [hasMore, activeId, loadingMore]);
 
-  // name resolver
+  // name resolver — tries profiles map, drivers, dispatchers, email, fallback
   const name = useCallback((id) => {
     if (!id) return 'Unknown';
     if (profiles[id]) return profiles[id];
-    const d = drivers.find(x => x.email?.toLowerCase() === id.toLowerCase() || x.id === id);
-    if (d) return d.name || 'Unknown';
-    const dp = dispatchers.find(x => x.email?.toLowerCase() === id.toLowerCase() || x.id === id);
-    if (dp) return dp.name || 'Unknown';
-    if (id.includes('@')) return id.split('@')[0];
-    return id.slice(0, 8);
-  }, [profiles, drivers, dispatchers]);
+    if (id.includes('@')) {
+      const emailKey = id.toLowerCase();
+      if (profiles[emailKey]) return profiles[emailKey];
+      const d = drivers.find(x => (x.email||'').toLowerCase() === emailKey);
+      if (d) return d.name || id.split('@')[0];
+      const dp = dispatchers.find(x => (x.email||'').toLowerCase() === emailKey);
+      if (dp) return dp.name || id.split('@')[0];
+      return id.split('@')[0];
+    }
+    const d = drivers.find(x => x.id === id);
+    if (d) return d.name || id;
+    const dp = dispatchers.find(x => x.id === id);
+    if (dp) return dp.name || id;
+    if (currentUser && id === uid) return currentUser.split('@')[0];
+    return 'Unknown';
+  }, [profiles, drivers, dispatchers, currentUser, uid]);
 
   // unread count
   const unread = conversations.reduce((s, c) => s + (c.unread?.[uid] || 0), 0);
@@ -478,20 +485,20 @@ export default function ChatPage({ currentUser, role, drivers = [], dispatchers 
               <button onClick={() => setReplyTo(null)} className="p-1 rounded-full hover:bg-blue-100 text-gray-400"><X size={14} /></button>
             </div>
           )}
-          <div className="flex items-end gap-2 px-3 py-2">
-            <button className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-50 shrink-0"><Paperclip size={18} /></button>
-            <div className="flex-1 min-h-[40px] bg-gray-50 rounded-2xl border border-gray-200 flex items-end px-3 py-1.5 focus-within:border-[#2b4c7e] focus-within:ring-1 focus-within:ring-[#2b4c7e]/20 transition-all">
-              <textarea value={input} onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                rows={1} placeholder="Type a message..."
-                className="flex-1 bg-transparent resize-none text-[13px] text-gray-900 placeholder-gray-400 outline-none max-h-20 py-0.5" style={{ minHeight: '18px' }} />
-              <button className="p-1 text-gray-400 hover:text-gray-600 ml-1"><Smile size={16} /></button>
+            <div className="flex items-end gap-2 px-3 py-2">
+              <button className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-50 shrink-0"><Paperclip size={18} /></button>
+              <div className="flex-1 min-h-[40px] bg-gray-50 rounded-2xl border border-gray-200 flex items-center px-3 py-1.5 focus-within:border-[#2b4c7e] focus-within:ring-1 focus-within:ring-[#2b4c7e]/20 transition-all">
+                <input value={input} onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); send(); } }}
+                  placeholder="Type a message..." type="text"
+                  className="flex-1 bg-transparent text-[13px] text-gray-900 placeholder-gray-400 outline-none" />
+                <button className="p-1 text-gray-400 hover:text-gray-600 ml-1"><Smile size={16} /></button>
+              </div>
+              <button onClick={send} disabled={!input.trim() || sending}
+                className="p-2.5 rounded-full bg-[#2b4c7e] text-white shadow-md active:scale-95 transition-all disabled:opacity-40 shrink-0">
+                <Send size={16} />
+              </button>
             </div>
-            <button onClick={send} disabled={!input.trim() || sending}
-              className="p-2.5 rounded-full bg-[#2b4c7e] text-white shadow-md active:scale-95 transition-all disabled:opacity-40 shrink-0">
-              <Send size={16} />
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -620,11 +627,11 @@ export default function ChatPage({ currentUser, role, drivers = [], dispatchers 
                   </div>
                 )}
                 <div className="flex items-end gap-2 px-3 py-2">
-                  <div className="flex-1 min-h-[40px] bg-gray-50 rounded-2xl border border-gray-200 flex items-end px-3 py-1.5 focus-within:border-[#2b4c7e] focus-within:ring-1 focus-within:ring-[#2b4c7e]/20 transition-all">
-                    <textarea value={input} onChange={e => setInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                      rows={1} placeholder="Type a message..."
-                      className="flex-1 bg-transparent resize-none text-[13px] text-gray-900 placeholder-gray-400 outline-none max-h-20 py-0.5" style={{ minHeight: '18px' }} />
+                  <div className="flex-1 min-h-[40px] bg-gray-50 rounded-2xl border border-gray-200 flex items-center px-3 py-1.5 focus-within:border-[#2b4c7e] focus-within:ring-1 focus-within:ring-[#2b4c7e]/20 transition-all">
+                    <input value={input} onChange={e => setInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); send(); } }}
+                      placeholder="Type a message..." type="text"
+                      className="flex-1 bg-transparent text-[13px] text-gray-900 placeholder-gray-400 outline-none" />
                   </div>
                   <button onClick={send} disabled={!input.trim() || sending}
                     className="p-2.5 rounded-full bg-[#2b4c7e] text-white shadow-md active:scale-95 transition-all disabled:opacity-40 shrink-0">
