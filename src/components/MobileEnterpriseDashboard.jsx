@@ -273,56 +273,56 @@ const MobileEnterpriseDashboard = (props) => {
       {renderContent()}
 
       {/* BOTTOM NAVIGATION */}
-      <nav className="bottom-nav">
+      <nav className="bg-white/60 backdrop-blur-xl border-t border-white/30 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] relative z-20 safe-area-bottom" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}>
         <div className="flex h-full items-center justify-around gap-1">
           <button
             onClick={() => handleNavClick('trips')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <Home size={24} strokeWidth={currentView === 'trips' && !subView ? 2.2 : 1.6} className={`transition-all duration-200 ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[11px] font-medium leading-none ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Trips</span>
+            <Home size={22} strokeWidth={currentView === 'trips' && !subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Trips</span>
           </button>
 
           {driverWorkDrivers.length > 0 ? (
           <button
             onClick={() => handleNavClick('drive')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <User size={24} strokeWidth={currentView === 'drive' && !subView ? 2.2 : 1.6} className={`transition-all duration-200 ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[11px] font-medium leading-none ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Drive</span>
+            <User size={22} strokeWidth={currentView === 'drive' && !subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Drive</span>
           </button>
           ) : (
           <button
             onClick={() => handleNavClick('map')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <Map size={24} strokeWidth={currentView === 'map' && !subView ? 2.2 : 1.6} className={`transition-all duration-200 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[11px] font-medium leading-none ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Map</span>
+            <Map size={22} strokeWidth={currentView === 'map' && !subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Map</span>
           </button>
           )}
 
           <button
             onClick={() => handleNavClick('reports')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <BarChart2 size={24} strokeWidth={currentView === 'reports' && !subView ? 2.2 : 1.6} className={`transition-all duration-200 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[11px] font-medium leading-none ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Reports</span>
+            <BarChart2 size={22} strokeWidth={currentView === 'reports' && !subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Reports</span>
           </button>
 
           <button
             onClick={() => handleNavClick('chat')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 2.2 : 1.6} className={`transition-all duration-200 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[11px] font-medium leading-none ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
+            <MessageCircle size={22} strokeWidth={currentView === 'chat' && !subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
           </button>
 
           <button
             onClick={() => handleNavClick('menu')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            <Menu size={24} strokeWidth={currentView === 'menu' || subView ? 2.2 : 1.6} className={`transition-all duration-200 ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span className={`max-w-full truncate text-[11px] font-medium leading-none ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400'}`}>More</span>
+            <Menu size={22} strokeWidth={currentView === 'menu' || subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400'}`} />
+            <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400'}`}>More</span>
           </button>
         </div>
       </nav>
