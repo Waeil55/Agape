@@ -322,28 +322,55 @@ function mapColumns(row) {
 }
 
 const AI_BATCH_SIZE = 5;
-const AI_MAX_RETRIES = 3;
+const AI_MAX_RETRIES = 2;
 const AI_BASE_DELAY_MS = 1000;
-const AI_429_BASE_DELAY_MS = 5000;
+const AI_429_BASE_DELAY_MS = 2000;
+const AI_FETCH_TIMEOUT_MS = 25000;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+let _aiAbortController = null;
+let _aiSkipRequested = false;
+
+export function requestAiSkip() {
+  _aiSkipRequested = true;
+  if (_aiAbortController) {
+    _aiAbortController.abort();
+    _aiAbortController = null;
+  }
+}
+
+function resetAiSkip() {
+  _aiSkipRequested = false;
+  _aiAbortController = null;
+}
+
 async function aiValidate(rows, onProgress) {
   const results = [];
+  resetAiSkip();
   const geminiConfig = GEMINI_API_CONFIG();
   if (!geminiConfig.apiKey) {
     return rows.map(() => ({ issues: [], confidence: 100 }));
   }
 
   for (let i = 0; i < rows.length; i += AI_BATCH_SIZE) {
+    if (_aiSkipRequested) {
+      console.warn('[aiValidate] Skipped by user');
+      for (let j = 0; j < AI_BATCH_SIZE && i + j < rows.length; j++) {
+        if (!results[i + j]) results[i + j] = { issues: [], confidence: 100 };
+      }
+      break;
+    }
+
     const batch = rows.slice(i, i + AI_BATCH_SIZE);
     const batchNum = Math.floor(i / AI_BATCH_SIZE) + 1;
     const totalBatches = Math.ceil(rows.length / AI_BATCH_SIZE);
     let succeeded = false;
 
     for (let attempt = 0; attempt <= AI_MAX_RETRIES; attempt++) {
+      if (_aiSkipRequested) break;
       const retryLabel = attempt > 0 ? ` (retry ${attempt}/${AI_MAX_RETRIES})` : '';
-      onProgress(`AI validating batch ${batchNum}/${totalBatches}${retryLabel}...`, Math.round((i / rows.length) * 70) + 15);
+      onProgress(`AI validating batch ${batchNum}/${totalBatches}${retryLabel}...`, Math.round((i / rows.length) * 70) + 15, false);
 
       const prompt = `You are a data validation AI. For each trip below, check if the pickup and dropoff look like valid addresses, the time looks valid, and the client name is present. Return a JSON array of objects, one per input row, with fields: "issues" (array of strings describing problems, empty if none), "correctedPickup" (fix obvious typos or leave as-is), "correctedDropoff", "correctedTime", "confidence" (0-100). If all looks good, "issues" should be [].
 
@@ -353,6 +380,8 @@ ${JSON.stringify(batch.map((r, idx) => ({ idx: i + idx, patient: r.patient, pick
 Return ONLY valid JSON array. No markdown. No explanation.`;
 
       try {
+        _aiAbortController = new AbortController();
+        const timeoutId = setTimeout(() => _aiAbortController?.abort(), AI_FETCH_TIMEOUT_MS);
         const resp = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiConfig.apiKey}`,
           {
@@ -362,13 +391,15 @@ Return ONLY valid JSON array. No markdown. No explanation.`;
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
             }),
+            signal: _aiAbortController.signal,
           }
         );
+        clearTimeout(timeoutId);
 
         if (resp.status === 429) {
           const delay = AI_429_BASE_DELAY_MS * Math.pow(2, attempt);
-          console.warn(`[aiValidate] Rate limited (429) on batch ${batchNum}, waiting ${delay}ms before retry...`);
-          onProgress(`Rate limited — waiting ${Math.round(delay / 1000)}s before retry...`, Math.round((i / rows.length) * 70) + 15);
+          console.warn(`[aiValidate] Rate limited (429) on batch ${batchNum}, waiting ${delay}ms...`);
+          onProgress(`Rate limited — waiting ${Math.round(delay / 1000)}s before retry...`, Math.round((i / rows.length) * 70) + 15, true);
           await sleep(delay);
           continue;
         }
@@ -393,6 +424,7 @@ Return ONLY valid JSON array. No markdown. No explanation.`;
         succeeded = true;
         break;
       } catch (err) {
+        if (err.name === 'AbortError' && _aiSkipRequested) break;
         if (attempt < AI_MAX_RETRIES) {
           const delay = AI_BASE_DELAY_MS * Math.pow(2, attempt);
           console.warn(`[aiValidate] Batch ${batchNum} attempt ${attempt + 1} failed: ${err.message}. Retrying in ${delay}ms...`);
@@ -401,13 +433,14 @@ Return ONLY valid JSON array. No markdown. No explanation.`;
       }
     }
 
-    if (!succeeded) {
+    if (!succeeded && !_aiSkipRequested) {
       console.error(`[aiValidate] Batch ${batchNum} failed after ${AI_MAX_RETRIES + 1} attempts — marking as unvalidated`);
       for (let j = 0; j < batch.length && i + j < rows.length; j++) {
         if (!results[i + j]) results[i + j] = { issues: ['AI validation unavailable'], confidence: 50 };
       }
     }
   }
+  _aiAbortController = null;
   return results;
 }
 
@@ -432,6 +465,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   const [progressMsg, setProgressMsg] = useState('');
   const [progressPct, setProgressPct] = useState(0);
   const [aiEnabled, setAiEnabled] = useState(true);
+  const [aiCanSkip, setAiCanSkip] = useState(false);
   const [detectedColumns, setDetectedColumns] = useState({});
   const [allColumnNames, setAllColumnNames] = useState([]);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -839,9 +873,10 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       const geminiConfig = GEMINI_API_CONFIG();
 
       if (aiEnabled && geminiConfig.apiKey) {
-        const aiResults = await aiValidate(pairedMapped, (msg, pct) => {
+        const aiResults = await aiValidate(pairedMapped, (msg, pct, canSkip) => {
           setProgressMsg(msg);
           setProgressPct(pct);
+          setAiCanSkip(!!canSkip);
         });
 
         const updated = pairedMapped.map((trip, idx) => {
@@ -1006,6 +1041,14 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               <p className="flex items-center gap-2">{progressPct >= 12 ? <CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> : <Loader size={12} className="animate-spin text-blue-500 shrink-0" />} Rows parsed &amp; columns mapped</p>
               <p className="flex items-center gap-2">{progressPct >= 15 ? <Loader size={12} className={`animate-spin ${aiEnabled ? 'text-indigo-500' : 'text-slate-300'} shrink-0`} /> : <Info size={12} className="text-slate-300 shrink-0" />} {aiEnabled ? 'AI validating data...' : 'Ready for review'}</p>
             </div>
+            {aiCanSkip && (
+              <button
+                onClick={requestAiSkip}
+                className="mt-4 px-4 py-2 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold hover:bg-slate-200 active:scale-95 transition-all"
+              >
+                Skip AI Validation
+              </button>
+            )}
           </div>
         </div>
       )}
