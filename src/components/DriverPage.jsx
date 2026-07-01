@@ -5450,8 +5450,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== BOTTOM NAVIGATION ===== */}
       {!isEmbedded && (
-        <nav className="bg-white/60 backdrop-blur-xl border-t border-white/30 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] relative z-20 md:hidden safe-area-bottom px-2 py-1" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 6px)' }}>
-          <div className="flex items-center justify-between gap-1">
+        <nav className="bottom-nav md:hidden">
+          <div className="flex h-full items-center justify-between gap-1 px-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActiveTab = activeNav === item.id;
@@ -5464,18 +5464,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     }
                     setActiveNav(item.id);
                   }}
-                    className={`flex flex-col items-center justify-center rounded-2xl transition-all duration-200 min-w-[52px] min-h-[44px] px-2 py-1.5 ${
-                      isActiveTab ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-slate-500'
+                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${
+                      isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8] hover:text-[#64748b]'
                     }`}>
                     <div className="relative">
-                      <Icon size={22} strokeWidth={isActiveTab ? 2 : 1.5} />
+                      <Icon size={24} strokeWidth={isActiveTab ? 2.2 : 1.8}
+                        className={`transition-all duration-200 ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}
+                      />
                       {item.id === 'chat' && chatUnreadCount > 0 && (
                         <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center leading-none shadow-sm ring-2 ring-white">
                           {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                         </span>
                       )}
                     </div>
-                    <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
+                    <span className={`max-w-full truncate text-[11px] font-medium tracking-wide transition-all leading-none ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}>
                       {item.label}
                     </span>
                   </button>
