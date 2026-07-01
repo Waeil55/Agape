@@ -1942,16 +1942,9 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-center gap-0.5`}>
-                          <div className="leading-tight text-slate-900 text-[13px] font-bold">
-                            {(trip.patient || 'Unnamed Client').split(' ').length > 1
-                              ? (trip.patient || 'Unnamed Client').split(' ')[0]
-                              : (trip.patient || 'Unnamed Client')}
+                          <div className="leading-snug text-slate-900 text-xs">
+                            {trip.patient || 'Unnamed Client'}
                           </div>
-                          {(trip.patient || '').split(' ').length > 1 && (
-                            <div className="leading-tight text-slate-500 text-[10px]">
-                              {(trip.patient || '').split(' ').slice(1).join(' ')}
-                            </div>
-                          )}
                           {densityProfile.lineCount <= 2 ? (
                             densityProfile.lineCount === 2 && clientSummary && (
                               <div className="text-[10px] text-slate-400 truncate">{clientSummary}</div>
