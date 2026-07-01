@@ -2818,7 +2818,7 @@ const App = () => {
 
       {/* LOADING SCREEN */}
       {isLoading ? (
-        <div className="flex-1 bg-[#5a94af] flex items-center justify-center px-4">
+        <div className="flex-1 bg-[#5a94af] flex items-center justify-center px-4 font-outfit">
           <div className="w-full max-w-md bg-white border border-slate-200/50 rounded-[2.5rem] overflow-hidden shadow-2xl p-8 flex flex-col items-center gap-6 text-center">
             <img src="/agape.png" alt="Agape Care" className="w-24 h-24 object-contain" />
             <div className="text-center">
@@ -2854,7 +2854,7 @@ const App = () => {
       ) : !isAuthenticated ? (
         renderLoginScreen()
       ) : dataLoading && !forceDataLoad ? (
-        <div className="flex-1 bg-[#5a94af] flex items-center justify-center px-4">
+        <div className="flex-1 bg-[#5a94af] flex items-center justify-center px-4 font-outfit">
           <div className="w-full max-w-md bg-white border border-slate-200/50 rounded-[2.5rem] overflow-hidden shadow-2xl p-8 flex flex-col items-center gap-5 text-center">
             <img src="/agape.png" alt="Agape Care" className="w-20 h-20 object-contain" />
             <div>
