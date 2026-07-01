@@ -5464,7 +5464,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     }
                     setActiveNav(item.id);
                   }}
-                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${
+                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full transition-all duration-200 min-h-[44px] ${
                       isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
                     }`}>
                     <div className="relative">

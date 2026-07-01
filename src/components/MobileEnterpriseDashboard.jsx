@@ -277,7 +277,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex h-full items-center justify-around gap-1">
           <button
             onClick={() => handleNavClick('trips')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full transition-all duration-200 min-h-[44px] ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
             <Home size={22} strokeWidth={currentView === 'trips' && !subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
             <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Trips</span>
@@ -286,7 +286,7 @@ const MobileEnterpriseDashboard = (props) => {
           {driverWorkDrivers.length > 0 ? (
           <button
             onClick={() => handleNavClick('drive')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full transition-all duration-200 min-h-[44px] ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
             <User size={22} strokeWidth={currentView === 'drive' && !subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
             <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Drive</span>
@@ -294,7 +294,7 @@ const MobileEnterpriseDashboard = (props) => {
           ) : (
           <button
             onClick={() => handleNavClick('map')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full transition-all duration-200 min-h-[44px] ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
             <Map size={22} strokeWidth={currentView === 'map' && !subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
             <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Map</span>
@@ -303,7 +303,7 @@ const MobileEnterpriseDashboard = (props) => {
 
           <button
             onClick={() => handleNavClick('reports')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full transition-all duration-200 min-h-[44px] ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
             <BarChart2 size={22} strokeWidth={currentView === 'reports' && !subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
             <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Reports</span>
@@ -311,7 +311,7 @@ const MobileEnterpriseDashboard = (props) => {
 
           <button
             onClick={() => handleNavClick('chat')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full transition-all duration-200 min-h-[44px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
             <MessageCircle size={22} strokeWidth={currentView === 'chat' && !subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`} />
             <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
@@ -319,7 +319,7 @@ const MobileEnterpriseDashboard = (props) => {
 
           <button
             onClick={() => handleNavClick('menu')}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center transition-all duration-200 min-h-[44px] ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full transition-all duration-200 min-h-[44px] ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
           >
             <Menu size={22} strokeWidth={currentView === 'menu' || subView ? 2 : 1.5} className={`transition-all duration-200 ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400'}`} />
             <span className={`max-w-full truncate text-[10px] font-medium leading-none mt-1 ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400'}`}>More</span>

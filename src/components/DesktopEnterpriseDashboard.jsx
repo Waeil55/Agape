@@ -712,7 +712,7 @@ const DesktopEnterpriseDashboard = ({
           <button
             key={item.id}
             onClick={() => setActivePanel(item.id)}
-            className={`flex-1 flex flex-col items-center justify-center transition-all relative touch-manipulation min-h-[44px] ${
+            className={`flex-1 flex flex-col items-center justify-center rounded-full transition-all relative touch-manipulation min-h-[44px] ${
               isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
             }`}
           >
