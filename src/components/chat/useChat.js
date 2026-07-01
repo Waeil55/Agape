@@ -9,23 +9,6 @@ import { normalizeDialable, TELNYX_NUMBER, pickColor } from './helpers';
 
 const normalizeEmail = (e) => (e || '').trim().toLowerCase();
 
-const resolveDisplayName = (targetUid, drivers = [], dispatchers = []) => {
-  if (!targetUid) return 'Unknown';
-  if (targetUid.includes('@')) {
-    const emailName = targetUid.split('@')[0];
-    const driverByEmail = drivers.find(d => normalizeEmail(d.email) === normalizeEmail(targetUid));
-    if (driverByEmail) return driverByEmail.name || emailName;
-    const dispatcherByEmail = dispatchers.find(d => normalizeEmail(d.email) === normalizeEmail(targetUid));
-    if (dispatcherByEmail) return dispatcherByEmail.name || emailName;
-    return emailName;
-  }
-  const driver = drivers.find(d => d.id === targetUid);
-  if (driver) return driver.name || 'Unknown';
-  const dispatcher = dispatchers.find(d => d.id === targetUid);
-  if (dispatcher) return dispatcher.name || 'Unknown';
-  return 'Unknown';
-};
-
 export default function useChat({ currentUser, drivers = [], dispatchers = [], isMobile = false }) {
   const [conversations, setConversations] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -33,26 +16,22 @@ export default function useChat({ currentUser, drivers = [], dispatchers = [], i
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [unreadCount, setUnreadCount] = useState(0);
-  const [typing, setTyping] = useState({});
+  const [typing] = useState({});
   const [onlineMap] = useState({});
   const [replyTo, setReplyTo] = useState(null);
   const [sentiment, setSentiment] = useState(null);
   const [showInfo, setShowInfo] = useState(false);
   const [newMsg, setNewMsg] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalTab, setModalTab] = useState('team');
-  const [modalSearch, setModalSearch] = useState('');
-  const [modalLoading, setModalLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [userProfiles, setUserProfiles] = useState({});
   const messagesEnd = useRef(null);
   const inputRef = useRef(null);
   const lastDocRef = useRef(null);
   const activeConvoRef = useRef(activeConvo);
 
   const uid = auth.currentUser?.uid || '';
-  const userMapRef = useRef({});
-
   activeConvoRef.current = activeConvo;
 
   useEffect(() => {
@@ -129,13 +108,53 @@ export default function useChat({ currentUser, drivers = [], dispatchers = [], i
     setUnreadCount(total);
   }, [conversations, uid]);
 
+  useEffect(() => {
+    if (!uid) return;
+    const allIds = new Set();
+    conversations.forEach(c => {
+      (c.participants || []).forEach(p => {
+        if (p !== uid) allIds.add(p);
+      });
+    });
+    if (allIds.size === 0) return;
+
+    const unsub = onSnapshot(collection(db, 'users'), snap => {
+      const profiles = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const id = d.id;
+        const email = normalizeEmail(data.email);
+        const displayName = data.displayName || data.name || (data.firstName || data.lastName
+          ? [data.firstName, data.lastName].filter(Boolean).join(' ')
+          : email ? email.split('@')[0] : null);
+        if (displayName) {
+          profiles[id] = displayName;
+          if (email) profiles[email] = displayName;
+        }
+      });
+      setUserProfiles(prev => ({ ...prev, ...profiles }));
+    });
+    return unsub;
+  }, [uid, conversations.length]);
+
   const getDisplayName = useCallback((id) => {
     if (!id) return 'Unknown';
-    if (userMapRef.current[id]) return userMapRef.current[id];
-    const name = resolveDisplayName(id, drivers, dispatchers);
-    if (name !== 'Unknown') userMapRef.current[id] = name;
-    return name;
-  }, [drivers, dispatchers]);
+    if (userProfiles[id]) return userProfiles[id];
+    if (id.includes('@')) {
+      const emailName = id.split('@')[0];
+      if (userProfiles[id]) return userProfiles[id];
+      const driver = drivers.find(d => normalizeEmail(d.email) === normalizeEmail(id));
+      if (driver) return driver.name || emailName;
+      const dispatcher = dispatchers.find(d => normalizeEmail(d.email) === normalizeEmail(id));
+      if (dispatcher) return dispatcher.name || emailName;
+      return emailName;
+    }
+    const driver = drivers.find(d => d.id === id);
+    if (driver) return driver.name || 'Unknown';
+    const dispatcher = dispatchers.find(d => d.id === id);
+    if (dispatcher) return dispatcher.name || 'Unknown';
+    return id.slice(0, 8);
+  }, [userProfiles, drivers, dispatchers]);
 
   const send = useCallback(async (text, opts = {}) => {
     if (!activeConvo || !text?.trim() || !uid) return;
@@ -159,7 +178,6 @@ export default function useChat({ currentUser, drivers = [], dispatchers = [], i
     try {
       const convSnap = await getDoc(doc(db, 'chatData', activeConvo));
       const participants = convSnap.data()?.participants || [];
-      const senderNameFinal = getDisplayName(currentUser);
       for (const pid of participants) {
         if (pid === uid) continue;
         try {
@@ -171,7 +189,7 @@ export default function useChat({ currentUser, drivers = [], dispatchers = [], i
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 tokens: [fcmToken],
-                title: senderNameFinal,
+                title: senderName,
                 body: body.slice(0, 120),
                 data: { conversationId: activeConvoRef.current, type: 'chat_message' },
               }),
@@ -252,7 +270,6 @@ export default function useChat({ currentUser, drivers = [], dispatchers = [], i
     unreadCount, typing, onlineMap, replyTo, setReplyTo,
     sentiment, setSentiment, showInfo, setShowInfo,
     newMsg, setNewMsg, modalOpen, setModalOpen,
-    modalTab, setModalTab, modalSearch, setModalSearch, modalLoading, setModalLoading,
     loadingMore, hasMore, messagesEnd, inputRef,
     send, markRead, createConvo, createSmsConvo, deleteMessage,
     markTyping, getDisplayName, pickColor: (id) => pickColor(id || ''),
