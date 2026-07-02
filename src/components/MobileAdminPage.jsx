@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Activity, KeyRound, Search, Shield, Truck } from 'lucide-react';
 import { getDriverLiveStatus } from '../constants/statuses';
 import { auth, sendPasswordResetEmail } from '../config/firebase';
@@ -92,15 +92,18 @@ const MobileAdminPage = ({
     return { online, busy, offline };
   }, [drivers]);
 
+  const timeoutRefs = useRef([]);
+  useEffect(() => () => timeoutRefs.current.forEach(clearTimeout), []);
+
   const handlePasswordReset = async (email) => {
     if (!email) return;
     try {
       await sendPasswordResetEmail(auth, email);
       setPwResetMsg(prev => ({ ...prev, [email]: 'Email sent' }));
-      setTimeout(() => setPwResetMsg(prev => { const n = { ...prev }; delete n[email]; return n; }), 3000);
+      timeoutRefs.current.push(setTimeout(() => setPwResetMsg(prev => { const n = { ...prev }; delete n[email]; return n; }), 3000));
     } catch (err) {
       setPwResetMsg(prev => ({ ...prev, [email]: err.message || 'Failed' }));
-      setTimeout(() => setPwResetMsg(prev => { const n = { ...prev }; delete n[email]; return n; }), 3000);
+      timeoutRefs.current.push(setTimeout(() => setPwResetMsg(prev => { const n = { ...prev }; delete n[email]; return n; }), 3000));
     }
   };
 

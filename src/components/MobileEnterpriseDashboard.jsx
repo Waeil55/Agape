@@ -1,7 +1,15 @@
-import React, { useMemo, useState, useEffect, lazy, Suspense } from 'react';
+import React, { useMemo, useState, useEffect, lazy, Suspense, Component } from 'react';
 import {
   Home, Map, MessageCircle, ChevronLeft, User, Menu, Truck, BarChart2
 } from 'lucide-react';
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(err) { console.error('[MobileUI] Error:', err); }
+  render() { return this.state.hasError ? <div className="flex items-center justify-center h-32 text-xs text-red-500 font-semibold">Something went wrong. Tap menu to navigate.</div> : this.props.children; }
+}
+
 const DriverPage = lazy(() => import('./DriverPage'));
 const AdminPage = lazy(() => import('./AdminPage'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
@@ -15,7 +23,7 @@ import { getDriverLiveStatus } from '../constants/statuses';
 const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })));
 
 const MobileEnterpriseDashboard = (props) => {
-  const { trips, drivers, dispatchers, currentUser, role, onLogout, chatUnreadCount = 0 } = props;
+  const { trips = [], drivers = [], dispatchers = [], currentUser, role, onLogout, chatUnreadCount = 0 } = props;
   const [currentView, setCurrentView] = useState('trips');
   const [subView, setSubView] = useState(null); // admin, reports, settings, archives
   const [expandedId, setExpandedId] = useState(null);
@@ -92,7 +100,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Reports & Export', true)}
           <div className="flex-1 overflow-y-auto">
-            <Suspense fallback={<Fallback />}><ReportsPage {...props} /></Suspense>
+            <ErrorBoundary><Suspense fallback={<Fallback />}><ReportsPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -103,7 +111,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('User Management', true)}
           <div className="flex-1 overflow-y-auto">
-            <Suspense fallback={<Fallback />}><AdminPage {...props} /></Suspense>
+            <ErrorBoundary><Suspense fallback={<Fallback />}><AdminPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -114,7 +122,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Archives', true)}
           <div className="flex-1 overflow-hidden">
-            <Suspense fallback={<Fallback />}><ArchivesPage {...props} /></Suspense>
+            <ErrorBoundary><Suspense fallback={<Fallback />}><ArchivesPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -125,7 +133,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Settings', true)}
           <div className="flex-1 overflow-y-auto px-3 py-3">
-            <Suspense fallback={<Fallback />}><SettingsPage {...props} /></Suspense>
+            <ErrorBoundary><Suspense fallback={<Fallback />}><SettingsPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -136,7 +144,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Fleet Management', true)}
           <div className="flex-1 overflow-y-auto px-3 py-3">
-            <Suspense fallback={<Fallback />}><DriversVehiclesPage {...props} /></Suspense>
+            <ErrorBoundary><Suspense fallback={<Fallback />}><DriversVehiclesPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -147,7 +155,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Live Map', true)}
           <div className="flex-1 overflow-hidden">
-            <Suspense fallback={<Fallback />}><LiveMapPage trips={trips} drivers={drivers} /></Suspense>
+            <ErrorBoundary><Suspense fallback={<Fallback />}><LiveMapPage trips={trips} drivers={drivers} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -158,7 +166,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
           <div className="absolute inset-0">
-            <Suspense fallback={<Fallback />}><MobileDispatchView {...props} activeTab={currentView === 'trips' ? 'trips' : 'drivers'} expandedId={expandedId} setExpandedId={setExpandedId} /></Suspense>
+            <ErrorBoundary><Suspense fallback={<Fallback />}><MobileDispatchView {...props} activeTab={currentView === 'trips' ? 'trips' : 'drivers'} expandedId={expandedId} setExpandedId={setExpandedId} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -169,7 +177,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Reports & Export')}
           <div className="flex-1 overflow-y-auto">
-            <Suspense fallback={<Fallback />}><ReportsPage {...props} /></Suspense>
+            <ErrorBoundary><Suspense fallback={<Fallback />}><ReportsPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -178,7 +186,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'chat') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          <Suspense fallback={<Fallback />}><ChatPage onBack={() => setCurrentView('trips')} /></Suspense>
+          <ErrorBoundary><Suspense fallback={<Fallback />}><ChatPage onBack={() => setCurrentView('trips')} /></Suspense></ErrorBoundary>
         </div>
       );
     }
@@ -222,6 +230,7 @@ const MobileEnterpriseDashboard = (props) => {
             </select>
           </div>
           <div className="min-h-0 flex-1">
+            <ErrorBoundary>
             <Suspense fallback={<Fallback />}>
             <DriverPage
               {...props}
@@ -246,6 +255,7 @@ const MobileEnterpriseDashboard = (props) => {
               isEmbedded
             />
             </Suspense>
+            </ErrorBoundary>
           </div>
         </div>
       );
@@ -255,7 +265,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
           <div className="absolute inset-0">
-            <Suspense fallback={<Fallback />}><LiveMapPage {...props} /></Suspense>
+            <ErrorBoundary><Suspense fallback={<Fallback />}><LiveMapPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -264,7 +274,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'menu') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          <Suspense fallback={<Fallback />}><MobileMenuPage {...props} setSubView={setSubView} /></Suspense>
+          <ErrorBoundary><Suspense fallback={<Fallback />}><MobileMenuPage {...props} setSubView={setSubView} /></Suspense></ErrorBoundary>
         </div>
       );
     }

@@ -621,7 +621,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const [activeNav, setActiveNav] = useState(() => {
     const savedNav = localStorage.getItem(`agape_drvNav_${userKey}`) || 'trips';
-    return ['trips', 'tools', 'history', 'settings', 'active-trip'].includes(savedNav) ? savedNav : 'trips';
+    return ['trips', 'tools', 'chat', 'history', 'settings', 'active-trip'].includes(savedNav) ? savedNav : 'trips';
   });
   const [historyFilter, setHistoryFilter] = useState(() => localStorage.getItem(`agape_drvHistFilter_${userKey}`) || 'all');
   const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
@@ -1364,7 +1364,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const extra = driverPosition?.lat && driverPosition?.lng
       ? { clockLocation: { lat: driverPosition.lat, lng: driverPosition.lng } }
       : {};
-    onDriverStatusUpdate(driverId, newStatus, extra);
+    onDriverStatusUpdate?.(driverId, newStatus, extra);
     if (newStatus) {
       setShowToast({ type: 'success', message: 'Clocked in — you\'re online for trips.' });
     } else {
@@ -1436,7 +1436,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }
     pendingClockOutRef.current = setTimeout(() => {
       if (isClockedIn) {
-        onDriverStatusUpdate(driverId, false);
+        onDriverStatusUpdate?.(driverId, false);
         setShowToast({ type: 'info', message: `Auto clock-out at ${targetTime24} — shift ended.` });
       }
       pendingClockOutRef.current = null;
@@ -4982,7 +4982,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       }
                       const coords = await geocodeAddress(editHomeAddress.trim());
                       if (coords) {
-                        onDriverStatusUpdate(driverId, isClockedIn, {
+                        onDriverStatusUpdate?.(driverId, isClockedIn, {
                           homeLat: coords.lat,
                           homeLng: coords.lng,
                           homeAddress: coords.formattedAddress,
@@ -4990,7 +4990,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         setShowToast({ type: 'success', message: `Home set: ${coords.formattedAddress}` });
                       } else {
                         // Save as-is if geocoding fails
-                        onDriverStatusUpdate(driverId, isClockedIn, {
+                        onDriverStatusUpdate?.(driverId, isClockedIn, {
                           homeAddress: editHomeAddress.trim(),
                         });
                         setShowToast({ type: 'info', message: 'Could not geocode. Address saved as text.' });
@@ -5005,7 +5005,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     onClick={() => {
                       if (driverPosition?.lat && driverPosition?.lng) {
                         const label = `${driverPosition.lat.toFixed(6)}, ${driverPosition.lng.toFixed(6)}`;
-                        onDriverStatusUpdate(driverId, isClockedIn, {
+                        onDriverStatusUpdate?.(driverId, isClockedIn, {
                           homeLat: driverPosition.lat,
                           homeLng: driverPosition.lng,
                           homeAddress: label,

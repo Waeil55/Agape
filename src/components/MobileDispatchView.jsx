@@ -357,7 +357,7 @@ const MobileDispatchView = ({
         )}
         {activeTab==="drivers" && (
           <div className="px-2.5 py-3 space-y-2 sm:px-4">
-            {drivers.sort((a,b)=>{
+            {[...drivers].sort((a,b)=>{
               const aA=!["Offline","Unavailable"].includes(a.status),bA=!["Offline","Unavailable"].includes(b.status);
               if(aA&&!bA) return -1; if(!aA&&bA) return 1;
               return (a.name||"").localeCompare(b.name||"");
