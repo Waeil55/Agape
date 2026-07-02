@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft, ChevronLeft, MessageCircle, MoreHorizontal, Phone, Radio, Search, Shield,
+  ArrowLeft, ChevronLeft, MoreHorizontal, Phone, Radio, Search, Shield,
   Truck, User, Users, Video, X,
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
-import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
 import { formatChatTime, getAvatarColor, getInitials, getRoleColor } from '../../utils/chatHelpers';
 
@@ -293,17 +292,7 @@ const ChatPage = ({ onBack }) => {
             </div>
           </div>
 
-          <ChatMessages
-            messages={chat.messages}
-            currentUser={chat.currentUser}
-            onlineUsers={chat.onlineUsers}
-            onReaction={chat.sendReaction}
-            hasMore={chat.hasMore}
-            loadingMore={chat.loadingMessages}
-            onLoadMore={() => chat.loadMessages(chat.activeChannel, true)}
-            messagesEndRef={chat.messagesEndRef}
-            typingUsers={chat.typingUsers}
-          />
+          <div className="flex-1 min-h-0" />
 
           {canSend ? (
             <ChatInput
@@ -321,13 +310,7 @@ const ChatPage = ({ onBack }) => {
           )}
         </>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center bg-[#f0f2f5] p-8 text-center">
-          <div className="w-24 h-24 rounded-full bg-white shadow-sm flex items-center justify-center text-blue-500 mb-4">
-            <MessageCircle size={40} />
-          </div>
-          <h2 className="text-[22px] font-bold text-slate-950 mb-1">Your Messages</h2>
-          <p className="text-sm text-slate-500 max-w-[280px]">Send private messages to a friend or group</p>
-        </div>
+        <div className="flex flex-1 flex-col items-center justify-center bg-[#f0f2f5]" />
       )}
     </div>
   );
