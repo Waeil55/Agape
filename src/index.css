@@ -1587,6 +1587,13 @@ body * {
   background: transparent !important;
   box-shadow: none !important;
   width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 0% !important;
+  color: #1e293b !important;
+  caret-color: #1e293b !important;
+}
+.agape-chat-input textarea::placeholder {
+  color: #94a3b8 !important;
 }
 .agape-chat-input textarea::-webkit-scrollbar { display: none; }
 
