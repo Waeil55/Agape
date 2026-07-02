@@ -37,6 +37,27 @@ const LazyFallback = () => (
   </div>
 );
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(err) { console.error('[DesktopDashboard ErrorBoundary]', err); }
+  render() {
+    if (this.state.hasError) return (
+      <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-3">
+          <AlertTriangle size={20} className="text-red-400" />
+        </div>
+        <p className="text-sm font-bold text-slate-700">Something went wrong</p>
+        <p className="text-xs text-slate-500 mt-1">Try navigating to a different section.</p>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute', 'skills', 'senior', 'living', 'manor', 'village'];
 const isFacility = (name) => { const l = (name||'').toLowerCase().trim(); return l ? FACILITY_KEYWORDS.some(kw => l.includes(kw)) : false; };
 const getClientPhoneGlobal = (trip) => {
@@ -1087,7 +1108,7 @@ const DesktopEnterpriseDashboard = ({
     // On mobile screens (< 768px): show the premium mobile dispatch view
     if (isMobile) {
       return (
-        <Suspense fallback={<LazyFallback />}>
+        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
         <MobileDispatchView
           role={role}
           currentUser={currentUser}
@@ -1114,12 +1135,12 @@ const DesktopEnterpriseDashboard = ({
           fallbackAdminOnline={fallbackAdminOnline}
           setFallbackAdminOnline={setFallbackAdminOnline}
         />
-        </Suspense>
+        </Suspense></ErrorBoundary>
       );
     }
     // On desktop: unchanged OperationsCommandCenter
     return (
-      <Suspense fallback={<LazyFallback />}>
+      <ErrorBoundary><Suspense fallback={<LazyFallback />}>
       <OperationsCommandCenter
         role={role}
         currentUser={currentUser}
@@ -1164,7 +1185,7 @@ const DesktopEnterpriseDashboard = ({
         onTogglePanel={toggleRightPanel}
         phoneNumbers={phoneNumbers}
       />
-      </Suspense>
+      </Suspense></ErrorBoundary>
     );
   };
 
@@ -1174,17 +1195,17 @@ const DesktopEnterpriseDashboard = ({
     switch (activePanel) {
       case 'operations': return renderOperationsPage();
       case 'liveMap': return (
-        <Suspense fallback={<LazyFallback />}>
+        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
           <LiveMapPage role={role} currentUser={currentUser} drivers={drivers} trips={trips} driverTelemetry={driverTelemetry} onUpdateDriverLocation={handleUpdateDriverLocation} assignTripToDriver={assignTripToDriver} triggerSmartAssign={triggerSmartAssign} setManualAssignTrip={setManualAssignTrip} makeCall={makeCall} sendSMS={sendSMS} />
-        </Suspense>
+        </Suspense></ErrorBoundary>
       );
       case 'dispatch': return (
-        <Suspense fallback={<LazyFallback />}>
+        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
           <DispatchAssistant drivers={drivers} trips={trips} onAssignTrip={assignTripToDriver} addAuditLog={addAuditLog} currentUser={currentUser} />
-        </Suspense>
+        </Suspense></ErrorBoundary>
       );
       case 'routePlanner': return (
-        <Suspense fallback={<LazyFallback />}>
+        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
         <RoutePlannerPage
           trips={trips}
           drivers={drivers}
@@ -1197,17 +1218,17 @@ const DesktopEnterpriseDashboard = ({
             setShowSequencerModal(true);
           }}
         />
-        </Suspense>
+        </Suspense></ErrorBoundary>
       );
       case 'reports': return (
-        <Suspense fallback={<LazyFallback />}>
+        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
           <ReportsPage trips={trips} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} />
-        </Suspense>
+        </Suspense></ErrorBoundary>
       );
-      case 'chat': return <Suspense fallback={<LazyFallback />}><ChatPage onBack={() => setActivePanel('operations')} /></Suspense>;
-      case 'archives': return <Suspense fallback={<LazyFallback />}><ArchivesPage trashedTrips={trashedTrips} restoreTrip={restoreTrip} drivers={drivers} role={role} updateTrashedTrip={updateTrashedTrip} /></Suspense>;
+      case 'chat': return <ErrorBoundary><Suspense fallback={<LazyFallback />}><ChatPage onBack={() => setActivePanel('operations')} /></Suspense></ErrorBoundary>;
+      case 'archives': return <ErrorBoundary><Suspense fallback={<LazyFallback />}><ArchivesPage trashedTrips={trashedTrips} restoreTrip={restoreTrip} drivers={drivers} role={role} updateTrashedTrip={updateTrashedTrip} /></Suspense></ErrorBoundary>;
       case 'admin': return (
-        <Suspense fallback={<LazyFallback />}>
+        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
         <AdminPage
           role={role} currentUser={currentUser}
           drivers={drivers} setDrivers={setDrivers} upsertDriverProfile={upsertDriverProfile}
@@ -1223,12 +1244,12 @@ const DesktopEnterpriseDashboard = ({
             if (trip) setTripDetails(trip);
           }}
         />
-        </Suspense>
+        </Suspense></ErrorBoundary>
       );
       case 'settings': return (
-        <Suspense fallback={<LazyFallback />}>
+        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
         <SettingsPage currentUser={currentUser} role={role} onLogout={onLogout} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} initialSection={activePanel === 'archives' ? 'archives' : undefined} />
-        </Suspense>
+        </Suspense></ErrorBoundary>
       );
       case 'drive': return driverWorkDrivers.length > 0 && activeDriverWorkDriver ? (
         <div className="flex h-full min-h-0 flex-col bg-[#f4f7fa]">
@@ -1304,9 +1325,9 @@ const DesktopEnterpriseDashboard = ({
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
-              <Suspense fallback={<LazyFallback />}>
+              <ErrorBoundary><Suspense fallback={<LazyFallback />}>
                 <ReportsPage trips={trips} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} />
-              </Suspense>
+              </Suspense></ErrorBoundary>
             ) : (
               <div className={
                 activePanel === 'drive' || activePanel === 'admin' || activePanel === 'chat'
@@ -1363,7 +1384,7 @@ const DesktopEnterpriseDashboard = ({
               <button onClick={() => setShowUploadModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-600" /></button>
             </div>
             <div className="p-6">
-              <Suspense fallback={<LazyFallback />}>
+              <ErrorBoundary><Suspense fallback={<LazyFallback />}>
                 <FileUploadTrips
                   uploadContext={activePanel}
                   drivers={drivers}
@@ -1406,7 +1427,7 @@ const DesktopEnterpriseDashboard = ({
                     }
                   }}
                 />
-              </Suspense>
+              </Suspense></ErrorBoundary>
             </div>
           </div>
         </div>
@@ -1767,7 +1788,7 @@ const DesktopEnterpriseDashboard = ({
               <button onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-600" /></button>
             </div>
             <div className="flex-1 overflow-hidden">
-              <Suspense fallback={<LazyFallback />}>
+              <ErrorBoundary><Suspense fallback={<LazyFallback />}>
                 <RouteSequencerApp
                   key={routePlannerSequencerKey}
                   trips={trips} 
@@ -1802,7 +1823,7 @@ const DesktopEnterpriseDashboard = ({
                     addAuditLog('Route Applied', `${currentUser} synced ${routeTripIds.size} trip assignments from route "${route.name}".`, 'emerald');
                   }}
                 />
-              </Suspense>
+              </Suspense></ErrorBoundary>
             </div>
           </div>
         </div>
