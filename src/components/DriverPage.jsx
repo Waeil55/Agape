@@ -2612,7 +2612,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const getPrimaryTripAction = (trip) => {
     if (!trip) return null;
-    if (!isClockedIn) return null;
     const s = normalizeWorkflowStatus(trip.status);
     if (s === 'assigned' || s === 'unassigned') {
       return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-600/25', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
@@ -3856,7 +3855,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         onReroute: handleReroute,
                         onTransfer: () => openTransferPrompt('trip', trip),
                       } : {}),
-                      renderWorkflow: !isTerminal && primary && isClockedIn ? () => {
+                      renderWorkflow: !isTerminal && primary ? () => {
                         const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
                         const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
                         const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
