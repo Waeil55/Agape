@@ -96,7 +96,7 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
         </div>
       )}
 
-      <div className="flex items-end gap-2 px-2 py-2"
+      <div className="flex items-center gap-2 px-2 py-2"
            style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
         <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
           className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 disabled:opacity-50 transition-colors">
@@ -105,17 +105,15 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
         <input ref={fileInputRef} type="file" onChange={handleFileSelect}
           accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" className="hidden" />
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center bg-slate-100 rounded-[22px] border border-transparent focus-within:border-slate-300 focus-within:bg-white transition-all">
-            <button onClick={() => setShowEmoji(!showEmoji)}
-              className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full ml-0.5 mb-0.5 transition-colors ${showEmoji ? 'text-amber-500' : 'text-slate-400 hover:text-slate-600'}`}>
-              <Smile size={20} />
-            </button>
-            <textarea ref={inputRef} value={text} onChange={handleTextChange} onKeyDown={handleKeyDown}
-              placeholder={`Message ${channelName}...`} rows={1}
-              className="agape-chat-textarea flex-1 min-h-[38px] max-h-[120px] bg-transparent py-2 pr-3 text-[15px] text-slate-800 placeholder:text-slate-400 outline-none resize-none leading-snug"
-              style={{ minHeight: '38px' }} />
-          </div>
+        <div className="flex-1 min-w-0 flex items-center bg-slate-100 rounded-[22px] border border-transparent focus-within:border-slate-300 focus-within:bg-white transition-all">
+          <button onClick={() => setShowEmoji(!showEmoji)}
+            className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full ml-0.5 transition-colors ${showEmoji ? 'text-amber-500' : 'text-slate-400 hover:text-slate-600'}`}>
+            <Smile size={20} />
+          </button>
+          <textarea ref={inputRef} value={text} onChange={handleTextChange} onKeyDown={handleKeyDown}
+            placeholder={`Message ${channelName}...`} rows={1}
+            style={{ minHeight: '38px', flex: '1 1 0%', minWidth: 0 }}
+            className="min-h-[38px] max-h-[120px] bg-transparent py-2 pr-3 text-[15px] text-slate-800 placeholder:text-slate-400 outline-none resize-none leading-snug" />
         </div>
 
         {text.trim() ? (
