@@ -1,30 +1,18 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Send, Paperclip, Smile, Plus } from 'lucide-react';
+import { Send, Paperclip, Smile, Camera } from 'lucide-react';
 import { EMOJI_QUICK } from '../../utils/chatHelpers';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import app from '../../config/firebase';
 
 const storage = getStorage(app);
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-const ALLOWED_FILE_TYPES = [
-  'image/',
-  'application/pdf',
-  'text/plain',
-  'text/csv',
-  'application/msword',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument',
-];
+const ALLOWED_FILE_TYPES = ['image/','application/pdf','text/plain','text/csv','application/msword','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument'];
 
-const sanitizeFileName = (name) => String(name || 'attachment')
-  .replace(/[^\w.\- ]+/g, '_')
-  .replace(/\s+/g, '_')
-  .slice(0, 120);
-
+const sanitizeFileName = (name) => String(name || 'attachment').replace(/[^\w.\- ]+/g, '_').replace(/\s+/g, '_').slice(0, 120);
 const isAllowedFile = (file) => {
   const type = String(file?.type || '').toLowerCase();
   if (!type) return false;
-  return ALLOWED_FILE_TYPES.some(allowed => type.startsWith(allowed));
+  return ALLOWED_FILE_TYPES.some(a => type.startsWith(a));
 };
 
 const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser }) => {
@@ -38,10 +26,7 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
   const typingTimeoutRef = useRef(null);
   const currentUserUid = currentUser?.uid || '';
 
-  const showUploadMessage = useCallback((message) => {
-    setUploadProgress(message);
-    setTimeout(() => setUploadProgress(''), 3000);
-  }, []);
+  const showUploadMessage = useCallback((msg) => { setUploadProgress(msg); setTimeout(() => setUploadProgress(''), 3000); }, []);
 
   const handleTextChange = useCallback((e) => {
     setText(e.target.value);
@@ -55,91 +40,41 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
     onSend(text);
     setText('');
     onStopTyping();
+    setShowEmoji(false);
     inputRef.current?.focus();
   }, [text, uploading, onSend, onStopTyping]);
 
   const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }, [handleSend]);
 
   const uploadFile = useCallback(async (file) => {
-    if (!file) return;
-    if (!currentUserUid) {
-      showUploadMessage('Sign in again before uploading files');
-      return;
-    }
-    if (file.size > MAX_UPLOAD_BYTES) {
-      showUploadMessage('File is too large. Maximum size is 10 MB.');
-      return;
-    }
-    if (!isAllowedFile(file)) {
-      showUploadMessage('This file type is not allowed');
-      return;
-    }
-
+    if (!file || !currentUserUid) { showUploadMessage('Sign in again before uploading'); return; }
+    if (file.size > MAX_UPLOAD_BYTES) { showUploadMessage('File too large (max 10 MB)'); return; }
+    if (!isAllowedFile(file)) { showUploadMessage('File type not allowed'); return; }
     setUploading(true);
     setUploadProgress(`Uploading ${file.name}...`);
     let failed = false;
     try {
       const isImage = file.type.startsWith('image/');
-      const safeName = sanitizeFileName(file.name);
-      const storagePath = `chat_uploads/${currentUserUid}/${Date.now()}_${safeName}`;
-      const storageRef = ref(storage, storagePath);
-      const snapshot = await uploadBytes(storageRef, file);
+      const storagePath = `chat_uploads/${currentUserUid}/${Date.now()}_${sanitizeFileName(file.name)}`;
+      const snapshot = await uploadBytes(ref(storage, storagePath), file);
       const url = await getDownloadURL(snapshot.ref);
-
-      onSend(isImage ? '' : `Attachment: ${file.name}`, {
-        fileUrl: url,
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: isImage ? 'image' : 'file',
-        storagePath,
-      });
-    } catch (err) {
-      failed = true;
-      console.error('[Chat] upload error:', err);
-      showUploadMessage('Upload failed');
-    } finally {
-      setUploading(false);
-      if (!failed) setUploadProgress('');
-    }
+      onSend(isImage ? '' : `Attachment: ${file.name}`, { fileUrl: url, fileName: file.name, fileSize: file.size, fileType: isImage ? 'image' : 'file', storagePath });
+    } catch (err) { failed = true; console.error('[Chat] upload error:', err); showUploadMessage('Upload failed'); }
+    finally { setUploading(false); if (!failed) setUploadProgress(''); }
   }, [currentUserUid, onSend, showUploadMessage]);
 
-  const handleFileSelect = useCallback((e) => {
-    const file = e.target.files?.[0];
-    if (file) uploadFile(file);
-    e.target.value = '';
-  }, [uploadFile]);
-
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) uploadFile(file);
-  }, [uploadFile]);
-
-  const handleDragOver = useCallback((e) => {
-    e.preventDefault();
-    setDragOver(true);
-  }, []);
-
+  const handleFileSelect = useCallback((e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); e.target.value = ''; }, [uploadFile]);
+  const handleDrop = useCallback((e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) uploadFile(f); }, [uploadFile]);
+  const handleDragOver = useCallback((e) => { e.preventDefault(); setDragOver(true); }, []);
   const handleDragLeave = useCallback(() => setDragOver(false), []);
-
-  const addEmoji = useCallback((emoji) => {
-    setText(prev => prev + emoji);
-    inputRef.current?.focus();
-    setShowEmoji(false);
-  }, []);
+  const addEmoji = useCallback((emoji) => { setText(prev => prev + emoji); inputRef.current?.focus(); }, []);
 
   return (
     <div
-      className={`agape-chat-input shrink-0 border-t border-slate-100 ${dragOver ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
+      className={`agape-chat-input shrink-0 bg-white border-t border-slate-200/80 ${dragOver ? 'bg-blue-50' : ''}`}
+      onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
     >
       {uploadProgress && (
         <div className="px-4 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
@@ -148,21 +83,12 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
         </div>
       )}
 
-      {dragOver && (
-        <div className="px-4 py-2 bg-blue-50 border-b border-blue-200 text-center">
-          <p className="text-xs text-blue-600 font-semibold">Drop file to upload</p>
-        </div>
-      )}
-
       {showEmoji && (
-        <div className="px-4 py-2 border-b border-slate-100 bg-slate-50">
-          <div className="flex flex-wrap gap-1">
+        <div className="px-3 py-2 border-b border-slate-100 bg-slate-50">
+          <div className="flex flex-wrap gap-0.5">
             {EMOJI_QUICK.map(emoji => (
-              <button
-                key={emoji}
-                onClick={() => addEmoji(emoji)}
-                className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white text-xl transition-colors"
-              >
+              <button key={emoji} onClick={() => addEmoji(emoji)}
+                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white text-2xl transition-colors">
                 {emoji}
               </button>
             ))}
@@ -170,60 +96,40 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
         </div>
       )}
 
-      <div
-        className="flex items-end gap-2 px-3 py-2.5"
-        style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}
-      >
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 disabled:opacity-50 transition-colors"
-          title="Attach file"
-        >
-          <Paperclip size={20} />
+      <div className="flex items-end gap-2 px-2 py-2"
+           style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
+        <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 disabled:opacity-50 transition-colors">
+          <Paperclip size={22} />
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          onChange={handleFileSelect}
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
-          className="hidden"
-        />
+        <input ref={fileInputRef} type="file" onChange={handleFileSelect}
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" className="hidden" />
 
-        <div className="flex-1 min-w-0 relative">
-          <div className="flex items-end bg-slate-100 rounded-3xl border border-slate-200 focus-within:border-blue-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-            <textarea
-              ref={inputRef}
-              value={text}
-              onChange={handleTextChange}
-              onKeyDown={handleKeyDown}
-              placeholder={`Message ${channelName}...`}
-              rows={1}
-              className="flex-1 min-h-[40px] max-h-[120px] bg-transparent px-4 py-2.5 text-[15px] font-medium text-slate-800 placeholder:text-slate-400 outline-none resize-none leading-snug"
-              style={{ minHeight: '40px' }}
-              onInput={(e) => {
-                e.target.style.height = '40px';
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-              }}
-            />
-            <button
-              onClick={() => setShowEmoji(!showEmoji)}
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full mr-1 mb-0.5 transition-colors ${showEmoji ? 'bg-amber-100 text-amber-500' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}
-              title="Emoji"
-            >
-              <Smile size={19} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-end bg-slate-100 rounded-[22px] border border-transparent focus-within:border-slate-300 focus-within:bg-white transition-all">
+            <button onClick={() => setShowEmoji(!showEmoji)}
+              className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full ml-0.5 mb-0.5 transition-colors ${showEmoji ? 'text-amber-500' : 'text-slate-400 hover:text-slate-600'}`}>
+              <Smile size={20} />
             </button>
+            <textarea ref={inputRef} value={text} onChange={handleTextChange} onKeyDown={handleKeyDown}
+              placeholder={`Message ${channelName}...`} rows={1}
+              className="flex-1 min-h-[38px] max-h-[120px] bg-transparent py-2 pr-3 text-[15px] text-slate-800 placeholder:text-slate-400 outline-none resize-none leading-snug"
+              style={{ minHeight: '38px' }}
+              onInput={(e) => { e.target.style.height = '38px'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }} />
           </div>
         </div>
 
-        <button
-          onClick={handleSend}
-          disabled={!text.trim() || uploading}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-md shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-          title="Send"
-        >
-          <Send size={18} className="ml-0.5" />
-        </button>
+        {text.trim() ? (
+          <button onClick={handleSend} disabled={uploading}
+            className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm shadow-blue-500/30 active:scale-95 transition-all disabled:opacity-40">
+            <Send size={18} className="ml-0.5" />
+          </button>
+        ) : (
+          <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+            className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors">
+            <Camera size={22} />
+          </button>
+        )}
       </div>
     </div>
   );

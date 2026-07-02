@@ -33,13 +33,10 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
   }, [messages]);
 
   const relativeDateLabels = useMemo(() => {
-    const todayDate = new Date();
-    const yesterdayDate = new Date(todayDate.getTime() - 86400000);
-    const options = { year: 'numeric', month: 'numeric', day: 'numeric' };
-    return {
-      today: todayDate.toLocaleDateString('en-US', options),
-      yesterday: yesterdayDate.toLocaleDateString('en-US', options),
-    };
+    const today = new Date();
+    const yesterday = new Date(today.getTime() - 86400000);
+    const opts = { year: 'numeric', month: 'numeric', day: 'numeric' };
+    return { today: today.toLocaleDateString('en-US', opts), yesterday: yesterday.toLocaleDateString('en-US', opts) };
   }, []);
 
   const formatDateSeparator = (dateKey) => {
@@ -49,27 +46,24 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
   };
 
   return (
-    <div className="agape-chat-messages flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-4 py-2">
+    <div className="agape-chat-messages flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 sm:px-3 py-2 bg-[#f0f2f5]">
       {hasMore && (
-        <button
-          onClick={onLoadMore}
-          disabled={loadingMore}
-          className="w-full flex items-center justify-center gap-1.5 py-2.5 mb-1 text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
-        >
+        <button onClick={onLoadMore} disabled={loadingMore}
+          className="w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-xs text-blue-500 hover:text-blue-600 font-medium transition-colors">
           {loadingMore ? <Loader2 size={14} className="animate-spin" /> : <ChevronUp size={14} />}
           {loadingMore ? 'Loading...' : 'Load earlier messages'}
         </button>
       )}
 
       {messages.length === 0 && !loadingMore && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-3">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-400">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-20 h-20 rounded-full bg-white shadow-sm flex items-center justify-center mb-4">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-500">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
           </div>
           <p className="text-sm font-semibold text-slate-600">No messages yet</p>
-          <p className="text-xs text-slate-400 mt-1">Start the conversation!</p>
+          <p className="text-xs text-slate-400 mt-1">Send a message to start the conversation</p>
         </div>
       )}
 
@@ -84,13 +78,12 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
         return (
           <div key={gi} className={isLastInSequence ? 'mb-3' : 'mb-0.5'}>
             {showDateSeparator && (
-              <div className="flex items-center gap-3 py-3">
-                <div className="flex-1 h-px bg-slate-200/60" />
-                <span className="text-[10px] font-semibold text-slate-400 px-1">{formatDateSeparator(group.dateKey)}</span>
-                <div className="flex-1 h-px bg-slate-200/60" />
+              <div className="flex justify-center py-3">
+                <span className="px-3 py-1 rounded-full bg-white/80 shadow-sm text-[11px] font-semibold text-slate-500 backdrop-blur-sm">
+                  {formatDateSeparator(group.dateKey)}
+                </span>
               </div>
             )}
-
             <ChatMessage
               group={group}
               isOwn={isOwn}
@@ -105,17 +98,17 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
       })}
 
       {typingUsers.length > 0 && (
-        <div className="flex items-center gap-2 px-2 py-2 mt-1">
-          <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
-            <div className="flex gap-0.5">
-              <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+        <div className="flex items-center gap-2 px-3 py-2 mt-1">
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${getAvatarColorFallback(typingUsers[0]?.email)}`}>
+            <span className="text-white text-[9px] font-bold">{(typingUsers[0]?.name || '?')[0].toUpperCase()}</span>
+          </div>
+          <div className="bg-white rounded-2xl rounded-bl-md px-4 py-2.5 shadow-sm">
+            <div className="flex gap-1">
+              <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
           </div>
-          <span className="text-[11px] text-slate-400 italic">
-            {typingUsers.map(u => u.name.split(' ')[0]).join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
-          </span>
         </div>
       )}
 
@@ -123,5 +116,12 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
     </div>
   );
 };
+
+function getAvatarColorFallback(email) {
+  const colors = ['bg-blue-500','bg-emerald-500','bg-violet-500','bg-amber-500','bg-rose-500','bg-cyan-500','bg-pink-500','bg-indigo-500'];
+  let hash = 0;
+  for (let i = 0; i < (email || '').length; i++) hash = email.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
 
 export default ChatMessages;

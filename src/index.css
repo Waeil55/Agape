@@ -720,9 +720,9 @@ body {
   z-index: 50;
   min-height: 70px;
   width: auto;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 35px;
   box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.12), 0 4px 12px -4px rgba(0, 0, 0, 0.06);
@@ -1550,11 +1550,16 @@ body * {
 
 /* Chat bubbles must opt out of the global inherited max-width reset above.
    Without this, nested message bubbles can collapse to one character per line. */
-/* ===== CHAT PAGE — Mobile-First Enterprise Messaging ===== */
+/* ===== CHAT PAGE — Real Messenger (WhatsApp/iMessage Style) ===== */
 
 @keyframes chat-fade-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes chat-typing-dot {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
 }
 
 .agape-chat-page {
@@ -1564,7 +1569,9 @@ body * {
 
 .agape-chat-messages {
   overscroll-behavior: contain;
-  scroll-padding-bottom: 7rem;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-bottom: 6rem;
 }
 
 .agape-chat-input,
@@ -1572,82 +1579,18 @@ body * {
   padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
 }
 
-.agape-chat-message-row {
-  width: 100%;
-  display: flex;
-  align-items: flex-end;
-  gap: 0;
-  animation: chat-fade-in 0.2s ease-out;
+.agape-chat-input textarea {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-
-.agape-chat-column {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.agape-chat-bubble-stack {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.agape-chat-bubble-wrap {
-  position: relative;
-  max-width: 100%;
-}
-
-.agape-chat-bubble {
-  display: inline-block;
-  min-width: 2.75rem;
-  max-width: 100%;
-  overflow-wrap: break-word;
-  word-break: normal;
-}
-
-.agape-chat-text {
-  max-width: 100%;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-  word-break: normal;
-  text-wrap: pretty;
-  line-height: 1.45;
-}
-
-.agape-chat-attachment,
-.agape-chat-file,
-.agape-chat-media {
-  max-width: 100%;
-}
-
-.agape-chat-file {
-  min-width: min(12rem, 100%);
-}
-
-@media (max-width: 640px) {
-  .agape-chat-column {
-    min-width: 5rem;
-    max-width: min(82%, 28rem);
-  }
-}
+.agape-chat-input textarea::-webkit-scrollbar { display: none; }
 
 @media (max-width: 767px) {
-  .agape-chat-page {
-    padding-bottom: 0;
-  }
+  .agape-chat-page { padding-bottom: 0; }
 }
 
-/* Chat send button press animation */
-.agape-chat-input button:active:not(:disabled) {
-  transform: scale(0.92);
-}
-
-/* Smooth scroll for chat messages */
-.agape-chat-messages {
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-}
+/* Bubble press animation */
+.agape-chat-input button:active:not(:disabled) { transform: scale(0.92); }
 
 table {
   table-layout: auto;
