@@ -49,12 +49,12 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
   };
 
   return (
-    <div className="agape-chat-messages flex-1 overflow-y-auto px-3 py-2 space-y-1">
+    <div className="agape-chat-messages flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-4 py-2">
       {hasMore && (
         <button
           onClick={onLoadMore}
           disabled={loadingMore}
-          className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
+          className="w-full flex items-center justify-center gap-1.5 py-2.5 mb-1 text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
         >
           {loadingMore ? <Loader2 size={14} className="animate-spin" /> : <ChevronUp size={14} />}
           {loadingMore ? 'Loading...' : 'Load earlier messages'}
@@ -62,9 +62,11 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
       )}
 
       {messages.length === 0 && !loadingMore && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-3">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-400"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-400">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
           </div>
           <p className="text-sm font-semibold text-slate-600">No messages yet</p>
           <p className="text-xs text-slate-400 mt-1">Start the conversation!</p>
@@ -73,16 +75,21 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
 
       {groupedMessages.map((group, gi) => {
         const isOwn = group.senderEmail === currentUser.email;
+        const prevGroup = groupedMessages[gi - 1];
+        const nextGroup = groupedMessages[gi + 1];
+        const isFirstInSequence = !prevGroup || prevGroup.senderEmail !== group.senderEmail || prevGroup.dateKey !== group.dateKey;
+        const isLastInSequence = !nextGroup || nextGroup.senderEmail !== group.senderEmail || nextGroup.dateKey !== group.dateKey;
+        const showDateSeparator = gi === 0 || groupedMessages[gi - 1]?.dateKey !== group.dateKey;
+
         return (
-          <div key={gi}>
-            {/* Date separator */}
-            {gi === 0 || groupedMessages[gi - 1]?.dateKey !== group.dateKey ? (
-              <div className="flex items-center gap-2 py-2">
-                <div className="flex-1 h-px bg-slate-100" />
-                <span className="text-[10px] font-semibold text-slate-400 px-2">{formatDateSeparator(group.dateKey)}</span>
-                <div className="flex-1 h-px bg-slate-100" />
+          <div key={gi} className={isLastInSequence ? 'mb-3' : 'mb-0.5'}>
+            {showDateSeparator && (
+              <div className="flex items-center gap-3 py-3">
+                <div className="flex-1 h-px bg-slate-200/60" />
+                <span className="text-[10px] font-semibold text-slate-400 px-1">{formatDateSeparator(group.dateKey)}</span>
+                <div className="flex-1 h-px bg-slate-200/60" />
               </div>
-            ) : null}
+            )}
 
             <ChatMessage
               group={group}
@@ -90,17 +97,21 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
               onlineUsers={onlineUsers}
               onReaction={onReaction}
               currentUserEmail={currentUser.email}
+              isFirstInSequence={isFirstInSequence}
+              isLastInSequence={isLastInSequence}
             />
           </div>
         );
       })}
 
       {typingUsers.length > 0 && (
-        <div className="flex items-center gap-2 px-2 py-1">
-          <div className="flex gap-0.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+        <div className="flex items-center gap-2 px-2 py-2 mt-1">
+          <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+            <div className="flex gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
           </div>
           <span className="text-[11px] text-slate-400 italic">
             {typingUsers.map(u => u.name.split(' ')[0]).join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
@@ -108,7 +119,7 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
         </div>
       )}
 
-      <div ref={messagesEndRef} />
+      <div ref={messagesEndRef} className="h-1" />
     </div>
   );
 };

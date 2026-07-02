@@ -1550,20 +1550,16 @@ body * {
 
 /* Chat bubbles must opt out of the global inherited max-width reset above.
    Without this, nested message bubbles can collapse to one character per line. */
-.agape-chat-message-row,
-.agape-chat-message-row * {
-  max-width: none;
-}
+/* ===== CHAT PAGE — Mobile-First Enterprise Messaging ===== */
 
-.agape-chat-message-row {
-  width: 100%;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
+@keyframes chat-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .agape-chat-page {
   min-height: 0;
+  height: 100%;
 }
 
 .agape-chat-messages {
@@ -1573,24 +1569,21 @@ body * {
 
 .agape-chat-input,
 .agape-chat-readonly-footer {
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+}
+
+.agape-chat-message-row {
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  animation: chat-fade-in 0.2s ease-out;
 }
 
 .agape-chat-column {
   display: flex;
   flex-direction: column;
-  min-width: 8rem;
-  max-width: min(75%, 44rem);
-}
-
-.agape-chat-column--own {
-  align-items: flex-end;
-  margin-left: auto;
-}
-
-.agape-chat-column--other {
-  align-items: flex-start;
-  margin-right: auto;
+  min-width: 0;
 }
 
 .agape-chat-bubble-stack {
@@ -1619,6 +1612,7 @@ body * {
   overflow-wrap: break-word;
   word-break: normal;
   text-wrap: pretty;
+  line-height: 1.45;
 }
 
 .agape-chat-attachment,
@@ -1640,8 +1634,19 @@ body * {
 
 @media (max-width: 767px) {
   .agape-chat-page {
-    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 0;
   }
+}
+
+/* Chat send button press animation */
+.agape-chat-input button:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+/* Smooth scroll for chat messages */
+.agape-chat-messages {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {

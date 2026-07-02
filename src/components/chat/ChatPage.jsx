@@ -1,6 +1,7 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft, ChevronLeft, MessageCircle, Radio, Search, Shield, Truck, User, Users
+  ArrowLeft, ChevronLeft, MessageCircle, MoreHorizontal, Radio, Search, Shield,
+  Truck, User, Users, X,
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import ChatMessages from './ChatMessages';
@@ -8,18 +9,8 @@ import ChatInput from './ChatInput';
 import { formatChatTime, getAvatarColor, getInitials, getRoleColor } from '../../utils/chatHelpers';
 
 const ROLE_ORDER = ['admin', 'dispatcher', 'driver', 'user'];
-const ROLE_LABELS = {
-  admin: 'Admins',
-  dispatcher: 'Dispatchers',
-  driver: 'Drivers',
-  user: 'Users',
-};
-const ROLE_ICONS = {
-  admin: Shield,
-  dispatcher: Radio,
-  driver: Truck,
-  user: User,
-};
+const ROLE_LABELS = { admin: 'Admins', dispatcher: 'Dispatchers', driver: 'Drivers', user: 'Users' };
+const ROLE_ICONS = { admin: Shield, dispatcher: Radio, driver: Truck, user: User };
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
@@ -27,6 +18,14 @@ const ChatPage = ({ onBack }) => {
   const chat = useChat();
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState('sidebar');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const chatScrollRef = useRef(null);
+
+  useEffect(() => {
+    if (chat.activeChannel && mobileView === 'sidebar') {
+      setMobileView('chat');
+    }
+  }, [chat.activeChannel]);
 
   const employeeByEmail = useMemo(() => {
     const map = new Map();
@@ -67,15 +66,13 @@ const ChatPage = ({ onBack }) => {
   const ownConversationByEmail = useMemo(() => {
     const map = new Map();
     conversations
-      .filter(conversation => conversation.isCurrentUserParticipant)
-      .forEach((conversation) => {
-        conversation.others.forEach(email => map.set(email, conversation));
-      });
+      .filter(c => c.isCurrentUserParticipant)
+      .forEach((c) => { c.others.forEach(email => map.set(email, c)); });
     return map;
   }, [conversations]);
 
   const activeConversation = useMemo(() => (
-    conversations.find(conversation => conversation.id === chat.activeChannel) || null
+    conversations.find(c => c.id === chat.activeChannel) || null
   ), [chat.activeChannel, conversations]);
 
   const activeTitle = chat.activeDMTarget?.name || activeConversation?.title || 'Messages';
@@ -83,6 +80,7 @@ const ChatPage = ({ onBack }) => {
     ? activeConversation.subtitle
     : chat.activeDMTarget?.email || activeConversation?.subtitle || '';
   const activeStatusEmail = chat.activeDMTarget?.email || activeConversation?.others?.[0] || '';
+  const isOnline = chat.onlineUsers.has(activeStatusEmail);
   const canSendInActiveChannel = activeConversation
     ? activeConversation.isCurrentUserParticipant
     : chat.activeDMTarget?.isCurrentUserParticipant !== false;
@@ -90,11 +88,10 @@ const ChatPage = ({ onBack }) => {
   const filteredEmployees = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return chat.employees
-      .filter((employee) => {
+      .filter((e) => {
         if (!q) return true;
-        return employee.name.toLowerCase().includes(q) ||
-          employee.email.toLowerCase().includes(q) ||
-          String(employee.role || '').toLowerCase().includes(q);
+        return e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q) ||
+          String(e.role || '').toLowerCase().includes(q);
       })
       .sort((a, b) => {
         const roleDiff = ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role);
@@ -117,20 +114,16 @@ const ChatPage = ({ onBack }) => {
 
   const adminReviewConversations = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return conversations.filter((conversation) => {
-      if (!conversation.isAdminReview) return false;
+    return conversations.filter((c) => {
+      if (!c.isAdminReview) return false;
       if (!q) return true;
-      return conversation.title.toLowerCase().includes(q) ||
-        conversation.subtitle.toLowerCase().includes(q) ||
-        String(conversation.lastMessage || '').toLowerCase().includes(q);
+      return c.title.toLowerCase().includes(q) || c.subtitle.toLowerCase().includes(q) ||
+        String(c.lastMessage || '').toLowerCase().includes(q);
     });
   }, [conversations, searchQuery]);
 
   const recentConversations = useMemo(() => (
-    conversations.filter(conversation => (
-      conversation.isCurrentUserParticipant &&
-      (conversation.lastMessage || conversation.unread > 0)
-    ))
+    conversations.filter(c => c.isCurrentUserParticipant && (c.lastMessage || c.unread > 0))
   ), [conversations]);
 
   const openPerson = useCallback((employee) => {
@@ -144,22 +137,24 @@ const ChatPage = ({ onBack }) => {
   }, [chat]);
 
   const handleBackToSidebar = useCallback(() => {
+    chat.setActiveChannel(null);
+    chat.clearDMTarget();
     setMobileView('sidebar');
-  }, []);
+  }, [chat]);
 
-  const renderAvatar = (email, name, size = 'w-11 h-11') => {
-    const isOnline = chat.onlineUsers.has(email);
+  const renderAvatar = (email, name, size = 'w-10 h-10') => {
+    const online = chat.onlineUsers.has(email);
     return (
       <div className="relative shrink-0">
         <div className={`${size} rounded-full ${getAvatarColor(email)} flex items-center justify-center text-white text-xs font-bold`}>
           {getInitials(name)}
         </div>
-        <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+        <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
       </div>
     );
   };
 
-  const ConversationRow = ({ conversation, compact = false }) => {
+  const ConversationRow = ({ conversation }) => {
     const active = chat.activeChannel === conversation.id;
     return (
       <button
@@ -172,13 +167,11 @@ const ChatPage = ({ onBack }) => {
         {renderAvatar(conversation.others[0] || conversation.participants[0], conversation.title)}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className={`truncate text-sm ${conversation.unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-900'}`}>
+            <p className={`truncate text-[15px] ${conversation.unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-900'}`}>
               {conversation.title}
             </p>
             {conversation.isAdminReview && (
-              <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                Review
-              </span>
+              <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Review</span>
             )}
           </div>
           <p className={`mt-0.5 truncate text-xs ${conversation.unread > 0 ? 'font-semibold text-slate-700' : 'text-slate-500'}`}>
@@ -194,7 +187,6 @@ const ChatPage = ({ onBack }) => {
               {conversation.unread > 99 ? '99+' : conversation.unread}
             </span>
           )}
-          {compact && !conversation.unread && <span className="h-5" />}
         </div>
       </button>
     );
@@ -215,7 +207,7 @@ const ChatPage = ({ onBack }) => {
         {renderAvatar(employee.email, employee.name)}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className={`truncate text-sm ${unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-900'}`}>
+            <p className={`truncate text-[15px] ${unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-900'}`}>
               {employee.name}
             </p>
             <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${getRoleColor(employee.role)}`}>
@@ -244,46 +236,49 @@ const ChatPage = ({ onBack }) => {
 
   const renderSidebar = () => (
     <div className="flex h-full min-h-0 flex-col bg-white">
-      <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-3">
-        <div className="mb-3 flex items-center gap-3">
+      <div className="shrink-0 border-b border-slate-200/80 bg-white px-4 pt-[env(safe-area-inset-top)] pb-1">
+        <div className="flex items-center gap-3 py-3">
           {onBack && (
             <button
               type="button"
               onClick={onBack}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 md:hidden"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors md:hidden"
               aria-label="Back"
             >
-              <ChevronLeft size={20} />
+              <ChevronLeft size={22} />
             </button>
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold text-slate-950">Messages</h1>
-            <p className="truncate text-xs font-medium text-slate-500">
-              {chat.currentUser.name}
-            </p>
+            <h1 className="text-xl font-bold text-slate-950 tracking-tight">Messages</h1>
+            <p className="text-xs font-medium text-slate-500 mt-0.5">{chat.currentUser.name}</p>
           </div>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
             <MessageCircle size={20} />
           </div>
         </div>
 
-        <label className="flex h-11 items-center gap-2 rounded-full bg-slate-100 px-4">
+        <label className="flex h-11 items-center gap-2.5 rounded-2xl bg-slate-100 px-4 mb-3">
           <Search size={16} className="shrink-0 text-slate-400" />
           <input
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search people"
-            className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400"
+            placeholder="Search people..."
+            className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-slate-800 outline-none placeholder:text-slate-400"
           />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600">
+              <X size={16} />
+            </button>
+          )}
         </label>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
         {recentConversations.length > 0 && (
           <>
             <SectionHeader>Recent</SectionHeader>
             {recentConversations.map(conversation => (
-              <ConversationRow key={conversation.id} conversation={conversation} compact />
+              <ConversationRow key={conversation.id} conversation={conversation} />
             ))}
           </>
         )}
@@ -327,29 +322,48 @@ const ChatPage = ({ onBack }) => {
   );
 
   const renderChatArea = () => (
-    <div className="flex h-full min-h-0 flex-col bg-[#f8fafc]">
+    <div className="flex h-full min-h-0 flex-col bg-white">
       {chat.activeChannel ? (
         <>
-          <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-3 sm:px-4">
-            <div className="flex items-center gap-3">
+          <div
+            className="shrink-0 bg-white border-b border-slate-200/80 px-3 pt-[env(safe-area-inset-top)]"
+            style={{ minHeight: 60 }}
+          >
+            <div className="flex items-center gap-3 h-[60px]">
               <button
                 type="button"
                 onClick={handleBackToSidebar}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 md:hidden"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors md:hidden"
                 aria-label="Back to messages"
               >
                 <ArrowLeft size={20} />
               </button>
 
-              {renderAvatar(activeStatusEmail || activeTitle, activeTitle, 'w-11 h-11')}
+              {renderAvatar(activeStatusEmail || activeTitle, activeTitle)}
               <div className="min-w-0 flex-1">
-                <h2 className="truncate text-base font-bold text-slate-950">{activeTitle}</h2>
-                <p className="truncate text-xs font-medium text-slate-500">
-                  {activeConversation?.isAdminReview
-                    ? activeSubtitle
-                    : chat.onlineUsers.has(activeStatusEmail) ? 'Online' : activeSubtitle || 'Offline'}
+                <h2 className="truncate text-[16px] font-bold text-slate-950 leading-tight">{activeTitle}</h2>
+                <p className="truncate text-xs font-medium mt-0.5">
+                  {activeConversation?.isAdminReview ? (
+                    <span className="text-slate-500">{activeSubtitle}</span>
+                  ) : isOnline ? (
+                    <span className="text-emerald-600">Online</span>
+                  ) : (
+                    <span className="text-slate-400">{activeSubtitle || 'Offline'}</span>
+                  )}
                 </p>
               </div>
+              <button
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors"
+                aria-label="Search"
+              >
+                <Search size={19} />
+              </button>
+              <button
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors"
+                aria-label="More options"
+              >
+                <MoreHorizontal size={19} />
+              </button>
             </div>
           </div>
 
@@ -374,7 +388,8 @@ const ChatPage = ({ onBack }) => {
               currentUser={chat.currentUser}
             />
           ) : (
-            <div className="agape-chat-readonly-footer border-t border-slate-100 bg-white px-4 py-3 text-center text-xs font-semibold text-slate-500">
+            <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 text-center text-xs font-semibold text-slate-500"
+                 style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
               Read only
             </div>
           )}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Send, Paperclip, Smile } from 'lucide-react';
+import { Send, Paperclip, Smile, Plus } from 'lucide-react';
 import { EMOJI_QUICK } from '../../utils/chatHelpers';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import app from '../../config/firebase';
@@ -136,32 +136,32 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
 
   return (
     <div
-      className={`agape-chat-input border-t border-slate-100 shrink-0 ${dragOver ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}
+      className={`agape-chat-input shrink-0 border-t border-slate-100 ${dragOver ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
       {uploadProgress && (
-        <div className="px-3 py-1.5 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+        <div className="px-4 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
           {uploading && <div className="w-4 h-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />}
           <span className="text-[11px] text-blue-700 font-medium">{uploadProgress}</span>
         </div>
       )}
 
       {dragOver && (
-        <div className="px-3 py-2 bg-blue-50 border-b border-blue-200 text-center">
+        <div className="px-4 py-2 bg-blue-50 border-b border-blue-200 text-center">
           <p className="text-xs text-blue-600 font-semibold">Drop file to upload</p>
         </div>
       )}
 
       {showEmoji && (
-        <div className="px-3 py-2 border-b border-slate-100 bg-slate-50">
+        <div className="px-4 py-2 border-b border-slate-100 bg-slate-50">
           <div className="flex flex-wrap gap-1">
             {EMOJI_QUICK.map(emoji => (
               <button
                 key={emoji}
                 onClick={() => addEmoji(emoji)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white text-lg transition-colors"
+                className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white text-xl transition-colors"
               >
                 {emoji}
               </button>
@@ -170,14 +170,17 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
         </div>
       )}
 
-      <div className="flex items-end gap-2 px-3 py-2">
+      <div
+        className="flex items-end gap-2 px-3 py-2.5"
+        style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}
+      >
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 disabled:opacity-50 transition-colors"
           title="Attach file"
         >
-          <Paperclip size={18} />
+          <Paperclip size={20} />
         </button>
         <input
           ref={fileInputRef}
@@ -187,38 +190,39 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
           className="hidden"
         />
 
-        <div className="flex-1 min-w-0">
-          <textarea
-            ref={inputRef}
-            value={text}
-            onChange={handleTextChange}
-            onKeyDown={handleKeyDown}
-            placeholder={`Message ${channelName}...`}
-            rows={1}
-            className="w-full resize-none rounded-[22px] border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all max-h-[112px]"
-            style={{ minHeight: '38px' }}
-            onInput={(e) => {
-              e.target.style.height = '38px';
-              e.target.style.height = Math.min(e.target.scrollHeight, 112) + 'px';
-            }}
-          />
+        <div className="flex-1 min-w-0 relative">
+          <div className="flex items-end bg-slate-100 rounded-3xl border border-slate-200 focus-within:border-blue-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+            <textarea
+              ref={inputRef}
+              value={text}
+              onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
+              placeholder={`Message ${channelName}...`}
+              rows={1}
+              className="flex-1 min-h-[40px] max-h-[120px] bg-transparent px-4 py-2.5 text-[15px] font-medium text-slate-800 placeholder:text-slate-400 outline-none resize-none leading-snug"
+              style={{ minHeight: '40px' }}
+              onInput={(e) => {
+                e.target.style.height = '40px';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
+            />
+            <button
+              onClick={() => setShowEmoji(!showEmoji)}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full mr-1 mb-0.5 transition-colors ${showEmoji ? 'bg-amber-100 text-amber-500' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}
+              title="Emoji"
+            >
+              <Smile size={19} />
+            </button>
+          </div>
         </div>
-
-        <button
-          onClick={() => setShowEmoji(!showEmoji)}
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${showEmoji ? 'bg-amber-50 text-amber-500' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
-          title="Emoji"
-        >
-          <Smile size={18} />
-        </button>
 
         <button
           onClick={handleSend}
           disabled={!text.trim() || uploading}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-md shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
           title="Send"
         >
-          <Send size={18} />
+          <Send size={18} className="ml-0.5" />
         </button>
       </div>
     </div>
