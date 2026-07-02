@@ -1,9 +1,12 @@
 import React, { useState, memo } from 'react';
 import { getInitials, getAvatarColor, formatChatMessageTime, EMOJI_QUICK } from '../../utils/chatHelpers';
-import { FileText, Download, SmilePlus } from 'lucide-react';
+import { FileText, Download, SmilePlus, Check, CheckCheck } from 'lucide-react';
 
 const ChatMessage = memo(function ChatMessage({ group, isOwn, onlineUsers, onReaction, currentUserEmail, isFirstInSequence, isLastInSequence }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const lastMessage = group.messages[group.messages.length - 1];
+  const readBy = Array.isArray(lastMessage?.readBy) ? lastMessage.readBy : [];
+  const readByOther = readBy.some(email => String(email || '').toLowerCase() !== String(currentUserEmail || '').toLowerCase());
 
   return (
     <div className={`agape-chat-message-row flex ${isOwn ? 'justify-end' : 'justify-start'} ${isFirstInSequence ? 'mt-3' : 'mt-0.5'}`}>
@@ -41,16 +44,16 @@ const ChatMessage = memo(function ChatMessage({ group, isOwn, onlineUsers, onRea
         )}
 
         {/* Messages in group */}
-        <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} w-full`}>
+        <div className={`agape-chat-bubble-stack flex flex-col ${isOwn ? 'items-end' : 'items-start'} w-full`}>
           {group.messages.map((msg, mi) => (
             <div key={msg.id || mi} className="relative group w-full flex" style={{ justifyContent: isOwn ? 'flex-end' : 'flex-start' }}>
-              <div className={`relative max-w-full ${msg.type === 'image' ? '' : 'inline-block'}`}>
-                <div className={`inline-block rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed shadow-sm ${
+              <div className={`agape-chat-bubble-wrap relative ${msg.type === 'image' ? '' : 'inline-block'}`}>
+                <div className={`agape-chat-bubble inline-block rounded-[21px] px-3.5 py-2 text-[15px] leading-relaxed ${
                   isOwn
-                    ? 'bg-blue-600 text-white rounded-br-md'
-                    : 'bg-slate-100 text-slate-800 rounded-bl-md'
+                    ? 'bg-blue-600 text-white rounded-br-md shadow-sm shadow-blue-600/10'
+                    : 'bg-white text-slate-800 rounded-bl-md shadow-[0_1px_4px_rgba(15,23,42,0.08)]'
                 } ${msg.type === 'image' ? '!p-1.5' : ''} ${
-                  !isOwn && 'ring-1 ring-slate-200/50'
+                  !isOwn && 'ring-1 ring-slate-200/70'
                 }`}>
                   {/* File attachment */}
                   {msg.type === 'image' && msg.fileUrl && (
@@ -94,7 +97,7 @@ const ChatMessage = memo(function ChatMessage({ group, isOwn, onlineUsers, onRea
                   )}
 
                   {/* Text */}
-                  {msg.text && <p className="whitespace-pre-wrap break-words">{msg.text}</p>}
+                  {msg.text && <p className="agape-chat-text whitespace-pre-wrap break-words">{msg.text}</p>}
                 </div>
 
                 {/* Reactions */}
@@ -151,9 +154,15 @@ const ChatMessage = memo(function ChatMessage({ group, isOwn, onlineUsers, onRea
 
         {/* Timestamp */}
         {isLastInSequence && (
-          <p className={`text-[10px] text-slate-400 mt-1 px-1 ${isOwn ? 'text-right' : ''}`}>
-            {formatChatMessageTime(group.messages[group.messages.length - 1]?.timestamp)}
-          </p>
+          <div className={`mt-1 flex items-center gap-1 px-1 text-[10px] text-slate-400 ${isOwn ? 'justify-end text-right' : 'justify-start'}`}>
+            <span>{formatChatMessageTime(lastMessage?.timestamp)}</span>
+            {isOwn && (
+              <span className="inline-flex items-center gap-0.5 text-blue-400" title={readByOther ? 'Read' : 'Sent'}>
+                {readByOther ? <CheckCheck size={12} /> : <Check size={12} />}
+                <span>{readByOther ? 'Read' : 'Sent'}</span>
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>

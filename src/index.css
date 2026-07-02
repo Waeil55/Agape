@@ -714,25 +714,37 @@ body {
 /* ===== BOTTOM NAV BAR (Dispatcher/Admin/Driver mobile) ===== */
 .bottom-nav {
   position: fixed;
-  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
-  left: max(16px, env(safe-area-inset-left, 0px));
-  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 50;
-  min-height: 70px;
+  min-height: calc(74px + env(safe-area-inset-bottom, 0px));
   width: auto;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 35px;
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.12), 0 4px 12px -4px rgba(0, 0, 0, 0.06);
-  padding: 6px 16px;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(203, 213, 225, 0.72);
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.08), 0 -1px 0 rgba(15, 23, 42, 0.04);
+  padding: 8px max(14px, env(safe-area-inset-left, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-right, 0px));
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 [data-theme="dark"] .bottom-nav {
-  background: rgba(30, 41, 59, 0.7);
-  border-color: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.3), 0 4px 12px -4px rgba(0, 0, 0, 0.15);
+  background: rgba(15, 23, 42, 0.94);
+  border-color: rgba(71, 85, 105, 0.6);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.25), 0 -1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.bottom-nav button:not(.text-blue-600):not([class*="text-[#2563eb]"]) {
+  color: #475569;
+}
+
+.messenger-nav-badge,
+.chat-unread-badge {
+  font-variant-numeric: tabular-nums;
+  transform-origin: center;
+  animation: badge-pulse 0.32s ease-out;
 }
 
 
@@ -1560,16 +1572,28 @@ body * {
 .agape-chat-page {
   min-height: 0;
   height: 100%;
+  overflow: hidden;
+  --agape-chat-bottom-clearance: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
+.agape-chat-page,
+.agape-chat-page * {
+  max-width: none;
+}
+
+.agape-chat-header {
+  min-height: calc(60px + env(safe-area-inset-top, 0px));
 }
 
 .agape-chat-messages {
   overscroll-behavior: contain;
-  scroll-padding-bottom: 7rem;
+  scroll-padding-bottom: 1.25rem;
+  overflow-anchor: none;
 }
 
 .agape-chat-input,
 .agape-chat-readonly-footer {
-  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+  padding-bottom: 0;
 }
 
 .agape-chat-message-row {
@@ -1584,10 +1608,13 @@ body * {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  width: fit-content;
+  max-width: min(78%, 34rem);
 }
 
 .agape-chat-bubble-stack {
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
@@ -1595,6 +1622,7 @@ body * {
 
 .agape-chat-bubble-wrap {
   position: relative;
+  width: fit-content;
   max-width: 100%;
 }
 
@@ -1602,6 +1630,7 @@ body * {
   display: inline-block;
   min-width: 2.75rem;
   max-width: 100%;
+  width: auto;
   overflow-wrap: break-word;
   word-break: normal;
 }
@@ -1613,6 +1642,20 @@ body * {
   word-break: normal;
   text-wrap: pretty;
   line-height: 1.45;
+}
+
+.agape-chat-composer-row {
+  min-height: 60px;
+}
+
+.agape-chat-composer-pill,
+.agape-chat-textarea {
+  transition: min-height 0.16s ease, height 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.agape-chat-icon-button,
+.agape-chat-send-button {
+  align-self: flex-end;
 }
 
 .agape-chat-attachment,
@@ -1628,13 +1671,32 @@ body * {
 @media (max-width: 640px) {
   .agape-chat-column {
     min-width: 5rem;
-    max-width: min(82%, 28rem);
+    max-width: min(80%, 28rem);
   }
 }
 
 @media (max-width: 767px) {
   .agape-chat-page {
-    padding-bottom: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    padding-bottom: var(--agape-chat-bottom-clearance);
+  }
+
+  @supports (height: 100svh) {
+    .agape-chat-page {
+      height: 100svh;
+      max-height: 100svh;
+    }
+  }
+
+  .agape-chat-input {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+  }
+
+  .agape-chat-messages {
+    padding-bottom: 0.75rem;
   }
 }
 

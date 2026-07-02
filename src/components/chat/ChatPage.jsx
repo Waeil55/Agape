@@ -18,14 +18,37 @@ const ChatPage = ({ onBack }) => {
   const chat = useChat();
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState('sidebar');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const chatScrollRef = useRef(null);
+  const [pendingOpenChannelId, setPendingOpenChannelId] = useState('');
+  const searchInputRef = useRef(null);
 
   useEffect(() => {
     if (chat.activeChannel && mobileView === 'sidebar') {
       setMobileView('chat');
     }
   }, [chat.activeChannel]);
+
+  useEffect(() => {
+    window.__agapeActiveChatChannel = chat.activeChannel || '';
+    return () => {
+      if (window.__agapeActiveChatChannel === chat.activeChannel) {
+        window.__agapeActiveChatChannel = '';
+      }
+    };
+  }, [chat.activeChannel]);
+
+  useEffect(() => {
+    const storedChannel = sessionStorage.getItem('agape_open_chat_channel') || '';
+    if (storedChannel) setPendingOpenChannelId(storedChannel);
+
+    const handleOpenChat = (event) => {
+      const channelId = event?.detail?.channelId || sessionStorage.getItem('agape_open_chat_channel') || '';
+      if (channelId) setPendingOpenChannelId(channelId);
+      setMobileView('chat');
+    };
+
+    window.addEventListener('agape:open-chat', handleOpenChat);
+    return () => window.removeEventListener('agape:open-chat', handleOpenChat);
+  }, []);
 
   const employeeByEmail = useMemo(() => {
     const map = new Map();
@@ -136,11 +159,25 @@ const ChatPage = ({ onBack }) => {
     setMobileView('chat');
   }, [chat]);
 
+  useEffect(() => {
+    if (!pendingOpenChannelId) return;
+    const conversation = conversations.find(item => item.id === pendingOpenChannelId);
+    if (!conversation) return;
+    openConversation(conversation);
+    sessionStorage.removeItem('agape_open_chat_channel');
+    setPendingOpenChannelId('');
+  }, [conversations, openConversation, pendingOpenChannelId]);
+
   const handleBackToSidebar = useCallback(() => {
     chat.setActiveChannel(null);
     chat.clearDMTarget();
     setMobileView('sidebar');
   }, [chat]);
+
+  const focusSearch = useCallback(() => {
+    setMobileView('sidebar');
+    requestAnimationFrame(() => searchInputRef.current?.focus());
+  }, []);
 
   const renderAvatar = (email, name, size = 'w-10 h-10') => {
     const online = chat.onlineUsers.has(email);
@@ -156,6 +193,10 @@ const ChatPage = ({ onBack }) => {
 
   const ConversationRow = ({ conversation }) => {
     const active = chat.activeChannel === conversation.id;
+    const senderIsCurrentUser = normalizeEmail(conversation.lastMessageBy) === chat.currentUser.email;
+    const preview = conversation.lastMessage
+      ? `${senderIsCurrentUser ? 'You: ' : ''}${conversation.lastMessage}`
+      : conversation.subtitle || 'No messages yet';
     return (
       <button
         type="button"
@@ -174,8 +215,8 @@ const ChatPage = ({ onBack }) => {
               <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Review</span>
             )}
           </div>
-          <p className={`mt-0.5 truncate text-xs ${conversation.unread > 0 ? 'font-semibold text-slate-700' : 'text-slate-500'}`}>
-            {conversation.lastMessage || conversation.subtitle || 'No messages yet'}
+          <p className={`mt-0.5 truncate text-xs ${conversation.unread > 0 ? 'font-semibold text-slate-800' : 'text-slate-500'}`}>
+            {preview}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
@@ -183,7 +224,7 @@ const ChatPage = ({ onBack }) => {
             <span className="text-[10px] font-medium text-slate-400">{formatChatTime(conversation.lastMessageAt)}</span>
           )}
           {conversation.unread > 0 && (
-            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white badge-pulse shadow-[0_0_6px_rgba(244,63,94,0.4)]">
+            <span className="chat-unread-badge flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white badge-pulse shadow-[0_0_6px_rgba(37,99,235,0.35)]">
               {conversation.unread > 99 ? '99+' : conversation.unread}
             </span>
           )}
@@ -220,7 +261,7 @@ const ChatPage = ({ onBack }) => {
           </p>
         </div>
         {unread > 0 && (
-          <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white badge-pulse shadow-[0_0_6px_rgba(244,63,94,0.4)]">
+          <span className="chat-unread-badge flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white badge-pulse shadow-[0_0_6px_rgba(37,99,235,0.35)]">
             {unread > 99 ? '99+' : unread}
           </span>
         )}
@@ -260,6 +301,7 @@ const ChatPage = ({ onBack }) => {
         <label className="flex h-11 items-center gap-2.5 rounded-2xl bg-slate-100 px-4 mb-3">
           <Search size={16} className="shrink-0 text-slate-400" />
           <input
+            ref={searchInputRef}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Search people..."
@@ -326,8 +368,7 @@ const ChatPage = ({ onBack }) => {
       {chat.activeChannel ? (
         <>
           <div
-            className="shrink-0 bg-white border-b border-slate-200/80 px-3 pt-[env(safe-area-inset-top)]"
-            style={{ minHeight: 60 }}
+            className="agape-chat-header shrink-0 bg-white border-b border-slate-200/80 px-3 pt-[env(safe-area-inset-top)]"
           >
             <div className="flex items-center gap-3 h-[60px]">
               <button
@@ -353,6 +394,7 @@ const ChatPage = ({ onBack }) => {
                 </p>
               </div>
               <button
+                onClick={focusSearch}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors"
                 aria-label="Search"
               >
@@ -409,7 +451,7 @@ const ChatPage = ({ onBack }) => {
   );
 
   return (
-    <div className="agape-chat-page flex h-full min-h-0 bg-white">
+    <div className="agape-chat-page flex h-full min-h-0 bg-[#f6f8fb]">
       <div className="hidden h-full min-h-0 w-full md:grid md:grid-cols-[360px_minmax(0,1fr)]">
         <div className="min-h-0 border-r border-slate-200">
           {renderSidebar()}

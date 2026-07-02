@@ -49,7 +49,7 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
   };
 
   return (
-    <div className="agape-chat-messages flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-4 py-2">
+    <div className="agape-chat-messages flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[#f6f8fb] px-3 sm:px-4 py-2">
       {hasMore && (
         <button
           onClick={onLoadMore}
@@ -86,7 +86,7 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
             {showDateSeparator && (
               <div className="flex items-center gap-3 py-3">
                 <div className="flex-1 h-px bg-slate-200/60" />
-                <span className="text-[10px] font-semibold text-slate-400 px-1">{formatDateSeparator(group.dateKey)}</span>
+                <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-400 shadow-sm ring-1 ring-slate-200/60">{formatDateSeparator(group.dateKey)}</span>
                 <div className="flex-1 h-px bg-slate-200/60" />
               </div>
             )}
@@ -106,7 +106,7 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
 
       {typingUsers.length > 0 && (
         <div className="flex items-center gap-2 px-2 py-2 mt-1">
-          <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-full bg-white shadow-sm ring-1 ring-slate-200 flex items-center justify-center shrink-0">
             <div className="flex gap-0.5">
               <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
               <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />

@@ -632,6 +632,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     localStorage.setItem(`agape_drvHistFilter_${userKey}`, historyFilter);
     localStorage.setItem(`agape_drvHistSearch_${userKey}`, historySearch);
   }, [activeNav, historyFilter, historySearch, userKey]);
+
+  useEffect(() => {
+    const openChat = () => setActiveNav('chat');
+    if (sessionStorage.getItem('agape_open_chat_channel')) openChat();
+    window.addEventListener('agape:open-chat', openChat);
+    return () => window.removeEventListener('agape:open-chat', openChat);
+  }, []);
   const [selectedTrips, setSelectedTrips] = useState([]);
   const [routePlanStops, setRoutePlanStops] = useState(null);
   const [aiOptimizing, setAiOptimizing] = useState(false);
@@ -2959,7 +2966,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       items.splice(1, 0, { id: 'active-trip', label: firstName, sublabel: lastName, icon: Truck });
     }
     return items;
-  }, [activeWorkTripId, activeWorkTrip]);
+  }, [activeWorkTripId, activeWorkTrip, chatUnreadCount]);
 
   const navApp = appSettings.navigationApp || 'google';
 
@@ -2985,7 +2992,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           onClick={() => setExpandedTripId(null)}
         />
       )}
-      {!(activeNav === 'active-trip' && activeWorkTrip) && (
+      {activeNav !== 'chat' && !(activeNav === 'active-trip' && activeWorkTrip) && (
         <div
           className="sticky top-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
@@ -5641,7 +5648,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         className={`transition-all duration-200 ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}
                       />
                       {item.badge > 0 && (
-                        <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black leading-none text-white badge-pulse shadow-[0_0_6px_rgba(244,63,94,0.5)]">
+                        <span className="messenger-nav-badge absolute -right-2.5 -top-2.5 flex h-[19px] min-w-[19px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none text-white shadow-[0_1px_4px_rgba(239,68,68,0.45)] ring-2 ring-white">
                           {item.badge > 99 ? '99+' : item.badge}
                         </span>
                       )}

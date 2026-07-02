@@ -266,6 +266,13 @@ const DesktopEnterpriseDashboard = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    const openChat = () => setActivePanel('chat');
+    if (sessionStorage.getItem('agape_open_chat_channel')) openChat();
+    window.addEventListener('agape:open-chat', openChat);
+    return () => window.removeEventListener('agape:open-chat', openChat);
+  }, [setActivePanel]);
+
   const todayStr = new Date().toISOString().split('T')[0];
 
   const sidebarItems = [
@@ -481,7 +488,7 @@ const DesktopEnterpriseDashboard = ({
                 <span className="relative inline-flex">
                   <Icon size={13} />
                   {item.badge > 0 && (
-                    <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black leading-none text-white badge-pulse shadow-[0_0_6px_rgba(244,63,94,0.5)]">
+                    <span className="messenger-nav-badge absolute -right-2.5 -top-2.5 flex h-[19px] min-w-[19px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none text-white shadow-[0_1px_4px_rgba(239,68,68,0.45)] ring-2 ring-white">
                       {item.badge > 99 ? '99+' : item.badge}
                     </span>
                   )}

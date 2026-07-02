@@ -22,7 +22,7 @@ const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
 import { getDriverLiveStatus } from '../constants/statuses';
 const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })));
 
-const MobileMobileFallback = () => <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+const MobileFallback = () => <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 
 const MobileEnterpriseDashboard = (props) => {
   const { trips = [], drivers = [], dispatchers = [], currentUser, role, onLogout, chatUnreadCount = 0 } = props;
@@ -83,6 +83,16 @@ const MobileEnterpriseDashboard = (props) => {
   useEffect(() => {
     if (!VALID_VIEWS.includes(currentView)) setCurrentView('trips');
   }, [currentView]);
+
+  useEffect(() => {
+    const openChat = () => {
+      setCurrentView('chat');
+      setSubView(null);
+    };
+    if (sessionStorage.getItem('agape_open_chat_channel')) openChat();
+    window.addEventListener('agape:open-chat', openChat);
+    return () => window.removeEventListener('agape:open-chat', openChat);
+  }, []);
 
   const getProfileAbbr = () => {
     return role === 'admin' ? 'AD' : 'DS';
@@ -303,7 +313,10 @@ const MobileEnterpriseDashboard = (props) => {
   };
 
   return (
-    <div className="w-full h-[100dvh] bg-white flex flex-col relative overflow-hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 100px)' }}>
+    <div
+      className="w-full h-[100dvh] bg-white flex flex-col relative overflow-hidden"
+      style={{ paddingBottom: currentView === 'chat' && !subView ? 0 : 'calc(env(safe-area-inset-bottom, 0px) + 88px)' }}
+    >
       {/* Dynamic Content */}
       {renderContent()}
 
@@ -363,7 +376,7 @@ const MobileEnterpriseDashboard = (props) => {
                   <span className="relative inline-flex">
                     <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 2.2 : 1.6} />
                     {chatUnreadCount > 0 && (
-                      <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black leading-none text-white badge-pulse shadow-[0_0_6px_rgba(244,63,94,0.5)]">
+                      <span className="messenger-nav-badge absolute -right-2.5 -top-2.5 flex h-[19px] min-w-[19px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none text-white shadow-[0_1px_4px_rgba(239,68,68,0.45)] ring-2 ring-white">
                         {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                       </span>
                     )}

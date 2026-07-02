@@ -5,7 +5,7 @@ import {
   Settings, BrainCircuit, Zap,
   Target, Upload, AlertCircle,
   Activity, Wand2, Lock, Briefcase, User,
-  RefreshCcw, X
+  RefreshCcw, X, MessageCircle
 } from 'lucide-react';
 import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
@@ -39,7 +39,7 @@ import { useDriverAssignments } from './hooks/useDriverAssignments';
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v352';
+const APP_VERSION = 'v353';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -529,6 +529,8 @@ const App = () => {
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const chatUnreadCountsRef = useRef({});
+  const chatUnreadPrimedRef = useRef(false);
 
   const scopedDrivers = useMemo(
     () => filterDriversForRole(role, currentUser, drivers, dispatchers),
@@ -679,6 +681,7 @@ const App = () => {
 
   const [activeTab, setActiveTab] = useState(() => 'dashboard');
   const [toasts, setToasts] = useState([]);
+  const [messageBanners, setMessageBanners] = useState([]);
   const [selectedTasks, setSelectedTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   // eslint-disable-next-line no-unused-vars
@@ -712,6 +715,25 @@ const App = () => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, title, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+  }, []);
+
+  const addMessageBanner = useCallback((banner) => {
+    const id = `${banner.channelId || 'chat'}-${Date.now()}`;
+    setMessageBanners(prev => [
+      { ...banner, id },
+      ...prev.filter(item => item.channelId !== banner.channelId),
+    ].slice(0, 3));
+    setTimeout(() => {
+      setMessageBanners(prev => prev.filter(item => item.id !== id));
+    }, 5500);
+  }, []);
+
+  const openMessageBanner = useCallback((banner) => {
+    if (banner?.channelId) {
+      sessionStorage.setItem('agape_open_chat_channel', banner.channelId);
+    }
+    window.dispatchEvent(new CustomEvent('agape:open-chat', { detail: { channelId: banner?.channelId || '' } }));
+    setMessageBanners(prev => prev.filter(item => item.id !== banner?.id));
   }, []);
 
   const dataErrorRef = useRef(dataError);
@@ -1311,10 +1333,23 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search || '');
+    const channelId = params.get('chatChannel') || params.get('channelId') || '';
+    if (!channelId) return;
+    sessionStorage.setItem('agape_open_chat_channel', channelId);
+    window.history.replaceState({}, document.title, window.location.pathname || '/');
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('agape:open-chat', { detail: { channelId } }));
+    }, 0);
+  }, []);
+
+  useEffect(() => {
     const activeUid = auth.currentUser?.uid || '';
     const activeEmail = normalizeEmail(currentUser || auth.currentUser?.email || '');
     if (!isAuthenticated || !activeUid || !activeEmail) {
       setChatUnreadCount(0);
+      chatUnreadCountsRef.current = {};
+      chatUnreadPrimedRef.current = false;
       return undefined;
     }
 
@@ -1329,16 +1364,69 @@ const App = () => {
       query(channelsRef, where('participantIds', 'array-contains', activeEmail)),
       (snap) => {
         let total = 0;
+        const nextCounts = {};
+        let bannerCandidate = null;
         snap.forEach(channel => {
-          if (channel.data()?.type === 'dm') total += readUnreadCount(channel.data());
+          const data = channel.data();
+          if (data?.type !== 'dm') return;
+          const unread = readUnreadCount(data);
+          total += unread;
+          nextCounts[channel.id] = unread;
+
+          const previousUnread = chatUnreadCountsRef.current[channel.id] || 0;
+          const senderEmail = normalizeEmail(data.lastMessageBy || '');
+          const isActiveChat = window.__agapeActiveChatChannel === channel.id;
+          if (
+            chatUnreadPrimedRef.current &&
+            unread > previousUnread &&
+            senderEmail &&
+            senderEmail !== activeEmail &&
+            !isActiveChat
+          ) {
+            const lastMessageMs = data.lastMessageAt?.toMillis?.() || 0;
+            if (!bannerCandidate || lastMessageMs > (bannerCandidate.lastMessageMs || 0)) {
+              const participants = (data.dmParticipants || data.participantIds || []).map(normalizeEmail).filter(Boolean);
+              const senderLabel = senderEmail.split('@')[0] || 'New message';
+              bannerCandidate = {
+                channelId: channel.id,
+                senderName: data.lastMessageSenderName || senderLabel,
+                senderEmail,
+                message: data.lastMessage || 'Sent a message',
+                lastMessageMs,
+                participants,
+              };
+            }
+          }
         });
+        chatUnreadCountsRef.current = nextCounts;
+        chatUnreadPrimedRef.current = true;
         setChatUnreadCount(total);
+        if (bannerCandidate && document.visibilityState === 'visible') {
+          addMessageBanner(bannerCandidate);
+        }
       },
       (err) => console.error('Chat DM unread listener failed:', err)
     );
 
     return () => unsubscribe();
-  }, [isAuthenticated, currentUser]);
+  }, [addMessageBanner, isAuthenticated, currentUser]);
+
+  useEffect(() => {
+    const count = Math.max(0, Number(chatUnreadCount) || 0);
+    if (typeof navigator === 'undefined') return;
+
+    if ('setAppBadge' in navigator || 'clearAppBadge' in navigator) {
+      try {
+        if (count > 0 && navigator.setAppBadge) {
+          navigator.setAppBadge(count).catch?.(() => {});
+        } else if (navigator.clearAppBadge) {
+          navigator.clearAppBadge().catch?.(() => {});
+        }
+      } catch {
+        // Browser does not support badge updates in this mode.
+      }
+    }
+  }, [chatUnreadCount]);
 
   const addAuditLog = useCallback((title, desc, color, meta = null) => {
     const now = Date.now();
@@ -3061,6 +3149,36 @@ const App = () => {
             </Suspense>
           )}
           {renderSecurityAuthModal()}
+
+          {messageBanners.length > 0 && (
+            <div
+              className="fixed left-3 right-3 top-[calc(env(safe-area-inset-top,0px)+10px)] z-[210] mx-auto flex max-w-md flex-col gap-2 md:left-auto md:right-6 md:top-6"
+              aria-live="polite"
+            >
+              {messageBanners.map(banner => (
+                <button
+                  key={banner.id}
+                  type="button"
+                  onClick={() => openMessageBanner(banner)}
+                  className="group flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 text-left shadow-xl shadow-slate-900/10 ring-1 ring-white/80 transition hover:bg-white"
+                >
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-black uppercase text-white shadow-sm">
+                    {(banner.senderName || banner.senderEmail || 'M').slice(0, 1)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <MessageCircle size={14} className="shrink-0 text-blue-600" />
+                      <p className="truncate text-sm font-black text-slate-950">{banner.senderName || 'New message'}</p>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs font-semibold text-slate-600">{banner.message}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">
+                    Open
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Toast Notifications - Global */}
           <div className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-[200] flex flex-col gap-3 pointer-events-none">
