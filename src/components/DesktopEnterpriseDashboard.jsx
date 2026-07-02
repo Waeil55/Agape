@@ -128,9 +128,9 @@ const findTripLocations = (trip, trips, trashedTrips, logs) => {
 };
 
 const DesktopEnterpriseDashboard = ({
-  role, currentUser, trips, setTrips, drivers, setDrivers, upsertDriverProfile, dispatchers, setDispatchers, vehicles, setVehicles,
-  trashedTrips, setTrashedTrips, restoreTrip, logs, setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
-  selectedTasks, setSelectedTasks, searchQuery, setSearchQuery,
+  role, currentUser, trips = [], setTrips, drivers = [], setDrivers, upsertDriverProfile, dispatchers = [], setDispatchers, vehicles = [], setVehicles,
+  trashedTrips = [], setTrashedTrips, restoreTrip, logs = [], setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
+  selectedTasks = [], setSelectedTasks, searchQuery, setSearchQuery,
   smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
   smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing,
   showOptimizeModal, setShowOptimizeModal, showUploadModal, setShowUploadModal,
@@ -299,7 +299,7 @@ const DesktopEnterpriseDashboard = ({
 
   const searchedTrips = searchQuery
     ? sortedScheduled.filter(t =>
-        t.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.patient || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.bookingId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.pickup || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.dropoff || '').toLowerCase().includes(searchQuery.toLowerCase())
@@ -403,7 +403,7 @@ const DesktopEnterpriseDashboard = ({
   }, [activePanel, openOperationsWorkspace, setShowAddTripModal, setShowUploadModal]);
 
   // Command palette commands
-  const commands = [
+  const commands = useMemo(() => [
     { id: 'ops', label: 'Go to Operations', icon: LayoutDashboard, action: () => setActivePanel('operations') },
     { id: 'map', label: 'Go to Live Map', icon: MapPin, action: () => setActivePanel('liveMap') },
     { id: 'sequencer', label: 'Open Route Sequencer', icon: Route, action: () => setShowSequencerModal(true) },
@@ -418,11 +418,11 @@ const DesktopEnterpriseDashboard = ({
   ].filter(cmd => {
     if (cmd.id === 'admin' && role !== 'admin') return false;
     return true;
-  });
+  }), [role, toggleRightPanel]);
 
-  const filteredCommands = commandQuery
+  const filteredCommands = useMemo(() => commandQuery
     ? commands.filter(c => c.label.toLowerCase().includes(commandQuery.toLowerCase()))
-    : commands;
+    : commands, [commands, commandQuery]);
 
   const submitAuthAction = async (e) => {
     e.preventDefault();
@@ -446,83 +446,6 @@ const DesktopEnterpriseDashboard = ({
       setReAuthError('Invalid password. Action denied.');
     }
   };
-
-  // ==================== TOP NAVIGATION ====================
-  const renderTopBar = () => (
-    <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-white/50 px-3 hidden md:flex items-center gap-2 shrink-0 h-[40px]" style={{boxShadow: '0 1px 16px rgba(0,0,0,0.06)'}}>
-      {/* Brand */}
-      <div className="flex items-center gap-2 shrink-0">
-        <img src="/agape.png" alt="Agape Care" className="w-6 h-6 rounded-md object-contain" />
-        <div className="flex items-center gap-1.5">
-          <div className="hidden lg:block">
-            <h1 className="text-caption font-black text-slate-900 tracking-tight leading-none">Agape Care</h1>
-            <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">Enterprise</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="w-px h-4 bg-slate-200 shrink-0" />
-
-      {/* Main Navigation — icon + label, no overflow */}
-      <nav className="flex items-center gap-0.5">
-        {sidebarItems.map(item => {
-          const Icon = item.icon;
-          const isActive = activePanel === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActivePanel(item.id)}
-              title={item.label}
-              className={`flex items-center gap-1 px-2 py-1 min-h-[40px] rounded-md text-xs font-bold transition-all duration-150 whitespace-nowrap ${
-                isActive
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'
-              }`}
-            >
-              <Icon size={16} className={isActive ? 'text-white' : 'text-slate-500'} />
-              <span className="hidden sm:inline">{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      <div className="flex-1" />
-
-      {/* Action Tools (Operations only) */}
-      {activePanel === 'operations' && (
-        <div className="flex items-center gap-1 shrink-0">
-          {selectedTasks.length > 0 && (
-            <button
-              onClick={() => setBulkAssignModal(true)}
-              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold transition flex items-center gap-1 shadow-sm"
-            >
-              <Users size={16} /> Assign {selectedTasks.length}
-            </button>
-          )}
-          <button
-            onClick={toggleRightPanel}
-            title={showRightPanel ? 'Close command panel' : 'Open command panel'}
-            className={`p-1 rounded-md transition flex items-center gap-1 text-xs font-bold shadow-sm ${
-              showRightPanel
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-            }`}
-          >
-            <PanelRight size={16} />
-          </button>
-        </div>
-      )}
-
-      {/* User Avatar */}
-      <button
-        onClick={() => setActivePanel('settings')}
-        title={displayLoginId}
-        className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold hover:bg-slate-300 transition shrink-0 uppercase"
-      >
-        {(displayLoginId || 'U')[0]}
-      </button>
-    </header>
-  );
 
   const renderEnterpriseTopBar = () => (
     <header className="sticky top-0 z-30 hidden h-20 items-center gap-4 border-b border-slate-200/40 bg-white px-6 backdrop-blur-[12px] md:flex shadow-sm">
@@ -722,8 +645,6 @@ const DesktopEnterpriseDashboard = ({
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-3 py-3">
         {rightPanelTab === 'fleet' && (() => {
-          const todayStr = new Date().toISOString().split('T')[0];
-          const todayTrips = trips.filter(t => t.date === todayStr || !t.date);
           const totalTrips = todayTrips.length;
           const completed = todayTrips.filter(t => t.status === 'Completed').length;
           const inProgress = todayTrips.filter(t => ['In Progress', 'In Transit', 'At Pickup', 'At Dropoff', 'Navigating Pickup', 'Navigating Dropoff'].includes(t.status)).length;
@@ -1132,8 +1053,6 @@ const DesktopEnterpriseDashboard = ({
           addToast={addToast}
           phoneNumbers={phoneNumbers}
           onDispatcherStatusUpdate={onDispatcherStatusUpdate}
-          fallbackAdminOnline={fallbackAdminOnline}
-          setFallbackAdminOnline={setFallbackAdminOnline}
         />
         </Suspense></ErrorBoundary>
       );

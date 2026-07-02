@@ -31,6 +31,20 @@ const MobileEnterpriseDashboard = (props) => {
   const driverWorkTrips = props.driverWorkTrips?.length ? props.driverWorkTrips : trips;
   const [driverWorkDriverId, setDriverWorkDriverId] = useState(() => localStorage.getItem('agape_mobileDriverWorkDriverId') || '');
 
+  const expandedTripInfo = useMemo(() => {
+    if (!expandedId) return null;
+    const trip = trips.find(t => t.id === expandedId);
+    if (!trip) return null;
+    const patientName = trip.patient || '';
+    const nameParts = patientName.trim().split(/\s+/).filter(Boolean);
+    return {
+      trip,
+      firstName: nameParts[0] || '',
+      lastName: nameParts.slice(1).join(' ') || '',
+      showStackedName: currentView === 'trips',
+    };
+  }, [expandedId, trips, currentView]);
+
   const activeDriverWorkDriver = useMemo(() => {
     if (!driverWorkDrivers?.length) return null;
     return driverWorkDrivers.find((driver) => driver.id === driverWorkDriverId) || driverWorkDrivers[0];
@@ -60,7 +74,13 @@ const MobileEnterpriseDashboard = (props) => {
   const handleNavClick = (view) => {
     setCurrentView(view);
     setSubView(null);
+    setExpandedId(null);
   };
+
+  const VALID_VIEWS = ['trips', 'drive', 'map', 'reports', 'chat', 'menu', 'fleet'];
+  useEffect(() => {
+    if (!VALID_VIEWS.includes(currentView)) setCurrentView('trips');
+  }, [currentView]);
 
   const getProfileAbbr = () => {
     return role === 'admin' ? 'AD' : 'DS';
@@ -162,7 +182,7 @@ const MobileEnterpriseDashboard = (props) => {
     }
 
     // Main Navigation Views
-    if (currentView === 'trips' || currentView === 'fleet') {
+    if (currentView === 'trips') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
           <div className="absolute inset-0">
@@ -283,33 +303,23 @@ const MobileEnterpriseDashboard = (props) => {
   };
 
   return (
-    <div className="w-full h-[100dvh] bg-white flex flex-col relative overflow-hidden pb-[100px]">
+    <div className="w-full h-[100dvh] bg-white flex flex-col relative overflow-hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 100px)' }}>
       {/* Dynamic Content */}
       {renderContent()}
 
       {/* BOTTOM NAVIGATION */}
-      <nav className="bottom-nav">
+      <nav className="bottom-nav" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="flex h-full items-center justify-around gap-1">
-          {(() => {
-            const expandedTrip = expandedId ? trips.find(t => t.id === expandedId) : null;
-            const patientName = expandedTrip?.patient || '';
-            const nameParts = patientName.trim().split(/\s+/).filter(Boolean);
-            const firstName = nameParts[0] || '';
-            const lastName = nameParts.slice(1).join(' ') || '';
-            const showStackedName = expandedTrip && currentView === 'trips';
-
-            return (
-              <>
                 <button
                   onClick={() => { handleNavClick('trips'); setExpandedId(null); }}
-                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
-                  {showStackedName ? (
+                  {expandedTripInfo?.showStackedName ? (
                     <>
                       <User size={22} strokeWidth={2} className="text-blue-600" />
                       <div className="flex flex-col items-center leading-tight mt-0.5">
-                        <span className="text-[10px] font-bold text-blue-600">{firstName}</span>
-                        {lastName && <span className="text-[10px] font-bold text-blue-600">{lastName}</span>}
+                        <span className="text-[10px] font-bold text-blue-600">{expandedTripInfo.firstName}</span>
+                        {expandedTripInfo.lastName && <span className="text-[10px] font-bold text-blue-600">{expandedTripInfo.lastName}</span>}
                       </div>
                     </>
                   ) : (
@@ -323,7 +333,7 @@ const MobileEnterpriseDashboard = (props) => {
                 {driverWorkDrivers.length > 0 ? (
                 <button
                   onClick={() => handleNavClick('drive')}
-                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
                   <User size={24} strokeWidth={currentView === 'drive' && !subView ? 2.2 : 1.6} />
                   <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'drive' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Drive</span>
@@ -331,7 +341,7 @@ const MobileEnterpriseDashboard = (props) => {
                 ) : (
                 <button
                   onClick={() => handleNavClick('map')}
-                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
                   <Map size={24} strokeWidth={currentView === 'map' && !subView ? 2.2 : 1.6} />
                   <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Map</span>
@@ -340,7 +350,7 @@ const MobileEnterpriseDashboard = (props) => {
 
                 <button
                   onClick={() => handleNavClick('reports')}
-                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
                   <BarChart2 size={24} strokeWidth={currentView === 'reports' && !subView ? 2.2 : 1.6} />
                   <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Reports</span>
@@ -348,7 +358,7 @@ const MobileEnterpriseDashboard = (props) => {
 
                 <button
                   onClick={() => handleNavClick('chat')}
-                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
                   <span className="relative inline-flex">
                     <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 2.2 : 1.6} />
@@ -363,14 +373,11 @@ const MobileEnterpriseDashboard = (props) => {
 
                 <button
                   onClick={() => handleNavClick('menu')}
-                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'menu' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
-                  <Menu size={24} strokeWidth={currentView === 'menu' || subView ? 2.2 : 1.6} />
-                  <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'menu' || subView ? 'text-blue-600' : 'text-slate-400'}`}>More</span>
+                  <Menu size={24} strokeWidth={currentView === 'menu' ? 2.2 : 1.6} />
+                  <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'menu' ? 'text-blue-600' : 'text-slate-400'}`}>More</span>
                 </button>
-              </>
-            );
-          })()}
         </div>
       </nav>
 

@@ -531,7 +531,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers, dispatchers, driverAssignments = [], assignmentUnreadCount = 0, chatUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false }) => {
+const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, chatUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false }) => {
   const [phoneNumbersFallback, setPhoneNumbersFallback] = useState(null);
 
   useEffect(() => {
@@ -699,10 +699,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [sendingQuickSms, setSendingQuickSms] = useState(false);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
   const [showToast, setShowToast] = useState(null);
+  const toastTimeoutRef = useRef(null);
   useEffect(() => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     if (!showToast || showToast.action || showToast.type === 'error') return;
-    const t = setTimeout(() => setShowToast(null), 1000);
-    return () => clearTimeout(t);
+    toastTimeoutRef.current = setTimeout(() => setShowToast(null), 1000);
+    return () => { if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current); };
   }, [showToast]);
   const [expandedTripId, setExpandedTripIdRaw] = useState(null);
   const setExpandedTripId = useCallback((val) => {
@@ -1302,7 +1304,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       ))
   ), [routeTemplates, me?.id, me?.email, currentUser]);
 
-  const isClockedIn = true;
+  const isClockedIn = me?.clockedIn || false;
   const [showIdleLogoutPrompt, setShowIdleLogoutPrompt] = useState(false);
   const idlePromptedRef = useRef(false);
   const [showClockOutOffer, setShowClockOutOffer] = useState(false);
@@ -1621,7 +1623,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             geofenceProximityNotified.current.add(`${tripKey}_pu`);
             setTimeout(() => geofenceProximityNotified.current.delete(`${tripKey}_pu`), 30000);
             setShowToast({ message: `Near pickup: ${trip.patient}. Tap to arrive.`, action: 'arrive-pickup', trip });
-            setTimeout(() => setShowToast(null), 8000);
+            if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+            toastTimeoutRef.current = setTimeout(() => setShowToast(null), 8000);
           }
         }
 
@@ -1631,7 +1634,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             geofenceProximityNotified.current.add(`${tripKey}_do`);
             setTimeout(() => geofenceProximityNotified.current.delete(`${tripKey}_do`), 30000);
             setShowToast({ message: `Near dropoff: ${trip.patient}. Tap to arrive.`, action: 'arrive-dropoff', trip });
-            setTimeout(() => setShowToast(null), 8000);
+            if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+            toastTimeoutRef.current = setTimeout(() => setShowToast(null), 8000);
           }
         }
       });
@@ -1639,7 +1643,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     return () => clearInterval(timer);
   }, [driverPosition, activeTrips]);
 
-  const filteredHistory = selectedHistoryDayTrips.filter(t => {
+  const filteredHistory = useMemo(() => selectedHistoryDayTrips.filter(t => {
     const matchFilter = historyFilter === 'all' ? true :
       historyFilter === 'completed' ? normalizeWorkflowStatus(t.status) === 'completed' :
       historyFilter === 'noshow' ? normalizeWorkflowStatus(t.status) === 'no show' :
@@ -1652,13 +1656,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       (t.bookingId || '').toLowerCase().includes(q) ||
       (t.pickup || '').toLowerCase().includes(q) ||
       (t.dropoff || '').toLowerCase().includes(q);
-  });
-  const sortedFilteredHistory = [...filteredHistory].sort((a, b) => {
+  }), [selectedHistoryDayTrips, historyFilter, historySearch]);
+
+  const sortedFilteredHistory = useMemo(() => [...filteredHistory].sort((a, b) => {
     const finishedTime = getHistoryFinishedSortMs(a) - getHistoryFinishedSortMs(b);
     if (finishedTime !== 0) return finishedTime;
-
     return timeToMinutes(a.time) - timeToMinutes(b.time);
-  });
+  }), [filteredHistory]);
 
   const toggleTripSelect = (tripId) => {
     setSelectedTrips(prev =>
@@ -3759,13 +3763,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 const doneBarColor = 'bg-emerald-400';
 
                 const getPrimaryAction = () => {
-                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-600/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-teal-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
-                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 shadow-rose-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); setActiveTab('work'); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Assigned' || trip.status === 'Unassigned') return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-600/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'In Progress') return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Navigating Pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'At Pickup') return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-teal-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'In Transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'Navigating Dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); openTripWorkPage(trip.id); } };
+                  if (trip.status === 'At Dropoff' || trip.status === 'Arrived') return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 shadow-rose-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); openTripWorkPage(trip.id); } };
                   return null;
                 };
                 const primary = getPrimaryAction();
@@ -5462,7 +5466,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <Lock size={24} className="text-white" />
                 </div>
                 <h3 className="text-lg     font-semibold text-slate-900">Confirm {passwordPrompt.type === 'route_stop_exception' ? passwordPrompt.status : passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Reroute' : passwordPrompt.type === 'restore' ? 'Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Edit' : passwordPrompt.type === 'transfer_send' ? 'Transfer' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Cancel'}</h3>
-                <p className="text-xs text-slate-500 mt-1">{passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Enter your password to save your trip changes' : String(passwordPrompt.type || '').includes('transfer') ? 'Enter your password to confirm this transfer decision.' : passwordPrompt.type === 'route_stop_exception' ? `Enter your password to mark ${passwordPrompt.trip?.patient || 'this route stop'} as ${passwordPrompt.status}.` : `Enter your password to mark ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Rerouted' : 'Cancelled'}`}</p>
+                <p className="text-xs text-slate-500 mt-1">{passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Enter your password to save your trip changes' : String(passwordPrompt.type || '').includes('transfer') ? 'Enter your password to confirm this transfer decision.' : passwordPrompt.type === 'route_stop_exception' ? `Enter your password to mark ${passwordPrompt.trip?.patient || 'this route stop'} as ${passwordPrompt.status}.` : `Enter your password to mark ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip?.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Rerouted' : 'Cancelled'}`}</p>
                 {passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 && (
                   <p className="text-xs text-rose-500 font-semibold mt-1">{passwordPrompt.selectedLegIds.length} leg{passwordPrompt.selectedLegIds.length !== 1 ? 's' : ''} will be affected</p>
                 )}
@@ -5613,7 +5617,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== BOTTOM NAVIGATION ===== */}
       {!isEmbedded && (
-        <nav className="bottom-nav md:hidden">
+        <nav className="bottom-nav md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <div className="flex h-full items-center justify-between gap-2 px-3">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -5627,7 +5631,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     }
                     setActiveNav(item.id);
                   }}
-                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1.5 py-1.5 transition-all duration-200 min-h-[56px] ${
+                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1.5 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${
                       isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8] hover:text-[#64748b]'
                     }`}>
                     <div className="relative">
@@ -5845,12 +5849,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <p className="text-sm font-medium">{showToast.message}</p>
             </div>
             {showToast.action === 'arrive-pickup' && (
-              <button type="button" onClick={() => { setShowToast(null); handleArrivePickup(showToast.trip); }} className="px-4 py-2 bg-blue-500 rounded-xl text-xs font-semibold hover:bg-blue-400 transition-all shrink-0 cursor-pointer">
+              <button type="button" onClick={() => { setShowToast(null); if (showToast.trip) handleArrivePickup(showToast.trip); }} className="px-4 py-2 bg-blue-500 rounded-xl text-xs font-semibold hover:bg-blue-400 transition-all shrink-0 cursor-pointer">
                 Arrive
               </button>
             )}
             {showToast.action === 'arrive-dropoff' && (
-              <button type="button" onClick={() => { setShowToast(null); handleArriveDropoff(showToast.trip); }} className="px-4 py-2 bg-orange-500 rounded-xl text-xs font-semibold hover:bg-orange-400 transition-all shrink-0 cursor-pointer">
+              <button type="button" onClick={() => { setShowToast(null); if (showToast.trip) handleArriveDropoff(showToast.trip); }} className="px-4 py-2 bg-orange-500 rounded-xl text-xs font-semibold hover:bg-orange-400 transition-all shrink-0 cursor-pointer">
                 Arrive
               </button>
             )}
