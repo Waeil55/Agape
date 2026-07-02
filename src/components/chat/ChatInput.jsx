@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Send, Paperclip, Smile, Camera } from 'lucide-react';
 import { EMOJI_QUICK } from '../../utils/chatHelpers';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -25,6 +25,13 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const currentUserUid = currentUser?.uid || '';
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.width = '100%';
+      inputRef.current.style.flex = '1';
+    }
+  }, [text]);
 
   const showUploadMessage = useCallback((msg) => { setUploadProgress(msg); setTimeout(() => setUploadProgress(''), 3000); }, []);
 
@@ -73,7 +80,7 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
 
   return (
     <div
-      className={`agape-chat-input shrink-0 bg-white border-t border-slate-200/80 ${dragOver ? 'bg-blue-50' : ''}`}
+      className={`agape-chat-input shrink-0 w-full bg-white border-t border-slate-200/80 ${dragOver ? 'bg-blue-50' : ''}`}
       onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
     >
       {uploadProgress && (
@@ -112,8 +119,7 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
           </button>
           <textarea ref={inputRef} value={text} onChange={handleTextChange} onKeyDown={handleKeyDown}
             placeholder={`Message ${channelName}...`} rows={1}
-            style={{ minHeight: '38px', flex: '1 1 0%', minWidth: 0 }}
-            className="min-h-[38px] max-h-[120px] bg-transparent py-2 pr-3 text-[15px] text-slate-800 placeholder:text-slate-400 outline-none resize-none leading-snug" />
+            style={{ minHeight: '38px', flex: '1 1 0%', minWidth: 0, width: '100%', display: 'block', border: 'none', outline: 'none', background: 'transparent', resize: 'none', padding: '8px 12px 8px 0', fontSize: '15px', lineHeight: '1.4', color: '#1e293b', fontFamily: 'inherit', overflow: 'hidden' }} />
         </div>
 
         {text.trim() ? (

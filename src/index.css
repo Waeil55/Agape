@@ -1591,9 +1591,16 @@ body * {
   flex: 1 1 0% !important;
   color: #1e293b !important;
   caret-color: #1e293b !important;
+  font-size: 15px !important;
+  line-height: 1.4 !important;
 }
 .agape-chat-input textarea::placeholder {
   color: #94a3b8 !important;
+}
+.agape-chat-input textarea:focus {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 .agape-chat-input textarea::-webkit-scrollbar { display: none; }
 
