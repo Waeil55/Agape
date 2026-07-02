@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Send, Paperclip, Smile, Camera } from 'lucide-react';
 import { EMOJI_QUICK } from '../../utils/chatHelpers';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -25,13 +25,6 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const currentUserUid = currentUser?.uid || '';
-
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.style.width = '100%';
-      inputRef.current.style.flex = '1';
-    }
-  }, [text]);
 
   const showUploadMessage = useCallback((msg) => { setUploadProgress(msg); setTimeout(() => setUploadProgress(''), 3000); }, []);
 
@@ -117,9 +110,9 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
             className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full ml-0.5 transition-colors ${showEmoji ? 'text-amber-500' : 'text-slate-400 hover:text-slate-600'}`}>
             <Smile size={20} />
           </button>
-          <textarea ref={inputRef} value={text} onChange={handleTextChange} onKeyDown={handleKeyDown}
-            placeholder={`Message ${channelName}...`} rows={1}
-            style={{ minHeight: '38px', flex: '1 1 0%', minWidth: 0, width: '100%', display: 'block', border: 'none', outline: 'none', background: 'transparent', resize: 'none', padding: '8px 12px 8px 0', fontSize: '15px', lineHeight: '1.4', color: '#1e293b', fontFamily: 'inherit', overflow: 'hidden' }} />
+          <input ref={inputRef} type="text" value={text} onChange={handleTextChange} onKeyDown={handleKeyDown}
+            placeholder={`Message ${channelName}...`}
+            style={{ flex: '1 1 0%', minWidth: 0, border: 'none', outline: 'none', background: 'transparent', padding: '10px 12px 10px 0', fontSize: '15px', lineHeight: '1.4', color: '#1e293b', fontFamily: 'inherit' }} />
         </div>
 
         {text.trim() ? (

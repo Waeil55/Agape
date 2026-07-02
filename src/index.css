@@ -1579,7 +1579,8 @@ body * {
   padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
 }
 
-.agape-chat-input textarea {
+.agape-chat-input textarea,
+.agape-chat-input input {
   scrollbar-width: none;
   -ms-overflow-style: none;
   border: none !important;
@@ -1594,10 +1595,12 @@ body * {
   font-size: 15px !important;
   line-height: 1.4 !important;
 }
-.agape-chat-input textarea::placeholder {
+.agape-chat-input textarea::placeholder,
+.agape-chat-input input::placeholder {
   color: #94a3b8 !important;
 }
-.agape-chat-input textarea:focus {
+.agape-chat-input textarea:focus,
+.agape-chat-input input:focus {
   outline: none !important;
   border: none !important;
   box-shadow: none !important;
