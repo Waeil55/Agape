@@ -5641,7 +5641,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         className={`transition-all duration-200 ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}
                       />
                       {item.badge > 0 && (
-                        <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black leading-none text-white badge-pulse shadow-[0_0_6px_rgba(244,63,94,0.5)]">
+                        <span key={item.badge} className="absolute -right-2.5 -top-2 badge-messenger badge-pop badge-pulse">
                           {item.badge > 99 ? '99+' : item.badge}
                         </span>
                       )}

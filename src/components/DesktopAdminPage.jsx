@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, BrainCircuit, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase, Download } from 'lucide-react';
+import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, BrainCircuit, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase, Download, MessageCircle } from 'lucide-react';
 import { sendPasswordResetEmail, auth, db, firebaseConfig, setDoc, doc, deleteApp, initializeApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from '../config/firebase';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiSecurityAnalysis } from '../config/ai';
@@ -8,6 +8,7 @@ import DriversVehiclesPage from './DriversVehiclesPage';
 import UsersPage from './UsersPage';
 import DriverAvatar from './DriverAvatar';
 import DriverPerformanceCard from './DriverPerformanceCard';
+import AdminChatMonitor from './AdminChatMonitor';
 import { getDriverLiveStatus } from '../constants/statuses';
 
 const getEntityType = (log) => {
@@ -281,7 +282,7 @@ const exportFullJson = (trips, drivers, dispatchers, vehicles, logs) => {
 const DesktopAdminPage = ({
   role, currentUser, drivers, setDrivers, upsertDriverProfile, dispatchers, setDispatchers,
   addAuditLog, logs = [], trips, vehicles, setVehicles,
-  assignTripToDriver, requestAuthAction, onViewTrip
+  assignTripToDriver, requestAuthAction, onViewTrip, chatUnreadCount = 0
 }) => {
   const [activeSection, setActiveSection] = useState(() => role === 'admin' ? 'dispatchers' : 'drivers');
   const [pwResetMsg, setPwResetMsg] = useState({});
@@ -643,6 +644,10 @@ const DesktopAdminPage = ({
           logs={logs}
         />
       ) },
+    { id: 'chat', title: 'Chat Monitor', icon: MessageCircle, roles: ['admin'],
+      content: (
+        <AdminChatMonitor chatUnreadCount={chatUnreadCount} />
+      ) },
   ];
   const visibleSections = sections.filter((section) => !section.roles || section.roles.includes(role));
 
@@ -726,7 +731,14 @@ const DesktopAdminPage = ({
             return (
               <button key={s.id} onClick={() => toggleSection(s.id)}
                 className={`flex flex-col items-center justify-center rounded-full px-2 py-1.5 transition-all duration-200 relative flex-1 min-h-[56px] ${isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}>
-                <Icon size={22} strokeWidth={isActive ? 2 : 1.5} className="transition-all" />
+                <span className="relative inline-flex">
+                  <Icon size={22} strokeWidth={isActive ? 2 : 1.5} className="transition-all" />
+                  {s.id === 'chat' && chatUnreadCount > 0 && (
+                    <span key={chatUnreadCount} className="absolute -right-2.5 -top-1.5 badge-messenger badge-pop badge-pulse">
+                      {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                    </span>
+                  )}
+                </span>
                 <span className={`text-[10px] font-medium leading-none mt-1 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>{s.title}</span>
               </button>
             );

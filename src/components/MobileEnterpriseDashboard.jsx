@@ -363,7 +363,7 @@ const MobileEnterpriseDashboard = (props) => {
                   <span className="relative inline-flex">
                     <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 2.2 : 1.6} />
                     {chatUnreadCount > 0 && (
-                      <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black leading-none text-white badge-pulse shadow-[0_0_6px_rgba(244,63,94,0.5)]">
+                      <span key={chatUnreadCount} className="absolute -right-2.5 -top-1.5 badge-messenger badge-pop badge-pulse">
                         {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                       </span>
                     )}
