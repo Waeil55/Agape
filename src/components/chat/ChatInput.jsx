@@ -106,14 +106,14 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
           accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" className="hidden" />
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-end bg-slate-100 rounded-[22px] border border-transparent focus-within:border-slate-300 focus-within:bg-white transition-all">
+          <div className="flex items-center bg-slate-100 rounded-[22px] border border-transparent focus-within:border-slate-300 focus-within:bg-white transition-all">
             <button onClick={() => setShowEmoji(!showEmoji)}
               className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full ml-0.5 mb-0.5 transition-colors ${showEmoji ? 'text-amber-500' : 'text-slate-400 hover:text-slate-600'}`}>
               <Smile size={20} />
             </button>
             <textarea ref={inputRef} value={text} onChange={handleTextChange} onKeyDown={handleKeyDown}
               placeholder={`Message ${channelName}...`} rows={1}
-              className="flex-1 min-h-[38px] max-h-[120px] bg-transparent py-2 pr-3 text-[15px] text-slate-800 placeholder:text-slate-400 outline-none resize-none leading-snug"
+              className="flex-1 w-full min-h-[38px] max-h-[120px] bg-transparent py-2 pr-3 text-[15px] text-slate-800 placeholder:text-slate-400 outline-none resize-none leading-snug"
               style={{ minHeight: '38px' }}
               onInput={(e) => { e.target.style.height = '38px'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }} />
           </div>

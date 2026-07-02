@@ -1582,6 +1582,11 @@ body * {
 .agape-chat-input textarea {
   scrollbar-width: none;
   -ms-overflow-style: none;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  width: 100% !important;
 }
 .agape-chat-input textarea::-webkit-scrollbar { display: none; }
 
