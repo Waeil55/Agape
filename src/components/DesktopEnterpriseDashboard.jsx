@@ -481,7 +481,7 @@ const DesktopEnterpriseDashboard = ({
                 <span className="relative inline-flex">
                   <Icon size={13} />
                   {item.badge > 0 && (
-                    <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black leading-none text-white">
+                    <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black leading-none text-white badge-pulse shadow-[0_0_6px_rgba(244,63,94,0.5)]">
                       {item.badge > 99 ? '99+' : item.badge}
                     </span>
                   )}

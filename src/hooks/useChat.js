@@ -172,6 +172,33 @@ export function useChat() {
     };
   }, [userEmail, userDisplayName, userUid]);
 
+  // Global message listener — plays sound for ANY new message across ALL channels
+  const lastSoundTimeRef = useRef(0);
+  useEffect(() => {
+    if (!userEmail) return undefined;
+    const msgsRef = collection(db, 'chat_messages');
+    const q = query(
+      msgsRef,
+      where('senderEmail', '!=', userEmail),
+      orderBy('senderEmail'),
+      orderBy('timestamp', 'desc'),
+      fbLimit(5)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const now = Date.now();
+      if (now - lastSoundTimeRef.current < 2000) return;
+      snap.forEach(d => {
+        const msg = d.data();
+        const msgTime = asMillis(msg.timestamp);
+        if (now - msgTime < 10000 && msg.channelId !== activeChannel) {
+          lastSoundTimeRef.current = now;
+          playMessageSound().catch(() => {});
+        }
+      });
+    }, () => {});
+    return () => unsub();
+  }, [userEmail, activeChannel]);
+
   useEffect(() => {
     if (!userEmail) return undefined;
     const unsub = onSnapshot(query(collection(db, 'presence')), (snap) => {

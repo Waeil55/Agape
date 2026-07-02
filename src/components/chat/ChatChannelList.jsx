@@ -70,7 +70,7 @@ const ChatChannelList = ({ channels, activeChannel, onSelect, onlineUsers, unrea
                     {ch.name}
                   </span>
                   {unread > 0 && (
-                    <span className="ml-2 min-w-[18px] h-[18px] rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center px-1 shrink-0">
+                    <span className="ml-2 min-w-[18px] h-[18px] rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shrink-0 badge-pulse shadow-[0_0_6px_rgba(244,63,94,0.4)]">
                       {unread > 99 ? '99+' : unread}
                     </span>
                   )}

@@ -190,7 +190,7 @@ const ChatPage = ({ onBack }) => {
             <span className="text-[10px] font-medium text-slate-400">{formatChatTime(conversation.lastMessageAt)}</span>
           )}
           {conversation.unread > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white">
+            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white badge-pulse shadow-[0_0_6px_rgba(244,63,94,0.4)]">
               {conversation.unread > 99 ? '99+' : conversation.unread}
             </span>
           )}
@@ -228,7 +228,7 @@ const ChatPage = ({ onBack }) => {
           </p>
         </div>
         {unread > 0 && (
-          <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white">
+          <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white badge-pulse shadow-[0_0_6px_rgba(244,63,94,0.4)]">
             {unread > 99 ? '99+' : unread}
           </span>
         )}
