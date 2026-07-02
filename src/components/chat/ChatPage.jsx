@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft, ChevronLeft, MoreHorizontal, Phone, Radio, Search, Shield,
+  ArrowLeft, ChevronLeft, MessageCircle, MoreHorizontal, Phone, Radio, Search, Shield,
   Truck, User, Users, Video, X,
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
