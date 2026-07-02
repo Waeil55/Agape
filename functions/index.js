@@ -528,46 +528,113 @@ exports.sendPushNotification = functions.https.onCall(async (data, context) => {
   }
 });
 
+function normalizeEmailAddress(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function chatMessagePreview(msg) {
+  const text = String(msg.text || "").trim();
+  if (text) return text.slice(0, 250);
+  if (msg.fileName) return `Attachment: ${msg.fileName}`.slice(0, 250);
+  return "Sent a message";
+}
+
+function collectUserTokens(userData) {
+  const tokens = [];
+  if (userData.fcmToken) tokens.push(userData.fcmToken);
+  if (userData.messagingToken) tokens.push(userData.messagingToken);
+  if (Array.isArray(userData.fcmTokens)) tokens.push(...userData.fcmTokens);
+  return tokens.filter(Boolean);
+}
+
 exports.onChatMessage = functions.firestore.document('chat_messages/{messageId}')
   .onCreate(async (snap) => {
     const msg = snap.data();
-    if (!msg || !msg.conversationId || !msg.sender) return null;
+    if (!msg || !msg.channelId || !msg.senderEmail) return null;
 
     try {
-      const convDoc = await admin.firestore().doc('chatData/conversations').get();
-      const conv = convDoc.data()?.conversations?.[msg.conversationId];
-      if (!conv) return null;
+      const db = admin.firestore();
+      const channelRef = db.doc(`chat_channels/${msg.channelId}`);
+      const channelDoc = await channelRef.get();
+      const channel = channelDoc.data();
+      if (!channel) return null;
 
-      const participants = (conv.participants || []).filter(p => p !== msg.sender);
-      if (participants.length === 0) return null;
+      const senderEmail = normalizeEmailAddress(msg.senderEmail);
+      const senderName = msg.senderName || senderEmail.split('@')[0];
+      const usersSnap = await db.collection('users').get();
+      const users = [];
+      usersSnap.forEach(d => {
+        const data = d.data();
+        const email = normalizeEmailAddress(data.email);
+        if (email) {
+          users.push({
+            uid: d.id,
+            email,
+            role: String(data.role || '').trim().toLowerCase(),
+            tokens: collectUserTokens(data),
+          });
+        }
+      });
 
-      const tokens = [];
-      for (const email of participants) {
-        const userSnap = await admin.firestore().collection('users').where('email', '==', email).get();
-        userSnap.forEach(d => {
-          const data = d.data();
-          if (data.fcmToken) tokens.push(data.fcmToken);
-        });
+      const channelRoles = Array.isArray(channel.roles)
+        ? channel.roles.map(role => String(role).trim().toLowerCase()).filter(Boolean)
+        : [];
+      const dmParticipants = (channel.dmParticipants || channel.participantIds || [])
+        .map(normalizeEmailAddress)
+        .filter(Boolean);
+
+      const recipients = channel.type === 'dm'
+        ? users.filter(user => dmParticipants.includes(user.email) && user.email !== senderEmail)
+        : users.filter(user => user.email !== senderEmail && (channelRoles.length === 0 || channelRoles.includes(user.role)));
+
+      const preview = chatMessagePreview(msg);
+      const channelUpdate = {
+        lastMessage: preview,
+        lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastMessageBy: senderName,
+      };
+      recipients.forEach((recipient) => {
+        channelUpdate[`unreadByUid.${recipient.uid}`] = admin.firestore.FieldValue.increment(1);
+      });
+      if (msg.senderUid) {
+        channelUpdate[`unreadByUid.${msg.senderUid}`] = 0;
       }
+      await channelRef.set(channelUpdate, { merge: true });
 
+      const tokens = [...new Set(recipients.flatMap(recipient => recipient.tokens))];
       if (tokens.length === 0) return null;
 
-      const senderName = msg.sender.split('@')[0];
-      const convName = conv.name || senderName;
-
-      await admin.messaging().sendEachForMulticast({
+      const channelName = channel.name || 'Team Chat';
+      const messagePayload = {
         tokens,
         notification: {
-          title: convName,
-          body: `${senderName}: ${msg.text || ''}`.slice(0, 250),
+          title: `${channelName} — ${senderName}`,
+          body: (msg.text || (msg.fileName ? `📎 ${msg.fileName}` : 'Sent a message')).slice(0, 250),
         },
         data: {
           type: 'chat',
-          conversationId: msg.conversationId,
+          channelId: msg.channelId,
+          click_action: '/',
         },
-      });
+      };
+      messagePayload.notification = {
+        title: channel.type === 'dm' ? senderName : `${channelName} - ${senderName}`,
+        body: preview,
+      };
 
-      functions.logger.info(`Chat push sent: ${tokens.length} tokens, conversation ${msg.conversationId}`);
+      if (tokens.length <= 500) {
+        await admin.messaging().sendEachForMulticast(messagePayload);
+      } else {
+        const chunks = [];
+        for (let i = 0; i < tokens.length; i += 500) {
+          chunks.push(tokens.slice(i, i + 500));
+        }
+        for (const chunk of chunks) {
+          await admin.messaging().sendEachForMulticast({ ...messagePayload, tokens: chunk });
+        }
+      }
+
+      functions.logger.info(`Chat push: ${tokens.length} tokens, channel ${msg.channelId}`);
     } catch (e) {
       functions.logger.error('onChatMessage push failed', e);
     }

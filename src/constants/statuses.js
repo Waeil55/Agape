@@ -111,19 +111,9 @@ export const DRIVER_LIVE_STATUS_COLORS = {
 
 export function getDriverLiveStatus(driver) {
   if (!driver) return { label: 'Unknown', color: 'bg-slate-100 text-slate-600' };
-  const driverStatus = String(driver.status || '').toLowerCase();
-  if (driverStatus === 'offline' || !driver.clockedIn) {
-    return { label: 'Offline', color: 'bg-slate-100 text-slate-600' };
-  }
-  if (driverStatus === 'available') {
-    return { label: 'Available', color: 'bg-green-100 text-green-700' };
-  }
   const tripState = String(driver.currentTripState || '').toLowerCase();
   if (tripState && DRIVER_LIVE_STATUS_LABELS[tripState]) {
     return { label: DRIVER_LIVE_STATUS_LABELS[tripState], color: DRIVER_LIVE_STATUS_COLORS[tripState] || 'bg-blue-100 text-blue-700' };
   }
-  if (driverStatus === 'on trip') {
-    return { label: 'On Trip', color: 'bg-blue-100 text-blue-700' };
-  }
-  return { label: driver.status || 'Active', color: 'bg-blue-100 text-blue-700' };
+  return { label: 'Available', color: 'bg-green-100 text-green-700' };
 }

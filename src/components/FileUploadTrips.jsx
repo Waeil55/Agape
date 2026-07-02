@@ -678,6 +678,17 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         const pKey = (m.patient || '').trim().toLowerCase();
         
         let patientPhone = patientClientPhone[pKey] || m.pickupPhone || m.dropoffPhone || '';
+
+        // Smart phone detection: if pickup is a facility, client phone is likely dropoffPhone (home), and vice versa
+        if (!patientClientPhone[pKey] && m.pickupPhone && m.dropoffPhone) {
+          const pickupIsFacility = isFacilitySiteName(m.pickupSiteName || '') || isFacilitySiteName(m.pickup || '');
+          const dropoffIsFacility = isFacilitySiteName(m.dropoffSiteName || '') || isFacilitySiteName(m.dropoff || '');
+          if (pickupIsFacility && !dropoffIsFacility) {
+            patientPhone = m.dropoffPhone;
+          } else if (dropoffIsFacility && !pickupIsFacility) {
+            patientPhone = m.pickupPhone;
+          }
+        }
         if (patientPhone && !patientClientPhone[pKey]) {
           const digits = cleanPhone(patientPhone);
           const isShared = phoneToPatients[digits] && phoneToPatients[digits].size > 1;
@@ -1199,7 +1210,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                     <select value={assignToDriver} onChange={(e) => setAssignToDriver(e.target.value)} className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-white font-bold shadow-sm">
                       <option value="">Leave Most as {forceCompleted ? 'Unassigned (Driver Unknown)' : 'Unassigned'} (Or use per-trip selector below)</option>
                       {drivers.map(d => (
-                        <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
+                         <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} (Active)</option>
                       ))}
                     </select>
                     {assignToDriver && (

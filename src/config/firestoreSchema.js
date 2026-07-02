@@ -7,7 +7,6 @@ export const FIRESTORE_COLLECTIONS = Object.freeze({
   HEARTBEAT: 'heartbeat',
   DRIVER_LOCATIONS: 'driver_locations',
   SYSTEM_EVENTS: 'system_events',
-  CHAT_THREADS: 'chat_threads',
   AUDIT_LOGS: 'audit_logs',
 });
 

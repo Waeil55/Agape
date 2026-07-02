@@ -236,7 +236,7 @@ const SettingsPage = ({
                         <td className="px-3 py-1.5 font-bold text-slate-900">{d.name || '—'}</td>
                         <td className="px-3 py-1.5 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
                         <td className="px-3 py-1.5"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${ROLE_COLORS[d.role] || 'bg-slate-100 text-slate-600'}`}>{ROLE_LABELS[d.role] || d.role}</span></td>
-                        <td className="px-3 py-1.5"><span className={`inline-flex items-center gap-1 text-xs font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
+                        <td className="px-3 py-1.5"><span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500" />Active</span></td>
                       </tr>
                     ))}
                     {drivers.map((d, i) => (
@@ -244,7 +244,7 @@ const SettingsPage = ({
                         <td className="px-3 py-1.5 font-bold text-slate-900">{d.name || '—'}</td>
                         <td className="px-3 py-1.5 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
                         <td className="px-3 py-1.5"><span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Driver</span></td>
-                        <td className="px-3 py-1.5"><span className={`inline-flex items-center gap-1 text-xs font-bold ${d.online ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />{d.online ? 'Online' : 'Offline'}</span></td>
+                        <td className="px-3 py-1.5"><span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500" />Active</span></td>
                       </tr>
                     ))}
                     {(dispatchers.length + drivers.length) === 0 && (

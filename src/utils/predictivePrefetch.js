@@ -63,16 +63,6 @@ const PREFETCH_RULES = [
     cacheKey: 'driverProfiles',
     ttl: 30000,
   },
-
-  // Idle rules
-  {
-    name: 'idle-chat',
-    trigger: 'idle:30s',
-    priority: PrefetchPriority.LOW,
-    fetch: () => getDoc(doc(db, 'chatData/conversations')),
-    cacheKey: 'chat',
-    ttl: 30000,
-  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════

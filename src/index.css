@@ -1525,6 +1525,102 @@ body * {
   max-width: inherit;
 }
 
+/* Chat bubbles must opt out of the global inherited max-width reset above.
+   Without this, nested message bubbles can collapse to one character per line. */
+.agape-chat-message-row,
+.agape-chat-message-row * {
+  max-width: none;
+}
+
+.agape-chat-message-row {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.agape-chat-page {
+  min-height: 0;
+}
+
+.agape-chat-messages {
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 7rem;
+}
+
+.agape-chat-input,
+.agape-chat-readonly-footer {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+.agape-chat-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 8rem;
+  max-width: min(75%, 44rem);
+}
+
+.agape-chat-column--own {
+  align-items: flex-end;
+  margin-left: auto;
+}
+
+.agape-chat-column--other {
+  align-items: flex-start;
+  margin-right: auto;
+}
+
+.agape-chat-bubble-stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.agape-chat-bubble-wrap {
+  position: relative;
+  max-width: 100%;
+}
+
+.agape-chat-bubble {
+  display: inline-block;
+  min-width: 2.75rem;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.agape-chat-text {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  text-wrap: pretty;
+}
+
+.agape-chat-attachment,
+.agape-chat-file,
+.agape-chat-media {
+  max-width: 100%;
+}
+
+.agape-chat-file {
+  min-width: min(12rem, 100%);
+}
+
+@media (max-width: 640px) {
+  .agape-chat-column {
+    min-width: 5rem;
+    max-width: min(82%, 28rem);
+  }
+}
+
+@media (max-width: 767px) {
+  .agape-chat-page {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 table {
   table-layout: auto;
   width: 100%;

@@ -70,7 +70,7 @@ const getTimeUrgency = (timeOrTask, status) => {
   const tripMins = h * 60 + m;
   const diff = tripMins - nowMins;
   const activeStatuses = ['IN PROGRESS', 'IN TRANSIT', 'AT PICKUP', 'AT DROPOFF', 'NAVIGATING PICKUP', 'NAVIGATING DROPOFF'];
-  if (diff < 0 && !activeStatuses.includes((tripStatus || '').toUpperCase())) return { type: 'critical', diff, isPastDue: true };
+  if (diff < 0) return { type: 'critical', diff, isPastDue: true };
   if (diff > 0 && diff <= 30) return { type: 'critical', diff };
   if (diff > 30 && diff <= 60) return { type: 'warning', diff };
   return { type: 'normal' };
@@ -127,14 +127,14 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
       className={`relative bg-white rounded-3xl mb-3
         ${isExpanded ? 'shadow-2xl ring-2 ring-blue-500/15' : 'shadow-sm border border-slate-100/50 hover:shadow-md'}
         ${isAnotherExpanded ? 'opacity-35 scale-[0.98] blur-[1px] pointer-events-none' : ''}
-        ${!isExpanded && timeUrgency.type === 'critical' ? 'border-rose-300 shadow-rose-100 shadow-md' : ''}
+        ${!isExpanded && timeUrgency.type === 'critical' ? 'border-rose-300 shadow-rose-100 shadow-md bg-rose-50' : ''}
         ${!isExpanded && timeUrgency.type === 'warning' ? 'border-orange-300 shadow-orange-50 shadow-sm' : ''}
       `}
     >
       {/* Collapsed Header */}
       <div
         className={`relative cursor-pointer select-none transition-colors ${isExpanded ? 'shrink-0' : ''} ${
-          !isExpanded && timeUrgency.type === 'critical' ? 'bg-rose-50/30 hover:bg-rose-50/50' :
+          !isExpanded && timeUrgency.type === 'critical' ? 'bg-rose-100/60 hover:bg-rose-100/80' :
           !isExpanded && timeUrgency.type === 'warning' ? 'bg-orange-50/30 hover:bg-orange-50/50' :
           'active:bg-slate-50'
         }`}

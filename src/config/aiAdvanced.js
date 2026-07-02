@@ -3,7 +3,7 @@
  * Integrates Gemini AI with business logic for:
  * - Trip optimization, demand forecasting, anomaly detection
  * - Natural language processing, sentiment analysis
- * - Predictive analytics, chatbot responses
+ * - Predictive analytics
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -148,27 +148,6 @@ export const aiSuggestSmartReply = async (message, conversationContext = []) => 
   } catch (e) {
     console.error("Smart reply error:", e);
     return ["Thank you for your message. We'll get back to you shortly."];
-  }
-};
-
-export const aiGenerateChatbotResponse = async (userMessage, context = {}) => {
-  try {
-    const systemPrompt = `You are Agape Care Support Bot, a helpful assistant for a medical transportation service.
-Be professional, empathetic, and direct. Answer common questions about:
-- Trip status, scheduling, pricing
-- Driver information, vehicle details
-- Policies, insurance, accessibility
-- Feedback, complaints, escalations
-
-Context: User type=${context.userType}, Trip ID=${context.tripId}, Language=${context.language || 'en'}
-
-Keep responses concise (1-2 sentences). If escalation needed, say "I'm connecting you with a specialist."`;
-
-    const result = await model.generateContent(systemPrompt + "\n\nUser: " + userMessage);
-    return result.response.text();
-  } catch (e) {
-    console.error("Chatbot error:", e);
-    return "Thank you for your message. A specialist will assist you shortly.";
   }
 };
 
@@ -375,7 +354,6 @@ export default {
   aiDetectAnomalies,
   aiAnalyzeSentimentAdvanced,
   aiSuggestSmartReply,
-  aiGenerateChatbotResponse,
   aiGenerateInsights,
   aiGenerateReport,
   aiCheckCompliance,

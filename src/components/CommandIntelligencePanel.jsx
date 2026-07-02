@@ -299,7 +299,7 @@ const CommandIntelligencePanel = ({
                         </p>
                       </div>
                       <span className={`px-2 py-0.5 rounded-md border text-xs font-bold ${tone.bg} ${tone.border} ${tone.text}`}>
-                        {d.status}
+                        Active
                       </span>
                     </div>
                     <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">

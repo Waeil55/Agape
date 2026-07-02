@@ -324,13 +324,6 @@ export const getWebManifest = () => ({
       url: '/trips?mode=standalone',
       icons: [{ src: '/icon-trips.png', sizes: '192x192' }],
     },
-    {
-      name: 'Chat',
-      short_name: 'Chat',
-      description: 'Message drivers and customers',
-      url: '/chat?mode=standalone',
-      icons: [{ src: '/icon-chat.png', sizes: '192x192' }],
-    },
   ],
   share_target: {
     action: '/share',

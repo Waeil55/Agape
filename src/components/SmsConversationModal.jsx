@@ -21,7 +21,19 @@ const SmsConversationModal = ({ trip, onClose }) => {
     if (digits.length === 10) return "+1" + digits;
     return "+" + digits;
   };
-  const phone = normalizePhone(trip.patientPhone || trip.pickupPhone);
+  const FACILITY_KW = ['center','centre','clinic','hospital','care','treatment','medical','health','therapy','academy','school','facility','llc','inc','llp','corp','ltd','pharmacy','pharm','dialysis','rehab','rehabilitation','mental health','behavioral','paediatric','pediatric','dental','lab','imaging','radiology','urgent care','er ','emergency','surgery','surgical','ortho','cardio','neuro'];
+  const isFac = (n) => { const l = (n||'').toLowerCase().trim(); return l ? FACILITY_KW.some(kw => l.includes(kw)) : false; };
+  const getClientPhone = (t) => {
+    if (t.patientPhone) return t.patientPhone;
+    const pu = t.pickupPhone || '', doPh = t.dropoffPhone || '';
+    if (!pu && !doPh) return '';
+    const puFac = isFac(t.pickupSiteName||'') || isFac(t.pickup||'');
+    const doFac = isFac(t.dropoffSiteName||'') || isFac(t.dropoff||'');
+    if (puFac && !doFac) return doPh;
+    if (doFac && !puFac) return pu;
+    return pu || doPh;
+  };
+  const phone = normalizePhone(getClientPhone(trip));
 
   const templatePreview = DEFAULT_TEMPLATE
     .replace(/\{patient\}/g, trip.patient || 'Client')

@@ -12,9 +12,10 @@ import ArchivesPage from './ArchivesPage';
 import SettingsPage from './SettingsPage';
 import DriversVehiclesPage from './DriversVehiclesPage';
 import { getDriverLiveStatus } from '../constants/statuses';
+import { ChatPage } from './chat';
 
 const MobileEnterpriseDashboard = (props) => {
-  const { trips, drivers, dispatchers, currentUser, role, onLogout } = props;
+  const { trips, drivers, dispatchers, currentUser, role, onLogout, chatUnreadCount = 0 } = props;
   const [currentView, setCurrentView] = useState('trips');
   const [subView, setSubView] = useState(null); // admin, reports, settings, archives
   const [expandedId, setExpandedId] = useState(null);
@@ -172,6 +173,14 @@ const MobileEnterpriseDashboard = (props) => {
       );
     }
 
+    if (currentView === 'chat') {
+      return (
+        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+          <ChatPage onBack={() => setCurrentView('trips')} />
+        </div>
+      );
+    }
+
     if (currentView === 'drive') {
       if (!activeDriverWorkDriver) {
         return (
@@ -244,14 +253,6 @@ const MobileEnterpriseDashboard = (props) => {
           <div className="absolute inset-0">
             <LiveMapPage {...props} />
           </div>
-        </div>
-      );
-    }
-
-    if (currentView === 'chat') {
-      return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50 items-center justify-center text-slate-400 text-sm">
-          Chat coming soon
         </div>
       );
     }
@@ -335,7 +336,14 @@ const MobileEnterpriseDashboard = (props) => {
                   onClick={() => handleNavClick('chat')}
                   className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 transition-all duration-200 min-h-[56px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
-                  <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 2.2 : 1.6} />
+                  <span className="relative inline-flex">
+                    <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 2.2 : 1.6} />
+                    {chatUnreadCount > 0 && (
+                      <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black leading-none text-white">
+                        {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                      </span>
+                    )}
+                  </span>
                   <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
                 </button>
 
@@ -351,6 +359,7 @@ const MobileEnterpriseDashboard = (props) => {
           })()}
         </div>
       </nav>
+
     </div>
   );
 };

@@ -139,18 +139,16 @@ export function FleetHeatMap({ drivers = [], trips = [], driverTelemetry = [] })
         </div>
         <div className="p-3 grid grid-cols-5 sm:grid-cols-10 gap-1.5">
           {drivers.map(driver => {
-            const isOnline = driver.clockedIn && driver.status !== 'Offline';
             const isMoving = driverTelemetry.find(t => t.driverId === driver.id)?.movementState === 'moving';
 
             return (
               <div
                 key={driver.id}
                 className={`aspect-square rounded-lg flex items-center justify-center text-[9px] font-bold uppercase ${
-                  !isOnline ? 'bg-slate-100 text-slate-400' :
                   isMoving ? 'bg-emerald-100 text-emerald-700' :
                   'bg-amber-100 text-amber-700'
                 }`}
-                title={`${driver.name || 'Driver'} - ${!isOnline ? 'Offline' : isMoving ? 'Moving' : 'Stopped'}`}
+                title={`${driver.name || 'Driver'} - ${isMoving ? 'Moving' : 'Stopped'}`}
               >
                 {(driver.name || '?')[0]}
               </div>
@@ -165,10 +163,6 @@ export function FleetHeatMap({ drivers = [], trips = [], driverTelemetry = [] })
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded bg-amber-100 border border-amber-200" />
             <span className="text-slate-600">Stopped</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-slate-100 border border-slate-200" />
-            <span className="text-slate-600">Offline</span>
           </div>
         </div>
       </div>

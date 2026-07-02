@@ -21,7 +21,20 @@ const SendSmsModal = ({ trips = [], onClose }) => {
     }));
   }, [trips, template]);
 
-  const canSend = trips.every(t => t.patientPhone || t.pickupPhone);
+  const FACILITY_KW = ['center','centre','clinic','hospital','care','treatment','medical','health','therapy','academy','school','facility','llc','inc','llp','corp','ltd','pharmacy','pharm','dialysis','rehab','rehabilitation','mental health','behavioral','paediatric','pediatric','dental','lab','imaging','radiology','urgent care','er ','emergency','surgery','surgical','ortho','cardio','neuro'];
+  const isFac = (n) => { const l = (n||'').toLowerCase().trim(); return l ? FACILITY_KW.some(kw => l.includes(kw)) : false; };
+  const getClientPhone = (t) => {
+    if (t.patientPhone) return t.patientPhone;
+    const pu = t.pickupPhone || '', doPh = t.dropoffPhone || '';
+    if (!pu && !doPh) return '';
+    const puFac = isFac(t.pickupSiteName||'') || isFac(t.pickup||'');
+    const doFac = isFac(t.dropoffSiteName||'') || isFac(t.dropoff||'');
+    if (puFac && !doFac) return doPh;
+    if (doFac && !puFac) return pu;
+    return pu || doPh;
+  };
+
+  const canSend = trips.every(t => getClientPhone(t));
 
   const handleSend = async () => {
     if (!canSend || sending) return;
@@ -31,7 +44,7 @@ const SendSmsModal = ({ trips = [], onClose }) => {
       const functions = getFunctions();
       const sendBulkSms = httpsCallable(functions, 'sendBulkSms');
       const messages = trips.map(t => ({
-        to: t.patientPhone || t.pickupPhone,
+        to: getClientPhone(t),
         text: template
           .replace(/\{patient\}/g, t.patient || 'Client')
           .replace(/\{time\}/g, t.time || '')
@@ -85,7 +98,7 @@ const SendSmsModal = ({ trips = [], onClose }) => {
                 <div key={t.id || i} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">{(t.patient || '?')[0]}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5"><p className="text-xs font-bold text-slate-900">{t.patient}</p><span className="text-[9px] text-slate-400">{t.patientPhone || t.pickupPhone}</span></div>
+                    <div className="flex items-center gap-1.5"><p className="text-xs font-bold text-slate-900">{t.patient}</p><span className="text-[9px] text-slate-400">{getClientPhone(t)}</span></div>
                     <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">{t.preview}</p>
                   </div>
                 </div>

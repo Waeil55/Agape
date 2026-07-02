@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Activity, KeyRound, Search, Shield, Truck, Wifi, WifiOff } from 'lucide-react';
+import { Activity, KeyRound, Search, Shield, Truck } from 'lucide-react';
 import { getDriverLiveStatus } from '../constants/statuses';
 import { auth, sendPasswordResetEmail } from '../config/firebase';
 
@@ -257,9 +257,8 @@ const MobileAdminPage = ({
                       {user._role === 'driver' ? (
                         <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-semibold ${live.color}`}>{live.label}</span>
                       ) : (
-                        <span className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold ${statusColor ? statusColor(user.clockedIn ? 'online' : 'offline') : 'bg-gray-200 text-gray-700'}`}>
-                          {user.clockedIn ? <Wifi size={10} /> : <WifiOff size={10} />}
-                          {user.clockedIn ? 'Online' : 'Offline'}
+                        <span className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold ${statusColor ? statusColor('online') : 'bg-gray-200 text-gray-700'}`}>
+                          Active
                         </span>
                       )}
                     </div>

@@ -3,9 +3,8 @@ import {
   LayoutDashboard, Users, MapPin, Settings, BarChart2,
   Archive, MessageCircle, Bell,
   CheckCircle2, BrainCircuit, Upload, Wand2, Search,
-  AlertTriangle, X, Truck, Zap,
+  AlertTriangle, X, Truck, Zap, Clock,
   PanelRight,
-  Wifi, WifiOff,
   Eye, Hash, Route, Activity,
   CalendarDays, ClipboardList, ShieldCheck, Receipt, Siren, CarFront, Plus,
 } from 'lucide-react';
@@ -22,6 +21,7 @@ import MobileDispatchView from './MobileDispatchView';
 import AdminPage from './AdminPage';
 import DriverPage from './DriverPage';
 import RoutePlannerPage from './RoutePlannerPage';
+import { ChatPage } from './chat';
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LiveMapPage = lazy(() => import('./LiveMapPage'));
 const DispatchAssistant = lazy(() => import('./DispatchAssistant'));
@@ -38,6 +38,17 @@ const LazyFallback = () => (
 );
 
 const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute', 'skills', 'senior', 'living', 'manor', 'village'];
+const isFacility = (name) => { const l = (name||'').toLowerCase().trim(); return l ? FACILITY_KEYWORDS.some(kw => l.includes(kw)) : false; };
+const getClientPhoneGlobal = (trip) => {
+  if (trip.patientPhone) return trip.patientPhone;
+  const pu = trip.pickupPhone || '', doPh = trip.dropoffPhone || '';
+  if (!pu && !doPh) return '';
+  const puFac = isFacility(trip.pickupSiteName||'') || isFacility(trip.pickup||'');
+  const doFac = isFacility(trip.dropoffSiteName||'') || isFacility(trip.dropoff||'');
+  if (puFac && !doFac) return doPh;
+  if (doFac && !puFac) return pu;
+  return pu || doPh;
+};
 const SYNTHETIC_REFERENCE_PATTERNS = [/^BK-\d+-\d+$/i, /^TRP-\d+$/i, /^TRIP-\d{10,}-\d+$/i];
 
 const isSyntheticReference = (value) => {
@@ -107,10 +118,10 @@ const DesktopEnterpriseDashboard = ({
   addToast, addAuditLog, persistState, hasPermission, requestAuthAction,
   triggerSmartAssign, triggerFleetOptimization, assignTripToDriver,
   bulkAssignTrips, createSharedRide, createLegMission, requestDeleteTrip, requestBulkDelete, updateTrip, updateTrashedTrip,
-  chatUnreadCount, makeCall, sendSMS, handleUpdateDriverLocation, addTrip, showAddTripModal, setShowAddTripModal,
+  makeCall, sendSMS, handleUpdateDriverLocation, addTrip, showAddTripModal, setShowAddTripModal,
   driverTelemetry = [],
   onDispatcherStatusUpdate, driverWorkDrivers = [], driverWorkTrips = [], allDrivers = [],
-  onUpdateMission, onUpdateDriverTrip, onDriverStatusUpdate, onCompleteTrip, onLogout
+  onUpdateMission, onUpdateDriverTrip, onDriverStatusUpdate, onCompleteTrip, onLogout, chatUnreadCount = 0
 }) => {
   const displayLoginId = String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '');
   const [activePanel, setActivePanel] = useState(() => localStorage.getItem('agape_activePanel') || 'operations');
@@ -121,13 +132,8 @@ const DesktopEnterpriseDashboard = ({
   const [reAuthError, setReAuthError] = useState('');
   const [tripDetails, setTripDetails] = useState(null);
   const [showTripLocations, setShowTripLocations] = useState(false);
-  const [showRightPanel, setShowRightPanel] = useState(false);
+  const [showRightPanel, setShowRightPanel] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [fallbackAdminOnline, setFallbackAdminOnline] = useState(() => localStorage.getItem('agape_adminOnline') === 'true');
-
-  useEffect(() => {
-    localStorage.setItem('agape_adminOnline', fallbackAdminOnline);
-  }, [fallbackAdminOnline]);
   const [commandQuery, setCommandQuery] = useState('');
   const [rightPanelTab, setRightPanelTab] = useState(() => {
     const t = localStorage.getItem('agape_rightPanelTab');
@@ -137,7 +143,6 @@ const DesktopEnterpriseDashboard = ({
   const [routePlannerSequencerStops, setRoutePlannerSequencerStops] = useState(null);
   const [routePlannerSequencerSequence, setRoutePlannerSequencerSequence] = useState(null);
   const [routePlannerSequencerKey, setRoutePlannerSequencerKey] = useState(0);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [driverWorkDriverId, setDriverWorkDriverId] = useState(() => localStorage.getItem('agape_driverWorkDriverId') || '');
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
@@ -192,18 +197,6 @@ const DesktopEnterpriseDashboard = ({
     });
   }, [activeDriverWorkDriver, allDrivers, driverWorkTrips]);
 
-  // Online/offline listener
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
   // Mobile breakpoint listener (< 768px = mobile dispatch view)
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -254,7 +247,6 @@ const DesktopEnterpriseDashboard = ({
     { id: 'operations', label: 'Dispatch', icon: LayoutDashboard, roles: ['admin', 'dispatcher'] },
     { id: 'drive', label: 'Drive', icon: Truck, roles: ['admin', 'dispatcher'] },
     { id: 'liveMap', label: 'Map', icon: MapPin, roles: ['admin', 'dispatcher', 'fleet_manager', 'qa_auditor', 'supervisor'] },
-    { id: 'chat', label: 'Chat', icon: MessageCircle, roles: ['admin', 'dispatcher'] },
     { id: 'archives', label: 'Archives', icon: Archive, roles: ['admin', 'dispatcher', 'fleet_manager', 'qa_auditor', 'supervisor'] },
     { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['admin', 'dispatcher', 'billing', 'qa_auditor', 'fleet_manager', 'supervisor'] },
     { id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, roles: ['admin', 'dispatcher'] },
@@ -309,11 +301,6 @@ const DesktopEnterpriseDashboard = ({
       title: 'Live Map Intelligence',
       description: 'Realtime fleet movement, dwell time, driver status, next destinations, and geographic risk visibility.',
     },
-    chat: {
-      eyebrow: '',
-      title: 'Operational Messaging',
-      description: 'Role-aware communications across dispatch, drivers, routing, and supervisors.',
-    },
     routePlanner: {
       eyebrow: '',
       title: 'Smart Route Planner',
@@ -355,12 +342,12 @@ const DesktopEnterpriseDashboard = ({
       ...(driverWorkDrivers.length > 0 ? [{ id: 'drive', label: 'Drive', icon: Truck, active: activePanel === 'drive', action: () => setActivePanel('drive') }] : []),
       ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
       { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => setActivePanel('reports') },
+      { id: 'chat', label: 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat'), badge: chatUnreadCount },
       { id: 'map', label: 'Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
-      { id: 'messages', label: 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat') },
       { id: 'settings', label: 'Settings', icon: Settings, active: activePanel === 'settings', action: () => setActivePanel('settings') },
     ];
     return items;
-  }, [activePanel, driverWorkDrivers.length, openOperationsWorkspace, role, setActivePanel, showSequencerModal]);
+  }, [activePanel, chatUnreadCount, driverWorkDrivers.length, openOperationsWorkspace, role, setActivePanel, showSequencerModal]);
 
   const topActionItems = useMemo(() => {
     switch (activePanel) {
@@ -375,10 +362,6 @@ const DesktopEnterpriseDashboard = ({
         return [
           { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
           { id: 'routes', label: 'Routes', icon: Route, action: () => setShowSequencerModal(true) },
-        ];
-      case 'chat':
-        return [
-          { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
         ];
       case 'archives':
         return [
@@ -403,7 +386,6 @@ const DesktopEnterpriseDashboard = ({
     { id: 'ops', label: 'Go to Operations', icon: LayoutDashboard, action: () => setActivePanel('operations') },
     { id: 'map', label: 'Go to Live Map', icon: MapPin, action: () => setActivePanel('liveMap') },
     { id: 'sequencer', label: 'Open Route Sequencer', icon: Route, action: () => setShowSequencerModal(true) },
-    { id: 'chat', label: 'Go to Chat', icon: MessageCircle, action: () => setActivePanel('chat') },
     { id: 'routes', label: 'Go to Route Planner', icon: Route, action: () => setActivePanel('routePlanner') },
     { id: 'reports', label: 'Go to Reports', icon: BarChart2, action: () => setActivePanel('reports') },
     { id: 'archives', label: 'Go to Archives', icon: Archive, action: () => setActivePanel('archives') },
@@ -455,7 +437,6 @@ const DesktopEnterpriseDashboard = ({
             <h1 className="text-caption font-black text-slate-900 tracking-tight leading-none">Agape Care</h1>
             <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">Enterprise</p>
           </div>
-          <span title={isOnline ? 'Realtime connected' : 'Offline / not realtime'} className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'} shrink-0 hidden lg:inline-block`} />
         </div>
       </div>
 
@@ -511,31 +492,6 @@ const DesktopEnterpriseDashboard = ({
         </div>
       )}
 
-      {/* Online/Offline Status Toggle */}
-      {(() => {
-        const myDispatcher = dispatchers?.find(d => d.email === currentUser);
-        const amIOnline = myDispatcher ? myDispatcher.clockedIn : fallbackAdminOnline;
-        
-        return (
-          <button 
-            onClick={() => {
-              if (myDispatcher && onDispatcherStatusUpdate) {
-                onDispatcherStatusUpdate(myDispatcher.id, !amIOnline);
-              } else {
-                setFallbackAdminOnline(!fallbackAdminOnline);
-              }
-            }}
-            className={`hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold uppercase tracking-wider border shadow-sm transition-all hover:scale-105 active:scale-95 ${
-              amIOnline ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
-            }`}
-            title={amIOnline ? "Click to go Offline" : "Click to go Online"}
-          >
-            {amIOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
-            {amIOnline ? 'Online' : 'Offline'}
-          </button>
-        );
-      })()}
-
       {/* User Avatar */}
       <button
         onClick={() => setActivePanel('settings')}
@@ -575,7 +531,14 @@ const DesktopEnterpriseDashboard = ({
                 }`}
                 title={item.label}
               >
-                <Icon size={13} />
+                <span className="relative inline-flex">
+                  <Icon size={13} />
+                  {item.badge > 0 && (
+                    <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black leading-none text-white">
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </span>
+                  )}
+                </span>
                 <span>{item.label}</span>
               </button>
             );
@@ -584,30 +547,6 @@ const DesktopEnterpriseDashboard = ({
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
-        {/* Online/Offline Status Toggle */}
-        {(() => {
-          const myDispatcher = dispatchers?.find(d => d.email === currentUser);
-          const amIOnline = myDispatcher ? myDispatcher.clockedIn : fallbackAdminOnline;
-          
-          return (
-            <button 
-              onClick={() => {
-                if (myDispatcher && onDispatcherStatusUpdate) {
-                  onDispatcherStatusUpdate(myDispatcher.id, !amIOnline);
-                } else {
-                  setFallbackAdminOnline(!fallbackAdminOnline);
-                }
-              }}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border shadow-sm transition-all hover:scale-105 active:scale-95 ${
-                amIOnline ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80' : 'bg-rose-50 text-rose-700 border-rose-200/80'
-              }`}
-              title={amIOnline ? "Click to go Offline" : "Click to go Online"}
-            >
-              {amIOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
-              {amIOnline ? 'Online' : 'Offline'}
-            </button>
-          );
-        })()}
 
         {activePanel === 'operations' && (
           <div className="flex items-center gap-2">
@@ -678,8 +617,6 @@ const DesktopEnterpriseDashboard = ({
         <p className="text-xs font-medium text-blue-200 capitalize drop-shadow-sm">{activeWorkspaceMeta.title}</p>
       </div>
       <div className="flex-1" />
-      {/* Online status dot */}
-      <div className={`w-2.5 h-2.5 rounded-full border border-white/20 shadow-sm ${isOnline ? 'bg-emerald-400' : 'bg-rose-400'}`} title={isOnline ? 'Online' : 'Offline'} />
       {activePanel === 'operations' && (
         <button
           onClick={toggleRightPanel}
@@ -707,7 +644,6 @@ const DesktopEnterpriseDashboard = ({
         {sidebarItems.map(item => {
           const Icon = item.icon;
           const isActive = activePanel === item.id;
-          const hasBadge = item.id === 'chat' && chatUnreadCount > 0;
           return (
             <button
               key={item.id}
@@ -718,11 +654,6 @@ const DesktopEnterpriseDashboard = ({
             >
               <div className="relative flex items-center justify-center">
                 <Icon size={22} strokeWidth={isActive ? 2 : 1.5} className="relative" />
-                {hasBadge && (
-                  <span className="absolute -top-0.5 -right-2 min-w-[16px] h-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
-                    {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
-                  </span>
-                )}
               </div>
               <span className={`text-[10px] font-medium leading-none mt-1 truncate max-w-full px-0.5 ${
                 isActive ? 'text-blue-600' : 'text-slate-400'
@@ -744,6 +675,7 @@ const DesktopEnterpriseDashboard = ({
       {/* Tabs */}
       <div className="flex border-b border-slate-100">
         {[
+          { id: 'fleet', label: 'Fleet', icon: Activity },
           { id: 'alerts', label: 'Alerts', icon: AlertTriangle },
           { id: 'details', label: 'Details', icon: Eye },
           { id: 'ai', label: 'AI', icon: BrainCircuit },
@@ -768,6 +700,99 @@ const DesktopEnterpriseDashboard = ({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-3 py-3">
+        {rightPanelTab === 'fleet' && (() => {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const todayTrips = trips.filter(t => t.date === todayStr || !t.date);
+          const totalTrips = todayTrips.length;
+          const completed = todayTrips.filter(t => t.status === 'Completed').length;
+          const inProgress = todayTrips.filter(t => ['In Progress', 'In Transit', 'At Pickup', 'At Dropoff', 'Navigating Pickup', 'Navigating Dropoff'].includes(t.status)).length;
+          const unassigned = todayTrips.filter(t => !t.driverId || t.status === 'Unassigned').length;
+          const late = todayTrips.filter(t => {
+            if (!t.time || t.time === 'Will Call' || ['Completed', 'Cancelled', 'No Show'].includes(t.status)) return false;
+            const now = new Date();
+            const mins = t.time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+            if (!mins) return false;
+            let h = parseInt(mins[1]), m = parseInt(mins[2]);
+            if (mins[3]?.toUpperCase() === 'PM' && h < 12) h += 12;
+            if (mins[3]?.toUpperCase() === 'AM' && h === 12) h = 0;
+            return now > new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+          }).length;
+          const availableDrivers = drivers.filter(d => d.status !== 'Unavailable').length;
+          const busyDrivers = drivers.filter(d => {
+            return todayTrips.some(t => t.driverId === d.id && ['In Progress', 'In Transit', 'At Pickup', 'At Dropoff'].includes(t.status));
+          }).length;
+
+          return (
+            <div className="space-y-3">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: 'Total', value: totalTrips, color: 'text-slate-900', bg: 'bg-slate-50' },
+                  { label: 'Active', value: inProgress, color: 'text-blue-600', bg: 'bg-blue-50' },
+                  { label: 'Late', value: late, color: 'text-rose-600', bg: 'bg-rose-50' },
+                  { label: 'Done', value: completed, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                ].map(kpi => (
+                  <div key={kpi.label} className={`rounded-xl ${kpi.bg} p-3 border border-slate-100`}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{kpi.label}</p>
+                    <p className={`text-xl font-black ${kpi.color} mt-0.5`}>{kpi.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Driver Fleet */}
+              <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">Drivers</span>
+                  <span className="text-[10px] text-slate-500">{availableDrivers} available</span>
+                </div>
+                <div className="divide-y divide-slate-100 max-h-[240px] overflow-y-auto">
+                  {drivers.slice(0, 12).map(driver => {
+                    const driverTrip = todayTrips.find(t => t.driverId === driver.id && ['In Progress', 'In Transit', 'At Pickup', 'At Dropoff'].includes(t.status));
+                    const driverCompleted = todayTrips.filter(t => t.driverId === driver.id && t.status === 'Completed').length;
+                    const isBusy = Boolean(driverTrip);
+                    return (
+                      <div key={driver.id} className="px-3 py-2 flex items-center gap-2.5 hover:bg-slate-50 transition-colors">
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${isBusy ? 'bg-blue-500' : 'bg-emerald-400'}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-slate-900 truncate">{driver.name}</p>
+                          <p className="text-[10px] text-slate-500 truncate">{isBusy ? driverTrip.patient || 'On trip' : driver.vehicle || 'Available'}</p>
+                        </div>
+                        {driverCompleted > 0 && (
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{driverCompleted} done</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {drivers.length > 12 && (
+                    <div className="px-3 py-2 text-center text-[10px] text-slate-400">+{drivers.length - 12} more</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Unassigned Alerts */}
+              {unassigned > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                    <p className="text-xs font-bold text-amber-800">{unassigned} unassigned trip{unassigned !== 1 ? 's' : ''}</p>
+                  </div>
+                  <p className="text-[10px] text-amber-700 mt-1">Needs dispatcher attention</p>
+                </div>
+              )}
+
+              {/* Late Alerts */}
+              {late > 0 && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                  <div className="flex items-center gap-2">
+                    <Clock size={14} className="text-rose-600 shrink-0" />
+                    <p className="text-xs font-bold text-rose-800">{late} late trip{late !== 1 ? 's' : ''}</p>
+                  </div>
+                  <p className="text-[10px] text-rose-700 mt-1">Past scheduled time</p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {rightPanelTab === 'alerts' && (
           <div className="space-y-3">
             {logs.slice(0, 20).map((log, i) => (
@@ -810,8 +835,8 @@ const DesktopEnterpriseDashboard = ({
                   {getBookingReference(tripDetails) && <p className="text-xs text-slate-500 mt-0.5">Booking ID: {getBookingReference(tripDetails)}</p>}
                   {getClientIdentifier(tripDetails) && <p className="text-xs text-slate-500 mt-0.5">Client ID: {getClientIdentifier(tripDetails)}</p>}
                   {(tripDetails.type || tripDetails.serviceType) && <p className="text-xs text-slate-500 mt-0.5">Service: {tripDetails.type || tripDetails.serviceType}</p>}
-                  {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone)}</p>}
-                  {formatPhoneDisplay(tripDetails.pickupPhone) && formatPhoneDisplay(tripDetails.pickupPhone) !== formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700">Pickup phone: {formatPhoneDisplay(tripDetails.pickupPhone)}</p>}
+                  {formatPhoneDisplay(getClientPhoneGlobal(tripDetails)) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(getClientPhoneGlobal(tripDetails))}</p>}
+                  {formatPhoneDisplay(tripDetails.pickupPhone) && formatPhoneDisplay(tripDetails.pickupPhone) !== formatPhoneDisplay(getClientPhoneGlobal(tripDetails)) && <p className="text-xs text-emerald-700">Pickup phone: {formatPhoneDisplay(tripDetails.pickupPhone)}</p>}
                   {formatPhoneDisplay(tripDetails.dropoffPhone) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.dropoffPhone)}</p>}
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
@@ -1083,7 +1108,6 @@ const DesktopEnterpriseDashboard = ({
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           addToast={addToast}
-          isOnline={isOnline}
           phoneNumbers={phoneNumbers}
           onDispatcherStatusUpdate={onDispatcherStatusUpdate}
           fallbackAdminOnline={fallbackAdminOnline}
@@ -1135,7 +1159,6 @@ const DesktopEnterpriseDashboard = ({
         onOpenLiveMap={() => setActivePanel('liveMap')}
         showRightPanel={showRightPanel}
         onTogglePanel={toggleRightPanel}
-        isOnline={isOnline}
         phoneNumbers={phoneNumbers}
       />
     );
@@ -1156,7 +1179,6 @@ const DesktopEnterpriseDashboard = ({
           <DispatchAssistant drivers={drivers} trips={trips} onAssignTrip={assignTripToDriver} addAuditLog={addAuditLog} currentUser={currentUser} />
         </Suspense>
       );
-      case 'chat': return <div className="flex items-center justify-center h-full text-slate-400 text-sm">Chat coming soon</div>;
       case 'routePlanner': return (
         <RoutePlannerPage
           trips={trips}
@@ -1176,6 +1198,7 @@ const DesktopEnterpriseDashboard = ({
           <ReportsPage trips={trips} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} />
         </Suspense>
       );
+      case 'chat': return <ChatPage onBack={() => setActivePanel('operations')} />;
       case 'archives': return <ArchivesPage trashedTrips={trashedTrips} restoreTrip={restoreTrip} drivers={drivers} role={role} updateTrashedTrip={updateTrashedTrip} />;
       case 'admin': return (
         <AdminPage
@@ -1267,7 +1290,7 @@ const DesktopEnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${activePanel === 'chat' ? 'overflow-hidden flex flex-col' : activePanel === 'reports' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'chat', 'reports', 'admin', 'drive'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+            <div className={`flex-1 min-h-0 ${activePanel === 'reports' || activePanel === 'chat' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'reports', 'admin', 'drive', 'chat'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
@@ -1276,10 +1299,8 @@ const DesktopEnterpriseDashboard = ({
               </Suspense>
             ) : (
               <div className={
-                activePanel === 'drive' || activePanel === 'admin'
+                activePanel === 'drive' || activePanel === 'admin' || activePanel === 'chat'
                   ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0'
-                  : activePanel === 'chat'
-                  ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
                   : 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm overflow-hidden'
               }>
                 {renderPanelContent()}
@@ -1612,8 +1633,8 @@ const DesktopEnterpriseDashboard = ({
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Pickup</p>
                     <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.pickup || '—'}</p>
                     {tripDetails.pickupSiteName && <p className="text-xs text-emerald-700 mt-1">{tripDetails.pickupSiteName}</p>}
-                    {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone)}</p>}
-                    {formatPhoneDisplay(tripDetails.pickupPhone) && formatPhoneDisplay(tripDetails.pickupPhone) !== formatPhoneDisplay(tripDetails.patientPhone || tripDetails.pickupPhone) && <p className="text-xs text-emerald-700">Pickup phone: {formatPhoneDisplay(tripDetails.pickupPhone)}</p>}
+                    {formatPhoneDisplay(getClientPhoneGlobal(tripDetails)) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(getClientPhoneGlobal(tripDetails))}</p>}
+                    {formatPhoneDisplay(tripDetails.pickupPhone) && formatPhoneDisplay(tripDetails.pickupPhone) !== formatPhoneDisplay(getClientPhoneGlobal(tripDetails)) && <p className="text-xs text-emerald-700">Pickup phone: {formatPhoneDisplay(tripDetails.pickupPhone)}</p>}
                   </div>
                 </div>
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
@@ -1776,6 +1797,7 @@ const DesktopEnterpriseDashboard = ({
           </div>
         </div>
       )}
+
     </div>
   );
 };

@@ -21,6 +21,95 @@ service cloud.firestore {
       return data is map
         && data.keys().hasAny(['userId', 'email', 'name']);
     }
+    function signedIn() {
+      return request.auth != null;
+    }
+    function userEmail() {
+      return request.auth.token.email;
+    }
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function listHas(values, value) {
+      return values is list && values.hasAny([value]);
+    }
+    function roleAllowed(roles) {
+      return !(roles is list) || roles.size() == 0 || roles.hasAny([userRole()]);
+    }
+    function validGroupRoles(channelId, roles) {
+      return roles is list && (
+        (channelId == 'general' && roles.size() == 0) ||
+        (channelId == 'dispatchers' && roles.hasAll(['admin', 'dispatcher']) && roles.hasOnly(['admin', 'dispatcher'])) ||
+        (channelId == 'drivers' && roles.hasAll(['admin', 'driver', 'dispatcher']) && roles.hasOnly(['admin', 'driver', 'dispatcher'])) ||
+        (channelId == 'admin' && roles.hasAll(['admin']) && roles.hasOnly(['admin']))
+      );
+    }
+    function isKnownGroupChannel(channelId) {
+      return channelId in ['general', 'dispatchers', 'drivers', 'admin'];
+    }
+    function isChatParticipant(data) {
+      return listHas(data.dmParticipants, userEmail()) || listHas(data.participantIds, userEmail());
+    }
+    function canReadChannelData(data) {
+      return signedIn() && (
+        isAdmin() ||
+        (data.type == 'dm' && isChatParticipant(data)) ||
+        (data.type == 'group' && roleAllowed(data.roles))
+      );
+    }
+    function canWriteChannelData(data) {
+      return signedIn() && (
+        (data.type == 'dm' && isChatParticipant(data)) ||
+        (data.type == 'group' && roleAllowed(data.roles))
+      );
+    }
+    function canReadChannel(channelId) {
+      return canReadChannelData(get(/databases/$(database)/documents/chat_channels/$(channelId)).data);
+    }
+    function canWriteChannel(channelId) {
+      return canWriteChannelData(get(/databases/$(database)/documents/chat_channels/$(channelId)).data);
+    }
+    function validChatChannelCreate(channelId) {
+      let data = request.resource.data;
+      return (
+        isKnownGroupChannel(channelId) &&
+        data.type == 'group' &&
+        validGroupRoles(channelId, data.roles)
+      ) || (
+        channelId.matches('^dm_.*') &&
+        data.type == 'dm' &&
+        data.participantIds is list &&
+        data.dmParticipants is list &&
+        data.participantIds.size() == 2 &&
+        data.dmParticipants.size() == 2 &&
+        data.participantIds.hasAny([userEmail()]) &&
+        data.dmParticipants.hasAny([userEmail()])
+      );
+    }
+    function unreadBefore() {
+      return resource.data.unreadByUid is map ? resource.data.unreadByUid : {};
+    }
+    function onlyOwnUnreadChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unreadByUid']) &&
+        request.resource.data.unreadByUid is map &&
+        request.resource.data.unreadByUid.diff(unreadBefore()).affectedKeys().hasOnly([request.auth.uid]) &&
+        request.resource.data.unreadByUid[request.auth.uid] == 0;
+    }
+    function validChatMessageCreate() {
+      let data = request.resource.data;
+      return data.keys().hasOnly([
+          'channelId', 'senderUid', 'senderEmail', 'senderName', 'senderRole',
+          'text', 'type', 'fileUrl', 'fileName', 'fileSize', 'fileType',
+          'storagePath', 'timestamp', 'readBy', 'reactions'
+        ]) &&
+        data.keys().hasAll(['channelId', 'senderUid', 'senderEmail', 'text', 'type', 'timestamp']) &&
+        data.senderUid == request.auth.uid &&
+        data.senderEmail == userEmail() &&
+        data.text is string &&
+        data.text.size() <= 5000 &&
+        data.type in ['text', 'image', 'file'] &&
+        canWriteChannel(data.channelId);
+    }
 
     match /users/{userId} {
       allow read: if request.auth != null;
@@ -90,8 +179,27 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && isAdmin();
     }
     match /chat_threads/{threadId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if signedIn() && (
+        isDispatcher() ||
+        listHas(resource.data.participantIds, userEmail()) ||
+        listHas(resource.data.participantIds, request.auth.uid)
+      );
+      allow create: if signedIn() && (
+        listHas(request.resource.data.participantIds, userEmail()) ||
+        listHas(request.resource.data.participantIds, request.auth.uid)
+      );
+      allow update: if signedIn() && (
+        isDispatcher() ||
+        listHas(resource.data.participantIds, userEmail()) ||
+        listHas(resource.data.participantIds, request.auth.uid)
+      );
+      allow delete: if signedIn() && isAdmin();
+    }
+    match /chat_channels/{channelId} {
+      allow read: if canReadChannelData(resource.data);
+      allow create: if signedIn() && validChatChannelCreate(channelId);
+      allow update: if signedIn() && (canWriteChannelData(resource.data) || isAdmin()) && onlyOwnUnreadChanged();
+      allow delete: if signedIn() && isAdmin();
     }
     match /audit_logs/{auditId} {
       allow read: if request.auth != null && isDispatcher();
@@ -138,21 +246,30 @@ service cloud.firestore {
       allow write: if request.auth != null && isDispatcher();
     }
     match /chat_messages/{msgId} {
-      allow read: if request.auth != null && (isAdmin() || (resource.data.conversationId != null && resource.data.participants.hasAny([request.auth.token.email])));
-      allow create: if request.auth != null && request.resource.data.sender == request.auth.token.email;
-      allow update, delete: if request.auth != null && isAdmin();
+      allow read: if signedIn() && canReadChannel(resource.data.channelId);
+      allow create: if signedIn() && validChatMessageCreate();
+      allow update: if signedIn() &&
+        canWriteChannel(resource.data.channelId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions', 'readBy']);
+      allow delete: if signedIn() && isAdmin();
     }
     match /presence/{email} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.token.email == email;
+      allow read: if signedIn();
+      allow write: if signedIn() && userEmail() == email;
     }
     match /chat_typing/{docId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.resource.data.email == request.auth.token.email;
+      allow read: if signedIn() && canReadChannel(resource.data.channelId);
+      allow write: if signedIn() &&
+        request.resource.data.email == userEmail() &&
+        canWriteChannel(request.resource.data.channelId);
     }
     match /driverTelemetry/{docId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
+    }
+    match /chat_uploads/{fileId} {
+      allow read: if signedIn() && isDispatcher();
+      allow write: if signedIn() && isDispatcher();
     }
   }
 }

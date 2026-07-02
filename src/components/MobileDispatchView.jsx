@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import {
   Search, Plus, Upload, Route, Users, Truck, MapPin, Phone,
-  ChevronDown, X, User, Wifi, WifiOff, Edit2, Archive,
+  ChevronDown, X, User, Edit2, Archive,
   SlidersHorizontal
 } from "lucide-react";
 import { getDriverLiveStatus } from "../constants/statuses";
@@ -76,7 +76,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
   const timeParts = trip.time !== "Will Call" ? dispTime.split(" ") : [];
 
   return (
-    <div className={"bg-white rounded-[22px] border border-slate-200 border-l-[5px] " + sty.border + " shadow-sm overflow-visible transition-all duration-200"}>
+    <div className={(isLate ? "bg-rose-50 " : "bg-white ") + "rounded-[22px] border border-slate-200 border-l-[5px] " + sty.border + " shadow-sm overflow-visible transition-all duration-200"}>
       <button type="button" onClick={onToggle} className="w-full text-left px-3 pt-2.5 pb-2 focus:outline-none active:bg-slate-50/70 sm:px-3.5">
         <div className="flex items-start gap-2.5">
           <div className="shrink-0 text-center w-[50px] rounded-2xl bg-slate-50 border border-slate-100 py-1.5">
@@ -240,8 +240,7 @@ const MobileDispatchView = ({
   requestDeleteTrip, updateTrip, makeCall,
   setTripDetails, setShowAddTripModal, setShowUploadModal,
   onOpenSequencer, onOpenLiveMap, searchQuery, setSearchQuery,
-  addToast, isOnline, phoneNumbers,
-  onDispatcherStatusUpdate, fallbackAdminOnline, setFallbackAdminOnline,
+  addToast, phoneNumbers,
   activeTab = "trips", // Controlled by parent bottom nav
   expandedId: expandedIdProp, setExpandedId: setExpandedIdProp
 }) => {
@@ -277,15 +276,10 @@ const MobileDispatchView = ({
     return r;
   },[todayTrips,filter,localSearch]);
 
-  const myDispatcher=dispatchers?.find(d=>d.email===currentUser);
-  const amIOnline=myDispatcher?myDispatcher.clockedIn:(fallbackAdminOnline??true);
-  const toggleOnline=()=>{ if(myDispatcher&&onDispatcherStatusUpdate) onDispatcherStatusUpdate(myDispatcher.id,!amIOnline); else if(setFallbackAdminOnline) setFallbackAdminOnline(!amIOnline); };
-
   const todayFmt=new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
   const unassignedN=todayTrips.filter(t=>t.status==="Unassigned").length;
   const activeN=todayTrips.filter(t=>IN_PROGRESS.includes(t.status)).length;
   const doneN=todayTrips.filter(t=>t.status==="Completed").length;
-  const activeDriversN=drivers.filter(d=>!["Offline","Unavailable"].includes(d.status)).length;
 
   const CHIPS=[
     {id:"all",label:"All",n:todayTrips.length},
@@ -305,11 +299,6 @@ const MobileDispatchView = ({
             <h1 className="text-xl font-bold text-gray-900 mt-0.5 leading-none">{todayFmt}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={toggleOnline}
-              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border transition-all active:scale-95 "+(amIOnline?"bg-emerald-50 text-emerald-700 border-emerald-200":"bg-rose-50 text-rose-700 border-rose-200")}>
-              {amIOnline?<Wifi size={11}/>:<WifiOff size={11}/>}
-              {amIOnline?"Online":"Offline"}
-            </button>
             <button type="button" onClick={()=>setShowTools(true)}
               className="w-9 h-9 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-600 active:scale-95 transition-all hover:bg-gray-100">
               <SlidersHorizontal size={16}/>

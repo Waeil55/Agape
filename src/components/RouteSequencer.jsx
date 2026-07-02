@@ -1456,7 +1456,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                     >
                       <option value="">No Default Driver</option>
                       {drivers.map(d => (
-                        <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
+                         <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} (Active)</option>
                       ))}
                     </select>
                   </div>
@@ -1478,7 +1478,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                     >
                       <option value="">Leave Unassigned</option>
                       {drivers.map(d => (
-                        <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} ({d.status})</option>
+                         <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} (Active)</option>
                       ))}
                     </select>
                   )}

@@ -1,15 +1,18 @@
 export const IN_OUT_WAIT_MINUTES = 5;
 
-const IN_OUT_RE = /\bIN\s*(?:\/|-|\s)\s*OUT\b/i;
+const IN_OUT_RE = /\bIN\s*(?:\/|-|\s)?\s*OUT\b/i;
+const IN_OUT_COMPACT_RE = /\bINOUT\b/i;
 
 export const hasInOutMarker = (value) => {
   if (value === undefined || value === null) return false;
-  return IN_OUT_RE.test(String(value));
+  const s = String(value).trim();
+  return IN_OUT_RE.test(s) || IN_OUT_COMPACT_RE.test(s);
 };
 
 export const isInOutTrip = (trip = {}) => {
   if (!trip) return false;
   if (trip.inOutTrip || trip.inOut || trip.tripKind === 'IN_OUT') return true;
+  if (hasInOutMarker(trip.inOutType) || hasInOutMarker(trip.category)) return true;
   return [
     trip.time,
     trip.dropoffTime,
@@ -18,6 +21,15 @@ export const isInOutTrip = (trip = {}) => {
     trip.notes,
     trip.serviceType,
     trip.transportType,
+    trip.pickup,
+    trip.dropoff,
+    trip.pickupAddress,
+    trip.dropoffAddress,
+    trip.clientNotes,
+    trip.specialInstructions,
+    trip.instructions,
+    trip.destination,
+    trip.description,
   ].some(hasInOutMarker);
 };
 

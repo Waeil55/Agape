@@ -242,7 +242,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
     };
 
     return (
-      <div key={trip.id} className={`rounded-xl border bg-white p-3 transition-all ${isSelected ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300' : isLate ? 'border-rose-200 bg-white' : 'border-slate-200 hover:border-slate-300'}`}>
+      <div key={trip.id} className={`rounded-xl border bg-white p-3 transition-all ${isSelected ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300' : isLate ? 'border-rose-200 bg-rose-50' : 'border-slate-200 hover:border-slate-300'}`}>
         <div className="flex items-start gap-2">
           <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} className="mt-1 h-5 w-5 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
           <div className="min-w-0 flex-1">

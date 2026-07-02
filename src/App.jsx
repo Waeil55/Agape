@@ -7,7 +7,7 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   RefreshCcw, X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -44,7 +44,7 @@ import { useDriverAssignments } from './hooks/useDriverAssignments';
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v350';
+const APP_VERSION = 'v351';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -218,7 +218,7 @@ function buildDriverProfileFromEmail(email, uid = '') {
     name,
     email: normalizedEmail,
     phone: '',
-    status: 'Offline',
+    status: 'Available',
     vehicle: 'Pending Assignment',
     dist: '--',
     currentZone: 'TBD',
@@ -399,7 +399,6 @@ function withTimeout(promise, timeoutMs, label) {
 }
 
 const App = () => {
-  const [isOffline, setIsOffline] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [startupIssue, setStartupIssue] = useState('');
@@ -408,7 +407,6 @@ const App = () => {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [forceDataLoad, setForceDataLoad] = useState(false);
   const authBootResolvedRef = useRef(false);
-  const prevChatConvsRef = useRef(null);
   const loginPortalRoleRef = useRef(null);
   const loginInProgressRef = useRef(false);
   const loginAttemptRef = useRef(0);
@@ -433,7 +431,6 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    setIsOffline(isAuthenticated && !realtimeReliability.isOnline);
     if (isAuthenticated && realtimeReliability.isOnline) setRefreshTick(t => t + 1);
   }, [isAuthenticated, realtimeReliability.isOnline, realtimeReliability.resubscribeKey]);
 
@@ -774,7 +771,6 @@ const App = () => {
     roleRef.current = null;
     currentUserRef.current = null;
     authBootResolvedRef.current = true;
-    prevChatConvsRef.current = null;
 
     setIsAuthenticated(false);
     setRole(null);
@@ -1006,7 +1002,7 @@ const App = () => {
       setLoginError('');
       setStartupIssue('');
 
-      const driverTabs = ['driverHome', 'chat', 'completed', 'cancelled', 'noshow', 'settings'];
+      const driverTabs = ['driverHome', 'completed', 'cancelled', 'noshow', 'settings'];
       const userSettings = userDoc && userDoc.exists?.() ? (userDoc.data().settings || {}) : {};
       const preferredTab = userSettings.activeTab || null;
       const validTab = userRole === 'driver'
@@ -1026,9 +1022,10 @@ const App = () => {
       unsubFcm = onForegroundMessage((payload) => {
         const title = payload.notification?.title || payload.data?.title || 'Agape Care';
         const body = payload.notification?.body || payload.data?.body || '';
-        const type = payload.data?.type === 'chat' || title.toLowerCase().includes('message') ? 'message' : 'notification';
+        const type = payload.data?.type === 'chat' ? 'message' : 'notification';
         if (title && body) {
-          if (type === 'message') playMessageSound(); else playNotificationSound();
+          if (type === 'message') playMessageSound();
+          else playNotificationSound();
           showLocalNotification(title, body, type);
         }
       });
@@ -1317,54 +1314,34 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || !currentUser || !role) return;
-    let firstSnapshot = true;
-    
-    const unsubscribe = onSnapshot(doc(db, 'chatData/conversations'), (snap) => {
-      if (!snap.exists()) { setChatUnreadCount(0); return; }
-      const curr = snap.data().conversations || {};
-      
-      // Calculate unread count for nav badge
-      let totalUnread = 0;
-      const normalizedCurrentUser = String(currentUser || '').trim().toLowerCase();
-      for (const c of Object.values(curr)) {
-        if (Array.isArray(c?.participants) && !c.participants.includes(normalizedCurrentUser)) continue;
-        const explicitUnread = (c?.unread || {})[normalizedCurrentUser] || 0;
-        if (explicitUnread > 0) {
-          totalUnread += explicitUnread;
-        } else if (c?.lastMessage?.sender && c.lastMessage.sender !== normalizedCurrentUser &&
-            !(c.lastMessage?.readBy || []).includes(normalizedCurrentUser)) {
-          totalUnread += 1;
-        }
-      }
-      setChatUnreadCount(totalUnread);
-      
-      if (firstSnapshot) { firstSnapshot = false; prevChatConvsRef.current = curr; return; }
-      
-      const prev = prevChatConvsRef.current || {};
-      for (const [id, c] of Object.entries(curr)) {
-        const prevLast = prev[id]?.lastMessage;
-        const currLast = c?.lastMessage;
-        if (currLast && currLast.sender && currLast.sender !== normalizedCurrentUser &&
-            (!c?.participants || c.participants.includes(normalizedCurrentUser)) &&
-            (!prevLast || prevLast.text !== currLast.text || prevLast.timestamp !== currLast.timestamp)) {
-          if (activeTab !== 'chat') {
-            playMessageSound();
-            showLocalNotification(
-              c?.groupName || 'New Message',
-              currLast.text,
-              () => setActiveTab('chat')
-            );
-          }
-        }
-      }
-      prevChatConvsRef.current = curr;
-    }, (err) => {
-      console.error('Chat unread listener failed:', err);
-    });
+    const activeUid = auth.currentUser?.uid || '';
+    const activeEmail = normalizeEmail(currentUser || auth.currentUser?.email || '');
+    if (!isAuthenticated || !activeUid || !activeEmail) {
+      setChatUnreadCount(0);
+      return undefined;
+    }
+
+    const readUnreadCount = (data) => {
+      const byUid = data?.unreadByUid || {};
+      const legacy = data?.unreadCounts || {};
+      return Number(byUid[activeUid] || legacy[activeUid] || legacy[activeEmail] || 0);
+    };
+
+    const channelsRef = collection(db, 'chat_channels');
+    const unsubscribe = onSnapshot(
+      query(channelsRef, where('participantIds', 'array-contains', activeEmail)),
+      (snap) => {
+        let total = 0;
+        snap.forEach(channel => {
+          if (channel.data()?.type === 'dm') total += readUnreadCount(channel.data());
+        });
+        setChatUnreadCount(total);
+      },
+      (err) => console.error('Chat DM unread listener failed:', err)
+    );
 
     return () => unsubscribe();
-  }, [isAuthenticated, currentUser, role, activeTab]);
+  }, [isAuthenticated, currentUser]);
 
   const addAuditLog = (title, desc, color, meta = null) => {
     const now = Date.now();
@@ -2002,7 +1979,7 @@ const App = () => {
         ...d,
         clockedIn,
         lastUpdate: now,
-        status: clockedIn ? 'Available' : 'Offline',
+        status: clockedIn ? 'Available' : 'Available',
         ...merged,
       } : d);
       return updated;
@@ -2020,7 +1997,7 @@ const App = () => {
     if (driverId) {
       upsertDriverProfile(driverId, {
         clockedIn,
-        status: clockedIn ? 'Available' : 'Offline',
+        status: clockedIn ? 'Available' : 'Available',
         ...merged,
         lastUpdate: now,
         updatedAtLocal: now,
@@ -2581,11 +2558,11 @@ const App = () => {
                     </div>
                     <div>
                       <p className="text-sm font-bold text-slate-900">{d.name}</p>
-                      <p className="text-xs font-medium text-slate-500">{d.vehicle || 'No Vehicle'} &bull; {d.status}</p>
+                      <p className="text-xs font-medium text-slate-500">{d.vehicle || 'No Vehicle'} &bull; Active</p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <Badge variant={d.status === 'Available' ? 'success' : 'warning'}>{d.status}</Badge>
+                    <Badge variant="success">Active</Badge>
                     <span className="text-xs font-bold text-blue-600">Assign &rarr;</span>
                   </div>
                 </button>
@@ -2739,7 +2716,7 @@ const App = () => {
                         <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold">{String(d?.name || '?').charAt(0)}</div>
                         <div className="text-left">
                           <p className="text-sm font-bold text-slate-900">{d.name}</p>
-                          <p className="text-xs font-medium text-slate-500">{d.status} • {d.vehicle}</p>
+                          <p className="text-xs font-medium text-slate-500">Active &bull; {d.vehicle}</p>
                         </div>
                       </div>
                       <ArrowRight size={16} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
@@ -2798,10 +2775,6 @@ const App = () => {
 
   return (
     <>
-      {/* Offline Banner */}
-      <div className={`offline-banner${isOffline ? ' visible' : ''}`}>
-        You are offline — changes will sync when connection returns
-      </div>
       <div className="min-h-[100dvh] flex-1 flex flex-col bg-[var(--bg-app)] overflow-visible w-full">
       {/* Header removed: DriverPage handles its own UI */}
       {startupIssue && !isLoading && (

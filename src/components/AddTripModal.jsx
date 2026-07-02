@@ -426,7 +426,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
                       <option value="">— Unassigned —</option>
                       {selectableDrivers.map(d => (
                         <option key={d.id} value={d.id}>
-                          {d.name} {d.status ? `(${d.status})` : ''}
+                          {d.name}
                         </option>
                       ))}
                     </select>

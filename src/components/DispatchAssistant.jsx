@@ -259,7 +259,6 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-sm text-slate-900 break-words">{d.name}</p>
                           <div className={`w-2 h-2 rounded-full ${statusColor}`} />
-                          {!isClockedIn && <span className="text-xs font-bold text-slate-400 uppercase">Offline</span>}
                         </div>
                         <p className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
                           <MapPin size={10} className="shrink-0" /> {d.currentZone} &bull; {d.vehicle}

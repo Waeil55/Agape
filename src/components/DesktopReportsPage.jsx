@@ -143,7 +143,6 @@ const DesktopReportsPage = ({
   drivers = [],
   vehicles = [],
   onUpdateTrip,
-  setEditTrip,
   setShowUploadModal,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -487,7 +486,7 @@ const DesktopReportsPage = ({
                   <DetailRow label="Signature" value={trip.paperSignatureConfirmed ? 'Yes' : 'No'} />
                   <DetailRow label="Review Status" value={trip.reviewed ? 'Reviewed' : 'Pending'} valueColor={trip.reviewed ? 'text-emerald-600' : 'text-amber-600'} />
                   <div className="mt-4 pt-4 border-t border-slate-300/50 flex gap-2">
-                    <button onClick={() => setEditTrip?.(trip)} className="flex-1 bg-white border border-slate-300 text-slate-700 rounded-lg py-2 min-h-[40px] text-xs font-semibold hover:bg-slate-50 transition-colors flex justify-center items-center gap-1.5 shadow-sm">
+                    <button onClick={() => startRowEdit(trip)} className="flex-1 bg-white border border-slate-300 text-slate-700 rounded-lg py-2 min-h-[40px] text-xs font-semibold hover:bg-slate-50 transition-colors flex justify-center items-center gap-1.5 shadow-sm">
                       <Edit2 size={16} /> Edit Data
                     </button>
                     <button

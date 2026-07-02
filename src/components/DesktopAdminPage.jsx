@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, Wifi, WifiOff, BrainCircuit, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase, Download } from 'lucide-react';
+import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, BrainCircuit, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase, Download } from 'lucide-react';
 import { sendPasswordResetEmail, auth, db, firebaseConfig, setDoc, doc, deleteApp, initializeApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from '../config/firebase';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiSecurityAnalysis } from '../config/ai';
+import { isInOutTrip } from '../utils/inOutTrips';
 import DriversVehiclesPage from './DriversVehiclesPage';
 import UsersPage from './UsersPage';
 import DriverAvatar from './DriverAvatar';
@@ -45,12 +46,10 @@ const buildStableProfileId = (role, uid) => {
 };
 
 const statusColor = (status) => {
-  if (!status) return 'bg-slate-200 text-slate-600';
+  if (!status) return 'bg-emerald-100 text-emerald-700';
   const s = String(status).toLowerCase();
-  if (s === 'available' || s === 'online') return 'bg-emerald-100 text-emerald-700';
   if (s === 'busy' || s === 'on trip') return 'bg-amber-100 text-amber-700';
-  if (s === 'offline' || s === 'unavailable') return 'bg-slate-200 text-slate-500';
-  return 'bg-blue-100 text-blue-700';
+  return 'bg-emerald-100 text-emerald-700';
 };
 
 const SectionTab = ({ title, count, isActive, onClick }) => (
@@ -91,6 +90,11 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
             <div className="flex items-center gap-1.5 mb-2">
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
               <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Current Trip</span>
+              {isInOutTrip(currentTrip) && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">
+                  {currentTrip.inOutLeg ? `${currentTrip.inOutLeg} LEG` : 'IN/OUT'}
+                </span>
+              )}
               {onViewTrip && (
                 <button onClick={() => onViewTrip(currentTrip.id)} className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-blue-600 text-white rounded-lg text-[9px] font-bold hover:bg-blue-700 transition-colors">
                   <ExternalLink size={7} /> View
@@ -129,6 +133,9 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                   <span className="font-semibold text-slate-700 min-w-[80px]">{trip.time}</span>
                   <span className="text-slate-600 truncate">{trip.patient}</span>
+                  {isInOutTrip(trip) && (
+                    <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200 shrink-0">I/O</span>
+                  )}
                   {onViewTrip && (
                     <button onClick={() => onViewTrip(trip.id)} className="ml-auto text-blue-600 hover:text-blue-800 font-bold text-[9px] shrink-0">View</button>
                   )}
@@ -180,9 +187,8 @@ const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
             <div className="flex items-center gap-1.5">
               <p className="font-bold text-slate-900 text-sm truncate">{dispatcher.name}</p>
               {dispatcher.clockedIn !== undefined && (
-                <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${dispatcher.clockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
-                  {dispatcher.clockedIn ? <Wifi size={8} /> : <WifiOff size={8} />}
-                  {dispatcher.clockedIn ? 'Online' : 'Offline'}
+                <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${dispatcher.clockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  {dispatcher.clockedIn ? 'Active' : 'Active'}
                 </span>
               )}
             </div>
@@ -570,9 +576,8 @@ const DesktopAdminPage = ({
                           {getDriverLiveStatus(user).label}
                         </span>
                       ) : (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${statusColor(user.clockedIn !== undefined ? (user.clockedIn ? 'online' : 'offline') : user.status)}`}>
-                          {user.clockedIn !== undefined ? (user.clockedIn ? <Wifi size={10} /> : <WifiOff size={10} />) : null}
-                          {user.clockedIn !== undefined ? (user.clockedIn ? 'Online' : 'Offline') : (user.status || '-')}
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${statusColor('online')}`}>
+                          Active
                         </span>
                       )}
                       {workTimes[user.name]?.length > 0 && (
@@ -671,6 +676,7 @@ const DesktopAdminPage = ({
             <span className="px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-100 text-blue-700 text-[10px] font-bold">{drivers?.length || 0} drivers</span>
             {role === 'admin' && <span className="px-2 py-0.5 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold">{dispatchers?.length || 0} dispatchers</span>}
             <span className="px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-bold">{vehicles?.length || 0} vehicles</span>
+            <span className="px-2 py-0.5 rounded-lg bg-amber-50 border border-amber-100 text-amber-700 text-[10px] font-bold">{trips?.filter(t => isInOutTrip(t)).length || 0} IN/OUT trips</span>
           </div>
         </div>
         {/* Section Tabs */}

@@ -202,7 +202,6 @@ export default function EnterpriseNemtCommandCenter({
   onTogglePanel,
   addToast,
   operationsBoard,
-  isOnline,
 }) {
   const [module, setModule] = useState('command');
 
@@ -307,7 +306,7 @@ export default function EnterpriseNemtCommandCenter({
       const key = lower(trip.patient || trip.clientName || 'No client name');
       const record = clients.get(key) || {
         name: trip.patient || trip.clientName || 'No client name',
-        phone: trip.patientPhone || trip.pickupPhone || trip.dropoffPhone || '',
+        phone: (() => { if (trip.patientPhone) return trip.patientPhone; const F=['center','centre','clinic','hospital','care','treatment','medical','health','therapy','academy','school','facility','llc','inc','llp','corp','ltd','pharmacy','dialysis','rehab','rehabilitation','mental health','behavioral','paediatric','pediatric','dental','lab','imaging','radiology','urgent care','er ','emergency','surgery','surgical','ortho','cardio','neuro']; const isF=(n)=>{const l=(n||'').toLowerCase().trim();return l?F.some(k=>l.includes(k)):false}; const puF=isF(trip.pickupSiteName)||isF(trip.pickup); const doF=isF(trip.dropoffSiteName)||isF(trip.dropoff); if(puF&&!doF) return trip.dropoffPhone||''; if(doF&&!puF) return trip.pickupPhone||''; return trip.pickupPhone||trip.dropoffPhone||''; })(),
         trips: [],
         inOut: 0,
         willCall: 0,
