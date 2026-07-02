@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft, ChevronLeft, MessageCircle, MoreHorizontal, Phone, Radio, Search, Shield,
-  Truck, User, Users, Video, X,
+  ChevronLeft, MessageCircle, Radio, Search, Shield,
+  Truck, User, Users, X,
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import ChatInput from './ChatInput';
@@ -17,9 +17,7 @@ const ChatPage = ({ onBack }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState('sidebar');
   const [showSearch, setShowSearch] = useState(false);
-  const [showMore, setShowMore] = useState(false);
   const searchInputRef = useRef(null);
-  const moreRef = useRef(null);
 
   useEffect(() => {
     if (chat.activeChannel && mobileView === 'sidebar') setMobileView('chat');
@@ -28,14 +26,6 @@ const ChatPage = ({ onBack }) => {
   useEffect(() => {
     if (showSearch && searchInputRef.current) searchInputRef.current.focus();
   }, [showSearch]);
-
-  useEffect(() => {
-    const handleClick = (e) => {
-      if (moreRef.current && !moreRef.current.contains(e.target)) setShowMore(false);
-    };
-    if (showMore) document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [showMore]);
 
   const employeeByEmail = useMemo(() => {
     const map = new Map();
@@ -103,8 +93,6 @@ const ChatPage = ({ onBack }) => {
 
   const openPerson = useCallback((employee) => { chat.openDM(employee.email, employee.name); setMobileView('chat'); }, [chat]);
   const openConversation = useCallback((c) => { chat.openExistingDM(c); setMobileView('chat'); }, [chat]);
-  const handleBackToSidebar = useCallback(() => { chat.setActiveChannel(null); chat.clearDMTarget(); setMobileView('sidebar'); }, [chat]);
-
   const Avatar = ({ email, name, size = 40, showOnline = true }) => (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <div className={`w-full h-full rounded-full ${getAvatarColor(email)} flex items-center justify-center text-white font-bold`}
@@ -260,38 +248,6 @@ const ChatPage = ({ onBack }) => {
     <div className="flex h-full w-full min-h-0 flex-col bg-[#f0f2f5]">
       {chat.activeChannel ? (
         <>
-          <div className="shrink-0 bg-white border-b border-slate-200/80 px-2 pt-[env(safe-area-inset-top)]" style={{ minHeight: 56 }}>
-            <div className="flex items-center gap-2 h-[56px]">
-              <button type="button" onClick={handleBackToSidebar}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-blue-500 active:bg-slate-100 md:hidden">
-                <ArrowLeft size={22} />
-              </button>
-              <Avatar email={activeStatusEmail || activeTitle} name={activeTitle} size={36} showOnline={false} />
-              <div className="min-w-0 flex-1">
-                <h2 className="truncate text-[16px] font-semibold text-slate-950 leading-tight">{activeTitle}</h2>
-                <p className={`text-[11px] font-medium mt-px ${isOnline ? 'text-emerald-500' : 'text-slate-400'}`}>
-                  {activeConversation?.isAdminReview ? activeSubtitle : isOnline ? 'Online' : activeSubtitle || 'Offline'}
-                </p>
-              </div>
-              <button className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 active:bg-slate-100"><Phone size={18} /></button>
-              <button className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 active:bg-slate-100"><Video size={18} /></button>
-              <div className="relative" ref={moreRef}>
-                <button onClick={() => setShowMore(!showMore)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 active:bg-slate-100"><MoreHorizontal size={18} /></button>
-                {showMore && (
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
-                    <button className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                      <Search size={16} /> Search messages
-                    </button>
-                    <button className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                      <User size={16} /> View profile
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
           <div className="flex-1 min-h-0" />
 
           {canSend ? (
