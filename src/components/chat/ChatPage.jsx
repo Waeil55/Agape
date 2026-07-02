@@ -123,19 +123,19 @@ const ChatPage = ({ onBack }) => {
     const active = chat.activeChannel === conversation.id;
     return (
       <button type="button" onClick={() => openConversation(conversation)}
-        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-150 ${active ? 'bg-blue-50' : 'active:bg-slate-100'}`}>
-        <Avatar email={conversation.others[0] || conversation.participants[0]} name={conversation.title} size={48} />
+        className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all duration-150 ${active ? 'bg-blue-50' : 'active:bg-slate-100'}`}>
+        <Avatar email={conversation.others[0] || conversation.participants[0]} name={conversation.title} size={52} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between">
-            <p className={`truncate text-[15px] ${conversation.unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-800'}`}>{conversation.title}</p>
-            {conversation.lastMessageAt && <span className="text-[11px] text-slate-400 shrink-0 ml-2">{formatChatTime(conversation.lastMessageAt)}</span>}
+            <p className={`truncate text-[16px] ${conversation.unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-800'}`}>{conversation.title}</p>
+            {conversation.lastMessageAt && <span className="text-[12px] text-slate-400 shrink-0 ml-2">{formatChatTime(conversation.lastMessageAt)}</span>}
           </div>
           <div className="flex items-center justify-between mt-0.5">
-            <p className={`truncate text-[13px] ${conversation.unread > 0 ? 'font-semibold text-slate-700' : 'text-slate-500'}`}>
+            <p className={`truncate text-[14px] ${conversation.unread > 0 ? 'font-semibold text-slate-700' : 'text-slate-500'}`}>
               {conversation.lastMessage || conversation.subtitle || 'No messages yet'}
             </p>
             {conversation.unread > 0 && (
-              <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[10px] font-bold text-white">
+              <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[11px] font-bold text-white">
                 {conversation.unread > 99 ? '99+' : conversation.unread}
               </span>
             )}
@@ -151,23 +151,23 @@ const ChatPage = ({ onBack }) => {
     const online = chat.onlineUsers.has(employee.email);
     return (
       <button type="button" onClick={() => openPerson(employee)}
-        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-150 active:bg-slate-100`}>
-        <div className="relative shrink-0" style={{ width: 48, height: 48 }}>
+        className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all duration-150 active:bg-slate-100`}>
+        <div className="relative shrink-0" style={{ width: 52, height: 52 }}>
           <div className={`w-full h-full rounded-full ${getAvatarColor(employee.email)} flex items-center justify-center text-white font-bold text-sm`}>
             {getInitials(employee.name)}
           </div>
-          <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+          <span className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white ${online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between">
-            <p className={`truncate text-[15px] ${unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-800'}`}>{employee.name}</p>
+            <p className={`truncate text-[16px] ${unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-800'}`}>{employee.name}</p>
             {unread > 0 && (
-              <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[10px] font-bold text-white">
+              <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[11px] font-bold text-white">
                 {unread > 99 ? '99+' : unread}
               </span>
             )}
           </div>
-          <p className="text-[13px] text-slate-500 truncate mt-0.5">{employee.email}</p>
+          <p className="text-[14px] text-slate-500 truncate mt-0.5">{employee.email}</p>
         </div>
       </button>
     );
@@ -179,22 +179,22 @@ const ChatPage = ({ onBack }) => {
         <div className="flex items-center gap-3 py-3">
           {onBack && (
             <button type="button" onClick={onBack}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 active:bg-slate-100 md:hidden">
-              <ChevronLeft size={24} />
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 active:bg-slate-100 md:hidden">
+              <ChevronLeft size={26} />
             </button>
           )}
           <div className="min-w-0 flex-1">
             <h1 className="text-[22px] font-bold text-slate-950 tracking-tight">Messages</h1>
           </div>
-          <button className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white active:bg-blue-600">
-            <MessageCircle size={18} />
+          <button className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500 text-white active:bg-blue-600">
+            <MessageCircle size={20} />
           </button>
         </div>
-        <label className="flex h-10 items-center gap-2.5 rounded-xl bg-slate-100 px-3 mb-3">
-          <Search size={16} className="shrink-0 text-slate-400" />
+        <label className="flex h-11 items-center gap-2.5 rounded-xl bg-slate-100 px-3 mb-3">
+          <Search size={18} className="shrink-0 text-slate-400" />
           <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search" className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-slate-800 outline-none placeholder:text-slate-400" />
-          {searchQuery && <button onClick={() => setSearchQuery('')} className="text-slate-400"><X size={16} /></button>}
+            placeholder="Search" className="min-w-0 flex-1 bg-transparent text-[16px] font-medium text-slate-800 outline-none placeholder:text-slate-400" />
+          {searchQuery && <button onClick={() => setSearchQuery('')} className="text-slate-400"><X size={18} /></button>}
         </label>
       </div>
 
@@ -321,7 +321,7 @@ const ChatPage = ({ onBack }) => {
           )}
         </>
       ) : (
-        <div className="hidden flex-1 flex-col items-center justify-center bg-[#f0f2f5] p-8 text-center md:flex">
+        <div className="flex flex-1 flex-col items-center justify-center bg-[#f0f2f5] p-8 text-center">
           <div className="w-24 h-24 rounded-full bg-white shadow-sm flex items-center justify-center text-blue-500 mb-4">
             <MessageCircle size={40} />
           </div>
