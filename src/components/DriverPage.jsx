@@ -616,7 +616,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (workflowProgressState.storageKey !== workflowStorageKey) return;
     try {
       localStorage.setItem(workflowStorageKey, JSON.stringify(workflowProgress));
-    } catch {}
+    } catch (e) { console.warn('[workflow persist]', e); }
   }, [workflowProgressState.storageKey, workflowStorageKey, workflowProgress]);
 
   const [activeNav, setActiveNav] = useState(() => {
@@ -651,7 +651,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   });
   useEffect(() => {
     if (lastOdometer > 0) {
-      try { localStorage.setItem(`agape_drvOdo_${userKey}`, String(lastOdometer)); } catch {}
+      try { localStorage.setItem(`agape_drvOdo_${userKey}`, String(lastOdometer)); } catch (e) { console.warn('[odo persist]', e); }
     }
   }, [lastOdometer, userKey]);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(null);
@@ -905,7 +905,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         if (coords?.lat && coords?.lng) {
           addressCoordsCache.current[addr] = { lat: coords.lat, lng: coords.lng, type };
         }
-      } catch {}
+      } catch (e) { console.warn('[geocode]', e); }
     }
   }, []);
 
@@ -1016,7 +1016,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const handleUndo = () => {
     if (!undoableAction) return;
-    if (!window.confirm(`Are you sure you want to restore ${undoableAction.trip.patient} to "${undoableAction.previousStatus}"?`)) return;
+    if (!window.confirm(`Are you sure you want to restore ${undoableAction.trip?.patient || 'this trip'} to "${undoableAction.previousStatus}"?`)) return;
     advanceWorkflow(undoableAction.trip, undoableAction.previousStatus, {}, { allowRegression: true });
     setUndoableAction(null);
     if (undoTimeoutRef.current) { clearTimeout(undoTimeoutRef.current); undoTimeoutRef.current = null; }
@@ -1592,7 +1592,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         etasRef.current[trip.id] = etaMinutes;
         setEtas(prev => ({ ...prev, [trip.id]: etaMinutes }));
       }
-    } catch {}
+    } catch (e) { console.warn('[ETA calc]', e); }
   }, [driverPosition]);
 
   // Batch update ETAs (limit to first 3 trips, 30s interval to avoid rate limits)
@@ -1694,7 +1694,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           setAiSuggestions([`AI-optimized sequence: ${orderedNames}`, `Estimated time savings based on proximity and schedule.`]);
         }
       }
-    } catch {}
+    } catch (e) { console.warn('[AI optimize]', e); }
     if (!silent) setAiOptimizing(false);
   };
 
@@ -2648,7 +2648,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       const url = /Android/i.test(navigator.userAgent) ? `sms:${cleaned}?body=${encoded}` : `sms:${cleaned}&body=${encoded}`;
       window.location.href = url;
     } else {
-      try { await navigator.clipboard.writeText(body); } catch {}
+      try { await navigator.clipboard.writeText(body); } catch (e) { console.warn('[clipboard]', e); }
       setShowToast({ message: 'Message copied to clipboard' });
     }
   };
@@ -2671,7 +2671,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         const destEnc = encodeURIComponent(destination || '');
         const mapsLink = `https://www.google.com/maps/dir/?api=1&destination=${destEnc}`;
         etaText = ` Check my ETA: ${mapsLink}`;
-      } catch {}
+      } catch (e) { console.warn('[geo SMS]', e); }
     }
     return greeting + etaText;
   };
@@ -2978,7 +2978,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F3F4F6] text-slate-900" style={{ fontSize: '96%' }}>
+    <div className="flex-1 flex flex-col bg-[#F3F4F6] text-slate-900">
       {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && expandedTripId && !activeWorkTrip && (
         <div
           className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
@@ -5669,7 +5669,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {showSequencerModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); setRoutePlanSequencerOrigin(null); }}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-7xl max-h-[92vh] min-h-[400px] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
             <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm     font-semibold text-slate-900 flex items-center gap-2">
                 <Route size={16} className="text-indigo-700" /> Route Sequencer

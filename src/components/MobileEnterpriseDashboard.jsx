@@ -22,6 +22,8 @@ const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
 import { getDriverLiveStatus } from '../constants/statuses';
 const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })));
 
+const MobileMobileFallback = () => <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+
 const MobileEnterpriseDashboard = (props) => {
   const { trips = [], drivers = [], dispatchers = [], currentUser, role, onLogout, chatUnreadCount = 0 } = props;
   const [currentView, setCurrentView] = useState('trips');
@@ -94,7 +96,7 @@ const MobileEnterpriseDashboard = (props) => {
     <div className="px-4 py-3 flex items-center justify-between bg-white border-b border-gray-100 shrink-0 sticky top-0 z-50">
       <div className="flex items-center gap-3">
         {showBack && (
-          <button onClick={() => setSubView(null)} className="p-1.5 -ml-1.5 mr-1 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50">
+          <button onClick={() => setSubView(null)} className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-1.5 mr-1 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 touch-manipulation">
             <ChevronLeft size={20} />
           </button>
         )}
@@ -111,16 +113,14 @@ const MobileEnterpriseDashboard = (props) => {
     </div>
   );
 
-  const Fallback = () => <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
-
   const renderContent = () => {
     // Handle Sub-views (from Menu)
     if (subView === 'reports') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Reports & Export', true)}
-          <div className="flex-1 overflow-y-auto">
-            <ErrorBoundary><Suspense fallback={<Fallback />}><ReportsPage {...props} /></Suspense></ErrorBoundary>
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -130,8 +130,8 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('User Management', true)}
-          <div className="flex-1 overflow-y-auto">
-            <ErrorBoundary><Suspense fallback={<Fallback />}><AdminPage {...props} /></Suspense></ErrorBoundary>
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><AdminPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -142,7 +142,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Archives', true)}
           <div className="flex-1 overflow-hidden">
-            <ErrorBoundary><Suspense fallback={<Fallback />}><ArchivesPage {...props} /></Suspense></ErrorBoundary>
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><ArchivesPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -152,8 +152,8 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Settings', true)}
-          <div className="flex-1 overflow-y-auto px-3 py-3">
-            <ErrorBoundary><Suspense fallback={<Fallback />}><SettingsPage {...props} /></Suspense></ErrorBoundary>
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><SettingsPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -163,8 +163,8 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Fleet Management', true)}
-          <div className="flex-1 overflow-y-auto px-3 py-3">
-            <ErrorBoundary><Suspense fallback={<Fallback />}><DriversVehiclesPage {...props} /></Suspense></ErrorBoundary>
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><DriversVehiclesPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -175,7 +175,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Live Map', true)}
           <div className="flex-1 overflow-hidden">
-            <ErrorBoundary><Suspense fallback={<Fallback />}><LiveMapPage trips={trips} drivers={drivers} /></Suspense></ErrorBoundary>
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><LiveMapPage trips={trips} drivers={drivers} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -186,7 +186,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
           <div className="absolute inset-0">
-            <ErrorBoundary><Suspense fallback={<Fallback />}><MobileDispatchView {...props} activeTab={currentView === 'trips' ? 'trips' : 'drivers'} expandedId={expandedId} setExpandedId={setExpandedId} /></Suspense></ErrorBoundary>
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><MobileDispatchView {...props} activeTab={currentView === 'trips' ? 'trips' : 'drivers'} expandedId={expandedId} setExpandedId={setExpandedId} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -196,8 +196,8 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Reports & Export')}
-          <div className="flex-1 overflow-y-auto">
-            <ErrorBoundary><Suspense fallback={<Fallback />}><ReportsPage {...props} /></Suspense></ErrorBoundary>
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -206,7 +206,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'chat') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          <ErrorBoundary><Suspense fallback={<Fallback />}><ChatPage onBack={() => setCurrentView('trips')} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ChatPage onBack={() => setCurrentView('trips')} /></Suspense></ErrorBoundary>
         </div>
       );
     }
@@ -251,7 +251,7 @@ const MobileEnterpriseDashboard = (props) => {
           </div>
           <div className="min-h-0 flex-1">
             <ErrorBoundary>
-            <Suspense fallback={<Fallback />}>
+            <Suspense fallback={<MobileFallback />}>
             <DriverPage
               {...props}
               currentUser={activeDriverWorkDriver.email || activeDriverWorkDriver.id || currentUser}
@@ -285,7 +285,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
           <div className="absolute inset-0">
-            <ErrorBoundary><Suspense fallback={<Fallback />}><LiveMapPage {...props} /></Suspense></ErrorBoundary>
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><LiveMapPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -294,7 +294,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'menu') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          <ErrorBoundary><Suspense fallback={<Fallback />}><MobileMenuPage {...props} setSubView={setSubView} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><MobileMenuPage {...props} setSubView={setSubView} /></Suspense></ErrorBoundary>
         </div>
       );
     }

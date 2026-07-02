@@ -123,7 +123,7 @@ const findTripLocations = (trip, trips, trashedTrips, logs) => {
   if (trips?.some(t => matchKey(t.id) || matchKey(t.bookingId))) locations.push({ panel: 'operations', label: 'Dispatch Board', icon: 'Zap' });
   if (trashedTrips?.some(t => matchKey(t.id) || matchKey(t.bookingId))) locations.push({ panel: 'archives', label: 'Archives', icon: 'Archive' });
   if (logs?.some(l => matchKey(l.meta?.id) || matchKey(l.meta?.bookingId) || String(l.d || '').includes(id) || String(l.d || '').includes(bk))) locations.push({ panel: 'reports', label: 'Activity Logs', icon: 'BarChart2' });
-  if (trip?.routeAssignments?.length > 0) locations.push({ panel: 'operations', label: 'Route Plans', icon: 'Route' });
+  if (Array.isArray(trip?.routeAssignments) && trip.routeAssignments.length > 0) locations.push({ panel: 'operations', label: 'Route Plans', icon: 'Route' });
   return locations;
 };
 
@@ -145,7 +145,11 @@ const DesktopEnterpriseDashboard = ({
   onUpdateMission, onUpdateDriverTrip, onDriverStatusUpdate, onCompleteTrip, onLogout, chatUnreadCount = 0
 }) => {
   const displayLoginId = String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '');
-  const [activePanel, setActivePanel] = useState(() => localStorage.getItem('agape_activePanel') || 'operations');
+  const VALID_PANELS = ['operations', 'liveMap', 'archives', 'reports', 'admin', 'settings', 'drive', 'chat', 'routePlanner', 'dispatch'];
+  const [activePanel, setActivePanel] = useState(() => {
+    const saved = localStorage.getItem('agape_activePanel');
+    return saved && VALID_PANELS.includes(saved) ? saved : 'operations';
+  });
   const [operationsTab, setOperationsTab] = useState(() => localStorage.getItem('agape_operationsTab') || 'manifest');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authActionPayload, setAuthActionPayload] = useState(null);
@@ -176,7 +180,7 @@ const DesktopEnterpriseDashboard = ({
     else localStorage.removeItem('agape_driverWorkDriverId');
   }, [driverWorkDriverId]);
   useEffect(() => {
-    if (showRightPanel && !rightPanelTab) {
+    if (showRightPanel && (rightPanelTab === null || rightPanelTab === undefined)) {
       setRightPanelTab('alerts');
     }
   }, [showRightPanel, rightPanelTab]);
@@ -282,7 +286,7 @@ const DesktopEnterpriseDashboard = ({
   const inProgressTrips = activeTrips.filter(t => ['In Mission', 'En Route', 'At Pickup', 'At Dropoff', 'Assigned', 'In Progress', 'Navigating Pickup', 'Navigating Dropoff', 'In Transit', 'Arrived'].includes(t.status));
   const completedToday = todayTrips.filter(t => t.status === 'Completed').length;
   const availableDrivers = drivers.filter(d => d.status === 'Available').length;
-  const lateTrips = activeTrips.filter(t => isTripLate(t.time));
+  const lateTrips = activeTrips.filter(t => isTripLate(t.time || ''));
   const dispatcherOnlineCount = dispatchers.filter((dispatcher) => dispatcher.clockedIn).length;
   const activeDriverCount = drivers.filter((driver) => driver.status && !['Offline', 'Unavailable'].includes(driver.status)).length;
   const aiAlertCount = lateTrips.length + unassignedTrips.length;
@@ -442,9 +446,7 @@ const DesktopEnterpriseDashboard = ({
       setAuthPassword('');
       setAuthActionPayload(null);
       setReAuthError('');
-    } catch {
-      setReAuthError('Invalid password. Action denied.');
-    }
+    } catch (err) { console.error('[AuthAction]', err); setReAuthError('Invalid password. Action denied.'); }
   };
 
   const renderEnterpriseTopBar = () => (
@@ -468,6 +470,7 @@ const DesktopEnterpriseDashboard = ({
                 key={item.id}
                 type="button"
                 onClick={item.action}
+                aria-label={item.label}
                 className={`inline-flex h-9 items-center gap-2 rounded-full px-4 text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
                   item.active
                     ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
@@ -738,7 +741,7 @@ const DesktopEnterpriseDashboard = ({
         {rightPanelTab === 'alerts' && (
           <div className="space-y-3">
             {logs.slice(0, 20).map((log, i) => (
-              <div key={i} className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-sm mb-1.5 hover:shadow-md transition-all duration-200 group">
+              <div key={log.timestamp || log.id || `log-${i}`} className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-sm mb-1.5 hover:shadow-md transition-all duration-200 group">
                 <div className="flex items-start gap-2.5">
                   <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ring-1 ring-slate-200 ${
                     log.c === 'rose' ? 'bg-rose-500 ring-rose-500/20' :
@@ -980,7 +983,7 @@ const DesktopEnterpriseDashboard = ({
     return (
       <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[20vh]" onClick={() => setCommandPaletteOpen(false)}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
-        <div className="w-full max-w-lg bg-white backdrop-blur-xl border border-slate-200 rounded-3xl shadow-sm overflow-hidden relative z-10 animate-in fade-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
+        <div role="dialog" aria-modal="true" aria-label="Command palette" className="w-full max-w-lg bg-white backdrop-blur-xl border border-slate-200 rounded-3xl shadow-sm overflow-hidden relative z-10 animate-in fade-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100">
             <Search size={16} className="text-slate-500" />
             <input
@@ -1240,7 +1243,7 @@ const DesktopEnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${activePanel === 'reports' || activePanel === 'chat' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'reports', 'admin', 'drive', 'chat'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+            <div className={`flex-1 min-h-0 ${activePanel === 'reports' || activePanel === 'chat' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'reports', 'admin', 'drive', 'chat', 'liveMap'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
@@ -1309,6 +1312,7 @@ const DesktopEnterpriseDashboard = ({
                   drivers={drivers}
                   preSelectDriver={uploadAssignDriver}
                    onTripsCreated={async (newTrips) => {
+                    try {
                     const ok = await setTrips(prev => {
                       const makeKey = (t) => {
                         const bk = t?.bookingId;
@@ -1344,6 +1348,7 @@ const DesktopEnterpriseDashboard = ({
                     } else {
                       addToast('Import Failed', 'Failed to save trips to Firestore. See console for details.', 'danger');
                     }
+                    } catch (err) { console.error('[onTripsCreated]', err); addToast('Import Failed', err.message || 'Unexpected error.', 'danger'); }
                   }}
                 />
               </Suspense></ErrorBoundary>
@@ -1523,7 +1528,7 @@ const DesktopEnterpriseDashboard = ({
                     <p className="text-xs text-slate-600">Optimize driver routes and assignments for maximum efficiency.</p>
                   </div>
                   <button
-                    onClick={() => { triggerFleetOptimization(); setTimeout(() => setShowOptimizeModal(false), 3000); }}
+                    onClick={() => { try { triggerFleetOptimization(); } catch (e) { console.error('[FleetOpt]', e); } setTimeout(() => setShowOptimizeModal(false), 3000); }}
                     className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2"
                   >
                     <Zap size={16} /> Run Optimization
@@ -1667,7 +1672,7 @@ const DesktopEnterpriseDashboard = ({
       {showAuthModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div className="bg-white w-full max-w-sm rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+          <div role="dialog" aria-modal="true" aria-label="Re-authenticate" className="bg-white w-full max-w-sm rounded-3xl shadow-sm relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="px-5 py-3.5 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Hash size={16} className="text-blue-700" /> Authenticate
@@ -1717,6 +1722,7 @@ const DesktopEnterpriseDashboard = ({
                   initialStops={routePlannerSequencerStops}
                   initialSequence={routePlannerSequencerSequence}
                   onRouteSaved={({ route, saveMode, driverId, validTripIds }) => {
+                    try {
                     if (saveMode === 'recurring') {
                       addAuditLog('Route Created', `${currentUser} saved recurring route "${route.name}" with ${route.sequence?.length || 0} stops.`, 'indigo');
                       return;
@@ -1729,8 +1735,10 @@ const DesktopEnterpriseDashboard = ({
                         : `${currentUser} saved today's route "${route.name}" without assigning a driver.`,
                       driver ? 'amber' : 'slate'
                     );
+                    } catch (err) { console.error('[onRouteSaved]', err); addToast?.('Error', 'Failed to save route.', 'danger'); }
                   }}
                   onApplyRoute={({ route, driverId, tripIds, driver }) => {
+                    try {
                     const routeTripIds = new Set(tripIds || []);
                     if (!driverId || routeTripIds.size === 0) return;
                     setTrips(prev => prev.map(t => {
@@ -1740,6 +1748,7 @@ const DesktopEnterpriseDashboard = ({
                       return t;
                     }));
                     addAuditLog('Route Applied', `${currentUser} synced ${routeTripIds.size} trip assignments from route "${route.name}".`, 'emerald');
+                    } catch (err) { console.error('[onApplyRoute]', err); addToast?.('Error', 'Failed to apply route.', 'danger'); }
                   }}
                 />
               </Suspense></ErrorBoundary>
