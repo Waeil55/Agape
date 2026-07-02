@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Clock, Navigation, MapPin } from 'lucide-react';
 import { calculateETA, formatETAMinutes, formatETADistance, getETAColor, getETABackgroundColor } from '../utils/eta';
 
-export function ETABadge({ currentLat, currentLng, destLat, destLng, label, compact = false }) {
+export const ETABadge = memo(function ETABadge({ currentLat, currentLng, destLat, destLng, label, compact = false }) {
   const eta = calculateETA(currentLat, currentLng, destLat, destLng);
 
   if (!eta) return null;
@@ -66,6 +66,6 @@ export function TripETADisplay({ trip, driverPosition }) {
   }
 
   return null;
-}
+});
 
 export default ETABadge;

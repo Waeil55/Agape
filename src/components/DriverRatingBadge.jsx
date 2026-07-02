@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Star, MessageSquare } from 'lucide-react';
 import { calculateDriverRating, formatRating, getRatingColor, RATING_LABELS } from '../utils/driverRatings';
 
@@ -45,7 +45,7 @@ export function RatingStars({ rating, size = 'sm' }) {
   return <div className="flex items-center gap-0.5">{stars}</div>;
 }
 
-export function DriverRatingBadge({ driver, trips, compact = false }) {
+export const DriverRatingBadge = memo(function DriverRatingBadge({ driver, trips, compact = false }) {
   const rating = calculateDriverRating(trips);
 
   if (compact) {
@@ -108,7 +108,7 @@ export function DriverRatingBadge({ driver, trips, compact = false }) {
       </div>
     </div>
   );
-}
+});
 
 export function TripFeedbackDisplay({ trip }) {
   if (!trip?.feedback) return null;

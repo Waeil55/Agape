@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { getInitials, getAvatarColor, formatChatMessageTime, EMOJI_QUICK } from '../../utils/chatHelpers';
 import { FileText, Download, SmilePlus } from 'lucide-react';
 
-const ChatMessage = ({ group, isOwn, onlineUsers, onReaction, currentUserEmail }) => {
+const ChatMessage = memo(function ChatMessage({ group, isOwn, onlineUsers, onReaction, currentUserEmail }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const isOnline = onlineUsers.has(group.senderEmail);
 
@@ -147,6 +147,6 @@ const ChatMessage = ({ group, isOwn, onlineUsers, onReaction, currentUserEmail }
       </div>
     </div>
   );
-};
+});
 
 export default ChatMessage;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { DollarSign, TrendingUp, Clock, Truck, Calendar } from 'lucide-react';
 import { calculateTripEarnings, calculateWeeklyEarnings, calculateDailyEarnings } from '../utils/driverEarnings';
 
@@ -23,7 +23,7 @@ export function TripEarningsBadge({ trip, compact = false }) {
   );
 }
 
-export function DriverEarningsCard({ driver, trips }) {
+export const DriverEarningsCard = memo(function DriverEarningsCard({ driver, trips }) {
   const today = new Date().toISOString().split('T')[0];
   const daily = calculateDailyEarnings(driver, trips, today);
   const weekly = calculateWeeklyEarnings(driver, trips);
@@ -80,6 +80,6 @@ export function DriverEarningsCard({ driver, trips }) {
       </div>
     </div>
   );
-}
+});
 
 export default DriverEarningsCard;

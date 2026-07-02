@@ -12,16 +12,16 @@ import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config
 import { openMapLink } from '../utils/nativeActions';
 import { timeToMinutes, isTripLate } from '../utils/tripDate';
 import { getDriverLiveStatus } from '../constants/statuses';
-import ArchivesPage from './ArchivesPage';
-import DriversVehiclesPage from './DriversVehiclesPage';
-import SettingsPage from './SettingsPage';
-import UsersPage from './UsersPage';
-import OperationsCommandCenter from './OperationsCommandCenter';
-import MobileDispatchView from './MobileDispatchView';
-import AdminPage from './AdminPage';
-import DriverPage from './DriverPage';
-import RoutePlannerPage from './RoutePlannerPage';
-import { ChatPage } from './chat';
+const ArchivesPage = lazy(() => import('./ArchivesPage'));
+const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
+const SettingsPage = lazy(() => import('./SettingsPage'));
+const UsersPage = lazy(() => import('./UsersPage'));
+const OperationsCommandCenter = lazy(() => import('./OperationsCommandCenter'));
+const MobileDispatchView = lazy(() => import('./MobileDispatchView'));
+const AdminPage = lazy(() => import('./AdminPage'));
+const DriverPage = lazy(() => import('./DriverPage'));
+const RoutePlannerPage = lazy(() => import('./RoutePlannerPage'));
+const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })));
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LiveMapPage = lazy(() => import('./LiveMapPage'));
 const DispatchAssistant = lazy(() => import('./DispatchAssistant'));
@@ -107,7 +107,7 @@ const findTripLocations = (trip, trips, trashedTrips, logs) => {
 };
 
 const DesktopEnterpriseDashboard = ({
-  role, currentUser, trips, setTrips, drivers, setDrivers, dispatchers, setDispatchers, vehicles, setVehicles,
+  role, currentUser, trips, setTrips, drivers, setDrivers, upsertDriverProfile, dispatchers, setDispatchers, vehicles, setVehicles,
   trashedTrips, setTrashedTrips, restoreTrip, logs, setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
   selectedTasks, setSelectedTasks, searchQuery, setSearchQuery,
   smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
@@ -1087,6 +1087,7 @@ const DesktopEnterpriseDashboard = ({
     // On mobile screens (< 768px): show the premium mobile dispatch view
     if (isMobile) {
       return (
+        <Suspense fallback={<LazyFallback />}>
         <MobileDispatchView
           role={role}
           currentUser={currentUser}
@@ -1113,10 +1114,12 @@ const DesktopEnterpriseDashboard = ({
           fallbackAdminOnline={fallbackAdminOnline}
           setFallbackAdminOnline={setFallbackAdminOnline}
         />
+        </Suspense>
       );
     }
     // On desktop: unchanged OperationsCommandCenter
     return (
+      <Suspense fallback={<LazyFallback />}>
       <OperationsCommandCenter
         role={role}
         currentUser={currentUser}
@@ -1161,6 +1164,7 @@ const DesktopEnterpriseDashboard = ({
         onTogglePanel={toggleRightPanel}
         phoneNumbers={phoneNumbers}
       />
+      </Suspense>
     );
   };
 
@@ -1180,6 +1184,7 @@ const DesktopEnterpriseDashboard = ({
         </Suspense>
       );
       case 'routePlanner': return (
+        <Suspense fallback={<LazyFallback />}>
         <RoutePlannerPage
           trips={trips}
           drivers={drivers}
@@ -1192,18 +1197,20 @@ const DesktopEnterpriseDashboard = ({
             setShowSequencerModal(true);
           }}
         />
+        </Suspense>
       );
       case 'reports': return (
         <Suspense fallback={<LazyFallback />}>
           <ReportsPage trips={trips} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} />
         </Suspense>
       );
-      case 'chat': return <ChatPage onBack={() => setActivePanel('operations')} />;
-      case 'archives': return <ArchivesPage trashedTrips={trashedTrips} restoreTrip={restoreTrip} drivers={drivers} role={role} updateTrashedTrip={updateTrashedTrip} />;
+      case 'chat': return <Suspense fallback={<LazyFallback />}><ChatPage onBack={() => setActivePanel('operations')} /></Suspense>;
+      case 'archives': return <Suspense fallback={<LazyFallback />}><ArchivesPage trashedTrips={trashedTrips} restoreTrip={restoreTrip} drivers={drivers} role={role} updateTrashedTrip={updateTrashedTrip} /></Suspense>;
       case 'admin': return (
+        <Suspense fallback={<LazyFallback />}>
         <AdminPage
           role={role} currentUser={currentUser}
-          drivers={drivers} setDrivers={setDrivers}
+          drivers={drivers} setDrivers={setDrivers} upsertDriverProfile={upsertDriverProfile}
           dispatchers={dispatchers} setDispatchers={setDispatchers}
           vehicles={vehicles} setVehicles={setVehicles}
           addAuditLog={addAuditLog}
@@ -1216,9 +1223,12 @@ const DesktopEnterpriseDashboard = ({
             if (trip) setTripDetails(trip);
           }}
         />
+        </Suspense>
       );
       case 'settings': return (
+        <Suspense fallback={<LazyFallback />}>
         <SettingsPage currentUser={currentUser} role={role} onLogout={onLogout} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} initialSection={activePanel === 'archives' ? 'archives' : undefined} />
+        </Suspense>
       );
       case 'drive': return driverWorkDrivers.length > 0 && activeDriverWorkDriver ? (
         <div className="flex h-full min-h-0 flex-col bg-[#f4f7fa]">

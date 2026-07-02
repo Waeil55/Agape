@@ -14,11 +14,6 @@ import { hasPermission } from './constants/roles';
 import { timeToMinutes, tripCalendarDateKey, tripMatchesTodayOrTomorrow, isCalendarDateKeyWithinLastDays } from './utils/tripDate';
 import { cleanPhone } from './utils/smartContacts';
 import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, isDriverAssignedToDispatcher, isTripInDispatcherScope, normalizeEmail } from './utils/accessControl';
-import ArchivesPage from './components/ArchivesPage';
-import DriversVehiclesPage from './components/DriversVehiclesPage';
-import SettingsPage from './components/SettingsPage';
-import UsersPage from './components/UsersPage';
-import AddTripModal from './components/AddTripModal';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
 import { playMessageSound, playNotificationSound, initAudioContext } from './utils/notificationSound';
 import { makeCall, sendSMS } from './utils/nativeActions';
@@ -44,7 +39,7 @@ import { useDriverAssignments } from './hooks/useDriverAssignments';
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v351';
+const APP_VERSION = 'v352';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -117,6 +112,7 @@ const FileUploadTrips = lazyWithRetry(() => import('./components/FileUploadTrips
 const ReportsPage = lazyWithRetry(() => import('./components/ReportsPage'));
 const DriverPage = lazyWithRetry(() => import('./components/DriverPage'));
 const EnterpriseDashboard = lazyWithRetry(() => import('./components/EnterpriseDashboard'));
+const AddTripModal = lazyWithRetry(() => import('./components/AddTripModal'));
 
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
@@ -399,6 +395,7 @@ function withTimeout(promise, timeoutMs, label) {
 }
 
 const App = () => {
+  const noopRef = useRef(() => {});
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [startupIssue, setStartupIssue] = useState('');
@@ -711,11 +708,11 @@ const App = () => {
   });
   const [, setUserSettingsLoaded] = useState(false);
 
-  const addToast = (title, message, type = 'info') => {
+  const addToast = useCallback((title, message, type = 'info') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, title, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
-  };
+  }, []);
 
   const dataErrorRef = useRef(dataError);
   useEffect(() => {
@@ -738,12 +735,12 @@ const App = () => {
     setPhoneNumbers(prev => ({ ...prev, ...updates }));
   }, [setPhoneNumbers]);
 
-  const requestAuthAction = (label, callback) => {
+  const requestAuthAction = useCallback((label, callback) => {
     setReAuthError('');
     setAuthPassword('');
     setAuthActionPayload({ label, callback });
     setShowAuthModal(true);
-  };
+  }, []);
 
   // eslint-disable-next-line no-unused-vars
   const [activeManifest, setActiveManifest] = useState(null);
@@ -1343,10 +1340,9 @@ const App = () => {
     return () => unsubscribe();
   }, [isAuthenticated, currentUser]);
 
-  const addAuditLog = (title, desc, color, meta = null) => {
+  const addAuditLog = useCallback((title, desc, color, meta = null) => {
     const now = Date.now();
     const timeStr = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    // Attach actor metadata so UIs can filter sensitive admin activity
     const actorEmail = currentUser || 'system';
     let actorRole = 'admin';
     try {
@@ -1357,7 +1353,7 @@ const App = () => {
     } catch (e) { /* ignore */ }
     setLogs(prev => [{ t: title, d: desc, c: color, type: 'audit', timestamp: timeStr, time: now, actor: actorEmail, actorRole, meta }, ...prev].slice(0, 100));
     addLog({ t: title, d: desc, c: color, type: 'audit', time: now, actor: actorEmail, actorRole, meta });
-  };
+  }, [currentUser, drivers, dispatchers, addLog]);
 
 
   const handleCreateAccount = async () => {
@@ -1600,7 +1596,7 @@ const App = () => {
     // Firestore auto-syncs via useFirestoreAppData
   };
 
-  const assignTripToDriver = (tripId, driverId) => {
+  const assignTripToDriver = useCallback((tripId, driverId) => {
     const driver = drivers.find(d => d.id === driverId);
     const tripToAssign = trips.find(t => t.id === tripId);
     if (!driver || !tripToAssign) return;
@@ -1624,7 +1620,6 @@ const App = () => {
       { field: 'driverName', before: prevTrip.driverName || null, after: driver.name },
     ];
     addAuditLog('Trip Assigned', `${currentUser} assigned ${tripToAssign.patient}'s trip to ${driver.name}.`, 'emerald', { entity: 'trip', id: tripId, diffs: changed });
-    // Firestore auto-syncs via useFirestoreAppData
     if (notificationsEnabled && tripToAssign) {
       playNotificationSound();
       showLocalNotification(
@@ -1632,14 +1627,9 @@ const App = () => {
         `${tripToAssign.patient} — ${tripToAssign.pickup} → ${tripToAssign.dropoff}`
       );
     }
-    // Specific alert for the driver if they are online
-    if (driver && driver.email) {
-      // In a real app, this would be a cloud function sending a push notification.
-      // For this demo, we'll assume the driver is listening to the Firestore snapshot.
-    }
-  };
+  }, [drivers, trips, currentUser, addAuditLog, notificationsEnabled]);
 
-  const bulkAssignTrips = (driverId) => {
+  const bulkAssignTrips = useCallback((driverId) => {
     if (selectedTasks.length === 0) return;
     const driver = drivers.find(d => d.id === driverId);
     if (!driver || !canControlDriver(driver)) {
@@ -1660,7 +1650,7 @@ const App = () => {
     addAuditLog('Bulk Assignment', `${currentUser} assigned ${allowedSelection.length} trips to ${driver?.name || 'Unknown'}`, 'emerald');
     setSelectedTasks([]);
     setBulkAssignModal(false);
-  };
+  }, [selectedTasks, drivers, trips, currentUser, addAuditLog]);
 
   const triggerSmartAssign = async (trip) => {
     if (!canControlTrip(trip)) {
@@ -2967,6 +2957,7 @@ const App = () => {
               setTrips={setTrips}
               drivers={scopedDrivers}
               setDrivers={setDrivers}
+              upsertDriverProfile={upsertDriverProfile}
               dispatchers={dispatchers}
               setDispatchers={setDispatchers}
               vehicles={vehicles}
@@ -3005,7 +2996,7 @@ const App = () => {
               setShowDispatcherArchive={setShowDispatcherArchive}
               addToast={addToast}
               addAuditLog={addAuditLog}
-              persistState={() => {}} // No-op: Firestore is the single source of truth
+              persistState={noopRef.current}
               driverTelemetry={driverTelemetry}
               hasPermission={hasPermission}
               requestAuthAction={requestAuthAction}
@@ -3058,6 +3049,7 @@ const App = () => {
 
           {/* Global Modals */}
           {showAddTripModal && (
+            <Suspense fallback={<LazyFallback />}>
             <AddTripModal
               onClose={() => setShowAddTripModal(false)}
               onAddTrip={addTrip}
@@ -3066,6 +3058,7 @@ const App = () => {
               drivers={role === 'driver' ? (currentUserDriverProfile ? [currentUserDriverProfile] : []) : role === 'dispatcher' ? scopedDrivers : drivers}
               dispatchers={dispatchers}
             />
+            </Suspense>
           )}
           {renderSecurityAuthModal()}
 

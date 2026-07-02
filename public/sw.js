@@ -1,9 +1,9 @@
-/* Agape Care PWA Service Worker v14
+/* Agape Care PWA Service Worker v15
    Static assets only. Never cache index.html.
    Firestore onSnapshot listeners own all realtime data delivery.
 */
 
-const CACHE_VERSION = 'agape-v16';
+const CACHE_VERSION = 'agape-v17';
 const RUNTIME_CACHE = CACHE_VERSION + '-assets';
 
 self.addEventListener('install', (event) => {

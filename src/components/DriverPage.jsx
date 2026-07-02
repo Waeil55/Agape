@@ -5,10 +5,10 @@ import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
 import { playNotificationSound } from '../utils/notificationSound';
-import DriverToolsPage from './DriverToolsPage';
+const DriverToolsPage = lazy(() => import('./DriverToolsPage'));
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
-import TaskCard from './TaskCard';
+const TaskCard = lazy(() => import('./TaskCard'));
 import {
   Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle,
   AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check,
@@ -23,7 +23,7 @@ import {
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
-import { ChatPage } from './chat';
+const ChatPage = lazy(() => import('./chat/ChatPage'));
 import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
 import { normalizeEmail } from '../utils/accessControl';
 import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
@@ -1081,7 +1081,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     return driverScopedTrips.filter(t => t.driverId === adminDriverFilter);
   }, [driverScopedTrips, role, adminDriverFilter]);
 
-  const myTrips = filteredDriverScopedTrips
+  const myTrips = useMemo(() => filteredDriverScopedTrips
     .filter(t => isTripDateRecent(t.date) || !isWorkflowTerminalTrip(t))
     .sort((a, b) => {
       const today = getTodayStr();
@@ -1089,34 +1089,34 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       const bToday = b.date === today ? 0 : 1;
       if (aToday !== bToday) return aToday - bToday;
       return timeToMinutes(a.time) - timeToMinutes(b.time);
-    });
+    }), [filteredDriverScopedTrips]);
 
   const historyWindowEnd = localCalendarYmd();
   const historyWindowStart = calendarDateKeyDaysAgo(DRIVER_HISTORY_LOOKBACK_DAYS - 1);
-  const allHistory = filteredDriverScopedTrips
+  const allHistory = useMemo(() => filteredDriverScopedTrips
     .filter(isWorkflowTerminalTrip)
     .sort((a, b) => {
       const dateCompare = String(getTripHistoryDateKey(a) || '').localeCompare(String(getTripHistoryDateKey(b) || ''));
       if (dateCompare !== 0) return dateCompare;
       return timeToMinutes(a.time) - timeToMinutes(b.time);
-    });
-  const historyWindowTrips = allHistory.filter((trip) => {
+    }), [filteredDriverScopedTrips]);
+  const historyWindowTrips = useMemo(() => allHistory.filter((trip) => {
     const dateKey = getTripHistoryDateKey(trip);
     return Boolean(dateKey) && dateKey >= historyWindowStart && dateKey <= historyWindowEnd;
-  });
+  }), [allHistory, historyWindowStart, historyWindowEnd]);
   const selectedHistoryDate = historyDate < historyWindowStart
     ? historyWindowStart
     : historyDate > historyWindowEnd
       ? historyWindowEnd
       : historyDate;
-  const selectedHistoryDayTrips = historyWindowTrips.filter((trip) => getTripHistoryDateKey(trip) === selectedHistoryDate);
-  const historyStatusCounts = {
+  const selectedHistoryDayTrips = useMemo(() => historyWindowTrips.filter((trip) => getTripHistoryDateKey(trip) === selectedHistoryDate), [historyWindowTrips, selectedHistoryDate]);
+  const historyStatusCounts = useMemo(() => ({
     all: selectedHistoryDayTrips.length,
     completed: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed').length,
     noshow: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'no show').length,
     cancelled: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'cancelled').length,
     rerouted: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'rerouted').length,
-  };
+  }), [selectedHistoryDayTrips]);
   useEffect(() => {
     if (historyDate !== selectedHistoryDate) setHistoryDate(selectedHistoryDate);
   }, [historyDate, selectedHistoryDate]);
@@ -1127,7 +1127,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     else setHistoryDate(next);
   };
 
-  const activeTrips = myTrips.filter(t => !isWorkflowTerminalTrip(t));
+  const activeTrips = useMemo(() => myTrips.filter(t => !isWorkflowTerminalTrip(t)), [myTrips]);
   const activeWorkTrip = activeWorkTripId
     ? driverScopedTrips.find((trip) => trip.id === activeWorkTripId) || null
     : null;
@@ -1136,7 +1136,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       setActiveWorkTripId(null);
       setWorkNotesOpen(false);
     }
-  }, [activeNav, activeWorkTripId]);
+  }, [activeNav]);
   useEffect(() => {
     if (activeWorkTripId && trips.length > 0 && !driverScopedTrips.some((trip) => trip.id === activeWorkTripId)) {
       setActiveWorkTripId(null);
@@ -1158,7 +1158,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     'Arrived DO',
   ].includes(trip.status)) || activeTrips[0] || null;
 
-  const orderedTrips = stackInOutPairs([...activeTrips].sort((a, b) => {
+  const orderedTrips = useMemo(() => stackInOutPairs([...activeTrips].sort((a, b) => {
     // 1. If guided mode is active, the absolute top priority is the current step's trip
     if (guidedMode && guidedSteps && guidedSteps[guidedStepIndex]) {
       if (a.id === guidedSteps[guidedStepIndex].tripId && b.id !== guidedSteps[guidedStepIndex].tripId) return -1;
@@ -1226,10 +1226,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const urgencyDiff = getUrgency(b) - getUrgency(a);
     if (urgencyDiff !== 0) return urgencyDiff;
     return timeToMinutes(a.time) - timeToMinutes(b.time);
-  }));
+  })), [activeTrips, guidedMode, guidedSteps, guidedStepIndex, driverScopedTrips, aiSequence]);
 
-  const timedTrips = orderedTrips.filter(t => !isWillCall(t));
-  const willCallTrips = orderedTrips.filter(t => isWillCall(t));
+  const timedTrips = useMemo(() => orderedTrips.filter(t => !isWillCall(t)), [orderedTrips]);
+  const willCallTrips = useMemo(() => orderedTrips.filter(t => isWillCall(t)), [orderedTrips]);
   const transferTargetDrivers = useMemo(() => (
     (allDrivers || drivers || [])
       .filter((driver) => driver?.id && driver.id !== me?.id)
@@ -3787,6 +3787,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         <div className="h-px flex-1 bg-slate-200" />
                       </div>
                     )}
+                    <Suspense fallback={<div className="h-32 bg-slate-50 rounded-xl animate-pulse" />}>
                     <TaskCard
                     task={{
                       id: trip.id,
@@ -3917,8 +3918,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         );
                       } : null,
                     }}
-                  />
-                </React.Fragment>
+/>
+                    </Suspense>
+                  </React.Fragment>
               );
               })}
             </div>
@@ -4478,12 +4480,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {/* ===== CHAT PAGE ===== */}
       {activeNav === 'chat' && (
         <div className="flex-1 overflow-hidden">
+          <Suspense fallback={<div className="h-full flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
           <ChatPage onBack={() => setActiveNav('trips')} />
+          </Suspense>
         </div>
       )}
 
       {/* ===== TOOLS PAGE ===== */}
       {isClockedIn && activeNav === 'tools' && (
+        <Suspense fallback={<div className="h-full flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
         <DriverToolsPage
           trips={trips}
           activeTrips={activeTrips}
@@ -4567,6 +4572,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             setShowToast({ type: 'success', message: `${items.length} route stop${items.length !== 1 ? 's' : ''} loaded in Route Sequencer.` });
           }}
         />
+        </Suspense>
       )}
 
       {/* ===== HISTORY PAGE ===== */}

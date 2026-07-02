@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Truck, Calendar, Shield, Wrench, Gauge, Fuel, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-export default function VehicleDetailsCard({ vehicle, driver, compact = false }) {
+export default memo(function VehicleDetailsCard({ vehicle, driver, compact = false }) {
   if (!vehicle && !driver) return null;
 
   const vehicleName = vehicle?.name || driver?.vehicle || 'No vehicle';
@@ -147,4 +147,4 @@ export default function VehicleDetailsCard({ vehicle, driver, compact = false })
       </div>
     </div>
   );
-}
+});
