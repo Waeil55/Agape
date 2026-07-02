@@ -174,7 +174,7 @@ const ChatPage = ({ onBack }) => {
   };
 
   const renderSidebar = () => (
-    <div className="flex h-full min-h-0 flex-col bg-white">
+    <div className="flex h-full w-full min-h-0 flex-col bg-white">
       <div className="shrink-0 border-b border-slate-200/80 bg-white px-4 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-3 py-3">
           {onBack && (
@@ -258,7 +258,7 @@ const ChatPage = ({ onBack }) => {
   );
 
   const renderChatArea = () => (
-    <div className="flex h-full min-h-0 flex-col bg-[#f0f2f5]">
+    <div className="flex h-full w-full min-h-0 flex-col bg-[#f0f2f5]">
       {chat.activeChannel ? (
         <>
           <div className="shrink-0 bg-white border-b border-slate-200/80 px-2 pt-[env(safe-area-inset-top)]" style={{ minHeight: 56 }}>
@@ -333,7 +333,7 @@ const ChatPage = ({ onBack }) => {
   );
 
   return (
-    <div className="agape-chat-page flex h-full min-h-0 bg-white">
+    <div className="agape-chat-page flex h-full w-full min-h-0 bg-white">
       <div className="hidden h-full min-h-0 w-full md:grid md:grid-cols-[360px_minmax(0,1fr)]">
         <div className="min-h-0 border-r border-slate-200">{renderSidebar()}</div>
         <div className="min-h-0">{renderChatArea()}</div>
