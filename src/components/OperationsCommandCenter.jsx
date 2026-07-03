@@ -1582,7 +1582,7 @@ const OperationsCommandCenter = ({
   };
 
   const renderManifestBoard = () => (
-    <div className="flex-1 min-h-0 flex flex-col xl:grid xl:grid-cols-[1fr_360px] gap-4 px-3 pb-3 h-full overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_360px] gap-4 px-3 pb-3 h-full overflow-hidden">
       {/* Board View (Left Column) */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         {manifestFeedTrips.length === 0 ? (
@@ -1646,8 +1646,7 @@ const OperationsCommandCenter = ({
         )}
       </div>
 
-      {/* Drivers Activity View (Right Column) */}
-      <div className="hidden xl:flex flex-col min-h-0 bg-slate-50 border border-slate-200/60 rounded-3xl p-4 shadow-inner">
+      <div className="hidden lg:flex flex-col min-h-0 bg-slate-50 border border-slate-200/60 rounded-3xl p-4 shadow-inner">
         <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200">
           <Activity size={18} className="text-blue-600" />
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Drivers Activity</h3>
