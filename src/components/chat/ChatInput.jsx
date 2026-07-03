@@ -130,6 +130,7 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
   return (
     <div
       className={`agape-chat-input shrink-0 ${dragOver ? 'bg-blue-50' : 'bg-[#f0f2f5]'} transition-colors`}
+      style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom, 10px))' }}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -198,12 +199,6 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
             value={text}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
-            onFocus={() => {
-              setTimeout(() => {
-                window.scrollTo(0, 0);
-                if (document.body) document.body.scrollTop = 0;
-              }, 80);
-            }}
             placeholder={`Message ${channelName || ''}…`}
             rows={1}
             className="flex-1 min-w-0 bg-transparent outline-none resize-none text-[15px] text-slate-800 placeholder:text-slate-400 py-[10px] pr-2 leading-[1.45] overflow-y-auto"
@@ -215,8 +210,7 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
         {canSend ? (
           <button
             type="button"
-            onMouseDown={handleSendPress}
-            onTouchStart={handleSendPress}
+            onPointerDown={handleSendPress}
             className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-blue-500 text-white shadow-md shadow-blue-500/40 hover:bg-blue-600 active:scale-90 transition-all"
           >
             <Send size={18} className="ml-0.5 mt-0.5" />

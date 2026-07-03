@@ -1,8 +1,28 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import ChatMessage from './ChatMessage';
-import { ChevronUp, Loader2 } from 'lucide-react';
+import { ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 
 const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore, loadingMore, onLoadMore, messagesEndRef, typingUsers }) => {
+  const [showScrollDown, setShowScrollDown] = useState(false);
+  const containerRef = useRef(null);
+
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollDown(distFromBottom > 200);
+  }, []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messagesEndRef]);
   const groupedMessages = useMemo(() => {
     const groups = [];
     let currentGroup = null;
@@ -46,7 +66,7 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
   };
 
   return (
-    <div className="agape-chat-messages">
+    <div ref={containerRef} className="agape-chat-messages relative">
       {hasMore && (
         <button onClick={onLoadMore} disabled={loadingMore}
           className="w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-xs text-blue-500 hover:text-blue-600 font-medium transition-colors">
@@ -113,6 +133,16 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
       )}
 
       <div ref={messagesEndRef} className="h-1" />
+
+      {/* Scroll to bottom FAB */}
+      {showScrollDown && (
+        <button
+          onClick={scrollToBottom}
+          className="sticky bottom-2 left-1/2 -translate-x-1/2 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-lg border border-slate-200 text-slate-600 hover:bg-slate-50 active:scale-90 transition-all mx-auto mb-2"
+        >
+          <ChevronDown size={18} />
+        </button>
+      )}
     </div>
   );
 };

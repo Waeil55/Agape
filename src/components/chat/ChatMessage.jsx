@@ -1,16 +1,56 @@
-import React, { useState, memo } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { getInitials, getAvatarColor, formatChatMessageTime, EMOJI_QUICK } from '../../utils/chatHelpers';
 import { FileText, Download, SmilePlus } from 'lucide-react';
+
+const URL_REGEX = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+
+function renderTextWithLinks(text, isOwn) {
+  const parts = text.split(URL_REGEX);
+  return parts.map((part, i) => {
+    if (part.match(URL_REGEX)) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className={`${isOwn ? 'text-white/90 hover:text-white underline decoration-white/40' : 'text-blue-600 hover:text-blue-700 underline decoration-blue-300'}`}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+}
 
 const ChatMessage = memo(function ChatMessage({
   group, isOwn, onlineUsers, onReaction, currentUserEmail,
   isFirstInSequence, isLastInSequence,
 }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+  const emojiRef = useRef(null);
+
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handleClickOutside = (e) => {
+      if (emojiRef.current && !emojiRef.current.contains(e.target)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
 
   return (
     <div
-      className={`chat-bubble-enter flex ${isOwn ? 'justify-end' : 'justify-start'} ${isFirstInSequence ? 'mt-3' : 'mt-[2px]'}`}
+      className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${isFirstInSequence ? 'mt-3' : 'mt-[2px]'}`}
     >
       {/* Sender avatar — only for incoming, only on last message in group */}
       {!isOwn && (
@@ -75,7 +115,7 @@ const ChatMessage = memo(function ChatMessage({
                     src={msg.fileUrl}
                     alt={msg.fileName || 'Image'}
                     className="max-h-[260px] max-w-[260px] rounded-[18px] object-cover cursor-pointer block"
-                    onClick={() => window.open(msg.fileUrl, '_blank')}
+                    onClick={() => setPreviewImage(msg.fileUrl)}
                     loading="lazy"
                   />
                 )}
@@ -112,9 +152,14 @@ const ChatMessage = memo(function ChatMessage({
                 {/* Text */}
                 {msg.text && (
                   <p className="text-[15px] leading-[1.4] whitespace-pre-wrap break-words">
-                    {msg.text}
+                    {renderTextWithLinks(msg.text, isOwn)}
                   </p>
                 )}
+              </div>
+
+              {/* Per-message timestamp — visible on hover on desktop, always hidden on mobile */}
+              <div className={`opacity-0 group-hover:opacity-100 transition-opacity ${isOwn ? 'text-right' : 'text-left'} mt-0.5 px-1 hidden md:block`}>
+                <span className="text-[10px] text-slate-400">{formatChatMessageTime(msg.timestamp)}</span>
               </div>
 
               {/* Reactions */}
@@ -137,8 +182,8 @@ const ChatMessage = memo(function ChatMessage({
                 </div>
               )}
 
-              {/* Hover emoji reaction button */}
-              <div className={`absolute top-1/2 -translate-y-1/2 ${isOwn ? '-left-9' : '-right-9'} opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+              {/* Emoji reaction button — always visible on mobile, hover on desktop */}
+              <div ref={emojiRef} className={`absolute top-1/2 -translate-y-1/2 ${isOwn ? '-left-9' : '-right-9'} md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10`}>
                 <button
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   className="p-1.5 rounded-full bg-white shadow-md hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors"
@@ -172,6 +217,22 @@ const ChatMessage = memo(function ChatMessage({
           </p>
         )}
       </div>
+
+      {/* Image lightbox */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setPreviewImage(null)}
+        >
+          <img src={previewImage} alt="Preview" className="max-w-full max-h-full rounded-lg shadow-2xl object-contain" />
+          <button
+            onClick={() => setPreviewImage(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center hover:bg-white/30 transition"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 });

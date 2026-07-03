@@ -133,8 +133,8 @@ const ChatPage = ({ onBack }) => {
   }, [adminReviewConversations]);
 
   const unifiedChatList = useMemo(() => {
-    // 1. Get all active DMs
-    const activeDMs = conversations.filter(c => c.isCurrentUserParticipant && (c.lastMessage || c.unread > 0));
+    // 1. Get all active DMs (show even if no messages yet — user just opened the DM)
+    const activeDMs = conversations.filter(c => c.isCurrentUserParticipant);
     
     // 2. Get emails of people we already have an active conversation with
     const recentEmails = new Set(
@@ -294,9 +294,6 @@ const ChatPage = ({ onBack }) => {
               </span>
             )}
           </h1>
-          <button className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600 active:scale-95 transition-all shadow-sm shadow-blue-500/30">
-            <MessageCircle size={18} />
-          </button>
         </div>
         {/* Search bar */}
         <div className="px-4 pb-3 pt-3 md:pt-0">

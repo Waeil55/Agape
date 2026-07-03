@@ -180,17 +180,19 @@ export function useChat() {
     };
   }, [userEmail, userDisplayName, userUid]);
 
-  // Global message listener — plays sound for ANY new message across ALL channels
+  // Global message listener — plays sound for new messages in user's channels
   const lastSoundTimeRef = useRef(0);
   useEffect(() => {
     if (!userEmail) return undefined;
+    const myChannelIds = new Set(channels.map(c => c.id));
+    if (myChannelIds.size === 0) return undefined;
     const msgsRef = collection(db, 'chat_messages');
     const q = query(
       msgsRef,
       where('senderEmail', '!=', userEmail),
       orderBy('senderEmail'),
       orderBy('timestamp', 'desc'),
-      fbLimit(5)
+      fbLimit(10)
     );
     const unsub = onSnapshot(q, (snap) => {
       const now = Date.now();
@@ -198,14 +200,14 @@ export function useChat() {
       snap.forEach(d => {
         const msg = d.data();
         const msgTime = asMillis(msg.timestamp);
-        if (now - msgTime < 10000 && msg.channelId !== activeChannel && !window.isChatPageOpen) {
+        if (now - msgTime < 10000 && msg.channelId !== activeChannel && !window.isChatPageOpen && myChannelIds.has(msg.channelId)) {
           lastSoundTimeRef.current = now;
           playMessageSound().catch(() => {});
         }
       });
     }, () => {});
     return () => unsub();
-  }, [userEmail, activeChannel]);
+  }, [userEmail, activeChannel, channels]);
 
   useEffect(() => {
     if (!userEmail) return undefined;
@@ -299,7 +301,8 @@ export function useChat() {
         messagesRefForPagination.current = newMsgs;
         setHasMore(newMsgs.length >= LIVE_MESSAGES_LIMIT);
         setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'instant' }), 300);
         }, 100);
       }
     } catch (err) {
@@ -366,7 +369,7 @@ export function useChat() {
       setHasMore(newMsgs.length >= LIVE_MESSAGES_LIMIT);
       markAsRead(activeChannel);
 
-      if (isAtBottom || newMsgs.length > 0) {
+      if (isAtBottom) {
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
       }
 

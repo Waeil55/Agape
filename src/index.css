@@ -1689,6 +1689,10 @@ body,
   -webkit-overflow-scrolling: touch;
   scroll-padding-bottom: 6rem;
 }
+.agape-chat-messages .break-words {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
 
 .agape-chat-input,
 .agape-chat-readonly-footer {
