@@ -405,6 +405,7 @@ const App = () => {
   const loginAttemptRef = useRef(0);
   const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
+  const loadingStartedAtRef = useRef(Date.now());
   
   const [refreshTick, setRefreshTick] = useState(0);
   const [role, setRole] = useState(null);
@@ -1011,7 +1012,10 @@ const App = () => {
 
       setDataLoaded(false);
       authBootResolvedRef.current = true;
-      setIsLoading(false);
+      const elapsed = Date.now() - loadingStartedAtRef.current;
+      const delay = Math.max(0, 1000 - elapsed);
+      if (delay > 0) setTimeout(() => setIsLoading(false), delay);
+      else setIsLoading(false);
     };
 
     const unsub = onAuthStateChanged(auth, async (user) => {
