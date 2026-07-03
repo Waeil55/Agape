@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, BrainCircuit, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase, Download, MessageCircle } from 'lucide-react';
+import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase, Download, MessageCircle } from 'lucide-react';
 import { sendPasswordResetEmail, auth, db, firebaseConfig, setDoc, doc, deleteApp, initializeApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from '../config/firebase';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiSecurityAnalysis } from '../config/ai';
@@ -188,8 +188,8 @@ const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
             <div className="flex items-center gap-1.5">
               <p className="font-bold text-slate-900 text-sm truncate">{dispatcher.name}</p>
               {dispatcher.clockedIn !== undefined && (
-                <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${dispatcher.clockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                  {dispatcher.clockedIn ? 'Active' : 'Active'}
+                <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${dispatcher.clockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {dispatcher.clockedIn ? 'Active' : 'Offline'}
                 </span>
               )}
             </div>
@@ -478,14 +478,16 @@ const DesktopAdminPage = ({
   };
 
   const handleDeleteUser = (user) => {
-    if (user._source === 'dispatchers') {
-      setDispatchers(prev => prev.filter(d => d.id !== user.id));
-    } else if (user._source === 'drivers') {
-      setDrivers(prev => prev.filter(d => d.id !== user.id));
-    }
-    addAuditLog('User Deleted', `${currentUser} deleted ${user.name} (${user._role})`, 'rose');
-    setConfirmDelete(null);
-    if (requestAuthAction) requestAuthAction('Delete User', () => {});
+    if (!requestAuthAction) return;
+    requestAuthAction('Delete User', () => {
+      if (user._source === 'dispatchers') {
+        setDispatchers(prev => prev.filter(d => d.id !== user.id));
+      } else if (user._source === 'drivers') {
+        setDrivers(prev => prev.filter(d => d.id !== user.id));
+      }
+      addAuditLog('User Deleted', `${currentUser} deleted ${user.name} (${user._role})`, 'rose');
+      setConfirmDelete(null);
+    });
   };
 
   const activeDrivers = useMemo(() => {

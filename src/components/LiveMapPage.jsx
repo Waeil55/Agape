@@ -623,7 +623,7 @@ const LiveMapPage = ({
   // Resize handler
   useEffect(() => {
     if (!mapRef.current) return;
-    const handler = () => { mapRef.current?.google?.maps?.event?.trigger(mapRef.current, 'resize'); };
+    const handler = () => { if (mapRef.current && window.google?.maps) window.google.maps.event.trigger(mapRef.current, 'resize'); };
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, [mapReady]);
