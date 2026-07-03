@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, lazy, Suspense, Component } from 'react';
 import {
-  Home, Map, MessageCircle, ChevronLeft, User, Menu, Truck, BarChart2
+  Home, Map, MessageCircle, ChevronLeft, User, Menu, Truck, BarChart2, Archive
 } from 'lucide-react';
 
 class ErrorBoundary extends Component {
@@ -79,10 +79,10 @@ const MobileEnterpriseDashboard = (props) => {
     setExpandedId(null);
   };
 
-  const VALID_VIEWS = ['trips', 'drive', 'map', 'reports', 'chat', 'menu', 'fleet'];
+  const VALID_VIEWS = ['trips', 'drive', 'map', 'reports', 'chat', 'menu', 'fleet', 'archives'];
   useEffect(() => {
     if (!VALID_VIEWS.includes(currentView)) setCurrentView('trips');
-  }, [currentView]);
+  }, [currentView, VALID_VIEWS]);
 
   const getProfileAbbr = () => {
     return role === 'admin' ? 'AD' : 'DS';
@@ -206,7 +206,18 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'chat') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ChatPage onBack={() => setCurrentView('trips')} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileMobileFallback />}><ChatPage onBack={() => setCurrentView('trips')} /></Suspense></ErrorBoundary>
+        </div>
+      );
+    }
+
+    if (currentView === 'archives') {
+      return (
+        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+          {renderTopBar('Archives & Recovery')}
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            <ErrorBoundary><Suspense fallback={<MobileMobileFallback />}><ArchivesPage {...props} /></Suspense></ErrorBoundary>
+          </div>
         </div>
       );
     }
@@ -251,7 +262,7 @@ const MobileEnterpriseDashboard = (props) => {
           </div>
           <div className="min-h-0 flex-1">
             <ErrorBoundary>
-            <Suspense fallback={<MobileFallback />}>
+            <Suspense fallback={<MobileMobileFallback />}>
             <DriverPage
               {...props}
               currentUser={activeDriverWorkDriver.email || activeDriverWorkDriver.id || currentUser}
@@ -285,7 +296,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
           <div className="absolute inset-0">
-            <ErrorBoundary><Suspense fallback={<MobileFallback />}><LiveMapPage {...props} /></Suspense></ErrorBoundary>
+            <ErrorBoundary><Suspense fallback={<MobileMobileFallback />}><LiveMapPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -294,7 +305,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'menu') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><MobileMenuPage {...props} setSubView={setSubView} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileMobileFallback />}><MobileMenuPage {...props} setSubView={setSubView} /></Suspense></ErrorBoundary>
         </div>
       );
     }
@@ -370,6 +381,14 @@ const MobileEnterpriseDashboard = (props) => {
                     )}
                   </span>
                   <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
+                </button>
+
+                <button
+                  onClick={() => handleNavClick('archives')}
+                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'archives' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+                >
+                  <Archive size={24} strokeWidth={currentView === 'archives' && !subView ? 2.2 : 1.6} />
+                  <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'archives' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Archives</span>
                 </button>
 
                 <button
