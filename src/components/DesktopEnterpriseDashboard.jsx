@@ -266,7 +266,7 @@ const DesktopEnterpriseDashboard = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
 
   const sidebarItems = [
     { id: 'operations', label: 'Dispatch', icon: LayoutDashboard, roles: ['admin', 'dispatcher'] },
@@ -1458,7 +1458,7 @@ const DesktopEnterpriseDashboard = ({
             <div className="p-5">
               {aiAnalyzing ? (
                 <div className="flex flex-col items-center justify-center py-8">
-                  <div className="w-10 h-10 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3" />
+                  <div className="w-10 h-10 border-[3px] border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3" />
                   <p className="text-sm font-medium text-slate-600">Analyzing routes...</p>
                 </div>
               ) : smartAssignResult?.driverId ? (
@@ -1520,7 +1520,7 @@ const DesktopEnterpriseDashboard = ({
             <div className="p-5">
               {aiAnalyzing ? (
                 <div className="flex flex-col items-center justify-center py-8">
-                  <div className="w-10 h-10 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3" />
+                  <div className="w-10 h-10 border-[3px] border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3" />
                   <p className="text-sm font-medium text-slate-600">Optimizing fleet...</p>
                 </div>
               ) : (

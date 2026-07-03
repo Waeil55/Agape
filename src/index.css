@@ -824,11 +824,6 @@ body:has(.agape-chat-page textarea:focus) .bottom-nav {
 
 /* Adjust layout elements when keyboard is open on mobile (textarea/input focused) */
 @media (max-width: 768px) {
-  body:has(.agape-chat-page textarea:focus) .bottom-nav,
-  body:has(.agape-chat-page input:focus) .bottom-nav,
-  body.keyboard-visible .bottom-nav {
-    display: none !important;
-  }
   body:has(.agape-chat-page textarea:focus) .mobile-enterprise-dashboard-wrapper,
   body:has(.agape-chat-page input:focus) .mobile-enterprise-dashboard-wrapper,
   body.keyboard-visible .mobile-enterprise-dashboard-wrapper {
@@ -1662,12 +1657,6 @@ body,
   max-width: 100%;
 }
 
-body * {
-  max-width: inherit;
-}
-
-/* Chat bubbles must opt out of the global inherited max-width reset above.
-   Without this, nested message bubbles can collapse to one character per line. */
 /* ===== CHAT PAGE — Real Messenger (WhatsApp/iMessage Style) ===== */
 
 @keyframes chat-fade-in {

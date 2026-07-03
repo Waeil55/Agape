@@ -22,7 +22,9 @@ const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
 import { getDriverLiveStatus } from '../constants/statuses';
 const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })));
 
-const MobileMobileFallback = () => <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+const MobileFallback = () => <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+
+const VALID_VIEWS = ['trips', 'drive', 'map', 'reports', 'chat', 'menu', 'archives'];
 
 const MobileEnterpriseDashboard = (props) => {
   const { trips = [], drivers = [], dispatchers = [], currentUser, role, onLogout, chatUnreadCount = 0 } = props;
@@ -82,7 +84,7 @@ const MobileEnterpriseDashboard = (props) => {
   const VALID_VIEWS = ['trips', 'drive', 'map', 'reports', 'chat', 'menu', 'fleet', 'archives'];
   useEffect(() => {
     if (!VALID_VIEWS.includes(currentView)) setCurrentView('trips');
-  }, [currentView, VALID_VIEWS]);
+  }, [currentView]);
 
   const getProfileAbbr = () => {
     return role === 'admin' ? 'AD' : 'DS';
@@ -206,7 +208,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'chat') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          <ErrorBoundary><Suspense fallback={<MobileMobileFallback />}><ChatPage onBack={() => setCurrentView('trips')} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ChatPage onBack={() => setCurrentView('trips')} /></Suspense></ErrorBoundary>
         </div>
       );
     }
@@ -216,7 +218,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Archives & Recovery')}
           <div className="flex-1 overflow-y-auto overscroll-contain">
-            <ErrorBoundary><Suspense fallback={<MobileMobileFallback />}><ArchivesPage {...props} /></Suspense></ErrorBoundary>
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><ArchivesPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -262,7 +264,7 @@ const MobileEnterpriseDashboard = (props) => {
           </div>
           <div className="min-h-0 flex-1">
             <ErrorBoundary>
-            <Suspense fallback={<MobileMobileFallback />}>
+            <Suspense fallback={<MobileFallback />}>
             <DriverPage
               {...props}
               currentUser={activeDriverWorkDriver.email || activeDriverWorkDriver.id || currentUser}
@@ -296,7 +298,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
           <div className="absolute inset-0">
-            <ErrorBoundary><Suspense fallback={<MobileMobileFallback />}><LiveMapPage {...props} /></Suspense></ErrorBoundary>
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><LiveMapPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -305,7 +307,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'menu') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          <ErrorBoundary><Suspense fallback={<MobileMobileFallback />}><MobileMenuPage {...props} setSubView={setSubView} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><MobileMenuPage {...props} setSubView={setSubView} /></Suspense></ErrorBoundary>
         </div>
       );
     }

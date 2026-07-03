@@ -2959,7 +2959,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       items.splice(1, 0, { id: 'active-trip', label: firstName, sublabel: lastName, icon: Truck });
     }
     return items;
-  }, [activeWorkTripId, activeWorkTrip]);
+  }, [activeWorkTripId, activeWorkTrip, chatUnreadCount]);
 
   const navApp = appSettings.navigationApp || 'google';
 
@@ -3695,7 +3695,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                   <Phone size={16} /> {pc.label}
                                 </div>
                                 <span className="text-sm font-semibold text-slate-900">{formatPhoneDisplay(pc.phone)}</span>
-                                <button type="button" onClick={() => navigator.clipboard.writeText(pc.phone)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-600 transition-colors" title="Copy number" aria-label="Copy phone number">
+                                <button type="button" onClick={() => { try { navigator.clipboard?.writeText(pc.phone); } catch(e) {} }} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-600 transition-colors" title="Copy number" aria-label="Copy phone number">
                                   <Copy size={16} />
                                 </button>
                               </div>
