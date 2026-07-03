@@ -320,7 +320,7 @@ const MobileEnterpriseDashboard = (props) => {
 
       {/* BOTTOM NAVIGATION */}
       {!subView && (
-        <nav className="bottom-nav" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <nav className="bottom-nav">
         <div className="flex h-full items-center justify-around gap-1">
                 <button
                   onClick={() => { handleNavClick('trips'); setExpandedId(null); }}

@@ -5618,7 +5618,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== BOTTOM NAVIGATION ===== */}
       {!isEmbedded && (
-        <nav className="bottom-nav md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <nav className="bottom-nav md:hidden">
           <div className="flex h-full items-center justify-between gap-2 px-3">
               {navItems.map((item) => {
                 const Icon = item.icon;
