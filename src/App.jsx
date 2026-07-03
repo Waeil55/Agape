@@ -2785,35 +2785,37 @@ const App = () => {
 
       {/* LOADING SCREEN */}
       {isLoading ? (
-        <div className="flex-1 bg-[#5a94af] flex items-center justify-center px-4 font-outfit">
-          <div className="w-full max-w-md bg-white border border-slate-200/50 rounded-[2.5rem] overflow-hidden shadow-2xl p-8 flex flex-col items-center gap-6 text-center">
-            <img src="/agape.png" alt="Agape Care" className="w-24 h-24 object-contain" />
-            <div className="text-center">
-              <p className="text-lg font-bold text-slate-700">Loading Agape Care</p>
-              <p className="text-sm font-medium text-slate-500 mt-1">Preparing your workspace...</p>
-              {startupIssue && <p className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mt-4">{startupIssue}</p>}
+        <div className="flex-1 bg-gradient-to-br from-[#3d7a96] via-[#5a94af] to-[#7bb3c9] flex items-center justify-center px-4 font-outfit overflow-hidden relative">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute -top-32 -right-32 w-96 h-96 bg-white/5 rounded-full animate-pulse" />
+            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-white/5 rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/[0.03] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+          </div>
+          <div className="relative z-10 flex flex-col items-center gap-8 text-center max-w-sm">
+            <div className="relative">
+              <div className="absolute inset-0 bg-white/20 rounded-full blur-2xl scale-150 animate-pulse" />
+              <div className="relative bg-white/15 backdrop-blur-sm rounded-3xl p-6 border border-white/20 shadow-2xl">
+                <img src="/agape.png" alt="Agape Care" className="w-20 h-20 object-contain drop-shadow-lg" />
+              </div>
             </div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-black text-white tracking-tight drop-shadow-md">Agape Care</h1>
+              <p className="text-sm font-medium text-white/70">Preparing your workspace...</p>
+            </div>
+            <div className="w-48 h-1 bg-white/15 rounded-full overflow-hidden">
+              <div className="h-full bg-white/60 rounded-full animate-loadingSlide" />
+            </div>
+            {startupIssue && (
+              <p className="text-xs font-bold text-amber-200 bg-amber-500/20 border border-amber-400/30 rounded-xl px-4 py-2 backdrop-blur-sm">{startupIssue}</p>
+            )}
             {showLoadingRecovery && (
-              <div className="w-full border-t border-slate-100 pt-5 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. Retry first, or repair stale browser files without signing out.</p>
+              <div className="w-full space-y-3">
+                <p className="text-xs font-semibold text-white/60 leading-relaxed">This is taking longer than expected.</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => window.location.reload()} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
-                    <RefreshCcw size={15} /> Retry
-                  </button>
-                  <button onClick={async () => {
-                    skipNextSignedOutResetRef.current = true;
-                    await signOut(auth).catch(() => {});
-                    resetSessionState({ loginErrorMessage: 'Session reset. Please sign in again.' });
-                  }} className="h-11 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm active:scale-95 transition">
-                    Access Portal
-                  </button>
+                  <button onClick={() => window.location.reload()} className="h-11 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-sm backdrop-blur-sm border border-white/20 transition active:scale-95">Retry</button>
+                  <button onClick={async () => { skipNextSignedOutResetRef.current = true; await signOut(auth).catch(() => {}); resetSessionState({ loginErrorMessage: 'Session reset. Please sign in again.' }); }} className="h-11 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 font-bold text-sm backdrop-blur-sm border border-white/15 transition active:scale-95">Sign In Again</button>
                 </div>
-                <button onClick={async () => {
-                  await repairBrowserStatePreservingAuth().catch(() => {});
-                  window.location.reload();
-                }} className="w-full h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-sm active:scale-95 transition">
-                  Repair Browser & Reload
-                </button>
+                <button onClick={async () => { await repairBrowserStatePreservingAuth().catch(() => {}); window.location.reload(); }} className="w-full h-11 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 font-bold text-sm backdrop-blur-sm border border-amber-400/25 transition active:scale-95">Repair & Reload</button>
               </div>
             )}
           </div>

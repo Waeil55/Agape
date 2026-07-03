@@ -472,6 +472,15 @@ body {
   background-size: 1000px 100%;
 }
 
+@keyframes loadingSlide {
+  0% { width: 0%; margin-left: 0; }
+  50% { width: 60%; margin-left: 20%; }
+  100% { width: 0%; margin-left: 100%; }
+}
+.animate-loadingSlide {
+  animation: loadingSlide 1.5s ease-in-out infinite;
+}
+
 /* ===== PREMIUM GLASSOMORPHISM ===== */
 .glass-premium {
   background: var(--glass-bg);
