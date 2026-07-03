@@ -32,7 +32,7 @@ import './utils/clientExport';
 import { registerServiceWorker, setupSWMessageHandler, skipWaiting } from './utils/swManager';
 import { syncQueueProcessor } from './services/syncQueueProcessor';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
-import { useRealtimeReliability, requestRealtimeResubscribe } from './hooks/useRealtimeReliability';
+import { useRealtimeReliability } from './hooks/useRealtimeReliability';
 import { useDriverLiveState, useDriverLivenessMonitor } from './hooks/useDriverLiveState';
 import { useDriverAssignments } from './hooks/useDriverAssignments';
 
@@ -281,8 +281,6 @@ function getBestDriverProfileForEmail(drivers = [], email = '', trips = []) {
   })[0];
 }
 
-const FIRESTORE_BOOT_TIMEOUT_MS = 8000;
-const DATA_LOAD_FORCE_TIMEOUT_MS = 20000;
 const AUTH_WATCHDOG_TIMEOUT_MS = 30000;
 
 // --- Role cache: persist role to localStorage so boot is instant for returning users ---
@@ -400,9 +398,7 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [startupIssue, setStartupIssue] = useState('');
   const [showLoadingRecovery, setShowLoadingRecovery] = useState(false);
-  const [showDataLoadingRecovery, setShowDataLoadingRecovery] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
-  const [forceDataLoad, setForceDataLoad] = useState(false);
   const authBootResolvedRef = useRef(false);
   const loginPortalRoleRef = useRef(null);
   const loginInProgressRef = useRef(false);
@@ -929,26 +925,6 @@ const App = () => {
       persistUserSettings(appSettings);
     }
   }, [appSettings]);
-
-  // Firestore data timeout: show recovery, then open with best available data.
-  useEffect(() => {
-    setShowDataLoadingRecovery(false);
-    const recoveryT = setTimeout(() => {
-      if (dataLoading) setShowDataLoadingRecovery(true);
-    }, FIRESTORE_BOOT_TIMEOUT_MS);
-    return () => { clearTimeout(recoveryT); };
-  }, [dataLoading]);
-  // Never block the workspace indefinitely on slow realtime data.
-  useEffect(() => {
-    setForceDataLoad(false);
-    if (!dataLoading) return;
-    const t = setTimeout(() => {
-      setForceDataLoad(true);
-      setStartupIssue('Live data is slow. The workspace opened with the latest available data and will keep reconnecting.');
-      requestRealtimeResubscribe('data_timeout');
-    }, DATA_LOAD_FORCE_TIMEOUT_MS);
-    return () => clearTimeout(t);
-  }, [dataLoading]);
 
   useEffect(() => {
     let unsubData = null;
@@ -2844,46 +2820,6 @@ const App = () => {
         </div>
       ) : !isAuthenticated ? (
         renderLoginScreen()
-      ) : dataLoading && !forceDataLoad ? (
-        <div className="flex-1 bg-[#5a94af] flex items-center justify-center px-4 font-outfit">
-          <div className="w-full max-w-md bg-white border border-slate-200/50 rounded-[2.5rem] overflow-hidden shadow-2xl p-8 flex flex-col items-center gap-5 text-center">
-            <img src="/agape.png" alt="Agape Care" className="w-20 h-20 object-contain" />
-            <div>
-              <p className="text-lg font-bold text-slate-800">Syncing live operations</p>
-              <p className="text-sm font-medium text-slate-500 mt-1">{role === 'driver' ? 'Connecting to your trips and profile...' : 'Pulling trips, drivers, assignments, and route data from Firestore.'}</p>
-            </div>
-            <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
-            {startupIssue && (
-              <div className="w-full bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs font-semibold text-amber-800 flex items-center justify-between gap-2">
-                <span>{startupIssue}</span>
-                <button onClick={() => setStartupIssue('')} className="text-amber-700 hover:text-amber-900 font-bold shrink-0">Dismiss</button>
-              </div>
-            )}
-            {showDataLoadingRecovery && (
-              <div className="w-full border-t border-slate-100 pt-4 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 leading-relaxed">This is taking longer than expected. Retry first, or repair stale browser files without signing out.</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => { requestRealtimeResubscribe('retry'); setShowDataLoadingRecovery(false); setStartupIssue('Reconnecting...'); }} className="h-11 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition">
-                    <RefreshCcw size={15} /> Retry
-                  </button>
-                  <button onClick={async () => {
-                    skipNextSignedOutResetRef.current = true;
-                    await signOut(auth).catch(() => {});
-                    resetSessionState({ loginErrorMessage: 'Session reset. Please sign in again.' });
-                  }} className="h-11 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm active:scale-95 transition">
-                    Access Portal
-                  </button>
-                </div>
-                <button onClick={async () => {
-                  await repairBrowserStatePreservingAuth().catch(() => {});
-                  window.location.reload();
-                }} className="w-full h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-sm active:scale-95 transition">
-                  Repair Browser & Reload
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
       ) : (
         <>
           {role === 'driver' ? (() => {
