@@ -2835,31 +2835,6 @@ const App = () => {
                 isProvisioningProfile: true,
               } : null
             );
-            // Only show the syncing screen if data is still loading AND we truly have no profile
-            if (!myDriver && dataLoading) {
-              return (
-                <div className="flex-1 bg-slate-100 flex items-center justify-center px-4">
-                  <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl shadow-sm p-6 text-center">
-                    <img src="/agape.png" alt="Agape Care" className="w-20 h-20 object-contain mx-auto mb-4" />
-                    <h2 className="text-lg font-semibold text-slate-900">Syncing your driver profile...</h2>
-                    <p className="text-sm font-medium text-slate-500 mt-2 leading-relaxed">
-                      We are reconnecting your cloud driver record and live trips.
-                    </p>
-                    <div className="mt-5 grid grid-cols-1 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => makeCall(phoneNumbers?.dispatcher || '', 'Dispatcher')}
-                        disabled={!phoneNumbers?.dispatcher}
-                        className="h-11 rounded-xl bg-blue-50 text-blue-700 font-bold text-sm border border-blue-200 disabled:opacity-50"
-                      >
-                        Call Dispatcher
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-            // If data finished loading but no profile exists at all — render with provisional profile
             if (!myDriver) return null;
             const driverId = myDriver.id;
             const myTrips = currentUserDriverTrips;
