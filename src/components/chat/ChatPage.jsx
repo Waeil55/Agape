@@ -21,6 +21,13 @@ const ChatPage = ({ onBack }) => {
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
 
   useEffect(() => {
+    window.isChatPageOpen = true;
+    return () => {
+      window.isChatPageOpen = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!window.visualViewport) return;
     const handleResize = () => {
       const vvHeight = window.visualViewport.height;

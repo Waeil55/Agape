@@ -198,7 +198,7 @@ export function useChat() {
       snap.forEach(d => {
         const msg = d.data();
         const msgTime = asMillis(msg.timestamp);
-        if (now - msgTime < 10000 && msg.channelId !== activeChannel) {
+        if (now - msgTime < 10000 && msg.channelId !== activeChannel && !window.isChatPageOpen) {
           lastSoundTimeRef.current = now;
           playMessageSound().catch(() => {});
         }
@@ -343,7 +343,7 @@ export function useChat() {
 
         if (incoming.length > 0 && sameChannel.length > 0) {
           const newFromOthers = incoming.filter(m => normalizeEmail(m.senderEmail) !== userEmail);
-          if (newFromOthers.length > 0) {
+          if (newFromOthers.length > 0 && !window.isChatPageOpen) {
             playMessageSound().catch(() => {});
           }
         }

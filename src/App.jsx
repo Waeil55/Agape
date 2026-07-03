@@ -1021,9 +1021,15 @@ const App = () => {
         const body = payload.notification?.body || payload.data?.body || '';
         const type = payload.data?.type === 'chat' ? 'message' : 'notification';
         if (title && body) {
-          if (type === 'message') playMessageSound();
-          else playNotificationSound();
-          showLocalNotification(title, body, type);
+          if (type === 'message') {
+            if (!window.isChatPageOpen) {
+              playMessageSound();
+              showLocalNotification(title, body, type);
+            }
+          } else {
+            playNotificationSound();
+            showLocalNotification(title, body, type);
+          }
         }
       });
 
