@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   LogOut, AlertCircle, Database, Eye, EyeOff, Save, Palette, Navigation, Type, Moon, Sun, Monitor, Route,
   Phone, ShieldCheck, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus,
-  LayoutDashboard, Users, Activity, Lock, Archive, Settings, User, Bell, KeyRound,
-  ChevronRight, Search, Clock, Truck, Filter, Trash2, RefreshCw
+  LayoutDashboard, Users, Activity, Archive, Settings, User, Bell, KeyRound,
+  Truck, RefreshCw, Trash2, RotateCcw
 } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
 import { auth, updatePassword } from '../config/firebase';
@@ -100,11 +100,14 @@ const SettingsPage = ({
   trashedTrips = [],
   restoreTrip,
   updateTrashedTrip,
+  deleteTrashedTrip,
   appSettings,
   onUpdateAppSettings,
+  updateAppSettings: updateAppSettingsAlias,
   driverProfile,
   phoneNumbers,
   onUpdatePhoneNumbers,
+  setPhoneNumbers: setPhoneNumbersAlias,
   requestAuthAction,
   hasPermission,
   trips = [],
@@ -113,7 +116,10 @@ const SettingsPage = ({
   vehicles = [],
   logs = [],
   initialSection,
+  persistState,
 }) => {
+  const _updateSettings = onUpdateAppSettings || updateAppSettingsAlias;
+  const _updatePhone = onUpdatePhoneNumbers || ((updates) => { setPhoneNumbersAlias?.(prev => ({ ...prev, ...updates })); persistState?.(); });
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
   const resolvedInitialSection = initialSection === 'archives' ? 'archived' : initialSection;
   const [activeSection, setActiveSection] = useState(() => resolvedInitialSection || localStorage.getItem(`agape_settingsSection_${userKey}`) || 'overview');
@@ -172,8 +178,6 @@ const SettingsPage = ({
     { group: 'Personal', items: personalNav },
   ];
   const mobileNavItems = navItems.flatMap((group) => group.items);
-
-  const activeLabel = [...adminNav, ...personalNav].find(s => s.id === activeSection)?.label || '';
 
   const sectionContent = () => {
     switch (activeSection) {
@@ -328,7 +332,7 @@ const SettingsPage = ({
           <div className="space-y-6">
             <div>
               <h3 className="text-heading text-slate-900 mb-1">Archived Trips</h3>
-              <p className="text-body text-slate-500">Trips that have been archived from operations.</p>
+              <p className="text-body text-slate-500">Trips that have been archived from operations. Restore to reactivate or permanently delete.</p>
             </div>
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               {!showArchivedTrips ? (
@@ -347,11 +351,12 @@ const SettingsPage = ({
                           <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600 hidden sm:table-cell">Pickup</th>
                           <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600 hidden sm:table-cell">Dropoff</th>
                           <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600">Time</th>
+                          <th className="px-3 sm:px-4 py-1.5 text-right text-xs font-semibold text-slate-600">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {trashedTrips.length === 0 ? (
-                          <tr><td colSpan="5" className="px-4 sm:px-6 py-12 text-center text-slate-500 text-base">No archived trips.</td></tr>
+                          <tr><td colSpan="6" className="px-4 sm:px-6 py-12 text-center text-slate-500 text-base">No archived trips.</td></tr>
                         ) : (
                           trashedTrips.map((trip) => (
                             <tr key={trip.id} className="border-b border-slate-100 hover:bg-slate-50">
@@ -360,6 +365,16 @@ const SettingsPage = ({
                               <td className="px-3 sm:px-4 py-1.5 text-xs text-emerald-600 hidden sm:table-cell">{trip.pickup}</td>
                               <td className="px-3 sm:px-4 py-1.5 text-xs text-rose-600 hidden sm:table-cell">{trip.dropoff}</td>
                               <td className="px-3 sm:px-4 py-1.5 text-xs text-slate-600">{trip.time}</td>
+                              <td className="px-3 sm:px-4 py-1.5 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button onClick={() => restoreTrip?.(trip.id)} className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-200 transition flex items-center gap-1" title="Restore trip">
+                                    <RotateCcw size={12} /> Restore
+                                  </button>
+                                  <button onClick={() => deleteTrashedTrip?.(trip.id)} className="px-2.5 py-1 bg-rose-100 text-rose-700 rounded-lg text-xs font-bold hover:bg-rose-200 transition flex items-center gap-1" title="Permanently delete">
+                                    <Trash2 size={12} /> Delete
+                                  </button>
+                                </div>
+                              </td>
                             </tr>
                           ))
                         )}
@@ -384,7 +399,7 @@ const SettingsPage = ({
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-base mb-1"><Database size={18} /> System Logs</div>
                 <p className="text-sm text-slate-500 mb-4">View all system logs and user activities from the dashboard audit panel.</p>
-                <button onClick={() => alert('View system logs from the Dashboard → Audit panel.')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition text-sm">View Logs</button>
+                <button onClick={() => setActiveSection('activity')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition text-sm flex items-center gap-2"><Eye size={16} /> View Logs</button>
               </div>
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-base mb-1"><RefreshCw size={18} /> Data Sync Status</div>
@@ -424,14 +439,14 @@ const SettingsPage = ({
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1.5">Dispatcher Phone</label>
                         <div className="flex gap-2">
-                          <input type="tel" value={phoneNumbers?.dispatcher || ''} onChange={(e) => onUpdatePhoneNumbers?.({ dispatcher: e.target.value })} className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777707" />
+                          <input type="tel" value={phoneNumbers?.dispatcher || ''} onChange={(e) => _updatePhone?.({ dispatcher: e.target.value })} className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777707" />
                           <button onClick={() => makeCall(phoneNumbers?.dispatcher || '', 'Dispatcher')} className="px-3 py-2.5 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition flex items-center" aria-label="Call dispatcher"><Phone size={16} /></button>
                         </div>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1.5">Routing Phone</label>
                         <div className="flex gap-2">
-                          <input type="tel" value={phoneNumbers?.routing || ''} onChange={(e) => onUpdatePhoneNumbers?.({ routing: e.target.value })} className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777708" />
+                          <input type="tel" value={phoneNumbers?.routing || ''} onChange={(e) => _updatePhone?.({ routing: e.target.value })} className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777708" />
                           <button onClick={() => makeCall(phoneNumbers?.routing || '', 'Routing')} className="px-3 py-2.5 bg-indigo-100 text-indigo-700 rounded-xl hover:bg-indigo-200 transition flex items-center" aria-label="Call routing"><Phone size={16} /></button>
                         </div>
                       </div>
@@ -447,7 +462,7 @@ const SettingsPage = ({
                     <div className="bg-white border border-slate-200 rounded-2xl p-4">
                       <p className="text-micro">Current Odometer</p>
                       <div className="flex items-center gap-2 mt-2">
-                        <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) onUpdateAppSettings?.({ odometer: val }, true); }} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-900 focus:border-blue-500 outline-none text-base" />
+                        <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) _updateSettings?.({ odometer: val }, true); }} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-900 focus:border-blue-500 outline-none text-base" />
                         <span className="text-sm font-bold text-slate-400">mi</span>
                       </div>
                     </div>
@@ -476,7 +491,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.theme === option.value;
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ theme: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => _updateSettings?.({ theme: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
@@ -503,7 +518,7 @@ const SettingsPage = ({
                     const active = appSettings?.fontScale === option.value;
                     const isDriverMode = option.value === 'driver';
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ fontScale: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? (isDriverMode ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'card-active bg-blue-50') : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => _updateSettings?.({ fontScale: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? (isDriverMode ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'card-active bg-blue-50') : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? (isDriverMode ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white') : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
@@ -516,13 +531,13 @@ const SettingsPage = ({
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-base"><Accessibility size={20} /> Readability Mode</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
-                  <button onClick={() => onUpdateAppSettings?.({ readability: 'normal' })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${appSettings?.readability !== 'enhanced' ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                  <button onClick={() => _updateSettings?.({ readability: 'normal' })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${appSettings?.readability !== 'enhanced' ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability !== 'enhanced' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><TextSelect size={20} /></div>
                     <div className="font-bold text-sm text-slate-900">Standard</div>
                     <p className="text-xs text-slate-500 mt-0.5">Normal contrast and font weights</p>
                     {appSettings?.readability !== 'enhanced' && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
                   </button>
-                  <button onClick={() => onUpdateAppSettings?.({ readability: 'enhanced' })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
+                  <button onClick={() => _updateSettings?.({ readability: 'enhanced' })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability === 'enhanced' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Eye size={20} /></div>
                     <div className="font-bold text-sm text-slate-900">Enhanced</div>
                     <p className="text-xs text-slate-500 mt-0.5">Bolder text, stronger contrast, better spacing</p>
@@ -547,7 +562,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.navigationApp === option.value;
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ navigationApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => _updateSettings?.({ navigationApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
@@ -566,7 +581,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.routePlanNavApp === option.value;
                     return (
-                      <button key={option.value} onClick={() => onUpdateAppSettings?.({ routePlanNavApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => _updateSettings?.({ routePlanNavApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-bold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
@@ -596,7 +611,7 @@ const SettingsPage = ({
                     <label key={item.key} className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl cursor-pointer border border-slate-100">
                       <input type="checkbox" checked={checked} onChange={(e) => {
                         const n = { ...(appSettings?.notifications || {}), [item.key]: e.target.checked };
-                        onUpdateAppSettings?.({ notifications: n });
+                        _updateSettings?.({ notifications: n });
                       }} className="w-5 h-5 mt-0.5 rounded" />
                       <div>
                         <p className="text-base font-bold text-slate-800">{item.label}</p>

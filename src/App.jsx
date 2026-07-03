@@ -7,7 +7,7 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   RefreshCcw, X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot, query, where } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -1942,6 +1942,25 @@ const App = () => {
     });
   };
 
+  const deleteTrashedTrip = (tripId) => {
+    requestAuthAction('delete_trip', () => {
+      let deletedTrip = null;
+      setTrashedTrips(currentTrashed => {
+        deletedTrip = currentTrashed.find(t => t.id === tripId);
+        if (!deletedTrip) return currentTrashed;
+        return currentTrashed.filter(t => t.id !== tripId);
+      });
+      setTimeout(() => {
+        if (deletedTrip) {
+          deleteDoc(doc(db, 'trips', tripId)).catch(err => {
+            console.error('Failed to delete trip from Firestore:', err);
+          });
+          addAuditLog('Trip Permanently Deleted', `${currentUser || 'Admin'} permanently deleted trip ${tripId} (${deletedTrip.patient}) from Archive.`, 'rose', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'archived', after: 'deleted' }] });
+        }
+      }, 0);
+    });
+  };
+
   const handleDriverStatusUpdate = (driverId, clockedIn, extraFields = {}) => {
     const prevDriverState = drivers.find(d => d.id === driverId) || {};
     const now = new Date().toISOString();
@@ -2971,6 +2990,7 @@ const App = () => {
               onDispatcherStatusUpdate={handleDispatcherStatusUpdate}
               trashedTrips={trashedTrips}
               restoreTrip={restoreTrip}
+              deleteTrashedTrip={deleteTrashedTrip}
               logs={logs}
               setLogs={setLogs}
               phoneNumbers={phoneNumbers}

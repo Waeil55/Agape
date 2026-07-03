@@ -129,7 +129,7 @@ const findTripLocations = (trip, trips, trashedTrips, logs) => {
 
 const DesktopEnterpriseDashboard = ({
   role, currentUser, trips = [], setTrips, drivers = [], setDrivers, upsertDriverProfile, dispatchers = [], setDispatchers, vehicles = [], setVehicles,
-  trashedTrips = [], setTrashedTrips, restoreTrip, logs = [], setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
+  trashedTrips = [], setTrashedTrips, restoreTrip, deleteTrashedTrip, logs = [], setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
   selectedTasks = [], setSelectedTasks, searchQuery, setSearchQuery,
   smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
   smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing,
@@ -1171,7 +1171,7 @@ const DesktopEnterpriseDashboard = ({
       );
       case 'settings': return (
         <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-        <SettingsPage currentUser={currentUser} role={role} onLogout={onLogout} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} initialSection={activePanel === 'archives' ? 'archives' : undefined} />
+        <SettingsPage currentUser={currentUser} role={role} onLogout={onLogout} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} restoreTrip={restoreTrip} deleteTrashedTrip={deleteTrashedTrip} updateTrashedTrip={updateTrashedTrip} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} persistState={persistState} initialSection={activePanel === 'archives' ? 'archives' : undefined} />
         </Suspense></ErrorBoundary>
       );
       case 'drive': return driverWorkDrivers.length > 0 && activeDriverWorkDriver ? (

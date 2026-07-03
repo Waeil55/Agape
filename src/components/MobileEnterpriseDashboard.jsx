@@ -155,7 +155,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Settings', true)}
           <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
-            <ErrorBoundary><Suspense fallback={<MobileFallback />}><SettingsPage {...props} /></Suspense></ErrorBoundary>
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><SettingsPage {...props} onResetSystem={() => { props.setTrips?.([]); props.setTrashedTrips?.([]); props.setDrivers?.([]); props.setLogs?.([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); props.addAuditLog?.('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
