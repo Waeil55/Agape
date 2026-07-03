@@ -198,6 +198,12 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
             value={text}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
+            onFocus={() => {
+              setTimeout(() => {
+                window.scrollTo(0, 0);
+                if (document.body) document.body.scrollTop = 0;
+              }, 80);
+            }}
             placeholder={`Message ${channelName || ''}…`}
             rows={1}
             className="flex-1 min-w-0 bg-transparent outline-none resize-none text-[15px] text-slate-800 placeholder:text-slate-400 py-[10px] pr-2 leading-[1.45] overflow-y-auto"

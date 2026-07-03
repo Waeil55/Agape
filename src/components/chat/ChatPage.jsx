@@ -27,13 +27,28 @@ const ChatPage = ({ onBack }) => {
       setViewportHeight(vvHeight);
       const isKeyboard = vvHeight < window.innerHeight * 0.85;
       document.body.classList.toggle('keyboard-visible', isKeyboard);
+      
+      if (isKeyboard) {
+        window.scrollTo(0, 0);
+        if (document.body) document.body.scrollTop = 0;
+      }
     };
+
+    const handleWindowScroll = () => {
+      if (document.body.classList.contains('keyboard-visible')) {
+        window.scrollTo(0, 0);
+        if (document.body) document.body.scrollTop = 0;
+      }
+    };
+
     handleResize();
     window.visualViewport.addEventListener('resize', handleResize);
     window.visualViewport.addEventListener('scroll', handleResize);
+    window.addEventListener('scroll', handleWindowScroll);
     return () => {
       window.visualViewport.removeEventListener('resize', handleResize);
       window.visualViewport.removeEventListener('scroll', handleResize);
+      window.removeEventListener('scroll', handleWindowScroll);
       document.body.classList.remove('keyboard-visible');
     };
   }, []);
