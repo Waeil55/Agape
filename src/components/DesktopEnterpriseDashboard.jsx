@@ -157,7 +157,7 @@ const DesktopEnterpriseDashboard = ({
   const [reAuthError, setReAuthError] = useState('');
   const [tripDetails, setTripDetails] = useState(null);
   const [showTripLocations, setShowTripLocations] = useState(false);
-  const [showRightPanel, setShowRightPanel] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
+  const [showRightPanel, setShowRightPanel] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
   const [rightPanelTab, setRightPanelTab] = useState(() => {
