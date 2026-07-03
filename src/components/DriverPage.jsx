@@ -2978,7 +2978,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F3F4F6] text-slate-900">
+    <div className="w-full h-[100dvh] overflow-hidden flex flex-col bg-[#F3F4F6] text-slate-900">
       {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && expandedTripId && !activeWorkTrip && (
         <div
           className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
@@ -2987,7 +2987,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       )}
       {!(activeNav === 'active-trip' && activeWorkTrip) && (
         <div
-          className="sticky top-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
+          className="driver-page-header sticky top-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
           <div className="px-3 py-3 flex items-center gap-3">
@@ -4483,9 +4483,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
       )}
 
-      {/* ===== CHAT PAGE ===== */}
       {activeNav === 'chat' && (
-        <div className="flex-1 overflow-hidden">
+        <div className="driver-page-chat-wrapper flex-1 overflow-hidden flex flex-col">
           <Suspense fallback={<div className="h-full flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
           <ChatPage onBack={() => setActiveNav('trips')} />
           </Suspense>

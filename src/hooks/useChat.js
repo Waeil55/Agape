@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   db, auth, collection, doc, addDoc, setDoc, updateDoc, getDoc,
   serverTimestamp, onSnapshot, query, where, orderBy, limit as fbLimit,
-  arrayUnion, arrayRemove, getDocs
+  arrayUnion, arrayRemove, getDocs, onAuthStateChanged
 } from '../config/firebase';
 import { getDMChannelId } from '../utils/chatHelpers';
 import { playMessageSound } from '../utils/notificationSound';
@@ -30,7 +30,15 @@ export function useChat() {
   const [currentUserProfile, setCurrentUserProfile] = useState({ name: '', role: '' });
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-  const currentUser = auth.currentUser;
+  const messagesRefForPagination = useRef([]);
+  const [currentUser, setCurrentUser] = useState(auth.currentUser);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const userEmail = normalizeEmail(currentUser?.email);
   const userUid = currentUser?.uid || '';
@@ -265,8 +273,10 @@ export function useChat() {
         fbLimit(loadOlder ? MESSAGES_PER_LOAD : LIVE_MESSAGES_LIMIT),
       ];
 
-      if (loadOlder && messages.length > 0) {
-        const oldest = messages.find(msg => msg.channelId === channelId);
+      if (loadOlder) {
+        // Use ref to avoid stale closure — no messages dependency needed
+        const currentMsgs = messagesRefForPagination.current.filter(m => m.channelId === channelId);
+        const oldest = currentMsgs[0]; // sorted asc, index 0 is oldest
         if (oldest?.timestamp) constraints.push(where('timestamp', '<', oldest.timestamp));
       }
 
@@ -279,11 +289,14 @@ export function useChat() {
         setMessages(prev => {
           const sameChannel = prev.filter(msg => msg.channelId === channelId);
           const seen = new Set(sameChannel.map(msg => msg.id));
-          return [...newMsgs.filter(msg => !seen.has(msg.id)), ...sameChannel];
+          const merged = [...newMsgs.filter(msg => !seen.has(msg.id)), ...sameChannel];
+          messagesRefForPagination.current = merged;
+          return merged;
         });
         setHasMore(newMsgs.length >= MESSAGES_PER_LOAD);
       } else {
         setMessages(newMsgs);
+        messagesRefForPagination.current = newMsgs;
         setHasMore(newMsgs.length >= LIVE_MESSAGES_LIMIT);
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -294,7 +307,7 @@ export function useChat() {
     } finally {
       setLoadingMessages(false);
     }
-  }, [messages]);
+  }, []); // No messages dependency — uses ref instead
 
   useEffect(() => {
     if (!activeChannel) {
@@ -330,19 +343,24 @@ export function useChat() {
 
         if (incoming.length > 0 && sameChannel.length > 0) {
           const newFromOthers = incoming.filter(m => normalizeEmail(m.senderEmail) !== userEmail);
-          if (newFromOthers.length > 0 && !isAtBottom) {
+          if (newFromOthers.length > 0) {
             playMessageSound().catch(() => {});
           }
         }
 
-        if (sameChannel.length === 0) return newMsgs;
+        if (sameChannel.length === 0) {
+          messagesRefForPagination.current = newMsgs;
+          return newMsgs;
+        }
         const merged = [...sameChannel];
         for (const msg of newMsgs) {
           const idx = merged.findIndex(m => m.id === msg.id);
           if (idx >= 0) merged[idx] = msg;
           else merged.push(msg);
         }
-        return merged.sort((a, b) => asMillis(a.timestamp) - asMillis(b.timestamp));
+        const sorted = merged.sort((a, b) => asMillis(a.timestamp) - asMillis(b.timestamp));
+        messagesRefForPagination.current = sorted;
+        return sorted;
       });
 
       setHasMore(newMsgs.length >= LIVE_MESSAGES_LIMIT);
@@ -409,6 +427,16 @@ export function useChat() {
         readBy: [userEmail],
         reactions: {},
       });
+
+      // Update channel preview so conversation list shows latest message
+      const previewText = extra.fileUrl
+        ? (extra.fileType === 'image' ? '📷 Photo' : `📎 ${extra.fileName || 'File'}`)
+        : (text?.trim() || '');
+      updateDoc(doc(db, 'chat_channels', channelId), {
+        lastMessage: previewText,
+        lastMessageAt: serverTimestamp(),
+        lastMessageBy: userDisplayName,
+      }).catch(() => {}); // non-fatal if channel doc doesn't exist yet
 
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch (err) {
@@ -514,6 +542,25 @@ export function useChat() {
   }, []);
 
   const totalUnread = Object.values(unreadCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
+
+  // PWA App Badging API support to set home screen icon badge
+  useEffect(() => {
+    try {
+      if ('setAppBadge' in navigator) {
+        if (totalUnread > 0) {
+          navigator.setAppBadge(totalUnread).catch((err) => {
+            console.warn('[PWA Badge] Failed to set badge:', err);
+          });
+        } else {
+          navigator.clearAppBadge().catch((err) => {
+            console.warn('[PWA Badge] Failed to clear badge:', err);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[PWA Badge] Error updating badge:', e);
+    }
+  }, [totalUnread]);
 
   return {
     channels,

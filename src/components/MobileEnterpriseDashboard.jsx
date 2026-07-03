@@ -303,12 +303,13 @@ const MobileEnterpriseDashboard = (props) => {
   };
 
   return (
-    <div className="w-full h-[100dvh] bg-white flex flex-col relative overflow-hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 100px)' }}>
+    <div className="mobile-enterprise-dashboard-wrapper w-full h-[100dvh] bg-white flex flex-col relative overflow-hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 100px)' }}>
       {/* Dynamic Content */}
       {renderContent()}
 
       {/* BOTTOM NAVIGATION */}
-      <nav className="bottom-nav" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      {!subView && (
+        <nav className="bottom-nav" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="flex h-full items-center justify-around gap-1">
                 <button
                   onClick={() => { handleNavClick('trips'); setExpandedId(null); }}
@@ -380,6 +381,7 @@ const MobileEnterpriseDashboard = (props) => {
                 </button>
         </div>
       </nav>
+      )}
 
     </div>
   );

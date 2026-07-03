@@ -726,40 +726,131 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 18px;
-  min-width: 18px;
+  height: 19px;
+  min-width: 19px;
   padding: 0 5px;
   border-radius: 9999px;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1;
   color: #fff;
-  background-color: #ef4444;
-  box-shadow: 0 0 0 2px #fff, 0 2px 8px rgba(239, 68, 68, 0.4);
+  background-color: #ff3b30;
+  border: 1.5px solid #fff;
 }
 
 /* ===== BOTTOM NAV BAR (Dispatcher/Admin/Driver mobile) ===== */
 .bottom-nav {
   position: fixed;
-  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   left: max(16px, env(safe-area-inset-left, 0px));
   right: max(16px, env(safe-area-inset-right, 0px));
   z-index: 50;
-  min-height: 58px;
+  min-height: 60px;
   width: auto;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 35px;
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.12), 0 4px 12px -4px rgba(0, 0, 0, 0.06);
-  padding: 4px 14px;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Solid, premium look — 97% opacity so it reads clearly on any background */
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 36px;
+  /* Richer shadow for depth without translucency */
+  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.18), 0 2px 8px -2px rgba(0, 0, 0, 0.10);
+  padding: 4px 12px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
 }
+
+/* Hide bottom nav when virtual keyboard is open to prevent layout overlap */
+@media screen and (max-height: 500px) and (max-width: 768px) {
+  .bottom-nav {
+    display: none !important;
+  }
+}
+/* Hide nav on keyboard open — but only when NOT inside the agape-chat-page (chat manages its own layout) */
+body:has(input:focus, textarea:focus):not(:has(.agape-chat-page)) .bottom-nav {
+  display: none !important;
+}
+/* Also hide when inside chat panel (chat manages input positioning itself) */
+body:has(.agape-chat-page input:focus) .bottom-nav,
+body:has(.agape-chat-page textarea:focus) .bottom-nav {
+  display: none !important;
+}
+
 [data-theme="dark"] .bottom-nav {
-  background: rgba(30, 41, 59, 0.7);
-  border-color: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.3), 0 4px 12px -4px rgba(0, 0, 0, 0.15);
+  background: rgba(15, 23, 42, 0.97);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.5), 0 2px 8px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* ===== CHAT BUBBLE ANIMATIONS ===== */
+@keyframes chat-bubble-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.chat-bubble-enter {
+  animation: chat-bubble-in 0.2s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+}
+
+/* ===== CHAT PAGE LAYOUT ===== */
+.agape-chat-page {
+  /* Ensure the chat container stretches fully and handles keyboard correctly */
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.agape-chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 8px 12px;
+  background: #f0f2f5;
+}
+
+/* Chat input area — stays above keyboard */
+.agape-chat-input {
+  flex-shrink: 0;
+  width: 100%;
+}
+
+/* Adjust layout elements when keyboard is open on mobile (textarea/input focused) */
+@media (max-width: 768px) {
+  body:has(.agape-chat-page textarea:focus) .bottom-nav,
+  body:has(.agape-chat-page input:focus) .bottom-nav,
+  body.keyboard-visible .bottom-nav {
+    display: none !important;
+  }
+  body:has(.agape-chat-page textarea:focus) .mobile-enterprise-dashboard-wrapper,
+  body:has(.agape-chat-page input:focus) .mobile-enterprise-dashboard-wrapper,
+  body.keyboard-visible .mobile-enterprise-dashboard-wrapper {
+    padding-bottom: 0px !important;
+  }
+}
+
+.mobile-enterprise-dashboard-wrapper {
+  transition: padding-bottom 0.22s cubic-bezier(0.3, 0.9, 0.4, 1) !important;
+}
+
+/* Driver Page Chat wrapper layout padding */
+.driver-page-chat-wrapper {
+  padding-bottom: calc(85px + env(safe-area-inset-bottom, 0px)) !important;
+  transition: padding-bottom 0.22s cubic-bezier(0.3, 0.9, 0.4, 1) !important;
+}
+@media (max-width: 768px) {
+  body:has(.agape-chat-page textarea:focus) .driver-page-chat-wrapper,
+  body:has(.agape-chat-page input:focus) .driver-page-chat-wrapper,
+  body.keyboard-visible .driver-page-chat-wrapper {
+    padding-bottom: 0px !important;
+  }
 }
 
 
