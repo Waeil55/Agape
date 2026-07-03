@@ -24,8 +24,6 @@ const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })
 
 const MobileFallback = () => <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 
-const VALID_VIEWS = ['trips', 'drive', 'map', 'reports', 'chat', 'menu', 'archives'];
-
 const MobileEnterpriseDashboard = (props) => {
   const { trips = [], drivers = [], dispatchers = [], currentUser, role, onLogout, chatUnreadCount = 0 } = props;
   const [currentView, setCurrentView] = useState('trips');

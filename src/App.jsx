@@ -1736,7 +1736,11 @@ const App = () => {
     };
   };
 
-  const updateTrip = (updatedTrip) => {
+  const updateTrip = (tripIdOrObject, partialFields = null) => {
+    const updatedTrip = typeof tripIdOrObject === 'string'
+      ? (() => { const existing = trips.find(t => t.id === tripIdOrObject); return existing ? { ...existing, ...partialFields } : null; })()
+      : tripIdOrObject;
+    if (!updatedTrip) return;
     if (!canControlTrip(updatedTrip)) {
       addAuditLog('Scope Blocked', `${currentUser} attempted to edit an out-of-scope trip.`, 'rose');
       return;

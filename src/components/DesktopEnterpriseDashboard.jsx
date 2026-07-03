@@ -404,7 +404,7 @@ const DesktopEnterpriseDashboard = ({
       default:
         return [];
     }
-  }, [activePanel, openOperationsWorkspace, setShowAddTripModal, setShowUploadModal]);
+  }, [activePanel, openOperationsWorkspace, setShowUploadModal, setShowSequencerModal, setActivePanel]);
 
   // Command palette commands
   const commands = useMemo(() => [

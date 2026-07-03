@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ChevronDown, ChevronLeft, ChevronRight, Folder, MessageCircle, MoreVertical,
-  Phone, Radio, Search, Shield, Truck, User, Users, X,
+  ChevronDown, ChevronLeft, ChevronRight, Folder, MessageCircle,
+  Radio, Search, Shield, Truck, User, Users, X,
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import ChatInput from './ChatInput';
@@ -425,16 +425,7 @@ const ChatPage = ({ onBack }) => {
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-0.5 shrink-0">
-            <button className="flex h-10 w-10 items-center justify-center rounded-full text-blue-500 hover:bg-blue-50 active:bg-blue-100 transition-colors">
-              <Phone size={20} />
-            </button>
-            <button className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors">
-              <MoreVertical size={20} />
-            </button>
           </div>
-        </div>
       </div>
 
       {/* Messages area — THE CRITICAL FIX: ChatMessages now actually renders here */}
