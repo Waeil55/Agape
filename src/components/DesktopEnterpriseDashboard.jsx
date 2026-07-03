@@ -1069,6 +1069,7 @@ const DesktopEnterpriseDashboard = ({
         trips={trips}
         drivers={drivers}
         dispatchers={dispatchers}
+        logs={logs}
         selectedTasks={selectedTasks}
         setSelectedTasks={setSelectedTasks}
         searchQuery={searchQuery}

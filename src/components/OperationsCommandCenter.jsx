@@ -403,7 +403,8 @@ const OperationsCommandCenter = ({
   bulkAssignTrips, setBulkAssignModal, requestDeleteTrip, requestBulkDelete, updateTrip,
   makeCall, sendSMS, setTripDetails, setShowAddTripModal, setShowUploadModal, onOpenSequencer,
   onOpenLiveMap, showRightPanel, onTogglePanel,
-  phoneNumbers
+  phoneNumbers,
+  logs = []
 }) => {
   const [filterStatus, setFilterStatus] = useState(() => localStorage.getItem('agape_opsFilterStatus') || 'all');
   const [filterUrgency, setFilterUrgency] = useState(() => localStorage.getItem('agape_opsFilterUrgency') || 'all');
@@ -1406,41 +1407,41 @@ const OperationsCommandCenter = ({
     const routeMileage = trip.estMiles ? `${trip.estMiles} mi` : (trip.distance ? `${trip.distance} mi` : 'N/A');
 
     return (
-      <div key={trip.id} className={`rounded-xl shadow-sm border p-2 transition-all duration-200 hover:shadow-md ${
+      <div key={trip.id} className={`rounded-xl shadow-sm border p-3 transition-all duration-200 hover:shadow-md ${
         isLate ? 'bg-rose-50 border-rose-200 hover:border-rose-300' : 'bg-white border-slate-200 hover:border-slate-300'
       }`}>
         {/* Top Row */}
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-1.5 min-w-0">
             <button 
               type="button" 
               onClick={(e) => { e.stopPropagation(); setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id]); }}
               className={`shrink-0 transition-colors ${isSelected ? 'text-blue-600' : 'text-slate-500 hover:text-slate-600'}`}
             >
-              {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+              {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
             </button>
             <div className="flex items-center gap-1 shrink-0">
-              <Clock size={12} className={isLate ? 'text-rose-500' : 'text-orange-500'} />
-              <span className={`font-bold text-xs ${isLate ? 'text-rose-600' : 'text-orange-600'}`}>{timeDisplay}</span>
+              <Clock size={14} className={isLate ? 'text-rose-500' : 'text-orange-500'} />
+              <span className={`font-bold text-sm ${isLate ? 'text-rose-600' : 'text-orange-600'}`}>{timeDisplay}</span>
               {urgencyDisplay && (
-                <span className={`text-[9px] px-1 py-0.5 rounded ${isLate ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>
+                <span className={`text-xs px-1.5 py-0.5 rounded ${isLate ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>
                   {urgencyDisplay}
                 </span>
               )}
             </div>
             <span className="text-slate-300 mx-0.5 shrink-0">•</span>
-            <span className="font-bold text-slate-800 text-xs truncate max-w-[100px] md:max-w-none">
+            <span className="font-bold text-slate-800 text-sm truncate max-w-[100px] md:max-w-none">
               {passengerName}
             </span>
           </div>
           
           <div className="flex items-center gap-1 shrink-0 ml-1">
-            {distanceTop && <span className="hidden md:inline text-[10px] text-slate-500 font-medium">{distanceTop}</span>}
-            <span className="border border-slate-200 text-slate-600 text-[9px] px-1 py-0.5 rounded uppercase bg-slate-50">
+            {distanceTop && <span className="hidden md:inline text-xs text-slate-500 font-medium">{distanceTop}</span>}
+            <span className="border border-slate-200 text-slate-600 text-xs px-1.5 py-0.5 rounded uppercase bg-slate-50">
               {legsCount}
             </span>
             {isInOutTrip(trip) && (
-              <span className="border border-emerald-200 text-emerald-700 text-[9px] px-1 py-0.5 rounded bg-emerald-50 font-bold">
+              <span className="border border-emerald-200 text-emerald-700 text-xs px-1.5 py-0.5 rounded bg-emerald-50 font-bold">
                 {trip.inOutLeg || 'I/O'}
               </span>
             )}
@@ -1449,14 +1450,14 @@ const OperationsCommandCenter = ({
 
         {/* Addresses & Expand Button */}
         <div className="flex items-start justify-between">
-          <div className="flex-1 space-y-0.5 min-w-0">
+          <div className="flex-1 space-y-1 min-w-0">
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-              <span className="text-slate-600 text-[10px] md:text-xs leading-tight truncate font-medium">{pickupAddress}</span>
+              <span className="text-slate-600 text-xs md:text-sm leading-tight truncate font-medium">{pickupAddress}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-              <span className="text-slate-600 text-[10px] md:text-xs leading-tight truncate font-medium">{dropoffAddress}</span>
+              <span className="text-slate-600 text-xs md:text-sm leading-tight truncate font-medium">{dropoffAddress}</span>
             </div>
           </div>
 
@@ -1464,21 +1465,21 @@ const OperationsCommandCenter = ({
             onClick={() => toggleTripExpanded(trip.id)}
             className="ml-2 p-1 text-slate-500 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors shrink-0"
           >
-            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
         </div>
 
         {/* Compact Info Line */}
-        <div className="mt-1 pt-1 border-t border-slate-100 flex items-center gap-3 text-[10px] text-slate-500">
+        <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-3 text-xs text-slate-500">
           <span className="flex items-center gap-1 truncate">
-            <User size={10} />
+            <User size={12} />
             {driver ? driverName : <span className="text-rose-500 italic">Unassigned</span>}
           </span>
           <span className="hidden md:flex items-center gap-1 truncate">
-            <Car size={10} /> {driverCar}
+            <Car size={12} /> {driverCar}
           </span>
           <span className="hidden md:flex items-center gap-1 truncate">
-            <Navigation size={10} /> ETA: {etaDisplay}
+            <Navigation size={12} /> ETA: {etaDisplay}
           </span>
         </div>
 
@@ -1581,66 +1582,101 @@ const OperationsCommandCenter = ({
   };
 
   const renderManifestBoard = () => (
-    <div className="flex-1 overflow-y-auto px-3 pb-3">
-      {manifestFeedTrips.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-500">
-          <div className="max-w-sm rounded-3xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-              <FileText size={28} />
+    <div className="flex-1 min-h-0 flex flex-col xl:grid xl:grid-cols-[1fr_360px] gap-4 px-3 pb-3 h-full overflow-hidden">
+      {/* Board View (Left Column) */}
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+        {manifestFeedTrips.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+            <div className="max-w-sm rounded-3xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                <FileText size={28} />
+              </div>
+              <p className="text-base text-slate-900">Dispatch board is clear</p>
+              <p className="mt-1.5 text-sm">Try another view, reset the filters, or upload more trips.</p>
             </div>
-            <p className="text-base text-slate-900">Dispatch board is clear</p>
-            <p className="mt-1.5 text-sm">Try another view, reset the filters, or upload more trips.</p>
           </div>
-        </div>
-      ) : (
-        <>
-          <div className={`grid gap-3 ${manifestGroupBy === 'driver' ? '2xl:grid-cols-2' : 'xl:grid-cols-2'}`}>
-            {manifestGroupedSections.map((section) => (
-              <section key={section.key} className="rounded-3xl border border-slate-100/50 bg-white shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
-                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 bg-slate-50/70">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm text-slate-900">{section.label}</div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                        {section.trips.length} trip{section.trips.length !== 1 ? 's' : ''}
-                      </span>
-                      {section.lateCount > 0 && (
-                        <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
-                          {section.lateCount} late
+        ) : (
+          <>
+            <div className={`grid gap-3 ${manifestGroupBy === 'driver' ? '2xl:grid-cols-2' : 'xl:grid-cols-2'}`}>
+              {manifestGroupedSections.map((section) => (
+                <section key={section.key} className="rounded-3xl border border-slate-100/50 bg-white shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 bg-slate-50/70">
+                    <div className="min-w-0">
+                      <div className="truncate text-base font-bold text-slate-900">{section.label}</div>
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-sm text-slate-600">
+                          {section.trips.length} trip{section.trips.length !== 1 ? 's' : ''}
                         </span>
-                      )}
-                      {section.unassignedCount > 0 && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
-                          {section.unassignedCount} open
-                        </span>
-                      )}
+                        {section.lateCount > 0 && (
+                          <span className="rounded-full bg-rose-100 px-2 py-0.5 text-sm text-rose-700 font-medium">
+                            {section.lateCount} late
+                          </span>
+                        )}
+                        {section.unassignedCount > 0 && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-sm text-amber-700 font-medium">
+                            {section.unassignedCount} open
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                      {manifestGroupBy}
                     </div>
                   </div>
-                  <div className="text-xs uppercase tracking-wide text-slate-500">
-                    {manifestGroupBy}
+                  <div className="space-y-3 p-3">
+                    {section.trips.map((trip) => renderManifestCard(trip))}
+                  </div>
+                </section>
+              ))}
+            </div>
+
+            <div className="mt-3 flex items-center justify-between rounded-3xl border border-slate-100/50 bg-white px-4 py-3 text-sm font-medium text-slate-500 shadow-sm">
+              <span>Showing {visibleTrips.length} of {manifestFeedTrips.length} manifest trips</span>
+              {manifestFeedTrips.length > visibleTrips.length && (
+                <button
+                  type="button"
+                  onClick={() => setManifestLimit((prev) => prev + 150)}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  Load 150 More
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Drivers Activity View (Right Column) */}
+      <div className="hidden xl:flex flex-col min-h-0 bg-slate-50 border border-slate-200/60 rounded-3xl p-4 shadow-inner">
+        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200">
+          <Activity size={18} className="text-blue-600" />
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Drivers Activity</h3>
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-2.5 pr-0.5">
+          {(!logs || logs.length === 0) ? (
+            <div className="text-center py-10 text-xs text-slate-400">No recent driver activity logs</div>
+          ) : (
+            logs.slice(0, 30).map((log, i) => (
+              <div key={log.timestamp || log.id || `log-${i}`} className="p-3 bg-white border border-slate-200/75 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-start gap-2.5">
+                  <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ring-1 ring-slate-200 ${
+                    log.c === 'rose' ? 'bg-rose-500 ring-rose-500/20' :
+                    log.c === 'amber' ? 'bg-amber-500 ring-amber-500/20' :
+                    log.c === 'emerald' ? 'bg-emerald-500 ring-emerald-500/20' :
+                    log.c === 'blue' ? 'bg-blue-500 ring-blue-500/20' :
+                    'bg-slate-500 ring-slate-500/20'
+                  }`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-bold text-slate-800 leading-snug">{log.t}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">{log.d}</p>
+                    {log.timestamp && <p className="text-[10px] text-slate-400 mt-1 font-medium">{log.timestamp}</p>}
                   </div>
                 </div>
-                <div className="space-y-3 p-3">
-                  {section.trips.map((trip) => renderManifestCard(trip))}
-                </div>
-              </section>
-            ))}
-          </div>
-
-          <div className="mt-3 flex items-center justify-between rounded-3xl border border-slate-100/50 bg-white px-4 py-3 text-xs font-medium text-slate-500 shadow-sm">
-            <span>Showing {visibleTrips.length} of {manifestFeedTrips.length} manifest trips</span>
-            {manifestFeedTrips.length > visibleTrips.length && (
-              <button
-                type="button"
-                onClick={() => setManifestLimit((prev) => prev + 150)}
-                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
-              >
-                Load 150 More
-              </button>
-            )}
-          </div>
-        </>
-      )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 
