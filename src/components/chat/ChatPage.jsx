@@ -311,7 +311,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
   const renderSidebar = () => (
     <div className="flex h-full w-full min-h-0 flex-col bg-white">
       {/* Mobile Top Bar (consistent with other app sections) */}
-      <div className="px-4 py-3 flex items-center justify-between bg-white border-b border-slate-100 shrink-0 md:hidden">
+      <div className="hidden px-4 py-3 items-center justify-between bg-white border-b border-slate-100 shrink-0">
         <div className="flex items-center gap-3">
           {onBack && (
             <button 

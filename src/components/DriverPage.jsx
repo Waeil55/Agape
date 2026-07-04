@@ -3310,7 +3310,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           onClick={() => setExpandedTripId(null)}
         />
       )}
-      {activeNav !== 'chat' && !(activeNav === 'active-trip' && activeWorkTrip) && (
+      {!(activeNav === 'chat' && isChatThreadOpen) && !(activeNav === 'active-trip' && activeWorkTrip) && (
         <div
           className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
           style={{ paddingTop: 'max(8px, env(safe-area-inset-top, 0px))' }}
