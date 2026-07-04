@@ -324,7 +324,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
           )}
           <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-semibold border border-blue-100 shrink-0">
             <span className="text-xs">
-              {chat.currentUser.role === 'admin' ? 'AD' : 'DS'}
+              {chat.currentUser.role === 'admin' ? 'AD' : chat.currentUser.role === 'driver' ? 'DR' : 'DS'}
             </span>
           </div>
           <div>

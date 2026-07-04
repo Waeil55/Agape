@@ -634,6 +634,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const savedNav = localStorage.getItem(`agape_drvNav_${userKey}`) || 'trips';
     return ['trips', 'tools', 'chat', 'history', 'settings', 'active-trip'].includes(savedNav) ? savedNav : 'trips';
   });
+  const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState(() => localStorage.getItem(`agape_drvHistFilter_${userKey}`) || 'all');
   const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
   const [historyDate, setHistoryDate] = useState(() => localCalendarYmd());
@@ -859,29 +860,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   useEffect(() => {
     if (!me?.id) return;
-    let cancelled = false;
-    const refreshRoutes = async () => {
-      try {
-        const snap = await getDocFromServer(doc(db, 'routeData', 'sequences'));
-        if (cancelled) return;
+    return onSnapshot(doc(db, 'routeData', 'sequences'), (snap) => {
       if (snap.exists()) {
-        const templates = snap.data().templates || [];
-        setRouteTemplates(templates);
+        setRouteTemplates(snap.data().templates || []);
       } else {
         setRouteTemplates([]);
       }
-      } catch (err) {
-        if (!cancelled) console.error('[DriverPage] Route sequence refresh failed:', err);
-      }
-    };
-    refreshRoutes();
-    const timer = setInterval(refreshRoutes, 15000);
-    window.addEventListener('online', refreshRoutes);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-      window.removeEventListener('online', refreshRoutes);
-    };
+    }, (err) => {
+      console.error('[DriverPage] Route sequence listener failed:', err);
+    });
   }, [me?.id]);
 
   // Re-compute assignedSequence whenever templates, me, or trips change
@@ -4851,9 +4838,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       )}
 
       {activeNav === 'chat' && (
-        <div className="driver-page-chat-wrapper flex-1 overflow-hidden flex flex-col">
+        <div 
+          className="driver-page-chat-wrapper flex-1 overflow-hidden flex flex-col"
+          style={{ paddingBottom: isChatThreadOpen ? 0 : 'calc(88px + env(safe-area-inset-bottom, 0px))' }}
+        >
           <Suspense fallback={<div className="h-full flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
-          <ChatPage onBack={() => setActiveNav('trips')} />
+            <ChatPage onBack={() => setActiveNav('trips')} onThreadActiveChange={setIsChatThreadOpen} />
           </Suspense>
         </div>
       )}
@@ -6013,7 +6003,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       })()}
 
       {/* ===== BOTTOM NAVIGATION ===== */}
-      {!isEmbedded && (
+      {!isEmbedded && !(activeNav === 'chat' && isChatThreadOpen) && (
         <nav className="bottom-nav md:hidden">
           <div className="flex h-full items-center justify-between gap-2 px-3">
               {navItems.map((item) => {
