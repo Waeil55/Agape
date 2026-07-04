@@ -24,7 +24,7 @@ const PlacesAutocompleteInput = ({ value, onChange, placeholder, className, requ
     return () => {
       if (autocomplete) window.google.maps.event.clearInstanceListeners(autocomplete);
     };
-  }, [ready]);
+  }, [ready, onChange, onPlaceSelect]);
 
   return (
     <input

@@ -94,8 +94,13 @@ export async function getDB() {
     },
   });
 
-  dbInstance = await dbPromise;
-  return dbInstance;
+  try {
+    dbInstance = await dbPromise;
+    return dbInstance;
+  } catch (err) {
+    dbPromise = null;
+    throw err;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -433,11 +438,10 @@ export async function clearSyncQueue() {
 export async function clearAllLocalData() {
   try {
     const db = await getDB();
-    const tx = db.transaction(
-      Object.values(STORES),
-      'readwrite'
-    );
-    for (const store of Object.values(STORES)) {
+    const allStores = [...Object.values(STORES), 'eventSourcing', 'retryQueue', 'deadLetterQueue'];
+    const existingStores = allStores.filter(s => db.objectStoreNames.contains(s));
+    const tx = db.transaction(existingStores, 'readwrite');
+    for (const store of existingStores) {
       tx.objectStore(store).clear();
     }
     await tx.done;

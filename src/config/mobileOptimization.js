@@ -331,14 +331,20 @@ export const useNetworkInfo = () => {
         saveData: connection.saveData,
       });
 
-      connection.addEventListener('change', () => {
+      const onChange = () => {
         setNetworkInfo({
           effectiveType: connection.effectiveType,
           downlink: connection.downlink,
           rtt: connection.rtt,
           saveData: connection.saveData,
         });
-      });
+      };
+
+      connection.addEventListener('change', onChange);
+
+      return () => {
+        connection.removeEventListener('change', onChange);
+      };
     }
   }, []);
 
@@ -379,11 +385,12 @@ export const useInfiniteScroll = (callback) => {
  * Mobile-safe modal with viewport adjustment
  */
 export const useMobileViewport = () => {
+  const orientation = useOrientation();
   const [viewport, setViewport] = React.useState({
     width: window.innerWidth,
     height: window.innerHeight,
     isMobile: getDeviceType() === 'mobile',
-    orientation: useOrientation(),
+    orientation,
   });
 
   React.useEffect(() => {

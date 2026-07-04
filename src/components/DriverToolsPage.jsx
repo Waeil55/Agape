@@ -743,7 +743,7 @@ const DriverToolsPage = ({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2">
+    <div className="flex-1 overflow-y-auto overscroll-contain pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-3 pt-2 space-y-2">
       {/* Guided Mode Progress Header */}
       {guidedMode && aiSequence && aiSequence.length > 0 && guidedStepIndex < aiSequence.length && (() => {
         const currentTripId = aiSequence[guidedStepIndex];

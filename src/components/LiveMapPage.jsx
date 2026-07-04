@@ -366,6 +366,10 @@ const LiveMapPage = ({
     [trips, today]
   );
 
+  const driverMarkerKey = useMemo(() => {
+    return drivers.map(d => `${d.id}:${d.name}:${d.vehicle}:${d.status}:${d.lastLocationUpdate || d.lastUpdate || ''}:${d.lat || ''}:${d.lng || ''}:${d.pickupLat || ''}:${d.pickupLng || ''}`).join('|');
+  }, [drivers]);
+
   const driverSummaries = useMemo(() => drivers.map(driver => {
     const driverTrips = todaysTrips.filter(trip => isTripForDriver(trip, driver, drivers));
     const activeTrips = sortTripsByTime(driverTrips.filter(trip => ACTIVE_STATUSES.has(trip.status)));
@@ -492,7 +496,12 @@ const LiveMapPage = ({
         }
       })
       .catch(() => { if (!cancelled) setMapsLoadError(true); });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (mapRef.current) {
+        mapRef.current = null;
+      }
+    };
   }, []);
 
   // Traffic Layer update
@@ -590,7 +599,7 @@ const LiveMapPage = ({
     if (selPoint) {
       mapRef.current.panTo(selPoint);
     }
-  }, [mapReady, drivers, selectedDriverId, showClusters]);
+  }, [mapReady, driverMarkerKey, selectedDriverId, showClusters]);
 
   // Trail polyline update
   useEffect(() => {
@@ -849,7 +858,7 @@ const LiveMapPage = ({
             </div>
 
             {/* Tab content */}
-            <div className="max-h-[62dvh] overflow-y-auto p-4 space-y-4 bg-slate-50/30 sm:max-h-[60vh] sm:p-6 sm:space-y-6">
+            <div className="max-h-[62dvh] overflow-y-auto overscroll-contain p-4 space-y-4 bg-slate-50/30 sm:max-h-[60vh] sm:p-6 sm:space-y-6">
               {/* OVERVIEW TAB */}
               {detailTab === 'overview' && (
                 <>

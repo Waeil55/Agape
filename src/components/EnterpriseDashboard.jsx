@@ -12,7 +12,7 @@ const EnterpriseDashboard = (props) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const Fallback = () => <div className="flex items-center justify-center h-screen"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+  const Fallback = () => <div className="flex items-center justify-center h-[100dvh]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
     <Suspense fallback={<Fallback />}>

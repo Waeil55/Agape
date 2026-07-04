@@ -122,6 +122,10 @@ class AdaptiveSyncEngine {
       clearTimeout(this._syncTimer);
       this._syncTimer = null;
     }
+    if (this._idleCheckTimer) {
+      clearInterval(this._idleCheckTimer);
+      this._idleCheckTimer = null;
+    }
     this._unsubConnection?.();
     window.removeEventListener('online', this._onOnline);
     window.removeEventListener('offline', this._onOffline);
@@ -210,7 +214,7 @@ class AdaptiveSyncEngine {
     window.addEventListener('touchstart', this._onActivity, { passive: true });
 
     // Check for idle every 30 seconds
-    setInterval(() => {
+    this._idleCheckTimer = setInterval(() => {
       const idleTime = Date.now() - this._userActivity.lastInteraction;
       const wasIdle = this._userActivity.isIdle;
       this._userActivity.isIdle = idleTime > 60000; // 1 minute idle

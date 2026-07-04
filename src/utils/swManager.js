@@ -6,6 +6,9 @@
 
 let swRegistration = null;
 let updateCheckTimer = null;
+let controllerChangeHandler = null;
+let updateFoundHandler = null;
+let stateChangeHandler = null;
 
 /**
  * Register the service worker and set up update listeners
@@ -17,6 +20,14 @@ export const registerServiceWorker = async () => {
   }
 
   try {
+    // Clean up previous registration listeners
+    if (updateFoundHandler && swRegistration) {
+      swRegistration.removeEventListener('updatefound', updateFoundHandler);
+    }
+    if (stateChangeHandler) {
+      stateChangeHandler = null;
+    }
+
     swRegistration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
     });
@@ -24,16 +35,23 @@ export const registerServiceWorker = async () => {
     console.log('Service Worker registered successfully');
 
     // Listen for updates
-    swRegistration.addEventListener('updatefound', () => {
+    updateFoundHandler = () => {
       const newWorker = swRegistration.installing;
+      if (!newWorker) return;
       
-      newWorker.addEventListener('statechange', () => {
+      // Remove previous statechange handler if any
+      if (stateChangeHandler) {
+        newWorker.removeEventListener('statechange', stateChangeHandler);
+      }
+
+      stateChangeHandler = () => {
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          // New SW ready, notify user
           notifyUpdateAvailable();
         }
-      });
-    });
+      };
+      newWorker.addEventListener('statechange', stateChangeHandler);
+    };
+    swRegistration.addEventListener('updatefound', updateFoundHandler);
 
     // Check for updates periodically without forcing a page reload.
     if (updateCheckTimer) clearInterval(updateCheckTimer);
@@ -41,9 +59,13 @@ export const registerServiceWorker = async () => {
       swRegistration.update();
     }, 5 * 60 * 1000);
 
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (controllerChangeHandler && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.removeEventListener('controllerchange', controllerChangeHandler);
+    }
+    controllerChangeHandler = () => {
       window.dispatchEvent(new CustomEvent('swControllerChanged'));
-    });
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', controllerChangeHandler);
 
     return swRegistration;
   } catch (error) {
@@ -103,6 +125,22 @@ export const skipWaiting = () => {
       type: 'SKIP_WAITING'
     });
   }
+};
+
+export const cleanupServiceWorker = () => {
+  if (updateCheckTimer) {
+    clearInterval(updateCheckTimer);
+    updateCheckTimer = null;
+  }
+  if (controllerChangeHandler && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.removeEventListener('controllerchange', controllerChangeHandler);
+    controllerChangeHandler = null;
+  }
+  if (updateFoundHandler && swRegistration) {
+    swRegistration.removeEventListener('updatefound', updateFoundHandler);
+    updateFoundHandler = null;
+  }
+  stateChangeHandler = null;
 };
 
 export default {

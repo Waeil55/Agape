@@ -190,7 +190,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   }, [logs, role]);
 
   return (
-    <div className={`space-y-6 ${activityFeedOnly ? 'h-full' : ''}`}>
+    <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-6 ${activityFeedOnly ? 'h-full' : ''}`}>
       {!activityFeedOnly && (
       <>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">

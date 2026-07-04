@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { tripMatchesCalendarDay } from '../utils/tripDate';
 import { Clock, MapPin, Truck, BrainCircuit, X, Zap, AlertCircle, UserCheck } from 'lucide-react';
 import { suggestOptimalDriver, getDriverScheduleStatus, getScheduleBlocks } from '../config/ai';
@@ -71,6 +71,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
   const [aiLoading, setAiLoading] = useState(false);
   const [showUnassigned, setShowUnassigned] = useState(true);
   const [aiDriverId, setAiDriverId] = useState(null);
+  const selectedTripIdRef = useRef(null);
 
   // Refresh schedule status once a minute; Firestore handles live data changes.
   useEffect(() => {
@@ -92,16 +93,25 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
 
   const handleTripSelect = async (trip) => {
     setSelectedTrip(trip);
+    selectedTripIdRef.current = trip.id;
     setAiSuggestion(null);
     setAiLoading(true);
-    const result = await suggestOptimalDriver(trip, drivers, trips);
-    setAiLoading(false);
-    if (result) {
-      setAiSuggestion(result);
-      setAiDriverId(result.driverId);
-    } else {
-      setAiSuggestion({ driverId: null, score: 0, reason: 'AI suggestion unavailable. Check driver schedules.' });
+    try {
+      const result = await suggestOptimalDriver(trip, drivers, trips);
+      if (selectedTripIdRef.current !== trip.id) return;
+      if (result) {
+        setAiSuggestion(result);
+        setAiDriverId(result.driverId);
+      } else {
+        setAiSuggestion({ driverId: null, score: 0, reason: 'AI suggestion unavailable. Check driver schedules.' });
+        setAiDriverId(null);
+      }
+    } catch (err) {
+      console.error('[DispatchAssistant] AI suggestion failed:', err);
+      setAiSuggestion({ driverId: null, score: 0, reason: 'AI suggestion failed. Try again.' });
       setAiDriverId(null);
+    } finally {
+      setAiLoading(false);
     }
   };
 

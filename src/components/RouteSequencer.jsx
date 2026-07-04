@@ -584,7 +584,9 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
     if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
       const _seq = [...sequence];
       const dragged = _seq.splice(dragItem.current, 1)[0];
-      _seq.splice(dragOverItem.current, 0, dragged);
+      let targetIdx = dragOverItem.current;
+      if (dragItem.current < targetIdx) targetIdx--;
+      _seq.splice(targetIdx, 0, dragged);
       setSequence(_seq);
     }
     dragItem.current = null;

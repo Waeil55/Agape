@@ -52,6 +52,8 @@ class CrossTabSync {
     this._fieldVersions = new Map(); // field → version
     this._presence = new Map(); // tabId → { user, role, tab, lastSeen }
     this._initialized = false;
+    this._beforeUnloadHandler = null;
+    this._visibilityChangeHandler = null;
   }
 
   /**
@@ -74,16 +76,18 @@ class CrossTabSync {
     });
 
     // Handle tab close
-    window.addEventListener('beforeunload', () => {
+    this._beforeUnloadHandler = () => {
       this._send(MessageType.TAB_LEAVE, { tabId: this._tabId });
-    });
+    };
+    window.addEventListener('beforeunload', this._beforeUnloadHandler);
 
     // Handle visibility change (tab switch)
-    document.addEventListener('visibilitychange', () => {
+    this._visibilityChangeHandler = () => {
       if (document.visibilityState === 'visible') {
         this._send(MessageType.HEARTBEAT, this._getHeartbeatData());
       }
-    });
+    };
+    document.addEventListener('visibilitychange', this._visibilityChangeHandler);
   }
 
   /**
@@ -193,9 +197,24 @@ class CrossTabSync {
   destroy() {
     if (this._heartbeatTimer) {
       clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
+    }
+    if (this._beforeUnloadHandler) {
+      window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+      this._beforeUnloadHandler = null;
+    }
+    if (this._visibilityChangeHandler) {
+      document.removeEventListener('visibilitychange', this._visibilityChangeHandler);
+      this._visibilityChangeHandler = null;
     }
     this._send(MessageType.TAB_LEAVE, { tabId: this._tabId });
     this._channel?.close();
+    this._channel = null;
+    this._listeners.clear();
+    this._globalListeners.clear();
+    this._activeTabs.clear();
+    this._presence.clear();
+    this._fieldVersions.clear();
     this._initialized = false;
   }
 

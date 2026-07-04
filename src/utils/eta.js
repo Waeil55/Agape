@@ -4,7 +4,7 @@
  */
 
 export function calculateETA(currentLat, currentLng, destLat, destLng, avgSpeedMph = 30) {
-  if (!currentLat || !currentLng || !destLat || !destLng) return null;
+  if (currentLat == null || currentLng == null || destLat == null || destLng == null) return null;
 
   const distance = getDistanceMiles(currentLat, currentLng, destLat, destLng);
   if (distance === null) return null;
@@ -21,7 +21,7 @@ export function calculateETA(currentLat, currentLng, destLat, destLng, avgSpeedM
 }
 
 export function getDistanceMiles(lat1, lng1, lat2, lng2) {
-  if (!lat1 || !lng1 || !lat2 || !lng2) return null;
+  if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
 
   const R = 3959; // Earth's radius in miles
   const dLat = toRad(lat2 - lat1);

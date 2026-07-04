@@ -155,6 +155,7 @@ const DesktopEnterpriseDashboard = ({
   const [authActionPayload, setAuthActionPayload] = useState(null);
   const [authPassword, setAuthPassword] = useState('');
   const [reAuthError, setReAuthError] = useState('');
+  const optimizeTimerRef = useRef(null);
   const [tripDetails, setTripDetails] = useState(null);
   const [showTripLocations, setShowTripLocations] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
@@ -646,7 +647,7 @@ const DesktopEnterpriseDashboard = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-3 py-3">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
         {rightPanelTab === 'fleet' && (() => {
           const totalTrips = todayTrips.length;
           const completed = todayTrips.filter(t => t.status === 'Completed').length;
@@ -1314,7 +1315,7 @@ const DesktopEnterpriseDashboard = ({
                   preSelectDriver={uploadAssignDriver}
                    onTripsCreated={async (newTrips) => {
                     try {
-                    const ok = await setTrips(prev => {
+                    setTrips(prev => {
                       const makeKey = (t) => {
                         const bk = t?.bookingId;
                         if (bk && !/^(BK-\d+-\d+|TRP-\d+|TRIP-\d{10,}-\d+)$/i.test(bk)) return `bk::${bk}`;
@@ -1343,12 +1344,8 @@ const DesktopEnterpriseDashboard = ({
                       });
                       return updatedTrips;
                     });
-                    if (ok) {
-                      setShowUploadModal(false);
-                      addToast('Trips Imported', `${newTrips.length} trip(s) imported successfully.`, 'success');
-                    } else {
-                      addToast('Import Failed', 'Failed to save trips to Firestore. See console for details.', 'danger');
-                    }
+                    setShowUploadModal(false);
+                    addToast('Trips Imported', `${newTrips.length} trip(s) imported successfully.`, 'success');
                     } catch (err) { console.error('[onTripsCreated]', err); addToast('Import Failed', err.message || 'Unexpected error.', 'danger'); }
                   }}
                 />
@@ -1529,7 +1526,7 @@ const DesktopEnterpriseDashboard = ({
                     <p className="text-xs text-slate-600">Optimize driver routes and assignments for maximum efficiency.</p>
                   </div>
                   <button
-                    onClick={() => { try { triggerFleetOptimization(); } catch (e) { console.error('[FleetOpt]', e); } setTimeout(() => setShowOptimizeModal(false), 3000); }}
+                    onClick={() => { try { triggerFleetOptimization().then(() => setShowOptimizeModal(false)); } catch (e) { console.error('[FleetOpt]', e); } }}
                     className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2"
                   >
                     <Zap size={16} /> Run Optimization

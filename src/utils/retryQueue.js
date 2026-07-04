@@ -58,6 +58,7 @@ class RetryQueue {
     this._processing = false;
     this._started = false;
     this._retryTimer = null;
+    this._onlineHandler = null;
     this._stats = {
       totalQueued: 0,
       totalRetried: 0,
@@ -77,7 +78,8 @@ class RetryQueue {
     this._processQueue();
 
     // Process when coming back online
-    window.addEventListener('online', () => this._processQueue());
+    this._onlineHandler = () => this._processQueue();
+    window.addEventListener('online', this._onlineHandler);
 
     // Periodic retry check
     this._retryTimer = setInterval(() => {
@@ -92,6 +94,10 @@ class RetryQueue {
     if (this._retryTimer) {
       clearInterval(this._retryTimer);
       this._retryTimer = null;
+    }
+    if (this._onlineHandler) {
+      window.removeEventListener('online', this._onlineHandler);
+      this._onlineHandler = null;
     }
   }
 

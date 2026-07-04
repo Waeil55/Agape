@@ -59,7 +59,7 @@ class RequestDeduplication {
     // Check if recently completed
     if (this._completed.has(idempotencyKey)) {
       this._notify({ type: 'dedup-blocked', key: idempotencyKey, reason: 'recently-completed' });
-      return { executed: false, result: this._completed.get(idempotencyKey), reason: 'recently-completed' };
+      return { executed: false, result: this._completed.get(idempotencyKey)?.result, reason: 'recently-completed' };
     }
 
     // Execute
@@ -70,7 +70,7 @@ class RequestDeduplication {
     try {
       const result = await fn();
       entry.result = result;
-      this._completed.set(idempotencyKey, result);
+      this._completed.set(idempotencyKey, { result, timestamp: Date.now() });
       this._cleanup();
       this._notify({ type: 'dedup-completed', key: idempotencyKey });
       return { executed: true, result };

@@ -8,6 +8,84 @@ import ChatInput from './ChatInput';
 import ChatMessages from './ChatMessages';
 import { formatChatTime, getAvatarColor, getInitials } from '../../utils/chatHelpers';
 
+// ─── Sub-components (defined outside to prevent remounting) ───────────────
+const ConversationRow = React.memo(({ conversation, activeChannelId, onlineUsers, onOpen }) => {
+  const active = activeChannelId === conversation.id;
+  const personOnline = onlineUsers.has(conversation.others[0]);
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(conversation)}
+      className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors duration-150 ${active ? 'bg-blue-50' : 'hover:bg-slate-50 active:bg-slate-100'}`}
+    >
+      <div className="relative shrink-0">
+        <div className={`w-[54px] h-[54px] rounded-full ${getAvatarColor(conversation.others[0] || conversation.participants[0])} flex items-center justify-center text-white font-bold`}>
+          {getInitials(conversation.title)}
+        </div>
+        <span className={`absolute -bottom-0.5 -right-0.5 w-[15px] h-[15px] rounded-full border-[2.5px] border-white ${personOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between mb-0.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className={`truncate text-[16px] leading-snug ${conversation.unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-800'}`}>
+              {conversation.title}
+            </p>
+            {conversation.unread > 0 && (
+              <span className="badge-messenger badge-pop shrink-0">
+                {conversation.unread > 99 ? '99+' : conversation.unread}
+              </span>
+            )}
+          </div>
+          {conversation.lastMessageAt && (
+            <span className="text-[12px] text-slate-400 shrink-0 ml-2">{formatChatTime(conversation.lastMessageAt)}</span>
+          )}
+        </div>
+        <p className={`truncate text-[14px] leading-snug ${conversation.unread > 0 ? 'font-medium text-slate-600' : 'text-slate-400'}`}>
+          {conversation.lastMessage || conversation.subtitle || 'No messages yet'}
+        </p>
+      </div>
+    </button>
+  );
+});
+
+const PersonRow = React.memo(({ employee, ownConversationByEmail, onlineUsers, onOpen }) => {
+  const conversation = ownConversationByEmail.get(employee.email);
+  const unread = conversation?.unread || 0;
+  const online = onlineUsers.has(employee.email);
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(employee)}
+      className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
+    >
+      <div className="relative shrink-0">
+        <div className={`w-[54px] h-[54px] rounded-full ${getAvatarColor(employee.email)} flex items-center justify-center text-white font-bold`}>
+          {getInitials(employee.name)}
+        </div>
+        <span className={`absolute -bottom-0.5 -right-0.5 w-[15px] h-[15px] rounded-full border-[2.5px] border-white ${online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className={`truncate text-[16px] leading-snug ${unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-800'}`}>
+              {employee.name}
+            </p>
+            {unread > 0 && (
+              <span className="badge-messenger badge-pop shrink-0">
+                {unread > 99 ? '99+' : unread}
+              </span>
+            )}
+          </div>
+        </div>
+        <p className="text-[13px] text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+          {online ? 'Online' : 'No messages yet'}
+        </p>
+      </div>
+    </button>
+  );
+});
+
 const ROLE_ORDER = ['admin', 'dispatcher', 'driver', 'user'];
 const ROLE_LABELS = { admin: 'Admins', dispatcher: 'Dispatchers', driver: 'Drivers', user: 'Users' };
 const ROLE_ICONS = { admin: Shield, dispatcher: Radio, driver: Truck, user: User };
@@ -191,84 +269,6 @@ const ChatPage = ({ onBack }) => {
     chat.setActiveChannel(null);
   }, [chat]);
 
-  // ─── Sub-components ───────────────────────────────────────────────────
-  const ConversationRow = ({ conversation }) => {
-    const active = chat.activeChannel === conversation.id;
-    const personOnline = chat.onlineUsers.has(conversation.others[0]);
-    return (
-      <button
-        type="button"
-        onClick={() => openConversation(conversation)}
-        className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors duration-150 ${active ? 'bg-blue-50' : 'hover:bg-slate-50 active:bg-slate-100'}`}
-      >
-        <div className="relative shrink-0">
-          <div className={`w-[54px] h-[54px] rounded-full ${getAvatarColor(conversation.others[0] || conversation.participants[0])} flex items-center justify-center text-white font-bold`}>
-            {getInitials(conversation.title)}
-          </div>
-          <span className={`absolute -bottom-0.5 -right-0.5 w-[15px] h-[15px] rounded-full border-[2.5px] border-white ${personOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between mb-0.5">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <p className={`truncate text-[16px] leading-snug ${conversation.unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-800'}`}>
-                {conversation.title}
-              </p>
-              {conversation.unread > 0 && (
-                <span className="badge-messenger badge-pop shrink-0">
-                  {conversation.unread > 99 ? '99+' : conversation.unread}
-                </span>
-              )}
-            </div>
-            {conversation.lastMessageAt && (
-              <span className="text-[12px] text-slate-400 shrink-0 ml-2">{formatChatTime(conversation.lastMessageAt)}</span>
-            )}
-          </div>
-          <p className={`truncate text-[14px] leading-snug ${conversation.unread > 0 ? 'font-medium text-slate-600' : 'text-slate-400'}`}>
-            {conversation.lastMessage || conversation.subtitle || 'No messages yet'}
-          </p>
-        </div>
-      </button>
-    );
-  };
-
-  const PersonRow = ({ employee }) => {
-    const conversation = ownConversationByEmail.get(employee.email);
-    const unread = conversation?.unread || 0;
-    const online = chat.onlineUsers.has(employee.email);
-    return (
-      <button
-        type="button"
-        onClick={() => openPerson(employee)}
-        className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
-      >
-        <div className="relative shrink-0">
-          <div className={`w-[54px] h-[54px] rounded-full ${getAvatarColor(employee.email)} flex items-center justify-center text-white font-bold`}>
-            {getInitials(employee.name)}
-          </div>
-          <span className={`absolute -bottom-0.5 -right-0.5 w-[15px] h-[15px] rounded-full border-[2.5px] border-white ${online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <p className={`truncate text-[16px] leading-snug ${unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-800'}`}>
-                {employee.name}
-              </p>
-              {unread > 0 && (
-                <span className="badge-messenger badge-pop shrink-0">
-                  {unread > 99 ? '99+' : unread}
-                </span>
-              )}
-            </div>
-          </div>
-          <p className="text-[13px] text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-            {online ? 'Online' : 'No messages yet'}
-          </p>
-        </div>
-      </button>
-    );
-  };
-
   // ─── Sidebar ──────────────────────────────────────────────────────────
   const renderSidebar = () => (
     <div className="flex h-full w-full min-h-0 flex-col bg-white">
@@ -353,7 +353,7 @@ const ChatPage = ({ onBack }) => {
             </button>
             {isAdminReviewExpanded && (
               <div className="bg-slate-50/30 pl-2 border-l-2 border-slate-200">
-                {adminReviewConversations.map(c => <ConversationRow key={c.id} conversation={c} />)}
+                {adminReviewConversations.map(c => <ConversationRow key={c.id} conversation={c} activeChannelId={chat.activeChannel} onlineUsers={chat.onlineUsers} onOpen={openConversation} />)}
               </div>
             )}
           </div>
@@ -363,9 +363,9 @@ const ChatPage = ({ onBack }) => {
         <div className="divide-y divide-slate-100/50">
           {unifiedChatList.map(item => {
             if (item.type === 'conversation') {
-              return <ConversationRow key={item.key} conversation={item.data} />;
+              return <ConversationRow key={item.key} conversation={item.data} activeChannelId={chat.activeChannel} onlineUsers={chat.onlineUsers} onOpen={openConversation} />;
             } else {
-              return <PersonRow key={item.key} employee={item.data} />;
+              return <PersonRow key={item.key} employee={item.data} ownConversationByEmail={ownConversationByEmail} onlineUsers={chat.onlineUsers} onOpen={openPerson} />;
             }
           })}
         </div>
@@ -484,7 +484,7 @@ const ChatPage = ({ onBack }) => {
   return (
     <div
       className={`agape-chat-page flex h-full w-full min-h-0 bg-white ${mobileView === 'chat' ? 'agape-chat-page-conversation-active' : ''}`}
-      style={mobileView === 'chat' && window.innerWidth < 768 ? { height: `${viewportHeight}px` } : {}}
+      style={window.innerWidth < 768 ? { height: `${viewportHeight}px` } : {}}
     >
       {/* Desktop: 2-column grid */}
       <div className="hidden h-full min-h-0 w-full md:grid md:grid-cols-[360px_minmax(0,1fr)]">

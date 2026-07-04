@@ -363,7 +363,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
             <div className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-6">
           <div className="max-w-lg mx-auto text-center mb-6">
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black mx-auto mb-3 shadow-lg ${isPuNav ? 'bg-blue-600 text-white' : 'bg-amber-600 text-white'}`}>
               {isPuNav ? 'PU' : 'DO'}
@@ -424,7 +424,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
 
   // ─── MAIN LAYOUT (Schedule + Route Builder) ───
   return (
-    <div className={`flex-1 flex min-h-0 flex-col md:flex-row ${bg}`}>
+    <div className={`flex-1 flex min-h-0 overflow-hidden flex-col md:flex-row ${bg}`}>
       {/* === LEFT: Schedule / Trip List === */}
       <div className={`w-full max-h-[42dvh] shrink-0 border-b md:w-72 md:max-h-none md:border-b-0 md:border-r xl:w-80 ${dark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} flex flex-col`}>
         <div className={`sticky top-0 px-3 py-2 border-b ${dark ? 'border-slate-700' : 'border-slate-100'} shrink-0`}>
@@ -447,7 +447,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
             </select>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-2 space-y-1.5">
           {availTrips.length === 0 ? (
             <div className="p-4 text-center">
               <p className={`text-xs font-bold ${muted}`}>No trips available</p>
@@ -511,7 +511,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
         )}
 
         {/* Stops list */}
-        <div className="flex-1 overflow-y-auto p-3">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-3">
           {stops.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
               <Route size={40} className="mb-3 opacity-20" />

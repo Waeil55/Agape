@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   db,
   collection,
@@ -47,6 +47,7 @@ export function useDriverAssignments({ enabled, driver, currentUser, resubscribe
     }
 
     setLoading(true);
+    const querySeenIdsRef = { current: [new Set(), new Set()] };
     const queries = [];
     if (driverId) {
       queries.push(
@@ -71,12 +72,20 @@ export function useDriverAssignments({ enabled, driver, currentUser, resubscribe
       );
     }
 
-    const unsubscribes = queries.map((q) =>
+    const unsubscribes = queries.map((q, qIdx) =>
       onSnapshot(q, (snapshot) => {
         const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const currentIds = new Set(docs.map((d) => d.id));
         setAssignments((prev) => {
           const byId = new Map(prev.map((a) => [a.id, a]));
+          const prevSeen = querySeenIdsRef.current[qIdx] || new Set();
+          for (const id of prevSeen) {
+            if (!currentIds.has(id) && byId.has(id)) {
+              byId.delete(id);
+            }
+          }
           docs.forEach((d) => byId.set(d.id, d));
+          querySeenIdsRef.current[qIdx] = currentIds;
           return sortAssignments([...byId.values()]);
         });
         setLoading(false);
@@ -95,55 +104,65 @@ export function useDriverAssignments({ enabled, driver, currentUser, resubscribe
   const acknowledgeAssignment = useCallback(async (assignmentId) => {
     if (!assignmentId) return false;
     const assignment = assignments.find((item) => item.id === assignmentId);
-    await updateDoc(doc(db, FIRESTORE_COLLECTIONS.ASSIGNMENTS, assignmentId), {
-      deliveryState: 'seen',
-      seenAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    emitSystemEvent({
-      type: SYSTEM_EVENT_TYPES.ASSIGNMENT_UPDATED,
-      aggregateType: 'assignment',
-      aggregateId: assignmentId,
-      tripId: assignment?.tripId || null,
-      driverId: assignment?.driverId || driverId || null,
-      assignmentId,
-      actor: { userId: currentUser || driverEmail || driverId || 'driver', role: 'driver' },
-      severity: 'info',
-      payload: {
-        before: { deliveryState: assignment?.deliveryState || 'queued' },
-        after: { deliveryState: 'seen' },
-        changedFields: ['deliveryState', 'seenAt'],
-      },
-    }).catch((err) => console.error('Assignment seen event failed:', err));
-    return true;
+    try {
+      await updateDoc(doc(db, FIRESTORE_COLLECTIONS.ASSIGNMENTS, assignmentId), {
+        deliveryState: 'seen',
+        seenAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      emitSystemEvent({
+        type: SYSTEM_EVENT_TYPES.ASSIGNMENT_UPDATED,
+        aggregateType: 'assignment',
+        aggregateId: assignmentId,
+        tripId: assignment?.tripId || null,
+        driverId: assignment?.driverId || driverId || null,
+        assignmentId,
+        actor: { userId: currentUser || driverEmail || driverId || 'driver', role: 'driver' },
+        severity: 'info',
+        payload: {
+          before: { deliveryState: assignment?.deliveryState || 'queued' },
+          after: { deliveryState: 'seen' },
+          changedFields: ['deliveryState', 'seenAt'],
+        },
+      }).catch((err) => console.error('Assignment seen event failed:', err));
+      return true;
+    } catch (err) {
+      console.error('[useDriverAssignments] acknowledgeAssignment failed:', err);
+      return false;
+    }
   }, [assignments, currentUser, driverEmail, driverId]);
 
   const acceptAssignment = useCallback(async (assignmentId) => {
     if (!assignmentId) return false;
     const assignment = assignments.find((item) => item.id === assignmentId);
-    await updateDoc(doc(db, FIRESTORE_COLLECTIONS.ASSIGNMENTS, assignmentId), {
-      status: ASSIGNMENT_STATUSES.ACCEPTED,
-      deliveryState: 'seen',
-      seenAt: assignment?.seenAt || serverTimestamp(),
-      respondedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    emitSystemEvent({
-      type: SYSTEM_EVENT_TYPES.ASSIGNMENT_UPDATED,
-      aggregateType: 'assignment',
-      aggregateId: assignmentId,
-      tripId: assignment?.tripId || null,
-      driverId: assignment?.driverId || driverId || null,
-      assignmentId,
-      actor: { userId: currentUser || driverEmail || driverId || 'driver', role: 'driver' },
-      severity: 'info',
-      payload: {
-        before: { status: assignment?.status || ASSIGNMENT_STATUSES.OFFERED },
-        after: { status: ASSIGNMENT_STATUSES.ACCEPTED, deliveryState: 'seen' },
-        changedFields: ['status', 'deliveryState', 'respondedAt'],
-      },
-    }).catch((err) => console.error('Assignment accept event failed:', err));
-    return true;
+    try {
+      await updateDoc(doc(db, FIRESTORE_COLLECTIONS.ASSIGNMENTS, assignmentId), {
+        status: ASSIGNMENT_STATUSES.ACCEPTED,
+        deliveryState: 'seen',
+        seenAt: assignment?.seenAt || serverTimestamp(),
+        respondedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      emitSystemEvent({
+        type: SYSTEM_EVENT_TYPES.ASSIGNMENT_UPDATED,
+        aggregateType: 'assignment',
+        aggregateId: assignmentId,
+        tripId: assignment?.tripId || null,
+        driverId: assignment?.driverId || driverId || null,
+        assignmentId,
+        actor: { userId: currentUser || driverEmail || driverId || 'driver', role: 'driver' },
+        severity: 'info',
+        payload: {
+          before: { status: assignment?.status || ASSIGNMENT_STATUSES.OFFERED },
+          after: { status: ASSIGNMENT_STATUSES.ACCEPTED, deliveryState: 'seen' },
+          changedFields: ['status', 'deliveryState', 'respondedAt'],
+        },
+      }).catch((err) => console.error('Assignment accept event failed:', err));
+      return true;
+    } catch (err) {
+      console.error('[useDriverAssignments] acceptAssignment failed:', err);
+      return false;
+    }
   }, [assignments, currentUser, driverEmail, driverId]);
 
   const unseenCount = useMemo(

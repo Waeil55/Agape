@@ -132,10 +132,10 @@ export default function CommandSidebar({
                          <p className="text-xs font-bold text-slate-500 italic py-1 px-1">No active mission</p>
                        )}
                        
-                       {(upcoming.length > 0 || completed > 0) && (
-                         <div className="flex items-center gap-2 pt-1">
-                           {upcoming.length > 0 && <span className="text-xs text-slate-600 font-bold bg-slate-100 border border-slate-200 px-2 py-1 rounded-md">{upcoming.length} upcoming</span>}
-                           {completed > 0 && <span className="text-xs text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md flex items-center gap-1"><span className="text-emerald-500">✓</span> {completed} completed</span>}
+                        {(upcoming.length > 0 || completed.length > 0) && (
+                          <div className="flex items-center gap-2 pt-1">
+                            {upcoming.length > 0 && <span className="text-xs text-slate-600 font-bold bg-slate-100 border border-slate-200 px-2 py-1 rounded-md">{upcoming.length} upcoming</span>}
+                            {completed.length > 0 && <span className="text-xs text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md flex items-center gap-1"><span className="text-emerald-500">✓</span> {completed.length} completed</span>}
                          </div>
                        )}
                      </div>

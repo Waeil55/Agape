@@ -10,7 +10,7 @@ export function extractZipFromAddress(address) {
 }
 
 export function haversineMiles(pointA, pointB) {
-  if (!pointA?.lat || !pointA?.lng || !pointB?.lat || !pointB?.lng) return null;
+  if (pointA?.lat == null || pointA?.lng == null || pointB?.lat == null || pointB?.lng == null) return null;
   const toRad = (degrees) => (degrees * Math.PI) / 180;
   const earthRadiusMiles = 3958.8;
   const dLat = toRad(pointB.lat - pointA.lat);
@@ -102,7 +102,7 @@ export async function getTravelDuration(origin, destination) {
 export async function getDistanceMiles(origin, destination) {
   if (!origin || !destination) return null;
 
-  if (typeof origin !== 'string' && typeof destination !== 'string' && origin.lat && destination.lat) {
+  if (typeof origin !== 'string' && typeof destination !== 'string' && origin.lat != null && origin.lng != null && destination.lat != null && destination.lng != null) {
     return haversineMiles(origin, destination);
   }
 

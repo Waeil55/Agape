@@ -1,20 +1,28 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 
 const ToastContext = createContext(null);
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
+  const toastCounterRef = React.useRef(0);
+  const timeoutsRef = useRef([]);
 
   const addToast = useCallback((message, type = 'info', duration = 3000) => {
-    const id = Date.now();
+    const id = `${Date.now()}_${++toastCounterRef.current}`;
     setToasts(prev => [...prev, { id, message, type }]);
 
     if (duration) {
-      setTimeout(() => {
+      const tid = setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== id));
+        timeoutsRef.current = timeoutsRef.current.filter(t => t !== tid);
       }, duration);
+      timeoutsRef.current.push(tid);
     }
+  }, []);
+
+  useEffect(() => {
+    return () => timeoutsRef.current.forEach(clearTimeout);
   }, []);
 
   const removeToast = useCallback((id) => {

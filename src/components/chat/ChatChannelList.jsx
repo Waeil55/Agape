@@ -13,7 +13,7 @@ const CHANNEL_ICONS = {
 
 const ChatChannelList = ({ channels, activeChannel, onSelect, onlineUsers, unreadCounts, currentUser }) => {
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto overscroll-contain">
       {/* Online users bar */}
       <div className="px-4 py-3 border-b border-slate-100">
         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Online Now</p>

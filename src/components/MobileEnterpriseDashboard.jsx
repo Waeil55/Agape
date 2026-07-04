@@ -141,7 +141,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
           {renderTopBar('Archives', true)}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto overscroll-contain">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><ArchivesPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
@@ -205,7 +205,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (currentView === 'chat') {
       return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+        <div className="mobile-chat-wrapper flex-1 overflow-hidden flex flex-col">
           <ErrorBoundary><Suspense fallback={<MobileFallback />}><ChatPage onBack={() => setCurrentView('trips')} /></Suspense></ErrorBoundary>
         </div>
       );

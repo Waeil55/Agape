@@ -135,7 +135,7 @@ const AdminChatMonitor = () => {
                 {messages.map(msg => {
                   const isSystem = msg.type === 'system';
                   return (
-                    <div key={msg.id} className={`flex ${msg.senderEmail === normalizeEmail(msg.senderEmail) ? 'justify-start' : 'justify-end'}`}>
+                    <div key={msg.id} className="flex justify-start">
                       <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${isSystem ? 'bg-slate-200 text-slate-600 text-xs italic mx-auto' : 'bg-white shadow-sm text-slate-800'}`}>
                         {!isSystem && <p className="text-[10px] font-bold text-slate-500 mb-0.5">{msg.senderName || msg.senderEmail}</p>}
                         <p className="break-words">{msg.text}</p>

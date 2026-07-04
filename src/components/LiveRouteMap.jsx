@@ -66,7 +66,7 @@ const LiveRouteMap = React.memo(({
         s.push({ id: `${t.id}-pickup`, address: t.pickup, label: `${i + 1}`, type: 'pickup', patient: t.patient, trip: t });
       }
       if (t.dropoffLat && t.dropoffLng) {
-        s.push({ id: `${t.id}-dropoff`, lat: t.dropoffLng ? t.dropoffLat : null, lng: t.dropoffLng || null, label: `${i + 1}D`, type: 'dropoff', patient: t.patient, address: t.dropoff, trip: t });
+        s.push({ id: `${t.id}-dropoff`, lat: t.dropoffLat ?? null, lng: t.dropoffLng ?? null, label: `${i + 1}D`, type: 'dropoff', patient: t.patient, address: t.dropoff, trip: t });
       } else if (t.dropoff) {
         s.push({ id: `${t.id}-dropoff`, address: t.dropoff, label: `${i + 1}D`, type: 'dropoff', patient: t.patient, trip: t });
       }
@@ -491,7 +491,7 @@ const LiveRouteMap = React.memo(({
         )}
 
         {/* Map Container */}
-        <div ref={mapRef} className={`w-full ${fullscreen ? 'h-screen' : 'h-64 sm:h-80 md:h-96'}`} />
+        <div ref={mapRef} className={`w-full ${fullscreen ? 'h-[100dvh]' : 'h-64 sm:h-80 md:h-96'}`} />
 
         {/* Attribution */}
         <div className="absolute bottom-1 right-2 z-10 text-xs text-slate-400 opacity-50 pointer-events-none select-none">

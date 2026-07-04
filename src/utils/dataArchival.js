@@ -40,32 +40,35 @@ export function getArchivableDateKeys() {
  * Archive trips from a specific date to cold storage
  */
 export async function archiveTripsForDate(dateKey) {
-  const sourceCollection = `trips/${dateKey}`;
-  const archiveCollection = `archivedTrips/${dateKey}`;
-
   try {
-    const snapshot = await getDocsFromServer(collection(db, sourceCollection));
+    const q = query(collection(db, 'trips'), where('dateKey', '==', dateKey));
+    const snapshot = await getDocsFromServer(q);
 
     if (snapshot.empty) {
       return { archived: 0, errors: 0 };
     }
 
-    const batch = writeBatch(db);
+    const docs = snapshot.docs;
+    const BATCH_LIMIT = 250; // 250 docs × 2 ops = 500 ops (Firestore limit)
     let count = 0;
 
-    snapshot.forEach(docSnap => {
-      const archiveRef = doc(db, archiveCollection, docSnap.id);
-      batch.set(archiveRef, {
-        ...docSnap.data(),
-        archivedAt: serverTimestamp(),
-        originalDateKey: dateKey,
+    for (let i = 0; i < docs.length; i += BATCH_LIMIT) {
+      const chunk = docs.slice(i, i + BATCH_LIMIT);
+      const batch = writeBatch(db);
+
+      chunk.forEach(docSnap => {
+        const archiveRef = doc(db, 'archivedTrips', docSnap.id);
+        batch.set(archiveRef, {
+          ...docSnap.data(),
+          archivedAt: serverTimestamp(),
+          originalDateKey: dateKey,
+        });
+        batch.delete(docSnap.ref);
       });
 
-      batch.delete(docSnap.ref);
-      count++;
-    });
-
-    await batch.commit();
+      await batch.commit();
+      count += chunk.length;
+    }
 
     console.log(`Archived ${count} trips for ${dateKey}`);
     return { archived: count, errors: 0 };
@@ -111,7 +114,8 @@ export async function deleteOldArchives() {
 
   for (const dateKey of dateKeys) {
     try {
-      const snapshot = await getDocsFromServer(collection(db, `archivedTrips/${dateKey}`));
+      const q = query(collection(db, 'archivedTrips'), where('originalDateKey', '==', dateKey));
+      const snapshot = await getDocsFromServer(q);
 
       if (snapshot.empty) {
         results.push({ dateKey, deleted: 0 });
@@ -154,14 +158,16 @@ export async function getStorageStats() {
 
     for (const dateKey of dateKeys) {
       try {
-        const activeSnap = await getDocsFromServer(collection(db, `trips/${dateKey}`));
+        const activeQ = query(collection(db, 'trips'), where('dateKey', '==', dateKey));
+        const activeSnap = await getDocsFromServer(activeQ);
         totalActiveTrips += activeSnap.size;
       } catch (err) {
         // Collection might not exist
       }
 
       try {
-        const archiveSnap = await getDocsFromServer(collection(db, `archivedTrips/${dateKey}`));
+        const archiveQ = query(collection(db, 'archivedTrips'), where('originalDateKey', '==', dateKey));
+        const archiveSnap = await getDocsFromServer(archiveQ);
         totalArchivedTrips += archiveSnap.size;
       } catch (err) {
         // Collection might not exist

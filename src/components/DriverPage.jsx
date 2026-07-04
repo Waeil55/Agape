@@ -28,6 +28,7 @@ import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisp
 import { normalizeEmail } from '../utils/accessControl';
 import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
 import { getDriverLiveStatus } from '../constants/statuses';
+import { useTimeTracking } from '../hooks/useTimeTracking';
 import ErrorBoundary from './ErrorBoundary';
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
@@ -1006,7 +1007,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       playNotificationSound();
       showLocalNotification(`🚨 ${level}: ${t.patient}`, `${t.time} — ${t.pickup} → ${t.dropoff}`);
     });
-  }, [trips]);
+  }, [orderedTrips]);
 
   const setUndoable = (trip, previousStatus, newStatus) => {
     if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
@@ -1314,6 +1315,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const clockOutOfferedRef = useRef(false);
   const [editHomeAddress, setEditHomeAddress] = useState(me?.homeAddress || '');
 
+  const timeTracking = useTimeTracking({
+    driverId: me?.id,
+    driver: me,
+    trips: driverScopedTrips,
+    clockEvents: me?.clockEvents || [],
+    currentPosition: driverPosition,
+    onStatusChange: (evt) => {
+      console.log('[TimeTracking] event:', evt.type, evt);
+    },
+  });
+
   const driverId = me?.id || (() => {
     const normalizedEmail = String(currentUser || '').trim().toLowerCase();
     const seed = normalizedEmail.replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'USER';
@@ -1377,9 +1389,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       setDelayedClockOutTarget('');
       setShowClockOutOffer(false);
       clockOutOfferedRef.current = false;
+      timeTracking.clockOut('MANUAL');
       setShowToast({ type: 'info', message: 'Clocked out — trips are now read-only.' });
     }
-  }, [isClockedIn, driverId, onDriverStatusUpdate, driverPosition?.lat, driverPosition?.lng]);
+  }, [isClockedIn, driverId, onDriverStatusUpdate, driverPosition?.lat, driverPosition?.lng, timeTracking]);
 
   const estimateClockOutFromHome = useCallback(async () => {
     if (!driverPosition?.lat || !driverPosition?.lng || !me?.homeLat || !me?.homeLng) {
@@ -1437,10 +1450,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       return;
     }
     pendingClockOutRef.current = setTimeout(() => {
-      if (isClockedIn) {
-        onDriverStatusUpdate?.(driverId, false);
-        setShowToast({ type: 'info', message: `Auto clock-out at ${targetTime24} — shift ended.` });
-      }
+      onDriverStatusUpdate?.(driverId, false);
+      setShowToast({ type: 'info', message: `Auto clock-out at ${targetTime24} — shift ended.` });
       pendingClockOutRef.current = null;
       setDelayedClockOutTarget('');
       setShowClockOutOffer(false);
@@ -1525,6 +1536,41 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       setShowToast({ type: 'info', message: 'Looks like you\'re near home! Clock out to end your shift.', action: 'geofence-clockout' });
     }
   }, [isClockedIn, driverPosition?.lat, driverPosition?.lng, me?.homeLat, me?.homeLng, activeTrips.length]);
+
+  // Time tracking: auto clock-in on first trip arrival
+  const timeTrackingInitRef = useRef(false);
+  useEffect(() => {
+    if (!isClockedIn || !timeTracking.isOffShift || timeTrackingInitRef.current) return;
+    const today = getTodayStr();
+    const todayTrips = driverScopedTrips.filter(t =>
+      t.date === today && t.driverId === driverId
+    );
+    const firstArrivedTrip = todayTrips.find(t =>
+      t.status === 'At Pickup' || t.status === 'In Transit' || t.status === 'Navigating Dropoff' || t.status === 'At Dropoff' || t.status === 'Arrived'
+    );
+    if (firstArrivedTrip) {
+      timeTrackingInitRef.current = true;
+      timeTracking.handleTripArrival(firstArrivedTrip);
+    }
+  }, [isClockedIn, timeTracking, driverScopedTrips, driverId, getTodayStr]);
+
+  // Time tracking: handle dispatcher-added trip during break → auto resume
+  useEffect(() => {
+    if (!timeTracking.isOnBreak) return;
+    const prevCount = driverScopedTrips.length;
+    const timer = setTimeout(() => {
+      if (driverScopedTrips.length > prevCount && timeTracking.isOnBreak) {
+        const newTrip = driverScopedTrips.find(t =>
+          !['Completed', 'Cancelled', 'No Show'].includes(t.status)
+        );
+        if (newTrip) {
+          timeTracking.handleDispatcherTrip(newTrip);
+          setShowToast({ type: 'info', message: 'New trip added — resuming from break.' });
+        }
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [driverScopedTrips.length]);
 
   // Detect ride-sharing opportunities — deduplicated, max 3
   useEffect(() => {
@@ -2134,6 +2180,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       arrivalTime: nowIso,
       startTime: nowIso,
     });
+    timeTracking.handleTripEvent('TRIP_ARRIVED_PICKUP', showOdometerPrompt);
     setLastOdometer(odo);
     setShowOdometerPrompt(null);
     setOdometerValue('');
@@ -2145,6 +2192,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     advanceWorkflow(trip, 'At Dropoff', {
       arrivalDropoffTime: new Date().toISOString(),
     });
+    timeTracking.handleTripEvent('TRIP_ARRIVED_DROPOFF', trip);
   };
 
   const handleSkipNav = (trip) => {
@@ -2179,6 +2227,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       departedPickupTime: new Date().toISOString(),
       paperSignatureConfirmed: true,
     });
+    timeTracking.handleTripEvent('TRIP_DEPARTED_PICKUP', showSignatureConfirm);
     setShowSignatureConfirm(null);
     setSignatureConfirmed(false);
   };
@@ -2455,6 +2504,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         if (editedData) {
           const odo = parseInt(editedData.dropoffOdometer, 10) || 0;
           advanceWorkflow(trip, 'Completed', { ...editedData, completedVehicle: me?.vehicle || '' });
+          timeTracking.handleTripEvent('TRIP_COMPLETED', trip);
           setShowTripDetails(prev => (prev?.id === trip.id ? { ...prev, ...editedData, status: 'Completed', completedVehicle: me?.vehicle || '' } : prev));
           if (onAddAuditLog) {
             onAddAuditLog('Trip Completed via Edit', `${currentUser} completed trip for ${trip.patient} (odo: ${odo.toLocaleString()} mi).`, 'emerald');
@@ -2539,9 +2589,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       dropoffOdometer: odo,
       completedAt: now,
       departedPickupTime: toIso(departedTime),
-      arrivalDropoffTime: showCompleteModal.arrivalDropoffTime ? showCompleteModal.arrivalDropoffTime : toIso(arrivalDropoffTime),
+      arrivalDropoffTime: toIso(arrivalDropoffTime),
       completedVehicle: me?.vehicle || '',
     });
+    timeTracking.handleTripEvent('TRIP_COMPLETED', showCompleteModal);
     setLastOdometer(odo);
     setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
     setShowCompleteModal(null);
@@ -3056,11 +3107,61 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
       )}
 
+      {/* ===== TIME TRACKING STATUS BAR ===== */}
+      {isClockedIn && timeTracking.hasActiveSession && (
+        <div className="sticky top-0 z-20 bg-white border-b border-slate-100 px-3 py-2 flex items-center gap-3 shadow-sm">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className={`w-2 h-2 rounded-full shrink-0 ${timeTracking.isOnBreak ? 'bg-yellow-500 animate-pulse' : 'bg-emerald-500'}`} />
+            <span className="text-xs font-semibold text-slate-700">
+              {timeTracking.isOnBreak ? 'On Break' : 'Active'}
+            </span>
+            <span className="text-xs text-slate-400">·</span>
+            <span className="text-xs font-mono text-slate-600">
+              {Math.floor(timeTracking.billableHours)}h {Math.round((timeTracking.billableMinutes % 60))}m billable
+            </span>
+            {timeTracking.breakMinutes > 0 && (
+              <>
+                <span className="text-xs text-slate-400">·</span>
+                <span className="text-xs text-yellow-600">
+                  {Math.floor(timeTracking.breakHours)}h {Math.round((timeTracking.breakMinutes % 60))}m break
+                </span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {timeTracking.isOnBreak ? (
+              <button
+                type="button"
+                onClick={timeTracking.resumeWork}
+                className="h-7 px-3 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold active:bg-emerald-700 transition-colors flex items-center gap-1"
+              >
+                <Play size={12} /> Resume
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={timeTracking.startBreak}
+                className="h-7 px-3 rounded-lg bg-yellow-500 text-white text-[11px] font-semibold active:bg-yellow-600 transition-colors flex items-center gap-1"
+              >
+                <Pause size={12} /> Break
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => timeTracking.clockOut('MANUAL')}
+              className="h-7 px-3 rounded-lg bg-rose-500 text-white text-[11px] font-semibold active:bg-rose-600 transition-colors flex items-center gap-1"
+            >
+              <LogOut size={12} /> End Shift
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ===== ACTIVE TRIP WORK PAGE ===== */}
       {activeNav === 'active-trip' && activeWorkTrip && (
         <div
           ref={tripsScrollRef}
-          className="flex-1 overflow-y-auto bg-[#F3F4F6]"
+          className="flex-1 overflow-y-auto overscroll-contain bg-[#F3F4F6]"
           style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
         >
           {renderTripWorkPage(activeWorkTrip)}
@@ -3071,7 +3172,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && (
         <div
           ref={tripsScrollRef}
-          className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F3F4F6]"
+          className="flex-1 overflow-y-auto overscroll-contain pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-3 pt-2 space-y-2 bg-[#F3F4F6]"
           style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
         >
             <>
@@ -4375,7 +4476,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <button type="button" onClick={() => setShowTripDetails(null)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90 cursor-pointer"><X size={18} /></button>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
             {(() => {
               const statusMeta = getHistoryStatusMeta(showTripDetails.status);
               return (
@@ -4492,7 +4593,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       )}
 
       {/* ===== TOOLS PAGE ===== */}
-      {isClockedIn && activeNav === 'tools' && (
+      {activeNav === 'tools' && (
         <Suspense fallback={<div className="h-full flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
         <DriverToolsPage
           trips={trips}
@@ -4582,7 +4683,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== HISTORY PAGE ===== */}
       {activeNav === 'history' && (
-        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
+        <div className="flex-1 overflow-y-auto overscroll-contain pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-3 pt-2">
           <div className="px-1 pt-2 pb-2">
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap">
 
@@ -4847,7 +4948,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== SETTINGS PAGE ===== */}
       {activeNav === 'settings' && (
-        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
+        <div className="flex-1 overflow-y-auto overscroll-contain pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-3 pt-2">
           <div className="px-1 pt-2 pb-3">
             <h2 className="text-xl font-semibold text-slate-900">Settings</h2>
             <p className="text-slate-500 text-xs font-semibold mt-0.5">Account and app preferences</p>

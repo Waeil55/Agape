@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   collection,
   query,
@@ -25,12 +25,13 @@ export function usePaginatedQuery(collectionPath, options = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [hasMore, setHasMore] = useState(true);
+  const hasMoreRef = useRef(true);
   const lastDocRef = useRef(null);
   const loadingRef = useRef(false);
 
   const loadPage = useCallback(async (reset = false) => {
     if (loadingRef.current || !enabled) return;
-    if (!reset && !hasMore) return;
+    if (!reset && !hasMoreRef.current) return;
 
     loadingRef.current = true;
     setLoading(true);
@@ -40,6 +41,7 @@ export function usePaginatedQuery(collectionPath, options = {}) {
       if (reset) {
         lastDocRef.current = null;
         setHasMore(true);
+        hasMoreRef.current = true;
       }
 
       const constraints = [];
@@ -68,6 +70,7 @@ export function usePaginatedQuery(collectionPath, options = {}) {
 
       if (snapshot.empty) {
         setHasMore(false);
+        hasMoreRef.current = false;
         if (reset) setData([]);
         return;
       }
@@ -81,6 +84,7 @@ export function usePaginatedQuery(collectionPath, options = {}) {
 
       if (snapshot.docs.length < pageSize) {
         setHasMore(false);
+        hasMoreRef.current = false;
       }
 
       setData(prev => reset ? newDocs : [...prev, ...newDocs]);
@@ -91,7 +95,7 @@ export function usePaginatedQuery(collectionPath, options = {}) {
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [collectionPath, filters, orderByField, orderByDirection, pageSize, enabled, hasMore]);
+  }, [collectionPath, filters, orderByField, orderByDirection, pageSize, enabled]);
 
   const loadMore = useCallback(() => {
     if (!loading && hasMore) {
@@ -103,11 +107,12 @@ export function usePaginatedQuery(collectionPath, options = {}) {
     loadPage(true);
   }, [loadPage]);
 
+  const filterKey = useMemo(() => JSON.stringify(filters), [filters]);
   useEffect(() => {
     if (enabled) {
       refresh();
     }
-  }, [enabled, collectionPath, JSON.stringify(filters)]);
+  }, [enabled, collectionPath, filterKey]);
 
   return {
     data,

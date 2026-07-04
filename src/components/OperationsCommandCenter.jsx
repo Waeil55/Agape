@@ -88,6 +88,16 @@ const isTripLate = (tripTime) => {
 
 const to12hr = (time) => {
   if (!time || time === 'Will Call') return 'WC';
+  if (typeof time === 'string' && (time.includes('T') || /^\d{4}-/.test(time))) {
+    const d = new Date(time);
+    if (!isNaN(d.getTime())) {
+      let h = d.getHours();
+      const min = String(d.getMinutes()).padStart(2, '0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${h}:${min} ${ampm}`;
+    }
+  }
   const m = time.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)?/i);
   if (!m) return time;
   let h = parseInt(m[1]);
@@ -1500,7 +1510,7 @@ const OperationsCommandCenter = ({
                   <button
                     key={id}
                     type="button"
-                    disabled={terminal && id !== 'complete'}
+                    disabled={TERMINAL_STATUSES.includes(trip.status) && id !== 'complete'}
                     onClick={() => applyDriverWorkStep(trip, id)}
                     className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-35 disabled:cursor-not-allowed ${color}`}
                   >
@@ -1584,7 +1594,7 @@ const OperationsCommandCenter = ({
   const renderManifestBoard = () => (
     <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_360px] gap-4 px-3 pb-3 h-full overflow-hidden">
       {/* Board View (Left Column) */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
         {manifestFeedTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">
             <div className="max-w-sm rounded-3xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
@@ -1651,7 +1661,7 @@ const OperationsCommandCenter = ({
           <Activity size={18} className="text-blue-600" />
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Drivers Activity</h3>
         </div>
-        <div className="flex-1 overflow-y-auto space-y-2.5 pr-0.5">
+        <div className="flex-1 overflow-y-auto overscroll-contain space-y-2.5 pr-0.5">
           {(!logs || logs.length === 0) ? (
             <div className="text-center py-10 text-xs text-slate-400">No recent driver activity logs</div>
           ) : (
@@ -1700,7 +1710,7 @@ const OperationsCommandCenter = ({
       return Math.round(diffMs / 60000);
     };
     return (
-      <div className="flex-1 overflow-y-auto px-3 pb-3">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
         {manifestFeedTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">
             <div className="max-w-sm rounded-3xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
@@ -1993,7 +2003,7 @@ const OperationsCommandCenter = ({
 
   // ==================== TRIP TABLE ====================
   const renderTripTable = () => (
-    <div className="flex-1 overflow-y-auto px-3 pb-3">
+    <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
       {manifestFeedTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <div className="bg-white border border-slate-100/50 rounded-3xl p-8 text-center max-w-xs shadow-sm">
@@ -2460,7 +2470,7 @@ const OperationsCommandCenter = ({
 
   // ==================== Fleet Matrix ====================
   const renderFleetMatrix = () => (
-    <div className="flex-1 overflow-y-auto p-3">
+    <div className="flex-1 overflow-y-auto overscroll-contain p-3">
       <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <div className="rounded-3xl border border-slate-100/50 bg-white px-4 py-3 shadow-sm">
           <div className="text-xs uppercase tracking-wide text-slate-500">Drivers</div>
@@ -2483,7 +2493,7 @@ const OperationsCommandCenter = ({
         {fleetDrivers.slice(0, fleetLimit).map(d => {
           const driverTrips = getDriverTrips(d.id);
           const isExpanded = expandedDriver === d.id;
-          const isMaintenanceDue = d.nextOilChange - d.odometer < 200;
+          const isMaintenanceDue = d.nextOilChange != null && d.odometer != null && (d.nextOilChange - d.odometer < 200);
           return (
             <div key={d.id} className={`bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm transition-all duration-300 ${
               d.status === 'Available' ? 'border-emerald-200' : ''
@@ -2650,7 +2660,7 @@ const OperationsCommandCenter = ({
 
   // ==================== WILL CALL VIEW ====================
   const renderWillCall = () => (
-    <div className="flex-1 overflow-y-auto p-3">
+    <div className="flex-1 overflow-y-auto overscroll-contain p-3">
       {willCallTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <div className="bg-white border border-slate-200 rounded-3xl p-8 text-center max-w-xs shadow-sm">

@@ -103,49 +103,53 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
     }
     setSubmitting(true);
 
-    const forcedDriver = role === 'driver' ? selectableDrivers[0] : null;
-    const selectedDriver = forcedDriver || selectableDrivers.find(d => d.id === form.driverId);
-    const tripDate = form.oneTimeOnly ? form.tripDate : form.date;
+    try {
+      const forcedDriver = role === 'driver' ? selectableDrivers[0] : null;
+      const selectedDriver = forcedDriver || selectableDrivers.find(d => d.id === form.driverId);
+      const tripDate = form.oneTimeOnly ? form.tripDate : form.date;
 
-    const newTrip = {
-      id: generateTripId(),
-      bookingId: form.bookingId || generateBookingId(),
-      patient: form.patient.trim(),
-      date: tripDate,
-      time: form.willCall ? 'Will Call' : form.time,
-      pickup: form.pickup.trim(),
-      dropoff: form.dropoff.trim(),
-      pickupPhone: form.pickupPhone.trim(),
-      dropoffPhone: form.dropoffPhone.trim(),
-      patientPhone: form.patientPhone.trim(),
-      notes: form.notes.trim(),
-      status: selectedDriver?.id ? 'Assigned' : 'Unassigned',
-      driverId: selectedDriver?.id || null,
-      driverEmail: selectedDriver?.email || null,
-      driverName: selectedDriver?.name || null,
-      recurring: form.recurring && !form.oneTimeOnly,
-      schedule: form.recurring && !form.oneTimeOnly ? form.schedule : [],
-      tripDate: form.oneTimeOnly ? form.tripDate : null,
-      createdAt: new Date().toISOString(),
-      createdBy: currentUser,
-      // Initialize trip metrics
-      pickupOdometer: null,
-      dropoffOdometer: null,
-      arrivalTime: null,
-      arrivalDropoffTime: null,
-      departedPickupTime: null,
-      completedAt: null,
-      completedVehicle: null,
-      paperSignatureConfirmed: false,
-      unableToSign: false,
-      travelTime: '',
-      distance: null,
-      reviewed: false,
-    };
+      const newTrip = {
+        id: generateTripId(),
+        bookingId: form.bookingId || generateBookingId(),
+        patient: form.patient.trim(),
+        date: tripDate,
+        time: form.willCall ? 'Will Call' : form.time,
+        pickup: form.pickup.trim(),
+        dropoff: form.dropoff.trim(),
+        pickupPhone: form.pickupPhone.trim(),
+        dropoffPhone: form.dropoffPhone.trim(),
+        patientPhone: form.patientPhone.trim(),
+        notes: form.notes.trim(),
+        status: selectedDriver?.id ? 'Assigned' : 'Unassigned',
+        driverId: selectedDriver?.id || null,
+        driverEmail: selectedDriver?.email || null,
+        driverName: selectedDriver?.name || null,
+        recurring: form.recurring && !form.oneTimeOnly,
+        schedule: form.recurring && !form.oneTimeOnly ? form.schedule : [],
+        tripDate: form.oneTimeOnly ? form.tripDate : null,
+        createdAt: new Date().toISOString(),
+        createdBy: currentUser,
+        pickupOdometer: null,
+        dropoffOdometer: null,
+        arrivalTime: null,
+        arrivalDropoffTime: null,
+        departedPickupTime: null,
+        completedAt: null,
+        completedVehicle: null,
+        paperSignatureConfirmed: false,
+        unableToSign: false,
+        travelTime: '',
+        distance: null,
+        reviewed: false,
+      };
 
-    await onAddTrip(newTrip);
-    setSubmitting(false);
-    onClose();
+      await onAddTrip(newTrip);
+      onClose();
+    } catch (err) {
+      setErrors({ submit: err.message || 'Failed to save trip. Please try again.' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const inputClass = (field) => `

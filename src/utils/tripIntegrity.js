@@ -70,7 +70,7 @@ export const hasRealTripPatient = (trip = {}) => {
 export const hasRealTripAddress = (trip = {}) => {
   const pickup = normalized(trip.pickup || trip.pickupAddress || trip.originAddress || trip.fromAddress || trip.origin);
   const dropoff = normalized(trip.dropoff || trip.dropoffAddress || trip.destinationAddress || trip.toAddress || trip.destination);
-  return !PLACEHOLDER_ADDRESSES.has(pickup) || !PLACEHOLDER_ADDRESSES.has(dropoff);
+  return !PLACEHOLDER_ADDRESSES.has(pickup) && !PLACEHOLDER_ADDRESSES.has(dropoff);
 };
 
 export const hasTripServiceDate = (trip = {}) => Boolean(textValue(

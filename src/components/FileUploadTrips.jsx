@@ -1160,9 +1160,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                         <select 
                           value={trip.driverId || ''} 
                           onChange={(e) => {
-                            const newTrips = [...mappedTrips];
-                            newTrips[idx].driverId = e.target.value;
-                            setMappedTrips(newTrips);
+                            setMappedTrips(prev => prev.map((t, i) => i === idx ? { ...t, driverId: e.target.value } : t));
                           }}
                           className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
                         >

@@ -236,7 +236,7 @@ export function useDriverLocationStream({
       if (visibilityTimer) clearTimeout(visibilityTimer);
       if (capWatchId !== null) {
         const capGeo = getCapacitorGeolocation();
-        capGeo?.clearWatch?.({ id: capWatchId });
+        capGeo?.clearWatch?.(capWatchId);
         capWatchId = null;
       }
       if (watchIdRef.current !== null) {

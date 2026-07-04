@@ -118,6 +118,8 @@ class BackgroundSyncManager {
     this._processing = false;
     this._started = false;
     this._retryTimer = null;
+    this._swMessageHandler = null;
+    this._onlineHandler = null;
     this._conflictLog = []; // Recent conflicts for debugging
     this._stats = {
       totalQueued: 0,
@@ -142,18 +144,20 @@ class BackgroundSyncManager {
 
     // Listen for SW sync messages
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', (event) => {
+      this._swMessageHandler = (event) => {
         if (event.data?.type === 'SYNC_REQUEST' || event.data?.type === 'BACKGROUND_SYNC') {
           this._processQueue();
         }
-      });
+      };
+      navigator.serviceWorker.addEventListener('message', this._swMessageHandler);
     }
 
     // Process queue when coming back online
-    window.addEventListener('online', () => {
+    this._onlineHandler = () => {
       this._processQueue();
       this._registerBackgroundSync();
-    });
+    };
+    window.addEventListener('online', this._onlineHandler);
 
     // Periodic retry (every 30 seconds when online)
     this._retryTimer = setInterval(() => {
@@ -171,6 +175,14 @@ class BackgroundSyncManager {
     if (this._retryTimer) {
       clearInterval(this._retryTimer);
       this._retryTimer = null;
+    }
+    if (this._swMessageHandler && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.removeEventListener('message', this._swMessageHandler);
+      this._swMessageHandler = null;
+    }
+    if (this._onlineHandler) {
+      window.removeEventListener('online', this._onlineHandler);
+      this._onlineHandler = null;
     }
   }
 

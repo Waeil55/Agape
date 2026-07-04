@@ -20,7 +20,7 @@ export default function useGoogleMaps() {
     script.defer = true;
     loadingPromise = new Promise((resolve, reject) => {
       script.onload = () => { loaded = true; setReady(true); resolve(); };
-      script.onerror = () => { const e = new Error('Google Maps API failed to load'); setError(e); reject(e); };
+      script.onerror = () => { loadingPromise = null; loaded = false; const e = new Error('Google Maps API failed to load'); setError(e); reject(e); };
     });
     document.head.appendChild(script);
     return () => { /* keep script loaded */ };

@@ -51,7 +51,19 @@ export function mergeDocumentVersions(localDoc, remoteDoc) {
       continue;
     }
 
-    if (typeof localValue === 'object' && !Array.isArray(localValue) &&
+    if (Array.isArray(localValue) && Array.isArray(remoteValue)) {
+      // Merge arrays by ID if items have id, otherwise use remote
+      if (localValue.length > 0 && typeof localValue[0] === 'object' && localValue[0]?.id) {
+        const mergedArray = [...remoteValue];
+        for (const localItem of localValue) {
+          const remoteIdx = mergedArray.findIndex(r => r?.id === localItem.id);
+          if (remoteIdx === -1) mergedArray.push(localItem);
+        }
+        merged[key] = mergedArray;
+      } else {
+        merged[key] = localValue;
+      }
+    } else if (typeof localValue === 'object' && !Array.isArray(localValue) &&
         typeof remoteValue === 'object' && !Array.isArray(remoteValue)) {
       merged[key] = mergeDocumentVersions(localValue, remoteValue);
     }

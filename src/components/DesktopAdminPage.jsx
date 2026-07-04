@@ -713,7 +713,7 @@ const DesktopAdminPage = ({
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto px-3 pt-2 pb-28 space-y-2">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-3 pt-2 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] space-y-2">
         {role === 'admin' && aiSecurity && (
           <AIInsightsBanner insights={aiSecurity} loading={aiSecLoading} onClose={() => setAiSecurity(null)} />
         )}

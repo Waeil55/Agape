@@ -21,11 +21,13 @@ export default function CommandPalette({ isOpen, onClose, navigateTo }) {
   }, [isOpen, onClose]);
 
   useEffect(() => {
+    let id;
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      id = setTimeout(() => inputRef.current?.focus(), 100);
     } else {
       setQuery('');
     }
+    return () => { if (id) clearTimeout(id); };
   }, [isOpen]);
 
   if (!isOpen) return null;

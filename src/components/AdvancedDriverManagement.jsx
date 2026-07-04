@@ -13,10 +13,10 @@ import { aiGenerateDriverCoaching, aiDetectAnomalies } from '../config/aiAdvance
 /**
  * Driver Performance Score Card
  */
-const DriverScoreCard = ({ driver, onClick }) => {
-  const score = Math.floor(Math.random() * 30 + 70); // 70-100 score
-  const safetyScore = Math.floor(Math.random() * 20 + 80);
-  const efficiencyScore = Math.floor(Math.random() * 25 + 75);
+const DriverScoreCard = React.memo(({ driver, onClick }) => {
+  const score = useMemo(() => Math.floor((parseInt(driver.id, 36) % 30) + 70), [driver.id]);
+  const safetyScore = useMemo(() => Math.floor((parseInt(driver.id, 36) % 20) + 80), [driver.id]);
+  const efficiencyScore = useMemo(() => Math.floor((parseInt(driver.id, 36) % 25) + 75), [driver.id]);
 
   const getScoreColor = (s) => {
     if (s >= 90) return 'text-emerald-600 bg-emerald-50';
@@ -276,11 +276,17 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [showCoaching, setShowCoaching] = useState(false);
   const [notice, setNotice] = useState('');
+  const noticeTimerRef = React.useRef(null);
 
   const notify = (message) => {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
     setNotice(message);
-    window.setTimeout(() => setNotice(''), 3000);
+    noticeTimerRef.current = setTimeout(() => setNotice(''), 3000);
   };
+
+  React.useEffect(() => {
+    return () => { if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current); };
+  }, []);
 
   const handleAddDriver = () => {
     if (onEditDriver) {
@@ -323,11 +329,9 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
 
   const filteredDrivers = useMemo(() => {
     return drivers.filter(d => {
-      if (filterBy === 'top' && Math.random() > 0.5) return false;
-      if (filterBy === 'needs-coaching' && Math.random() > 0.3) return false;
       return d.name.toLowerCase().includes(searchTerm.toLowerCase());
     });
-  }, [drivers, filterBy, searchTerm]);
+  }, [drivers, searchTerm]);
 
   return (
     <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">

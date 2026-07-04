@@ -35,6 +35,7 @@ import { useFirestoreAppData } from './hooks/useFirestoreAppData';
 import { useRealtimeReliability } from './hooks/useRealtimeReliability';
 import { useDriverLiveState, useDriverLivenessMonitor } from './hooks/useDriverLiveState';
 import { useDriverAssignments } from './hooks/useDriverAssignments';
+import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './components/pwa';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
@@ -101,8 +102,9 @@ const lazyWithRetry = (componentImport) =>
       return await componentImport();
     } catch (error) {
       console.warn('[LazyLoad] Chunk load failed, clearing cache and reloading...', error);
-      caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
+      try { caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))); } catch {}
       window.location.reload();
+      return { default: LazyFallback };
     }
   });
 
@@ -134,7 +136,7 @@ const getLogTextColor = (color) => {
 
 const todayStr = new Date().toISOString().split('T')[0];
 const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
-const DRIVER_HISTORY_STATUSES = new Set(['completed', 'cancelled', 'no show', 'rerouted']);
+const DRIVER_HISTORY_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted']);
 const normalizeTripStatus = (status) => String(status || '').trim().toLowerCase();
 const getTripHistoryDateKey = (trip) => {
   const dateKey = tripCalendarDateKey(trip?.date);
@@ -1363,6 +1365,7 @@ const App = () => {
         setLoginError('Enter a valid username using letters, numbers, dot, dash, or underscore.');
         return;
       }
+      loginInProgressRef.current = true;
       await setPersistence(auth, browserLocalPersistence);
       const userCred = await createUserWithEmailAndPassword(auth, authEmail, password);
       await setDoc(
@@ -1379,6 +1382,8 @@ const App = () => {
       requestNotificationPermission().then(token => { if (token) { setNotificationsEnabled(true); } });
     } catch (err) {
       setLoginError(err.message.replace('Firebase: ', ''));
+    } finally {
+      loginInProgressRef.current = false;
     }
   };
 
@@ -1561,19 +1566,17 @@ const App = () => {
     });
     
     // Update trips status and assign to driver
-    const updatedTrips = trips.map(t => selectedTasks.includes(t.id) && canControlTrip(t) ? {
+    setTrips(prev => prev.map(t => selectedTasks.includes(t.id) && canControlTrip(t) ? {
       ...t,
       status: 'In Mission',
       driverId,
       driverEmail: driver?.email || null,
       driverName: driver?.name || null,
-    } : t);
-    setTrips(updatedTrips);
+    } : t));
     
     // Save mission to driver document or a separate missions collection (using a special field for now)
     if (driver) {
-      const updatedDrivers = drivers.map(d => d.id === driverId ? { ...d, activeMission: { id: `M-${Date.now()}`, legs, currentLegIndex: 0 } } : d);
-      setDrivers(updatedDrivers);
+      setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, activeMission: { id: `M-${Date.now()}`, legs, currentLegIndex: 0 } } : d));
       addAuditLog('Mission Created', `${currentUser} created a ${legs.length}-leg mission for ${driver.name} with ${selectedTrips.length} patients.`, 'indigo');
     }
     
@@ -1978,7 +1981,7 @@ const App = () => {
         ...d,
         clockedIn,
         lastUpdate: now,
-        status: clockedIn ? 'Available' : 'Available',
+        status: clockedIn ? 'Available' : 'Offline',
         ...merged,
       } : d);
       return updated;
@@ -1996,7 +1999,7 @@ const App = () => {
     if (driverId) {
       upsertDriverProfile(driverId, {
         clockedIn,
-        status: clockedIn ? 'Available' : 'Available',
+        status: clockedIn ? 'Available' : 'Offline',
         ...merged,
         lastUpdate: now,
         updatedAtLocal: now,
@@ -2045,7 +2048,7 @@ const App = () => {
         diffs.push({ field: key, before: trip?.[key], after: nextTrip?.[key] });
       }
     });
-    const driver = drivers.find(d => d.id === driverId);
+    const driver = driversRef.current.find(d => d.id === driverId);
     addAuditLog(
       'Trip Completed',
       `${driver?.name || 'Driver'} completed trip ${tripId} (${trip?.patient}). Odometer: ${odometer?.toLocaleString()} mi.`,
@@ -2596,7 +2599,7 @@ const App = () => {
             <div className="grid grid-cols-2 gap-4 text-xs font-bold text-slate-600">
               <div><span className="text-slate-500 block mb-1">Time</span>{smartAssignTrip.time}</div>
               <div><span className="text-slate-500 block mb-1">Type</span>{smartAssignTrip.type}</div>
-              <div className="col-span-2"><span className="text-slate-500 block mb-1">Route</span>{smartAssignTrip.pickup} <ArrowRight size={12} className="inline text-slate-300 mx-1" /> {smartAssignTrip.dropoff.split(' ')[0]}</div>
+              <div className="col-span-2"><span className="text-slate-500 block mb-1">Route</span>{smartAssignTrip.pickup} <ArrowRight size={12} className="inline text-slate-300 mx-1" /> {(smartAssignTrip.dropoff || '').split(' ')[0]}</div>
             </div>
           </div>
           {aiAnalyzing ? (
@@ -2761,7 +2764,7 @@ const App = () => {
                 <p className="text-sm font-bold text-indigo-900 mb-2">Ready to optimize Agape Care routes?</p>
                 <p className="text-xs text-indigo-700/80">This will auto-assign all unassigned trips based on live traffic, capacity, and schedules.</p>
               </div>
-              <button onClick={() => { triggerFleetOptimization(); setTimeout(() => setShowOptimizeModal(false), 3000); }} className="w-full py-4 bg-indigo-600 text-white rounded-[1rem] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-3 shadow-md shadow-indigo-500/30">
+              <button onClick={() => { triggerFleetOptimization().then(() => setShowOptimizeModal(false)); }} className="w-full py-4 bg-indigo-600 text-white rounded-[1rem] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-3 shadow-md shadow-indigo-500/30">
                 <Zap size={20} /> Launch Optimization
               </button>
             </div>
@@ -2866,11 +2869,9 @@ const App = () => {
               onUpdateDriverLocation={handleUpdateDriverLocation}
               onUpdateTrip={(tripId, status, extraData = {}) => {
                 const prevTrip = trips.find(t => t.id === tripId);
-                const newTrip = prevTrip ? { ...prevTrip, status, ...extraData } : null;
-                if (newTrip) {
-                  // Apply update
-                  setTrips(prev => prev.map(t => t.id === tripId ? newTrip : t));
-                  // Compute field-level diffs for audit
+                setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
+                if (prevTrip) {
+                  const newTrip = { ...prevTrip, status, ...extraData };
                   const changed = [];
                   Object.keys(newTrip).forEach((k) => {
                     const a = prevTrip[k];
@@ -2886,8 +2887,6 @@ const App = () => {
               onDriverStatusUpdate={handleDriverStatusUpdate}
               onCompleteTrip={(tripId, driverId, odometer) => {
                 handleCompleteTrip(tripId, driverId, odometer);
-                const trip = trips.find(t => t.id === tripId);
-                addAuditLog('Trip Completed', `${currentUser} (Driver) completed trip ${tripId} (${trip?.patient || 'Unknown'}). Odo: ${odometer}`, 'emerald');
               }}
               onAddAuditLog={addAuditLog}
               onAddTrip={addTrip}
@@ -2972,21 +2971,22 @@ const App = () => {
               }}
               onUpdateDriverTrip={(tripId, status, extraData = {}) => {
                 const prevTrip = trips.find(t => t.id === tripId);
-                const nextTrip = prevTrip ? { ...prevTrip, status, ...extraData } : null;
-                if (!nextTrip) return;
-                setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
-                const diffs = [];
-                Object.keys(nextTrip).forEach((key) => {
-                  if (String(prevTrip?.[key]) !== String(nextTrip?.[key])) {
-                    diffs.push({ field: key, before: prevTrip?.[key], after: nextTrip?.[key] });
-                  }
-                });
-                addAuditLog(
-                  'Worker Driver Update',
-                  `${currentUser} updated trip ${tripId} (${prevTrip?.patient || 'Unknown'}) to ${status}`,
-                  'blue',
-                  { entity: 'trip', id: tripId, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; ') }
-                );
+                setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
+                if (prevTrip) {
+                  const nextTrip = { ...prevTrip, status, ...extraData };
+                  const diffs = [];
+                  Object.keys(nextTrip).forEach((key) => {
+                    if (String(prevTrip?.[key]) !== String(nextTrip?.[key])) {
+                      diffs.push({ field: key, before: prevTrip?.[key], after: nextTrip?.[key] });
+                    }
+                  });
+                  addAuditLog(
+                    'Worker Driver Update',
+                    `${currentUser} updated trip ${tripId} (${prevTrip?.patient || 'Unknown'}) to ${status}`,
+                    'blue',
+                    { entity: 'trip', id: tripId, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; ') }
+                  );
+                }
               }}
               onDriverStatusUpdate={handleDriverStatusUpdate}
               onCompleteTrip={handleCompleteTrip}
@@ -3029,6 +3029,11 @@ const App = () => {
               </div>
             ))}
           </div>
+
+          {/* PWA Components */}
+          <PWAInstallPrompt />
+          <PWAUpdatePrompt />
+          <OfflineIndicator />
         </>
       )}
     </div>

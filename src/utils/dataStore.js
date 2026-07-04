@@ -86,17 +86,29 @@ class ConnectionMonitor {
     this.quality = { latencyMs: null, downlink: null, effectiveType: null };
     this._lastPing = 0;
     this._pingFailures = 0;
+    this._started = false;
+    this._onlineHandler = null;
+    this._offlineHandler = null;
+    this._connectionChangeHandler = null;
+    this._stopPingLoop = false;
   }
 
   start() {
-    window.addEventListener('online', () => this._transition(ConnectionState.RECONNECTING));
-    window.addEventListener('offline', () => this._transition(ConnectionState.OFFLINE));
+    if (this._started) return;
+    this._started = true;
+
+    this._onlineHandler = () => this._transition(ConnectionState.RECONNECTING);
+    this._offlineHandler = () => this._transition(ConnectionState.OFFLINE);
+    window.addEventListener('online', this._onlineHandler);
+    window.addEventListener('offline', this._offlineHandler);
 
     if (navigator.connection) {
-      navigator.connection.addEventListener('change', () => this._readQuality());
+      this._connectionChangeHandler = () => this._readQuality();
+      navigator.connection.addEventListener('change', this._connectionChangeHandler);
     }
 
     this._readQuality();
+    this._stopPingLoop = false;
     this._pingLoop();
 
     // Mark as online if we were connecting
@@ -107,6 +119,24 @@ class ConnectionMonitor {
         }
       }, 3000);
     }
+  }
+
+  stop() {
+    this._started = true; // prevent re-entry while stopped
+    this._stopPingLoop = true;
+    if (this._onlineHandler) {
+      window.removeEventListener('online', this._onlineHandler);
+      this._onlineHandler = null;
+    }
+    if (this._offlineHandler) {
+      window.removeEventListener('offline', this._offlineHandler);
+      this._offlineHandler = null;
+    }
+    if (this._connectionChangeHandler && navigator.connection) {
+      navigator.connection.removeEventListener('change', this._connectionChangeHandler);
+      this._connectionChangeHandler = null;
+    }
+    this._started = false;
   }
 
   subscribe(callback) {
@@ -143,6 +173,7 @@ class ConnectionMonitor {
   async _pingLoop() {
     for (;;) {
       await new Promise(r => setTimeout(r, 15000));
+      if (this._stopPingLoop) break;
       if (!navigator.onLine) continue;
 
       const start = performance.now();

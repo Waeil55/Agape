@@ -76,10 +76,10 @@ const CommandIntelligencePanel = ({
 
   // Real AI: periodic Gemini analysis
   useEffect(() => {
+    let cancelled = false;
     const run = async () => {
       setAiLoading(true);
       try {
-        // Build driver proximity scores using Google Maps
         const driverScores = {};
         const unassignedTrips = heuristic.unassigned.slice(0, 5);
         for (const trip of unassignedTrips) {
@@ -92,11 +92,10 @@ const CommandIntelligencePanel = ({
             }
           }
         }
-        setAiDriverScores(driverScores);
+        if (!cancelled) setAiDriverScores(driverScores);
 
-        // Call Gemini for operational intelligence
         const summary = await analyzeActivityLogs(logs);
-        if (summary && summary.summary) {
+        if (!cancelled && summary && summary.summary) {
           const activeCount = heuristic.active.length;
           const lateCount = heuristic.late.length;
           const unassignedCount = heuristic.unassigned.length;
@@ -114,12 +113,12 @@ const CommandIntelligencePanel = ({
           });
         }
       } catch {}
-      setAiLoading(false);
+      if (!cancelled) setAiLoading(false);
     };
 
     run();
     intervalRef.current = setInterval(run, 60000);
-    return () => clearInterval(intervalRef.current);
+    return () => { cancelled = true; clearInterval(intervalRef.current); };
   }, [trips.length, drivers.length, logs.length]);
 
   const riskTone = heuristic.score >= 80 ? 'emerald' : heuristic.score >= 60 ? 'amber' : 'rose';

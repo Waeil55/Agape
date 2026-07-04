@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import {
   BarChart2, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft,
   ChevronRight, Clock, Download, Edit2, FileText, RefreshCw, Search, Upload,
-  Wand2, XCircle,
+  XCircle,
 } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
 
@@ -443,7 +443,7 @@ const DesktopReportsPage = ({
   };
 
   const renderCards = () => (
-    <div className="flex-1 overflow-y-auto bg-slate-50 px-4 py-4">
+    <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-50 px-4 py-4">
       <div className="space-y-4">
         {reportRows.map(({ trip, driver, travelMinutes }) => {
           const isExpanded = expandedTripId === trip.id;
@@ -506,7 +506,7 @@ const DesktopReportsPage = ({
   );
 
   const renderInvoiceTable = () => (
-    <div className="flex-1 overflow-y-auto px-3 pb-3">
+    <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
     <div className="overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
       <div className="overflow-x-auto">
       <table className="w-full table-fixed text-xs">
@@ -622,7 +622,7 @@ const DesktopReportsPage = ({
   );
 
   const renderReviewTable = () => (
-    <div className="flex-1 overflow-y-auto px-3 pb-3">
+    <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
     <div className="overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
       <div className="overflow-x-auto">
       <table className="w-full table-fixed text-xs">
@@ -798,9 +798,6 @@ const DesktopReportsPage = ({
             </button>
             <button type="button" onClick={() => exportReviewCsv(reportRows)} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 hover:bg-blue-700 px-2 py-1 text-[11px] font-semibold text-white transition-colors whitespace-nowrap">
               <Download size={13} /> CSV
-            </button>
-            <button type="button" className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition-all whitespace-nowrap bg-purple-600 text-white shadow-sm">
-              <Wand2 size={13} /> AI
             </button>
           </div>
         </div>

@@ -42,7 +42,8 @@ class NetworkQualityMonitor {
 
     // Use Network Information API if available (Chrome, Edge, Opera)
     if (navigator.connection) {
-      navigator.connection.addEventListener('change', () => this._readConnectionInfo());
+      this._boundOnConnectionChange = () => this._readConnectionInfo();
+      navigator.connection.addEventListener('change', this._boundOnConnectionChange);
     }
 
     // Initial check
@@ -64,7 +65,7 @@ class NetworkQualityMonitor {
     window.removeEventListener('online', this._boundOnLine);
     window.removeEventListener('offline', this._boundOffLine);
     if (navigator.connection) {
-      navigator.connection.removeEventListener('change', () => this._readConnectionInfo());
+      navigator.connection.removeEventListener('change', this._boundOnConnectionChange);
     }
   }
 

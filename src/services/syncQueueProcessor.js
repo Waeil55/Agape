@@ -7,6 +7,7 @@ const RETRY_DELAY_MS = 5000;
 class SyncQueueProcessor {
   constructor() {
     this._timer = null;
+    this._onlineTimer = null;
     this._processing = false;
     this._started = false;
     this._onProcess = null;
@@ -19,16 +20,17 @@ class SyncQueueProcessor {
     this._processQueue();
 
     this._timer = setInterval(() => {
-      if (navigator.onLine && !this._processing) {
+      if (this._started && navigator.onLine && !this._processing) {
         this._processQueue();
       }
     }, PROCESS_INTERVAL_MS);
 
-    window.addEventListener('online', () => {
-      if (!this._processing) {
-        setTimeout(() => this._processQueue(), RETRY_DELAY_MS);
+    this._handleOnline = () => {
+      if (this._started && !this._processing) {
+        this._onlineTimer = setTimeout(() => this._processQueue(), RETRY_DELAY_MS);
       }
-    });
+    };
+    window.addEventListener('online', this._handleOnline);
   }
 
   stop() {
@@ -37,6 +39,14 @@ class SyncQueueProcessor {
       clearInterval(this._timer);
       this._timer = null;
     }
+    if (this._onlineTimer) {
+      clearTimeout(this._onlineTimer);
+      this._onlineTimer = null;
+    }
+    if (this._handleOnline) {
+      window.removeEventListener('online', this._handleOnline);
+      this._handleOnline = null;
+    }
   }
 
   onProcess(callback) {
@@ -44,7 +54,7 @@ class SyncQueueProcessor {
   }
 
   async _processQueue() {
-    if (this._processing || !navigator.onLine) return;
+    if (!this._started || this._processing || !navigator.onLine) return;
     this._processing = true;
 
     try {
@@ -54,7 +64,12 @@ class SyncQueueProcessor {
       for (const op of pending) {
         if (!navigator.onLine) break;
 
-        if (op.nextRetryAt && new Date(op.nextRetryAt) > new Date()) continue;
+        if (op.nextRetryAt) {
+          const retryAt = op.nextRetryAt?.toDate
+            ? op.nextRetryAt.toDate()
+            : new Date(op.nextRetryAt);
+          if (retryAt > new Date()) continue;
+        }
 
         try {
           await this._executeOperation(op);
@@ -75,9 +90,11 @@ class SyncQueueProcessor {
   async _executeOperation(op) {
     switch (op.type) {
       case 'setField': {
+        const docId = op.docId ?? op.field;
+        if (!docId) throw new Error('[SyncQueueProcessor] setField requires op.docId or op.field');
         const ref = op.collection
-          ? doc(db, op.collection, op.docId || op.field)
-          : doc(db, 'systemConfig', 'syncQueueMeta');
+          ? doc(db, op.collection, docId)
+          : doc(db, 'systemConfig', docId);
         await setDoc(ref, {
           [op.field]: op.value,
           updatedAt: serverTimestamp(),
@@ -86,6 +103,7 @@ class SyncQueueProcessor {
         break;
       }
       case 'setDoc': {
+        if (!op.collection || !op.docId) throw new Error('[SyncQueueProcessor] setDoc missing collection or docId');
         await setDoc(doc(db, op.collection, op.docId), {
           ...op.data,
           syncedAt: serverTimestamp(),
@@ -94,11 +112,12 @@ class SyncQueueProcessor {
         break;
       }
       case 'deleteDoc': {
+        if (!op.collection || !op.docId) throw new Error('[SyncQueueProcessor] deleteDoc missing collection or docId');
         await deleteDoc(doc(db, op.collection, op.docId));
         break;
       }
       default:
-        console.warn(`[SyncQueueProcessor] Unknown operation type: ${op.type}`, op);
+        throw new Error(`[SyncQueueProcessor] Unknown operation type: ${op.type}`);
     }
   }
 }

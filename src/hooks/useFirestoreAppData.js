@@ -359,7 +359,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       ]);
       const mergedTrips = mergedTripsBase.filter((t) => !trashedIds.has(t.id));
       dataRef.current = { ...baseData, trips: mergedTrips };
-      setState(prev => ({ ...prev, trips: mergedTrips, loading: false, error: null }));
+      setState(prev => ({ ...prev, trips: mergedTrips, loading: false, error: null, initialized: true }));
     };
 
     const setupListener = (ref, applyFn, label) => {
@@ -397,13 +397,15 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
         return unsub;
       };
       subscribe();
+      return () => clearTimeout(retryTimeout);
     };
 
-    setupListener(collection(db, TRIPS_COLLECTION), applyTripsSnapshot, 'Trips');
-    setupListener(collection(db, DRIVER_PROFILE_COLLECTION), (snap) => applyCollectionData('drivers', snap), 'Drivers');
-    setupListener(collection(db, DISPATCHER_PROFILE_COLLECTION), (snap) => applyCollectionData('dispatchers', snap), 'Dispatchers');
-    setupListener(collection(db, VEHICLE_COLLECTION), (snap) => applyCollectionData('vehicles', snap), 'Vehicles');
-    setupListener(collection(db, DRIVER_TRIP_PROGRESS_COLLECTION), applyTripProgressSnapshot, 'TripProgress');
+    const cleanupFns = [];
+    cleanupFns.push(setupListener(collection(db, TRIPS_COLLECTION), applyTripsSnapshot, 'Trips'));
+    cleanupFns.push(setupListener(collection(db, DRIVER_PROFILE_COLLECTION), (snap) => applyCollectionData('drivers', snap), 'Drivers'));
+    cleanupFns.push(setupListener(collection(db, DISPATCHER_PROFILE_COLLECTION), (snap) => applyCollectionData('dispatchers', snap), 'Dispatchers'));
+    cleanupFns.push(setupListener(collection(db, VEHICLE_COLLECTION), (snap) => applyCollectionData('vehicles', snap), 'Vehicles'));
+    cleanupFns.push(setupListener(collection(db, DRIVER_TRIP_PROGRESS_COLLECTION), applyTripProgressSnapshot, 'TripProgress'));
 
     const unsubPhones = onSnapshot(doc(db, PHONE_NUMBERS_DOC), (snap) => {
       if (cancelled) return;
@@ -427,6 +429,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
 
     return () => {
       cancelled = true;
+      cleanupFns.forEach((fn) => fn());
       clearTimeout(loadingTimeoutId);
       unsubscribers.forEach((unsub) => unsub());
     };
@@ -506,6 +509,9 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
         }
       } else if (field === 'phoneNumbers') {
         await setDoc(doc(db, PHONE_NUMBERS_DOC), sanitized, { merge: true });
+      } else if (field === 'logs') {
+        const logsDoc = doc(db, 'appData', 'logs');
+        await setDoc(logsDoc, { logs: sanitized, updatedAt: serverTimestamp() }, { merge: true });
       }
 
       const actor = getCurrentEventActor();
@@ -517,7 +523,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       setState(prev => ({ ...prev, saving: pendingWritesRef.current > 0, lastSavedAt: new Date().toISOString() }));
       return true;
     } catch (err) {
-      dataRef.current = previousData;
+      dataRef.current = { ...dataRef.current, [field]: previousData[field] };
       pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
       console.error(`Failed to save ${field}:`, err);
       setState(prev => ({ ...prev, [field]: previousData[field] || [], saving: pendingWritesRef.current > 0, error: err.message || `Failed to save ${field}` }));

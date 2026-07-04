@@ -130,6 +130,9 @@ class PredictivePrefetch {
     this._userPatterns = new Map(); // page → visit count
     this._lastActivity = Date.now();
     this._idleTimer = null;
+    this._idleCheckInterval = null;
+    this._timeCheckInterval = null;
+    this._networkUnsub = null;
     this._currentHour = new Date().getHours();
   }
 
@@ -156,8 +159,12 @@ class PredictivePrefetch {
   stop() {
     this._active = false;
     if (this._idleTimer) clearTimeout(this._idleTimer);
+    if (this._idleCheckInterval) clearInterval(this._idleCheckInterval);
+    if (this._timeCheckInterval) clearInterval(this._timeCheckInterval);
+    if (this._networkUnsub) this._networkUnsub();
     window.removeEventListener('mousemove', this._onActivity);
     window.removeEventListener('keydown', this._onActivity);
+    window.removeEventListener('touchstart', this._onActivity);
   }
 
   /**
@@ -291,7 +298,7 @@ class PredictivePrefetch {
     window.addEventListener('touchstart', this._onActivity, { passive: true });
 
     // Check for idle every 30 seconds
-    setInterval(() => {
+    this._idleCheckInterval = setInterval(() => {
       const idleTime = Date.now() - this._lastActivity;
 
       if (idleTime > 30000) {
@@ -302,7 +309,7 @@ class PredictivePrefetch {
 
   _startTimeMonitor() {
     // Check time-based triggers every 5 minutes
-    setInterval(() => {
+    this._timeCheckInterval = setInterval(() => {
       const hour = new Date().getHours();
       if (hour !== this._currentHour) {
         this._currentHour = hour;
@@ -317,7 +324,7 @@ class PredictivePrefetch {
   }
 
   _startNetworkMonitor() {
-    connectionMonitor.subscribe(({ state }) => {
+    this._networkUnsub = connectionMonitor.subscribe(({ state }) => {
       if (state === ConnectionState.ONLINE && this._queue.length > 0) {
         this._processQueue();
       }

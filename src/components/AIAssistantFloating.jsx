@@ -54,7 +54,7 @@ Answer in 2-3 sentences maximum. Be specific and actionable.` }] }],
   return (
     <>
       {open && (
-        <div className="fixed bottom-20 right-5 z-[9999] w-80 h-96 bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
+        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-5 z-[9999] w-80 h-96 bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
           <div className="flex items-center justify-between px-3 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
             <div className="flex items-center gap-2">
               <Bot size={16} />
@@ -103,7 +103,7 @@ Answer in 2-3 sentences maximum. Be specific and actionable.` }] }],
         </div>
       )}
       <button onClick={() => setOpen(v => !v)}
-        className="fixed bottom-5 right-5 z-[9999] w-12 h-12 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-full shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center">
+        className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-5 z-[9999] w-12 h-12 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-full shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center">
         {open ? <X size={20} /> : <Bot size={22} />}
       </button>
     </>

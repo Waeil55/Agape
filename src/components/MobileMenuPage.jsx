@@ -33,7 +33,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
   ];
 
   return (
-    <div className="w-full h-full bg-gray-50 flex flex-col overflow-y-auto">
+    <div className="w-full h-full bg-gray-50 flex flex-col overflow-y-auto overscroll-contain">
       {/* Header Profile Section */}
       <div className="px-6 pt-10 pb-8 bg-white border-b border-gray-200">
         <div className="flex items-center gap-4">
@@ -83,7 +83,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
       </div>
 
       {/* Logout */}
-      <div className="px-4 pb-24">
+      <div className="px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-4">
         <button
           onClick={onLogout}
           className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-white border border-rose-200 text-rose-600 font-bold hover:bg-rose-50 active:scale-95 transition-all shadow-sm"

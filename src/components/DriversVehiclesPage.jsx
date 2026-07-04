@@ -52,7 +52,7 @@ const [form, setForm] = useState({
       setVehicles(prev => prev.map(v => v.id === editVehicleId ? { ...v, ...vForm } : v));
       addAuditLog('Vehicle Updated', `${currentUser} updated vehicle ${vForm.name}.`, 'blue');
     } else {
-      const id = `VHC-${String(vehicles.length + 1).padStart(3, '0')}`;
+      const id = `VHC-${Date.now()}`;
       setVehicles(prev => [...prev, { ...vForm, id, status: 'Available' }]);
       addAuditLog('Vehicle Added', `${currentUser} added vehicle ${vForm.name}.`, 'emerald');
     }
@@ -107,7 +107,7 @@ const [form, setForm] = useState({
     setFleetSummaryLoading(false);
   }, [filteredDrivers, trips]);
 
-  const resetForm = () => setForm({ name: '', email: '', phone: '', vehicle: '', status: 'Available', currentZone: '', assignedDispatcher: '', vin: '', insuranceExpiry: '', capacity: '1', licenseNumber: '', cdlStatus: 'Active' });
+  const resetForm = () => setForm({ name: '', email: '', phone: '', vehicle: '', status: 'Available', currentZone: '', assignedDispatcher: '', assignedTo: '', vin: '', insuranceExpiry: '', capacity: '1', licenseNumber: '', cdlStatus: 'Active' });
 
   const openAdd = () => { setEditing(null); resetForm(); setShowForm(true); };
 
@@ -131,7 +131,7 @@ const [form, setForm] = useState({
       setDrivers(prev => prev.map(d => d.id === editing ? { ...d, ...form } : d));
       addAuditLog('Driver Updated', `${currentUser} updated driver ${form.name}.`, 'blue');
     } else {
-      const id = `DRV-${String(drivers.length + 1).padStart(3, '0')}`;
+      const id = `DRV-${Date.now()}`;
       const currentDispatcher = role === 'dispatcher'
         ? dispatchers.find((dispatcher) => normalizeEmail(dispatcher.email) === normalizeEmail(currentUser))
         : null;
@@ -245,7 +245,7 @@ const [form, setForm] = useState({
   const resolvedTab = mode !== 'all' ? mode : activeTab;
 
   return (
-    <div className={mode === 'all' ? 'space-y-5' : ''}>
+    <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${mode === 'all' ? 'space-y-5' : ''}`}>
       {mode === 'all' && (
         <div className="flex gap-2 flex-wrap sticky top-0 z-10 bg-[#F3F4F6]/95 py-1 backdrop-blur">
           {[

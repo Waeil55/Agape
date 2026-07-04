@@ -265,8 +265,11 @@ export function useChat() {
     }
   }, [userUid]);
 
+  const loadMessagesRunningRef = useRef(false);
+
   const loadMessages = useCallback(async (channelId, loadOlder = false) => {
-    if (!channelId) return;
+    if (!channelId || loadMessagesRunningRef.current) return;
+    loadMessagesRunningRef.current = true;
     setLoadingMessages(true);
     try {
       const constraints = [
@@ -308,6 +311,7 @@ export function useChat() {
     } catch (err) {
       console.error('[Chat] loadMessages error:', err);
     } finally {
+      loadMessagesRunningRef.current = false;
       setLoadingMessages(false);
     }
   }, []); // No messages dependency — uses ref instead
@@ -485,6 +489,12 @@ export function useChat() {
       console.error('[Chat] setTyping error:', err);
     }
   }, [userEmail, userDisplayName, userUid]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
 
   const openDM = useCallback(async (targetEmail, targetName) => {
     const normalizedTargetEmail = normalizeEmail(targetEmail);

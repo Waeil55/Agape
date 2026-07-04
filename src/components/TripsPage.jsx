@@ -32,9 +32,9 @@ const getTodayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
-const today = getTodayStr();
 
 const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onUnassignTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
+  const today = useMemo(() => getTodayStr(), []);
   const [sortBy, setSortBy] = useState('time');
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [legsDetailPatient, setLegsDetailPatient] = useState(null);
@@ -44,6 +44,9 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [assignmentFeedback, setAssignmentFeedback] = useState('');
+  const feedbackTimerRef = React.useRef(null);
+
+  React.useEffect(() => () => clearTimeout(feedbackTimerRef.current), []);
   const [newTrip, setNewTrip] = useState({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
   const [editTrip, setEditTrip] = useState(null);
   const [manifestDate, setManifestDate] = useState(today);
@@ -67,7 +70,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       onBulkAssignTrips(driverId);
       setShowAssign(false);
       setAssignmentFeedback(`✓ Assigned ${selectedTasks.length} trips`);
-      setTimeout(() => setAssignmentFeedback(''), 3000);
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = setTimeout(() => setAssignmentFeedback(''), 3000);
     }
   };
 
@@ -77,7 +81,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
     });
     setShowReassignModal(false);
     setAssignmentFeedback(`✓ Reassigned ${selectedTasks.length} trips`);
-    setTimeout(() => setAssignmentFeedback(''), 3000);
+    clearTimeout(feedbackTimerRef.current);
+    feedbackTimerRef.current = setTimeout(() => setAssignmentFeedback(''), 3000);
   };
 
   const handleBulkUnassign = () => {
@@ -86,7 +91,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       onAssignTrip(tripId, '');
     });
     setAssignmentFeedback(`✓ Unassigned ${selectedTasks.length} trips`);
-    setTimeout(() => setAssignmentFeedback(''), 3000);
+    clearTimeout(feedbackTimerRef.current);
+    feedbackTimerRef.current = setTimeout(() => setAssignmentFeedback(''), 3000);
   };
 
   const handleBulkDelete = () => {
@@ -205,7 +211,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       const driver = drivers.find(d => d.id === driverId);
       onAssignTrip(selectedTrip.id, driverId);
       setAssignmentFeedback(`✓ ${selectedTrip.patient} assigned to ${driver?.name || 'Driver'}`);
-      setTimeout(() => setAssignmentFeedback(''), 3000);
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = setTimeout(() => setAssignmentFeedback(''), 3000);
       setShowAssign(false);
       setSelectedTrip(null);
     }
@@ -325,7 +332,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-6">
       {/* Assignment Success Feedback */}
       {assignmentFeedback && (
         <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 animate-in">

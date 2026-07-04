@@ -39,11 +39,16 @@ const isoToTimeInput = (iso) => {
 
 const timeToIsoForTripDate = (timeStr, tripDate) => {
   if (!timeStr) return '';
-  const parts = String(timeStr).match(/(\d{1,2}):(\d{2})/);
+  const parts = String(timeStr).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
   if (!parts) return '';
+  let h = parseInt(parts[1], 10);
+  const m = parseInt(parts[2], 10);
+  const ampm = parts[3]?.toUpperCase();
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
   const base = tripDate ? new Date(`${tripDate}T12:00:00`) : new Date();
   const d = Number.isNaN(base.getTime()) ? new Date() : base;
-  d.setHours(parseInt(parts[1], 10), parseInt(parts[2], 10), 0, 0);
+  d.setHours(h, m, 0, 0);
   return d.toISOString();
 };
 
@@ -156,7 +161,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip }) => {
   const inputCls = "w-full px-2.5 py-2 bg-white border border-gray-200 rounded-lg font-bold text-xs focus:border-[#2b4c7e] outline-none transition-all";
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-white overflow-hidden pb-16">
+    <div className="w-full flex-1 flex flex-col bg-white overflow-hidden overscroll-contain pb-16">
       
       {/* DATE & FILTERS BAR */}
       <div className="px-4 py-3 flex items-center justify-between bg-white shrink-0 border-b border-gray-100">
@@ -189,7 +194,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip }) => {
       </div>
 
       {/* MAIN SCROLLABLE CONTENT */}
-      <div className="flex-1 overflow-y-auto bg-gray-50 relative">
+      <div className="flex-1 overflow-y-auto overscroll-contain bg-gray-50 relative">
         {/* DAILY SUMMARY BAR */}
         <div className="bg-white px-4 py-3 mb-3 border-b border-gray-200 flex flex-col gap-3 sticky top-0 z-10 shadow-sm">
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-gray-600">

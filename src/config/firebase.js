@@ -46,7 +46,7 @@ try {
 } catch (err) {
   auth = getAuth(app);
 }
-const analytics = getAnalytics(app);
+const analytics = (() => { try { return getAnalytics(app); } catch { return null; } })();
 
 let messaging;
 try { messaging = getMessaging(app); } catch { /* FCM not available in all environments */ }
@@ -106,7 +106,7 @@ export async function getTrips() {
 export async function updateTripStatus(tripId, updates) {
   const tripRef = doc(db, 'trips', tripId);
   const beforeSnap = await getDoc(tripRef).catch(() => null);
-  const beforeTrip = beforeSnap?.exists?.() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
+  const beforeTrip = beforeSnap?.exists() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
   const nextTrip = buildOperationalTripRecord({ ...(beforeTrip || { id: tripId }), ...updates, id: tripId });
   if (isCorruptedTripRecord(nextTrip)) {
     console.warn('Blocked corrupted trip status update:', { tripId, updates });
@@ -179,7 +179,7 @@ export async function updateDriverLocation(location) {
   };
 
   await setDoc(doc(db, 'driver_locations', driverId), locationDoc, { merge: true });
-  await updateDoc(driverRef, {
+  await setDoc(driverRef, {
     currentLocation: {
       lat: location.lat,
       lng: location.lng,
@@ -191,7 +191,7 @@ export async function updateDriverLocation(location) {
     fraudFlags: fraudSignals.flags || [],
     lastFraudSignals: fraudSignals,
     lastUpdated: serverTimestamp()
-  });
+  }, { merge: true });
   await setDoc(driverProfileRef, {
     lat: location.lat,
     lng: location.lng,
@@ -233,7 +233,7 @@ export async function saveTripWorkflowUpdate(tripId, updates = {}) {
   const safeTripId = String(tripId);
   const tripsRef = doc(db, 'trips', safeTripId);
   const beforeSnap = await getDoc(tripsRef).catch(() => null);
-  const beforeTrip = beforeSnap?.exists?.() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
+  const beforeTrip = beforeSnap?.exists() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
   const cleanUpdates = cleanFirestoreUpdates({
     ...updates,
     workflowUpdatedAt: updates.workflowUpdatedAt || new Date().toISOString(),
@@ -252,7 +252,7 @@ export async function saveTripWorkflowUpdate(tripId, updates = {}) {
     updatedAt: serverTimestamp(),
   }, { merge: true });
 
-  runTransaction(db, async (transaction) => {
+  await runTransaction(db, async (transaction) => {
     const appSnap = await transaction.get(appDataRef);
     if (!appSnap.exists()) return;
     const data = appSnap.data() || {};
@@ -316,7 +316,7 @@ export async function getDriverProfile(driverId) {
 export async function updateDriverProfile(driverId, updates) {
   const driverRef = doc(db, 'driverProfiles', driverId);
   const beforeSnap = await getDoc(driverRef).catch(() => null);
-  const beforeDriver = beforeSnap?.exists?.() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
+  const beforeDriver = beforeSnap?.exists() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
   await setDoc(driverRef, updates, { merge: true });
   await emitEventsSafely(({ buildDriverEvents }) => buildDriverEvents(
     beforeDriver ? [beforeDriver] : [],
@@ -331,15 +331,15 @@ export async function syncOfflineQueue(queue) {
   for (const item of queue) {
     if (item.action === 'startTrip') {
       const tripRef = doc(db, 'trips', item.data.tripId);
-      batch.update(tripRef, item.data);
+      batch.set(tripRef, item.data, { merge: true });
     } else if (item.action === 'completeTrip') {
       const tripRef = doc(db, 'trips', item.data.tripId);
-      batch.update(tripRef, item.data);
+      batch.set(tripRef, item.data, { merge: true });
     } else if (item.action === 'updateLocation') {
       const driverId = auth.currentUser?.uid;
       if (driverId) {
         const driverRef = doc(db, 'drivers', driverId);
-        batch.update(driverRef, { currentLocation: item.data });
+        batch.set(driverRef, { currentLocation: item.data }, { merge: true });
       }
     }
   }

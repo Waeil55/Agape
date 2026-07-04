@@ -175,13 +175,27 @@ export class NetworkStatusMonitor {
   constructor(callback) {
     this.callback = callback;
     this.online = navigator.onLine;
+    this._onOnline = null;
+    this._onOffline = null;
     this.init();
   }
 
   init() {
-    window.addEventListener('online', () => this.setStatus(true));
-    window.addEventListener('offline', () => this.setStatus(false));
+    this._onOnline = () => this.setStatus(true);
+    this._onOffline = () => this.setStatus(false);
+    window.addEventListener('online', this._onOnline);
+    window.addEventListener('offline', this._onOffline);
+  }
 
+  destroy() {
+    if (this._onOnline) {
+      window.removeEventListener('online', this._onOnline);
+      this._onOnline = null;
+    }
+    if (this._onOffline) {
+      window.removeEventListener('offline', this._onOffline);
+      this._onOffline = null;
+    }
   }
 
   setStatus(online) {
@@ -221,6 +235,7 @@ export const useOfflineSupport = () => {
     networkMonitor.current = new NetworkStatusMonitor(setIsOnline);
     return () => {
       if (networkMonitor.current) {
+        networkMonitor.current.destroy();
         networkMonitor.current = null;
       }
     };

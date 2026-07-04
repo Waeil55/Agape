@@ -66,7 +66,11 @@ class DistributedLock {
     // Wait for lock with timeout
     return new Promise((resolve, reject) => {
       const waitTimeoutId = setTimeout(() => {
-        this._removeFromWaitQueue(resource, resolve);
+        const queue = this._waitQueues.get(resource);
+        if (queue) {
+          const idx = queue.findIndex(e => e.timeoutId === waitTimeoutId);
+          if (idx >= 0) queue.splice(idx, 1);
+        }
         reject(new Error(`Lock timeout: could not acquire lock on '${resource}' within ${timeout}ms`));
       }, timeout);
 

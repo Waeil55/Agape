@@ -65,16 +65,23 @@ export async function emitSystemEvents(events = []) {
   const cleanEvents = events.filter(Boolean);
   if (cleanEvents.length === 0) return true;
 
+  let allSucceeded = true;
+
   for (let i = 0; i < cleanEvents.length; i += 450) {
-    const batch = writeBatch(db);
-    cleanEvents.slice(i, i + 450).forEach((event) => {
-      const eventRef = doc(collection(db, FIRESTORE_COLLECTIONS.SYSTEM_EVENTS));
-      batch.set(eventRef, buildSystemEvent(event));
-    });
-    await batch.commit();
+    try {
+      const batch = writeBatch(db);
+      cleanEvents.slice(i, i + 450).forEach((event) => {
+        const eventRef = doc(collection(db, FIRESTORE_COLLECTIONS.SYSTEM_EVENTS));
+        batch.set(eventRef, buildSystemEvent(event));
+      });
+      await batch.commit();
+    } catch (err) {
+      console.error('[FirestoreEventEngine] batch commit failed:', err);
+      allSucceeded = false;
+    }
   }
 
-  return true;
+  return allSucceeded;
 }
 
 export async function emitSystemEvent(event) {
@@ -120,8 +127,8 @@ export function buildTripEvents(beforeTrips = [], afterTrips = [], actor = {}) {
       aggregateType: 'trip',
       aggregateId: tripId,
       tripId,
-      driverId: afterTrip.driverId || beforeTrip?.driverId || null,
-      assignmentId: afterTrip.assignmentId || beforeTrip?.assignmentId || null,
+      driverId: afterTrip.driverId ?? beforeTrip?.driverId ?? null,
+      assignmentId: afterTrip.assignmentId ?? beforeTrip?.assignmentId ?? null,
       actor,
       severity: eventType === SYSTEM_EVENT_TYPES.TRIP_CANCELLED ? 'warning' : 'info',
       payload: {

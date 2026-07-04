@@ -129,7 +129,7 @@ const SettingsPage = ({
     if (resolvedInitialSection && resolvedInitialSection !== activeSection) {
       setActiveSection(resolvedInitialSection);
     }
-  }, [resolvedInitialSection]);
+  }, [resolvedInitialSection, activeSection]);
 
   useEffect(() => {
     localStorage.setItem(`agape_settingsSection_${userKey}`, activeSection);
@@ -660,7 +660,7 @@ const SettingsPage = ({
   };
 
   return (
-    <div className="flex min-h-0 w-full flex-col gap-3 lg:flex-row lg:gap-6">
+    <div className="flex min-h-0 w-full flex-col gap-3 lg:flex-row lg:gap-6 overflow-y-auto overscroll-contain">
       {/* Sidebar */}
       <div className="w-56 flex-shrink-0 hidden lg:block">
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm sticky top-4">

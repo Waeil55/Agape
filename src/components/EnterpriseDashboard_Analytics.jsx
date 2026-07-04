@@ -193,16 +193,16 @@ const EnterpriseDashboard = ({ trips = [], drivers = [], vehicles = [], onViewDe
     URL.revokeObjectURL(url);
   };
 
-  // Chart data
-  const hourlyTripsData = Array(12).fill(0).map((_, i) => ({
+  // Chart data (memoized to prevent flicker)
+  const hourlyTripsData = useMemo(() => Array(12).fill(0).map((_, i) => ({
     label: `${i * 2}:00`,
     value: Math.floor(Math.random() * 15 + 5),
-  }));
+  })), []);
 
-  const revenueData = Array(7).fill(0).map((_, i) => ({
+  const revenueData = useMemo(() => Array(7).fill(0).map((_, i) => ({
     label: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
     value: Math.floor(Math.random() * 2000 + 1500),
-  }));
+  })), []);
 
   return (
     <div className="flex-1 flex flex-col bg-slate-50 overflow-auto">
