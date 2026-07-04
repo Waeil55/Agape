@@ -84,6 +84,16 @@ const MobileEnterpriseDashboard = (props) => {
     if (!VALID_VIEWS.includes(currentView)) setCurrentView('trips');
   }, [currentView]);
 
+  useEffect(() => {
+    const openChat = () => {
+      setCurrentView('chat');
+      setSubView(null);
+    };
+    if (sessionStorage.getItem('agape_open_chat_channel')) openChat();
+    window.addEventListener('agape:open-chat', openChat);
+    return () => window.removeEventListener('agape:open-chat', openChat);
+  }, []);
+
   const getProfileAbbr = () => {
     return role === 'admin' ? 'AD' : 'DS';
   };
@@ -314,7 +324,10 @@ const MobileEnterpriseDashboard = (props) => {
   };
 
   return (
-    <div className="mobile-enterprise-dashboard-wrapper w-full h-[100dvh] bg-white flex flex-col relative overflow-hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 100px)' }}>
+    <div
+      className="mobile-enterprise-dashboard-wrapper w-full h-[100dvh] bg-white flex flex-col relative overflow-hidden"
+      style={{ paddingBottom: currentView === 'chat' && !subView ? 0 : 'calc(env(safe-area-inset-bottom, 0px) + 88px)' }}
+    >
       {/* Dynamic Content */}
       {renderContent()}
 
@@ -375,7 +388,7 @@ const MobileEnterpriseDashboard = (props) => {
                   <span className="relative inline-flex">
                     <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 2.2 : 1.6} />
                     {chatUnreadCount > 0 && (
-                      <span key={chatUnreadCount} className="absolute -right-2.5 -top-1.5 badge-messenger badge-pop badge-pulse">
+                      <span key={chatUnreadCount} className="messenger-nav-badge absolute -right-2.5 -top-1.5 badge-messenger badge-pop badge-pulse">
                         {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                       </span>
                     )}

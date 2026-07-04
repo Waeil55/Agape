@@ -66,7 +66,7 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
   };
 
   return (
-    <div ref={containerRef} className="agape-chat-messages relative">
+    <div ref={containerRef} className="agape-chat-messages flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[#f6f8fb] px-3 sm:px-4 py-2">
       {hasMore && (
         <button onClick={onLoadMore} disabled={loadingMore}
           className="w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-xs text-blue-500 hover:text-blue-600 font-medium transition-colors">
@@ -98,10 +98,10 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
         return (
           <div key={gi} className={isLastInSequence ? 'mb-3' : 'mb-0.5'}>
             {showDateSeparator && (
-              <div className="flex justify-center py-3">
-                <span className="px-3 py-1 rounded-full bg-white/80 shadow-sm text-[11px] font-semibold text-slate-500 backdrop-blur-sm">
-                  {formatDateSeparator(group.dateKey)}
-                </span>
+              <div className="flex items-center gap-3 py-3">
+                <div className="flex-1 h-px bg-slate-200/60" />
+                <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-400 shadow-sm ring-1 ring-slate-200/60">{formatDateSeparator(group.dateKey)}</span>
+                <div className="flex-1 h-px bg-slate-200/60" />
               </div>
             )}
             <ChatMessage
@@ -118,15 +118,12 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
       })}
 
       {typingUsers.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 mt-1">
-          <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${getAvatarColorFallback(typingUsers[0]?.email)}`}>
-            <span className="text-white text-[9px] font-bold">{(typingUsers[0]?.name || '?')[0].toUpperCase()}</span>
-          </div>
-          <div className="bg-white rounded-2xl rounded-bl-md px-4 py-2.5 shadow-sm">
-            <div className="flex gap-1">
-              <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+        <div className="flex items-center gap-2 px-2 py-2 mt-1">
+          <div className="w-8 h-8 rounded-full bg-white shadow-sm ring-1 ring-slate-200 flex items-center justify-center shrink-0">
+            <div className="flex gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
           </div>
         </div>

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
 import { getInitials, getAvatarColor, formatChatMessageTime, EMOJI_QUICK } from '../../utils/chatHelpers';
-import { FileText, Download, SmilePlus } from 'lucide-react';
+import { FileText, Download, SmilePlus, Check, CheckCheck, X } from 'lucide-react';
 
 const URL_REGEX = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
 
 function renderTextWithLinks(text, isOwn) {
-  const parts = text.split(URL_REGEX);
+  const parts = String(text || '').split(URL_REGEX);
   return parts.map((part, i) => {
     if (part.match(URL_REGEX)) {
       return (
@@ -26,15 +26,18 @@ function renderTextWithLinks(text, isOwn) {
 }
 
 const ChatMessage = memo(function ChatMessage({
-  group, isOwn, onlineUsers, onReaction, currentUserEmail,
+  group, isOwn, onReaction, currentUserEmail,
   isFirstInSequence, isLastInSequence,
 }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const emojiRef = useRef(null);
+  const lastMessage = group.messages[group.messages.length - 1];
+  const readBy = Array.isArray(lastMessage?.readBy) ? lastMessage.readBy : [];
+  const readByOther = readBy.some(email => String(email || '').toLowerCase() !== String(currentUserEmail || '').toLowerCase());
 
   useEffect(() => {
-    if (!showEmojiPicker) return;
+    if (!showEmojiPicker) return undefined;
     const handleClickOutside = (e) => {
       if (emojiRef.current && !emojiRef.current.contains(e.target)) {
         setShowEmojiPicker(false);
@@ -52,7 +55,6 @@ const ChatMessage = memo(function ChatMessage({
     <div
       className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${isFirstInSequence ? 'mt-3' : 'mt-[2px]'}`}
     >
-      {/* Sender avatar — only for incoming, only on last message in group */}
       {!isOwn && (
         <div className="shrink-0 w-8 mr-1.5 self-end pb-[2px]">
           {isLastInSequence ? (
@@ -60,26 +62,21 @@ const ChatMessage = memo(function ChatMessage({
               {getInitials(group.senderName)}
             </div>
           ) : (
-            <div className="w-8" /> // placeholder to keep alignment
+            <div className="w-8" />
           )}
         </div>
       )}
 
-      {/* Message column */}
       <div className={`flex flex-col gap-[2px] max-w-[78%] ${isOwn ? 'items-end' : 'items-start'}`}>
-        {/* Sender name — only first in group for incoming */}
         {!isOwn && isFirstInSequence && (
           <span className="text-[11px] font-semibold text-slate-500 px-1 mb-0.5">
             {group.senderName}
           </span>
         )}
 
-        {/* Bubble(s) */}
         {group.messages.map((msg, mi) => {
           const isFirst = mi === 0;
           const isLast = mi === group.messages.length - 1;
-
-          // Corner rounding: iMessage-style grouped bubbles
           const ownRadius = isFirst && isLast
             ? 'rounded-[20px] rounded-br-[5px]'
             : isFirst
@@ -87,7 +84,6 @@ const ChatMessage = memo(function ChatMessage({
             : isLast
             ? 'rounded-[20px] rounded-tr-[8px] rounded-br-[5px]'
             : 'rounded-[20px] rounded-r-[8px]';
-
           const otherRadius = isFirst && isLast
             ? 'rounded-[20px] rounded-bl-[5px]'
             : isFirst
@@ -102,14 +98,13 @@ const ChatMessage = memo(function ChatMessage({
               className="relative group"
               style={{ alignSelf: isOwn ? 'flex-end' : 'flex-start', maxWidth: '100%' }}
             >
-              <div className={`relative inline-block ${isOwn ? ownRadius : otherRadius} ${
+              <div className={`agape-chat-bubble relative inline-block ${isOwn ? ownRadius : otherRadius} ${
                 msg.type === 'image' ? 'overflow-hidden p-0.5' : 'px-[14px] py-[8px]'
               } ${
                 isOwn
                   ? 'bg-[#0084ff] text-white shadow-sm shadow-blue-500/20'
-                  : 'bg-white text-slate-800 shadow-sm shadow-slate-200/80'
+                  : 'bg-white text-slate-800 shadow-[0_1px_4px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70'
               }`}>
-                {/* Image attachment */}
                 {msg.type === 'image' && msg.fileUrl && (
                   <img
                     src={msg.fileUrl}
@@ -120,7 +115,6 @@ const ChatMessage = memo(function ChatMessage({
                   />
                 )}
 
-                {/* File attachment */}
                 {msg.type === 'file' && msg.fileUrl && (
                   <a
                     href={msg.fileUrl}
@@ -149,20 +143,17 @@ const ChatMessage = memo(function ChatMessage({
                   </a>
                 )}
 
-                {/* Text */}
                 {msg.text && (
-                  <p className="text-[15px] leading-[1.4] whitespace-pre-wrap break-words">
+                  <p className="agape-chat-text text-[15px] leading-[1.4] whitespace-pre-wrap break-words">
                     {renderTextWithLinks(msg.text, isOwn)}
                   </p>
                 )}
               </div>
 
-              {/* Per-message timestamp — visible on hover on desktop, always hidden on mobile */}
               <div className={`opacity-0 group-hover:opacity-100 transition-opacity ${isOwn ? 'text-right' : 'text-left'} mt-0.5 px-1 hidden md:block`}>
                 <span className="text-[10px] text-slate-400">{formatChatMessageTime(msg.timestamp)}</span>
               </div>
 
-              {/* Reactions */}
               {msg.reactions && Object.keys(msg.reactions).length > 0 && (
                 <div className={`flex flex-wrap gap-1 mt-0.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                   {Object.entries(msg.reactions).map(([emoji, users]) => (
@@ -182,17 +173,17 @@ const ChatMessage = memo(function ChatMessage({
                 </div>
               )}
 
-              {/* Emoji reaction button — always visible on mobile, hover on desktop */}
               <div ref={emojiRef} className={`absolute top-1/2 -translate-y-1/2 ${isOwn ? '-left-9' : '-right-9'} md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10`}>
                 <button
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   className="p-1.5 rounded-full bg-white shadow-md hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors"
+                  title="React"
+                  aria-label="React"
                 >
                   <SmilePlus size={14} />
                 </button>
               </div>
 
-              {/* Emoji picker popover */}
               {showEmojiPicker && (
                 <div className={`absolute z-50 top-full mt-1 ${isOwn ? 'right-0' : 'left-0'} bg-white rounded-2xl border border-slate-200 shadow-xl p-2 flex flex-wrap gap-1 w-[200px]`}>
                   {EMOJI_QUICK.map(emoji => (
@@ -210,15 +201,19 @@ const ChatMessage = memo(function ChatMessage({
           );
         })}
 
-        {/* Timestamp — only on last message in group */}
         {isLastInSequence && (
-          <p className={`text-[11px] text-slate-400 mt-0.5 px-1 ${isOwn ? 'text-right' : ''}`}>
-            {formatChatMessageTime(group.messages[group.messages.length - 1]?.timestamp)}
-          </p>
+          <div className={`mt-1 flex items-center gap-1 px-1 text-[10px] text-slate-400 ${isOwn ? 'justify-end text-right' : 'justify-start'}`}>
+            <span>{formatChatMessageTime(lastMessage?.timestamp)}</span>
+            {isOwn && (
+              <span className="inline-flex items-center gap-0.5 text-blue-400" title={readByOther ? 'Read' : 'Sent'}>
+                {readByOther ? <CheckCheck size={12} /> : <Check size={12} />}
+                <span>{readByOther ? 'Read' : 'Sent'}</span>
+              </span>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Image lightbox */}
       {previewImage && (
         <div
           className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4 cursor-pointer"
@@ -228,8 +223,9 @@ const ChatMessage = memo(function ChatMessage({
           <button
             onClick={() => setPreviewImage(null)}
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center hover:bg-white/30 transition"
+            aria-label="Close preview"
           >
-            ✕
+            <X size={20} />
           </button>
         </div>
       )}

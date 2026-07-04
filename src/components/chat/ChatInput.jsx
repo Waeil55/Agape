@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Send, Paperclip, Smile, Camera } from 'lucide-react';
+import { Send, Paperclip, Smile } from 'lucide-react';
 import { EMOJI_QUICK } from '../../utils/chatHelpers';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import app from '../../config/firebase';
@@ -32,13 +32,15 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
   const typingTimeoutRef = useRef(null);
   const currentUserUid = currentUser?.uid || '';
 
-  // Auto-grow textarea — max 4 lines (~120px)
-  useEffect(() => {
-    const el = textareaRef.current;
+  const resizeTextarea = useCallback((el) => {
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-  }, [text]);
+    el.style.height = '44px';
+    el.style.height = `${Math.min(el.scrollHeight, 112)}px`;
+  }, []);
+
+  useEffect(() => {
+    resizeTextarea(textareaRef.current);
+  }, [text, resizeTextarea]);
 
   const showUploadMessage = useCallback((msg) => {
     setUploadProgress(msg);
@@ -47,28 +49,24 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
 
   const handleTextChange = useCallback((e) => {
     setText(e.target.value);
+    resizeTextarea(e.target);
     onTyping?.();
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => onStopTyping?.(), 3000);
-  }, [onTyping, onStopTyping]);
+  }, [onTyping, onStopTyping, resizeTextarea]);
 
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed || uploading) return;
     onSend(trimmed);
     setText('');
-    onStopTyping?.();
     setShowEmoji(false);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.focus();
-    }
-  }, [text, uploading, onSend, onStopTyping]);
-
-  const handleSendPress = useCallback((e) => {
-    e.preventDefault();
-    handleSend();
-  }, [handleSend]);
+    onStopTyping?.();
+    requestAnimationFrame(() => {
+      resizeTextarea(textareaRef.current);
+      textareaRef.current?.focus();
+    });
+  }, [text, uploading, onSend, onStopTyping, resizeTextarea]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -82,7 +80,7 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
     if (file.size > MAX_UPLOAD_BYTES) { showUploadMessage('File too large (max 10 MB)'); return; }
     if (!isAllowedFile(file)) { showUploadMessage('File type not allowed'); return; }
     setUploading(true);
-    setUploadProgress(`Uploading ${file.name}…`);
+    setUploadProgress(`Uploading ${file.name}...`);
     let failed = false;
     try {
       const isImage = file.type.startsWith('image/');
@@ -129,31 +127,33 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
 
   return (
     <div
-      className={`agape-chat-input shrink-0 ${dragOver ? 'bg-blue-50' : 'bg-[#f0f2f5]'} transition-colors`}
+      className={`agape-chat-input shrink-0 border-t border-slate-200/80 ${dragOver ? 'bg-blue-50 border-blue-300' : 'bg-white/95'}`}
       style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom, 10px))' }}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      {/* Upload progress banner */}
       {uploadProgress && (
-        <div className="mx-3 mb-2 px-3 py-2 bg-blue-50 rounded-xl border border-blue-100 flex items-center gap-2">
-          {uploading && (
-            <div className="w-4 h-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0" />
-          )}
-          <span className="text-[12px] text-blue-700 font-medium">{uploadProgress}</span>
+        <div className="mx-3 mt-2 rounded-2xl bg-blue-50 border border-blue-100 px-3 py-2 flex items-center gap-2">
+          {uploading && <div className="w-4 h-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />}
+          <span className="text-[11px] text-blue-700 font-medium">{uploadProgress}</span>
         </div>
       )}
 
-      {/* Emoji picker */}
+      {dragOver && (
+        <div className="mx-3 mt-2 rounded-2xl bg-blue-50 border border-blue-200 px-4 py-2 text-center">
+          <p className="text-xs text-blue-600 font-semibold">Drop file to upload</p>
+        </div>
+      )}
+
       {showEmoji && (
-        <div className="mx-3 mb-2 p-2.5 bg-white rounded-2xl border border-slate-200 shadow-lg">
+        <div className="mx-3 mt-2 rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
           <div className="flex flex-wrap gap-1">
             {EMOJI_QUICK.map(emoji => (
               <button
                 key={emoji}
                 onClick={() => addEmoji(emoji)}
-                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-100 active:scale-90 text-2xl transition-all"
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-xl transition-colors"
               >
                 {emoji}
               </button>
@@ -162,15 +162,14 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
         </div>
       )}
 
-      {/* Composer row */}
-      <div className="flex items-end gap-2 px-3 py-2.5">
-        {/* Attachment */}
+      <div className="agape-chat-composer-row flex items-end gap-2 px-3 py-2.5">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:shadow-sm active:scale-90 disabled:opacity-40 transition-all"
+          className="agape-chat-icon-button flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 disabled:opacity-50 transition-colors"
           title="Attach file"
+          aria-label="Attach file"
         >
           <Paperclip size={21} />
         </button>
@@ -182,50 +181,40 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
           className="hidden"
         />
 
-        {/* Pill-shaped input field */}
-        <div className={`flex-1 min-w-0 flex items-end rounded-[24px] bg-white shadow-sm border transition-all duration-200 ${dragOver ? 'border-blue-300 bg-blue-50' : 'border-slate-200 focus-within:border-blue-300 focus-within:shadow-md'}`}>
-          {/* Emoji toggle inside pill */}
-          <button
-            type="button"
-            onClick={() => setShowEmoji(!showEmoji)}
-            className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full ml-0.5 transition-colors ${showEmoji ? 'text-amber-500' : 'text-slate-400 hover:text-slate-600'}`}
-          >
-            <Smile size={20} />
-          </button>
-
-          {/* Auto-growing textarea */}
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={handleTextChange}
-            onKeyDown={handleKeyDown}
-            placeholder={`Message ${channelName || ''}…`}
-            rows={1}
-            className="flex-1 min-w-0 bg-transparent outline-none resize-none text-[15px] text-slate-800 placeholder:text-slate-400 py-[10px] pr-2 leading-[1.45] overflow-y-auto"
-            style={{ fontFamily: 'inherit', maxHeight: 120 }}
-          />
+        <div className="flex-1 min-w-0 relative">
+          <div className="agape-chat-composer-pill flex items-end bg-slate-100 rounded-[26px] border border-slate-200 focus-within:border-blue-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
+              placeholder={`Message ${channelName || ''}...`}
+              rows={1}
+              className="agape-chat-textarea flex-1 min-h-[44px] max-h-[112px] bg-transparent px-4 py-[11px] text-[15px] font-medium text-slate-800 placeholder:text-slate-400 outline-none resize-none leading-snug overflow-y-auto"
+              style={{ minHeight: '44px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowEmoji(!showEmoji)}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full mr-1 mb-0.5 transition-colors ${showEmoji ? 'bg-amber-100 text-amber-500' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/60'}`}
+              title="Emoji"
+              aria-label="Emoji"
+            >
+              <Smile size={19} />
+            </button>
+          </div>
         </div>
 
-        {/* Send / Camera button */}
-        {canSend ? (
-          <button
-            type="button"
-            onPointerDown={handleSendPress}
-            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-blue-500 text-white shadow-md shadow-blue-500/40 hover:bg-blue-600 active:scale-90 transition-all"
-          >
-            <Send size={18} className="ml-0.5 mt-0.5" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:shadow-sm active:scale-90 disabled:opacity-40 transition-all"
-            title="Add photo"
-          >
-            <Camera size={21} />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={!canSend}
+          className="agape-chat-send-button flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-md shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+          title="Send"
+          aria-label="Send message"
+        >
+          <Send size={18} className="ml-0.5" />
+        </button>
       </div>
     </div>
   );

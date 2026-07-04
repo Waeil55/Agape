@@ -896,6 +896,17 @@ body:has(.agape-chat-page textarea:focus) .bottom-nav {
   }
 }
 
+.bottom-nav button:not(.text-blue-600):not([class*="text-[#2563eb]"]) {
+  color: #475569;
+}
+
+.messenger-nav-badge,
+.chat-unread-badge {
+  font-variant-numeric: tabular-nums;
+  transform-origin: center;
+  animation: badge-pulse 0.32s ease-out;
+}
+
 
 
 button,
@@ -1720,13 +1731,25 @@ body,
 .agape-chat-page {
   min-height: 0;
   height: 100%;
+  overflow: hidden;
+  --agape-chat-bottom-clearance: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
+.agape-chat-page,
+.agape-chat-page * {
+  max-width: none;
+}
+
+.agape-chat-header {
+  min-height: calc(60px + env(safe-area-inset-top, 0px));
 }
 
 .agape-chat-messages {
   overscroll-behavior: contain;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-  scroll-padding-bottom: 6rem;
+  scroll-padding-bottom: 1.25rem;
+  overflow-anchor: none;
 }
 .agape-chat-messages .break-words {
   word-break: break-word;
@@ -1735,7 +1758,7 @@ body,
 
 .agape-chat-input,
 .agape-chat-readonly-footer {
-  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+  padding-bottom: 0;
 }
 
 .agape-chat-input textarea,
@@ -1763,10 +1786,102 @@ body,
   border: none !important;
   box-shadow: none !important;
 }
+
+.agape-chat-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: fit-content;
+  max-width: min(78%, 34rem);
+}
+
+.agape-chat-bubble-stack {
+  width: fit-content;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.agape-chat-bubble-wrap {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.agape-chat-bubble {
+  display: inline-block;
+  min-width: 2.75rem;
+  max-width: 100%;
+  width: auto;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.agape-chat-text {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  text-wrap: pretty;
+  line-height: 1.45;
+}
+
+.agape-chat-composer-row {
+  min-height: 60px;
+}
+
+.agape-chat-composer-pill,
+.agape-chat-textarea {
+  transition: min-height 0.16s ease, height 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.agape-chat-icon-button,
+.agape-chat-send-button {
+  align-self: flex-end;
+}
+
+.agape-chat-attachment,
+.agape-chat-file,
+.agape-chat-media {
+  max-width: 100%;
+}
+
+.agape-chat-file {
+  min-width: min(12rem, 100%);
+}
+
+@media (max-width: 640px) {
+  .agape-chat-column {
+    min-width: 5rem;
+    max-width: min(80%, 28rem);
+  }
+}
 .agape-chat-input textarea::-webkit-scrollbar { display: none; }
 
 @media (max-width: 767px) {
-  .agape-chat-page { padding-bottom: 0; }
+  .agape-chat-page {
+    height: 100dvh;
+    max-height: 100dvh;
+    padding-bottom: 0;
+  }
+
+  @supports (height: 100svh) {
+    .agape-chat-page {
+      height: 100svh;
+      max-height: 100svh;
+    }
+  }
+
+  .agape-chat-input {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+  }
+
+  .agape-chat-messages {
+    padding-bottom: 0.75rem;
+  }
 }
 
 /* Bubble press animation */

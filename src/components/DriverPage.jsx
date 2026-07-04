@@ -643,6 +643,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     localStorage.setItem(`agape_drvHistFilter_${userKey}`, historyFilter);
     localStorage.setItem(`agape_drvHistSearch_${userKey}`, historySearch);
   }, [activeNav, historyFilter, historySearch, userKey]);
+
+  useEffect(() => {
+    const openChat = () => setActiveNav('chat');
+    if (sessionStorage.getItem('agape_open_chat_channel')) openChat();
+    window.addEventListener('agape:open-chat', openChat);
+    return () => window.removeEventListener('agape:open-chat', openChat);
+  }, []);
   const [selectedTrips, setSelectedTrips] = useState([]);
   const [routePlanStops, setRoutePlanStops] = useState(null);
   const [aiOptimizing, setAiOptimizing] = useState(false);
@@ -3316,7 +3323,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           onClick={() => setExpandedTripId(null)}
         />
       )}
-      {!(activeNav === 'active-trip' && activeWorkTrip) && (
+      {activeNav !== 'chat' && !(activeNav === 'active-trip' && activeWorkTrip) && (
         <div
           className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
           style={{ paddingTop: 'max(8px, env(safe-area-inset-top, 0px))' }}
@@ -6029,7 +6036,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         className={`transition-all duration-200 ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}
                       />
                       {item.badge > 0 && (
-                        <span key={item.badge} className="absolute -right-2.5 -top-2 badge-messenger badge-pop badge-pulse">
+                        <span key={item.badge} className="messenger-nav-badge absolute -right-2.5 -top-2 badge-messenger badge-pop badge-pulse">
                           {item.badge > 99 ? '99+' : item.badge}
                         </span>
                       )}

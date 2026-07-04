@@ -269,6 +269,13 @@ const DesktopEnterpriseDashboard = ({
 
   const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
 
+  useEffect(() => {
+    const openChat = () => setActivePanel('chat');
+    if (sessionStorage.getItem('agape_open_chat_channel')) openChat();
+    window.addEventListener('agape:open-chat', openChat);
+    return () => window.removeEventListener('agape:open-chat', openChat);
+  }, [setActivePanel]);
+
   const sidebarItems = [
     { id: 'operations', label: 'Dispatch', icon: LayoutDashboard, roles: ['admin', 'dispatcher'] },
     { id: 'drive', label: 'Drive', icon: Truck, roles: ['admin', 'dispatcher'] },
@@ -482,7 +489,7 @@ const DesktopEnterpriseDashboard = ({
                 <span className="relative inline-flex">
                   <Icon size={13} />
                   {item.badge > 0 && (
-                    <span key={item.badge} className="absolute -right-2.5 -top-2 badge-messenger badge-pop badge-pulse">
+                    <span key={item.badge} className="messenger-nav-badge absolute -right-2.5 -top-2 badge-messenger badge-pop badge-pulse">
                       {item.badge > 99 ? '99+' : item.badge}
                     </span>
                   )}
