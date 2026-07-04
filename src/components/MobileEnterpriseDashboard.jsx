@@ -217,7 +217,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'chat') {
       return (
         <div className="mobile-chat-wrapper flex-1 overflow-hidden flex flex-col">
-          {!isChatThreadOpen && renderTopBar('Messages')}
+          {renderTopBar('Messages')}
           <ErrorBoundary><Suspense fallback={<MobileFallback />}><ChatPage onBack={() => setCurrentView('trips')} onThreadActiveChange={setIsChatThreadOpen} /></Suspense></ErrorBoundary>
         </div>
       );

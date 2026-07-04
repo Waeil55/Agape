@@ -310,41 +310,6 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
 
   const renderSidebar = () => (
     <div className="flex h-full w-full min-h-0 flex-col bg-white">
-      {/* Mobile Top Bar (consistent with other app sections) */}
-      <div className="hidden px-4 py-3 items-center justify-between bg-white border-b border-slate-100 shrink-0">
-        <div className="flex items-center gap-3">
-          {onBack && (
-            <button 
-              type="button"
-              onClick={onBack} 
-              className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-1.5 mr-1 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 touch-manipulation"
-            >
-              <ChevronLeft size={20} />
-            </button>
-          )}
-          <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-semibold border border-blue-100 shrink-0">
-            <span className="text-xs">
-              {chat.currentUser.role === 'admin' ? 'AD' : chat.currentUser.role === 'driver' ? 'DR' : 'DS'}
-            </span>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-bold text-sm text-gray-900 flex items-center gap-1.5 leading-none">
-                Messages
-                {chat.totalUnread > 0 && (
-                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white leading-none">
-                    {chat.totalUnread > 99 ? '99+' : chat.totalUnread}
-                  </span>
-                )}
-              </h1>
-            </div>
-            <p className="text-[10px] text-gray-500 font-medium truncate max-w-[220px] mt-0.5">
-              {chat.currentUser.email}
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Desktop Header */}
       <div className="hidden md:block agape-chat-sidebar-header shrink-0 bg-white border-b border-slate-100">
         <div className="flex items-center gap-2 px-4 pt-4 pb-3 md:pt-3">
