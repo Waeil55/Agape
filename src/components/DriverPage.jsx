@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateRecent } from '../utils/tripDate';
-import { auth, db, doc, getDocFromServer, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, updateDriverProfile, onSnapshot } from '../config/firebase';
+import { auth, db, doc, getDocFromServer, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, updateDriverProfile, onSnapshot, collection, addDoc, serverTimestamp } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
@@ -21,6 +21,7 @@ import {
   Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair
 } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
+import { TIME_TRACKING_STATES, classifyGap } from '../utils/timeTracking';
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
 const ChatPage = lazy(() => import('./chat/ChatPage'));
@@ -30,6 +31,7 @@ import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES }
 import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
+const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
 const isWillCall = (trip) => {
@@ -750,6 +752,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [assignedSequence, setAssignedSequence] = useState(null);
   const [showAssignedRouteDetails, setShowAssignedRouteDetails] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [showTTAdmin, setShowTTAdmin] = useState(false);
   const displayLoginId = useMemo(
     () => String(me?.email || currentUser || '').replace(/@auth\.agapecare\.local$/i, ''),
     [me?.email, currentUser]
@@ -1006,7 +1009,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       playNotificationSound();
       showLocalNotification(`🚨 ${level}: ${t.patient}`, `${t.time} — ${t.pickup} → ${t.dropoff}`);
     });
-  }, [orderedTrips]);
+  }, [trips]);
 
   const setUndoable = (trip, previousStatus, newStatus) => {
     if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
@@ -1305,6 +1308,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   ), [routeTemplates, me?.id, me?.email, currentUser]);
 
   const isClockedIn = me?.clockedIn || false;
+  const TT = TIME_TRACKING_STATES;
+  const [ttState, setTtState] = useState(TT.OFF_SHIFT);
+  const ttStateRef = useRef(TT.OFF_SHIFT);
+  const [ttBillableMin, setTtBillableMin] = useState(0);
+  const [ttBreakMin, setTtBreakMin] = useState(0);
+  const ttBreakStartRef = useRef(null);
+  const ttClockInTimeRef = useRef(null);
+  const ttLastTripEventRef = useRef(null);
+  const ttEventsLogRef = useRef([]);
+  const ttTickRef = useRef(null);
   const [showIdleLogoutPrompt, setShowIdleLogoutPrompt] = useState(false);
   const idlePromptedRef = useRef(false);
   const [showClockOutOffer, setShowClockOutOffer] = useState(false);
@@ -1313,88 +1326,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const pendingClockOutRef = useRef(null);
   const clockOutOfferedRef = useRef(false);
   const [editHomeAddress, setEditHomeAddress] = useState(me?.homeAddress || '');
-
-  // ─── TIME TRACKING (inlined to avoid TDZ from separate module) ──
-  const TT_STATES = { OFF: 'OFF', ACTIVE: 'ACTIVE', BREAK: 'BREAK' };
-  const [ttState, setTtState] = useState(TT_STATES.OFF);
-  const [ttSession, setTtSession] = useState(null);
-  const [ttBillableMin, setTtBillableMin] = useState(0);
-  const [ttBreakMin, setTtBreakMin] = useState(0);
-  const ttBreakStartRef = useRef(null);
-  const ttStateRef = useRef(TT_STATES.OFF);
-  useEffect(() => { ttStateRef.current = ttState; }, [ttState]);
-
-  const timeTracking = useMemo(() => ({
-    isOffShift: ttState === TT_STATES.OFF,
-    isActive: ttState === TT_STATES.ACTIVE,
-    isOnBreak: ttState === TT_STATES.BREAK,
-    hasActiveSession: ttSession != null,
-    billableMinutes: ttBillableMin,
-    breakMinutes: ttBreakMin,
-    billableHours: Math.round((ttBillableMin / 60) * 10) / 10,
-    breakHours: Math.round((ttBreakMin / 60) * 10) / 10,
-    startBreak: () => {
-      if (ttStateRef.current !== TT_STATES.ACTIVE) return;
-      ttBreakStartRef.current = new Date().toISOString();
-      setTtState(TT_STATES.BREAK);
-      setTtSession(prev => prev ? { ...prev, events: [...prev.events, { type: 'BREAK_START', timestamp: ttBreakStartRef.current }] } : prev);
-    },
-    resumeWork: () => {
-      if (ttStateRef.current !== TT_STATES.BREAK) return;
-      const now = new Date().toISOString();
-      if (ttBreakStartRef.current) {
-        const dur = (new Date(now) - new Date(ttBreakStartRef.current)) / 60000;
-        setTtSession(prev => prev ? { ...prev, events: [...prev.events, { type: 'BREAK_END', timestamp: now }], breakMinutes: (prev.breakMinutes || 0) + dur } : prev);
-        setTtBreakMin(prev => prev + dur);
-      }
-      setTtState(TT_STATES.ACTIVE);
-      ttBreakStartRef.current = null;
-    },
-    clockOut: (reason = 'MANUAL') => {
-      const now = new Date().toISOString();
-      setTtSession(prev => {
-        if (!prev) return null;
-        return { ...prev, events: [...prev.events, { type: 'CLOCK_OUT', timestamp: now, reason }], clockOutTime: now, isOpen: false };
-      });
-      setTtState(TT_STATES.OFF);
-    },
-    handleTripEvent: (eventType, trip) => {
-      if (ttStateRef.current === TT_STATES.OFF) return;
-      setTtSession(prev => {
-        if (!prev) return prev;
-        const event = { type: 'TRIP_EVENT', eventType, timestamp: new Date().toISOString(), tripId: trip?.id, patient: trip?.patient };
-        return { ...prev, events: [...prev.events, event] };
-      });
-    },
-    handleTripArrival: (trip) => {
-      if (ttStateRef.current !== TT_STATES.OFF) return;
-      const now = new Date().toISOString();
-      const session = {
-        sessionId: `session_${Date.now()}`,
-        clockInTime: now,
-        clockInLocation: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null,
-        events: [{ type: 'TRIP_EVENT', eventType: 'AUTO_CLOCK_IN', timestamp: now, tripId: trip?.id, patient: trip?.patient }],
-        breakMinutes: 0,
-      };
-      setTtSession(session);
-      setTtState(TT_STATES.ACTIVE);
-      ttBreakStartRef.current = null;
-      setTtBillableMin(0);
-      setTtBreakMin(0);
-    },
-    handleDispatcherTrip: (trip) => {
-      if (ttStateRef.current !== TT_STATES.BREAK) return;
-      setTtState(TT_STATES.ACTIVE);
-      ttBreakStartRef.current = null;
-      setTimeout(() => {
-        if (ttStateRef.current === TT_STATES.OFF) {
-          const now = new Date().toISOString();
-          setTtSession({ sessionId: `session_${Date.now()}`, clockInTime: now, clockInLocation: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null, events: [{ type: 'TRIP_EVENT', eventType: 'AUTO_CLOCK_IN', timestamp: now, tripId: trip?.id }], breakMinutes: 0 });
-          setTtState(TT_STATES.ACTIVE);
-        }
-      }, 100);
-    },
-  }), [ttState, ttSession, ttBillableMin, ttBreakMin, driverPosition]);
 
   const driverId = me?.id || (() => {
     const normalizedEmail = String(currentUser || '').trim().toLowerCase();
@@ -1459,10 +1390,29 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       setDelayedClockOutTarget('');
       setShowClockOutOffer(false);
       clockOutOfferedRef.current = false;
-      timeTracking.clockOut('MANUAL');
+      // Persist time tracking session to Firestore
+      if (ttEventsLogRef.current.length > 0) {
+        const events = [...ttEventsLogRef.current];
+        const clockIn = events.find(e => e.type === 'CLOCK_IN');
+        const clockOutEv = events.find(e => e.type === 'CLOCK_OUT');
+        addDoc(collection(db, 'timeTrackingSessions'), {
+          driverId: driverId || driverId,
+          driverEmail: currentUser || '',
+          driverName: me?.name || '',
+          date: new Date().toISOString().slice(0, 10),
+          clockIn: clockIn?.timestamp || null,
+          clockInLocation: clockIn?.location || null,
+          clockOut: clockOutEv?.timestamp || null,
+          clockOutLocation: clockOutEv?.location || null,
+          billableMinutes: ttBillableMin,
+          breakMinutes: ttBreakMin,
+          events,
+          createdAt: serverTimestamp(),
+        }).catch(() => {});
+      }
       setShowToast({ type: 'info', message: 'Clocked out — trips are now read-only.' });
     }
-  }, [isClockedIn, driverId, onDriverStatusUpdate, driverPosition?.lat, driverPosition?.lng, timeTracking]);
+  }, [isClockedIn, driverId, onDriverStatusUpdate, driverPosition?.lat, driverPosition?.lng, currentUser, me?.name, ttBillableMin, ttBreakMin]);
 
   const estimateClockOutFromHome = useCallback(async () => {
     if (!driverPosition?.lat || !driverPosition?.lng || !me?.homeLat || !me?.homeLng) {
@@ -1520,8 +1470,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       return;
     }
     pendingClockOutRef.current = setTimeout(() => {
-      onDriverStatusUpdate?.(driverId, false);
-      setShowToast({ type: 'info', message: `Auto clock-out at ${targetTime24} — shift ended.` });
+      if (isClockedIn) {
+        onDriverStatusUpdate?.(driverId, false);
+        setShowToast({ type: 'info', message: `Auto clock-out at ${targetTime24} — shift ended.` });
+      }
       pendingClockOutRef.current = null;
       setDelayedClockOutTarget('');
       setShowClockOutOffer(false);
@@ -1535,7 +1487,88 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   useEffect(() => {
     return () => {
       if (pendingClockOutRef.current) clearTimeout(pendingClockOutRef.current);
+      if (ttTickRef.current) clearInterval(ttTickRef.current);
     };
+  }, []);
+
+  // ─── TIME TRACKING: sync clock-in/out with TT state ───
+  useEffect(() => {
+    if (isClockedIn && ttStateRef.current === TT.OFF_SHIFT) {
+      const now = new Date().toISOString();
+      setTtState(TT.ON_SHIFT_ACTIVE);
+      ttStateRef.current = TT.ON_SHIFT_ACTIVE;
+      ttClockInTimeRef.current = now;
+      ttEventsLogRef.current = [{ type: 'CLOCK_IN', timestamp: now, location: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null }];
+      setTtBillableMin(0);
+      setTtBreakMin(0);
+      ttBreakStartRef.current = null;
+      ttLastTripEventRef.current = null;
+    } else if (!isClockedIn && ttStateRef.current !== TT.OFF_SHIFT) {
+      if (ttTickRef.current) { clearInterval(ttTickRef.current); ttTickRef.current = null; }
+      const now = new Date().toISOString();
+      ttEventsLogRef.current.push({ type: 'CLOCK_OUT', timestamp: now, location: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null });
+      setTtState(TT.OFF_SHIFT);
+      ttStateRef.current = TT.OFF_SHIFT;
+      ttClockInTimeRef.current = null;
+      setTtBillableMin(0);
+      setTtBreakMin(0);
+    }
+  }, [isClockedIn, driverPosition?.lat, driverPosition?.lng]);
+
+  // ─── TIME TRACKING: tick billable minutes every 60s while ON_SHIFT_ACTIVE ───
+  useEffect(() => {
+    if (ttStateRef.current === TT.ON_SHIFT_ACTIVE) {
+      if (ttTickRef.current) clearInterval(ttTickRef.current);
+      ttTickRef.current = setInterval(() => {
+        if (ttStateRef.current === TT.ON_SHIFT_ACTIVE) {
+          setTtBillableMin(prev => prev + 1);
+        }
+      }, 60000);
+    }
+    return () => { if (ttTickRef.current) { clearInterval(ttTickRef.current); ttTickRef.current = null; } };
+  }, [ttState]);
+
+  // ─── TIME TRACKING: break, resume, end shift handlers ───
+  const ttStartBreak = useCallback(() => {
+    if (ttStateRef.current !== TT.ON_SHIFT_ACTIVE) return;
+    const now = new Date().toISOString();
+    setTtState(TT.ON_BREAK);
+    ttStateRef.current = TT.ON_BREAK;
+    ttBreakStartRef.current = now;
+    ttEventsLogRef.current.push({ type: 'BREAK_START', timestamp: now });
+    setShowToast({ type: 'info', message: 'Break started — time paused.' });
+  }, []);
+
+  const ttResume = useCallback(() => {
+    if (ttStateRef.current !== TT.ON_BREAK) return;
+    const now = new Date().toISOString();
+    if (ttBreakStartRef.current) {
+      const breakMs = new Date(now) - new Date(ttBreakStartRef.current);
+      const breakMin = Math.round(breakMs / 60000);
+      setTtBreakMin(prev => prev + breakMin);
+    }
+    ttEventsLogRef.current.push({ type: 'BREAK_END', timestamp: now, breakDurationMin: ttBreakStartRef.current ? Math.round((new Date(now) - new Date(ttBreakStartRef.current)) / 60000) : 0 });
+    ttBreakStartRef.current = null;
+    setTtState(TT.ON_SHIFT_ACTIVE);
+    ttStateRef.current = TT.ON_SHIFT_ACTIVE;
+    setShowToast({ type: 'success', message: 'Break ended — back on shift.' });
+  }, []);
+
+  const ttEndShift = useCallback(() => {
+    handleClockToggle();
+  }, [handleClockToggle]);
+
+  const ttLogTripEvent = useCallback((eventType, tripId, location) => {
+    const now = new Date().toISOString();
+    const prev = ttLastTripEventRef.current;
+    if (prev) {
+      const gap = classifyGap(prev.timestamp, now, prev.location, location);
+      ttEventsLogRef.current.push({ ...gap.auditRecord, eventType: 'GAP_CLASSIFIED', sessionId: 'live' });
+    }
+    const evt = { type: 'TRIP_EVENT', eventType, timestamp: now, tripId, location: location || null };
+    ttEventsLogRef.current.push(evt);
+    ttLastTripEventRef.current = evt;
+    setTtBillableMin(prev => prev + 1);
   }, []);
 
   // Idle logout prompt — when no trips for 30s while clocked in
@@ -1606,41 +1639,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       setShowToast({ type: 'info', message: 'Looks like you\'re near home! Clock out to end your shift.', action: 'geofence-clockout' });
     }
   }, [isClockedIn, driverPosition?.lat, driverPosition?.lng, me?.homeLat, me?.homeLng, activeTrips.length]);
-
-  // Time tracking: auto clock-in on first trip arrival
-  const timeTrackingInitRef = useRef(false);
-  useEffect(() => {
-    if (!isClockedIn || !timeTracking.isOffShift || timeTrackingInitRef.current) return;
-    const today = getTodayStr();
-    const todayTrips = driverScopedTrips.filter(t =>
-      t.date === today && t.driverId === driverId
-    );
-    const firstArrivedTrip = todayTrips.find(t =>
-      t.status === 'At Pickup' || t.status === 'In Transit' || t.status === 'Navigating Dropoff' || t.status === 'At Dropoff' || t.status === 'Arrived'
-    );
-    if (firstArrivedTrip) {
-      timeTrackingInitRef.current = true;
-      timeTracking.handleTripArrival(firstArrivedTrip);
-    }
-  }, [isClockedIn, timeTracking, driverScopedTrips, driverId, getTodayStr]);
-
-  // Time tracking: handle dispatcher-added trip during break → auto resume
-  useEffect(() => {
-    if (!timeTracking.isOnBreak) return;
-    const prevCount = driverScopedTrips.length;
-    const timer = setTimeout(() => {
-      if (driverScopedTrips.length > prevCount && timeTracking.isOnBreak) {
-        const newTrip = driverScopedTrips.find(t =>
-          !['Completed', 'Cancelled', 'No Show'].includes(t.status)
-        );
-        if (newTrip) {
-          timeTracking.handleDispatcherTrip(newTrip);
-          setShowToast({ type: 'info', message: 'New trip added — resuming from break.' });
-        }
-      }
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [driverScopedTrips.length]);
 
   // Detect ride-sharing opportunities — deduplicated, max 3
   useEffect(() => {
@@ -2250,7 +2248,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       arrivalTime: nowIso,
       startTime: nowIso,
     });
-    timeTracking.handleTripEvent('TRIP_ARRIVED_PICKUP', showOdometerPrompt);
+    if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
+      ttLogTripEvent('TRIP_ARRIVED_PICKUP', showOdometerPrompt.id, driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null);
+    }
     setLastOdometer(odo);
     setShowOdometerPrompt(null);
     setOdometerValue('');
@@ -2258,11 +2258,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const handleArriveDropoff = (trip) => {
     setUndoable(trip, trip.status, 'At Dropoff');
-    // Record dropoff arrival in the dedicated field (was incorrectly overwriting pickup arrival)
     advanceWorkflow(trip, 'At Dropoff', {
       arrivalDropoffTime: new Date().toISOString(),
     });
-    timeTracking.handleTripEvent('TRIP_ARRIVED_DROPOFF', trip);
+    if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
+      ttLogTripEvent('TRIP_ARRIVED_DROPOFF', trip.id, driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null);
+    }
   };
 
   const handleSkipNav = (trip) => {
@@ -2297,7 +2298,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       departedPickupTime: new Date().toISOString(),
       paperSignatureConfirmed: true,
     });
-    timeTracking.handleTripEvent('TRIP_DEPARTED_PICKUP', showSignatureConfirm);
+    if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
+      ttLogTripEvent('TRIP_DEPARTED_PICKUP', showSignatureConfirm.id, driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null);
+    }
     setShowSignatureConfirm(null);
     setSignatureConfirmed(false);
   };
@@ -2574,7 +2577,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         if (editedData) {
           const odo = parseInt(editedData.dropoffOdometer, 10) || 0;
           advanceWorkflow(trip, 'Completed', { ...editedData, completedVehicle: me?.vehicle || '' });
-          timeTracking.handleTripEvent('TRIP_COMPLETED', trip);
           setShowTripDetails(prev => (prev?.id === trip.id ? { ...prev, ...editedData, status: 'Completed', completedVehicle: me?.vehicle || '' } : prev));
           if (onAddAuditLog) {
             onAddAuditLog('Trip Completed via Edit', `${currentUser} completed trip for ${trip.patient} (odo: ${odo.toLocaleString()} mi).`, 'emerald');
@@ -2659,10 +2661,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       dropoffOdometer: odo,
       completedAt: now,
       departedPickupTime: toIso(departedTime),
-      arrivalDropoffTime: toIso(arrivalDropoffTime),
+      arrivalDropoffTime: showCompleteModal.arrivalDropoffTime ? showCompleteModal.arrivalDropoffTime : toIso(arrivalDropoffTime),
       completedVehicle: me?.vehicle || '',
     });
-    timeTracking.handleTripEvent('TRIP_COMPLETED', showCompleteModal);
+    if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
+      ttLogTripEvent('TRIP_COMPLETED', showCompleteModal.id, null);
+    }
     setLastOdometer(odo);
     setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
     setShowCompleteModal(null);
@@ -3178,51 +3182,30 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       )}
 
       {/* ===== TIME TRACKING STATUS BAR ===== */}
-      {isClockedIn && timeTracking.hasActiveSession && (
-        <div className="sticky top-0 z-20 bg-white border-b border-slate-100 px-3 py-2 flex items-center gap-3 shadow-sm">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className={`w-2 h-2 rounded-full shrink-0 ${timeTracking.isOnBreak ? 'bg-yellow-500 animate-pulse' : 'bg-emerald-500'}`} />
-            <span className="text-xs font-semibold text-slate-700">
-              {timeTracking.isOnBreak ? 'On Break' : 'Active'}
-            </span>
-            <span className="text-xs text-slate-400">·</span>
-            <span className="text-xs font-mono text-slate-600">
-              {Math.floor(timeTracking.billableHours)}h {Math.round((timeTracking.billableMinutes % 60))}m billable
-            </span>
-            {timeTracking.breakMinutes > 0 && (
-              <>
-                <span className="text-xs text-slate-400">·</span>
-                <span className="text-xs text-yellow-600">
-                  {Math.floor(timeTracking.breakHours)}h {Math.round((timeTracking.breakMinutes % 60))}m break
-                </span>
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {timeTracking.isOnBreak ? (
-              <button
-                type="button"
-                onClick={timeTracking.resumeWork}
-                className="h-7 px-3 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold active:bg-emerald-700 transition-colors flex items-center gap-1"
-              >
-                <Play size={12} /> Resume
-              </button>
+      {isClockedIn && ttState !== TT.OFF_SHIFT && (
+        <div className={`mx-3 mt-2 rounded-xl px-3 py-2 flex items-center gap-2 text-[11px] font-semibold border ${
+          ttState === TT.ON_BREAK
+            ? 'bg-amber-50 border-amber-200 text-amber-800'
+            : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+        }`}>
+          <div className={`w-2 h-2 rounded-full shrink-0 ${ttState === TT.ON_BREAK ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+          <span className="uppercase tracking-wider">{ttState === TT.ON_BREAK ? 'On Break' : 'Active'}</span>
+          <span className="text-slate-400">·</span>
+          <Clock size={11} />
+          <span>{Math.floor(ttBillableMin / 60)}h {ttBillableMin % 60}m</span>
+          {ttBreakMin > 0 && (
+            <>
+              <span className="text-slate-400">·</span>
+              <span>Break {ttBreakMin}m</span>
+            </>
+          )}
+          <div className="ml-auto flex gap-1.5">
+            {ttState === TT.ON_SHIFT_ACTIVE ? (
+              <button onClick={ttStartBreak} className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors text-[10px] font-bold">Break</button>
             ) : (
-              <button
-                type="button"
-                onClick={timeTracking.startBreak}
-                className="h-7 px-3 rounded-lg bg-yellow-500 text-white text-[11px] font-semibold active:bg-yellow-600 transition-colors flex items-center gap-1"
-              >
-                <Pause size={12} /> Break
-              </button>
+              <button onClick={ttResume} className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors text-[10px] font-bold">Resume</button>
             )}
-            <button
-              type="button"
-              onClick={() => timeTracking.clockOut('MANUAL')}
-              className="h-7 px-3 rounded-lg bg-rose-500 text-white text-[11px] font-semibold active:bg-rose-600 transition-colors flex items-center gap-1"
-            >
-              <LogOut size={12} /> End Shift
-            </button>
+            <button onClick={ttEndShift} className="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 transition-colors text-[10px] font-bold">End Shift</button>
           </div>
         </div>
       )}
@@ -3231,7 +3214,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {activeNav === 'active-trip' && activeWorkTrip && (
         <div
           ref={tripsScrollRef}
-          className="flex-1 overflow-y-auto overscroll-contain bg-[#F3F4F6]"
+          className="flex-1 overflow-y-auto bg-[#F3F4F6]"
           style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
         >
           {renderTripWorkPage(activeWorkTrip)}
@@ -3242,7 +3225,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && (
         <div
           ref={tripsScrollRef}
-          className="flex-1 overflow-y-auto overscroll-contain pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-3 pt-2 space-y-2 bg-[#F3F4F6]"
+          className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F3F4F6]"
           style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
         >
             <>
@@ -4546,7 +4529,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <button type="button" onClick={() => setShowTripDetails(null)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90 cursor-pointer"><X size={18} /></button>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {(() => {
               const statusMeta = getHistoryStatusMeta(showTripDetails.status);
               return (
@@ -4753,7 +4736,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== HISTORY PAGE ===== */}
       {activeNav === 'history' && (
-        <div className="flex-1 overflow-y-auto overscroll-contain pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-3 pt-2">
+        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
           <div className="px-1 pt-2 pb-2">
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap">
 
@@ -5018,7 +5001,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== SETTINGS PAGE ===== */}
       {activeNav === 'settings' && (
-        <div className="flex-1 overflow-y-auto overscroll-contain pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-3 pt-2">
+        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
           <div className="px-1 pt-2 pb-3">
             <h2 className="text-xl font-semibold text-slate-900">Settings</h2>
             <p className="text-slate-500 text-xs font-semibold mt-0.5">Account and app preferences</p>
@@ -5341,6 +5324,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
             </div>
 
+            {/* Time Tracking Admin (admin/dispatcher only) */}
+            {(role === 'admin' || role === 'dispatcher') && (
+              <button onClick={() => setShowTTAdmin(true)} className="w-full flex items-center justify-between px-4 py-3.5 bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:bg-blue-50/50 transition-all">
+                <div className="flex items-center gap-3">
+                  <BarChart3 size={17} className="text-blue-500" />
+                  <span className="font-medium text-sm text-slate-700">Time Tracking Audit</span>
+                </div>
+                <ChevronRight size={15} className="text-slate-300" />
+              </button>
+            )}
+
             {/* Sign Out */}
             <button onClick={() => onLogout?.()} className="w-full flex items-center justify-between px-4 py-3.5 bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:bg-rose-50/50 transition-all">
               <div className="flex items-center gap-3">
@@ -5350,6 +5344,21 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <ChevronRight size={15} className="text-slate-300" />
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ===== TIME TRACKING ADMIN ===== */}
+      {showTTAdmin && (
+        <div className="fixed inset-0 bg-white z-[200] overflow-y-auto">
+          <Suspense fallback={<div className="h-full flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
+            <LazyTimeTrackingAdmin
+              onBack={() => setShowTTAdmin(false)}
+              drivers={allDrivers}
+              trips={driverScopedTrips}
+              clockEvents={me?.clockEvents || []}
+              timeData={ttEventsLogRef.current.length > 0 ? { events: ttEventsLogRef.current, billableMinutes: ttBillableMin, breakMinutes: ttBreakMin } : null}
+            />
+          </Suspense>
         </div>
       )}
 
