@@ -416,7 +416,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
   const renderChatArea = () => {
     if (!chat.activeChannel) return renderEmptyState();
     return (
-      <div className="agape-chat-conversation flex h-full min-h-0 flex-col bg-white">
+      <div className="agape-chat-conversation flex h-full w-full min-h-0 flex-col bg-white">
         <div className="agape-chat-header shrink-0 bg-white border-b border-slate-200/80 px-3">
           <div className="agape-chat-header-inner flex items-center gap-2">
             <button
