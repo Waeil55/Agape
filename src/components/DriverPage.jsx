@@ -28,7 +28,6 @@ import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisp
 import { normalizeEmail } from '../utils/accessControl';
 import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
 import { getDriverLiveStatus } from '../constants/statuses';
-import { useTimeTracking } from '../hooks/useTimeTracking';
 import ErrorBoundary from './ErrorBoundary';
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
@@ -1315,16 +1314,87 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const clockOutOfferedRef = useRef(false);
   const [editHomeAddress, setEditHomeAddress] = useState(me?.homeAddress || '');
 
-  const timeTracking = useTimeTracking({
-    driverId: me?.id,
-    driver: me,
-    trips: driverScopedTrips,
-    clockEvents: me?.clockEvents || [],
-    currentPosition: driverPosition,
-    onStatusChange: (evt) => {
-      console.log('[TimeTracking] event:', evt.type, evt);
+  // ─── TIME TRACKING (inlined to avoid TDZ from separate module) ──
+  const TT_STATES = { OFF: 'OFF', ACTIVE: 'ACTIVE', BREAK: 'BREAK' };
+  const [ttState, setTtState] = useState(TT_STATES.OFF);
+  const [ttSession, setTtSession] = useState(null);
+  const [ttBillableMin, setTtBillableMin] = useState(0);
+  const [ttBreakMin, setTtBreakMin] = useState(0);
+  const ttBreakStartRef = useRef(null);
+  const ttStateRef = useRef(TT_STATES.OFF);
+  useEffect(() => { ttStateRef.current = ttState; }, [ttState]);
+
+  const timeTracking = useMemo(() => ({
+    isOffShift: ttState === TT_STATES.OFF,
+    isActive: ttState === TT_STATES.ACTIVE,
+    isOnBreak: ttState === TT_STATES.BREAK,
+    hasActiveSession: ttSession != null,
+    billableMinutes: ttBillableMin,
+    breakMinutes: ttBreakMin,
+    billableHours: Math.round((ttBillableMin / 60) * 10) / 10,
+    breakHours: Math.round((ttBreakMin / 60) * 10) / 10,
+    startBreak: () => {
+      if (ttStateRef.current !== TT_STATES.ACTIVE) return;
+      ttBreakStartRef.current = new Date().toISOString();
+      setTtState(TT_STATES.BREAK);
+      setTtSession(prev => prev ? { ...prev, events: [...prev.events, { type: 'BREAK_START', timestamp: ttBreakStartRef.current }] } : prev);
     },
-  });
+    resumeWork: () => {
+      if (ttStateRef.current !== TT_STATES.BREAK) return;
+      const now = new Date().toISOString();
+      if (ttBreakStartRef.current) {
+        const dur = (new Date(now) - new Date(ttBreakStartRef.current)) / 60000;
+        setTtSession(prev => prev ? { ...prev, events: [...prev.events, { type: 'BREAK_END', timestamp: now }], breakMinutes: (prev.breakMinutes || 0) + dur } : prev);
+        setTtBreakMin(prev => prev + dur);
+      }
+      setTtState(TT_STATES.ACTIVE);
+      ttBreakStartRef.current = null;
+    },
+    clockOut: (reason = 'MANUAL') => {
+      const now = new Date().toISOString();
+      setTtSession(prev => {
+        if (!prev) return null;
+        return { ...prev, events: [...prev.events, { type: 'CLOCK_OUT', timestamp: now, reason }], clockOutTime: now, isOpen: false };
+      });
+      setTtState(TT_STATES.OFF);
+    },
+    handleTripEvent: (eventType, trip) => {
+      if (ttStateRef.current === TT_STATES.OFF) return;
+      setTtSession(prev => {
+        if (!prev) return prev;
+        const event = { type: 'TRIP_EVENT', eventType, timestamp: new Date().toISOString(), tripId: trip?.id, patient: trip?.patient };
+        return { ...prev, events: [...prev.events, event] };
+      });
+    },
+    handleTripArrival: (trip) => {
+      if (ttStateRef.current !== TT_STATES.OFF) return;
+      const now = new Date().toISOString();
+      const session = {
+        sessionId: `session_${Date.now()}`,
+        clockInTime: now,
+        clockInLocation: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null,
+        events: [{ type: 'TRIP_EVENT', eventType: 'AUTO_CLOCK_IN', timestamp: now, tripId: trip?.id, patient: trip?.patient }],
+        breakMinutes: 0,
+      };
+      setTtSession(session);
+      setTtState(TT_STATES.ACTIVE);
+      ttBreakStartRef.current = null;
+      setTtBillableMin(0);
+      setTtBreakMin(0);
+    },
+    handleDispatcherTrip: (trip) => {
+      if (ttStateRef.current !== TT_STATES.BREAK) return;
+      setTtState(TT_STATES.ACTIVE);
+      ttBreakStartRef.current = null;
+      setTimeout(() => {
+        if (ttStateRef.current === TT_STATES.OFF) {
+          const now = new Date().toISOString();
+          setTtSession({ sessionId: `session_${Date.now()}`, clockInTime: now, clockInLocation: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null, events: [{ type: 'TRIP_EVENT', eventType: 'AUTO_CLOCK_IN', timestamp: now, tripId: trip?.id }], breakMinutes: 0 });
+          setTtState(TT_STATES.ACTIVE);
+        }
+      }, 100);
+    },
+  }), [ttState, ttSession, ttBillableMin, ttBreakMin, driverPosition]);
 
   const driverId = me?.id || (() => {
     const normalizedEmail = String(currentUser || '').trim().toLowerCase();
