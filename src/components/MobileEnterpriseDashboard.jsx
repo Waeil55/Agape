@@ -28,6 +28,7 @@ const MobileEnterpriseDashboard = (props) => {
   const { trips = [], drivers = [], dispatchers = [], currentUser, role, onLogout, chatUnreadCount = 0 } = props;
   const [currentView, setCurrentView] = useState('trips');
   const [subView, setSubView] = useState(null); // admin, reports, settings, archives
+  const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const driverWorkDrivers = props.driverWorkDrivers?.length ? props.driverWorkDrivers : drivers;
   const driverWorkTrips = props.driverWorkTrips?.length ? props.driverWorkTrips : trips;
@@ -216,7 +217,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'chat') {
       return (
         <div className="mobile-chat-wrapper flex-1 overflow-hidden flex flex-col">
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ChatPage onBack={() => setCurrentView('trips')} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ChatPage onBack={() => setCurrentView('trips')} onThreadActiveChange={setIsChatThreadOpen} /></Suspense></ErrorBoundary>
         </div>
       );
     }
@@ -326,13 +327,13 @@ const MobileEnterpriseDashboard = (props) => {
   return (
     <div
       className="mobile-enterprise-dashboard-wrapper w-full h-[100dvh] bg-white flex flex-col relative overflow-hidden"
-      style={{ paddingBottom: currentView === 'chat' && !subView ? 0 : 'calc(env(safe-area-inset-bottom, 0px) + 88px)' }}
+      style={{ paddingBottom: (currentView === 'chat' && isChatThreadOpen) ? 0 : 'calc(env(safe-area-inset-bottom, 0px) + 88px)' }}
     >
       {/* Dynamic Content */}
       {renderContent()}
 
       {/* BOTTOM NAVIGATION */}
-      {!subView && (
+      {!subView && !(currentView === 'chat' && isChatThreadOpen) && (
         <nav className="bottom-nav">
         <div className="flex h-full items-center justify-around gap-1">
                 <button

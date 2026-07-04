@@ -20,14 +20,23 @@ const getRoleColor = (role) => {
   }
 };
 
-const ChatPage = ({ onBack }) => {
+const ChatPage = ({ onBack, onThreadActiveChange }) => {
   const chat = useChat();
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState('sidebar');
   const [isAdminReviewExpanded, setIsAdminReviewExpanded] = useState(false);
-  const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
+  const [viewportHeight, setViewportHeight] = useState(() => (
+    typeof window !== 'undefined' ? window.innerHeight : 0
+  ));
   const [pendingOpenChannelId, setPendingOpenChannelId] = useState('');
   const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    onThreadActiveChange?.(mobileView === 'chat');
+    return () => {
+      onThreadActiveChange?.(false);
+    };
+  }, [mobileView, onThreadActiveChange]);
 
   useEffect(() => {
     window.isChatPageOpen = true;
@@ -301,7 +310,43 @@ const ChatPage = ({ onBack }) => {
 
   const renderSidebar = () => (
     <div className="flex h-full w-full min-h-0 flex-col bg-white">
-      <div className="shrink-0 bg-white border-b border-slate-100">
+      {/* Mobile Top Bar (consistent with other app sections) */}
+      <div className="px-4 py-3 flex items-center justify-between bg-white border-b border-slate-100 shrink-0 md:hidden">
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button 
+              type="button"
+              onClick={onBack} 
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-1.5 mr-1 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 touch-manipulation"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          )}
+          <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-semibold border border-blue-100 shrink-0">
+            <span className="text-xs">
+              {chat.currentUser.role === 'admin' ? 'AD' : 'DS'}
+            </span>
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="font-bold text-sm text-gray-900 flex items-center gap-1.5 leading-none">
+                Messages
+                {chat.totalUnread > 0 && (
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white leading-none">
+                    {chat.totalUnread > 99 ? '99+' : chat.totalUnread}
+                  </span>
+                )}
+              </h1>
+            </div>
+            <p className="text-[10px] text-gray-500 font-medium truncate max-w-[220px] mt-0.5">
+              {chat.currentUser.email}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Header */}
+      <div className="hidden md:block agape-chat-sidebar-header shrink-0 bg-white border-b border-slate-100">
         <div className="flex items-center gap-2 px-4 pt-4 pb-3 md:pt-3">
           {onBack && (
             <button
@@ -321,23 +366,25 @@ const ChatPage = ({ onBack }) => {
             )}
           </h1>
         </div>
-        <div className="px-4 pb-3">
-          <label className="flex h-11 items-center gap-2.5 rounded-2xl bg-slate-100 px-4">
-            <Search size={16} className="shrink-0 text-slate-400" />
-            <input
-              ref={searchInputRef}
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search people..."
-              className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-slate-800 outline-none placeholder:text-slate-400"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600">
-                <X size={16} />
-              </button>
-            )}
-          </label>
-        </div>
+      </div>
+
+      {/* Search Input (Shared) */}
+      <div className="px-4 pb-3 pt-2 bg-white border-b border-slate-100/60 shrink-0">
+        <label className="flex h-11 items-center gap-2.5 rounded-2xl bg-slate-100 px-4">
+          <Search size={16} className="shrink-0 text-slate-400" />
+          <input
+            ref={searchInputRef}
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search people..."
+            className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-slate-800 outline-none placeholder:text-slate-400"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600">
+              <X size={16} />
+            </button>
+          )}
+        </label>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -404,9 +451,9 @@ const ChatPage = ({ onBack }) => {
   const renderChatArea = () => {
     if (!chat.activeChannel) return renderEmptyState();
     return (
-      <div className="flex h-full min-h-0 flex-col bg-white">
+      <div className="agape-chat-conversation flex h-full min-h-0 flex-col bg-white">
         <div className="agape-chat-header shrink-0 bg-white border-b border-slate-200/80 px-3">
-          <div className="flex h-16 items-center gap-2">
+          <div className="agape-chat-header-inner flex items-center gap-2">
             <button
               type="button"
               onClick={handleBackToSidebar}
@@ -508,7 +555,7 @@ const ChatPage = ({ onBack }) => {
   return (
     <div
       className={`agape-chat-page flex h-full w-full min-h-0 bg-[#f6f8fb] ${mobileView === 'chat' ? 'agape-chat-page-conversation-active' : ''}`}
-      style={window.innerWidth < 768 ? { height: `${viewportHeight}px` } : {}}
+      style={{ '--agape-chat-viewport-height': `${viewportHeight}px` }}
     >
       <div className="hidden h-full min-h-0 w-full md:grid md:grid-cols-[360px_minmax(0,1fr)]">
         <div className="min-h-0 border-r border-slate-200">{renderSidebar()}</div>
