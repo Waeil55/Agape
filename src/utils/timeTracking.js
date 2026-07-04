@@ -6,8 +6,17 @@
  * Payroll is based on EVENTS, not raw clock-in/out times.
  */
 
-import { haversineMiles } from '../config/maps';
 import { todayLocal } from './driverTelemetry';
+
+function haversineMiles(pointA, pointB) {
+  if (pointA?.lat == null || pointA?.lng == null || pointB?.lat == null || pointB?.lng == null) return null;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const R = 3958.8;
+  const dLat = toRad(pointB.lat - pointA.lat);
+  const dLng = toRad(pointB.lng - pointA.lng);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(pointA.lat)) * Math.cos(toRad(pointB.lat)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 // ─── CONSTANTS ───────────────────────────────────────────────────
 export const TIME_TRACKING_STATES = {

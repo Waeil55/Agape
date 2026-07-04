@@ -27,3 +27,6 @@ AUTH_AND_API_SETUP.md
 DATABASE_STRUCTURE.md
 Excel sample.xlsx
 lint-errors.txt
+
+# Local Netlify folder
+.netlify
