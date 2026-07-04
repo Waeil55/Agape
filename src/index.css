@@ -316,10 +316,7 @@
 
 html {
   height: 100dvh;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  padding: 0;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -754,19 +751,31 @@ body {
   left: max(16px, env(safe-area-inset-left, 0px));
   right: max(16px, env(safe-area-inset-right, 0px));
   z-index: 50;
+  height: 60px;
   min-height: 60px;
+  max-height: 60px;
   width: auto;
-  /* Solid, premium look — 97% opacity so it reads clearly on any background */
-  background: rgba(255, 255, 255, 0.97);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 9999px;
   overflow: hidden;
-  /* Richer shadow for depth without translucency */
-  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.18), 0 2px 8px -2px rgba(0, 0, 0, 0.10);
+  box-shadow: 0 10px 28px -14px rgba(15, 23, 42, 0.35), 0 1px 6px rgba(15, 23, 42, 0.08);
   padding: 4px 12px;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  color-scheme: light;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.bottom-nav > div {
+  height: 100%;
+  min-height: 0;
+}
+
+html:not([data-theme="dark"]) .bottom-nav {
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: #334155;
+  color-scheme: light;
 }
 
 /* Hide bottom nav when virtual keyboard is open to prevent layout overlap */
@@ -786,9 +795,26 @@ body:has(.agape-chat-page textarea:focus) .bottom-nav {
 }
 
 [data-theme="dark"] .bottom-nav {
-  background: rgba(15, 23, 42, 0.97);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.5), 0 2px 8px -2px rgba(0, 0, 0, 0.3);
+  background: #0f172a !important;
+  color-scheme: dark;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.5), 0 2px 8px -2px rgba(0, 0, 0, 0.3) !important;
+}
+[data-theme="dark"] .bottom-nav .text-slate-900,
+[data-theme="dark"] .bottom-nav .text-slate-800 {
+  color: #e2e8f0 !important;
+}
+[data-theme="dark"] .bottom-nav .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+[data-theme="dark"] .bottom-nav .text-slate-600 {
+  color: #94a3b8 !important;
+}
+[data-theme="dark"] .bottom-nav .bg-white {
+  background-color: #1e293b !important;
+}
+[data-theme="dark"] .bottom-nav .border-slate-200 {
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* ===== CHAT BUBBLE ANIMATIONS ===== */
@@ -1971,7 +1997,7 @@ textarea {
 /* ===== PWA STANDALONE MODE STYLES ===== */
 @media (display-mode: standalone) {
   html {
-    padding-top: env(safe-area-inset-top, 0px);
+    padding-top: 0;
   }
 
   body {
@@ -1980,13 +2006,25 @@ textarea {
   }
 
   .bottom-nav {
-    bottom: env(safe-area-inset-bottom, 0px) !important;
-    left: 0 !important;
-    right: 0 !important;
-    border-radius: 0 !important;
-    border-left: none !important;
-    border-right: none !important;
-    border-bottom: none !important;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    left: max(12px, env(safe-area-inset-left, 0px)) !important;
+    right: max(12px, env(safe-area-inset-right, 0px)) !important;
+    height: 60px !important;
+    min-height: 60px !important;
+    max-height: 60px !important;
+    border-radius: 9999px !important;
+    border: 1px solid rgba(15, 23, 42, 0.08) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 0 12px 30px -14px rgba(15, 23, 42, 0.35), 0 2px 8px rgba(15, 23, 42, 0.08) !important;
+  }
+
+  [data-theme="dark"] .bottom-nav {
+    background: rgba(15, 23, 42, 0.94) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .driver-page-header {
+    padding-top: max(8px, env(safe-area-inset-top, 0px)) !important;
   }
 
   .mobile-chat-wrapper,

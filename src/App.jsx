@@ -1951,24 +1951,32 @@ const App = () => {
   const handleDriverStatusUpdate = (driverId, clockedIn, extraFields = {}) => {
     const prevDriverState = drivers.find(d => d.id === driverId) || {};
     const now = new Date().toISOString();
+    const {
+      clockLocation,
+      clockTimestamp,
+      autoClockIn,
+      clockEventType,
+      ...persistableExtraFields
+    } = extraFields || {};
+    const eventTimestamp = clockTimestamp || autoClockIn || now;
     const wasClockedIn = Boolean(prevDriverState.clockedIn);
     const clockChanged = wasClockedIn !== clockedIn;
     let clockEvents = prevDriverState.clockEvents || [];
     if (clockChanged && clockedIn) {
-      const event = { type: 'in', timestamp: now };
-      if (extraFields.clockLocation) event.lat = extraFields.clockLocation.lat;
-      if (extraFields.clockLocation) event.lng = extraFields.clockLocation.lng;
+      const event = { type: clockEventType || (autoClockIn ? 'auto_in' : 'in'), timestamp: eventTimestamp };
+      if (clockLocation) event.lat = clockLocation.lat;
+      if (clockLocation) event.lng = clockLocation.lng;
       clockEvents = [...clockEvents, event];
     } else if (clockChanged && !clockedIn) {
-      const event = { type: 'out', timestamp: now };
-      if (extraFields.clockLocation) event.lat = extraFields.clockLocation.lat;
-      if (extraFields.clockLocation) event.lng = extraFields.clockLocation.lng;
+      const event = { type: clockEventType || 'out', timestamp: eventTimestamp };
+      if (clockLocation) event.lat = clockLocation.lat;
+      if (clockLocation) event.lng = clockLocation.lng;
       clockEvents = [...clockEvents, event];
     }
     const merged = {
-      ...(extraFields.clockLocation ? {} : extraFields),
+      ...persistableExtraFields,
       ...(clockChanged ? { clockEvents } : {}),
-      ...(clockedIn && clockChanged ? { clockedInAt: now } : {}),
+      ...(clockedIn && clockChanged ? { clockedInAt: eventTimestamp } : {}),
     };
     // Strip clockLocation from top-level — it's only used inside clockEvents
     if (merged.clockLocation) delete merged.clockLocation;

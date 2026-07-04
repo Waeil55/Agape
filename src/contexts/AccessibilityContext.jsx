@@ -19,8 +19,10 @@ export const AccessibilityProvider = ({ children }) => {
     if (theme === 'system') {
       const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       root.dataset.theme = isDark ? 'dark' : 'light';
+      root.classList.toggle('dark', isDark);
     } else {
       root.dataset.theme = theme;
+      root.classList.toggle('dark', theme === 'dark');
     }
     localStorage.setItem('agape_theme', theme);
   }, [theme]);

@@ -8,8 +8,28 @@
 
 import { todayLocal } from './driverTelemetry';
 
-function haversineMiles(pointA, pointB) {
-  if (pointA?.lat == null || pointA?.lng == null || pointB?.lat == null || pointB?.lng == null) return null;
+const toNumber = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+const normalizePoint = (pointOrLat, maybeLng) => {
+  if (pointOrLat && typeof pointOrLat === 'object') {
+    const lat = toNumber(pointOrLat.lat ?? pointOrLat.latitude);
+    const lng = toNumber(pointOrLat.lng ?? pointOrLat.longitude);
+    return lat == null || lng == null ? null : { lat, lng };
+  }
+  const lat = toNumber(pointOrLat);
+  const lng = toNumber(maybeLng);
+  return lat == null || lng == null ? null : { lat, lng };
+};
+
+function haversineMiles(pointAOrLat, pointBOrLng, maybeLat2, maybeLng2) {
+  const pointA = normalizePoint(pointAOrLat, pointBOrLng);
+  const pointB = pointAOrLat && typeof pointAOrLat === 'object'
+    ? normalizePoint(pointBOrLng)
+    : normalizePoint(maybeLat2, maybeLng2);
+  if (!pointA || !pointB) return 0;
   const toRad = (d) => (d * Math.PI) / 180;
   const R = 3958.8;
   const dLat = toRad(pointB.lat - pointA.lat);
@@ -223,6 +243,7 @@ export const classifyGap = (lastEventTime, nextEventTime, lastLocation, nextLoca
   let classification;
   let payrollEffect;
   let notes = '';
+  let gapDistanceMiles = null;
 
   if (durationMinutes <= GAP_THRESHOLDS.SHORT_MAX) {
     classification = GAP_CLASSIFICATIONS.SHORT;
@@ -240,7 +261,7 @@ export const classifyGap = (lastEventTime, nextEventTime, lastLocation, nextLoca
 
   // Check for GPS deviation (location jumped significantly during gap)
   if (lastLocation && nextLocation && classification !== GAP_CLASSIFICATIONS.LONG) {
-    const gapDistanceMiles = haversineDistanceMiles(
+    gapDistanceMiles = haversineDistanceMiles(
       lastLocation.lat, lastLocation.lng,
       nextLocation.lat, nextLocation.lng
     );
@@ -260,7 +281,9 @@ export const classifyGap = (lastEventTime, nextEventTime, lastLocation, nextLoca
     startLocation: lastLocation ? { lat: lastLocation.lat, lng: lastLocation.lng } : null,
     endLocation: nextLocation ? { lat: nextLocation.lat, lng: nextLocation.lng } : null,
     classification,
+    gapType: payrollEffect === PAYROLL_EFFECTS.EXCLUDED ? 'UNPAID_GAP' : 'WORK_CONTINUITY',
     payrollEffect,
+    gapDistanceMiles: gapDistanceMiles == null ? null : Math.round(gapDistanceMiles * 10) / 10,
     notes,
     classifiedAt: new Date().toISOString(),
   };
@@ -301,6 +324,7 @@ export const stitchSessions = (events) => {
         breakMinutes: 0,
         gapMinutes: 0,
         personalGapMinutes: 0,
+        excludedGapMinutes: 0,
       };
       sessions.push(currentSession);
       continue;
@@ -314,7 +338,7 @@ export const stitchSessions = (events) => {
         // Calculate session duration
         const durationMs = new Date(event.timestamp) - new Date(currentSession.clockInTime);
         currentSession.totalMinutes = Math.max(0, durationMs / (1000 * 60));
-        currentSession.billableMinutes = currentSession.totalMinutes - currentSession.breakMinutes - currentSession.personalGapMinutes;
+        currentSession.billableMinutes = Math.max(0, currentSession.totalMinutes - currentSession.breakMinutes - currentSession.excludedGapMinutes);
         currentSession = null;
       }
       continue;
@@ -361,6 +385,7 @@ export const stitchSessions = (events) => {
 
           if (gap.payrollEffect === PAYROLL_EFFECTS.EXCLUDED) {
             currentSession.gapMinutes += gap.durationMinutes;
+            currentSession.excludedGapMinutes += gap.durationMinutes;
             if (gap.classification === GAP_CLASSIFICATIONS.LONG) {
               currentSession.personalGapMinutes += gap.durationMinutes;
             }
@@ -376,7 +401,7 @@ export const stitchSessions = (events) => {
     const now = new Date();
     const durationMs = now - new Date(currentSession.clockInTime);
     currentSession.totalMinutes = Math.max(0, durationMs / (1000 * 60));
-    currentSession.billableMinutes = currentSession.totalMinutes - currentSession.breakMinutes - currentSession.personalGapMinutes;
+    currentSession.billableMinutes = Math.max(0, currentSession.totalMinutes - currentSession.breakMinutes - currentSession.excludedGapMinutes);
     currentSession.isOpen = true;
   }
 
@@ -520,98 +545,203 @@ export const detectAbuse = ({ breadcrumbs, clockInLocation, clockOutLocation, du
  * @param {string} policyMode
  * @returns {{ events: Array, sessions: Object, gapLog: Array, billableMinutes: number }}
  */
-export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_MODES.SMART_MODE) => {
+export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_MODES.SMART_MODE, options = {}) => {
   const events = [];
-  const today = todayLocal();
+  const dateFilter = options.date || todayLocal();
+  const driverId = driver?.id || driver?.email || options.driverId || '';
 
-  // Add clock events
-  if (clockEvents && clockEvents.length > 0) {
-    clockEvents.forEach(ce => {
-      if (ce.timestamp && ce.timestamp.startsWith(today)) {
-        events.push({
-          type: ce.type === 'in' ? 'CLOCK_IN' : 'CLOCK_OUT',
-          timestamp: ce.timestamp,
-          location: ce.lat && ce.lng ? { lat: ce.lat, lng: ce.lng } : null,
-        });
-      }
+  const toIso = (value) => {
+    if (!value) return null;
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    }
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
+    if (typeof value.toDate === 'function') return value.toDate().toISOString();
+    if (value.seconds) return new Date(value.seconds * 1000).toISOString();
+    return null;
+  };
+
+  const isoDateKey = (value) => {
+    const iso = toIso(value);
+    return iso ? iso.slice(0, 10) : null;
+  };
+
+  const eventDateKey = (event) => isoDateKey(event.timestamp || event.at || event.createdAt || event.time);
+  const shouldIncludeDate = (dateKey) => !dateFilter || dateKey === dateFilter;
+
+  const locationFrom = (entity, latKey = 'lat', lngKey = 'lng') => {
+    const direct = normalizePoint(entity?.location);
+    if (direct) return direct;
+    return normalizePoint(entity?.[latKey], entity?.[lngKey]);
+  };
+
+  const clockLocationFrom = (clockEvent) => (
+    locationFrom(clockEvent)
+    || normalizePoint(clockEvent?.clockLocation)
+    || normalizePoint(clockEvent?.lat, clockEvent?.lng)
+    || normalizePoint(clockEvent?.latitude, clockEvent?.longitude)
+  );
+
+  const normalizeClockType = (type) => {
+    const lower = String(type || '').toLowerCase();
+    if (lower.includes('break') && (lower.includes('end') || lower.includes('resume'))) return 'BREAK_END';
+    if (lower.includes('break')) return 'BREAK_START';
+    if (lower.includes('auto')) return 'AUTO_CLOCK_IN';
+    if (lower === 'in' || lower === 'clock_in' || lower === 'clockin') return 'CLOCK_IN';
+    if (lower === 'out' || lower === 'clock_out' || lower === 'clockout') return 'CLOCK_OUT';
+    if (lower === 'break_end') return 'BREAK_END';
+    if (lower === 'break_start') return 'BREAK_START';
+    return lower.includes('out') ? 'CLOCK_OUT' : 'CLOCK_IN';
+  };
+
+  const tripDateKey = (trip) => {
+    if (typeof trip?.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(trip.date)) return trip.date.slice(0, 10);
+    return (
+      isoDateKey(trip?.arrivalTime)
+      || isoDateKey(trip?.startTime)
+      || isoDateKey(trip?.startedAt)
+      || isoDateKey(trip?.arrivalDropoffTime)
+      || isoDateKey(trip?.completedAt)
+      || null
+    );
+  };
+
+  const pickupLocationFrom = (trip) => (
+    normalizePoint(trip?.pickupLocation)
+    || normalizePoint(trip?.pickupLat ?? trip?.pickupLatitude, trip?.pickupLng ?? trip?.pickupLongitude)
+  );
+  const dropoffLocationFrom = (trip) => (
+    normalizePoint(trip?.dropoffLocation)
+    || normalizePoint(trip?.dropoffLat ?? trip?.dropoffLatitude, trip?.dropoffLng ?? trip?.dropoffLongitude)
+  );
+
+  const normalizedClockEvents = (clockEvents || [])
+    .map((ce) => {
+      const timestamp = toIso(ce.timestamp || ce.at || ce.createdAt || ce.time);
+      if (!timestamp) return null;
+      const date = timestamp.slice(0, 10);
+      if (!shouldIncludeDate(date)) return null;
+      return {
+        ...ce,
+        driverId: ce.driverId || driverId,
+        date,
+        at: timestamp,
+        timestamp,
+        type: normalizeClockType(ce.type || ce.eventType || ce.clockEventType),
+        location: clockLocationFrom(ce),
+      };
+    })
+    .filter(Boolean);
+
+  normalizedClockEvents.forEach((ce) => {
+    events.push({
+      type: ce.type,
+      timestamp: ce.timestamp,
+      location: ce.location,
+      driverId: ce.driverId || driverId,
+      date: ce.date,
+    });
+  });
+
+  const normalizedTrips = [];
+  (trips || []).forEach((trip) => {
+    const date = tripDateKey(trip) || dateFilter;
+    if (!shouldIncludeDate(date)) return;
+    const pickupLocation = pickupLocationFrom(trip);
+    const dropoffLocation = dropoffLocationFrom(trip);
+    const base = {
+      ...trip,
+      driverId: trip.driverId || trip.assignedDriverId || driverId,
+      date,
+      pickupLocation,
+      dropoffLocation,
+    };
+    normalizedTrips.push(base);
+
+    const addTripEvent = (eventType, timestampValue, location) => {
+      const timestamp = toIso(timestampValue);
+      if (!timestamp) return;
+      events.push({
+        type: 'TRIP_EVENT',
+        eventType,
+        timestamp,
+        tripId: trip.id,
+        patient: trip.patient,
+        location: location || null,
+        driverId: base.driverId,
+        date: timestamp.slice(0, 10),
+      });
+    };
+
+    addTripEvent('TRIP_STARTED', trip.startedAt || trip.startTime, pickupLocation);
+    addTripEvent('ARRIVED_PICKUP', trip.arrivalTime || trip.arrivedPickupAt, pickupLocation);
+    addTripEvent('DEPARTED_PICKUP', trip.departedPickupTime || trip.departedPickupAt, pickupLocation);
+    addTripEvent('ARRIVED_DROPOFF', trip.arrivalDropoffTime || trip.arrivedDropoffAt, dropoffLocation);
+    addTripEvent('TRIP_COMPLETED', trip.completedAt || trip.completedTime, dropoffLocation || pickupLocation);
+  });
+
+  const hasClockIn = events.some((event) => event.type === 'CLOCK_IN' || event.type === 'AUTO_CLOCK_IN');
+  const firstWorkEvent = [...events]
+    .filter((event) => event.type === 'TRIP_EVENT')
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))[0];
+
+  if (!hasClockIn && firstWorkEvent) {
+    const anchor = calculateAnchor({
+      policyMode,
+      driver,
+      lastWorkLocation: options.lastWorkLocation || null,
+      pickupLocation: firstWorkEvent.location,
+      pickupTime: new Date(firstWorkEvent.timestamp),
+    });
+    events.push({
+      type: 'AUTO_CLOCK_IN',
+      timestamp: anchor.clockInTime ? anchor.clockInTime.toISOString() : firstWorkEvent.timestamp,
+      location: anchor.anchorLocation || firstWorkEvent.location || null,
+      driverId,
+      date: dateFilter,
+      anchorType: anchor.anchorType,
+      travelMinutes: Math.round(anchor.travelMinutes || 0),
+      reason: 'FIRST_WORK_EVENT',
     });
   }
 
-  // Add trip events
-  (trips || []).forEach(trip => {
-    if (trip.date !== today) return;
-
-    // Trip started
-    if (trip.startedAt) {
-      events.push({
-        type: 'TRIP_EVENT',
-        eventType: 'TRIP_STARTED',
-        timestamp: trip.startedAt,
-        tripId: trip.id,
-        patient: trip.patient,
-        location: null,
-      });
-    }
-
-    // Arrived at pickup
-    if (trip.arrivalTime) {
-      events.push({
-        type: 'TRIP_EVENT',
-        eventType: 'ARRIVED_PICKUP',
-        timestamp: trip.arrivalTime,
-        tripId: trip.id,
-        patient: trip.patient,
-        location: trip.pickupLat ? { lat: trip.pickupLat, lng: trip.pickupLng } : null,
-      });
-    }
-
-    // Departed pickup
-    if (trip.departedPickupTime) {
-      events.push({
-        type: 'TRIP_EVENT',
-        eventType: 'DEPARTED_PICKUP',
-        timestamp: trip.departedPickupTime,
-        tripId: trip.id,
-        patient: trip.patient,
-        location: null,
-      });
-    }
-
-    // Arrived at dropoff
-    if (trip.arrivalDropoffTime) {
-      events.push({
-        type: 'TRIP_EVENT',
-        eventType: 'ARRIVED_DROPOFF',
-        timestamp: trip.arrivalDropoffTime,
-        tripId: trip.id,
-        patient: trip.patient,
-        location: trip.dropoffLat ? { lat: trip.dropoffLat, lng: trip.dropoffLng } : null,
-      });
-    }
-
-    // Trip completed
-    if (trip.completedAt) {
-      events.push({
-        type: 'TRIP_EVENT',
-        eventType: 'TRIP_COMPLETED',
-        timestamp: trip.completedAt,
-        tripId: trip.id,
-        patient: trip.patient,
-        location: null,
-      });
-    }
-  });
-
-  // Sort all events by timestamp
   events.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-  // Stitch sessions
   const { sessions, totalBillableMinutes, gapLog } = stitchSessions(events);
+  const gapLogWithMeta = gapLog.map((gap) => ({
+    ...gap,
+    driverId: gap.driverId || driverId,
+    date: gap.date || gap.startTime?.slice(0, 10) || dateFilter,
+  }));
+
+  const firstSession = sessions[0] || {};
+  const lastSession = sessions[sessions.length - 1] || {};
+  const abuse = detectAbuse({
+    breadcrumbs: options.breadcrumbs || driver?.breadcrumbs || [],
+    clockInLocation: firstSession.clockInLocation,
+    clockOutLocation: lastSession.clockOutLocation,
+    durationMinutes: sessions.reduce((sum, session) => sum + (session.totalMinutes || 0), 0),
+  });
+  const teleports = abuse.flags.map((flag) => ({
+    driverId,
+    date: dateFilter,
+    type: flag,
+    details: abuse.details,
+    payrollEffect: 'REVIEW',
+  }));
 
   return {
+    date: dateFilter,
+    driverId,
     events,
-    sessions,
-    gapLog,
+    sessions: sessions.map((session) => ({ ...session, driverId, date: dateFilter })),
+    gapLog: gapLogWithMeta,
+    gaps: gapLogWithMeta,
+    clockEvents: normalizedClockEvents,
+    trips: normalizedTrips,
+    teleports,
+    abuse,
     billableMinutes: totalBillableMinutes,
     policyMode,
   };
@@ -626,7 +756,7 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
  * @returns {{ payTime: Object, sessionBreakdown: Array, gapLogs: Array, adminNotes: Array }}
  */
 export const generatePayrollOutput = (timeData, hourlyRate = 0) => {
-  const { sessions, gapLog, billableMinutes, policyMode } = timeData;
+  const { sessions = [], gapLog = [], billableMinutes = 0, policyMode, date } = timeData || {};
 
   const billableHours = billableMinutes / 60;
   const regularHours = Math.min(billableHours, 8);
@@ -646,6 +776,7 @@ export const generatePayrollOutput = (timeData, hourlyRate = 0) => {
     breakMinutes: Math.round(s.breakMinutes || 0),
     gapMinutes: Math.round(s.gapMinutes || 0),
     personalGapMinutes: Math.round(s.personalGapMinutes || 0),
+    excludedGapMinutes: Math.round(s.excludedGapMinutes || 0),
     tripCount: s.events.filter(e => e.type === 'TRIP_EVENT').length,
     isOpen: s.isOpen || false,
   }));
@@ -663,7 +794,7 @@ export const generatePayrollOutput = (timeData, hourlyRate = 0) => {
 
   return {
     payTime: {
-      date: todayLocal(),
+      date: date || todayLocal(),
       billableMinutes: Math.round(billableMinutes),
       billableHours: Math.round(billableHours * 10) / 10,
       regularHours: Math.round(regularHours * 10) / 10,

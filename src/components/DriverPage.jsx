@@ -21,7 +21,16 @@ import {
   Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair
 } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
-import { TIME_TRACKING_STATES, classifyGap } from '../utils/timeTracking';
+import {
+  TIME_TRACKING_STATES,
+  POLICY_MODES,
+  calculateAnchor,
+  validateArrival,
+  classifyGap,
+  generatePendingClockOut,
+  buildTimeEvents,
+  generatePayrollOutput,
+} from '../utils/timeTracking';
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
 const ChatPage = lazy(() => import('./chat/ChatPage'));
@@ -1309,6 +1318,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const isClockedIn = me?.clockedIn || false;
   const TT = TIME_TRACKING_STATES;
+  const timeTrackingPolicyMode = appSettings?.timeTrackingPolicy || POLICY_MODES.SMART_MODE;
   const [ttState, setTtState] = useState(TT.OFF_SHIFT);
   const ttStateRef = useRef(TT.OFF_SHIFT);
   const [ttBillableMin, setTtBillableMin] = useState(0);
@@ -1332,6 +1342,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const seed = normalizedEmail.replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'USER';
     return `DRV-${seed}`;
   })();
+
+  const getTripPickupLocation = useCallback((trip) => {
+    const lat = Number(trip?.pickupLat ?? trip?.pickupLatitude);
+    const lng = Number(trip?.pickupLng ?? trip?.pickupLongitude);
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }, []);
+
+  const getTripDropoffLocation = useCallback((trip) => {
+    const lat = Number(trip?.dropoffLat ?? trip?.dropoffLatitude);
+    const lng = Number(trip?.dropoffLng ?? trip?.dropoffLongitude);
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }, []);
+
+  const getDriverClockLocation = useCallback(() => (
+    driverPosition?.lat && driverPosition?.lng
+      ? { lat: driverPosition.lat, lng: driverPosition.lng }
+      : null
+  ), [driverPosition?.lat, driverPosition?.lng]);
 
   const clockHistory = useMemo(() => {
     const events = me?.clockEvents || [];
@@ -1376,9 +1404,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const handleClockToggle = useCallback(() => {
     const newStatus = !isClockedIn;
-    const extra = driverPosition?.lat && driverPosition?.lng
-      ? { clockLocation: { lat: driverPosition.lat, lng: driverPosition.lng } }
-      : {};
+    const nowIso = new Date().toISOString();
+    const clockLocation = getDriverClockLocation();
+    const extra = {
+      clockTimestamp: nowIso,
+      ...(clockLocation ? { clockLocation } : {}),
+    };
     onDriverStatusUpdate?.(driverId, newStatus, extra);
     if (newStatus) {
       setShowToast({ type: 'success', message: 'Clocked in — you\'re online for trips.' });
@@ -1392,11 +1423,26 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       clockOutOfferedRef.current = false;
       // Persist time tracking session to Firestore
       if (ttEventsLogRef.current.length > 0) {
+        const lastEvent = ttEventsLogRef.current[ttEventsLogRef.current.length - 1];
+        if (lastEvent?.type !== 'CLOCK_OUT') {
+          ttEventsLogRef.current.push({ type: 'CLOCK_OUT', timestamp: nowIso, location: clockLocation });
+        }
         const events = [...ttEventsLogRef.current];
-        const clockIn = events.find(e => e.type === 'CLOCK_IN');
-        const clockOutEv = events.find(e => e.type === 'CLOCK_OUT');
+        const clockIn = events.find(e => e.type === 'CLOCK_IN' || e.type === 'AUTO_CLOCK_IN');
+        const clockOutEv = [...events].reverse().find(e => e.type === 'CLOCK_OUT');
+        const dailyTimeData = buildTimeEvents(
+          driverScopedTrips,
+          me,
+          [
+            ...(me?.clockEvents || []),
+            { type: 'out', timestamp: nowIso, ...(clockLocation ? { lat: clockLocation.lat, lng: clockLocation.lng } : {}) },
+          ],
+          timeTrackingPolicyMode,
+          { date: nowIso.slice(0, 10), breadcrumbs: me?.breadcrumbs || [] }
+        );
+        const payrollOutput = generatePayrollOutput(dailyTimeData, Number(me?.hourlyRate || 0));
         addDoc(collection(db, 'timeTrackingSessions'), {
-          driverId: driverId || driverId,
+          driverId,
           driverEmail: currentUser || '',
           driverName: me?.name || '',
           date: new Date().toISOString().slice(0, 10),
@@ -1404,15 +1450,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           clockInLocation: clockIn?.location || null,
           clockOut: clockOutEv?.timestamp || null,
           clockOutLocation: clockOutEv?.location || null,
-          billableMinutes: ttBillableMin,
+          billableMinutes: payrollOutput.payTime.billableMinutes || ttBillableMin,
           breakMinutes: ttBreakMin,
+          gapLog: dailyTimeData.gapLog,
+          sessions: dailyTimeData.sessions,
+          payrollOutput,
+          policyMode: timeTrackingPolicyMode,
           events,
           createdAt: serverTimestamp(),
         }).catch(() => {});
       }
       setShowToast({ type: 'info', message: 'Clocked out — trips are now read-only.' });
     }
-  }, [isClockedIn, driverId, onDriverStatusUpdate, driverPosition?.lat, driverPosition?.lng, currentUser, me?.name, ttBillableMin, ttBreakMin]);
+  }, [isClockedIn, getDriverClockLocation, onDriverStatusUpdate, driverId, driverScopedTrips, me, timeTrackingPolicyMode, currentUser, ttBillableMin, ttBreakMin]);
 
   const estimateClockOutFromHome = useCallback(async () => {
     if (!driverPosition?.lat || !driverPosition?.lng || !me?.homeLat || !me?.homeLng) {
@@ -1506,7 +1556,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     } else if (!isClockedIn && ttStateRef.current !== TT.OFF_SHIFT) {
       if (ttTickRef.current) { clearInterval(ttTickRef.current); ttTickRef.current = null; }
       const now = new Date().toISOString();
-      ttEventsLogRef.current.push({ type: 'CLOCK_OUT', timestamp: now, location: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null });
+      const lastEvent = ttEventsLogRef.current[ttEventsLogRef.current.length - 1];
+      if (lastEvent?.type !== 'CLOCK_OUT') {
+        ttEventsLogRef.current.push({ type: 'CLOCK_OUT', timestamp: now, location: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null });
+      }
       setTtState(TT.OFF_SHIFT);
       ttStateRef.current = TT.OFF_SHIFT;
       ttClockInTimeRef.current = null;
@@ -1639,6 +1692,31 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       setShowToast({ type: 'info', message: 'Looks like you\'re near home! Clock out to end your shift.', action: 'geofence-clockout' });
     }
   }, [isClockedIn, driverPosition?.lat, driverPosition?.lng, me?.homeLat, me?.homeLng, activeTrips.length]);
+
+  // ─── DISPATCHER ADDED TRIP DURING BREAK (Section 13) ───
+  const prevTripsCountRef = useRef(activeTrips.length);
+  useEffect(() => {
+    const prevCount = prevTripsCountRef.current;
+    prevTripsCountRef.current = activeTrips.length;
+    if (activeTrips.length > prevCount && ttStateRef.current === TT.ON_BREAK) {
+      // New trip arrived while on break — cancel pending clock-out and resume
+      if (pendingClockOutRef.current) {
+        clearTimeout(pendingClockOutRef.current);
+        pendingClockOutRef.current = null;
+      }
+      clockOutOfferedRef.current = false;
+      setShowClockOutOffer(false);
+      ttResume();
+      const resumeLocation = getDriverClockLocation();
+      onDriverStatusUpdate?.(driverId, true, {
+        clockTimestamp: new Date().toISOString(),
+        clockEventType: 'break_end',
+        timeTrackingState: TT.ON_SHIFT_ACTIVE,
+        ...(resumeLocation ? { clockLocation: resumeLocation } : {}),
+      });
+      setShowToast({ type: 'success', message: 'New trip assigned — break ended, session resumed.' });
+    }
+  }, [activeTrips.length, driverId, getDriverClockLocation, onDriverStatusUpdate, ttResume]);
 
   // Detect ride-sharing opportunities — deduplicated, max 3
   useEffect(() => {
@@ -2243,13 +2321,60 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
     // Record pickup arrival + departure timestamps using canonical fields
     const nowIso = new Date().toISOString();
+    const pickupLocation = getTripPickupLocation(showOdometerPrompt);
+    const driverLocation = getDriverClockLocation();
+    if (pickupLocation && driverLocation) {
+      const arrivalCheck = validateArrival(driverLocation.lat, driverLocation.lng, pickupLocation.lat, pickupLocation.lng);
+      if (!arrivalCheck.valid) {
+        setShowToast({ type: 'warning', message: `You are ${arrivalCheck.distanceFeet}ft from pickup. Move closer before confirming arrival.` });
+        return;
+      }
+    }
+
+    let autoStartedShift = false;
+    if (!isClockedIn && ttStateRef.current === TT.OFF_SHIFT) {
+      const anchor = calculateAnchor({
+        policyMode: timeTrackingPolicyMode,
+        driver: me,
+        lastWorkLocation: ttLastTripEventRef.current?.location || null,
+        pickupLocation,
+        pickupTime: new Date(nowIso),
+      });
+      const travelMin = Math.round(anchor.travelMinutes || 0);
+      const autoClockInTime = anchor.clockInTime ? anchor.clockInTime.toISOString() : nowIso;
+      onDriverStatusUpdate?.(driverId, true, {
+        clockTimestamp: autoClockInTime,
+        clockEventType: 'auto_in',
+        timeTrackingState: TT.ON_SHIFT_ACTIVE,
+        timeTrackingPolicy: timeTrackingPolicyMode,
+        timeTrackingAnchor: anchor.anchorType,
+        timeTrackingTravelMinutes: travelMin,
+        ...(anchor.anchorLocation || driverLocation ? { clockLocation: anchor.anchorLocation || driverLocation } : {}),
+      });
+      setTtState(TT.ON_SHIFT_ACTIVE);
+      ttStateRef.current = TT.ON_SHIFT_ACTIVE;
+      ttClockInTimeRef.current = autoClockInTime;
+      ttEventsLogRef.current = [{
+        type: 'AUTO_CLOCK_IN',
+        timestamp: autoClockInTime,
+        location: anchor.anchorLocation || driverLocation || pickupLocation,
+        anchorType: anchor.anchorType,
+        travelMinutes: travelMin,
+        policyMode: timeTrackingPolicyMode,
+      }];
+      setTtBillableMin(0);
+      setTtBreakMin(0);
+      ttBreakStartRef.current = null;
+      autoStartedShift = true;
+      setShowToast({ type: 'success', message: `Auto clocked in - ${travelMin} min travel included.` });
+    }
     advanceWorkflow(showOdometerPrompt, 'At Pickup', {
       pickupOdometer: odo,
       arrivalTime: nowIso,
       startTime: nowIso,
     });
-    if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
-      ttLogTripEvent('TRIP_ARRIVED_PICKUP', showOdometerPrompt.id, driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null);
+    if (autoStartedShift || ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
+      ttLogTripEvent('TRIP_ARRIVED_PICKUP', showOdometerPrompt.id, driverLocation || pickupLocation);
     }
     setLastOdometer(odo);
     setShowOdometerPrompt(null);
@@ -2281,11 +2406,60 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
     setUndoable(showArrivalConfirm, showArrivalConfirm.status, 'At Pickup');
     const nowIso = new Date().toISOString();
+    const pickupLocation = getTripPickupLocation(showArrivalConfirm);
+    const driverLocation = getDriverClockLocation();
+    if (pickupLocation && driverLocation) {
+      const arrivalCheck = validateArrival(driverLocation.lat, driverLocation.lng, pickupLocation.lat, pickupLocation.lng);
+      if (!arrivalCheck.valid) {
+        setShowToast({ type: 'warning', message: `You are ${arrivalCheck.distanceFeet}ft from pickup. Move closer before confirming arrival.` });
+        return;
+      }
+    }
+    let autoStartedShift = false;
+    if (!isClockedIn && ttStateRef.current === TT.OFF_SHIFT) {
+      const anchor = calculateAnchor({
+        policyMode: timeTrackingPolicyMode,
+        driver: me,
+        lastWorkLocation: ttLastTripEventRef.current?.location || null,
+        pickupLocation,
+        pickupTime: new Date(nowIso),
+      });
+      const travelMin = Math.round(anchor.travelMinutes || 0);
+      const autoClockInTime = anchor.clockInTime ? anchor.clockInTime.toISOString() : nowIso;
+      onDriverStatusUpdate?.(driverId, true, {
+        clockTimestamp: autoClockInTime,
+        clockEventType: 'auto_in',
+        timeTrackingState: TT.ON_SHIFT_ACTIVE,
+        timeTrackingPolicy: timeTrackingPolicyMode,
+        timeTrackingAnchor: anchor.anchorType,
+        timeTrackingTravelMinutes: travelMin,
+        ...(anchor.anchorLocation || driverLocation ? { clockLocation: anchor.anchorLocation || driverLocation } : {}),
+      });
+      setTtState(TT.ON_SHIFT_ACTIVE);
+      ttStateRef.current = TT.ON_SHIFT_ACTIVE;
+      ttClockInTimeRef.current = autoClockInTime;
+      ttEventsLogRef.current = [{
+        type: 'AUTO_CLOCK_IN',
+        timestamp: autoClockInTime,
+        location: anchor.anchorLocation || driverLocation || pickupLocation,
+        anchorType: anchor.anchorType,
+        travelMinutes: travelMin,
+        policyMode: timeTrackingPolicyMode,
+      }];
+      setTtBillableMin(0);
+      setTtBreakMin(0);
+      ttBreakStartRef.current = null;
+      autoStartedShift = true;
+      setShowToast({ type: 'success', message: `Auto clocked in - ${travelMin} min travel included.` });
+    }
     advanceWorkflow(showArrivalConfirm, 'At Pickup', {
       pickupOdometer: odo,
       arrivalTime: nowIso,
       startTime: nowIso,
     });
+    if (autoStartedShift || ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
+      ttLogTripEvent('TRIP_ARRIVED_PICKUP', showArrivalConfirm.id, driverLocation || pickupLocation);
+    }
     setLastOdometer(odo);
     setShowArrivalConfirm(null);
     setArrivalOdometer('');
@@ -2665,7 +2839,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       completedVehicle: me?.vehicle || '',
     });
     if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
-      ttLogTripEvent('TRIP_COMPLETED', showCompleteModal.id, null);
+      ttLogTripEvent('TRIP_COMPLETED', showCompleteModal.id, getTripDropoffLocation(showCompleteModal) || getDriverClockLocation());
     }
     setLastOdometer(odo);
     setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
@@ -2685,14 +2859,46 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setActiveNav('trips');
     setWorkNotesOpen(false);
 
-    // Check if all trips are done — offer clock-out
-    if (isClockedIn && !clockOutOfferedRef.current) {
+    // Check if all trips are done - offer clock-out with pending timer
+    if ((isClockedIn || ttStateRef.current !== TT.OFF_SHIFT) && !clockOutOfferedRef.current) {
       const remaining = driverScopedTrips.filter(t =>
         tripMatchesTodayOrTomorrow(t.date) && !isWorkflowTerminalTrip(t) && t.id !== showCompleteModal.id
       );
       if (remaining.length === 0) {
         clockOutOfferedRef.current = true;
-        estimateClockOutFromHome();
+        const completedTrip = {
+          ...showCompleteModal,
+          completedAt: now,
+          arrivalDropoffTime: showCompleteModal.arrivalDropoffTime || toIso(arrivalDropoffTime),
+        };
+        const pending = generatePendingClockOut({
+          lastTrip: completedTrip,
+          driver: me,
+          policyMode: timeTrackingPolicyMode,
+        });
+        if (pending.pendingClockOut && pending.estimatedClockOutTime) {
+          const travelMin = Math.max(Math.round(pending.pendingClockOut.travelMinutes || 0), 0);
+          ttEventsLogRef.current.push({
+            ...pending.pendingClockOut,
+            timestamp: now,
+            location: getTripDropoffLocation(showCompleteModal) || getDriverClockLocation(),
+          });
+          setClockOutEstimate({
+            minutes: travelMin,
+            targetTime: '',
+            label: travelMin > 0 ? `${travelMin} min travel home` : 'Clock out at dropoff',
+          });
+          const waitMs = Math.max(pending.estimatedClockOutTime.getTime() - Date.now(), 0);
+          pendingClockOutRef.current = setTimeout(() => {
+            if (ttStateRef.current !== TT.OFF_SHIFT) {
+              handleClockToggle();
+              setShowToast({ type: 'info', message: travelMin > 0 ? `Auto clock-out - ${travelMin} min travel home completed.` : 'Auto clock-out - final trip completed.' });
+            }
+            pendingClockOutRef.current = null;
+          }, waitMs);
+        } else {
+          estimateClockOutFromHome();
+        }
         setShowClockOutOffer(true);
       }
     }
@@ -2836,7 +3042,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
     return (
       <><div className="min-h-full bg-[#f4f7fb] pb-32">
-        <div className="sticky top-0 z-30 bg-white border-b-2 border-amber-400" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="sticky top-0 z-30 bg-white border-b-2 border-amber-400" style={{ paddingTop: 'max(8px, env(safe-area-inset-top, 0px))' }}>
           <div className="px-3 py-2.5 flex items-center gap-2.5">
             <button
               type="button"
@@ -3112,8 +3318,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       )}
       {!(activeNav === 'active-trip' && activeWorkTrip) && (
         <div
-          className="driver-page-header sticky top-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
-          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+          className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
+          style={{ paddingTop: 'max(8px, env(safe-area-inset-top, 0px))' }}
         >
           <div className="px-3 py-3 flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
@@ -5118,14 +5324,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
             </div>
 
-            {/* Home Location */}
+            {/* Home Location — admin/dispatcher can edit, driver can view only */}
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><MapPin size={16} /> Home Location</div>
               {me?.homeAddress ? (
                 <p className="text-xs text-slate-500 font-semibold mb-2">{me.homeAddress}</p>
               ) : (
-                <p className="text-xs text-slate-500 font-semibold mb-2">Enter your home address for commute time estimates.</p>
+                <p className="text-xs text-slate-500 font-semibold mb-2">{(role === 'admin' || role === 'dispatcher') ? 'Enter home address for commute time estimates.' : 'Home address set by admin.'}</p>
               )}
+              {(role === 'admin' || role === 'dispatcher') ? (
               <div className="space-y-2">
                 <input type="text" value={editHomeAddress}
                   onChange={(e) => setEditHomeAddress(e.target.value)}
@@ -5148,7 +5355,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         });
                         setShowToast({ type: 'success', message: `Home set: ${coords.formattedAddress}` });
                       } else {
-                        // Save as-is if geocoding fails
                         onDriverStatusUpdate?.(driverId, isClockedIn, {
                           homeAddress: editHomeAddress.trim(),
                         });
@@ -5182,6 +5388,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   </button>
                 </div>
               </div>
+              ) : (
+                <p className="text-xs text-slate-400 italic">Only admin or dispatcher can edit home address.</p>
+              )}
             </div>
 
             {/* Clock History (last 14 days) */}
@@ -5356,7 +5565,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               drivers={allDrivers}
               trips={driverScopedTrips}
               clockEvents={me?.clockEvents || []}
-              timeData={ttEventsLogRef.current.length > 0 ? { events: ttEventsLogRef.current, billableMinutes: ttBillableMin, breakMinutes: ttBreakMin } : null}
+              timeData={{ policyMode: timeTrackingPolicyMode }}
             />
           </Suspense>
         </div>
@@ -5812,7 +6021,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     }
                     setActiveNav(item.id);
                   }}
-                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1.5 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${
+                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1.5 py-1 touch-manipulation transition-all duration-200 min-h-[52px] ${
                       isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8] hover:text-[#64748b]'
                     }`}>
                     <div className="relative">

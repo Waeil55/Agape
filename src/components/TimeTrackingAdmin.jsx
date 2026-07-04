@@ -24,6 +24,7 @@ import {
   User,
   Navigation,
 } from 'lucide-react';
+import { buildTimeEvents, generatePayrollOutput, POLICY_MODES } from '../utils/timeTracking';
 
 const formatMinutes = (minutes) => {
   const h = Math.floor(minutes / 60);
@@ -77,55 +78,137 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
     return drivers.filter(d => d.id === selectedDriver);
   }, [drivers, selectedDriver]);
 
-  // Build sessions per driver from timeData
+  // Build sessions per driver from available trip and clock data.
   const driverSessions = useMemo(() => {
-    if (!timeData) return {};
     const sessions = {};
+
+    const toIso = (value) => {
+      if (!value) return null;
+      if (typeof value === 'string') {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date.toISOString();
+      }
+      if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
+      if (typeof value.toDate === 'function') return value.toDate().toISOString();
+      if (value.seconds) return new Date(value.seconds * 1000).toISOString();
+      return null;
+    };
+
+    const dateKeyFrom = (value) => {
+      const iso = toIso(value);
+      return iso ? iso.slice(0, 10) : null;
+    };
+
+    const tripDateKey = (trip) => {
+      if (typeof trip?.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(trip.date)) return trip.date.slice(0, 10);
+      return dateKeyFrom(trip?.arrivalTime)
+        || dateKeyFrom(trip?.startTime)
+        || dateKeyFrom(trip?.startedAt)
+        || dateKeyFrom(trip?.arrivalDropoffTime)
+        || dateKeyFrom(trip?.completedAt);
+    };
+
+    const eventDateKey = (event) => dateKeyFrom(event?.timestamp || event?.at || event?.createdAt || event?.time);
+    const inDateRange = (date) => (
+      !!date
+      && (!dateRange.from || date >= dateRange.from)
+      && (!dateRange.to || date <= dateRange.to)
+    );
+
+    const sourceTrips = timeData?.trips || trips || [];
+    const sourceClockEvents = [
+      ...(clockEvents || []),
+      ...(timeData?.clockEvents || []),
+    ];
+    const sourceGaps = timeData?.gaps || timeData?.gapLog || [];
+    const sourceTeleports = timeData?.teleports || [];
+
     filteredDrivers.forEach(driver => {
       const driverId = driver.id;
-      const driverTrips = (timeData.trips || []).filter(t => t.driverId === driverId);
-      const driverClockEvents = (timeData.clockEvents || []).filter(e => e.driverId === driverId);
-      const driverGaps = (timeData.gaps || []).filter(g => g.driverId === driverId);
-      const driverTeleports = (timeData.teleports || []).filter(t => t.driverId === driverId);
+      const driverKeys = new Set([
+        driver.id,
+        driver.driverId,
+        driver.uid,
+        driver.email,
+        driver.name,
+      ].filter(Boolean).map(v => String(v).toLowerCase()));
+
+      const matchesDriver = (item) => {
+        const values = [
+          item?.driverId,
+          item?.assignedDriverId,
+          item?.driverEmail,
+          item?.assignedDriverEmail,
+          item?.driverName,
+          item?.assignedDriverName,
+          item?.email,
+        ].filter(Boolean).map(v => String(v).toLowerCase());
+        return values.length === 0 ? false : values.some(v => driverKeys.has(v));
+      };
+
+      const driverTrips = sourceTrips.filter(matchesDriver);
+      const driverClockEvents = [
+        ...(driver.clockEvents || []),
+        ...sourceClockEvents.filter(matchesDriver),
+      ];
+      const driverGaps = sourceGaps.filter(matchesDriver);
+      const driverTeleports = sourceTeleports.filter(matchesDriver);
 
       // Group by date
       const byDate = {};
       driverTrips.forEach(trip => {
-        const date = trip.date || (trip.completedAt ? new Date(trip.completedAt).toISOString().split('T')[0] : null);
-        if (!date) return;
-        if (!byDate[date]) byDate[date] = { trips: [], clockEvents: [], gaps: [], teleports: [] };
+        const date = tripDateKey(trip);
+        if (!inDateRange(date)) return;
+        if (!byDate[date]) byDate[date] = { trips: [], clockEvents: [], gaps: [], teleports: [], events: [], sessions: [], payroll: null };
         byDate[date].trips.push(trip);
       });
 
       driverClockEvents.forEach(event => {
-        const date = event.date || (event.at ? new Date(event.at).toISOString().split('T')[0] : null);
-        if (!date) return;
-        if (!byDate[date]) byDate[date] = { trips: [], clockEvents: [], gaps: [], teleports: [] };
+        const date = event.date || eventDateKey(event);
+        if (!inDateRange(date)) return;
+        if (!byDate[date]) byDate[date] = { trips: [], clockEvents: [], gaps: [], teleports: [], events: [], sessions: [], payroll: null };
         byDate[date].clockEvents.push(event);
       });
 
       driverGaps.forEach(gap => {
-        const date = gap.date;
-        if (!date) return;
-        if (!byDate[date]) byDate[date] = { trips: [], clockEvents: [], gaps: [], teleports: [] };
+        const date = gap.date || dateKeyFrom(gap.startTime || gap.timestamp);
+        if (!inDateRange(date)) return;
+        if (!byDate[date]) byDate[date] = { trips: [], clockEvents: [], gaps: [], teleports: [], events: [], sessions: [], payroll: null };
         byDate[date].gaps.push(gap);
       });
 
       driverTeleports.forEach(teleport => {
-        const date = teleport.date;
-        if (!date) return;
-        if (!byDate[date]) byDate[date] = { trips: [], clockEvents: [], gaps: [], teleports: [] };
+        const date = teleport.date || dateKeyFrom(teleport.timestamp || teleport.createdAt);
+        if (!inDateRange(date)) return;
+        if (!byDate[date]) byDate[date] = { trips: [], clockEvents: [], gaps: [], teleports: [], events: [], sessions: [], payroll: null };
         byDate[date].teleports.push(teleport);
+      });
+
+      Object.entries(byDate).forEach(([date, day]) => {
+        const model = buildTimeEvents(
+          day.trips,
+          driver,
+          day.clockEvents,
+          timeData?.policyMode || driver.timeTrackingPolicy || POLICY_MODES.SMART_MODE,
+          { date, breadcrumbs: driver.breadcrumbs || [] }
+        );
+        const externalGaps = day.gaps.filter(gap => !model.gapLog.some(modelGap => modelGap.startTime === gap.startTime && modelGap.endTime === gap.endTime));
+        day.trips = model.trips;
+        day.clockEvents = model.clockEvents;
+        day.events = model.events;
+        day.sessions = model.sessions;
+        day.gaps = [...model.gapLog, ...externalGaps];
+        day.teleports = [...model.teleports, ...day.teleports];
+        day.payroll = generatePayrollOutput(model, Number(driver.hourlyRate || 0));
       });
 
       sessions[driverId] = byDate;
     });
     return sessions;
-  }, [filteredDrivers, timeData]);
+  }, [filteredDrivers, trips, clockEvents, timeData, dateRange.from, dateRange.to]);
 
   // Summary stats
   const summaryStats = useMemo(() => {
-    if (!timeData) return null;
     const allSessions = Object.values(driverSessions).flatMap(byDate => Object.values(byDate));
     const totalTrips = allSessions.reduce((sum, s) => sum + s.trips.length, 0);
     const totalGaps = allSessions.reduce((sum, s) => sum + s.gaps.length, 0);
@@ -140,18 +223,19 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
       totalTeleports,
       excludedMinutes,
     };
-  }, [driverSessions, timeData]);
+  }, [driverSessions]);
 
   // Export CSV
   const exportCSV = () => {
-    if (!timeData) return;
     const rows = [['Driver', 'Date', 'Clock In', 'Clock Out', 'Billable Minutes', 'Break Minutes', 'Gap Minutes', 'Trips', 'Gaps', 'Teleports']];
     Object.entries(driverSessions).forEach(([driverId, byDate]) => {
       const driver = drivers.find(d => d.id === driverId);
       Object.entries(byDate).forEach(([date, session]) => {
         const clockIn = session.clockEvents.find(e => e.type === 'IN' || e.type === 'CLOCK_IN' || e.type === 'AUTO_CLOCK_IN');
         const clockOut = session.clockEvents.find(e => e.type === 'OUT' || e.type === 'CLOCK_OUT');
-        const billable = session.trips.reduce((sum, t) => sum + (t.billableMinutes || 0), 0);
+        const billable = session.payroll?.payTime?.billableMinutes
+          ?? session.sessions.reduce((sum, s) => sum + (s.billableMinutes || 0), 0)
+          ?? session.trips.reduce((sum, t) => sum + (t.billableMinutes || 0), 0);
         const breaks = session.gaps.filter(g => g.gapType === 'BREAK').reduce((sum, g) => sum + g.durationMinutes, 0);
         const gaps = session.gaps.filter(g => g.payrollEffect === 'EXCLUDED').reduce((sum, g) => sum + g.durationMinutes, 0);
         rows.push([
@@ -344,7 +428,9 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                         const day = byDate[date];
                         const clockIn = day.clockEvents.find(e => e.type === 'IN' || e.type === 'CLOCK_IN' || e.type === 'AUTO_CLOCK_IN');
                         const clockOut = day.clockEvents.find(e => e.type === 'OUT' || e.type === 'CLOCK_OUT');
-                        const billable = day.trips.reduce((sum, t) => sum + (t.billableMinutes || 0), 0);
+                        const billable = day.payroll?.payTime?.billableMinutes
+                          ?? day.sessions.reduce((sum, s) => sum + (s.billableMinutes || 0), 0)
+                          ?? day.trips.reduce((sum, t) => sum + (t.billableMinutes || 0), 0);
                         const breaks = day.gaps.filter(g => g.gapType === 'BREAK').reduce((sum, g) => sum + g.durationMinutes, 0);
 
                         return (
@@ -417,7 +503,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                   Object.entries(byDate).flatMap(([date, session]) =>
                     session.gaps.map(g => ({ ...g, driverId, date }))
                   )
-                ).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                ).sort((a, b) => new Date(b.timestamp || b.startTime) - new Date(a.timestamp || a.startTime));
 
                 if (allGaps.length === 0) {
                   return (
@@ -439,7 +525,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                             {gap.gapType === 'TRIP' ? 'Between trips' : gap.gapType === 'BREAK' ? 'Break' : 'After trip'}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {formatDate(gap.timestamp)} at {formatTime(gap.timestamp)}
+                            {formatDate(gap.timestamp || gap.startTime)} at {formatTime(gap.timestamp || gap.startTime)}
                           </p>
                         </div>
                       </div>
@@ -527,7 +613,11 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                   const driver = drivers.find(d => d.id === driverId);
                   const dates = Object.keys(byDate);
                   const totalBillable = dates.reduce((sum, d) =>
-                    sum + byDate[d].trips.reduce((s, t) => s + (t.billableMinutes || 0), 0), 0
+                    sum + (
+                      byDate[d].payroll?.payTime?.billableMinutes
+                      ?? byDate[d].sessions.reduce((s, session) => s + (session.billableMinutes || 0), 0)
+                      ?? byDate[d].trips.reduce((s, t) => s + (t.billableMinutes || 0), 0)
+                    ), 0
                   );
                   const totalBreaks = dates.reduce((sum, d) =>
                     sum + byDate[d].gaps.filter(g => g.gapType === 'BREAK').reduce((s, g) => s + g.durationMinutes, 0), 0
