@@ -104,7 +104,7 @@ const MobileEnterpriseDashboard = (props) => {
   };
 
   const renderTopBar = (title, showBack = false) => (
-    <div className="px-4 py-3 flex items-center justify-between bg-white border-b border-gray-100 shrink-0 sticky top-0 z-50">
+    <div className="mobile-enterprise-header px-4 py-3 flex items-center justify-between bg-white border-b border-gray-100 shrink-0 sticky top-0 z-50">
       <div className="flex items-center gap-3">
         {showBack && (
           <button onClick={() => setSubView(null)} className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-1.5 mr-1 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 touch-manipulation">

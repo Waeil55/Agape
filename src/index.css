@@ -2213,3 +2213,15 @@ html, body {
   padding-left: 0 !important;
   padding-right: 0 !important;
 }
+
+/* Ensure mobile page headers clear the top status bar / safe areas on all mobile devices and browsers (including Safari) */
+@media (max-width: 767px) {
+  .driver-page-header,
+  .driver-active-trip-header,
+  .mobile-enterprise-header,
+  .mobile-dispatch-header,
+  .mobile-admin-header,
+  .agape-chat-header {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
+  }
+}

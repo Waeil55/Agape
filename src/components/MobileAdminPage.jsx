@@ -132,7 +132,7 @@ const MobileAdminPage = ({
 
   return (
     <div className="flex flex-1 min-h-0 w-full flex-col bg-gray-50 overflow-hidden">
-      <div className="sticky top-0 z-20 border-b border-gray-200 bg-white px-3 py-3">
+      <div className="mobile-admin-header sticky top-0 z-20 border-b border-gray-200 bg-white px-3 pb-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2b4c7e]">Command Admin</p>

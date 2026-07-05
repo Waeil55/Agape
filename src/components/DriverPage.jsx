@@ -3036,7 +3036,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
     return (
       <><div className="min-h-full bg-[#f4f7fb] pb-32">
-        <div className="sticky top-0 z-30 bg-white border-b-2 border-amber-400" style={{ paddingTop: 'max(8px, env(safe-area-inset-top, 0px))' }}>
+        <div className="sticky top-0 z-30 bg-white border-b-2 border-amber-400 driver-active-trip-header">
           <div className="px-3 py-2.5 flex items-center gap-2.5">
             <button
               type="button"
@@ -3313,7 +3313,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {!(activeNav === 'active-trip' && activeWorkTrip) && (
         <div
           className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
-          style={{ paddingTop: 'max(8px, env(safe-area-inset-top, 0px))' }}
         >
           <div className="px-3 py-3 flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">

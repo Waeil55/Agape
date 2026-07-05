@@ -292,7 +292,7 @@ const MobileDispatchView = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 px-3 pt-4 pb-3 bg-white border-b border-gray-200 sm:px-4">
+      <div className="mobile-dispatch-header shrink-0 px-3 pb-3 bg-white border-b border-gray-200 sm:px-4">
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2b4c7e]">Dispatch Board</p>
