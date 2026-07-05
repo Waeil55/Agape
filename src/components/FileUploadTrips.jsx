@@ -994,9 +994,10 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           driverEmail,
           completedVehicle,
 
-          // --- ODOMETER ---
+          // --- ODOMETER & SIGNATURE ---
           pickupOdometer: cleanOdometer(pickupOdo),
           dropoffOdometer: cleanOdometer(dropoffOdo),
+          paperSignatureConfirmed: !!(cleanOdometer(pickupOdo) || cleanOdometer(dropoffOdo)) || [true, 'true', 'yes', 'y', '1', 1, 'received', 'rider signature received'].some(val => String(extract(m.paperSignatureConfirmed, row['Signature Captured'], row['Signature Captured?'], row['signature'])).toLowerCase().includes(String(val))),
 
           // --- TIMES (arrival/departure/completion) ---
           arrivalTime,
