@@ -153,6 +153,7 @@ const DesktopReportsPage = ({
   const [driverFilter, setDriverFilter] = useState('all');
   const [reviewFilter, setReviewFilter] = useState('all');
   const [hiddenColumns, setHiddenColumns] = useState(['travelTime', 'distance']);
+  const [reviewSortConfig, setReviewSortConfig] = useState({ key: 'schedule', direction: 'asc' });
   const toggleColumn = (col) => setHiddenColumns(prev => prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]);
 
   const [editingCell, setEditingCell] = useState(null); // { tripId, field }
@@ -633,7 +634,47 @@ const DesktopReportsPage = ({
     </div>
   );
 
-  const renderReviewTable = () => (
+  const handleReviewSort = (key) => {
+    if (key === 'edit') return;
+    setReviewSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const renderReviewTable = () => {
+    const sortedRows = [...reportRows].sort((a, b) => {
+      const k = reviewSortConfig.key;
+      const tA = a.trip;
+      const tB = b.trip;
+      let valA, valB;
+      
+      switch(k) {
+        case 'date': valA = tA.date; valB = tB.date; break;
+        case 'driver': valA = (a.driver?.name || tA.driverName || '').toLowerCase(); valB = (b.driver?.name || tB.driverName || '').toLowerCase(); break;
+        case 'vehicle': valA = (tA.completedVehicle || a.driver?.vehicle || '').toLowerCase(); valB = (tB.completedVehicle || b.driver?.vehicle || '').toLowerCase(); break;
+        case 'schedule': valA = tA.time; valB = tB.time; break;
+        case 'tripId': valA = String(tA.bookingId || tA.id); valB = String(tB.bookingId || tB.id); break;
+        case 'passenger': valA = String(tA.patient || '').toLowerCase(); valB = String(tB.patient || '').toLowerCase(); break;
+        case 'pickupAddr': valA = String(tA.pickup || '').toLowerCase(); valB = String(tB.pickup || '').toLowerCase(); break;
+        case 'pickupTime': valA = tA.arrivalTime || tA.pickupTime || ''; valB = tB.arrivalTime || tB.pickupTime || ''; break;
+        case 'startOdo': valA = parseFloat(tA.pickupOdometer) || 0; valB = parseFloat(tB.pickupOdometer) || 0; break;
+        case 'dropoffAddr': valA = String(tA.dropoff || '').toLowerCase(); valB = String(tB.dropoff || '').toLowerCase(); break;
+        case 'dropoffTime': valA = tA.arrivalDropoffTime || tA.completedAt || ''; valB = tB.arrivalDropoffTime || tB.completedAt || ''; break;
+        case 'endOdo': valA = parseFloat(tA.dropoffOdometer) || 0; valB = parseFloat(tB.dropoffOdometer) || 0; break;
+        case 'travelTime': valA = a.travelMinutes || 0; valB = b.travelMinutes || 0; break;
+        case 'distance': valA = parseFloat(calcMiles(tA)) || 0; valB = parseFloat(calcMiles(tB)) || 0; break;
+        case 'signature': valA = tA.paperSignatureConfirmed ? 1 : 0; valB = tB.paperSignatureConfirmed ? 1 : 0; break;
+        case 'review': valA = tA.reviewed ? 1 : 0; valB = tB.reviewed ? 1 : 0; break;
+        default: valA = ''; valB = '';
+      }
+      
+      if (valA < valB) return reviewSortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return reviewSortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return (
     <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
     <div className="overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
       <div className="overflow-x-auto">
@@ -667,7 +708,16 @@ const DesktopReportsPage = ({
               <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
                 <tr>
                   {cols.map((c, i) => (
-                    <th key={c.key} className={`px-3 py-1.5 text-left font-semibold ${i === 0 ? 'rounded-tl-xl' : ''} ${i === cols.length - 1 ? 'rounded-tr-xl' : ''}`}>{c.label}</th>
+                    <th key={c.key} className={`px-3 py-1.5 text-left font-semibold ${i === 0 ? 'rounded-tl-xl' : ''} ${i === cols.length - 1 ? 'rounded-tr-xl' : ''}`}>
+                      {c.key !== 'edit' ? (
+                        <button onClick={() => handleReviewSort(c.key)} className="flex w-full items-center gap-1 text-left hover:text-blue-200 transition-colors cursor-pointer outline-none uppercase tracking-wider text-[10px]">
+                          {c.label}
+                          {reviewSortConfig.key === c.key ? (reviewSortConfig.direction === 'asc' ? '↑' : '↓') : <span className="opacity-0">↕</span>}
+                        </button>
+                      ) : (
+                        c.label
+                      )}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -675,7 +725,7 @@ const DesktopReportsPage = ({
           );
         })()}
         <tbody className="divide-y divide-slate-100">
-          {reportRows.map(({ trip, driver, travelMinutes }, index) => (
+          {sortedRows.map(({ trip, driver, travelMinutes }, index) => (
             <tr key={trip.id} className={`${activeRow === trip.id ? 'bg-blue-100' : index % 2 ? 'bg-slate-50/70' : 'bg-white'} hover:bg-blue-50/70 transition-colors cursor-pointer`} onClick={() => setActiveRow(trip.id)}>
               {!hiddenColumns.includes('edit') && (
                 <td className="px-3 py-1.5">
