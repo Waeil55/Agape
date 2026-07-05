@@ -481,11 +481,8 @@ const App = () => {
     const onSWUpdate = () => { skipWaiting(); };
     window.addEventListener('swUpdateAvailable', onSWUpdate);
     const onControllerChange = () => {
-      // New SW activated — reload once to pick up fresh assets
-      if (!window.sessionStorage.getItem('sw-reload-pending')) {
-        window.sessionStorage.setItem('sw-reload-pending', 'true');
-        window.location.reload();
-      }
+      // Signal controller change locally; main thread registers separate effect below to show non-blocking toast
+      window.dispatchEvent(new CustomEvent('agape:sw-updated'));
     };
     window.addEventListener('swControllerChanged', onControllerChange);
 
@@ -715,6 +712,22 @@ const App = () => {
     setToasts(prev => [...prev, { id, title, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
   }, []);
+
+  // Show a non-blocking toast notification when the service worker updates,
+  // prompting the user to reload instead of calling location.reload() automatically (which hangs/freezes WebKit PWAs)
+  useEffect(() => {
+    const handleUpdate = () => {
+      addToast(
+        'App Updated', 
+        'A new version of the app is ready. Pull down to refresh or reopen to apply.', 
+        'success'
+      );
+    };
+    window.addEventListener('agape:sw-updated', handleUpdate);
+    return () => {
+      window.removeEventListener('agape:sw-updated', handleUpdate);
+    };
+  }, [addToast]);
 
   const addMessageBanner = useCallback((banner) => {
     const id = `${banner.channelId || 'chat'}-${Date.now()}`;
