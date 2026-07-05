@@ -2222,6 +2222,6 @@ html, body {
   .mobile-dispatch-header,
   .mobile-admin-header,
   .agape-chat-header {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
+    padding-top: calc(max(20px, env(safe-area-inset-top, 0px)) + 12px) !important;
   }
 }
