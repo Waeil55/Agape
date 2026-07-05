@@ -417,16 +417,16 @@ function mergePairedActivityRows(rows) {
     mergedRow['Address Short'] = puShort || doShort;
     if (fullAddrCol) mergedRow[fullAddrCol] = puFull || doFull;
 
-    const scheduleCol = headers.find(h => h.toLowerCase().replace(/[^a-z ]/g, '').trim() === 'scheduletime');
+    const scheduleCol = headers.find(h => h.toLowerCase().replace(/[^a-z]/g, '') === 'scheduletime');
     if (scheduleCol && pickupRow && pickupRow[scheduleCol]) mergedRow[scheduleCol] = pickupRow[scheduleCol];
 
-    const arrivalCol = headers.find(h => h.toLowerCase().replace(/[^a-z ]/g, '').trim() === 'arrivaltime');
+    const arrivalCol = headers.find(h => h.toLowerCase().replace(/[^a-z]/g, '') === 'arrivaltime');
     if (arrivalCol) {
       if (pickupRow && pickupRow[arrivalCol]) mergedRow['Pickup Arrival'] = pickupRow[arrivalCol];
       if (dropoffRow && dropoffRow[arrivalCol]) mergedRow['Dropoff Arrival'] = dropoffRow[arrivalCol];
     }
 
-    const departureCol = headers.find(h => h.toLowerCase().replace(/[^a-z ]/g, '').trim() === 'departuretime');
+    const departureCol = headers.find(h => h.toLowerCase().replace(/[^a-z]/g, '') === 'departuretime');
     if (departureCol) {
       if (pickupRow && pickupRow[departureCol]) mergedRow['Departure Time'] = pickupRow[departureCol];
       if (dropoffRow && dropoffRow[departureCol]) mergedRow['Dropoff Departure'] = dropoffRow[departureCol];
