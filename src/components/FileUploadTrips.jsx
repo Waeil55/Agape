@@ -1009,16 +1009,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           // --- MILEAGE ---
           distance,
 
-          // --- SIGNATURE ---
-          paperSignatureConfirmed: parseSig(
-            row['_agape_signature'] ?? 
-            m.paperSignatureConfirmed ?? 
-            row['Signature Captured?'] ?? 
-            row['Signature'] ?? 
-            row['signature'] ?? 
-            row['Signed'] ?? 
-            row['Rider Signature Received']
-          ),
+
 
           // --- CANCELLATION ---
           cancelledAt: extract(m.cancelledAt, row['Cancelled At'], row['cancelledAt']),
