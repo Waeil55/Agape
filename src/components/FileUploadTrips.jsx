@@ -96,8 +96,10 @@ const cleanOdometer = (value) => {
   if (value === undefined || value === null || value === '') return '';
   const s = String(value).trim();
   if (!s || /^\d{1,2}:\d{2}/.test(s)) return '';
-  const cleaned = s.replace(/,/g, '').replace(/\bmi(?:les)?\b/gi, '').trim();
-  return /^\d+(\.\d+)?$/.test(cleaned) && Number(cleaned) > 0 ? cleaned : '';
+  // Aggressively strip anything that isn't a digit or decimal point
+  const cleaned = s.replace(/[^0-9.]/g, '');
+  const num = parseFloat(cleaned);
+  return (!isNaN(num) && num >= 0) ? String(num) : '';
 };
 
 function findColumn(headers, aliases) {
