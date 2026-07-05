@@ -1078,6 +1078,13 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
   const confirmImport = () => {
     const tripSource = uploadContext === 'reports' ? 'report_upload' : 'dispatch_upload';
+    
+    const effectiveDateMode = fileDates.length > 0 ? dateMode : 'manual';
+    if (uploadContext === 'reports' && effectiveDateMode === 'manual' && !manualDate) {
+      setError('Please select a service date for this file before importing.');
+      return;
+    }
+
     const cleanTrips = mappedTrips.map(({ _originalRow, _hasIssues, _issues, _confidence, ...trip }) => {
       const finalDriverId = trip.driverId || assignToDriver || _originalRow['Driver ID'] || null;
       let newStatus = trip.status;
@@ -1092,7 +1099,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       }
 
       // Apply date override: use manualDate if dateMode is 'manual', else use trip's file date
-      const resolvedDate = dateMode === 'manual' ? manualDate : (trip.date || (() => {
+      const resolvedDate = effectiveDateMode === 'manual' ? manualDate : (trip.date || (() => {
         for (const field of ['scheduledDate', 'scheduleDate', 'tripDate']) {
           if (trip[field]) {
             const d = new Date(trip[field]);
