@@ -327,7 +327,7 @@ const MobileEnterpriseDashboard = (props) => {
 
   return (
     <div
-      className="mobile-enterprise-dashboard-wrapper w-full h-[100dvh] bg-white flex flex-col relative overflow-hidden"
+      className="mobile-enterprise-dashboard-wrapper w-full h-full bg-white flex flex-col relative overflow-hidden"
       style={{ paddingBottom: (currentView === 'chat' && isChatThreadOpen) ? 0 : 'calc(env(safe-area-inset-bottom, 0px) + 88px)' }}
     >
       {/* Dynamic Content */}

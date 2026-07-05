@@ -694,7 +694,7 @@ const LiveMapPage = ({
   };
 
   return (
-    <div className="h-[100dvh] w-full min-h-0 bg-slate-50 flex flex-col overflow-hidden select-none font-outfit">
+    <div className="h-full w-full min-h-0 bg-slate-50 flex flex-col overflow-hidden select-none font-outfit">
       {/* ===== HUD BAR (36px) ===== */}
       <header className="shrink-0 min-h-10 bg-white border-b border-slate-200 shadow-sm flex flex-wrap items-center gap-2 px-3 py-2 z-30 sm:flex-nowrap sm:gap-3 sm:px-4 sm:py-0">
         <span className="text-[12px] font-semibold text-slate-700 tracking-wide uppercase">Agape</span>

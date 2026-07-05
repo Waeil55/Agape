@@ -491,7 +491,7 @@ const LiveRouteMap = React.memo(({
         )}
 
         {/* Map Container */}
-        <div ref={mapRef} className={`w-full ${fullscreen ? 'h-[100dvh]' : 'h-64 sm:h-80 md:h-96'}`} />
+        <div ref={mapRef} className={`w-full ${fullscreen ? 'h-full' : 'h-64 sm:h-80 md:h-96'}`} />
 
         {/* Attribution */}
         <div className="absolute bottom-1 right-2 z-10 text-xs text-slate-400 opacity-50 pointer-events-none select-none">

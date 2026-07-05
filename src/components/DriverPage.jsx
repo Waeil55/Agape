@@ -3303,7 +3303,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }
 
   return (
-    <div className="w-full h-[100dvh] overflow-hidden flex flex-col bg-[#F3F4F6] text-slate-900">
+    <div className="w-full h-full overflow-hidden flex flex-col bg-[#F3F4F6] text-slate-900">
       {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && expandedTripId && !activeWorkTrip && (
         <div
           className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
