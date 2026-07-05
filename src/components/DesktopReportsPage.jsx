@@ -773,6 +773,7 @@ const DesktopReportsPage = ({
     </div>
     </div>
   );
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#f4f7fa] font-sans text-slate-900">

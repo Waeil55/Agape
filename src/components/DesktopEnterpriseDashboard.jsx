@@ -1343,7 +1343,17 @@ const DesktopEnterpriseDashboard = ({
                         const key = makeKey(nt);
                         if (existingKeys.has(key)) {
                           const idx = existingKeys.get(key);
-                          updatedTrips[idx] = { ...updatedTrips[idx], ...nt, id: updatedTrips[idx].id };
+                          const existingTrip = updatedTrips[idx];
+                          const mergedTrip = { ...existingTrip };
+                          Object.keys(nt).forEach(k => {
+                            // Only overwrite if the new value is meaningful, or if it's explicitly overriding
+                            if (nt[k] !== '' && nt[k] !== null && nt[k] !== undefined) {
+                              mergedTrip[k] = nt[k];
+                            }
+                          });
+                          // Ensure we keep the original Firestore ID
+                          mergedTrip.id = existingTrip.id;
+                          updatedTrips[idx] = mergedTrip;
                         } else {
                           updatedTrips.push(nt);
                           existingKeys.set(key, updatedTrips.length - 1);
