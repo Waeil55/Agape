@@ -443,6 +443,12 @@ function mergePairedActivityRows(rows) {
     const costCol = headers.find(h => h.toLowerCase().replace(/[^a-z ]/g, '').trim() === 'providercost');
     if (costCol && dropoffRow && dropoffRow[costCol]) mergedRow[costCol] = dropoffRow[costCol];
 
+    const odoCol = headers.find(h => h.toLowerCase().includes('odometer') || h.toLowerCase().includes('mileage'));
+    if (odoCol) {
+      if (pickupRow && pickupRow[odoCol]) mergedRow['Pickup Odometer'] = pickupRow[odoCol];
+      if (dropoffRow && dropoffRow[odoCol]) mergedRow['Dropoff Odometer'] = dropoffRow[odoCol];
+    }
+
     merged.push(mergedRow);
   });
 
@@ -592,7 +598,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   const [error, setError] = useState('');
   const [progressMsg, setProgressMsg] = useState('');
   const [progressPct, setProgressPct] = useState(0);
-  const [aiEnabled, setAiEnabled] = useState(true);
+  const [aiEnabled, setAiEnabled] = useState(uploadContext !== 'reports');
   const [aiCanSkip, setAiCanSkip] = useState(false);
   const [detectedColumns, setDetectedColumns] = useState({});
   const [allColumnNames, setAllColumnNames] = useState([]);
@@ -660,12 +666,14 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         setProgressMsg('Parsing CSV data...');
         const text = await file.text();
         rows = parseCSV(text);
-        rows = mergePairedActivityRows(rows);
       } else {
         setProgressMsg('Parsing spreadsheet...');
         const buffer = await file.arrayBuffer();
         rows = parseExcel(buffer);
       }
+      
+      // ALWAYS try to merge paired rows, regardless of file format
+      rows = mergePairedActivityRows(rows);
 
       if (rows.length === 0) {
         setError('No data rows found in the file. Make sure it has a header row followed by trip data.');
