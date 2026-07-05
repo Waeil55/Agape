@@ -891,18 +891,18 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
         // Extract odometer values, parsing as integers
         const pickupOdo = extract(
+          row['Pickup Odometer'],
           row['_agape_pickupOdo'],
           m.pickupOdometer,
           m.odometer,
-          row['Pickup Odometer'],
           row['pickupOdometer'],
           row['Start Odometer'],
           row['PU Odo'],
         );
         const dropoffOdo = extract(
+          row['Dropoff Odometer'],
           row['_agape_dropoffOdo'],
           m.dropoffOdometer,
-          row['Dropoff Odometer'],
           row['dropoffOdometer'],
           row['End Odometer'],
           row['DO Odo'],
@@ -910,17 +910,17 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
         // Extract arrival times
         const arrivalTime = extract(
+          row['Pickup Arrival'],
           row['_agape_pickupArrival'],
           m.pickupArrival,
-          row['Pickup Arrival'],
           row['arrivalTime'],
           row['Arrival Time'],
           row['PU Arrival'],
         );
         const arrivalDropoffTime = extract(
+          row['Dropoff Arrival'],
           row['_agape_dropoffArrival'],
           m.dropoffArrival,
-          row['Dropoff Arrival'],
           row['arrivalDropoffTime'],
           row['Dropoff Time'],
           row['DO Arrival'],
@@ -933,8 +933,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
         // Extract timestamps
         const completedAt = extract(m.completedAt, row['Completed At'], row['completedAt'], row['Completion Time']);
-        const startTime = extract(m.startTime, row['Start Time'], row['startTime'], row['Started At']);
-        const departedPickupTime = extract(m.departedPickupTime, row['Departed Pickup'], row['departedPickupTime']);
+        const startTime = extract(row['Departure Time'], m.startTime, row['Start Time'], row['startTime'], row['Started At']);
+        const departedPickupTime = extract(row['Departure Time'], m.departedPickupTime, row['Departed Pickup'], row['departedPickupTime']);
         const hasInOut = [
           m.time,
           m.dropoffTime,
@@ -953,8 +953,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         if (!date) date = normalizeDateValue(row['Date'] || row['date'] || row['Trip Date'] || row['Service Date'] || '');
         if (!date) date = today;
 
-        const pickupAddr = extract(m.pickup, row['Pickup Address'], row['pickup'], row['Pickup']);
-        const dropoffAddr = extract(m.dropoff, row['Dropoff Address'], row['dropoff'], row['Dropoff']);
+        const pickupAddr = extract(row['Pickup Address'], m.pickup, row['pickup'], row['Pickup']);
+        const dropoffAddr = extract(row['Dropoff Address'], m.dropoff, row['dropoff'], row['Dropoff']);
 
         return {
           // --- IDENTIFIERS ---
