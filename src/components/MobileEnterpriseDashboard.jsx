@@ -116,9 +116,9 @@ const MobileEnterpriseDashboard = (props) => {
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-bold text-sm text-gray-900">{title}</h1>
+            <h1 className="font-bold text-sm text-gray-900">{getProfileTitle()}</h1>
           </div>
-          <p className="text-[10px] text-gray-500 font-medium truncate max-w-[220px]">{currentUser}</p>
+          <p className="text-[10px] text-gray-500 font-medium truncate max-w-[220px]">{title} • {currentUser}</p>
         </div>
       </div>
     </div>
@@ -217,7 +217,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'chat') {
       return (
         <div className="mobile-chat-wrapper flex-1 overflow-hidden flex flex-col">
-          {!isChatThreadOpen && renderTopBar('Messages')}
+          {renderTopBar('Messages')}
           <ErrorBoundary><Suspense fallback={<MobileFallback />}><ChatPage onBack={() => setCurrentView('trips')} onThreadActiveChange={setIsChatThreadOpen} /></Suspense></ErrorBoundary>
         </div>
       );
