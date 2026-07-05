@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, 
   XCircle, AlertTriangle, RefreshCw, User, ChevronDown, 
-  Edit2, RotateCcw, PhoneCall, Check, ChevronUp, X
+  Edit2, RotateCcw, PhoneCall, Check, ChevronUp, X, Upload
 } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
 
@@ -60,12 +60,13 @@ const parseOdometerInput = (value) => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip }) => {
+const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUploadModal }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateStr, setDateStr] = useState(localCalendarYmd());
   const [expandedTripId, setExpandedTripId] = useState(null);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
+  const [sortKeyOverrides, setSortKeyOverrides] = useState({});
 
   const filteredTrips = useMemo(() => {
     let filtered = trips.filter(t => t.date === dateStr);
@@ -78,8 +79,12 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip }) => {
         (t.dropoff && t.dropoff.toLowerCase().includes(q))
       );
     }
-    return filtered.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-  }, [trips, dateStr, searchQuery]);
+    return filtered.sort((a, b) => {
+      const aKey = sortKeyOverrides[a.id] ?? (a.time || '');
+      const bKey = sortKeyOverrides[b.id] ?? (b.time || '');
+      return aKey.localeCompare(bKey);
+    });
+  }, [trips, dateStr, searchQuery, sortKeyOverrides]);
 
   const shiftDate = (days) => {
     const d = new Date(dateStr + 'T12:00:00');
@@ -119,11 +124,13 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip }) => {
       notes: trip.notes || '',
     });
     setExpandedTripId(trip.id);
+    setSortKeyOverrides(prev => ({ ...prev, [trip.id]: trip.time || '' }));
   };
 
   const cancelInlineEdit = () => {
     setEditingTripId(null);
     setEditingTripData(null);
+    setSortKeyOverrides({});
   };
 
   const saveInlineEdit = () => {
@@ -155,6 +162,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip }) => {
     };
     setEditingTripId(null);
     setEditingTripData(null);
+    setSortKeyOverrides({});
     if (onUpdateTrip) onUpdateTrip(editingTripId, payload);
   };
 
@@ -177,6 +185,11 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip }) => {
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
+        {setShowUploadModal && (
+          <button onClick={() => setShowUploadModal(true)} className="p-2 border border-gray-200 rounded text-gray-600 hover:bg-gray-50">
+            <Upload className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* SEARCH BAR */}

@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, ArrowRight, Download, Truck, X } from 'lucide-react';
+import Papa from 'papaparse';
+import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, ArrowRight, Download, Truck, X, Calendar, FileSpreadsheet } from 'lucide-react';
 import { GEMINI_API_CONFIG } from '../config/firebase';
 import { annotateInOutPairs, hasInOutMarker, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
 import { isCorruptedTripRecord } from '../utils/tripIntegrity';
@@ -35,7 +36,7 @@ const COLUMN_ALIASES = {
   driver: ['driver', 'driver name', 'assigned to', 'chauffeur', 'provider', 'assigned driver', 'driver id', 'driverid'],
   driverEmail: ['driver email', 'driver_email', 'driver email address', 'email'],
   vehicle: ['vehicle', 'vehicle id', 'car', 'van', 'fleet', 'assigned vehicle', 'truck', 'vehicle number', 'unit #', 'unit number'],
-  pickupOdometer: ['pickup odo', 'pickup odometer', 'pu odometer', 'start odometer', 'start mileage', 'pickup mileage', 'odometer start', 'pu odo', 'start odo', 'begin odo', 'begin odometer', 'start odo reading'],
+  pickupOdometer: ['pickup odo', 'pickup odometer', 'pu odometer', 'start odometer', 'start mileage', 'pickup mileage', 'odometer start', 'pu odo', 'start odo', 'begin odo', 'begin odometer', 'start odo reading', 'mileage/odometer'],
   dropoffOdometer: ['dropoff odo', 'dropoff odometer', 'do odometer', 'end odometer', 'end mileage', 'dropoff mileage', 'odometer end', 'do odo', 'end odo', 'final odo', 'end odo reading'],
   odometer: ['odometer', 'odo', 'mileage'],
   distance: ['distance', 'dist', 'trip distance', 'miles', 'total miles', 'est miles', 'estimated miles', 'est distance', 'total distance', 'mileage'],
@@ -115,7 +116,52 @@ function findColumn(headers, aliases) {
   return lower.findIndex(h => h.includes(a) || a.includes(h));
 }
 
+function detectDelimiter(firstLine) {
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  if (tabCount > commaCount) return '\t';
+  return ',';
+}
+
+function splitLine(line, delimiter) {
+  const values = [];
+  let v = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') { v += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { v += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === delimiter) { values.push(v.trim()); v = ''; }
+      else { v += ch; }
+    }
+  }
+  values.push(v.trim());
+  return values;
+}
+
 function parseCSV(text) {
+  // Try papaparse first — handles complex quoting, BOM, CRLF robustly
+  try {
+    const result = Papa.parse(text.replace(/^\uFEFF/, ''), {
+      header: true,
+      skipEmptyLines: true,
+      trimHeaders: true,
+      dynamicTyping: false,
+    });
+    if (result.data && result.data.length > 0 && result.meta?.fields?.length > 0) {
+      return result.data.map(row => {
+        const clean = {};
+        Object.keys(row).forEach(k => { clean[k.trim()] = String(row[k] ?? '').trim(); });
+        return clean;
+      });
+    }
+  } catch (_) { /* fall through to custom parser */ }
+
+  // Custom fallback parser
   text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const lines = [];
   let current = '';
@@ -135,27 +181,14 @@ function parseCSV(text) {
   if (current.trim()) lines.push(current);
 
   if (lines.length < 2) return [];
-  const headerLine = lines[0];
-  const headers = [];
-  let h = ''; let hq = false;
-  for (let i = 0; i < headerLine.length; i++) {
-    const ch = headerLine[i];
-    if (hq) { if (ch === '"' && headerLine[i + 1] === '"') { h += '"'; i++; } else if (ch === '"') { hq = false; } else { h += ch; } }
-    else { if (ch === '"') { hq = true; } else if (ch === ',') { headers.push(h.trim()); h = ''; } else { h += ch; } }
-  }
-  headers.push(h.trim());
+
+  const delimiter = detectDelimiter(lines[0]);
+  const headers = splitLine(lines[0], delimiter);
 
   const data = [];
   for (let r = 1; r < lines.length; r++) {
     if (!lines[r].trim()) continue;
-    const values = [];
-    let v = ''; let vq = false;
-    for (let i = 0; i < lines[r].length; i++) {
-      const ch = lines[r][i];
-      if (vq) { if (ch === '"' && lines[r][i + 1] === '"') { v += '"'; i++; } else if (ch === '"') { vq = false; } else { v += ch; } }
-      else { if (ch === '"') { vq = true; } else if (ch === ',') { values.push(v.trim()); v = ''; } else { v += ch; } }
-    }
-    values.push(v.trim());
+    const values = splitLine(lines[r], delimiter);
     const row = {};
     headers.forEach((h, idx) => {
       const raw = values[idx];
@@ -163,8 +196,8 @@ function parseCSV(text) {
     });
     if (values.length > headers.length) {
       const lastH = headers[headers.length - 1].trim();
-      const extra = values.slice(headers.length).map(v => v.trim()).join(',');
-      if (row[lastH] && extra) row[lastH] += ',' + extra;
+      const extra = values.slice(headers.length).map(v => v.trim()).join(delimiter === '\t' ? '\t' : ',');
+      if (row[lastH] && extra) row[lastH] += (delimiter === '\t' ? '\t' : ',') + extra;
     }
     data.push(row);
   }
@@ -321,6 +354,101 @@ function mapColumns(row) {
   };
 }
 
+function mergePairedActivityRows(rows) {
+  if (!rows || rows.length === 0) return rows;
+
+  const headers = Object.keys(rows[0]);
+  const activityCol = headers.find(h => h.toLowerCase().replace(/[^a-z]/g, '') === 'activity');
+  // Match 'Booking Id', 'Booking ID', 'BookingId', 'bookingid', 'Event Id', 'Event ID'
+  const bookingCol = headers.find(h => {
+    const norm = h.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return norm === 'bookingid' || norm === 'eventid';
+  });
+  if (!activityCol || !bookingCol) return rows;
+
+  const sample = rows.slice(0, 10);
+  const hasPaired = sample.some(r => {
+    const act = String(r[activityCol] || '').trim().toUpperCase();
+    return act === 'PICKUP' || act === 'DROPOFF';
+  });
+  if (!hasPaired) return rows;
+
+  const shortAddrCol = headers.find(h => h.toLowerCase().replace(/[^a-z ]/g, '').trim() === 'address short');
+  const fullAddrCol = headers.find(h => {
+    const norm = h.toLowerCase().replace(/[^a-z ]/g, '').trim();
+    return norm === 'address';
+  });
+
+  const groups = {};
+  rows.forEach(row => {
+    const bookingId = String(row[bookingCol] || '').trim();
+    if (!bookingId) return;
+    if (!groups[bookingId]) groups[bookingId] = [];
+    groups[bookingId].push(row);
+  });
+
+  const merged = [];
+  Object.values(groups).forEach(group => {
+    if (group.length === 1) {
+      merged.push(group[0]);
+      return;
+    }
+
+    const pickupRow = group.find(r => String(r[activityCol] || '').trim().toUpperCase() === 'PICKUP');
+    const dropoffRow = group.find(r => String(r[activityCol] || '').trim().toUpperCase() === 'DROPOFF');
+    const base = pickupRow || dropoffRow || group[0];
+    const mergedRow = { ...base };
+
+    const getShort = (row) => row && shortAddrCol && row[shortAddrCol] ? String(row[shortAddrCol]).trim() : '';
+    const getFull = (row) => row && fullAddrCol && row[fullAddrCol] ? String(row[fullAddrCol]).trim() : '';
+
+    const puShort = getShort(pickupRow);
+    const puFull = getFull(pickupRow);
+    const doShort = getShort(dropoffRow);
+    const doFull = getFull(dropoffRow);
+
+    const pickupAddr = puFull || puShort;
+    const dropoffAddr = doFull || doShort;
+
+    mergedRow['Pickup Address'] = pickupAddr;
+    mergedRow['Dropoff Address'] = dropoffAddr;
+    mergedRow['Address Short'] = puShort || doShort;
+    if (fullAddrCol) mergedRow[fullAddrCol] = puFull || doFull;
+
+    const scheduleCol = headers.find(h => h.toLowerCase().replace(/[^a-z ]/g, '').trim() === 'scheduletime');
+    if (scheduleCol && pickupRow && pickupRow[scheduleCol]) mergedRow[scheduleCol] = pickupRow[scheduleCol];
+
+    const arrivalCol = headers.find(h => h.toLowerCase().replace(/[^a-z ]/g, '').trim() === 'arrivaltime');
+    if (arrivalCol) {
+      if (pickupRow && pickupRow[arrivalCol]) mergedRow['Pickup Arrival'] = pickupRow[arrivalCol];
+      if (dropoffRow && dropoffRow[arrivalCol]) mergedRow['Dropoff Arrival'] = dropoffRow[arrivalCol];
+    }
+
+    const departureCol = headers.find(h => h.toLowerCase().replace(/[^a-z ]/g, '').trim() === 'departuretime');
+    if (departureCol) {
+      if (pickupRow && pickupRow[departureCol]) mergedRow['Departure Time'] = pickupRow[departureCol];
+      if (dropoffRow && dropoffRow[departureCol]) mergedRow['Dropoff Departure'] = dropoffRow[departureCol];
+    }
+
+    const distCol = headers.find(h => h.toLowerCase().replace(/[^a-z]/g, '') === 'distance');
+    if (distCol && dropoffRow && dropoffRow[distCol]) mergedRow[distCol] = dropoffRow[distCol];
+
+    const phoneCol = headers.find(h => h.toLowerCase().replace(/[^a-z]/g, '') === 'phone');
+    if (phoneCol) {
+      const puPhone = pickupRow && pickupRow[phoneCol] ? String(pickupRow[phoneCol]).trim() : '';
+      const doPhone = dropoffRow && dropoffRow[phoneCol] ? String(dropoffRow[phoneCol]).trim() : '';
+      mergedRow[phoneCol] = puPhone || doPhone;
+    }
+
+    const costCol = headers.find(h => h.toLowerCase().replace(/[^a-z ]/g, '').trim() === 'providercost');
+    if (costCol && dropoffRow && dropoffRow[costCol]) mergedRow[costCol] = dropoffRow[costCol];
+
+    merged.push(mergedRow);
+  });
+
+  return merged;
+}
+
 const AI_BATCH_SIZE = 5;
 const AI_MAX_RETRIES = 2;
 const AI_BASE_DELAY_MS = 1000;
@@ -356,8 +484,8 @@ async function aiValidate(rows, onProgress) {
   for (let i = 0; i < rows.length; i += AI_BATCH_SIZE) {
     if (_aiSkipRequested) {
       console.warn('[aiValidate] Skipped by user');
-      for (let j = 0; j < AI_BATCH_SIZE && i + j < rows.length; j++) {
-        if (!results[i + j]) results[i + j] = { issues: [], confidence: 100 };
+      for (let j = i; j < rows.length; j++) {
+        if (!results[j]) results[j] = { issues: [], confidence: 100 };
       }
       break;
     }
@@ -471,8 +599,26 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   const [selectedCount, setSelectedCount] = useState(0);
   const [assignToDriver, setAssignToDriver] = useState(preSelectDriver || '');
   const [showAssignPrompt, setShowAssignPrompt] = useState(true);
+  // Date override: 'file' = use dates from file, 'manual' = use a single date for all trips
+  const [dateMode, setDateMode] = useState('file'); // 'file' | 'manual'
+  const [manualDate, setManualDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  });
+  const [fileDates, setFileDates] = useState([]); // unique sorted dates detected from file
   const forceCompleted = uploadContext === 'reports';
   const dropRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const mountedRef = useRef(true);
+  const processingRef = useRef(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (_aiAbortController) { _aiAbortController.abort(); _aiAbortController = null; }
+    };
+  }, []);
 
   const handleFileSelect = (selectedFile) => {
     setError('');
@@ -496,6 +642,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
   const processFile = async () => {
     if (!file) { setError('Please select a file first.'); return; }
+    if (processingRef.current) return;
+    processingRef.current = true;
 
     setStep('parsing');
     setProgressPct(5);
@@ -512,6 +660,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         setProgressMsg('Parsing CSV data...');
         const text = await file.text();
         rows = parseCSV(text);
+        rows = mergePairedActivityRows(rows);
       } else {
         setProgressMsg('Parsing spreadsheet...');
         const buffer = await file.arrayBuffer();
@@ -799,7 +948,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
         return {
           // --- IDENTIFIERS ---
-          id: row['Trip ID'] || row['TripID'] || row['tripid'] || row['ID'] || row['id'] || `TRIP-${Date.now()}-${idx}`,
+          id: row['Trip ID'] || row['TripID'] || row['tripid'] || row['ID'] || row['id'] || m.bookingId || row['Booking Id'] || row['Booking ID'] || row['BookingId'] || row['Event Id'] || row['Event ID'] || `TRIP-${Date.now()}-${idx}`,
           bookingId: extract(m.bookingId, row['Booking Id'], row['Booking ID'], row['bookingId'], row['Booking'], row['Confirmation #']),
           patient: extract(m.patient, row['Client Name'], row['Client'], row['Patient'], row['patient'], 'Unknown'),
           patientPhone: patientPhone || extract(m.patientPhone, row['Patient Phone'], row['patientPhone']),
@@ -880,16 +1029,23 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       setMappedTrips(pairedMapped);
       setParsedRows(rows);
       setSelectedCount(pairedMapped.length);
+      // Detect unique dates from file
+      const datesInFile = [...new Set(pairedMapped.map(t => t.date).filter(Boolean))].sort();
+      setFileDates(datesInFile);
+      // Default to 'file' mode if dates found, else 'manual'
+      setDateMode(datesInFile.length > 0 ? 'file' : 'manual');
 
       const geminiConfig = GEMINI_API_CONFIG();
 
       if (aiEnabled && geminiConfig.apiKey) {
         const aiResults = await aiValidate(pairedMapped, (msg, pct, canSkip) => {
+          if (!mountedRef.current) return;
           setProgressMsg(msg);
           setProgressPct(pct);
           setAiCanSkip(!!canSkip);
         });
 
+        if (!mountedRef.current) return;
         const updated = pairedMapped.map((trip, idx) => {
           const ai = aiResults[idx];
           if (ai && ai.issues?.length > 0) {
@@ -898,6 +1054,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           return { ...trip, _confidence: ai?.confidence || 100 };
         });
 
+        if (!mountedRef.current) return;
         setMappedTrips(updated);
         setAiResults(aiResults);
         setProgressMsg('AI validation complete');
@@ -909,8 +1066,11 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
       setStep('review');
     } catch (err) {
+      if (!mountedRef.current) return;
       setError(`Processing error: ${err.message}`);
       setStep('upload');
+    } finally {
+      processingRef.current = false;
     }
   };
 
@@ -929,7 +1089,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         }
       }
 
-      const dateKey = trip.date || (() => {
+      // Apply date override: use manualDate if dateMode is 'manual', else use trip's file date
+      const resolvedDate = dateMode === 'manual' ? manualDate : (trip.date || (() => {
         for (const field of ['scheduledDate', 'scheduleDate', 'tripDate']) {
           if (trip[field]) {
             const d = new Date(trip[field]);
@@ -940,14 +1101,16 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         }
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      })();
+      })());
+
+      const dateKey = resolvedDate;
 
       const baseTrip = {
         ...trip,
         source: tripSource,
         dateKey,
         status: newStatus,
-        date: trip.date || dateKey,
+        date: dateKey,
         patient: trip.patient || trip.clientName || trip.memberName || 'Unknown Client',
         pickup: trip.pickup || trip.pickupAddress || trip.originAddress || '',
         dropoff: trip.dropoff || trip.dropoffAddress || trip.destinationAddress || '',
@@ -997,7 +1160,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-1">Drag & drop your file here</h3>
               <p className="text-slate-500 text-xs sm:text-sm mb-3 sm:mb-4">or click to browse</p>
               <p className="text-xs sm:text-sm text-slate-400 font-medium">Supports .csv, .xlsx, .xls &bull; Auto-detects columns</p>
-              <input id="fu-file-input" type="file" accept=".csv,.xlsx,.xls" onChange={handleInputChange} className="hidden" />
+              <input id="fu-file-input" ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleInputChange} className="hidden" />
             </div>
 
             {file && (
@@ -1077,9 +1240,9 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                   {mappedTrips.length} trip{ mappedTrips.length !== 1 ? 's' : '' } extracted
                   {withIssues > 0 ? ` — ${withIssues} with warnings` : ' — all clean' }
                 </p>
-                {uniqueDates.length > 0 && (
+                {fileDates.length > 0 && (
                   <p className="text-xs text-slate-400 mt-1">
-                    Service date{uniqueDates.length !== 1 ? 's' : ''}: {uniqueDates.join(', ')}
+                    Service date{fileDates.length !== 1 ? 's' : ''}: {fileDates.join(', ')}
                   </p>
                 )}
               </div>
@@ -1189,6 +1352,64 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               </table>
             </div>
 
+            {/* ── Date Assignment Panel ── */}
+            <div className="mt-4 sm:mt-6 p-4 bg-violet-50 border border-violet-200 rounded-2xl">
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar size={18} className="text-violet-600 shrink-0" />
+                <span className="text-sm font-black text-slate-900">Service Date</span>
+              </div>
+              {fileDates.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-violet-700 font-semibold">
+                    This file contains date{fileDates.length > 1 ? 's' : ''}: <span className="font-black">{fileDates.join(', ')}</span>
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      onClick={() => setDateMode('file')}
+                      className={`flex-1 py-2.5 px-4 rounded-xl border-2 text-xs font-bold transition flex items-center justify-center gap-2 ${
+                        dateMode === 'file'
+                          ? 'border-violet-500 bg-violet-600 text-white shadow-sm'
+                          : 'border-violet-200 bg-white text-violet-700 hover:bg-violet-50'
+                      }`}
+                    >
+                      <FileSpreadsheet size={14} /> Use dates from file
+                    </button>
+                    <button
+                      onClick={() => setDateMode('manual')}
+                      className={`flex-1 py-2.5 px-4 rounded-xl border-2 text-xs font-bold transition flex items-center justify-center gap-2 ${
+                        dateMode === 'manual'
+                          ? 'border-violet-500 bg-violet-600 text-white shadow-sm'
+                          : 'border-violet-200 bg-white text-violet-700 hover:bg-violet-50'
+                      }`}
+                    >
+                      <Calendar size={14} /> Set date manually
+                    </button>
+                  </div>
+                  {dateMode === 'manual' && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                      <input
+                        type="date"
+                        value={manualDate}
+                        onChange={e => setManualDate(e.target.value)}
+                        className="w-full px-4 py-2.5 border-2 border-violet-300 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-violet-500 bg-white"
+                      />
+                      <p className="text-xs text-violet-600 mt-1.5 font-medium">All {mappedTrips.length} trips will be assigned to this date.</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500">No dates detected in file — set the service date for all trips:</p>
+                  <input
+                    type="date"
+                    value={manualDate}
+                    onChange={e => setManualDate(e.target.value)}
+                    className="w-full px-4 py-2.5 border-2 border-violet-300 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-violet-500 bg-white"
+                  />
+                </div>
+              )}
+            </div>
+
             {uploadContext !== 'reports' && (
             <div className="mt-4 sm:mt-6 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
               <div className="flex items-center justify-between mb-3">
@@ -1238,7 +1459,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             )}
 
             <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <button onClick={() => { setStep('upload'); setFile(null); setMappedTrips([]); setParsedRows([]); setError(''); }} className="w-full sm:flex-1 py-3 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition text-sm">
+              <button onClick={() => { setStep('upload'); setFile(null); setMappedTrips([]); setParsedRows([]); setError(''); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="w-full sm:flex-1 py-3 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition text-sm">
                 Cancel
               </button>
               <button onClick={confirmImport} className="w-full sm:flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm text-sm">

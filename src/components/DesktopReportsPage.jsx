@@ -160,6 +160,7 @@ const DesktopReportsPage = ({
   const [editingRow, setEditingRow] = useState(null);
   const [editingRowSnapshot, setEditingRowSnapshot] = useState(null);
   const [activeRow, setActiveRow] = useState(null);
+  const [sortKeyOverrides, setSortKeyOverrides] = useState({}); // tripId → frozen sort key
   const inputRef = useRef(null);
 
   const startRowEdit = useCallback((trip) => {
@@ -167,6 +168,8 @@ const DesktopReportsPage = ({
     setEditingRowSnapshot({ ...trip });
     setEditingCell(null);
     setEditValue('');
+    const frozenKey = trip.arrivalDropoffTime || trip.completedAt || trip.time || '';
+    setSortKeyOverrides(prev => ({ ...prev, [trip.id]: frozenKey }));
   }, []);
 
   const finishRowEdit = useCallback(() => {
@@ -177,6 +180,7 @@ const DesktopReportsPage = ({
     setEditingRowSnapshot(null);
     setEditingCell(null);
     setEditValue('');
+    setSortKeyOverrides({});
   }, [editingRowSnapshot, onUpdateTrip]);
 
   const revertRowEdit = useCallback(() => {
@@ -184,15 +188,22 @@ const DesktopReportsPage = ({
     setEditingRowSnapshot(null);
     setEditingCell(null);
     setEditValue('');
+    setSortKeyOverrides({});
   }, []);
 
   const startCellEdit = useCallback((tripId, colKey, val) => {
     setEditingCell({ tripId, field: colKey });
     setEditValue(val);
-  }, []);
+    const trip = trips.find(t => t.id === tripId);
+    if (trip) {
+      const frozenKey = trip.arrivalDropoffTime || trip.completedAt || trip.time || '';
+      setSortKeyOverrides(prev => ({ ...prev, [tripId]: frozenKey }));
+    }
+  }, [trips]);
 
   const cancelEdit = useCallback(() => {
     setEditingCell(null);
+    setSortKeyOverrides({});
   }, []);
 
   const saveCell = useCallback((trip, field, val) => {
@@ -200,6 +211,7 @@ const DesktopReportsPage = ({
       setEditingRowSnapshot(prev => ({ ...prev, [field]: val }));
     } else {
       onUpdateTrip?.({ ...trip, [field]: val });
+      setSortKeyOverrides({});
     }
     setEditingCell(null);
   }, [editingRow, onUpdateTrip]);
@@ -395,11 +407,11 @@ const DesktopReportsPage = ({
         return { trip, driver, travelMinutes };
       })
       .sort((a, b) => {
-        const aDone = a.trip.arrivalDropoffTime || a.trip.completedAt || a.trip.time || '';
-        const bDone = b.trip.arrivalDropoffTime || b.trip.completedAt || b.trip.time || '';
-        return String(aDone).localeCompare(String(bDone));
+        const aKey = sortKeyOverrides[a.trip.id] ?? (a.trip.arrivalDropoffTime || a.trip.completedAt || a.trip.time || '');
+        const bKey = sortKeyOverrides[b.trip.id] ?? (b.trip.arrivalDropoffTime || b.trip.completedAt || b.trip.time || '');
+        return String(aKey).localeCompare(String(bKey));
       });
-  }, [trips, drivers, dateStr, searchQuery, statusFilter, driverFilter, reviewFilter]);
+  }, [trips, drivers, dateStr, searchQuery, statusFilter, driverFilter, reviewFilter, sortKeyOverrides]);
 
   const allDayRows = useMemo(() => trips
     .filter((trip) => trip.date === dateStr)

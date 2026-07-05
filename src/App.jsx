@@ -40,7 +40,7 @@ import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './component
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v353';
+const APP_VERSION = 'v354';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -102,7 +102,7 @@ const lazyWithRetry = (componentImport) =>
       return await componentImport();
     } catch (error) {
       console.warn('[LazyLoad] Chunk load failed, clearing cache and reloading...', error);
-      try { caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))); } catch {}
+      try { caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).catch(() => {}); } catch {}
       window.location.reload();
       return { default: LazyFallback };
     }
@@ -445,7 +445,7 @@ const App = () => {
       if (event.target?.tagName === 'LINK' && event.target?.rel === 'modulepreload') {
         event.preventDefault();
         reloaded = true;
-        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
+        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).catch(() => {});
         window.location.reload();
         return;
       }
@@ -453,16 +453,16 @@ const App = () => {
         if (!event.target.src.includes(location.origin)) return;
         event.preventDefault();
         reloaded = true;
-        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
+        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).catch(() => {});
         window.location.reload();
       }
     };
     const onRejection = (event) => {
       if (reloaded) return;
-      if (event.reason && typeof event.reason === 'object' && event.reason?.message?.includes('dynamically imported module')) {
+        if (event.reason && typeof event.reason === 'object' && event.reason?.message?.includes('dynamically imported module')) {
         event.preventDefault();
         reloaded = true;
-        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))));
+        caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).catch(() => {});
         window.location.reload();
       }
     };
@@ -1522,12 +1522,11 @@ const App = () => {
     loginInProgressRef.current = true;
     loginAttemptRef.current = 0;
     try {
-      // Re-apply persistence before each sign-in attempt for robustness
-      // (handles edge cases where the initial setPersistence failed at boot).
+      // Re-apply persistence before each sign-in attempt for robustness.
       // Try IndexedDB first, fall back to session storage.
-      setPersistence(auth, browserLocalPersistence).catch(() => {
-        setPersistence(auth, browserSessionPersistence).catch(() => {});
-      });
+      await setPersistence(auth, browserLocalPersistence).catch(() =>
+        setPersistence(auth, browserSessionPersistence).catch(() => {})
+      );
       const { authEmail, username } = resolveAuthIdentifier(email);
       if (!authEmail || !username) {
         setIsLoading(false);
@@ -1535,7 +1534,6 @@ const App = () => {
         loginInProgressRef.current = false;
         return;
       }
-      await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, authEmail, password);
     } catch (err) {
       loginInProgressRef.current = false;
@@ -1717,7 +1715,7 @@ const App = () => {
         `${tripToAssign.patient} — ${tripToAssign.pickup} → ${tripToAssign.dropoff}`
       );
     }
-  }, [drivers, trips, currentUser, addAuditLog, notificationsEnabled]);
+  }, [drivers, trips, currentUser, addAuditLog, notificationsEnabled, canControlDriver, canControlTrip]);
 
   const bulkAssignTrips = useCallback((driverId) => {
     if (selectedTasks.length === 0) return;
@@ -1740,7 +1738,7 @@ const App = () => {
     addAuditLog('Bulk Assignment', `${currentUser} assigned ${allowedSelection.length} trips to ${driver?.name || 'Unknown'}`, 'emerald');
     setSelectedTasks([]);
     setBulkAssignModal(false);
-  }, [selectedTasks, drivers, trips, currentUser, addAuditLog]);
+  }, [selectedTasks, drivers, trips, currentUser, addAuditLog, canControlDriver, canControlTrip]);
 
   const triggerSmartAssign = async (trip) => {
     if (!canControlTrip(trip)) {
@@ -1935,7 +1933,7 @@ const App = () => {
     });
     addAuditLog('Trip Added', `${currentUser} manually added trip for ${tripToAdd.patient} (${tripToAdd.bookingId}).`, 'emerald');
     addToast('Trip Added', `${tripToAdd.patient}'s trip has been added successfully.`, 'success');
-  }, [currentUser, role, currentUserDriverProfile, dedupTrips, drivers, canControlDriver]);
+  }, [currentUser, role, currentUserDriverProfile, dedupTrips, drivers, canControlDriver, addAuditLog, addToast]);
 
   const resetSystemData = () => {
     if (role !== 'admin') return;

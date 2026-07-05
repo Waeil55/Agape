@@ -764,6 +764,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [showLegsModal, setShowLegsModal] = useState(null);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
+  const [historySortKeyOverrides, setHistorySortKeyOverrides] = useState({});
   const [skipConfirmTripId, setSkipConfirmTripId] = useState(null);
   const [routeTemplates, setRouteTemplates] = useState([]);
   const [assignedSequence, setAssignedSequence] = useState(null);
@@ -1012,7 +1013,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       playNotificationSound();
       showLocalNotification(`🚨 ${level}: ${t.patient}`, `${t.time} — ${t.pickup} → ${t.dropoff}`);
     });
-  }, [trips]);
+  }, [trips, orderedTrips]);
 
   const setUndoable = (trip, previousStatus, newStatus) => {
     if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
@@ -1525,7 +1526,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }, ms);
     setShowToast({ type: 'success', message: `Clock-out set for ${targetTime24}.` });
     setShowClockOutOffer(false);
-  }, [driverId, isClockedIn, onDriverStatusUpdate]);
+  }, [driverId, isClockedIn, onDriverStatusUpdate, handleClockToggle]);
 
   // Cleanup delayed clock-out timer on unmount
   useEffect(() => {
@@ -1663,7 +1664,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [trips, driverPosition?.lat, driverPosition?.lng]);
+  }, [trips, driverPosition?.lat, driverPosition?.lng, selectedTrips]);
 
   // Geofence auto-suggest: near home + clocked in + no active trips → offer clock-out
   const geofencePromptedRef = useRef(false);
@@ -1845,10 +1846,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }), [selectedHistoryDayTrips, historyFilter, historySearch]);
 
   const sortedFilteredHistory = useMemo(() => [...filteredHistory].sort((a, b) => {
-    const finishedTime = getHistoryFinishedSortMs(a) - getHistoryFinishedSortMs(b);
+    const aKey = historySortKeyOverrides[a.id] ?? getHistoryFinishedSortMs(a);
+    const bKey = historySortKeyOverrides[b.id] ?? getHistoryFinishedSortMs(b);
+    const finishedTime = aKey - bKey;
     if (finishedTime !== 0) return finishedTime;
     return timeToMinutes(a.time) - timeToMinutes(b.time);
-  }), [filteredHistory]);
+  }), [filteredHistory, historySortKeyOverrides]);
 
   const toggleTripSelect = (tripId) => {
     setSelectedTrips(prev =>
@@ -2559,11 +2562,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       _clientSigned: original.paperSignatureConfirmed || false,
       notes: original.notes || '',
     });
+    setHistorySortKeyOverrides(prev => ({ ...prev, [original.id]: getHistoryFinishedSortMs(original) }));
   };
 
   const handleCancelInlineEdit = () => {
     setEditingTripId(null);
     setEditingTripData(null);
+    setHistorySortKeyOverrides({});
   };
 
   const handleSaveInlineEdit = () => {
@@ -2596,6 +2601,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     };
     setEditingTripId(null);
     setEditingTripData(null);
+    setHistorySortKeyOverrides({});
     setPasswordPrompt({ type: 'edittrip', trip: { ...original, ...cleanData }, editedData: cleanData });
   };
 

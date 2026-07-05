@@ -51,8 +51,8 @@ function dedupTripsByBookingId(trips = []) {
       const pb = STATUS_PRIORITY[b.status] || 0;
       if (pa !== pb) return pb - pa;
       const da = a.driverId ? 1 : 0;
-      const db = b.driverId ? 1 : 0;
-      if (da !== db) return db - da;
+      const dbFlag = b.driverId ? 1 : 0;
+      if (da !== dbFlag) return dbFlag - da;
       const ta = Date.parse(a.updatedAtLocal || a.updatedAt || a.createdAt || '');
       const tb = Date.parse(b.updatedAtLocal || b.updatedAt || b.createdAt || '');
       return tb - ta;
@@ -302,8 +302,8 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
         ...liveTripsRef.current.map((liveTrip) => {
           const progress = tripProgressRef.current[liveTrip.id];
           if (!progress) return liveTrip;
-          const progressTime = Date.parse(progress.workflowUpdatedAt || progress.updatedAt || 0);
-          const liveTime = Date.parse(liveTrip.workflowUpdatedAt || liveTrip.updatedAt || 0);
+          const progressTime = Date.parse(progress.workflowUpdatedAt || progress.updatedAt || '');
+          const liveTime = Date.parse(liveTrip.workflowUpdatedAt || liveTrip.updatedAt || '');
           if (progressTime > liveTime) return { ...liveTrip, ...progress };
           return { ...progress, ...liveTrip };
         }),
@@ -473,14 +473,9 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
           console.error('[writeField] writeTripsToCollection failed:', tripsErr.code, tripsErr.message, tripsErr.stack);
           throw tripsErr;
         }
-        try {
-          await writeAssignmentsToCollection(dataRef.current.trips || []).catch((err) => {
-            console.warn('[writeField] Assignment write non-fatal error:', err?.code, err?.message);
-            return;
-          });
-        } catch (assignErr) {
-          console.warn('[writeField] Assignment write non-fatal error (outer):', assignErr.code, assignErr.message);
-        }
+        await writeAssignmentsToCollection(dataRef.current.trips || []).catch((err) => {
+          console.warn('[writeField] Assignment write non-fatal error:', err?.code, err?.message);
+        });
       } else if (field === 'drivers') {
         await writeDriversToCollection(dataRef.current.drivers || []);
       } else if (field === 'dispatchers') {
