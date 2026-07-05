@@ -7,6 +7,9 @@ const CACHE_VERSION = 'agape-v18';
 const RUNTIME_CACHE = CACHE_VERSION + '-assets';
 
 self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(RUNTIME_CACHE).then((cache) => cache.add('/index.html'))
+  );
   self.skipWaiting();
 });
 
@@ -51,10 +54,18 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  // Navigation: ALWAYS fetch fresh from network, never cache
+  // Navigation: Network-First with background cache update and offline fallback
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/index.html').then((cached) => cached || new Response('Offline', { status: 503 })))
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => cache.put('/index.html', clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match('/index.html').then((cached) => cached || new Response('Offline', { status: 503 })))
     );
     return;
   }

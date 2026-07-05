@@ -7,7 +7,7 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
-  "background_color": "#ffffff",
+  "background_color": "#3d7a96",
   "theme_color": "#2563eb",
   "categories": ["transportation", "business", "productivity"],
   "prefer_related_applications": false,
