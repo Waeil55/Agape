@@ -1152,12 +1152,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     ? driverScopedTrips.find((trip) => trip.id === activeWorkTripId) || null
     : null;
   useEffect(() => {
-    if (activeNav !== 'trips' && activeNav !== 'active-trip' && activeWorkTripId) {
-      setActiveWorkTripId(null);
-      setWorkNotesOpen(false);
-    }
-  }, [activeNav]);
-  useEffect(() => {
     if (activeWorkTripId && trips.length > 0 && !driverScopedTrips.some((trip) => trip.id === activeWorkTripId)) {
       setActiveWorkTripId(null);
       setActiveNav('trips');
@@ -3126,7 +3120,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="px-3 py-2.5 flex items-center gap-2.5">
             <button
               type="button"
-              onClick={() => { setActiveWorkTripId(null); setWorkNotesOpen(false); }}
+              onClick={() => { setActiveNav('trips'); setWorkNotesOpen(false); }}
               className="w-8 h-11 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer"
               aria-label="Back to trips"
             >
