@@ -229,7 +229,7 @@ service cloud.firestore {
       allow write: if request.auth != null && isDispatcher();
     }
     match /systemConfig/{document} {
-      allow read: if request.auth != null && isDispatcher();
+      allow read: if request.auth != null && (isDispatcher() || document == 'phoneNumbers');
       allow write: if request.auth != null && isAdmin();
     }
     match /drivers/{driverId} {

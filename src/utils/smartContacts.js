@@ -2,6 +2,13 @@ const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','trea
 
 export const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 
+const isValidPhone = (cleaned) => {
+  if (!cleaned) return false;
+  if (cleaned.length === 10) return true;
+  if (cleaned.length === 11 && cleaned.startsWith('1')) return true;
+  return false;
+};
+
 const isLikelyFacilityAddress = (address) => {
   if (!address) return false;
   const lower = address.toLowerCase();
@@ -63,7 +70,7 @@ const buildContactList = (trip, allTrips, phoneNumbers = {}) => {
 
   const tryAddContact = (phone, name, role, label, priority, confidence, extra = {}) => {
     const cleaned = cleanPhone(phone);
-    if (!cleaned) return;
+    if (!cleaned || !isValidPhone(cleaned)) return;
     if (addedPhones.has(cleaned)) return;
     addedPhones.add(cleaned);
     contacts.push({

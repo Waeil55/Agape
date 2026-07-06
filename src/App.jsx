@@ -40,7 +40,7 @@ import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './component
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v354';
+const APP_VERSION = 'v356';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -74,7 +74,7 @@ async function repairBrowserStatePreservingAuth() {
   try { removeStorageKeys(window.sessionStorage, REPAIR_STORAGE_KEYS); } catch {}
   if (typeof navigator !== 'undefined' && navigator.serviceWorker?.getRegistrations) {
     const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map((registration) => registration.update().catch(() => null)));
+    await Promise.all(registrations.map((r) => r.unregister().catch(() => null)));
   }
 }
 
@@ -2055,6 +2055,7 @@ const App = () => {
       clockTimestamp,
       autoClockIn,
       clockEventType,
+      timeTrackingState,
       ...persistableExtraFields
     } = extraFields || {};
     const eventTimestamp = clockTimestamp || autoClockIn || now;
@@ -2071,13 +2072,28 @@ const App = () => {
       if (clockLocation) event.lat = clockLocation.lat;
       if (clockLocation) event.lng = clockLocation.lng;
       clockEvents = [...clockEvents, event];
+    } else if (clockEventType === 'break_start' || clockEventType === 'break_end') {
+      const event = { type: clockEventType, timestamp: eventTimestamp };
+      if (clockLocation) event.lat = clockLocation.lat;
+      if (clockLocation) event.lng = clockLocation.lng;
+      clockEvents = [...clockEvents, event];
+    }
+    let extraPersist = { ...persistableExtraFields };
+    if (clockEventType === 'break_start') {
+      extraPersist.lastBreakStart = eventTimestamp;
+    } else if (clockEventType === 'break_end') {
+      const prevBreakStart = prevDriverState.lastBreakStart;
+      const breakMs = prevBreakStart ? new Date(eventTimestamp) - new Date(prevBreakStart) : 0;
+      const breakMin = Math.round(breakMs / 60000);
+      extraPersist.lastBreakStart = null;
+      extraPersist.totalBreakMinutes = (prevDriverState.totalBreakMinutes || 0) + breakMin;
     }
     const merged = {
-      ...persistableExtraFields,
+      ...extraPersist,
       ...(clockChanged ? { clockEvents } : {}),
+      ...(clockEventType && !clockChanged ? { clockEvents } : {}),
       ...(clockedIn && clockChanged ? { clockedInAt: eventTimestamp } : {}),
     };
-    // Strip clockLocation from top-level — it's only used inside clockEvents
     if (merged.clockLocation) delete merged.clockLocation;
     setDrivers(prevDrivers => {
       const driverExists = prevDrivers.some(d => d.id === driverId);

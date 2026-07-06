@@ -27,6 +27,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
     pickupPhone: '',
     dropoffPhone: '',
     patientPhone: '',
+    hospitalPhone: '',
     notes: '',
     driverId: '',
     // Scheduling
@@ -119,6 +120,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
         pickupPhone: form.pickupPhone.trim(),
         dropoffPhone: form.dropoffPhone.trim(),
         patientPhone: form.patientPhone.trim(),
+        hospitalPhone: form.hospitalPhone.trim(),
         notes: form.notes.trim(),
         status: selectedDriver?.id ? 'Assigned' : 'Unassigned',
         driverId: selectedDriver?.id || null,
@@ -401,6 +403,17 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
                   onChange={e => update('dropoffPhone', e.target.value)}
                   placeholder="(555) 000-0000"
                   className={inputClass('dropoffPhone')}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}><Phone size={11} className="text-rose-600" /> Hospital Phone</label>
+                <input
+                  type="tel"
+                  value={form.hospitalPhone}
+                  onChange={e => update('hospitalPhone', e.target.value)}
+                  placeholder="(555) 000-0000"
+                  className={inputClass('hospitalPhone')}
                 />
               </div>
             </div>

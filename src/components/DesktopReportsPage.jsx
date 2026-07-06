@@ -162,15 +162,26 @@ const DesktopReportsPage = ({
   const [editingRowSnapshot, setEditingRowSnapshot] = useState(null);
   const [activeRow, setActiveRow] = useState(null);
   const [sortKeyOverrides, setSortKeyOverrides] = useState({}); // tripId → frozen sort key
-  const inputRef = useRef(null);
 
+  useEffect(() => {
+    if (!editingRow && !editingCell && Object.keys(sortKeyOverrides).length > 0) {
+      const timer = setTimeout(() => setSortKeyOverrides({}), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [editingRow, editingCell]);
+
+  const inputRef = useRef(null);
   const startRowEdit = useCallback((trip) => {
     setEditingRow(trip.id);
     setEditingRowSnapshot({ ...trip });
     setEditingCell(null);
     setEditValue('');
     const frozenKey = trip.arrivalDropoffTime || trip.completedAt || trip.time || '';
-    setSortKeyOverrides(prev => ({ ...prev, [trip.id]: frozenKey }));
+    setSortKeyOverrides(prev => {
+      const next = {};
+      next[trip.id] = frozenKey;
+      return next;
+    });
   }, []);
 
   const finishRowEdit = useCallback(() => {
@@ -181,8 +192,15 @@ const DesktopReportsPage = ({
     setEditingRowSnapshot(null);
     setEditingCell(null);
     setEditValue('');
-    setSortKeyOverrides({});
-  }, [editingRowSnapshot, onUpdateTrip]);
+    setSortKeyOverrides(prev => {
+      const next = { ...prev };
+      if (editingRow) {
+        const snap = editingRowSnapshot || {};
+        next[editingRow] = snap.arrivalDropoffTime || snap.completedAt || snap.time || prev[editingRow] || '';
+      }
+      return next;
+    });
+  }, [editingRow, editingRowSnapshot, onUpdateTrip]);
 
   const revertRowEdit = useCallback(() => {
     setEditingRow(null);
@@ -212,7 +230,7 @@ const DesktopReportsPage = ({
       setEditingRowSnapshot(prev => ({ ...prev, [field]: val }));
     } else {
       onUpdateTrip?.({ ...trip, [field]: val });
-      setSortKeyOverrides({});
+      setSortKeyOverrides(prev => ({ ...prev }));
     }
     setEditingCell(null);
   }, [editingRow, onUpdateTrip]);

@@ -27,7 +27,8 @@ const COLUMN_ALIASES = {
   pickup: ['pickup', 'pickup address', 'pickup_address', 'pick up', 'origin', 'from', 'from address', 'from_address', 'pu', 'pickup location', 'start address', 'start', 'pick-up address', 'pick up address', 'pu address', 'address short', 'address'],
   dropoff: ['dropoff', 'dropoff address', 'dropoff_address', 'drop off', 'destination', 'to', 'to address', 'to_address', 'do', 'dest', 'dropoff location', 'end address', 'end', 'drop-off address', 'drop off address', 'do address'],
   pickupPhone: ['pickup phone', 'pickup phone number', 'pickup_phone', 'phone', 'client phone', 'passenger phone', 'primary phone', 'phone number', 'tel', 'telephone', 'contact', 'member phone', 'mobile', 'cell phone', 'cell', 'primary contact'],
-  dropoffPhone: ['dropoff phone', 'dropoff phone number', 'dropoff_phone', 'facility phone', 'destination phone', 'location phone', 'secondary phone', 'dest phone', 'facility contact', 'location contact'],
+  dropoffPhone: ['dropoff phone', 'dropoff phone number', 'dropoff_phone', 'phone dropoff', 'facility phone', 'destination phone', 'location phone', 'secondary phone', 'dest phone', 'facility contact', 'location contact'],
+  hospitalPhone: ['hospital phone', 'hospital', 'facility phone number', 'medical phone', 'clinic phone'],
   time: ['time', 'pickup time', 'pickup_time', 'schedule time', 'scheduled time', 'appt time', 'appt', 'appointment time', 'timestamp', 'slot', 'scheduled', 'pick up time', 'pu time', 'pickup', 'scheduled pickup'],
   dropoffTime: ['requested late dropoff', 'requested time dropoff', 'dropoff time', 'late dropoff', 'return time', 'do time', 'drop-off time', 'drop off time', 'appt end time', 'end time', 'dropoff', 'scheduled dropoff', 'return'],
   date: ['date', 'trip date', 'service date', 'requested date', 'scheduled date', 'appt date', 'appointment date', 'day', 'calendar date', 'schedule date'],
@@ -55,6 +56,13 @@ const COLUMN_ALIASES = {
 };
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
+
+const isValidPhone = (cleaned) => {
+  if (!cleaned) return false;
+  if (cleaned.length === 10) return true;
+  if (cleaned.length === 11 && cleaned.startsWith('1')) return true;
+  return false;
+};
 
 const FACILITY_KEYWORDS = [
   'center', 'centre', 'clinic', 'hospital', 'care', 'treatment',
@@ -742,21 +750,24 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
         const puDigits = cleanPhone(m.pickupPhone);
         const doDigits = cleanPhone(m.dropoffPhone);
-        if (!puDigits && !doDigits) return;
+        if ((!puDigits || !isValidPhone(puDigits)) && (!doDigits || !isValidPhone(doDigits))) return;
 
         const puIsFac = isLocationFacility(row, m, 'pickup');
         const doIsFac = isLocationFacility(row, m, 'dropoff');
         const puIsHomeLoc = isLocationHome(row, m, 'pickup');
         const doIsHomeLoc = isLocationHome(row, m, 'dropoff');
 
-        if (puIsHomeLoc && !doIsHomeLoc && puDigits) {
-          patientClientPhone[p] = puDigits;
-        } else if (doIsHomeLoc && !puIsHomeLoc && doDigits) {
-          patientClientPhone[p] = doDigits;
-        } else if (puIsFac && !doIsFac && doDigits) {
-          patientClientPhone[p] = doDigits;
-        } else if (doIsFac && !puIsFac && puDigits) {
-          patientClientPhone[p] = puDigits;
+        const validPu = puDigits && isValidPhone(puDigits) ? puDigits : '';
+        const validDo = doDigits && isValidPhone(doDigits) ? doDigits : '';
+
+        if (puIsHomeLoc && !doIsHomeLoc && validPu) {
+          patientClientPhone[p] = validPu;
+        } else if (doIsHomeLoc && !puIsHomeLoc && validDo) {
+          patientClientPhone[p] = validDo;
+        } else if (puIsFac && !doIsFac && validDo) {
+          patientClientPhone[p] = validDo;
+        } else if (doIsFac && !puIsFac && validPu) {
+          patientClientPhone[p] = validPu;
         }
       });
 
@@ -778,10 +789,10 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           const puDigits = cleanPhone(m.pickupPhone);
           const doDigits = cleanPhone(m.dropoffPhone);
           if (!phoneFreq[p]) phoneFreq[p] = {};
-          if (puDigits && !isLocationFacility(row, m, 'pickup')) {
+          if (puDigits && isValidPhone(puDigits) && !isLocationFacility(row, m, 'pickup')) {
             phoneFreq[p][puDigits] = (phoneFreq[p][puDigits] || 0) + 1;
           }
-          if (doDigits && !isLocationFacility(row, m, 'dropoff')) {
+          if (doDigits && isValidPhone(doDigits) && !isLocationFacility(row, m, 'dropoff')) {
             phoneFreq[p][doDigits] = (phoneFreq[p][doDigits] || 0) + 1;
           }
         });
@@ -801,11 +812,11 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         if (!p) return;
         const puDigits = cleanPhone(m.pickupPhone);
         const doDigits = cleanPhone(m.dropoffPhone);
-        if (puDigits) {
+        if (puDigits && isValidPhone(puDigits)) {
           if (!phoneToPatients[puDigits]) phoneToPatients[puDigits] = new Set();
           phoneToPatients[puDigits].add(p);
         }
-        if (doDigits) {
+        if (doDigits && isValidPhone(doDigits)) {
           if (!phoneToPatients[doDigits]) phoneToPatients[doDigits] = new Set();
           phoneToPatients[doDigits].add(p);
         }
@@ -818,10 +829,10 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         const doDigits = cleanPhone(m.dropoffPhone);
         const puShared = puDigits && phoneToPatients[puDigits] && phoneToPatients[puDigits].size > 1;
         const doShared = doDigits && phoneToPatients[doDigits] && phoneToPatients[doDigits].size > 1;
-        if (puDigits && !puShared) patientClientPhone[p] = puDigits;
-        else if (doDigits && !doShared) patientClientPhone[p] = doDigits;
-        else if (puDigits) patientClientPhone[p] = puDigits;
-        else if (doDigits) patientClientPhone[p] = doDigits;
+        if (puDigits && isValidPhone(puDigits) && !puShared) patientClientPhone[p] = puDigits;
+        else if (doDigits && isValidPhone(doDigits) && !doShared) patientClientPhone[p] = doDigits;
+        else if (puDigits && isValidPhone(puDigits)) patientClientPhone[p] = puDigits;
+        else if (doDigits && isValidPhone(doDigits)) patientClientPhone[p] = doDigits;
       });
 
       // Parse a distance string like "5.2mi" or "5.2 mi" or "5.2" into a number
@@ -836,23 +847,34 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         const m = mapColumns(row);
         const pKey = (m.patient || '').trim().toLowerCase();
         
+        const puDigits = cleanPhone(m.pickupPhone);
+        const doDigits = cleanPhone(m.dropoffPhone);
+        const validPu = puDigits && isValidPhone(puDigits) ? puDigits : '';
+        const validDo = doDigits && isValidPhone(doDigits) ? doDigits : '';
+
+        const puIsFac = isFacilitySiteName(m.pickupSiteName || '') || isFacilitySiteName(m.pickup || '');
+        const doIsFac = isFacilitySiteName(m.dropoffSiteName || '') || isFacilitySiteName(m.dropoff || '');
+
+        let hospitalPhone = '';
+        if (puIsFac && validPu) hospitalPhone = validPu;
+        else if (doIsFac && validDo) hospitalPhone = validDo;
+
         let patientPhone = patientClientPhone[pKey] || m.pickupPhone || m.dropoffPhone || '';
 
         // Smart phone detection: if pickup is a facility, client phone is likely dropoffPhone (home), and vice versa
-        if (!patientClientPhone[pKey] && m.pickupPhone && m.dropoffPhone) {
-          const pickupIsFacility = isFacilitySiteName(m.pickupSiteName || '') || isFacilitySiteName(m.pickup || '');
-          const dropoffIsFacility = isFacilitySiteName(m.dropoffSiteName || '') || isFacilitySiteName(m.dropoff || '');
-          if (pickupIsFacility && !dropoffIsFacility) {
+        if (!patientClientPhone[pKey] && validPu && validDo) {
+          if (puIsFac && !doIsFac) {
             patientPhone = m.dropoffPhone;
-          } else if (dropoffIsFacility && !pickupIsFacility) {
+          } else if (doIsFac && !puIsFac) {
             patientPhone = m.pickupPhone;
           }
         }
         if (patientPhone && !patientClientPhone[pKey]) {
           const digits = cleanPhone(patientPhone);
           const isShared = phoneToPatients[digits] && phoneToPatients[digits].size > 1;
-          if (isShared) patientPhone = '';
+          if (isShared || !isValidPhone(digits)) patientPhone = '';
         }
+        if (patientPhone && !isValidPhone(cleanPhone(patientPhone))) patientPhone = '';
 
         const notes = [m.notes, row['Pickup Comments'], row['Dropoff Comments'], row['Comments'], row['Message']]
           .filter(Boolean)
@@ -973,8 +995,14 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           dropoff: dropoffAddr,
           pickupSiteName: extract(colMap.pickupSite ? row[colMap.pickupSite] : '', m.pickupSiteName, row['Pickup Site'], row['pickupSiteName'], row['Origin Site'], row['Pickup Location Name']),
           dropoffSiteName: extract(colMap.dropoffSite ? row[colMap.dropoffSite] : '', m.dropoffSiteName, row['Dropoff Site'], row['dropoffSiteName'], row['Destination Site']),
-          pickupPhone: extract(m.pickupPhone, row['Pickup Phone'], row['pickupPhone']),
-          dropoffPhone: extract(m.dropoffPhone, row['Dropoff Phone'], row['dropoffPhone']),
+          pickupPhone: (() => { const raw = extract(m.pickupPhone, row['Pickup Phone'], row['pickupPhone']); const c = cleanPhone(raw); return raw && isValidPhone(c) ? raw : ''; })(),
+          dropoffPhone: (() => { const raw = extract(m.dropoffPhone, row['Dropoff Phone'], row['dropoffPhone']); const c = cleanPhone(raw); return raw && isValidPhone(c) ? raw : ''; })(),
+          hospitalPhone: (() => {
+            if (hospitalPhone) return hospitalPhone;
+            const raw = extract(m.hospitalPhone, row['Hospital Phone'], row['hospitalPhone'], row['Facility Phone']);
+            const c = cleanPhone(raw);
+            return raw && isValidPhone(c) ? raw : '';
+          })(),
 
           // --- TYPE & NOTES ---
           type: extract(m.type, row['Space Types'], row['Type'], row['Service Type'], row['Req'], row['req']),
@@ -1028,6 +1056,133 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       });
 
       const pairedMapped = annotateInOutPairs(mapped);
+
+      // Post-pairing: normalize phone fields across IN/OUT groups
+      // All legs in the same group MUST share the same patientPhone (home) and hospitalPhone (facility)
+      const inoutGroups = new Map();
+      pairedMapped.forEach(trip => {
+        if (trip.inOutGroupId) {
+          if (!inoutGroups.has(trip.inOutGroupId)) inoutGroups.set(trip.inOutGroupId, []);
+          inoutGroups.get(trip.inOutGroupId).push(trip);
+        }
+      });
+
+      inoutGroups.forEach((trips, groupId) => {
+        if (trips.length < 2) return;
+
+        // Find the best client phone: the phone that is NOT a hospital/facility phone
+        const facilityPhones = new Set();
+        trips.forEach(t => {
+          if (t.hospitalPhone) facilityPhones.add(cleanPhone(t.hospitalPhone));
+          const puD = cleanPhone(t.pickupPhone);
+          const doD = cleanPhone(t.dropoffPhone);
+          const puIsF = isFacilitySiteName(t.pickupSiteName || '') || isFacilitySiteName(t.pickup || '');
+          const doIsF = isFacilitySiteName(t.dropoffSiteName || '') || isFacilitySiteName(t.dropoff || '');
+          if (puIsF && puD) facilityPhones.add(puD);
+          if (doIsF && doD) facilityPhones.add(doD);
+        });
+
+        // Collect all patientPhone values, prefer non-facility ones
+        let bestClientPhone = '';
+        let bestHospitalPhone = '';
+        trips.forEach(t => {
+          const pp = cleanPhone(t.patientPhone);
+          if (pp && isValidPhone(pp) && !facilityPhones.has(pp) && !bestClientPhone) {
+            bestClientPhone = pp;
+          }
+          const hp = cleanPhone(t.hospitalPhone);
+          if (hp && isValidPhone(hp) && !bestHospitalPhone) {
+            bestHospitalPhone = hp;
+          }
+        });
+
+        // If still no client phone, pick any non-facility phone from pickup/dropoff
+        if (!bestClientPhone) {
+          trips.forEach(t => {
+            if (bestClientPhone) return;
+            const puD = cleanPhone(t.pickupPhone);
+            const doD = cleanPhone(t.dropoffPhone);
+            if (puD && isValidPhone(puD) && !facilityPhones.has(puD)) bestClientPhone = puD;
+            else if (doD && isValidPhone(doD) && !facilityPhones.has(doD)) bestClientPhone = doD;
+          });
+        }
+
+        // If still no hospital phone, find the one that IS at a facility
+        if (!bestHospitalPhone) {
+          trips.forEach(t => {
+            if (bestHospitalPhone) return;
+            const puD = cleanPhone(t.pickupPhone);
+            const doD = cleanPhone(t.dropoffPhone);
+            const puIsF = isFacilitySiteName(t.pickupSiteName || '') || isFacilitySiteName(t.pickup || '');
+            const doIsF = isFacilitySiteName(t.dropoffSiteName || '') || isFacilitySiteName(t.dropoff || '');
+            if (puIsF && puD && isValidPhone(puD)) bestHospitalPhone = puD;
+            else if (doIsF && doD && isValidPhone(doD)) bestHospitalPhone = doD;
+          });
+        }
+
+        // Apply normalized phones to ALL legs in this group
+        if (bestClientPhone || bestHospitalPhone) {
+          trips.forEach(t => {
+            if (bestClientPhone && isValidPhone(bestClientPhone)) {
+              t.patientPhone = bestClientPhone;
+            }
+            if (bestHospitalPhone && isValidPhone(bestHospitalPhone)) {
+              t.hospitalPhone = bestHospitalPhone;
+            }
+          });
+        }
+      });
+
+      // Global normalization: ALL trips for the same patient get the same client phone
+      // This catches non-IN/OUT trips too
+      const patientGlobalPhone = {};
+      const patientGlobalHospital = {};
+      pairedMapped.forEach(t => {
+        const pk = (t.patient || '').trim().toLowerCase();
+        if (!pk) return;
+        const pp = cleanPhone(t.patientPhone);
+        const hp = cleanPhone(t.hospitalPhone);
+        if (pp && isValidPhone(pp) && !patientGlobalPhone[pk]) patientGlobalPhone[pk] = pp;
+        if (hp && isValidPhone(hp) && !patientGlobalHospital[pk]) patientGlobalHospital[pk] = hp;
+      });
+
+      // Cross-check: if a phone is shared by >1 patient, it's a facility phone — remove from patientPhone
+      const phonePatientCount = {};
+      pairedMapped.forEach(t => {
+        const pk = (t.patient || '').trim().toLowerCase();
+        const pp = cleanPhone(t.patientPhone);
+        if (pp && pk) {
+          if (!phonePatientCount[pp]) phonePatientCount[pp] = new Set();
+          phonePatientCount[pp].add(pk);
+        }
+      });
+
+      pairedMapped.forEach(t => {
+        const pk = (t.patient || '').trim().toLowerCase();
+        const pp = cleanPhone(t.patientPhone);
+        const hp = cleanPhone(t.hospitalPhone);
+
+        // If patientPhone is shared across multiple patients, it's a facility — replace with best
+        if (pp && phonePatientCount[pp] && phonePatientCount[pp].size > 1) {
+          t.patientPhone = patientGlobalPhone[pk] || '';
+          // If the shared phone is also our hospitalPhone, clear patientPhone entirely
+          if (cleanPhone(t.patientPhone) === hp) t.patientPhone = '';
+        }
+
+        // Ensure same patient always gets same phone
+        if (pk && patientGlobalPhone[pk] && isValidPhone(patientGlobalPhone[pk])) {
+          t.patientPhone = patientGlobalPhone[pk];
+        }
+        if (pk && patientGlobalHospital[pk] && isValidPhone(patientGlobalHospital[pk])) {
+          t.hospitalPhone = patientGlobalHospital[pk];
+        }
+
+        // Safety: patientPhone should never equal hospitalPhone
+        if (cleanPhone(t.patientPhone) && cleanPhone(t.patientPhone) === cleanPhone(t.hospitalPhone)) {
+          t.patientPhone = '';
+        }
+      });
+
       setMappedTrips(pairedMapped);
       setParsedRows(rows);
       setSelectedCount(pairedMapped.length);

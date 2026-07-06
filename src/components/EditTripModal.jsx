@@ -78,6 +78,7 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
       dropoff: editTrip.dropoff || '',
       pickupPhone: editTrip.pickupPhone || '',
       dropoffPhone: editTrip.dropoffPhone || '',
+      hospitalPhone: editTrip.hospitalPhone || '',
       distance: editTrip.distance || '',
       arrivalTime: pickupIso || editTrip.arrivalTime || null,
       startTime: pickupIso || editTrip.startTime || null,
@@ -192,6 +193,10 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
               <div>
                 <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Dropoff Phone</label>
                 <input value={editTrip.dropoffPhone || ''} onChange={(e) => handleField('dropoffPhone', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-bold text-rose-400 uppercase tracking-widest mb-1 block">Hospital Phone</label>
+                <input value={editTrip.hospitalPhone || ''} onChange={(e) => handleField('hospitalPhone', e.target.value)} className={inputClass} />
               </div>
               <div>
                 <label className="text-[0.6875em] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Distance</label>

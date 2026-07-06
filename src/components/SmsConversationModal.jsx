@@ -27,6 +27,11 @@ const SmsConversationModal = ({ trip, onClose }) => {
     if (t.patientPhone) return t.patientPhone;
     const pu = t.pickupPhone || '', doPh = t.dropoffPhone || '';
     if (!pu && !doPh) return '';
+    const hp = (t.hospitalPhone || '').replace(/[^0-9]/g, '');
+    const puClean = pu.replace(/[^0-9]/g, '');
+    const doClean = doPh.replace(/[^0-9]/g, '');
+    if (hp && puClean && puClean === hp && doPh && doClean !== hp) return doPh;
+    if (hp && doClean && doClean === hp && pu && puClean !== hp) return pu;
     const puFac = isFac(t.pickupSiteName||'') || isFac(t.pickup||'');
     const doFac = isFac(t.dropoffSiteName||'') || isFac(t.dropoff||'');
     if (puFac && !doFac) return doPh;

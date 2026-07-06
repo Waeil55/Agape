@@ -171,7 +171,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                 <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Contacts</p>
                 {trip.patientPhone && <button type="button" onClick={() => makeCall?.(trip.patientPhone,trip.patient)} className="flex items-center gap-2 text-blue-700 active:opacity-70"><Phone size={12}/><span className="text-xs font-bold">{trip.patient}: {trip.patientPhone}</span></button>}
                 {trip.pickupPhone && trip.pickupPhone!==trip.patientPhone && <button type="button" onClick={() => makeCall?.(trip.pickupPhone,"Pickup")} className="flex items-center gap-2 text-emerald-700 active:opacity-70"><Phone size={12}/><span className="text-xs font-bold">Pickup: {trip.pickupPhone}</span></button>}
-                {trip.dropoffPhone && <button type="button" onClick={() => makeCall?.(trip.dropoffPhone,"Dropoff")} className="flex items-center gap-2 text-rose-700 active:opacity-70"><Phone size={12}/><span className="text-xs font-bold">Dropoff: {trip.dropoffPhone}</span></button>}
+                {(trip.hospitalPhone || trip.dropoffPhone) && <button type="button" onClick={() => makeCall?.(trip.hospitalPhone || trip.dropoffPhone,"Hospital")} className="flex items-center gap-2 text-rose-700 active:opacity-70"><Phone size={12}/><span className="text-xs font-bold">Hospital: {trip.hospitalPhone || trip.dropoffPhone}</span></button>}
               </div>
             )}
           </div>

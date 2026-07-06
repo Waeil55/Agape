@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, 
   XCircle, AlertTriangle, RefreshCw, User, ChevronDown, 
@@ -86,6 +86,13 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     });
   }, [trips, dateStr, searchQuery, sortKeyOverrides]);
 
+  useEffect(() => {
+    if (!editingTripId && Object.keys(sortKeyOverrides).length > 0) {
+      const timer = setTimeout(() => setSortKeyOverrides({}), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [editingTripId]);
+
   const shiftDate = (days) => {
     const d = new Date(dateStr + 'T12:00:00');
     d.setDate(d.getDate() + days);
@@ -116,6 +123,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       dropoff: trip.dropoff || '',
       pickupPhone: trip.pickupPhone || '',
       dropoffPhone: trip.dropoffPhone || '',
+      hospitalPhone: trip.hospitalPhone || '',
       distance: trip.distance || '',
       _pickupTime: isoToTimeInput(trip.arrivalTime || trip.startTime || trip.pickupArrival || trip.departedPickupTime),
       _pickupOdometer: trip.pickupOdometer || '',
@@ -124,7 +132,11 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       notes: trip.notes || '',
     });
     setExpandedTripId(trip.id);
-    setSortKeyOverrides(prev => ({ ...prev, [trip.id]: trip.time || '' }));
+    setSortKeyOverrides(prev => {
+      const next = {};
+      next[trip.id] = trip.time || '';
+      return next;
+    });
   };
 
   const cancelInlineEdit = () => {
@@ -151,6 +163,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       dropoff: d.dropoff || '',
       pickupPhone: d.pickupPhone || '',
       dropoffPhone: d.dropoffPhone || '',
+      hospitalPhone: d.hospitalPhone || '',
       distance: d.distance || '',
       arrivalTime: pickupIso || original.arrivalTime || null,
       startTime: pickupIso || original.startTime || null,
@@ -162,7 +175,11 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     };
     setEditingTripId(null);
     setEditingTripData(null);
-    setSortKeyOverrides({});
+    setSortKeyOverrides(prev => {
+      const next = { ...prev };
+      if (editingTripId) next[editingTripId] = d.time || prev[editingTripId] || '';
+      return next;
+    });
     if (onUpdateTrip) onUpdateTrip(editingTripId, payload);
   };
 
@@ -325,6 +342,10 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                           <div>
                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-0.5 block">Dropoff Phone</label>
                             <input value={ie.dropoffPhone} onChange={(e) => setEditingTripData(p => ({ ...p, dropoffPhone: e.target.value }))} className={inputCls} />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-0.5 block">Hospital Phone</label>
+                            <input value={ie.hospitalPhone || ''} onChange={(e) => setEditingTripData(p => ({ ...p, hospitalPhone: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-0.5 block">Distance</label>

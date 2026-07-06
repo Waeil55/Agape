@@ -444,11 +444,19 @@ const OperationsCommandCenter = ({
   const [editTrip, setEditTrip] = useState(null);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
+  const [sortKeyOverrides, setSortKeyOverrides] = useState({});
   const [activeTripRow, setActiveTripRow] = useState(null);
   const [actionsMenuTripId, setActionsMenuTripId] = useState(null);
   const actionsMenuRef = useRef(null);
   const [boardActionsMenuTripId, setBoardActionsMenuTripId] = useState(null);
   const boardActionsMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!editingTripId && Object.keys(sortKeyOverrides).length > 0) {
+      const timer = setTimeout(() => setSortKeyOverrides({}), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [editingTripId]);
 
   const FACILITY_KEYWORDS_OPS = [
     'center', 'centre', 'clinic', 'hospital', 'care', 'treatment',
@@ -469,6 +477,11 @@ const OperationsCommandCenter = ({
     const puPhone = trip.pickupPhone || '';
     const doPhone = trip.dropoffPhone || '';
     if (!puPhone && !doPhone) return '';
+    const hp = (trip.hospitalPhone || '').replace(/[^0-9]/g, '');
+    const puClean = puPhone.replace(/[^0-9]/g, '');
+    const doClean = doPhone.replace(/[^0-9]/g, '');
+    if (hp && puClean && puClean === hp && doPhone && doClean !== hp) return doPhone;
+    if (hp && doClean && doClean === hp && puPhone && puClean !== hp) return puPhone;
     const puIsFacility = isFacility(trip.pickupSiteName || '') || isFacility(trip.pickup || '');
     const doIsFacility = isFacility(trip.dropoffSiteName || '') || isFacility(trip.dropoff || '');
     if (puIsFacility && !doIsFacility) return doPhone;
@@ -649,6 +662,12 @@ const OperationsCommandCenter = ({
       return '';
     };
     result.sort((a, b) => {
+      const aKey = sortKeyOverrides[a.id];
+      const bKey = sortKeyOverrides[b.id];
+      if (aKey !== undefined || bKey !== undefined) {
+        if (aKey !== undefined && bKey !== undefined) return String(aKey).localeCompare(String(bKey));
+        return aKey !== undefined ? -1 : 1;
+      }
       if (sortBy === 'time' && timeSortBottomInactive) {
         const inactiveDiff = Number(shouldPinToTimeSortBottom(a)) - Number(shouldPinToTimeSortBottom(b));
         if (inactiveDiff !== 0) return inactiveDiff;
@@ -711,7 +730,7 @@ const OperationsCommandCenter = ({
       return (originalOrder.get(a.id) || 0) - (originalOrder.get(b.id) || 0);
     });
     return result;
-  }, [searchedTrips, filterStatus, filterUrgency, driverFilter, serviceFilter, sortBy, sortDirection, timeSortBottomInactive, operationsTab, aiSortOrder, drivers, routeTripMap]);
+  }, [searchedTrips, filterStatus, filterUrgency, driverFilter, serviceFilter, sortBy, sortDirection, timeSortBottomInactive, operationsTab, aiSortOrder, drivers, routeTripMap, sortKeyOverrides]);
 
   useEffect(() => {
     setManifestLimit(150);
@@ -892,11 +911,17 @@ const OperationsCommandCenter = ({
       _dropoffOdometer: original.dropoffOdometer || '',
       notes: original.notes || '',
     });
+    setSortKeyOverrides(prev => {
+      const next = {};
+      next[original.id] = original.time || '';
+      return next;
+    });
   }, [trips]);
 
   const cancelInlineEdit = useCallback(() => {
     setEditingTripId(null);
     setEditingTripData(null);
+    setSortKeyOverrides({});
   }, []);
 
   const saveInlineEdit = useCallback(() => {
@@ -928,6 +953,11 @@ const OperationsCommandCenter = ({
     };
     setEditingTripId(null);
     setEditingTripData(null);
+    setSortKeyOverrides(prev => {
+      const next = { ...prev };
+      if (editingTripId) next[editingTripId] = d.time || prev[editingTripId] || '';
+      return next;
+    });
     if (updateTrip) updateTrip(editingTripId, payload);
     addToast?.('Trip Updated', `${d.patient || editingTripId} saved.`, 'success');
   }, [editingTripId, editingTripData, trips, updateTrip, addToast]);
@@ -1086,8 +1116,8 @@ const OperationsCommandCenter = ({
       ['Site', dropoffFacilityName],
       ['Address', trip.dropoff || 'Missing dropoff address'],
       ['City', dropoffCity],
-      ['Hospital phone', dropoffPhone],
-      ['Hospital alt', hasDisplayValue(trip.hospitalPhone) && formatPhoneDisplay(trip.hospitalPhone) !== dropoffPhone ? formatPhoneDisplay(trip.hospitalPhone) : ''],
+      ['Hospital phone', trip.hospitalPhone || dropoffPhone],
+      ['Dropoff phone', trip.hospitalPhone && dropoffPhone && formatPhoneDisplay(trip.hospitalPhone) !== dropoffPhone ? dropoffPhone : ''],
       ['Dropoff comments', dropoffComments],
     ].filter(([, value]) => hasDisplayValue(value));
     const noteItems = [
@@ -1154,7 +1184,7 @@ const OperationsCommandCenter = ({
           <div className="min-w-0">
             <span className="font-semibold text-emerald-600">Dropoff: </span>
             <span className="text-slate-800 truncate">{trip.dropoff || '—'}</span>
-            {dropoffPhone && <><br /><span className="text-slate-500">Hospital: </span><span className="text-slate-700">{dropoffPhone}</span></>}
+            {(trip.hospitalPhone || dropoffPhone) && <><br /><span className="text-slate-500">Hospital: </span><span className="text-slate-700">{formatPhoneDisplay(trip.hospitalPhone || dropoffPhone)}</span></>}
             {(trip.arrivalDropoffTime || trip.completedAt) && <><br /><span className="text-slate-500">DO time: </span><span className="text-slate-700">{to12hr(trip.arrivalDropoffTime || trip.completedAt)}</span></>}
             {(trip.dropoffOdometer || trip.endOdometer) && <><br /><span className="text-slate-500">DO odo: </span><span className="text-slate-700">{trip.dropoffOdometer || trip.endOdometer}</span></>}
           </div>
@@ -2099,6 +2129,7 @@ const OperationsCommandCenter = ({
                   const clientPhone = formatPhoneDisplay(getClientPhone(trip));
                   const pickupPhone = formatPhoneDisplay(trip.pickupPhone);
                   const dropoffPhone = formatPhoneDisplay(trip.dropoffPhone);
+                  const hospitalPhone = formatPhoneDisplay(trip.hospitalPhone || trip.dropoffPhone);
                   const pickupFacilityName = getPickupFacilityName(trip);
                   const dropoffFacilityName = getDropoffFacilityName(trip);
                   const serviceLabel = trip.type || trip.serviceType;
@@ -2106,7 +2137,7 @@ const OperationsCommandCenter = ({
                   const contactSummary = [
                     clientPhone && `Client ${clientPhone}`,
                     densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && `Pickup ${pickupPhone}`,
-                    densityProfile.showSecondaryPhones && dropoffPhone && `Hospital ${dropoffPhone}`,
+                    densityProfile.showSecondaryPhones && hospitalPhone && `Hospital ${hospitalPhone}`,
                   ].filter(Boolean).join(' • ');
                   const visibleRouteAssignments = routeAssignments.slice(0, densityProfile.routeChipLimit);
                   const rowBg = isSelected
@@ -2201,8 +2232,8 @@ const OperationsCommandCenter = ({
                               {densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && (
                                 <div className="text-xs text-emerald-700">Pickup desk {pickupPhone}</div>
                               )}
-                              {densityProfile.showSecondaryPhones && dropoffPhone && (
-                                <div className="text-xs text-rose-700">Hospital {dropoffPhone}</div>
+                              {densityProfile.showSecondaryPhones && hospitalPhone && (
+                                <div className="text-xs text-rose-700">Hospital {hospitalPhone}</div>
                               )}
                               {densityProfile.showNotesPreview && trip.notes && (
                                 <div className="text-xs font-medium leading-relaxed text-amber-700" style={getClampStyle(densityProfile.noteLines)}>

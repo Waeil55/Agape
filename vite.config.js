@@ -19,7 +19,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false,
+    sourcemap: true,
     target: 'es2020',
     chunkSizeWarningLimit: 600,
     rollupOptions: {

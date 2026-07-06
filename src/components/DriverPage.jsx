@@ -765,6 +765,22 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
   const [historySortKeyOverrides, setHistorySortKeyOverrides] = useState({});
+  const [activeSortKeyOverrides, setActiveSortKeyOverrides] = useState({});
+
+  useEffect(() => {
+    if (!editingTripId && Object.keys(activeSortKeyOverrides).length > 0) {
+      const timer = setTimeout(() => setActiveSortKeyOverrides({}), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [editingTripId]);
+
+  useEffect(() => {
+    if (!editingTripId && Object.keys(historySortKeyOverrides).length > 0) {
+      const timer = setTimeout(() => setHistorySortKeyOverrides({}), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [editingTripId]);
+
   const [skipConfirmTripId, setSkipConfirmTripId] = useState(null);
   const [routeTemplates, setRouteTemplates] = useState([]);
   const [assignedSequence, setAssignedSequence] = useState(null);
@@ -1004,17 +1020,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const notifiedTripsRef = useRef(new Set());
 
-  // Notify urgent trips (once per trip)
-  useEffect(() => {
-    const urgent = orderedTrips.filter(t => getUrgency(t) > 0 && !notifiedTripsRef.current.has(t.id));
-    urgent.forEach(t => {
-      notifiedTripsRef.current.add(t.id);
-      const level = getUrgency(t) === 2 ? 'Overdue' : 'Due Soon';
-      playNotificationSound();
-      showLocalNotification(`🚨 ${level}: ${t.patient}`, `${t.time} — ${t.pickup} → ${t.dropoff}`);
-    });
-  }, [trips, orderedTrips]);
-
   const setUndoable = (trip, previousStatus, newStatus) => {
     if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
     setUndoableAction({ trip, previousStatus, newStatus });
@@ -1093,12 +1098,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const myTrips = useMemo(() => filteredDriverScopedTrips
     .filter(t => isTripDateRecent(t.date) || !isWorkflowTerminalTrip(t))
     .sort((a, b) => {
+      const aKey = activeSortKeyOverrides[a.id];
+      const bKey = activeSortKeyOverrides[b.id];
+      if (aKey !== undefined || bKey !== undefined) {
+        if (aKey !== undefined && bKey !== undefined) return String(aKey).localeCompare(String(bKey));
+        return aKey !== undefined ? -1 : 1;
+      }
       const today = getTodayStr();
       const aToday = a.date === today ? 0 : 1;
       const bToday = b.date === today ? 0 : 1;
       if (aToday !== bToday) return aToday - bToday;
       return timeToMinutes(a.time) - timeToMinutes(b.time);
-    }), [filteredDriverScopedTrips]);
+    }), [filteredDriverScopedTrips, activeSortKeyOverrides]);
 
   const historyWindowEnd = localCalendarYmd();
   const historyWindowStart = calendarDateKeyDaysAgo(DRIVER_HISTORY_LOOKBACK_DAYS - 1);
@@ -1168,6 +1179,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   ].includes(trip.status)) || activeTrips[0] || null;
 
   const orderedTrips = useMemo(() => stackInOutPairs([...activeTrips].sort((a, b) => {
+    const aKey = activeSortKeyOverrides[a.id];
+    const bKey = activeSortKeyOverrides[b.id];
+    if (aKey !== undefined || bKey !== undefined) {
+      if (aKey !== undefined && bKey !== undefined) return String(aKey).localeCompare(String(bKey));
+      return aKey !== undefined ? -1 : 1;
+    }
+
     // 1. If guided mode is active, the absolute top priority is the current step's trip
     if (guidedMode && guidedSteps && guidedSteps[guidedStepIndex]) {
       if (a.id === guidedSteps[guidedStepIndex].tripId && b.id !== guidedSteps[guidedStepIndex].tripId) return -1;
@@ -1235,7 +1253,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const urgencyDiff = getUrgency(b) - getUrgency(a);
     if (urgencyDiff !== 0) return urgencyDiff;
     return timeToMinutes(a.time) - timeToMinutes(b.time);
-  })), [activeTrips, guidedMode, guidedSteps, guidedStepIndex, driverScopedTrips, aiSequence]);
+  })), [activeTrips, guidedMode, guidedSteps, guidedStepIndex, driverScopedTrips, aiSequence, activeSortKeyOverrides]);
+
+  // Notify urgent trips (once per trip)
+  useEffect(() => {
+    const urgent = orderedTrips.filter(t => getUrgency(t) > 0 && !notifiedTripsRef.current.has(t.id));
+    urgent.forEach(t => {
+      notifiedTripsRef.current.add(t.id);
+      const level = getUrgency(t) === 2 ? 'Overdue' : 'Due Soon';
+      playNotificationSound();
+      showLocalNotification(`🚨 ${level}: ${t.patient}`, `${t.time} — ${t.pickup} → ${t.dropoff}`);
+    });
+  }, [trips, orderedTrips]);
 
   const timedTrips = useMemo(() => orderedTrips.filter(t => !isWillCall(t)), [orderedTrips]);
   const willCallTrips = useMemo(() => orderedTrips.filter(t => isWillCall(t)), [orderedTrips]);
@@ -1373,25 +1402,39 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       d.setDate(d.getDate() - i);
       const dateKey = d.toISOString().slice(0, 10);
       const dayEvents = (byDate[dateKey] || []).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-      const clockIn = dayEvents.find(e => e.type === 'in');
-      const clockOut = [...dayEvents].reverse().find(e => e.type === 'out');
+      const isInType = (e) => e.type === 'in' || e.type === 'auto_in';
+      const isOutType = (e) => e.type === 'out';
+      const clockIn = dayEvents.find(e => isInType(e));
+      const clockOut = [...dayEvents].reverse().find(e => isOutType(e));
+      let breakMin = 0;
+      const breakStarts = dayEvents.filter(e => e.type === 'break_start');
+      const breakEnds = dayEvents.filter(e => e.type === 'break_end');
+      breakStarts.forEach((bs, idx) => {
+        const be = breakEnds[idx];
+        if (bs.timestamp && be?.timestamp) {
+          breakMin += Math.round((new Date(be.timestamp) - new Date(bs.timestamp)) / 60000);
+        } else if (bs.timestamp && !be) {
+          breakMin += Math.round((new Date() - new Date(bs.timestamp)) / 60000);
+        }
+      });
       let hours = null;
-      if (clockIn && clockOut) {
-        const diff = new Date(clockOut.timestamp) - new Date(clockIn.timestamp);
-        if (diff > 0) hours = (diff / (1000 * 60 * 60)).toFixed(1);
+      if (clockIn) {
+        const endTime = clockOut ? new Date(clockOut.timestamp) : new Date();
+        const diff = endTime - new Date(clockIn.timestamp);
+        if (diff > 0) {
+          const billableMin = Math.max(0, Math.round(diff / 60000) - breakMin);
+          hours = parseFloat((billableMin / 60).toFixed(1));
+        }
       }
-      const inPos = clockIn?.lat && clockIn?.lng ? `${clockIn.lat.toFixed(4)}, ${clockIn.lng.toFixed(4)}` : null;
-      const outPos = clockOut?.lat && clockOut?.lng ? `${clockOut.lat.toFixed(4)}, ${clockOut.lng.toFixed(4)}` : null;
       days.push({
         dateKey,
         hasEvents: dayEvents.length > 0,
         clockIn: clockIn?.timestamp || null,
         clockOut: clockOut?.timestamp || null,
-        hours: hours ? parseFloat(hours) : null,
-        inLocation: inPos,
-        outLocation: outPos,
+        hours,
+        breakMin,
       });
-      if (hours) weeklyTotal += parseFloat(hours);
+      if (hours) weeklyTotal += hours;
     }
     const weeklyOvertime = weeklyTotal > 40 ? weeklyTotal - 40 : 0;
     return { days, weeklyTotal: Math.round(weeklyTotal * 10) / 10, weeklyOvertime: Math.round(weeklyOvertime * 10) / 10 };
@@ -1539,14 +1582,26 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   // ─── TIME TRACKING: sync clock-in/out with TT state ───
   useEffect(() => {
     if (isClockedIn && ttStateRef.current === TT.OFF_SHIFT) {
-      const now = new Date().toISOString();
-      setTtState(TT.ON_SHIFT_ACTIVE);
-      ttStateRef.current = TT.ON_SHIFT_ACTIVE;
-      ttClockInTimeRef.current = now;
-      ttEventsLogRef.current = [{ type: 'CLOCK_IN', timestamp: now, location: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null }];
-      setTtBillableMin(0);
-      setTtBreakMin(0);
-      ttBreakStartRef.current = null;
+      const now = new Date();
+      const clockedInAt = me?.clockedInAt;
+      const clockInTime = clockedInAt ? new Date(clockedInAt) : now;
+      const elapsedMin = Math.max(0, Math.round((now - clockInTime) / 60000));
+      const savedBreakMin = me?.totalBreakMinutes || 0;
+      const isOnBreak = me?.timeTrackingState === 'ON_BREAK' || me?.lastBreakStart;
+      const breakStart = me?.lastBreakStart;
+      let additionalBreakMin = 0;
+      if (isOnBreak && breakStart) {
+        additionalBreakMin = Math.round((now - new Date(breakStart)) / 60000);
+      }
+      const totalBreak = savedBreakMin + additionalBreakMin;
+      const billable = Math.max(0, elapsedMin - totalBreak);
+      setTtState(isOnBreak ? TT.ON_BREAK : TT.ON_SHIFT_ACTIVE);
+      ttStateRef.current = isOnBreak ? TT.ON_BREAK : TT.ON_SHIFT_ACTIVE;
+      ttClockInTimeRef.current = clockInTime.toISOString();
+      ttEventsLogRef.current = [{ type: clockedInAt ? 'AUTO_CLOCK_IN' : 'CLOCK_IN', timestamp: clockInTime.toISOString(), location: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null }];
+      setTtBillableMin(billable);
+      setTtBreakMin(totalBreak);
+      ttBreakStartRef.current = isOnBreak ? breakStart : null;
       ttLastTripEventRef.current = null;
     } else if (!isClockedIn && ttStateRef.current !== TT.OFF_SHIFT) {
       if (ttTickRef.current) { clearInterval(ttTickRef.current); ttTickRef.current = null; }
@@ -1584,8 +1639,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     ttStateRef.current = TT.ON_BREAK;
     ttBreakStartRef.current = now;
     ttEventsLogRef.current.push({ type: 'BREAK_START', timestamp: now });
+    const breakLocation = getDriverClockLocation();
+    onDriverStatusUpdate?.(driverId, true, {
+      clockTimestamp: now,
+      clockEventType: 'break_start',
+      timeTrackingState: TT.ON_BREAK,
+      ...(breakLocation ? { clockLocation: breakLocation } : {}),
+    });
     setShowToast({ type: 'info', message: 'Break started — time paused.' });
-  }, []);
+  }, [driverId, getDriverClockLocation, onDriverStatusUpdate]);
 
   const ttResume = useCallback(() => {
     if (ttStateRef.current !== TT.ON_BREAK) return;
@@ -1599,8 +1661,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     ttBreakStartRef.current = null;
     setTtState(TT.ON_SHIFT_ACTIVE);
     ttStateRef.current = TT.ON_SHIFT_ACTIVE;
+    const resumeLocation = getDriverClockLocation();
+    onDriverStatusUpdate?.(driverId, true, {
+      clockTimestamp: now,
+      clockEventType: 'break_end',
+      timeTrackingState: TT.ON_SHIFT_ACTIVE,
+      ...(resumeLocation ? { clockLocation: resumeLocation } : {}),
+    });
     setShowToast({ type: 'success', message: 'Break ended — back on shift.' });
-  }, []);
+  }, [driverId, getDriverClockLocation, onDriverStatusUpdate]);
 
   const ttEndShift = useCallback(() => {
     handleClockToggle();
@@ -1616,7 +1685,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const evt = { type: 'TRIP_EVENT', eventType, timestamp: now, tripId, location: location || null };
     ttEventsLogRef.current.push(evt);
     ttLastTripEventRef.current = evt;
-    setTtBillableMin(prev => prev + 1);
   }, []);
 
   // Idle logout prompt — when no trips for 30s while clocked in
@@ -2554,6 +2622,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       dropoff: getFirstTripValue(original, ['dropoff', 'dropoffAddress']) || '',
       pickupPhone: original.pickupPhone || '',
       dropoffPhone: original.dropoffPhone || '',
+      hospitalPhone: original.hospitalPhone || '',
       distance: original.distance || '',
       _pickupTime: isoToTimeInput(original.arrivalTime || original.startTime || original.pickupArrival || original.departedPickupTime),
       _pickupOdometer: original.pickupOdometer || '',
@@ -2562,13 +2631,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       _clientSigned: original.paperSignatureConfirmed || false,
       notes: original.notes || '',
     });
-    setHistorySortKeyOverrides(prev => ({ ...prev, [original.id]: getHistoryFinishedSortMs(original) }));
+    const frozenKey = getHistoryFinishedSortMs(original);
+    setHistorySortKeyOverrides(prev => {
+      const next = {};
+      next[original.id] = frozenKey;
+      return next;
+    });
+    setActiveSortKeyOverrides(prev => {
+      const next = {};
+      next[original.id] = original.time || '';
+      return next;
+    });
   };
 
   const handleCancelInlineEdit = () => {
     setEditingTripId(null);
     setEditingTripData(null);
     setHistorySortKeyOverrides({});
+    setActiveSortKeyOverrides({});
   };
 
   const handleSaveInlineEdit = () => {
@@ -2589,6 +2669,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       dropoff: d.dropoff || '',
       pickupPhone: d.pickupPhone || '',
       dropoffPhone: d.dropoffPhone || '',
+      hospitalPhone: d.hospitalPhone || '',
       distance: d.distance || '',
       arrivalTime: pickupIso || original.arrivalTime || null,
       startTime: pickupIso || original.startTime || null,
@@ -2601,7 +2682,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     };
     setEditingTripId(null);
     setEditingTripData(null);
-    setHistorySortKeyOverrides({});
     setPasswordPrompt({ type: 'edittrip', trip: { ...original, ...cleanData }, editedData: cleanData });
   };
 
@@ -3061,6 +3141,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-100">
               Trip: {trip.bookingId || trip.id || '--'}
             </span>
+            <div className="flex items-center gap-1 shrink-0">
+              <button type="button" onClick={() => { if (!phoneNumbers?.dispatcher) { alert('No dispatcher number saved. Add it in Settings.'); return; } handleCall(phoneNumbers.dispatcher, 'Dispatcher'); }} title="Call Dispatcher" className="h-7 px-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 text-[10px] font-semibold active:bg-blue-100 transition-colors" aria-label="Call Dispatcher">
+                <Phone size={11} /><span>DISP</span>
+              </button>
+              <button type="button" onClick={() => { if (!phoneNumbers?.routing) { alert('No routing number saved. Add it in Settings.'); return; } handleCall(phoneNumbers.routing, 'Routing'); }} title="Call Routing" className="h-7 px-2 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1 text-[10px] font-semibold active:bg-indigo-100 transition-colors" aria-label="Call Routing">
+                <Phone size={11} /><span>ROUT</span>
+              </button>
+            </div>
 
           </div>
         </div>
@@ -3185,7 +3273,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           </div>
         </div>
 
-        <div className="fixed left-3 right-3 z-40 rounded-2xl border border-blue-100 bg-blue-50/95 p-2.5 shadow-lg backdrop-blur-xl" style={{ bottom: 'calc(110px + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="fixed left-3 right-3 z-40 rounded-2xl border border-blue-100 bg-blue-50/95 p-2.5 shadow-lg backdrop-blur-xl" style={{ bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
           <div className="mb-2 flex items-center gap-1">
             {getWorkflowSteps(trip).map((step, idx) => {
               const currentStep = getCurrentWorkflowStep(trip);
@@ -3309,7 +3397,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }
 
   return (
-    <div className="w-full h-full overflow-hidden flex flex-col bg-[#F3F4F6] text-slate-900">
+    <div className="w-full h-full overflow-hidden flex flex-col bg-[#F3F4F6] text-slate-900 relative">
       {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && expandedTripId && !activeWorkTrip && (
         <div
           className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
@@ -3386,32 +3474,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
       )}
 
-      {/* ===== TIME TRACKING STATUS BAR ===== */}
-      {isClockedIn && ttState !== TT.OFF_SHIFT && (
-        <div className={`mx-3 mt-2 rounded-xl px-3 py-2 flex items-center gap-2 text-[11px] font-semibold border ${
-          ttState === TT.ON_BREAK
-            ? 'bg-amber-50 border-amber-200 text-amber-800'
-            : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-        }`}>
-          <div className={`w-2 h-2 rounded-full shrink-0 ${ttState === TT.ON_BREAK ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
-          <span className="uppercase tracking-wider">{ttState === TT.ON_BREAK ? 'On Break' : 'Active'}</span>
-          <span className="text-slate-400">·</span>
-          <Clock size={11} />
+      {/* ===== TIME TRACKING STATUS INDICATOR ===== */}
+      {isClockedIn && ttState !== TT.OFF_SHIFT && activeNav !== 'settings' && (
+        <div className="absolute top-2 right-16 z-40 flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold border shadow-sm pointer-events-none
+          bg-emerald-50 border-emerald-200 text-emerald-700">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
           <span>{Math.floor(ttBillableMin / 60)}h {ttBillableMin % 60}m</span>
-          {ttBreakMin > 0 && (
-            <>
-              <span className="text-slate-400">·</span>
-              <span>Break {ttBreakMin}m</span>
-            </>
-          )}
-          <div className="ml-auto flex gap-1.5">
-            {ttState === TT.ON_SHIFT_ACTIVE ? (
-              <button onClick={ttStartBreak} className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors text-[10px] font-bold">Break</button>
-            ) : (
-              <button onClick={ttResume} className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors text-[10px] font-bold">Resume</button>
-            )}
-            <button onClick={ttEndShift} className="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 transition-colors text-[10px] font-bold">End Shift</button>
-          </div>
         </div>
       )}
 
@@ -5137,6 +5205,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                 <input value={ie.dropoffPhone} onChange={(e) => setEditingTripData(p => ({ ...p, dropoffPhone: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
+                                <label className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-0.5 block">Hospital Phone</label>
+                                <input value={ie.hospitalPhone || ''} onChange={(e) => setEditingTripData(p => ({ ...p, hospitalPhone: e.target.value }))} className={inputCls} />
+                              </div>
+                              <div>
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 block">Distance</label>
                                 <input value={ie.distance} onChange={(e) => setEditingTripData(p => ({ ...p, distance: e.target.value }))} className={inputCls} />
                               </div>
@@ -5231,6 +5303,41 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 </div>
               </div>
             </div>
+
+            {/* Time Tracking Controls */}
+            {isClockedIn && ttState !== TT.OFF_SHIFT && (
+              <div className={`rounded-2xl border p-4 shadow-sm ${
+                ttState === TT.ON_BREAK
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-emerald-50 border-emerald-200'
+              }`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${ttState === TT.ON_BREAK ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+                  <span className={`text-sm font-bold uppercase tracking-wide ${ttState === TT.ON_BREAK ? 'text-amber-800' : 'text-emerald-800'}`}>
+                    {ttState === TT.ON_BREAK ? 'On Break' : 'Active'}
+                  </span>
+                  <span className="text-slate-400">·</span>
+                  <Clock size={13} className={ttState === TT.ON_BREAK ? 'text-amber-600' : 'text-emerald-600'} />
+                  <span className={`text-sm font-bold ${ttState === TT.ON_BREAK ? 'text-amber-800' : 'text-emerald-800'}`}>
+                    {Math.floor(ttBillableMin / 60)}h {ttBillableMin % 60}m
+                  </span>
+                  {ttBreakMin > 0 && (
+                    <>
+                      <span className="text-slate-400">·</span>
+                      <span className={`text-xs font-semibold ${ttState === TT.ON_BREAK ? 'text-amber-700' : 'text-emerald-700'}`}>Break {ttBreakMin}m</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {ttState === TT.ON_SHIFT_ACTIVE ? (
+                    <button onClick={ttStartBreak} className="flex-1 h-9 rounded-xl bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors text-sm font-bold">Take Break</button>
+                  ) : (
+                    <button onClick={ttResume} className="flex-1 h-9 rounded-xl bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors text-sm font-bold">Resume</button>
+                  )}
+                  <button onClick={ttEndShift} className="flex-1 h-9 rounded-xl bg-rose-100 text-rose-700 hover:bg-rose-200 transition-colors text-sm font-bold">End Shift</button>
+                </div>
+              </div>
+            )}
 
             {/* Analytics */}
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
@@ -5415,7 +5522,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                         ]);
                       });
                       rows.push(['', '', '', '', '', '']);
-                      rows.push(['Weekly Total', '', '', clockHistory.weeklyTotal.toFixed(1), '', '']);
+                      rows.push(['Total', '', '', clockHistory.weeklyTotal.toFixed(1), '', '']);
                       if (clockHistory.weeklyOvertime > 0) rows.push(['Overtime', '', '', clockHistory.weeklyOvertime.toFixed(1), '', '']);
                       const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
                       const blob = new Blob([csv], { type: 'text/csv' });
@@ -5434,33 +5541,52 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <p className="text-xs text-slate-500 text-center py-4">No clock in/out history yet.</p>
               ) : (
                 <>
-                  <div className="overflow-x-auto -mx-1">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-100">
-                          <th className="text-left font-semibold text-slate-500 pb-1.5 pr-2 uppercase tracking-wide">Date</th>
-                          <th className="text-left font-semibold text-slate-500 pb-1.5 pr-2 uppercase tracking-wide">In</th>
-                          <th className="text-left font-semibold text-slate-500 pb-1.5 pr-2 uppercase tracking-wide">Out</th>
-                          <th className="text-right font-semibold text-slate-500 pb-1.5 uppercase tracking-wide">Hrs</th>
-                          <th className="text-left font-semibold text-slate-500 pb-1.5 uppercase tracking-wide">Location</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {clockHistory.days.map(day => (
-                          <tr key={day.dateKey} className={`border-b border-slate-50 ${!day.hasEvents ? 'opacity-40' : ''}`}>
-                            <td className="py-1.5 pr-2 font-semibold text-slate-700 whitespace-nowrap">{formatHistoryCompactDayLabel(day.dateKey)}</td>
-                            <td className="py-1.5 pr-2 font-semibold text-slate-800 whitespace-nowrap">{day.clockIn ? formatClockTime(day.clockIn) : '—'}</td>
-                            <td className="py-1.5 pr-2 font-semibold text-slate-800 whitespace-nowrap">{day.clockOut ? formatClockTime(day.clockOut) : '—'}</td>
-                            <td className="py-1.5 pr-2 text-right font-semibold text-slate-700 whitespace-nowrap">{day.hours ? `${day.hours.toFixed(1)}h` : '—'}</td>
-                            <td className="py-1.5 text-xs font-mono text-slate-500 truncate max-w-[80px]">{day.inLocation || day.outLocation || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="space-y-2">
+                    {clockHistory.days.filter(d => d.hasEvents).map(day => {
+                      const todayKey = new Date().toISOString().slice(0, 10);
+                      const isToday = day.dateKey === todayKey;
+                      return (
+                        <div key={day.dateKey} className={`rounded-xl border p-3 ${isToday ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className={`text-sm font-bold ${isToday ? 'text-emerald-700' : 'text-slate-800'}`}>
+                              {formatHistoryCompactDayLabel(day.dateKey)}
+                              {isToday && <span className="ml-1.5 text-[10px] font-bold uppercase bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full">Today</span>}
+                            </span>
+                            {day.hours ? (
+                              <span className={`text-sm font-bold ${day.hours >= 8 ? 'text-emerald-600' : day.hours >= 4 ? 'text-amber-600' : 'text-slate-600'}`}>
+                                {day.hours.toFixed(1)}h
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400">—</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs">
+                            {day.clockIn && (
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <span className="text-slate-600 font-medium">In</span>
+                                <span className="font-bold text-slate-800">{formatClockTime(day.clockIn)}</span>
+                              </div>
+                            )}
+                            {day.clockIn && day.clockOut && <div className="text-slate-300">→</div>}
+                            {day.clockOut && (
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full bg-rose-500" />
+                                <span className="text-slate-600 font-medium">Out</span>
+                                <span className="font-bold text-slate-800">{formatClockTime(day.clockOut)}</span>
+                              </div>
+                            )}
+                            {!day.clockIn && !day.clockOut && (
+                              <span className="text-slate-400 text-xs">No activity</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-600">This week total</span>
-                    <span className={`font-semibold ${clockHistory.weeklyOvertime > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                  <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-600">14-Day Total</span>
+                    <span className={`text-sm font-bold ${clockHistory.weeklyOvertime > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
                       {clockHistory.weeklyTotal.toFixed(1)}h
                       {clockHistory.weeklyOvertime > 0 && (
                         <span className="ml-2 text-xs text-rose-500">({clockHistory.weeklyOvertime.toFixed(1)}h OT)</span>

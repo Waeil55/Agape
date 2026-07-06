@@ -60,10 +60,16 @@ class ErrorBoundary extends React.Component {
 
 const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute', 'skills', 'senior', 'living', 'manor', 'village'];
 const isFacility = (name) => { const l = (name||'').toLowerCase().trim(); return l ? FACILITY_KEYWORDS.some(kw => l.includes(kw)) : false; };
+const cleanPhoneLocal = (p) => (p || '').replace(/[^0-9]/g, '');
 const getClientPhoneGlobal = (trip) => {
   if (trip.patientPhone) return trip.patientPhone;
   const pu = trip.pickupPhone || '', doPh = trip.dropoffPhone || '';
   if (!pu && !doPh) return '';
+  const hp = cleanPhoneLocal(trip.hospitalPhone);
+  const puClean = cleanPhoneLocal(pu);
+  const doClean = cleanPhoneLocal(doPh);
+  if (hp && puClean && puClean === hp && doPh && doClean !== hp) return doPh;
+  if (hp && doClean && doClean === hp && pu && puClean !== hp) return pu;
   const puFac = isFacility(trip.pickupSiteName||'') || isFacility(trip.pickup||'');
   const doFac = isFacility(trip.dropoffSiteName||'') || isFacility(trip.dropoff||'');
   if (puFac && !doFac) return doPh;
@@ -790,7 +796,7 @@ const DesktopEnterpriseDashboard = ({
                   {(tripDetails.type || tripDetails.serviceType) && <p className="text-xs text-slate-500 mt-0.5">Service: {tripDetails.type || tripDetails.serviceType}</p>}
                   {formatPhoneDisplay(getClientPhoneGlobal(tripDetails)) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(getClientPhoneGlobal(tripDetails))}</p>}
                   {formatPhoneDisplay(tripDetails.pickupPhone) && formatPhoneDisplay(tripDetails.pickupPhone) !== formatPhoneDisplay(getClientPhoneGlobal(tripDetails)) && <p className="text-xs text-emerald-700">Pickup phone: {formatPhoneDisplay(tripDetails.pickupPhone)}</p>}
-                  {formatPhoneDisplay(tripDetails.dropoffPhone) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.dropoffPhone)}</p>}
+                  {formatPhoneDisplay(tripDetails.hospitalPhone || tripDetails.dropoffPhone) && formatPhoneDisplay(tripDetails.hospitalPhone || tripDetails.dropoffPhone) !== formatPhoneDisplay(getClientPhoneGlobal(tripDetails)) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.hospitalPhone || tripDetails.dropoffPhone)}</p>}
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Status</p>
@@ -1615,7 +1621,7 @@ const DesktopEnterpriseDashboard = ({
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Dropoff</p>
                     <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.dropoff || '—'}</p>
                     {tripDetails.dropoffSiteName && <p className="text-xs text-rose-700 mt-1">{tripDetails.dropoffSiteName}</p>}
-                    {formatPhoneDisplay(tripDetails.dropoffPhone) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.dropoffPhone)}</p>}
+                    {formatPhoneDisplay(tripDetails.hospitalPhone || tripDetails.dropoffPhone) && formatPhoneDisplay(tripDetails.hospitalPhone || tripDetails.dropoffPhone) !== formatPhoneDisplay(getClientPhoneGlobal(tripDetails)) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.hospitalPhone || tripDetails.dropoffPhone)}</p>}
                   </div>
                 </div>
               </div>
