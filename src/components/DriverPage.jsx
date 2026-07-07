@@ -3135,14 +3135,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-100">
               Trip: {trip.bookingId || trip.id || '--'}
             </span>
-            <div className="flex items-center gap-1 shrink-0">
-              <button type="button" onClick={() => { if (!phoneNumbers?.dispatcher) { alert('No dispatcher number saved. Add it in Settings.'); return; } handleCall(phoneNumbers.dispatcher, 'Dispatcher'); }} title="Call Dispatcher" className="h-7 px-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 text-[10px] font-semibold active:bg-blue-100 transition-colors" aria-label="Call Dispatcher">
-                <Phone size={11} /><span>DISP</span>
-              </button>
-              <button type="button" onClick={() => { if (!phoneNumbers?.routing) { alert('No routing number saved. Add it in Settings.'); return; } handleCall(phoneNumbers.routing, 'Routing'); }} title="Call Routing" className="h-7 px-2 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1 text-[10px] font-semibold active:bg-indigo-100 transition-colors" aria-label="Call Routing">
-                <Phone size={11} /><span>ROUT</span>
-              </button>
-            </div>
 
           </div>
         </div>
@@ -3499,7 +3491,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
 
           {(incomingTransferTrips.length > 0 || incomingTransferRoutes.length > 0) && (() => {
-            const transferDisabled = !isClockedIn;
             return (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 shadow-sm space-y-2">
               <div className="flex items-center gap-2">
@@ -3511,10 +3502,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-sm font-semibold text-slate-900">{trip.patient || 'Trip'} · {to12hr(trip.time)}</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {trip.transferRequest?.fromDriverName || 'Driver'}: {trip.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-7 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 text-white'}`}>Accept</button>
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_trip', trip })} disabled={transferDisabled} className={`flex-1 h-7 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_trip', trip })} className="flex-1 h-7 rounded-xl text-xs font-medium bg-emerald-600 text-white">Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_trip', trip })} className="flex-1 h-7 rounded-xl text-xs font-medium bg-white border border-rose-200 text-rose-700">Decline</button>
                   </div>
-                  {transferDisabled && <p className="text-xs text-amber-600 font-medium mt-1">Clock in to respond</p>}
                 </div>
               ))}
               {incomingTransferRoutes.map((route) => (
@@ -3522,10 +3512,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-sm font-semibold text-slate-900">{route.name || 'Route Plan'} · {(route.sequence || []).length} stops</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">From {route.transferRequest?.fromDriverName || 'Driver'}: {route.transferRequest?.reason || 'Emergency transfer'}</p>
                   <div className="flex gap-2 mt-3">
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-7 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-emerald-600 text-white'}`}>Accept</button>
-                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_route', route, trip: {} })} disabled={transferDisabled} className={`flex-1 h-7 rounded-xl text-xs font-medium ${transferDisabled ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-0' : 'bg-white border border-rose-200 text-rose-700'}`}>Decline</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'accept_transfer_route', route, trip: {} })} className="flex-1 h-7 rounded-xl text-xs font-medium bg-emerald-600 text-white">Accept</button>
+                    <button type="button" onClick={() => setPasswordPrompt({ type: 'decline_transfer_route', route, trip: {} })} className="flex-1 h-7 rounded-xl text-xs font-medium bg-white border border-rose-200 text-rose-700">Decline</button>
                   </div>
-                  {transferDisabled && <p className="text-xs text-amber-600 font-medium mt-1">Clock in to respond</p>}
                 </div>
               ))}
             </div>
@@ -4270,12 +4259,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       onEditTrip: handleStartInlineEdit,
                       onScheduleEdit: () => openScheduleEditor(trip),
                       onClearActiveTrip: clearActiveTrip,
-                      ...(isClockedIn ? {
-                        onNoShow: handleNoShow,
-                        onCancel: handleCancel,
-                        onReroute: handleReroute,
-                        onTransfer: () => openTransferPrompt('trip', trip),
-                      } : {}),
+                      onNoShow: handleNoShow,
+                      onCancel: handleCancel,
+                      onReroute: handleReroute,
+                      onTransfer: () => openTransferPrompt('trip', trip),
                       renderWorkflow: !isTerminal && primary ? () => {
                         const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
                         const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
