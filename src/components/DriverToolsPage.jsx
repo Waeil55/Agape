@@ -7,6 +7,7 @@ import {
 import { impact } from '../utils/haptics';
 import { openMapLink } from '../utils/nativeActions';
 import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
+import { loadGoogleMapsApi } from '../hooks/useGoogleMaps';
 
 const timeToMinutes = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return 1440;
@@ -153,20 +154,6 @@ const RoutePlanSection = ({
   const [gettingLocation, setGettingLocation] = useState(false);
   const [routeError, setRouteError] = useState('');
   const [routeNotice, setRouteNotice] = useState('');
-
-  const loadGoogleMapsScript = useCallback(() => {
-    return new Promise((resolve, reject) => {
-      if (window.google && window.google.maps) { resolve(); return; }
-      const existing = document.getElementById('gm-script');
-      if (existing) { existing.addEventListener('load', resolve); existing.addEventListener('error', reject); return; }
-      const s = document.createElement('script');
-      s.id = 'gm-script';
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY()}`;
-      s.async = true; s.defer = true;
-      s.onload = resolve; s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }, []);
 
   const getCurrentAddress = useCallback(() => {
     return new Promise((resolve) => {
@@ -350,7 +337,7 @@ const RoutePlanSection = ({
       const waypoints = labels.slice(1, -1);
 
       try {
-        await loadGoogleMapsScript();
+        await loadGoogleMapsApi();
         const directionsService = new window.google.maps.DirectionsService();
         const formattedWaypoints = waypoints.map(wp => ({ location: wp, stopover: true }));
         const summary = await new Promise((resolve, reject) => {
@@ -400,7 +387,7 @@ const RoutePlanSection = ({
     };
     const id = setTimeout(calculateTripTime, 900);
     return () => clearTimeout(id);
-  }, [routeValidation, expanded, loadGoogleMapsScript]);
+  }, [routeValidation, expanded]);
 
   const handleSmartSort = () => {
     const sorted = [...stops.slice(1)]
@@ -643,7 +630,7 @@ const RoutePlanSection = ({
                       type="text"
                       value={stop.label}
                       onChange={(e) => handleTextChange(index, e.target.value)}
-                      className="text-[10px] font-medium text-slate-500 placeholder:text-slate-300 truncate bg-transparent outline-none w-full"
+                      className="text-[7px] font-normal text-slate-400 placeholder:text-slate-300 truncate bg-transparent outline-none w-full"
                       placeholder={index === 0 ? 'Starting point or current location' : `Stop ${stop.letter} address`}
                       spellCheck="false"
                     />

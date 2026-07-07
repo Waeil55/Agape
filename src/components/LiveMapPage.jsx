@@ -28,6 +28,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { GOOGLE_MAPS_API_KEY, db, collection, query, orderBy, limit as firestoreLimit, getDocs } from '../config/firebase';
+import { loadGoogleMapsApi } from '../hooks/useGoogleMaps';
 import { openMapLink } from '../utils/nativeActions';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import AIInsightsBanner from './AIInsightsBanner';
@@ -217,27 +218,6 @@ const DARK_MAP_STYLES = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
   { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
 ];
-
-function loadGoogleMapsApi(key) {
-  return new Promise((resolve, reject) => {
-    if (window.google?.maps) { resolve(window.google.maps); return; }
-    const existing = document.getElementById('gm-live-api');
-    if (existing) {
-      if (window.google?.maps) { resolve(window.google.maps); return; }
-      existing.addEventListener('load', () => resolve(window.google.maps), { once: true });
-      existing.addEventListener('error', reject, { once: true });
-      return;
-    }
-    const s = document.createElement('script');
-    s.id = 'gm-live-api';
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}`;
-    s.async = true;
-    s.defer = true;
-    s.onload = () => resolve(window.google.maps);
-    s.onerror = () => reject(new Error('Google Maps script failed to load'));
-    document.head.appendChild(s);
-  });
-}
 
 function createMarkerIcon(mapsLib, initial, fillColor, isSelected = false, isPulsing = false) {
   const size = isSelected ? 36 : 28;
@@ -468,7 +448,7 @@ const LiveMapPage = ({
   useEffect(() => {
     if (!hasGoogleMapsConfigured()) { setMapsLoadError(true); return; }
     let cancelled = false;
-    loadGoogleMapsApi(GOOGLE_MAPS_API_KEY())
+    loadGoogleMapsApi()
       .then((mapsLib) => {
         if (cancelled || mapRef.current) return;
         const el = mapContainerRef.current;
