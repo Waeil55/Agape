@@ -92,7 +92,7 @@ export function FleetHeatMap({ drivers = [], trips = [], driverTelemetry = [] })
       {/* Hot Zones */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100">
-          <h3 className="text-sm font-bold text-slate-900">Hot Zones</h3>
+          <h3 className="text-sm font-semibold text-slate-900">Hot Zones</h3>
           <p className="text-[10px] text-slate-500">Most active pickup/dropoff locations</p>
         </div>
         <div className="divide-y divide-slate-100">
@@ -111,7 +111,7 @@ export function FleetHeatMap({ drivers = [], trips = [], driverTelemetry = [] })
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-slate-900 truncate">{zone.zone}</p>
+                    <p className="text-xs font-semibold text-slate-900 truncate">{zone.zone}</p>
                     <div className="flex items-center gap-3 mt-0.5">
                       <span className="text-[10px] text-emerald-600">↑ {zone.pickups} pickup</span>
                       <span className="text-[10px] text-rose-600">↓ {zone.dropoffs} dropoff</span>
@@ -134,7 +134,7 @@ export function FleetHeatMap({ drivers = [], trips = [], driverTelemetry = [] })
       {/* Driver Activity Grid */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100">
-          <h3 className="text-sm font-bold text-slate-900">Driver Activity</h3>
+          <h3 className="text-sm font-semibold text-slate-900">Driver Activity</h3>
           <p className="text-[10px] text-slate-500">Current status of all drivers</p>
         </div>
         <div className="p-3 grid grid-cols-5 sm:grid-cols-10 gap-1.5">

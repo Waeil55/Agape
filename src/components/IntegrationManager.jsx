@@ -107,7 +107,7 @@ const APIConfiguration = ({ integrationKey, integration, onConnect }) => {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-slate-900">{integration.name}</h3>
+        <h3 className="text-lg font-semibold text-slate-900">{integration.name}</h3>
         {integration.status === 'connected' && (
           <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
             <CheckCircle size={14} />
@@ -120,7 +120,7 @@ const APIConfiguration = ({ integrationKey, integration, onConnect }) => {
 
       <div className="space-y-3">
         <div>
-          <label className="block text-sm font-bold text-slate-900 mb-2">API Key</label>
+          <label className="block text-sm font-semibold text-slate-900 mb-2">API Key</label>
           <div className="flex items-center gap-2">
             <input
               type={showKey ? 'text' : 'password'}
@@ -167,7 +167,7 @@ const APIConfiguration = ({ integrationKey, integration, onConnect }) => {
       </div>
 
       <div className="mt-4 p-3 bg-slate-50 rounded-lg text-xs text-slate-600">
-        <p className="font-bold mb-1">📚 Documentation</p>
+        <p className="font-semibold mb-1">📚 Documentation</p>
         <a href={INTEGRATION_DOCS[integrationKey]} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
           View {integration.name} API docs →
         </a>
@@ -213,7 +213,7 @@ const WebhookManager = () => {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
-      <h3 className="text-lg font-bold text-slate-900 mb-4">Webhooks</h3>
+      <h3 className="text-lg font-semibold text-slate-900 mb-4">Webhooks</h3>
 
       {/* Current Webhooks */}
       <div className="space-y-3 mb-6">
@@ -245,7 +245,7 @@ const WebhookManager = () => {
 
       {/* Add New Webhook */}
       <div className="border-t border-slate-200 pt-4">
-        <p className="font-bold text-slate-900 mb-3">Add Webhook</p>
+        <p className="font-semibold text-slate-900 mb-3">Add Webhook</p>
         <input
           type="url"
           value={newUrl}
@@ -255,7 +255,7 @@ const WebhookManager = () => {
         />
 
         <div className="mb-3">
-          <label className="text-sm font-bold text-slate-900 block mb-2">Events</label>
+          <label className="text-sm font-semibold text-slate-900 block mb-2">Events</label>
           <div className="grid grid-cols-2 gap-2">
             {availableEvents.map(event => (
               <label key={event} className="flex items-center gap-2 cursor-pointer">
@@ -328,7 +328,7 @@ const APIDocumentation = () => {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
-      <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
         <Globe size={20} className="text-blue-600" />
         API Documentation
       </h3>
@@ -352,7 +352,7 @@ const APIDocumentation = () => {
         ))}
       </div>
 
-      <a href="https://firebase.google.com/docs/functions" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold text-sm hover:underline flex items-center gap-1">
+      <a href="https://firebase.google.com/docs/functions" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold text-sm hover:underline flex items-center gap-1">
         View Full Documentation <ExternalLink size={14} />
       </a>
     </div>

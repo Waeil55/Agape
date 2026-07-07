@@ -160,7 +160,7 @@ const ReportGenerator = ({ trips = [], drivers = [], onGenerated }) => {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-2xl">
-      <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+      <h3 className="text-xl font-semibold text-slate-900 mb-6 flex items-center gap-2">
         <FileText size={24} className="text-blue-600" />
         Generate Report
       </h3>
@@ -168,7 +168,7 @@ const ReportGenerator = ({ trips = [], drivers = [], onGenerated }) => {
       <div className="space-y-4">
         {/* Report Type */}
         <div>
-          <label className="block text-sm font-bold text-slate-900 mb-2">Report Type</label>
+          <label className="block text-sm font-semibold text-slate-900 mb-2">Report Type</label>
           <select
             value={reportType}
             onChange={(e) => setReportType(e.target.value)}
@@ -184,7 +184,7 @@ const ReportGenerator = ({ trips = [], drivers = [], onGenerated }) => {
 
         {/* Time Range */}
         <div>
-          <label className="block text-sm font-bold text-slate-900 mb-2">Time Range</label>
+          <label className="block text-sm font-semibold text-slate-900 mb-2">Time Range</label>
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
@@ -348,7 +348,7 @@ const CustomDashboardBuilder = () => {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
-      <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
         <BarChart3 size={20} className="text-blue-600" />
         Custom Dashboard
       </h3>
@@ -370,7 +370,7 @@ const CustomDashboardBuilder = () => {
       <div className={`${layout === 'grid' ? 'grid grid-cols-1 md:grid-cols-3 gap-4' : 'space-y-3'}`}>
         {widgets.map(widget => (
           <div key={widget.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200 hover:shadow-md transition-shadow">
-            <p className="font-bold text-slate-900">{widget.title}</p>
+            <p className="font-semibold text-slate-900">{widget.title}</p>
             <p className="text-xs text-slate-500 mt-1">Metric: {widget.metric}</p>
             <div className="flex gap-2 mt-3">
               <button onClick={() => handleEditWidget(widget)} className="text-xs font-bold text-blue-600 hover:underline">Edit</button>
@@ -413,7 +413,7 @@ const ReportingModule = ({ trips = [], drivers = [] }) => {
           {/* Quick Stats */}
           <div className="space-y-4">
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
-              <p className="text-sm font-bold text-slate-600 mb-2">Quick Export</p>
+              <p className="text-sm font-semibold text-slate-600 mb-2">Quick Export</p>
               <QuickExport data={{
                 headers: ['Trip ID', 'Driver', 'Status', 'Revenue'],
                 rows: trips.slice(0, 5).map(t => [t.id, t.driverId, t.status, '$45']),
@@ -421,7 +421,7 @@ const ReportingModule = ({ trips = [], drivers = [] }) => {
             </div>
 
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-6">
-              <p className="font-bold text-slate-900">📊 Analytics Ready</p>
+              <p className="font-semibold text-slate-900">📊 Analytics Ready</p>
               <p className="text-sm text-slate-600 mt-2">Access AI-powered insights and trends in your dashboard</p>
               <button onClick={() => document.getElementById('custom-dashboard-builder')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="mt-3 text-sm font-bold text-blue-600 hover:underline">View Analytics →</button>
             </div>

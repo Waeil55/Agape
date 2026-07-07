@@ -21,7 +21,7 @@ export default memo(function VehicleDetailsCard({ vehicle, driver, compact = fal
           <Truck size={14} className="text-blue-600" />
         </div>
         <div className="min-w-0">
-          <p className="text-[11px] font-bold text-slate-900 truncate">{vehicleName}</p>
+          <p className="text-[11px] font-semibold text-slate-900 truncate">{vehicleName}</p>
           <p className="text-[9px] text-slate-500">
             {year && `${year} `}{make && `${make} `}{model && `${model}`}
             {plate && ` · ${plate}`}
@@ -58,7 +58,7 @@ export default memo(function VehicleDetailsCard({ vehicle, driver, compact = fal
             </div>
             <div>
               <p className="text-[9px] text-slate-500 uppercase">Plate</p>
-              <p className="text-xs font-bold text-slate-900">{plate}</p>
+              <p className="text-xs font-semibold text-slate-900">{plate}</p>
             </div>
           </div>
         )}
@@ -67,7 +67,7 @@ export default memo(function VehicleDetailsCard({ vehicle, driver, compact = fal
           <Gauge size={14} className="text-slate-400" />
           <div>
             <p className="text-[9px] text-slate-500 uppercase">Odometer</p>
-            <p className="text-xs font-bold text-slate-900">{odometer?.toLocaleString() || 0} mi</p>
+            <p className="text-xs font-semibold text-slate-900">{odometer?.toLocaleString() || 0} mi</p>
           </div>
         </div>
 
@@ -76,7 +76,7 @@ export default memo(function VehicleDetailsCard({ vehicle, driver, compact = fal
             <Truck size={14} className="text-slate-400" />
             <div>
               <p className="text-[9px] text-slate-500 uppercase">Type</p>
-              <p className="text-xs font-bold text-slate-900">{vehicle.type}</p>
+              <p className="text-xs font-semibold text-slate-900">{vehicle.type}</p>
             </div>
           </div>
         )}
@@ -86,7 +86,7 @@ export default memo(function VehicleDetailsCard({ vehicle, driver, compact = fal
             <Fuel size={14} className="text-slate-400" />
             <div>
               <p className="text-[9px] text-slate-500 uppercase">Fuel</p>
-              <p className="text-xs font-bold text-slate-900">{vehicle.fuelType}</p>
+              <p className="text-xs font-semibold text-slate-900">{vehicle.fuelType}</p>
             </div>
           </div>
         )}
@@ -94,7 +94,7 @@ export default memo(function VehicleDetailsCard({ vehicle, driver, compact = fal
 
       {/* Maintenance Status */}
       <div className="px-4 py-3 border-t border-slate-100">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Maintenance</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Maintenance</p>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

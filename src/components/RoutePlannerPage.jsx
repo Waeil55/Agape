@@ -253,7 +253,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
     return (
       <div key={trip.id} className={`${cardBg} rounded-lg border px-2.5 py-2 text-xs`}>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-bold truncate flex-1">{trip.patient}</span>
+          <span className="font-semibold truncate flex-1">{trip.patient}</span>
           <span className="text-slate-400 font-mono text-[9px]">{to12hr(trip.time)}</span>
         </div>
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -309,7 +309,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className={`text-xs font-bold truncate max-w-[120px] ${done ? 'line-through text-slate-400' : 'text-slate-800'}`}>{stop.patient}</span>
+                <span className={`text-xs font-semibold truncate max-w-[120px] ${done ? 'line-through text-slate-400' : 'text-slate-800'}`}>{stop.patient}</span>
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${done ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                   {to12hr(stop.time)}
                 </span>
@@ -345,7 +345,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
       <div className={`flex-1 flex items-center justify-center ${bg}`}>
         <div className="text-center p-8">
           <CheckCircle2 size={48} className="mx-auto mb-4 text-emerald-500" />
-          <p className="text-lg font-bold">Route Complete</p>
+          <p className="text-lg font-semibold">Route Complete</p>
           <p className={`text-sm ${muted} mt-1`}>All stops completed.</p>
           <button onClick={() => setNavMode(false)} className="mt-6 px-6 h-11 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700">Exit</button>
         </div>
@@ -368,7 +368,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black mx-auto mb-3 shadow-lg ${isPuNav ? 'bg-blue-600 text-white' : 'bg-amber-600 text-white'}`}>
               {isPuNav ? 'PU' : 'DO'}
             </div>
-            <p className={`text-lg font-bold ${dark ? 'text-slate-200' : 'text-slate-800'}`}>{current.patient}</p>
+            <p className={`text-lg font-semibold ${dark ? 'text-slate-200' : 'text-slate-800'}`}>{current.patient}</p>
             <p className={`text-sm ${muted} mt-0.5`}>Stop {navStep + 1} — {isPuNav ? 'Pickup' : 'Dropoff'}</p>
           </div>
           <div className={`${cardBg} rounded-2xl border p-4 mb-4 space-y-3 shadow-sm`}>
@@ -377,14 +377,14 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
                 {isPuNav ? <LogIn size={14} className="text-blue-600" /> : <LogOut size={14} className="text-amber-600" />}
               </div>
               <div className="min-w-0">
-                <p className={`text-[10px] font-bold ${muted} uppercase tracking-wider`}>{isPuNav ? 'Pickup' : 'Dropoff'} Address</p>
+                <p className={`text-[10px] font-semibold ${muted} uppercase tracking-wider`}>{isPuNav ? 'Pickup' : 'Dropoff'} Address</p>
                 <p className={`text-sm font-medium ${dark ? 'text-slate-200' : 'text-slate-800'} mt-0.5`}>{current.address || '—'}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center shrink-0"><Clock size={14} className="text-amber-600" /></div>
               <div className="min-w-0">
-                <p className={`text-[10px] font-bold ${muted} uppercase tracking-wider`}>Time</p>
+                <p className={`text-[10px] font-semibold ${muted} uppercase tracking-wider`}>Time</p>
                 <p className={`text-sm font-medium ${dark ? 'text-slate-200' : 'text-slate-800'} mt-0.5`}>{to12hr(current.time)}</p>
               </div>
             </div>
@@ -392,7 +392,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0"><AlertTriangle size={14} className="text-slate-500" /></div>
                 <div className="min-w-0">
-                  <p className={`text-[10px] font-bold ${muted} uppercase tracking-wider`}>Notes</p>
+                  <p className={`text-[10px] font-semibold ${muted} uppercase tracking-wider`}>Notes</p>
                   <p className={`text-sm ${dark ? 'text-slate-200' : 'text-slate-800'} mt-0.5`}>{current.notes}</p>
                 </div>
               </div>
@@ -404,13 +404,13 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
           </div>
           {navStep + 1 < stops.length && (
             <div className="mt-6 pt-4 border-t border-slate-100">
-              <p className={`text-[10px] font-bold ${muted} uppercase tracking-wider mb-2`}>Next</p>
+              <p className={`text-[10px] font-semibold ${muted} uppercase tracking-wider mb-2`}>Next</p>
               <div className={`flex items-center gap-3 ${cardBg} rounded-xl border p-3`}>
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black ${stops[navStep + 1].type === 'pickup' ? 'bg-blue-600 text-white' : 'bg-amber-600 text-white'}`}>
                   {stops[navStep + 1].type === 'pickup' ? 'PU' : 'DO'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-bold ${dark ? 'text-slate-200' : 'text-slate-700'} truncate`}>{stops[navStep + 1].patient}</p>
+                  <p className={`text-sm font-semibold ${dark ? 'text-slate-200' : 'text-slate-700'} truncate`}>{stops[navStep + 1].patient}</p>
                   <p className="text-xs text-slate-400">{to12hr(stops[navStep + 1].time)}</p>
                 </div>
                 <ChevronRight size={16} className="text-slate-300" />
@@ -429,7 +429,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
       <div className={`w-full max-h-[42dvh] shrink-0 border-b md:w-72 md:max-h-none md:border-b-0 md:border-r xl:w-80 ${dark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} flex flex-col`}>
         <div className={`sticky top-0 px-3 py-2 border-b ${dark ? 'border-slate-700' : 'border-slate-100'} shrink-0`}>
           <div className="flex items-center justify-between">
-            <h3 className={`text-xs font-bold flex items-center gap-1.5 ${dark ? 'text-slate-200' : 'text-slate-700'}`}>
+            <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${dark ? 'text-slate-200' : 'text-slate-700'}`}>
               <Filter size={11} /> Schedule
               <span className="text-[9px] font-normal text-slate-400">({filteredTrips.length})</span>
             </h3>
@@ -450,7 +450,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
         <div className="flex-1 overflow-y-auto overscroll-contain p-2 space-y-1.5">
           {availTrips.length === 0 ? (
             <div className="p-4 text-center">
-              <p className={`text-xs font-bold ${muted}`}>No trips available</p>
+              <p className={`text-xs font-semibold ${muted}`}>No trips available</p>
               <p className="text-[10px] text-slate-400 mt-1">All trips are in the route or completed.</p>
             </div>
           ) : availTrips.map(renderScheduleTrip)}
@@ -464,7 +464,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
           <div className="px-3 py-2.5 flex items-center gap-2 flex-wrap sm:px-4">
             <div className="flex items-center gap-1.5">
               <Route size={16} className="text-blue-600" />
-              <input value={routeName} onChange={e => setRouteName(e.target.value)} placeholder="Route name..." className={`text-sm font-bold bg-transparent outline-none w-28 placeholder:text-slate-300 ${dark ? 'text-slate-100' : 'text-slate-900'}`} />
+              <input value={routeName} onChange={e => setRouteName(e.target.value)} placeholder="Route name..." className={`text-sm font-semibold bg-transparent outline-none w-28 placeholder:text-slate-300 ${dark ? 'text-slate-100' : 'text-slate-900'}`} />
             </div>
             <div className="hidden flex-1 sm:block" />
             <div className="flex items-center gap-1">
@@ -515,7 +515,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
           {stops.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
               <Route size={40} className="mb-3 opacity-20" />
-              <p className="text-sm font-bold text-slate-600">No stops in route</p>
+              <p className="text-sm font-semibold text-slate-600">No stops in route</p>
               <p className={`text-xs ${muted} mt-1`}>Add trips from the left panel to build a route.</p>
             </div>
           ) : (

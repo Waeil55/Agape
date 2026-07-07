@@ -1306,7 +1306,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       {step === 'upload' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-8">
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">Upload Trips</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-slate-900 mb-2">Upload Trips</h2>
             <p className="text-sm sm:text-base text-slate-600 mb-2">Import from CSV (.csv) or Excel (.xlsx / .xls).</p>
             <p className="text-xs sm:text-xs text-slate-500 mb-6 flex items-center gap-1"><BrainCircuit size={12} className="text-indigo-500 shrink-0" /> AI auto-validates addresses, times, and fields for accuracy.</p>
 
@@ -1352,7 +1352,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             <details className="mt-4 sm:mt-6 text-xs sm:text-sm text-slate-500">
               <summary className="cursor-pointer font-medium text-slate-600 hover:text-slate-800">Column name guide</summary>
               <div className="mt-3 p-3 sm:p-4 bg-slate-50 rounded-lg text-xs sm:text-xs font-mono text-slate-600 space-y-1">
-                <p><span className="font-bold text-slate-800">Auto-detected</span> &mdash; just use common labels like:</p>
+                <p><span className="font-semibold text-slate-800">Auto-detected</span> &mdash; just use common labels like:</p>
                 <p className="pl-3">Client Name, Pickup Address, Dropoff Address, Phone, Pickup Time, etc.</p>
                 <p className="mt-2 text-slate-400">Any column layout is supported.</p>
               </div>
@@ -1369,7 +1369,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
               <FileText className="absolute inset-0 m-auto text-blue-600 animate-pulse" size={24} />
             </div>
-            <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">Processing File</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">Processing File</h3>
             <p className="text-slate-500 text-xs sm:text-sm mb-4">{progressMsg}</p>
             <div className="w-full bg-slate-100 rounded-full h-2 mb-4">
               <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }}></div>
@@ -1399,7 +1399,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                 {withIssues === 0 ? <CheckCircle2 size={22} className="text-emerald-600" /> : <AlertTriangle size={22} className="text-amber-600" />}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-lg sm:text-xl font-bold text-slate-900">Import Review</h3>
+                <h3 className="text-lg sm:text-xl font-semibold text-slate-900">Import Review</h3>
                 <p className="text-xs sm:text-sm text-slate-500 truncate">
                   {mappedTrips.length} trip{ mappedTrips.length !== 1 ? 's' : '' } extracted
                   {withIssues > 0 ? ` — ${withIssues} with warnings` : ' — all clean' }
@@ -1489,7 +1489,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                           onChange={(e) => {
                             setMappedTrips(prev => prev.map((t, i) => i === idx ? { ...t, driverId: e.target.value } : t));
                           }}
-                          className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
+                          className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500"
                         >
                           <option value="">Auto/Unassigned</option>
                           {drivers.map(d => (
@@ -1555,7 +1555,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                         type="date"
                         value={manualDate}
                         onChange={e => setManualDate(e.target.value)}
-                        className="w-full px-4 py-2.5 border-2 border-violet-300 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-violet-500 bg-white"
+                        className="w-full px-4 py-2.5 border-2 border-violet-300 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-violet-500 bg-white"
                       />
                       <p className="text-xs text-violet-600 mt-1.5 font-medium">All {mappedTrips.length} trips will be assigned to this date.</p>
                     </div>
@@ -1568,7 +1568,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                     type="date"
                     value={manualDate}
                     onChange={e => setManualDate(e.target.value)}
-                    className="w-full px-4 py-2.5 border-2 border-violet-300 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-violet-500 bg-white"
+                    className="w-full px-4 py-2.5 border-2 border-violet-300 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-violet-500 bg-white"
                   />
                 </div>
               )}
@@ -1582,15 +1582,15 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                 </label>
                 <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-blue-100">
                   <input type="checkbox" id="assign-prompt" checked={showAssignPrompt} onChange={(e) => setShowAssignPrompt(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-                  <label htmlFor="assign-prompt" className="text-xs font-bold text-blue-600 uppercase tracking-widest cursor-pointer">Enable Assignment</label>
+                  <label htmlFor="assign-prompt" className="text-xs font-semibold text-blue-600 uppercase tracking-widest cursor-pointer">Enable Assignment</label>
                 </div>
               </div>
 
               {showAssignPrompt ? (
                 <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <p className="text-xs text-blue-600 font-bold uppercase tracking-widest opacity-70">Bulk Assign All Uploaded Trips:</p>
+                  <p className="text-xs text-blue-600 font-semibold uppercase tracking-widest opacity-70">Bulk Assign All Uploaded Trips:</p>
                   <div className="flex gap-2">
-                    <select value={assignToDriver} onChange={(e) => setAssignToDriver(e.target.value)} className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-white font-bold shadow-sm">
+                    <select value={assignToDriver} onChange={(e) => setAssignToDriver(e.target.value)} className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-white font-semibold shadow-sm">
                       <option value="">Leave Most as {forceCompleted ? 'Unassigned (Driver Unknown)' : 'Unassigned'} (Or use per-trip selector below)</option>
                       {drivers.map(d => (
                          <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} (Active)</option>
@@ -1608,15 +1608,15 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                       <CheckCircle2 size={12} /> All {mappedTrips.length} trips will default to {drivers.find(d => d.id === assignToDriver)?.name}
                     </p>
                   )}
-                  <p className="text-xs text-slate-500 font-bold italic">Tip: You can still override individual trips in the table below.</p>
+                  <p className="text-xs text-slate-500 font-semibold italic">Tip: You can still override individual trips in the table below.</p>
                 </div>
               ) : forceCompleted ? (
                 <div className="p-4 border-2 border-dashed border-emerald-200 bg-emerald-50 rounded-xl text-center">
-                  <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-2"><CheckCircle2 size={14}/> Trips will be imported as Completed.</p>
+                  <p className="text-xs font-semibold text-emerald-700 flex items-center justify-center gap-2"><CheckCircle2 size={14}/> Trips will be imported as Completed.</p>
                 </div>
               ) : (
                 <div className="p-4 border-2 border-dashed border-blue-100 rounded-xl text-center">
-                  <p className="text-xs font-bold text-slate-400">Assignment disabled. Trips will be imported as Unassigned.</p>
+                  <p className="text-xs font-semibold text-slate-400">Assignment disabled. Trips will be imported as Unassigned.</p>
                 </div>
               )}
             </div>

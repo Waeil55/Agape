@@ -25,7 +25,7 @@ const KPICard = ({ title, value, unit, trend, icon: Icon, status = 'neutral', on
         <div className="flex-1">
           <p className="text-sm font-semibold text-slate-600 mb-2">{title}</p>
           <div className="flex items-baseline gap-2">
-            <p className="text-3xl font-bold text-slate-900">{value}</p>
+            <p className="text-3xl font-semibold text-slate-900">{value}</p>
             {unit && <p className="text-sm text-slate-500">{unit}</p>}
           </div>
           {trend !== null && (
@@ -57,7 +57,7 @@ const MiniChart = ({ data, title, type = 'line' }) => {
 
   return (
     <div className="p-4 bg-white rounded-xl border border-slate-100">
-      <h4 className="text-sm font-bold text-slate-900 mb-3">{title}</h4>
+      <h4 className="text-sm font-semibold text-slate-900 mb-3">{title}</h4>
       <div className="flex items-end gap-1 h-16">
         {data.map((d, i) => (
           <div key={i} className="flex-1 flex flex-col items-center">
@@ -82,7 +82,7 @@ const AlertsPanel = ({ alerts = [], onAction }) => {
     <div className="bg-white rounded-2xl border border-slate-100 p-6">
       <div className="flex items-center gap-3 mb-4">
         <AlertTriangle size={20} className="text-amber-600" />
-        <h3 className="text-lg font-bold text-slate-900">Active Alerts</h3>
+        <h3 className="text-lg font-semibold text-slate-900">Active Alerts</h3>
         <span className="ml-auto bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-sm font-bold">
           {alerts.length}
         </span>
@@ -327,7 +327,7 @@ const EnterpriseDashboard = ({ trips = [], drivers = [], vehicles = [], onViewDe
           <div className="bg-white rounded-2xl border border-slate-100 p-6">
             <div className="flex items-center gap-3 mb-4">
               <BrainCircuit size={20} className="text-blue-600" />
-              <h3 className="text-lg font-bold text-slate-900">AI Insights</h3>
+              <h3 className="text-lg font-semibold text-slate-900">AI Insights</h3>
               {loading && <Zap size={16} className="text-blue-600 animate-pulse ml-auto" />}
             </div>
             <div className="space-y-3">
@@ -347,26 +347,26 @@ const EnterpriseDashboard = ({ trips = [], drivers = [], vehicles = [], onViewDe
 
         {/* Detailed Metrics */}
         <div className="bg-white rounded-2xl border border-slate-100 p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <BarChart3 size={20} className="text-blue-600" />
             Performance Metrics
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             <div className="p-3 bg-slate-50 rounded-lg">
               <p className="text-sm text-slate-600 font-semibold">Utilization</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{metrics.utilizationRate}%</p>
+              <p className="text-2xl font-semibold text-slate-900 mt-1">{metrics.utilizationRate}%</p>
             </div>
             <div className="p-3 bg-slate-50 rounded-lg">
               <p className="text-sm text-slate-600 font-semibold">Completion Rate</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{metrics.totalTrips > 0 ? ((metrics.completedTrips / metrics.totalTrips) * 100).toFixed(1) : 0}%</p>
+              <p className="text-2xl font-semibold text-slate-900 mt-1">{metrics.totalTrips > 0 ? ((metrics.completedTrips / metrics.totalTrips) * 100).toFixed(1) : 0}%</p>
             </div>
             <div className="p-3 bg-slate-50 rounded-lg">
               <p className="text-sm text-slate-600 font-semibold">Cancellations</p>
-              <p className="text-2xl font-bold text-red-600 mt-1">{metrics.cancelledTrips}</p>
+              <p className="text-2xl font-semibold text-red-600 mt-1">{metrics.cancelledTrips}</p>
             </div>
             <div className="p-3 bg-slate-50 rounded-lg">
               <p className="text-sm text-slate-600 font-semibold">Vehicles Active</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{metrics.vehiclesActive}/{vehicles.length}</p>
+              <p className="text-2xl font-semibold text-slate-900 mt-1">{metrics.vehiclesActive}/{vehicles.length}</p>
             </div>
           </div>
         </div>

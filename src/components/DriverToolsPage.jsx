@@ -542,7 +542,7 @@ const RoutePlanSection = ({
             <MapIcon size={17} />
           </div>
           <div className="text-left min-w-0">
-            <span className="block text-sm font-bold text-slate-900">Route Plan</span>
+            <span className="block text-sm font-semibold text-slate-900">Route Plan</span>
             <span className="block text-xs font-semibold text-slate-400 truncate">
               {routeValidation.routeStops.length} stops / {routeValidation.tripCount} trips / {isCalculating ? 'calculating' : routeSummary.duration}
             </span>
@@ -565,8 +565,8 @@ const RoutePlanSection = ({
               ['Miles', routeSummary.distance],
             ].map(([label, value]) => (
               <div key={label} className="rounded-2xl bg-slate-50 border border-slate-100 px-2 py-2">
-                <div className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</div>
-                <div className="text-xs font-bold text-slate-900 truncate">{value}</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+                <div className="text-xs font-semibold text-slate-900 truncate">{value}</div>
               </div>
             ))}
           </div>
@@ -635,7 +635,7 @@ const RoutePlanSection = ({
                             {stop.stopType}
                           </span>
                         )}
-                        {stop.clientName && <span className="text-xs font-bold text-slate-800 truncate">{stop.clientName}</span>}
+                        {stop.clientName && <span className="text-xs font-semibold text-slate-800 truncate">{stop.clientName}</span>}
                         {stop.stopTime && <span className="text-xs font-semibold text-slate-400">{to12hr(stop.stopTime)}</span>}
                       </div>
                     )}
@@ -643,7 +643,7 @@ const RoutePlanSection = ({
                       type="text"
                       value={stop.label}
                       onChange={(e) => handleTextChange(index, e.target.value)}
-                      className="text-sm font-semibold text-slate-900 placeholder:text-slate-300 truncate bg-transparent outline-none w-full"
+                      className="text-[10px] font-medium text-slate-500 placeholder:text-slate-300 truncate bg-transparent outline-none w-full"
                       placeholder={index === 0 ? 'Starting point or current location' : `Stop ${stop.letter} address`}
                       spellCheck="false"
                     />
@@ -756,15 +756,15 @@ const DriverToolsPage = ({
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-bold text-white">{guidedStepIndex + 1}</span>
-                <span className="text-xs font-bold text-white/80 uppercase tracking-wider">of {aiSequence.length}</span>
+                <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">of {aiSequence.length}</span>
               </div>
-              <button onClick={() => { onSetGuidedMode(false); }} className="text-xs text-white/60 font-bold uppercase hover:text-white/90">Exit</button>
+              <button onClick={() => { onSetGuidedMode(false); }} className="text-xs text-white/60 font-semibold uppercase hover:text-white/90">Exit</button>
             </div>
             <div className="h-1 bg-white/20 rounded-full overflow-hidden mb-1.5">
               <div className="h-full bg-white rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold text-white truncate flex-1 min-w-0">
+              <p className="text-xs font-semibold text-white truncate flex-1 min-w-0">
                 {currentTrip?.patient || 'Loading...'}
                 <span className="text-white/60 font-medium ml-1 text-xs">· {currentTrip ? (['Assigned','Unassigned'].includes(currentTrip.status) ? 'Not started' : currentTrip.status) : ''}</span>
               </p>
@@ -782,7 +782,7 @@ const DriverToolsPage = ({
           <div className="flex items-start gap-2">
             <AlertTriangle size={14} className="text-rose-600 mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-rose-800">{conflicts.length} time conflict{conflicts.length > 1 ? 's' : ''}</p>
+              <p className="text-xs font-semibold text-rose-800">{conflicts.length} time conflict{conflicts.length > 1 ? 's' : ''}</p>
               <div className="mt-1 space-y-0.5">
                 {conflicts.slice(0, 5).map((c, i) => {
                   const tA = c.timeA || '';
@@ -804,7 +804,7 @@ const DriverToolsPage = ({
           <div className="flex items-start gap-2">
             <Repeat size={14} className="text-emerald-600 mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-emerald-800">{aiRideShare.length} shared ride{aiRideShare.length > 1 ? 's' : ''}</p>
+              <p className="text-xs font-semibold text-emerald-800">{aiRideShare.length} shared ride{aiRideShare.length > 1 ? 's' : ''}</p>
               <div className="mt-1 space-y-0.5">
                 {aiRideShare.slice(0, 3).map((r, i) => (
                   <p key={i} className="text-xs text-emerald-600 truncate">{r.tripA?.patient || r.patientA || ''} + {r.tripB?.patient || r.patientB || ''}</p>
@@ -818,7 +818,7 @@ const DriverToolsPage = ({
       {/* AI Optimize Button */}
       {selectedTrips.length >= 1 && (
         <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-3 flex items-center justify-between gap-2">
-          <span className="text-xs font-bold text-blue-700">{selectedTrips.length} selected</span>
+          <span className="text-xs font-semibold text-blue-700">{selectedTrips.length} selected</span>
           <div className="flex gap-2">
             <button onClick={() => onSelectAllTrips()} className="px-3 h-8 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95 transition border border-blue-100 hover:bg-blue-100">
               <CheckSquare size={12} /> {selectedTrips.length === activeTrips.length ? 'Deselect All' : 'Select All'}
@@ -845,7 +845,7 @@ const DriverToolsPage = ({
               <Route size={16} className="text-indigo-600" />
             </div>
             <div className="text-left">
-              <h3 className="text-sm font-bold text-slate-800">Route Sequencer</h3>
+              <h3 className="text-sm font-semibold text-slate-800">Route Sequencer</h3>
               <p className="text-xs font-semibold text-slate-400">Advanced multi-load engine & templates</p>
             </div>
           </div>
@@ -870,7 +870,7 @@ const DriverToolsPage = ({
           <div className="bg-white rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <BrainCircuit size={16} className="text-indigo-600" />
-              <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Smart Route</span>
+              <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Smart Route</span>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap mb-3">
               {aiSequence.map((id, i) => {
@@ -931,7 +931,7 @@ const DriverToolsPage = ({
           >
             <div className="flex items-center gap-2">
               <Navigation size={16} className="text-emerald-600" />
-              <span className="text-sm font-bold text-slate-800">Quick Navigation</span>
+              <span className="text-sm font-semibold text-slate-800">Quick Navigation</span>
               <span className="text-xs text-slate-400 font-medium">({activeTrips.length})</span>
             </div>
             {expandedSection === 'quicknav' ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
@@ -942,7 +942,7 @@ const DriverToolsPage = ({
                 <div key={trip.id} className="px-4 py-3">
                   <div className="flex items-center justify-between mb-2">
                     <div className="min-w-0">
-                      <span className="block truncate text-xs font-bold text-slate-800">{trip.patient}</span>
+                        <span className="block truncate text-xs font-semibold text-slate-800">{trip.patient}</span>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {trip.bookingId && (
                           <span className="rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-xs font-bold text-blue-700">
@@ -988,7 +988,7 @@ const DriverToolsPage = ({
           >
             <div className="flex items-center gap-2">
               <Timer size={16} className="text-amber-600" />
-              <span className="text-sm font-bold text-slate-800">Trip ETAs</span>
+              <span className="text-sm font-semibold text-slate-800">Trip ETAs</span>
             </div>
             {expandedSection === 'etas' ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
           </button>
@@ -1007,7 +1007,7 @@ const DriverToolsPage = ({
                         </span>
                       )}
                     </div>
-                    <span className="text-xs font-bold text-slate-500">{formatDuration(eta)}</span>
+                    <span className="text-xs font-semibold text-slate-500">{formatDuration(eta)}</span>
                   </div>
                 );
               })}

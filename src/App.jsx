@@ -2612,7 +2612,7 @@ const App = () => {
               
               <button type="submit" className="w-full py-4 mt-2 bg-[#23568E] hover:bg-[#1B4471] text-white rounded-full font-bold text-lg transition-all shadow-md shadow-blue-800/10 active:scale-95">Authorize Access</button>
               
-              <div className="pt-2 flex items-center justify-between text-sm font-bold">
+              <div className="pt-2 flex items-center justify-between text-sm font-semibold">
                 <button type="button" onClick={handleCreateAccount} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-semibold transition text-sm">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>
                 <button type="button" onClick={handlePasswordReset} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-semibold transition text-sm">Reset Help</button>
               </div>
@@ -2640,7 +2640,7 @@ const App = () => {
             <Lock size={32} />
           </div>
           <h3 className="text-xl font-semibold text-center text-slate-900 mb-2">Security Verification</h3>
-          <p className="text-xs text-center text-slate-500 font-medium mb-2">Re-enter your password to authorize: <span className="font-bold text-slate-800">{authActionPayload?.label || 'Action'}</span></p>
+          <p className="text-xs text-center text-slate-500 font-medium mb-2">Re-enter your password to authorize: <span className="font-semibold text-slate-800">{authActionPayload?.label || 'Action'}</span></p>
           {reAuthError && <p className="text-xs text-center text-rose-600 font-semibold mb-4">{reAuthError}</p>}
           <form onSubmit={submitAuthAction}>
             <input type="password" required placeholder="Enter your password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full p-4 bg-slate-100/50 rounded-[1rem] font-semibold border border-slate-200/50 focus:border-rose-500 focus:bg-white mb-4" />
@@ -2668,7 +2668,7 @@ const App = () => {
           </div>
           
           <div className="bg-emerald-50 rounded-2xl p-4 mb-6 border border-emerald-100">
-            <p className="text-sm font-bold text-emerald-900">Assigning {selectedTasks.length} Trips</p>
+            <p className="text-sm font-semibold text-emerald-900">Assigning {selectedTasks.length} Trips</p>
             <p className="text-sm font-medium text-emerald-700 mt-0.5">Select a driver below to assign all selected tasks.</p>
           </div>
 
@@ -2682,13 +2682,13 @@ const App = () => {
                       <User size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-slate-900">{d.name}</p>
+                      <p className="text-sm font-semibold text-slate-900">{d.name}</p>
                       <p className="text-xs font-medium text-slate-500">{d.vehicle || 'No Vehicle'} &bull; Active</p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <Badge variant="success">Active</Badge>
-                    <span className="text-xs font-bold text-blue-600">Assign &rarr;</span>
+                    <span className="text-xs font-semibold text-blue-600">Assign &rarr;</span>
                   </div>
                 </button>
               ))}
@@ -2719,7 +2719,7 @@ const App = () => {
             <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
           </div>
           <div className="bg-slate-50/80 rounded-2xl p-4 mb-6 border border-slate-200/50">
-            <div className="grid grid-cols-2 gap-4 text-xs font-bold text-slate-600">
+            <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-600">
               <div><span className="text-slate-500 block mb-1">Time</span>{smartAssignTrip.time}</div>
               <div><span className="text-slate-500 block mb-1">Type</span>{smartAssignTrip.type}</div>
               <div className="col-span-2"><span className="text-slate-500 block mb-1">Route</span>{smartAssignTrip.pickup} <ArrowRight size={12} className="inline text-slate-300 mx-1" /> {(smartAssignTrip.dropoff || '').split(' ')[0]}</div>
@@ -2733,7 +2733,7 @@ const App = () => {
                 <Zap className="absolute inset-0 m-auto text-indigo-600 animate-pulse" size={24} />
               </div>
               <div>
-                <p className="text-lg font-bold text-slate-800">Analyzing live telemetry...</p>
+                <p className="text-lg font-semibold text-slate-800">Analyzing live telemetry...</p>
                 <p className="text-xs font-medium text-slate-500 mt-1">Checking schedules, traffic, and proximities.</p>
               </div>
             </div>
@@ -2776,7 +2776,7 @@ const App = () => {
               ) : smartAssignResult && !smartAssignResult.driverId ? (
                 <div className="p-6 text-center bg-slate-50 rounded-2xl">
                   <AlertCircle size={24} className="mx-auto text-amber-500 mb-2" />
-                  <p className="text-xs font-bold text-slate-600">{smartAssignResult.reason || 'No suitable driver found'}</p>
+                  <p className="text-xs font-semibold text-slate-600">{smartAssignResult.reason || 'No suitable driver found'}</p>
                 </div>
               ) : null}
             </div>
@@ -2817,9 +2817,9 @@ const App = () => {
                     <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
                       className="flex items-center justify-between p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl hover:bg-emerald-50 active:scale-[0.98] transition-all group">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">{String(d?.name || '?').charAt(0)}</div>
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-semibold">{String(d?.name || '?').charAt(0)}</div>
                         <div className="text-left">
-                          <p className="text-sm font-bold text-slate-900">{d.name}</p>
+                          <p className="text-sm font-semibold text-slate-900">{d.name}</p>
                           <p className="text-xs font-medium text-slate-500">{d.vehicle} • {d.currentZone}</p>
                         </div>
                       </div>
@@ -2838,9 +2838,9 @@ const App = () => {
                     <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
                       className="flex items-center justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:bg-slate-50 active:scale-[0.98] transition-all group opacity-80 hover:opacity-100">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold">{String(d?.name || '?').charAt(0)}</div>
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-semibold">{String(d?.name || '?').charAt(0)}</div>
                         <div className="text-left">
-                          <p className="text-sm font-bold text-slate-900">{d.name}</p>
+                          <p className="text-sm font-semibold text-slate-900">{d.name}</p>
                           <p className="text-xs font-medium text-slate-500">Active &bull; {d.vehicle}</p>
                         </div>
                       </div>
@@ -2877,14 +2877,14 @@ const App = () => {
                 <BrainCircuit className="absolute inset-0 m-auto text-indigo-600 animate-pulse" size={32} />
               </div>
               <div>
-                <p className="text-xl font-bold text-slate-800">Processing Daily Trips...</p>
+                <p className="text-xl font-semibold text-slate-800">Processing Daily Trips...</p>
                 <p className="text-sm font-medium text-slate-500 mt-2">Distributing for maximum fuel efficiency and zero wait time.</p>
               </div>
             </div>
           ) : (
             <div className="space-y-6">
               <div className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100 text-center">
-                <p className="text-sm font-bold text-indigo-900 mb-2">Ready to optimize Agape Care routes?</p>
+                <p className="text-sm font-semibold text-indigo-900 mb-2">Ready to optimize Agape Care routes?</p>
                 <p className="text-xs text-indigo-700/80">This will auto-assign all unassigned trips based on live traffic, capacity, and schedules.</p>
               </div>
               <button onClick={() => { triggerFleetOptimization().then(() => setShowOptimizeModal(false)); }} className="w-full py-4 bg-indigo-600 text-white rounded-[1rem] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-3 shadow-md shadow-indigo-500/30">
@@ -2936,7 +2936,7 @@ const App = () => {
               <div className="h-full bg-white/60 rounded-full animate-loadingSlide" />
             </div>
             {startupIssue && (
-              <p className="text-xs font-bold text-amber-200 bg-amber-500/20 border border-amber-400/30 rounded-xl px-4 py-2 backdrop-blur-sm">{startupIssue}</p>
+              <p className="text-xs font-semibold text-amber-200 bg-amber-500/20 border border-amber-400/30 rounded-xl px-4 py-2 backdrop-blur-sm">{startupIssue}</p>
             )}
             {showLoadingRecovery && (
               <div className="w-full space-y-3">
@@ -3176,7 +3176,7 @@ const App = () => {
                    <Zap size={20} />}
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-slate-900">{toast.title}</h4>
+                  <h4 className="font-semibold text-sm text-slate-900">{toast.title}</h4>
                   <p className="text-xs font-medium text-slate-500 mt-0.5">{toast.message}</p>
                 </div>
               </div>

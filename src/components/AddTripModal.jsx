@@ -163,7 +163,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
     text-slate-900 placeholder:text-slate-400
   `;
 
-  const labelClass = 'text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5';
+  const labelClass = 'text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5';
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center" onClick={onClose}>
@@ -179,7 +179,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
               <Plus size={18} className="text-white" />
             </div>
             <div>
-              <h2 className="text-base font-black text-white">Add New Trip</h2>
+              <h2 className="text-base font-semibold text-white">Add New Trip</h2>
               <p className="text-xs text-white/70 font-medium capitalize">{role} • Manual Entry</p>
             </div>
           </div>
@@ -197,7 +197,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
 
             {/* Section: Patient Info */}
             <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
-              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                 <User size={12} className="text-blue-600" /> Patient Information
               </h3>
 
@@ -241,7 +241,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
 
             {/* Section: Schedule */}
             <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
-              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                 <Calendar size={12} className="text-indigo-600" /> Schedule
               </h3>
 
@@ -356,7 +356,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
 
             {/* Section: Route */}
             <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
-              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                 <Navigation size={12} className="text-emerald-600" /> Route
               </h3>
 
@@ -421,7 +421,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
             {/* Section: Driver Assignment */}
             {selectableDrivers.length > 0 && (
               <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
-                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                   <Truck size={12} className="text-blue-600" /> Driver Assignment
                 </h3>
 
@@ -457,7 +457,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
 
             {/* Section: Notes */}
             <div className="bg-slate-50 rounded-2xl p-4">
-              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-3">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-3">
                 <FileText size={12} className="text-amber-600" /> Notes & Special Requirements
               </h3>
               <textarea

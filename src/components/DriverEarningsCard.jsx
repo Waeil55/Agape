@@ -18,7 +18,7 @@ export function TripEarningsBadge({ trip, compact = false }) {
   return (
     <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-lg">
       <DollarSign size={12} className="text-emerald-600" />
-      <span className="text-xs font-bold text-emerald-700">${earnings.total.toFixed(2)}</span>
+      <span className="text-xs font-semibold text-emerald-700">${earnings.total.toFixed(2)}</span>
     </div>
   );
 }
@@ -36,7 +36,7 @@ export const DriverEarningsCard = memo(function DriverEarningsCard({ driver, tri
             <DollarSign size={16} className="text-emerald-600" />
           </div>
           <div>
-            <p className="text-xs font-bold text-slate-900">Earnings</p>
+            <p className="text-xs font-semibold text-slate-900">Earnings</p>
             <p className="text-[10px] text-slate-500">{driver?.name || 'Driver'}</p>
           </div>
         </div>
@@ -61,21 +61,21 @@ export const DriverEarningsCard = memo(function DriverEarningsCard({ driver, tri
             <Truck size={10} className="text-slate-400" />
             <span className="text-[10px] text-slate-500">Miles</span>
           </div>
-          <p className="text-xs font-bold text-slate-900">{weekly.totalMiles.toFixed(1)}</p>
+          <p className="text-xs font-semibold text-slate-900">{weekly.totalMiles.toFixed(1)}</p>
         </div>
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
             <Clock size={10} className="text-slate-400" />
             <span className="text-[10px] text-slate-500">Hours</span>
           </div>
-          <p className="text-xs font-bold text-slate-900">{weekly.totalHours.toFixed(1)}</p>
+          <p className="text-xs font-semibold text-slate-900">{weekly.totalHours.toFixed(1)}</p>
         </div>
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
             <TrendingUp size={10} className="text-slate-400" />
             <span className="text-[10px] text-slate-500">Avg/Trip</span>
           </div>
-          <p className="text-xs font-bold text-slate-900">${weekly.avgEarningsPerTrip.toFixed(2)}</p>
+          <p className="text-xs font-semibold text-slate-900">${weekly.avgEarningsPerTrip.toFixed(2)}</p>
         </div>
       </div>
     </div>

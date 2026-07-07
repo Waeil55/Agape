@@ -65,7 +65,7 @@ export default class ErrorBoundary extends React.Component {
             <div className="w-16 h-16 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <AlertTriangle size={32} className="text-rose-600" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Something went wrong</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-2">Something went wrong</h2>
             <p className="text-sm text-slate-500 mb-6">{this.state.error?.message || 'An unexpected error occurred.'}</p>
             {this.state.componentStack && (
               <pre className="text-[10px] text-left text-rose-600 bg-rose-50 rounded-xl p-3 mb-4 max-h-40 overflow-auto font-mono border border-rose-200">{this.state.componentStack}</pre>

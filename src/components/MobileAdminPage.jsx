@@ -136,7 +136,7 @@ const MobileAdminPage = ({
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2b4c7e]">Command Admin</p>
-            <h1 className="mt-0.5 truncate text-xl font-bold text-gray-950">Team Control</h1>
+            <h1 className="mt-0.5 truncate text-xl font-semibold text-gray-950">Team Control</h1>
           </div>
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
             <Shield size={20} />
@@ -169,7 +169,7 @@ const MobileAdminPage = ({
             <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-center gap-2">
                 <Truck size={18} className="text-blue-600" />
-                <h2 className="text-sm font-bold text-slate-900">Driver Workflow Status</h2>
+                <h2 className="text-sm font-semibold text-slate-900">Driver Workflow Status</h2>
               </div>
               <div className="mt-3 space-y-2">
                 {drivers.slice(0, 8).map((driver) => {
@@ -178,7 +178,7 @@ const MobileAdminPage = ({
                     <div key={driver.id || driver.email || driver.name} className="flex items-center gap-3 rounded-2xl bg-slate-50 px-3 py-2.5">
                       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold uppercase ${live.color}`}>{(driver.name || '?')[0]}</div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-slate-900">{driver.name}</p>
+                        <p className="truncate text-sm font-semibold text-slate-900">{driver.name}</p>
                         <p className="truncate text-[11px] font-semibold text-slate-500">{driver.vehicle || 'No vehicle'}</p>
                       </div>
                       <span className={`shrink-0 rounded-lg px-2 py-1 text-[9px] font-semibold uppercase ${live.color}`}>{live.label}</span>
@@ -202,7 +202,7 @@ const MobileAdminPage = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h3 className="truncate text-base font-bold text-slate-950">{driver.name}</h3>
+                          <h3 className="truncate text-base font-semibold text-slate-950">{driver.name}</h3>
                           <p className="mt-0.5 text-xs font-semibold text-slate-500">{driver.vehicle || 'No vehicle'}</p>
                         </div>
                         <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-semibold uppercase ${live.color}`}>{live.label}</span>
@@ -210,17 +210,17 @@ const MobileAdminPage = ({
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-2xl bg-slate-50 p-3">
                           <p className="font-semibold uppercase tracking-wide text-slate-400">Phone</p>
-                          <p className="mt-1 truncate font-bold text-slate-800">{driver.phone || '-'}</p>
+                          <p className="mt-1 truncate font-semibold text-slate-800">{driver.phone || '-'}</p>
                         </div>
                         <div className="rounded-2xl bg-slate-50 p-3">
                           <p className="font-semibold uppercase tracking-wide text-slate-400">Zone</p>
-                          <p className="mt-1 truncate font-bold text-slate-800">{driver.currentZone || '-'}</p>
+                          <p className="mt-1 truncate font-semibold text-slate-800">{driver.currentZone || '-'}</p>
                         </div>
                       </div>
                       {activeTrip && (
                         <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-3">
                           <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">{activeTrip.status}</p>
-                          <p className="mt-1 text-sm font-bold text-slate-900">{activeTrip.patient}</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">{activeTrip.patient}</p>
                         </div>
                       )}
                     </div>
@@ -253,7 +253,7 @@ const MobileAdminPage = ({
                           {(user.name || '?')[0]}
                         </div>
                         <div className="min-w-0">
-                          <h4 className="truncate text-sm font-bold text-slate-900">{user.name}</h4>
+                          <h4 className="truncate text-sm font-semibold text-slate-900">{user.name}</h4>
                           <p className="truncate text-xs font-semibold text-slate-500">{user.email || 'No email'}</p>
                         </div>
                       </div>
@@ -302,7 +302,7 @@ const MobileAdminPage = ({
                 <div className="flex items-start gap-2">
                   <Activity size={14} className="mt-0.5 shrink-0 text-blue-600" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-slate-900">{log.t || 'Activity'}</p>
+                    <p className="text-sm font-semibold text-slate-900">{log.t || 'Activity'}</p>
                     <p className="mt-0.5 line-clamp-2 text-xs font-semibold text-slate-500">{log.meta?.summary || log.d}</p>
                   </div>
                   <span className="shrink-0 text-[10px] font-bold text-slate-400">{log.time ? new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>

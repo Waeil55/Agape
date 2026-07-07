@@ -44,7 +44,7 @@ export const TwoFactorSetup = ({ user, onComplete }) => {
     <div className="max-w-md mx-auto p-6 bg-white rounded-2xl border border-slate-200">
       <div className="flex items-center gap-3 mb-6">
         <Smartphone size={24} className="text-blue-600" />
-        <h3 className="text-xl font-bold text-slate-900">Set Up 2-Factor Authentication</h3>
+        <h3 className="text-xl font-semibold text-slate-900">Set Up 2-Factor Authentication</h3>
       </div>
 
       {step === 'choose' && (
@@ -53,14 +53,14 @@ export const TwoFactorSetup = ({ user, onComplete }) => {
             onClick={() => { setMethod('sms'); handleSetupPhone(); }}
             className="w-full p-4 text-left border-2 border-slate-200 hover:border-blue-500 rounded-lg transition-colors"
           >
-            <p className="font-bold text-slate-900">📱 SMS Text Message</p>
+            <p className="font-semibold text-slate-900">📱 SMS Text Message</p>
             <p className="text-sm text-slate-500 mt-1">Receive codes via text</p>
           </button>
           <button
             onClick={() => { setMethod('app'); setStep('verify'); }}
             className="w-full p-4 text-left border-2 border-slate-200 hover:border-blue-500 rounded-lg transition-colors"
           >
-            <p className="font-bold text-slate-900">🔐 Authenticator App</p>
+            <p className="font-semibold text-slate-900">🔐 Authenticator App</p>
             <p className="text-sm text-slate-500 mt-1">Google Authenticator, Authy, etc.</p>
           </button>
         </div>
@@ -77,7 +77,7 @@ export const TwoFactorSetup = ({ user, onComplete }) => {
           )}
 
           <div>
-            <label className="block text-sm font-bold text-slate-900 mb-2">Enter Verification Code</label>
+            <label className="block text-sm font-semibold text-slate-900 mb-2">Enter Verification Code</label>
             <input
               type="text"
               value={verificationCode}
@@ -103,11 +103,11 @@ export const TwoFactorSetup = ({ user, onComplete }) => {
           <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
             <Check size={32} className="text-emerald-600" />
           </div>
-          <p className="font-bold text-slate-900">2FA Enabled!</p>
+          <p className="font-semibold text-slate-900">2FA Enabled!</p>
           <p className="text-sm text-slate-500">Your account is now secured with two-factor authentication</p>
 
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-left text-sm text-amber-800">
-            <p className="font-bold mb-2">⚠️ Save Recovery Codes</p>
+            <p className="font-semibold mb-2">⚠️ Save Recovery Codes</p>
             <p className="mb-3">Store these in a safe place. You'll need them if you lose access to your device.</p>
             <div className="bg-white p-2 rounded font-mono text-xs space-y-1 mb-3 max-h-24 overflow-y-auto">
               <div>A7K9-L2M5-N8P3-Q6R9</div>
@@ -168,7 +168,7 @@ export const AuditLogViewer = ({ logs = [] }) => {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
-      <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
         <Clock size={20} className="text-blue-600" />
         Audit Log
       </h3>
@@ -259,7 +259,7 @@ export const ComplianceChecklist = () => {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
-      <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
         <Shield size={20} className="text-blue-600" />
         Compliance Status
       </h3>
@@ -267,7 +267,7 @@ export const ComplianceChecklist = () => {
       {/* Overall Progress */}
       <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
         <div className="flex items-center justify-between mb-2">
-          <p className="font-bold text-slate-900">Overall Compliance</p>
+          <p className="font-semibold text-slate-900">Overall Compliance</p>
           <p className="text-2xl font-black text-blue-600">{totalPercentage}%</p>
         </div>
         <div className="w-full h-3 bg-white rounded-full overflow-hidden border border-blue-200">
@@ -285,7 +285,7 @@ export const ComplianceChecklist = () => {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
                 {getStatusIcon(item.status)}
-                <p className="font-bold text-slate-900">{item.title}</p>
+                <p className="font-semibold text-slate-900">{item.title}</p>
               </div>
               <p className="text-sm font-bold text-slate-600">{item.percentage}%</p>
             </div>
@@ -305,7 +305,7 @@ export const ComplianceChecklist = () => {
 
       {/* Status Summary */}
       <div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">
-        <p className="font-bold">✓ Good Standing</p>
+        <p className="font-semibold">✓ Good Standing</p>
         <p className="mt-1">Your system meets most enterprise security standards. Continue working on pending items.</p>
       </div>
     </div>
@@ -360,10 +360,10 @@ const SecurityModule = ({ user, onLogout }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl">
             <ComplianceChecklist />
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Security Overview</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Security Overview</h3>
               <div className="space-y-4">
                 <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                  <p className="font-bold text-emerald-900">✓ All Systems Secure</p>
+                  <p className="font-semibold text-emerald-900">✓ All Systems Secure</p>
                   <p className="text-sm text-emerald-700 mt-1">No known vulnerabilities</p>
                 </div>
                 <div className="space-y-3">
@@ -391,12 +391,12 @@ const SecurityModule = ({ user, onLogout }) => {
               <TwoFactorSetup user={user} onComplete={() => setShow2FASetup(false)} />
             ) : (
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Authentication Methods</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Authentication Methods</h3>
                 <button
                   onClick={() => setShow2FASetup(true)}
                   className="w-full p-4 text-left border-2 border-slate-200 hover:border-blue-500 rounded-lg transition-colors"
                 >
-                  <p className="font-bold text-slate-900">📱 Set Up 2-Factor Authentication</p>
+                  <p className="font-semibold text-slate-900">📱 Set Up 2-Factor Authentication</p>
                   <p className="text-sm text-slate-500 mt-1">Add an extra layer of security to your account</p>
                 </button>
               </div>

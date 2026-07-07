@@ -16,7 +16,7 @@ export default function DriverPerformanceCard({ driver, trips = [], compact = fa
         <div className="min-w-0">
           <div className="flex items-center gap-1">
             <Star size={10} className="text-amber-500 fill-amber-500" />
-            <span className="text-[11px] font-bold text-slate-900">{score.overall}/100</span>
+            <span className="text-[11px] font-semibold text-slate-900">{score.overall}/100</span>
             <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${tierInfo.bg} ${tierInfo.text}`}>{tierInfo.label}</span>
           </div>
           <p className="text-[9px] text-slate-500">{score.totalTrips} trips · {score.onTimeRate}% on-time</p>

@@ -58,7 +58,7 @@ Answer in 2-3 sentences maximum. Be specific and actionable.` }] }],
           <div className="flex items-center justify-between px-3 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
             <div className="flex items-center gap-2">
               <Bot size={16} />
-              <span className="text-xs font-bold">AI Assistant</span>
+              <span className="text-xs font-semibold">AI Assistant</span>
             </div>
             <button onClick={() => setOpen(false)} className="p-0.5 rounded hover:bg-white/20"><X size={14} /></button>
           </div>

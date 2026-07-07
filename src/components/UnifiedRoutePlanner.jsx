@@ -164,7 +164,7 @@ const UnifiedRoutePlanner = ({
           <div className="flex items-center justify-between mb-3">
             <div>
               <h1 className="text-lg font-black text-slate-900 tracking-tight">Route Planner</h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Plan · Saved · Build · Navigate</p>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">Plan · Saved · Build · Navigate</p>
             </div>
             {guidedMode && (
               <button onClick={() => { onSetGuidedMode(false); onSetAiSequence(null); onSetAiSuggestions([]); }}
@@ -252,7 +252,7 @@ const UnifiedRoutePlanner = ({
                       return (
                         <React.Fragment key={id}>
                           {i > 0 && <span className="text-white/20 text-[10px]">→</span>}
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/15 text-white/90">{t?.patient || id}</span>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white/15 text-white/90">{t?.patient || id}</span>
                         </React.Fragment>
                       );
                     })}
@@ -474,7 +474,7 @@ const UnifiedRoutePlanner = ({
             ) : (
               <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-6 sm:p-8 text-center">
                 <Bookmark size={24} className="text-slate-200 mx-auto mb-3" />
-                <p className="text-[12px] font-bold text-slate-400">No saved plans yet</p>
+                <p className="text-[12px] font-semibold text-slate-400">No saved plans yet</p>
                 <p className="text-[10px] text-slate-300 mt-1">Create a route in the Route tab and save it</p>
               </div>
             )}
@@ -545,7 +545,7 @@ const UnifiedRoutePlanner = ({
                         if (eta === undefined) return null;
                         return (
                           <div key={trip.id} className="bg-slate-50 rounded-xl px-2.5 py-1.5 flex items-center justify-between min-w-0">
-                            <span className="truncate text-[10px] font-bold text-slate-600">{trip.patient}</span>
+                            <span className="truncate text-[10px] font-semibold text-slate-600">{trip.patient}</span>
                             <span className="text-[10px] font-extrabold text-amber-600 ml-1 shrink-0">{Math.round(eta)}m</span>
                           </div>
                         );
@@ -565,7 +565,7 @@ const UnifiedRoutePlanner = ({
                             {(trip.type || trip.serviceType) && <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{trip.type || trip.serviceType}</span>}
                           </div>
                         </div>
-                        <span className="text-[11px] font-bold text-slate-400 shrink-0 ml-2">{trip.time || 'WC'}</span>
+                        <span className="text-[11px] font-semibold text-slate-400 shrink-0 ml-2">{trip.time || 'WC'}</span>
                       </div>
                       <div className="grid grid-cols-2 gap-1.5">
                         <button onClick={() => onOpenInNav(trip.pickup)}
@@ -586,7 +586,7 @@ const UnifiedRoutePlanner = ({
                 <div className="w-16 h-16 rounded-3xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
                   <Navigation size={24} className="text-slate-300" />
                 </div>
-                <p className="text-sm font-bold text-slate-400">No active trips</p>
+                <p className="text-sm font-semibold text-slate-400">No active trips</p>
                 <p className="text-xs text-slate-300 mt-1">Start a route to see navigation</p>
               </div>
             )}

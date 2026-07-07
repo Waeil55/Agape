@@ -38,7 +38,7 @@ const AIInsightsBanner = ({ insights, loading, error, onClose, compact }) => {
           {insights.summary && <p className="text-slate-700 leading-relaxed font-medium">{insights.summary}</p>}
           {insights.trends?.length > 0 && (
             <div>
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><TrendingUp size={10} /> Trends</p>
+              <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><TrendingUp size={10} /> Trends</p>
               <div className="flex flex-wrap gap-1">
                 {insights.trends.map((t, i) => (
                   <span key={i} className="px-1.5 py-0.5 bg-white/70 rounded-full border border-indigo-100 text-[10px] font-semibold text-slate-700">{t}</span>
@@ -48,7 +48,7 @@ const AIInsightsBanner = ({ insights, loading, error, onClose, compact }) => {
           )}
           {insights.recommendations?.length > 0 && (
             <div>
-              <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Lightbulb size={10} /> Recommendations</p>
+              <p className="text-[9px] font-semibold text-emerald-600 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Lightbulb size={10} /> Recommendations</p>
               {insights.recommendations.map((r, i) => (
                 <p key={i} className="text-[10px] text-emerald-800 ml-3 leading-relaxed">• {r}</p>
               ))}
@@ -56,7 +56,7 @@ const AIInsightsBanner = ({ insights, loading, error, onClose, compact }) => {
           )}
           {insights.anomalies?.length > 0 && (
             <div>
-              <p className="text-[9px] font-bold text-rose-500 uppercase tracking-wider mb-0.5 flex items-center gap-1"><AlertTriangle size={10} /> Flags</p>
+              <p className="text-[9px] font-semibold text-rose-500 uppercase tracking-wider mb-0.5 flex items-center gap-1"><AlertTriangle size={10} /> Flags</p>
               {insights.anomalies.map((a, i) => (
                 <p key={i} className="text-[10px] text-rose-700 ml-3 leading-relaxed">• {a}</p>
               ))}

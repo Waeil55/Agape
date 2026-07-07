@@ -789,7 +789,7 @@ const LiveMapPage = ({
           {streetViewLoc && (
             <div className="absolute inset-x-0 bottom-0 h-[50%] z-30 bg-white border-t border-slate-200 flex flex-col shadow-2xl md:inset-x-auto md:bottom-auto md:right-0 md:top-0 md:h-full md:w-[450px] md:max-w-[90vw] md:border-l md:border-t-0">
               <div className="flex items-center justify-between px-4 h-14 border-b border-slate-200 bg-slate-50 shrink-0">
-                <span className="text-slate-900 text-sm font-bold flex items-center gap-2"><MapPin size={16} className="text-blue-600" /> Street View Entrance</span>
+                <span className="text-slate-900 text-sm font-semibold flex items-center gap-2"><MapPin size={16} className="text-blue-600" /> Street View Entrance</span>
                 <button onClick={() => setStreetViewLoc(null)} className="text-slate-400 hover:text-slate-700 p-1.5 bg-white rounded-md hover:bg-slate-100 transition-colors shadow-sm border border-slate-200"><X size={16} /></button>
               </div>
               <div ref={svContainerRef} className="flex-1 w-full bg-slate-100" />
@@ -867,22 +867,22 @@ const LiveMapPage = ({
                     <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Moving</p>
                       <p className="mt-1 text-2xl font-black text-blue-600 tabular-nums">{formatTelemetryDuration(selectedTracking?.totalMovingMinutes || selectedSummary?.movingMinutes || 0)}</p>
-                      <p className="text-[10px] font-bold text-slate-500 mt-0.5 uppercase">today</p>
+                      <p className="text-[10px] font-semibold text-slate-500 mt-0.5 uppercase">today</p>
                     </div>
                     <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Stopped</p>
                       <p className="mt-1 text-2xl font-black text-amber-500 tabular-nums">{formatTelemetryDuration(selectedTracking?.totalStoppedMinutes || selectedSummary?.dwellMinutes || 0)}</p>
-                      <p className="text-[10px] font-bold text-slate-500 mt-0.5 uppercase">today</p>
+                      <p className="text-[10px] font-semibold text-slate-500 mt-0.5 uppercase">today</p>
                     </div>
                     <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Longest</p>
                       <p className="mt-1 text-2xl font-black text-rose-500 tabular-nums">{formatTelemetryDuration(selectedTracking?.longestStopMinutes || 0)}</p>
-                      <p className="text-[10px] font-bold text-slate-500 mt-0.5 uppercase">stop</p>
+                      <p className="text-[10px] font-semibold text-slate-500 mt-0.5 uppercase">stop</p>
                     </div>
                     <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Miles</p>
                       <p className="mt-1 text-2xl font-black text-emerald-600 tabular-nums">{selectedTracking ? `${Number(selectedTracking.totalTrackedMiles || 0).toFixed(1)}` : '0.0'}</p>
-                      <p className="text-[10px] font-bold text-slate-500 mt-0.5 uppercase">tracked</p>
+                      <p className="text-[10px] font-semibold text-slate-500 mt-0.5 uppercase">tracked</p>
                     </div>
                   </div>
 
@@ -894,7 +894,7 @@ const LiveMapPage = ({
                         <p className="mt-1 text-lg font-black text-slate-900">{formatMovementState(selectedSummary?.movementState)}</p>
                         {selectedTrip && (
                           <>
-                            <p className="mt-2 text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                            <p className="mt-2 text-sm font-semibold text-slate-700 flex items-center gap-1.5">
                               <Navigation size={14} className="text-blue-500" />
                               {selectedTrip.patient || 'Unknown patient'}
                             </p>
@@ -915,19 +915,19 @@ const LiveMapPage = ({
                     <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Stops</p>
                       <p className="mt-1 text-2xl font-black text-slate-900 tabular-nums">{selectedTracking?.stopCount || 0}</p>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase mt-0.5">today</p>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase mt-0.5">today</p>
                     </div>
                     <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Trips done</p>
                       <p className="mt-1 text-2xl font-black text-emerald-600 tabular-nums">{selectedSummary?.completed || 0}</p>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase mt-0.5">{selectedSummary?.upcoming?.length || 0} upcoming</p>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase mt-0.5">{selectedSummary?.upcoming?.length || 0} upcoming</p>
                     </div>
                   </div>
 
                   {/* Location coordinates */}
                   <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Coordinates</p>
-                    <p className="mt-1 font-mono text-sm font-bold text-slate-700">{selectedPoint ? `${selectedPoint.lat.toFixed(6)}, ${selectedPoint.lng.toFixed(6)}` : 'No coordinates'}</p>
+                    <p className="mt-1 font-mono text-sm font-semibold text-slate-700">{selectedPoint ? `${selectedPoint.lat.toFixed(6)}, ${selectedPoint.lng.toFixed(6)}` : 'No coordinates'}</p>
                     <p className="text-[11px] font-semibold text-slate-500 mt-1">Accuracy: {selectedDriver?.locationAccuracy ? `${Math.round(selectedDriver.locationAccuracy)}m` : 'Unknown'}</p>
                   </div>
                 </>
@@ -948,7 +948,7 @@ const LiveMapPage = ({
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <p className="truncate text-base font-black text-slate-900 leading-tight">{trip.patient || 'Unknown client'}</p>
-                                  <p className="text-xs font-bold text-slate-500 mt-1">{trip.time || 'Will Call'} · {trip.status}</p>
+                                  <p className="text-xs font-semibold text-slate-500 mt-1">{trip.time || 'Will Call'} · {trip.status}</p>
                                 </div>
                                 <span className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-md border ${
                                   phase.color === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-200' :
@@ -994,7 +994,7 @@ const LiveMapPage = ({
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-700">{trip.status || 'Open'}</span>
                               </div>
                               <p className="mt-2 text-xs font-semibold text-slate-500 line-clamp-2">{trip.pickup}</p>
-                              <p className="mt-1.5 text-[11px] font-bold text-slate-600">{trip.time || 'Will Call'} · {formatMiles(miles)} · {formatEta(etaMinutes)}</p>
+                              <p className="mt-1.5 text-[11px] font-semibold text-slate-600">{trip.time || 'Will Call'} · {formatMiles(miles)} · {formatEta(etaMinutes)}</p>
                             </div>
                             <div className="flex flex-col gap-2 shrink-0">
                               <button type="button" onClick={() => openDirections(selectedPoint ? `${selectedPoint.lat},${selectedPoint.lng}` : '', trip.pickup)} className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold hover:bg-slate-200 transition-colors">
@@ -1020,7 +1020,7 @@ const LiveMapPage = ({
                         {selectedSummary.upcoming.slice(0, 5).map(trip => (
                           <div key={trip.id} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
                             <p className="truncate text-base font-black text-slate-900">{trip.patient || 'Unknown client'}</p>
-                            <p className="text-[11px] font-bold text-slate-500 mt-1">{trip.time || 'Will Call'} · {trip.status}</p>
+                            <p className="text-[11px] font-semibold text-slate-500 mt-1">{trip.time || 'Will Call'} · {trip.status}</p>
                             <p className="mt-2 line-clamp-2 text-xs font-medium text-slate-600">{trip.pickup}</p>
                           </div>
                         ))}
@@ -1038,7 +1038,7 @@ const LiveMapPage = ({
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <p className="text-base font-black text-slate-900"><Zap size={14} className="inline text-amber-500 mr-1.5 mb-0.5" />{candidate.a.patient} + {candidate.b.patient}</p>
-                                <p className="text-xs font-bold text-slate-500 mt-1">{candidate.reason} · {candidate.timeGap}min gap · score {candidate.score}</p>
+                                <p className="text-xs font-semibold text-slate-500 mt-1">{candidate.reason} · {candidate.timeGap}min gap · score {candidate.score}</p>
                                 <p className="text-xs font-medium text-slate-600 mt-2 line-clamp-1">{candidate.a.pickup}</p>
                                 <p className="text-xs font-medium text-slate-600 line-clamp-1">{candidate.b.pickup}</p>
                               </div>
@@ -1072,7 +1072,7 @@ const LiveMapPage = ({
                           </div>
                           <div className="text-right shrink-0">
                             <p className="text-xs font-black text-slate-700 tabular-nums">{sample.speedMph || 0} mph</p>
-                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{formatAge(sample.at)}</p>
+                            <p className="text-[10px] font-semibold text-slate-400 mt-0.5">{formatAge(sample.at)}</p>
                           </div>
                         </div>
                       ))}
@@ -1095,7 +1095,7 @@ const LiveMapPage = ({
                           </div>
                           <div className="text-right shrink-0">
                             <p className="text-[11px] font-black text-slate-700">{formatAge(stop.startedAt)}</p>
-                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{stop.endedAt ? 'Closed' : 'Live'}</p>
+                            <p className="text-[10px] font-semibold text-slate-400 mt-0.5">{stop.endedAt ? 'Closed' : 'Live'}</p>
                           </div>
                         </div>
                       ))}

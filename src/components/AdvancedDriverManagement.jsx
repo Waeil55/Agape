@@ -32,7 +32,7 @@ const DriverScoreCard = React.memo(({ driver, onClick }) => {
     >
       <div className="flex items-start justify-between mb-3">
         <div>
-          <h4 className="font-bold text-slate-900">{driver.name}</h4>
+          <h4 className="font-semibold text-slate-900">{driver.name}</h4>
           <p className="text-xs text-slate-500">{driver.email}</p>
         </div>
         <div className={`px-3 py-1.5 rounded-lg font-bold text-sm ${getScoreColor(score)}`}>
@@ -67,15 +67,15 @@ const DriverScoreCard = React.memo(({ driver, onClick }) => {
       <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
         <div className="flex-1 text-center py-2 hover:bg-slate-50 rounded transition-colors">
           <p className="text-xs text-slate-600 font-semibold">Trips</p>
-          <p className="font-bold text-slate-900">24</p>
+          <p className="font-semibold text-slate-900">24</p>
         </div>
         <div className="flex-1 text-center py-2 hover:bg-slate-50 rounded transition-colors">
           <p className="text-xs text-slate-600 font-semibold">Miles</p>
-          <p className="font-bold text-slate-900">342</p>
+          <p className="font-semibold text-slate-900">342</p>
         </div>
         <div className="flex-1 text-center py-2 hover:bg-slate-50 rounded transition-colors">
           <p className="text-xs text-slate-600 font-semibold">Rating</p>
-          <p className="font-bold text-slate-900">4.8★</p>
+          <p className="font-semibold text-slate-900">4.8★</p>
         </div>
       </div>
     </div>
@@ -102,7 +102,7 @@ const DriverCoachingPanel = ({ driver, performanceData }) => {
     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-6">
       <div className="flex items-center gap-3 mb-4">
         <Brain size={24} className="text-blue-600" />
-        <h3 className="text-lg font-bold text-slate-900">AI Coaching</h3>
+        <h3 className="text-lg font-semibold text-slate-900">AI Coaching</h3>
       </div>
 
       {loading ? (
@@ -115,7 +115,7 @@ const DriverCoachingPanel = ({ driver, performanceData }) => {
           {/* Strengths */}
           {coaching?.strengths && (
             <div>
-              <h4 className="font-bold text-emerald-700 text-sm mb-2 flex items-center gap-2">
+              <h4 className="font-semibold text-emerald-700 text-sm mb-2 flex items-center gap-2">
                 <CheckCircle size={16} /> Strengths to Celebrate
               </h4>
               <ul className="space-y-1">
@@ -132,7 +132,7 @@ const DriverCoachingPanel = ({ driver, performanceData }) => {
           {/* Improvements */}
           {coaching?.improvements && (
             <div>
-              <h4 className="font-bold text-amber-700 text-sm mb-2 flex items-center gap-2">
+              <h4 className="font-semibold text-amber-700 text-sm mb-2 flex items-center gap-2">
                 <AlertTriangle size={16} /> Areas for Growth
               </h4>
               <ul className="space-y-1">
@@ -149,7 +149,7 @@ const DriverCoachingPanel = ({ driver, performanceData }) => {
           {/* Tips */}
           {coaching?.tips && (
             <div>
-              <h4 className="font-bold text-blue-700 text-sm mb-2 flex items-center gap-2">
+              <h4 className="font-semibold text-blue-700 text-sm mb-2 flex items-center gap-2">
                 <Zap size={16} /> Quick Tips
               </h4>
               <ul className="space-y-1">
@@ -178,7 +178,7 @@ const SafetyMonitoring = ({ driver, recentTrips = [] }) => {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-6">
-      <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
         <Activity size={20} className="text-red-600" />
         Safety Monitoring
       </h3>
@@ -230,7 +230,7 @@ const WellnessPanel = ({ driver }) => {
 
   return (
     <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl border border-pink-200 p-6">
-      <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
         <Heart size={20} className="text-pink-600" />
         Wellness & Support
       </h3>
@@ -242,7 +242,7 @@ const WellnessPanel = ({ driver }) => {
             <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
               <div className="h-full bg-green-500" style={{ width: '65%' }} />
             </div>
-            <span className="text-sm font-bold text-slate-600">Healthy</span>
+            <span className="text-sm font-semibold text-slate-600">Healthy</span>
           </div>
           <p className="text-xs text-slate-500 mt-2">On track with sustainable hours</p>
         </div>
@@ -420,8 +420,8 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
                     { label: 'On-Time %', value: '94%' },
                   ].map((m, i) => (
                     <div key={i} className="p-3 bg-slate-50 rounded-lg text-center border border-slate-200">
-                      <p className="text-xs text-slate-600 font-bold mb-1">{m.label}</p>
-                      <p className="text-lg font-bold text-slate-900">{m.value}</p>
+                      <p className="text-xs text-slate-600 font-semibold mb-1">{m.label}</p>
+                      <p className="text-lg font-semibold text-slate-900">{m.value}</p>
                     </div>
                   ))}
                 </div>
@@ -439,7 +439,7 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
 
               {/* Quick Actions */}
               <div className="bg-white rounded-2xl border border-slate-100 p-6">
-                <h3 className="font-bold text-slate-900 mb-3">Quick Actions</h3>
+                <h3 className="font-semibold text-slate-900 mb-3">Quick Actions</h3>
                 <div className="space-y-2">
                   <button onClick={handleCallDriver} className="w-full p-3 text-left text-sm font-semibold text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
                     📞 Call Driver

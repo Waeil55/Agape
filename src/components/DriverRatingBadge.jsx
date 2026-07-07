@@ -70,7 +70,7 @@ export const DriverRatingBadge = memo(function DriverRatingBadge({ driver, trips
             <Star size={16} className="text-amber-600 fill-amber-600" />
           </div>
           <div>
-            <p className="text-xs font-bold text-slate-900">Customer Rating</p>
+            <p className="text-xs font-semibold text-slate-900">Customer Rating</p>
             <p className="text-[10px] text-slate-500">{driver?.name || 'Driver'}</p>
           </div>
         </div>
@@ -99,7 +99,7 @@ export const DriverRatingBadge = memo(function DriverRatingBadge({ driver, trips
                       style={{ width: `${(value / 5) * 100}%` }}
                     />
                   </div>
-                  <span className="text-[10px] font-bold text-slate-700 w-6 text-right">{value}</span>
+                  <span className="text-[10px] font-semibold text-slate-700 w-6 text-right">{value}</span>
                 </div>
               </div>
             ))}
@@ -117,11 +117,11 @@ export function TripFeedbackDisplay({ trip }) {
     <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
       <div className="flex items-center gap-2 mb-2">
         <MessageSquare size={12} className="text-slate-400" />
-        <span className="text-[10px] font-bold text-slate-600 uppercase">Client Feedback</span>
+        <span className="text-[10px] font-semibold text-slate-600 uppercase">Client Feedback</span>
       </div>
       <div className="flex items-center gap-2 mb-2">
         <RatingStars rating={trip.feedback.overall || trip.feedback.average} size="sm" />
-        <span className="text-xs font-bold text-slate-700">
+        <span className="text-xs font-semibold text-slate-700">
           {formatRating(trip.feedback.overall || trip.feedback.average)}
         </span>
       </div>

@@ -20,7 +20,7 @@ export const ETABadge = memo(function ETABadge({ currentLat, currentLng, destLat
     <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${getETABackgroundColor(eta.minutes)}`}>
       <Clock size={14} className={getETAColor(eta.minutes)} />
       <div>
-        <p className={`text-xs font-bold ${getETAColor(eta.minutes)}`}>
+        <p className={`text-xs font-semibold ${getETAColor(eta.minutes)}`}>
           {formatETAMinutes(eta.minutes)}
         </p>
         <p className="text-[9px] text-slate-500">

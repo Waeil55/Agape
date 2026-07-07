@@ -1462,7 +1462,7 @@ const OperationsCommandCenter = ({
             </button>
             <div className="flex items-center gap-1 shrink-0">
               <Clock size={14} className={isLate ? 'text-rose-500' : 'text-orange-500'} />
-              <span className={`font-bold text-sm ${isLate ? 'text-rose-600' : 'text-orange-600'}`}>{timeDisplay}</span>
+              <span className={`font-semibold text-sm ${isLate ? 'text-rose-600' : 'text-orange-600'}`}>{timeDisplay}</span>
               {urgencyDisplay && (
                 <span className={`text-xs px-1.5 py-0.5 rounded ${isLate ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>
                   {urgencyDisplay}
@@ -1470,7 +1470,7 @@ const OperationsCommandCenter = ({
               )}
             </div>
             <span className="text-slate-300 mx-0.5 shrink-0">•</span>
-            <span className="font-bold text-slate-800 text-sm truncate max-w-[100px] md:max-w-none">
+            <span className="font-semibold text-slate-800 text-sm truncate max-w-[100px] md:max-w-none">
               {passengerName}
             </span>
           </div>
@@ -1642,7 +1642,7 @@ const OperationsCommandCenter = ({
                 <section key={section.key} className="rounded-3xl border border-slate-100/50 bg-white shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
                   <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 bg-slate-50/70">
                     <div className="min-w-0">
-                      <div className="truncate text-base font-bold text-slate-900">{section.label}</div>
+                      <div className="truncate text-base font-semibold text-slate-900">{section.label}</div>
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-sm text-slate-600">
                           {section.trips.length} trip{section.trips.length !== 1 ? 's' : ''}
@@ -1689,7 +1689,7 @@ const OperationsCommandCenter = ({
       <div className="hidden lg:flex flex-col min-h-0 bg-slate-50 border border-slate-200/60 rounded-3xl p-4 shadow-inner">
         <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200">
           <Activity size={18} className="text-blue-600" />
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Drivers Activity</h3>
+          <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">Drivers Activity</h3>
         </div>
         <div className="flex-1 overflow-y-auto overscroll-contain space-y-2.5 pr-0.5">
           {(!logs || logs.length === 0) ? (
@@ -1706,7 +1706,7 @@ const OperationsCommandCenter = ({
                     'bg-slate-500 ring-slate-500/20'
                   }`} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-bold text-slate-800 leading-snug">{log.t}</p>
+                    <p className="text-[12px] font-semibold text-slate-800 leading-snug">{log.t}</p>
                     <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">{log.d}</p>
                     {log.timestamp && <p className="text-[10px] text-slate-400 mt-1 font-medium">{log.timestamp}</p>}
                   </div>
@@ -2854,27 +2854,27 @@ const OperationsCommandCenter = ({
               <div className="overflow-y-auto px-5 py-4 flex-1 overflow-x-hidden space-y-3">
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Patient</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Patient</label>
                     <input value={ie.patient} onChange={(e) => setEditingTripData(p => ({ ...p, patient: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Booking ID</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Booking ID</label>
                     <input value={ie.bookingId} onChange={(e) => setEditingTripData(p => ({ ...p, bookingId: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Date</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Date</label>
                     <input type="date" value={ie.date} onChange={(e) => setEditingTripData(p => ({ ...p, date: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Time</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Time</label>
                     <input value={ie.time} onChange={(e) => setEditingTripData(p => ({ ...p, time: e.target.value }))} className={inputCls} placeholder="8:30 AM" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Service Type</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Service Type</label>
                     <input value={ie.type} onChange={(e) => setEditingTripData(p => ({ ...p, type: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Status</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Status</label>
                     <select value={ie.status} onChange={(e) => setEditingTripData(p => ({ ...p, status: e.target.value }))} className={inputCls}>
                       {['Assigned', 'Navigating Pickup', 'At Pickup', 'In Transit', 'At Dropoff', 'Completed', 'No Show', 'Cancelled', 'Rerouted'].map(s => (
                         <option key={s} value={s}>{s}</option>
@@ -2884,46 +2884,46 @@ const OperationsCommandCenter = ({
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 bg-blue-50 border border-blue-100 rounded-xl p-3">
                   <div>
-                    <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Time</label>
+                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Time</label>
                     <input type="time" value={ie._pickupTime} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupTime: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Odo</label>
+                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Odo</label>
                     <input type="number" min="0" step="1" placeholder="42500" value={ie._pickupOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupOdometer: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Time</label>
+                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Time</label>
                     <input type="time" value={ie._dropoffTime} onChange={(e) => setEditingTripData(p => ({ ...p, _dropoffTime: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Odo</label>
+                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Odo</label>
                     <input type="number" min="0" step="1" placeholder="42750" value={ie._dropoffOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _dropoffOdometer: e.target.value }))} className={inputCls} />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Address</label>
+                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Address</label>
                     <textarea value={ie.pickup} onChange={(e) => setEditingTripData(p => ({ ...p, pickup: e.target.value }))} className={inputCls} rows="2" />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Address</label>
+                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Address</label>
                     <textarea value={ie.dropoff} onChange={(e) => setEditingTripData(p => ({ ...p, dropoff: e.target.value }))} className={inputCls} rows="2" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Pickup Phone</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Pickup Phone</label>
                     <input value={ie.pickupPhone} onChange={(e) => setEditingTripData(p => ({ ...p, pickupPhone: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Dropoff Phone</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Dropoff Phone</label>
                     <input value={ie.dropoffPhone} onChange={(e) => setEditingTripData(p => ({ ...p, dropoffPhone: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Distance</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Distance</label>
                     <input value={ie.distance} onChange={(e) => setEditingTripData(p => ({ ...p, distance: e.target.value }))} className={inputCls} />
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Notes</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Notes</label>
                   <textarea value={ie.notes} onChange={(e) => setEditingTripData(p => ({ ...p, notes: e.target.value }))} className={inputCls} rows="2" placeholder="Update notes..." />
                 </div>
               </div>

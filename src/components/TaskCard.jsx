@@ -227,7 +227,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
           </div>
 
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-[15px] font-bold text-slate-800 truncate min-w-0 flex items-center gap-0.5">
+            <h3 className="text-[15px] font-semibold text-slate-800 truncate min-w-0 flex items-center gap-0.5">
               {task.patient || task.patientName}
               {task.activeTrip && (
                 <span className="inline-flex items-center gap-0.5 shrink-0 ml-0.5">
@@ -282,7 +282,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 <span className={`font-black tracking-tight ${timeUrgency.type === 'critical' ? 'text-rose-600' : timeUrgency.type === 'warning' ? 'text-orange-500' : 'text-slate-900'}`}>
                   {task.time || 'TBD'}
                 </span>
-                <span className="font-bold text-slate-800 truncate">{task.patient || task.patientName}</span>
+                <span className="font-semibold text-slate-800 truncate">{task.patient || task.patientName}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <StatusBadge status={task.status} />
@@ -352,7 +352,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                       <div className="flex justify-between items-start gap-2">
                         <div className="flex-1 min-w-0">
                           {pickupSiteName && pickupSiteName !== pickupAddress && (
-                            <h4 className="text-slate-900 font-bold text-[0.875em] flex items-center gap-1.5 mb-1 leading-tight">
+                            <h4 className="text-slate-900 font-semibold text-[0.875em] flex items-center gap-1.5 mb-1 leading-tight">
                               {getSiteIcon(pickupSiteName)} {pickupSiteName}
                             </h4>
                           )}
@@ -404,7 +404,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                       <div className="flex justify-between items-start gap-2">
                         <div className="flex-1 min-w-0">
                           {dropoffSiteName && dropoffSiteName !== dropoffAddress && (
-                            <h4 className="text-slate-900 font-bold text-[0.875em] flex items-center gap-1.5 mb-1 leading-tight">
+                            <h4 className="text-slate-900 font-semibold text-[0.875em] flex items-center gap-1.5 mb-1 leading-tight">
                               {getSiteIcon(dropoffSiteName)} {dropoffSiteName}
                             </h4>
                           )}

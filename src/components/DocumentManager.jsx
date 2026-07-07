@@ -92,7 +92,7 @@ export default function DocumentManager({ driver, documents = [], onUpdate, read
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-bold text-slate-900">Documents & Compliance</h3>
+        <h3 className="text-sm font-semibold text-slate-900">Documents & Compliance</h3>
         <span className="text-[10px] text-slate-500">{documents.filter(d => d.fileUrl).length}/{DOCUMENT_TYPES.length} uploaded</span>
       </div>
 
@@ -111,7 +111,7 @@ export default function DocumentManager({ driver, documents = [], onUpdate, read
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-[11px] font-bold text-slate-900 truncate">{docType.label}</p>
+                  <p className="text-[11px] font-semibold text-slate-900 truncate">{docType.label}</p>
                   {docType.required && <span className="text-[8px] text-rose-500 font-bold">REQUIRED</span>}
                 </div>
                 {doc?.fileUrl ? (
@@ -177,7 +177,7 @@ export default function DocumentManager({ driver, documents = [], onUpdate, read
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setPreviewDoc(null)}>
           <div className="bg-white rounded-2xl max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-              <h3 className="text-sm font-bold text-slate-900">{previewDoc.fileName || 'Document'}</h3>
+              <h3 className="text-sm font-semibold text-slate-900">{previewDoc.fileName || 'Document'}</h3>
               <button onClick={() => setPreviewDoc(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
                 <X size={16} className="text-slate-500" />
               </button>

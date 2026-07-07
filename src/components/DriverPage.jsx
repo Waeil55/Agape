@@ -793,6 +793,32 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   );
   const tripsScrollRef = useRef(null);
   const workflowSyncRef = useRef({});
+  const pullStartY = useRef(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handlePullTouchStart = useCallback((e) => {
+    pullStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handlePullTouchMove = useCallback((e) => {
+    if (pullStartY.current === null || isRefreshing) return;
+    const delta = e.touches[0].clientY - pullStartY.current;
+    if (delta > 0) {
+      setPullDistance(Math.min(delta * 0.25, 120));
+    }
+  }, [isRefreshing]);
+
+  const handlePullTouchEnd = useCallback(() => {
+    if (pullDistance > 100 && !isRefreshing) {
+      setIsRefreshing(true);
+      setPullDistance(0);
+      setTimeout(() => { window.location.reload(); }, 300);
+    } else {
+      setPullDistance(0);
+    }
+    pullStartY.current = null;
+  }, [pullDistance, isRefreshing]);
 
   const advanceWorkflow = useCallback((trip, status, extraFields = {}, options = {}) => {
     if (!trip?.id || !status) return;
@@ -3380,7 +3406,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }
 
   return (
-    <div className="w-full h-full overflow-hidden flex flex-col bg-[#F3F4F6] text-slate-900 relative">
+    <div
+      className="w-full h-full overflow-hidden flex flex-col bg-[#F3F4F6] text-slate-900 relative"
+      onTouchStart={handlePullTouchStart}
+      onTouchMove={handlePullTouchMove}
+      onTouchEnd={handlePullTouchEnd}
+    >
+      {(pullDistance > 0 || isRefreshing) && (
+        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center transition-all" style={{ height: isRefreshing ? 40 : pullDistance }}>
+          <div className={`w-6 h-6 border-2 border-slate-300 border-t-blue-600 rounded-full ${isRefreshing ? 'animate-spin' : ''}`} style={!isRefreshing ? { transform: `rotate(${pullDistance * 3}deg)` } : {}} />
+        </div>
+      )}
       {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && expandedTripId && !activeWorkTrip && (
         <div
           className="fixed inset-0 bg-slate-900/10 z-40 transition-opacity duration-300"
@@ -5119,27 +5155,27 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <div className="p-3 space-y-2.5">
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 block">Patient</label>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Patient</label>
                                 <input value={ie.patient} onChange={(e) => setEditingTripData(p => ({ ...p, patient: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 block">Booking ID</label>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Booking ID</label>
                                 <input value={ie.bookingId} onChange={(e) => setEditingTripData(p => ({ ...p, bookingId: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 block">Date</label>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Date</label>
                                 <input type="date" value={ie.date} onChange={(e) => setEditingTripData(p => ({ ...p, date: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 block">Time</label>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Time</label>
                                 <input value={ie.time} onChange={(e) => setEditingTripData(p => ({ ...p, time: e.target.value }))} className={inputCls} placeholder="8:30 AM" />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 block">Service Type</label>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Service Type</label>
                                 <input value={ie.type} onChange={(e) => setEditingTripData(p => ({ ...p, type: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 block">Status</label>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Status</label>
                                 <select value={ie.status} onChange={(e) => setEditingTripData(p => ({ ...p, status: e.target.value }))} className={inputCls}>
                                   {['Assigned', 'Navigating Pickup', 'At Pickup', 'In Transit', 'At Dropoff', 'Completed', 'No Show', 'Cancelled', 'Rerouted'].map(s => (
                                     <option key={s} value={s}>{s}</option>
@@ -5149,45 +5185,45 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             </div>
                             <div className="grid grid-cols-2 gap-2 bg-blue-50 border border-blue-100 rounded-xl p-2.5">
                               <div>
-                                <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Clock size={10} /> Pickup Time</label>
+                                <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Clock size={10} /> Pickup Time</label>
                                 <input type="time" value={ie._pickupTime} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupTime: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Ruler size={10} /> Pickup Odo</label>
+                                <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Ruler size={10} /> Pickup Odo</label>
                                 <input type="number" min="0" step="1" placeholder="42500" value={ie._pickupOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupOdometer: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Clock size={10} /> Dropoff Time</label>
+                                <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Clock size={10} /> Dropoff Time</label>
                                 <input type="time" value={ie._dropoffTime} onChange={(e) => setEditingTripData(p => ({ ...p, _dropoffTime: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Ruler size={10} /> Dropoff Odo</label>
+                                <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Ruler size={10} /> Dropoff Odo</label>
                                 <input type="number" min="0" step="1" placeholder="42750" value={ie._dropoffOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _dropoffOdometer: e.target.value }))} className={inputCls} />
                               </div>
                               <div className="col-span-2">
-                                <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-0.5 block">Pickup Address</label>
+                                <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Pickup Address</label>
                                 <textarea value={ie.pickup} onChange={(e) => setEditingTripData(p => ({ ...p, pickup: e.target.value }))} className={inputCls} rows="2" />
                               </div>
                               <div className="col-span-2">
-                                <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-0.5 block">Dropoff Address</label>
+                                <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Dropoff Address</label>
                                 <textarea value={ie.dropoff} onChange={(e) => setEditingTripData(p => ({ ...p, dropoff: e.target.value }))} className={inputCls} rows="2" />
                               </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 block">Pickup Phone</label>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Pickup Phone</label>
                                 <input value={ie.pickupPhone} onChange={(e) => setEditingTripData(p => ({ ...p, pickupPhone: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 block">Dropoff Phone</label>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Dropoff Phone</label>
                                 <input value={ie.dropoffPhone} onChange={(e) => setEditingTripData(p => ({ ...p, dropoffPhone: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-0.5 block">Hospital Phone</label>
+                                <label className="text-[10px] font-semibold text-rose-400 uppercase tracking-widest mb-0.5 block">Hospital Phone</label>
                                 <input value={ie.hospitalPhone || ''} onChange={(e) => setEditingTripData(p => ({ ...p, hospitalPhone: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 block">Distance</label>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Distance</label>
                                 <input value={ie.distance} onChange={(e) => setEditingTripData(p => ({ ...p, distance: e.target.value }))} className={inputCls} />
                               </div>
                             </div>
@@ -5196,11 +5232,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                                 <div onClick={() => setEditingTripData(p => ({ ...p, _clientSigned: !p._clientSigned }))} className={`w-4 h-4 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${ie._clientSigned ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'}`}>
                                   {ie._clientSigned && <CheckCircle2 size={10} />}
                                 </div>
-                                <span className="text-xs font-bold text-slate-900">Client Signed</span>
+                                <span className="text-xs font-semibold text-slate-900">Client Signed</span>
                               </label>
                             </div>
                             <div>
-                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 block">Notes</label>
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Notes</label>
                               <textarea value={ie.notes} onChange={(e) => setEditingTripData(p => ({ ...p, notes: e.target.value }))} className={inputCls} rows="2" placeholder="Update notes..." />
                             </div>
                           </div>
@@ -5232,7 +5268,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${statusMeta.iconBg}`}>
                             <StatusIcon size={13} />
                           </div>
-                          <span className="text-sm     font-semibold text-slate-900 truncate">{trip.patient}</span>
+                          <span className="text-sm font-semibold text-slate-900 truncate">{trip.patient}</span>
                           <span className="text-xs font-mono text-blue-600 font-semibold shrink-0">#{trip.bookingId || trip.id}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -5291,12 +5327,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               }`}>
                 <div className="flex items-center gap-2 mb-3">
                   <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${ttState === TT.ON_BREAK ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
-                  <span className={`text-sm font-bold uppercase tracking-wide ${ttState === TT.ON_BREAK ? 'text-amber-800' : 'text-emerald-800'}`}>
+                  <span className={`text-sm font-semibold uppercase tracking-wide ${ttState === TT.ON_BREAK ? 'text-amber-800' : 'text-emerald-800'}`}>
                     {ttState === TT.ON_BREAK ? 'On Break' : 'Active'}
                   </span>
                   <span className="text-slate-400">·</span>
                   <Clock size={13} className={ttState === TT.ON_BREAK ? 'text-amber-600' : 'text-emerald-600'} />
-                  <span className={`text-sm font-bold ${ttState === TT.ON_BREAK ? 'text-amber-800' : 'text-emerald-800'}`}>
+                  <span className={`text-sm font-semibold ${ttState === TT.ON_BREAK ? 'text-amber-800' : 'text-emerald-800'}`}>
                     {Math.floor(ttBillableMin / 60)}h {ttBillableMin % 60}m
                   </span>
                   {ttBreakMin > 0 && (
@@ -5526,12 +5562,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       return (
                         <div key={day.dateKey} className={`rounded-xl border p-3 ${isToday ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'}`}>
                           <div className="flex items-center justify-between mb-1.5">
-                            <span className={`text-sm font-bold ${isToday ? 'text-emerald-700' : 'text-slate-800'}`}>
+                            <span className={`text-sm font-semibold ${isToday ? 'text-emerald-700' : 'text-slate-800'}`}>
                               {formatHistoryCompactDayLabel(day.dateKey)}
-                              {isToday && <span className="ml-1.5 text-[10px] font-bold uppercase bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full">Today</span>}
+                              {isToday && <span className="ml-1.5 text-[10px] font-semibold uppercase bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full">Today</span>}
                             </span>
                             {day.hours ? (
-                              <span className={`text-sm font-bold ${day.hours >= 8 ? 'text-emerald-600' : day.hours >= 4 ? 'text-amber-600' : 'text-slate-600'}`}>
+                              <span className={`text-sm font-semibold ${day.hours >= 8 ? 'text-emerald-600' : day.hours >= 4 ? 'text-amber-600' : 'text-slate-600'}`}>
                                 {day.hours.toFixed(1)}h
                               </span>
                             ) : (
@@ -5543,7 +5579,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               <div className="flex items-center gap-1.5">
                                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
                                 <span className="text-slate-600 font-medium">In</span>
-                                <span className="font-bold text-slate-800">{formatClockTime(day.clockIn)}</span>
+                                <span className="font-semibold text-slate-800">{formatClockTime(day.clockIn)}</span>
                               </div>
                             )}
                             {day.clockIn && day.clockOut && <div className="text-slate-300">→</div>}
@@ -5551,7 +5587,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               <div className="flex items-center gap-1.5">
                                 <div className="w-2 h-2 rounded-full bg-rose-500" />
                                 <span className="text-slate-600 font-medium">Out</span>
-                                <span className="font-bold text-slate-800">{formatClockTime(day.clockOut)}</span>
+                                <span className="font-semibold text-slate-800">{formatClockTime(day.clockOut)}</span>
                               </div>
                             )}
                             {!day.clockIn && !day.clockOut && (
@@ -5563,8 +5599,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     })}
                   </div>
                   <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-sm font-bold text-slate-600">14-Day Total</span>
-                    <span className={`text-sm font-bold ${clockHistory.weeklyOvertime > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                    <span className="text-sm font-semibold text-slate-600">14-Day Total</span>
+                    <span className={`text-sm font-semibold ${clockHistory.weeklyOvertime > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
                       {clockHistory.weeklyTotal.toFixed(1)}h
                       {clockHistory.weeklyOvertime > 0 && (
                         <span className="ml-2 text-xs text-rose-500">({clockHistory.weeklyOvertime.toFixed(1)}h OT)</span>
@@ -6142,7 +6178,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     </div>
                     {item.sublabel ? (
                       <div className="flex flex-col items-center leading-none">
-                        <span className={`max-w-full truncate text-[10px] font-bold tracking-wide ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}>
+                        <span className={`max-w-full truncate text-[10px] font-semibold tracking-wide ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}>
                           {item.label}
                         </span>
                         <span className={`max-w-full truncate text-[9px] font-medium tracking-wide ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}>

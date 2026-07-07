@@ -70,14 +70,14 @@ export default function CommandPalette({ isOpen, onClose, navigateTo }) {
               onChange={(e) => setQuery(e.target.value)}
             />
             <div className="flex items-center gap-1 shrink-0 ml-3 bg-slate-100 rounded px-2 py-1">
-              <span className="text-[10px] font-bold text-slate-500">ESC</span>
+              <span className="text-[10px] font-semibold text-slate-500">ESC</span>
             </div>
           </div>
 
           <div className="max-h-[400px] overflow-y-auto p-2">
             {filtered.length > 0 ? (
               <div className="space-y-1">
-                <p className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Suggested Actions</p>
+                <p className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Suggested Actions</p>
                 {filtered.map(cmd => (
                   <button
                     key={cmd.id}
@@ -104,7 +104,7 @@ export default function CommandPalette({ isOpen, onClose, navigateTo }) {
               <span className="text-[10px] text-slate-500 font-medium">Agape AI Engine Active</span>
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
             </div>
-            <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400">
+            <div className="flex items-center gap-3 text-[10px] font-semibold text-slate-400">
               <span className="flex items-center gap-1"><kbd className="bg-white border border-slate-200 px-1.5 rounded">↑</kbd> <kbd className="bg-white border border-slate-200 px-1.5 rounded">↓</kbd> to navigate</span>
               <span className="flex items-center gap-1"><kbd className="bg-white border border-slate-200 px-1.5 rounded">↵</kbd> to select</span>
             </div>

@@ -49,7 +49,7 @@ export default function DriverAvatar({ driver, size = 'md', showUpload = false, 
 
   return (
     <div className="relative inline-block">
-      <div className={`${sizeClass} rounded-full overflow-hidden flex items-center justify-center font-bold uppercase shrink-0 ${
+      <div className={`${sizeClass} rounded-full overflow-hidden flex items-center justify-center font-semibold uppercase shrink-0 ${
         photoUrl ? '' : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white'
       }`}>
         {photoUrl ? (

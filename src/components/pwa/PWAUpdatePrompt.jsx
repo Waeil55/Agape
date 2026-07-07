@@ -63,7 +63,7 @@ const PWAUpdatePrompt = () => {
             <ArrowUp size={18} className="text-blue-600" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-900">Update Available</p>
+            <p className="text-sm font-semibold text-slate-900">Update Available</p>
             <p className="text-xs text-slate-500 mt-0.5">A new version of Agape Care is ready</p>
           </div>
           <button

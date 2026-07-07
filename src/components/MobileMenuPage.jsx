@@ -44,7 +44,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
             <h2 className="text-xl font-extrabold text-gray-900 tracking-wide truncate">{currentUser || 'User'}</h2>
             <div className="flex items-center gap-2 mt-1">
               <Shield size={12} className="text-[#2b4c7e]" />
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{role === 'admin' ? 'Administrator' : 'Dispatcher'}</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">{role === 'admin' ? 'Administrator' : 'Dispatcher'}</p>
             </div>
           </div>
         </div>
@@ -70,7 +70,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
                       <item.icon size={18} className={item.color} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-900">{item.label}</p>
+                      <p className="text-sm font-semibold text-gray-900">{item.label}</p>
                       <p className="text-[11px] font-semibold text-gray-500 mt-0.5">{item.desc}</p>
                     </div>
                     <ChevronRight size={16} className="text-gray-400 shrink-0" />

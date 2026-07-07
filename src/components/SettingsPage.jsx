@@ -16,7 +16,7 @@ const ActivityRow = ({ index, log }) => {
       <div className="flex items-start gap-3 cursor-pointer" onClick={() => setOpen(o => !o)}>
         <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${colorClass}`} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-slate-900">{log.t}</p>
+          <p className="text-sm font-semibold text-slate-900">{log.t}</p>
           <p className="text-xs text-slate-500 mt-0.5 truncate">{log.d}</p>
           {open && log.meta && log.meta.diffs && (
             <div className="mt-3 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-700">
@@ -207,7 +207,7 @@ const SettingsPage = ({
                       <Icon size={16} className="text-white" />
                     </div>
                     <p className="text-2xl font-black text-slate-900">{stat.value}</p>
-                    <p className="text-xs font-bold text-slate-500 mt-0.5">{stat.label}</p>
+                    <p className="text-xs font-semibold text-slate-500 mt-0.5">{stat.label}</p>
                   </div>
                 );
               })}
@@ -237,7 +237,7 @@ const SettingsPage = ({
                   <tbody>
                     {dispatchers.map((d, i) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-3 py-1.5 font-bold text-slate-900">{d.name || '—'}</td>
+                        <td className="px-3 py-1.5 font-semibold text-slate-900">{d.name || '—'}</td>
                         <td className="px-3 py-1.5 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
                         <td className="px-3 py-1.5"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${ROLE_COLORS[d.role] || 'bg-slate-100 text-slate-600'}`}>{ROLE_LABELS[d.role] || d.role}</span></td>
                         <td className="px-3 py-1.5"><span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500" />Active</span></td>
@@ -245,7 +245,7 @@ const SettingsPage = ({
                     ))}
                     {drivers.map((d, i) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-3 py-1.5 font-bold text-slate-900">{d.name || '—'}</td>
+                        <td className="px-3 py-1.5 font-semibold text-slate-900">{d.name || '—'}</td>
                         <td className="px-3 py-1.5 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
                         <td className="px-3 py-1.5"><span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Driver</span></td>
                         <td className="px-3 py-1.5"><span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500" />Active</span></td>
@@ -308,7 +308,7 @@ const SettingsPage = ({
                   <tbody>
                     {Object.keys(PERMISSION_LABELS).map(pkey => (
                       <tr key={pkey} className="border-b border-slate-100 hover:bg-slate-50/50">
-                        <td className="px-3 py-1.5 font-bold text-slate-800 whitespace-nowrap">{PERMISSION_LABELS[pkey]}</td>
+                        <td className="px-3 py-1.5 font-semibold text-slate-800 whitespace-nowrap">{PERMISSION_LABELS[pkey]}</td>
                         {Object.keys(ROLE_LABELS).map(r => {
                           const allowed = hasPermission ? hasPermission(r, pkey) : false;
                           return (
@@ -361,7 +361,7 @@ const SettingsPage = ({
                           trashedTrips.map((trip) => (
                             <tr key={trip.id} className="border-b border-slate-100 hover:bg-slate-50">
                               <td className="px-3 sm:px-4 py-1.5 font-mono text-xs text-slate-600">{trip.bookingId || '—'}</td>
-                              <td className="px-3 sm:px-4 py-1.5 text-xs font-bold text-slate-900">{trip.patient}</td>
+                              <td className="px-3 sm:px-4 py-1.5 text-xs font-semibold text-slate-900">{trip.patient}</td>
                               <td className="px-3 sm:px-4 py-1.5 text-xs text-emerald-600 hidden sm:table-cell">{trip.pickup}</td>
                               <td className="px-3 sm:px-4 py-1.5 text-xs text-rose-600 hidden sm:table-cell">{trip.dropoff}</td>
                               <td className="px-3 sm:px-4 py-1.5 text-xs text-slate-600">{trip.time}</td>
@@ -397,18 +397,18 @@ const SettingsPage = ({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-2 text-slate-800 font-bold text-base mb-1"><Database size={18} /> System Logs</div>
+                <div className="flex items-center gap-2 text-slate-800 font-semibold text-base mb-1"><Database size={18} /> System Logs</div>
                 <p className="text-sm text-slate-500 mb-4">View all system logs and user activities from the dashboard audit panel.</p>
                 <button onClick={() => setActiveSection('activity')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition text-sm flex items-center gap-2"><Eye size={16} /> View Logs</button>
               </div>
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-2 text-slate-800 font-bold text-base mb-1"><RefreshCw size={18} /> Data Sync Status</div>
+                <div className="flex items-center gap-2 text-slate-800 font-semibold text-base mb-1"><RefreshCw size={18} /> Data Sync Status</div>
                 <p className="text-sm text-slate-500 mb-4">Firestore real-time sync is active. Data is synchronized across all connected clients.</p>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Live</div>
               </div>
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm border-rose-200 bg-rose-50">
-              <h4 className="font-bold text-rose-900 mb-2 flex items-center gap-2 text-base"><AlertCircle size={20} /> Master Reset</h4>
+              <h4 className="font-semibold text-rose-900 mb-2 flex items-center gap-2 text-base"><AlertCircle size={20} /> Master Reset</h4>
               <p className="text-sm text-rose-700 mb-4">Warning: This will permanently delete all trips, drivers, and fleet data. This action cannot be undone.</p>
               <button onClick={() => { requestAuthAction?.('Master System Reset — This will permanently delete ALL trips, drivers, and fleet data. This action cannot be undone.', () => onResetSystem?.()); }} className="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition text-sm shadow-lg shadow-rose-600/20">
                 Wipe System Data
@@ -425,26 +425,26 @@ const SettingsPage = ({
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="space-y-5 max-w-3xl">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Username</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Username</label>
                   <input type="text" value={String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '')} readOnly className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-600 text-base" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Role</label>
-                  <input type="text" value={role || ''} readOnly className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-600 uppercase font-bold text-base" />
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Role</label>
+                  <input type="text" value={role || ''} readOnly className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-600 uppercase font-semibold text-base" />
                 </div>
                 {(role === 'admin' || role === 'dispatcher') && (
                   <div className="bg-blue-50/30 border border-blue-100 rounded-2xl p-5 space-y-4">
-                    <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2"><Phone size={16} className="text-blue-600" /> Contact Numbers</h4>
+                    <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2"><Phone size={16} className="text-blue-600" /> Contact Numbers</h4>
                     <div className="grid grid-cols-1 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5">Dispatcher Phone</label>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Dispatcher Phone</label>
                         <div className="flex gap-2">
                           <input type="tel" value={phoneNumbers?.dispatcher || ''} onChange={(e) => _updatePhone?.({ dispatcher: e.target.value })} className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777707" />
                           <button onClick={() => makeCall(phoneNumbers?.dispatcher || '', 'Dispatcher')} className="px-3 py-2.5 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition flex items-center" aria-label="Call dispatcher"><Phone size={16} /></button>
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5">Routing Phone</label>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Routing Phone</label>
                         <div className="flex gap-2">
                           <input type="tel" value={phoneNumbers?.routing || ''} onChange={(e) => _updatePhone?.({ routing: e.target.value })} className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-mono text-base focus:border-blue-500 outline-none" placeholder="3177777708" />
                           <button onClick={() => makeCall(phoneNumbers?.routing || '', 'Routing')} className="px-3 py-2.5 bg-indigo-100 text-indigo-700 rounded-xl hover:bg-indigo-200 transition flex items-center" aria-label="Call routing"><Phone size={16} /></button>
@@ -457,12 +457,12 @@ const SettingsPage = ({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="bg-white border border-slate-200 rounded-2xl p-4">
                       <p className="text-micro">Vehicle</p>
-                      <p className="text-lg font-bold text-slate-900 mt-2">{driverProfile?.vehicle || 'Not Assigned'}</p>
+                      <p className="text-lg font-semibold text-slate-900 mt-2">{driverProfile?.vehicle || 'Not Assigned'}</p>
                     </div>
                     <div className="bg-white border border-slate-200 rounded-2xl p-4">
                       <p className="text-micro">Current Odometer</p>
                       <div className="flex items-center gap-2 mt-2">
-                        <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) _updateSettings?.({ odometer: val }, true); }} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-900 focus:border-blue-500 outline-none text-base" />
+                        <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) _updateSettings?.({ odometer: val }, true); }} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-900 focus:border-blue-500 outline-none text-base" />
                         <span className="text-sm font-bold text-slate-400">mi</span>
                       </div>
                     </div>
@@ -485,7 +485,7 @@ const SettingsPage = ({
             <div><h3 className="text-heading text-slate-900 mb-1">Appearance</h3><p className="text-body text-slate-500">Choose the theme and reading size that work best for you.</p></div>
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8 space-y-8">
               <div>
-                <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-base"><Palette size={20} /> Theme</div>
+                <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold text-base"><Palette size={20} /> Theme</div>
                 <div className="grid grid-cols-3 gap-3 max-w-lg">
                   {THEME_OPTIONS.map((option) => {
                     const Icon = option.icon;
@@ -493,7 +493,7 @@ const SettingsPage = ({
                     return (
                       <button key={option.value} onClick={() => _updateSettings?.({ theme: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
-                        <div className="font-bold text-sm text-slate-900">{option.label}</div>
+                        <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
                       </button>
                     );
@@ -511,7 +511,7 @@ const SettingsPage = ({
             <div><h3 className="text-heading text-slate-900 mb-1">Accessibility</h3><p className="text-body text-slate-500">Optimize readability for operational use, especially while driving.</p></div>
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8 space-y-8">
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-slate-800 font-bold text-base"><Type size={20} /> Font Size</div>
+                <div className="flex items-center gap-2 text-slate-800 font-semibold text-base"><Type size={20} /> Font Size</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {FONT_SCALE_OPTIONS.map((option) => {
                     const Icon = option.icon;
@@ -520,7 +520,7 @@ const SettingsPage = ({
                     return (
                       <button key={option.value} onClick={() => _updateSettings?.({ fontScale: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? (isDriverMode ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'card-active bg-blue-50') : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? (isDriverMode ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white') : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
-                        <div className="font-bold text-sm text-slate-900">{option.label}</div>
+                        <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
                         {active && <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${isDriverMode ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>Active</span>}
                       </button>
@@ -529,17 +529,17 @@ const SettingsPage = ({
                 </div>
               </div>
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-slate-800 font-bold text-base"><Accessibility size={20} /> Readability Mode</div>
+                <div className="flex items-center gap-2 text-slate-800 font-semibold text-base"><Accessibility size={20} /> Readability Mode</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
                   <button onClick={() => _updateSettings?.({ readability: 'normal' })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${appSettings?.readability !== 'enhanced' ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability !== 'enhanced' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><TextSelect size={20} /></div>
-                    <div className="font-bold text-sm text-slate-900">Standard</div>
+                    <div className="font-semibold text-sm text-slate-900">Standard</div>
                     <p className="text-xs text-slate-500 mt-0.5">Normal contrast and font weights</p>
                     {appSettings?.readability !== 'enhanced' && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
                   </button>
                   <button onClick={() => _updateSettings?.({ readability: 'enhanced' })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability === 'enhanced' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Eye size={20} /></div>
-                    <div className="font-bold text-sm text-slate-900">Enhanced</div>
+                    <div className="font-semibold text-sm text-slate-900">Enhanced</div>
                     <p className="text-xs text-slate-500 mt-0.5">Bolder text, stronger contrast, better spacing</p>
                     {appSettings?.readability === 'enhanced' && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-700">Active</span>}
                   </button>
@@ -556,7 +556,7 @@ const SettingsPage = ({
             <div><h3 className="text-heading text-slate-900 mb-1">Navigation</h3><p className="text-body text-slate-500">Choose which GPS app opens for directions. Single-trip vs Route Plan can use different apps.</p></div>
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="max-w-3xl">
-                <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-base"><Route size={20} /> Preferred Navigation App</div>
+                <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold text-base"><Route size={20} /> Preferred Navigation App</div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {NAV_OPTIONS.map((option) => {
                     const Icon = option.icon;
@@ -564,7 +564,7 @@ const SettingsPage = ({
                     return (
                       <button key={option.value} onClick={() => _updateSettings?.({ navigationApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
-                        <div className="font-bold text-sm text-slate-900">{option.label}</div>
+                        <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
                       </button>
                     );
@@ -574,7 +574,7 @@ const SettingsPage = ({
             </div>
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="max-w-3xl">
-                <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-base"><Route size={20} /> Route Plan Navigation</div>
+                <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold text-base"><Route size={20} /> Route Plan Navigation</div>
                 <p className="text-sm text-slate-500 mb-3">GPS app for multi-stop Route Plan tool (Navigate All). Separate from single-trip navigation above.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {NAV_OPTIONS.map((option) => {
@@ -583,7 +583,7 @@ const SettingsPage = ({
                     return (
                       <button key={option.value} onClick={() => _updateSettings?.({ routePlanNavApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
-                        <div className="font-bold text-sm text-slate-900">{option.label}</div>
+                        <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
                       </button>
                     );
@@ -614,7 +614,7 @@ const SettingsPage = ({
                         _updateSettings?.({ notifications: n });
                       }} className="w-5 h-5 mt-0.5 rounded" />
                       <div>
-                        <p className="text-base font-bold text-slate-800">{item.label}</p>
+                        <p className="text-base font-semibold text-slate-800">{item.label}</p>
                         <p className="text-sm text-slate-500 mt-0.5">{item.desc}</p>
                       </div>
                     </label>
@@ -633,20 +633,20 @@ const SettingsPage = ({
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="space-y-5 max-w-2xl">
                 <div>
-                  <h4 className="font-bold text-slate-900 mb-4 text-base">Change Password</h4>
+                  <h4 className="font-semibold text-slate-900 mb-4 text-base">Change Password</h4>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">New Password</label>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">New Password</label>
                       <div className="relative">
                         <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="w-full px-3 py-1.5 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
                         <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-600" aria-label="Toggle password visibility">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Confirm Password</label>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Confirm Password</label>
                       <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="w-full px-3 py-1.5 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-base" />
                     </div>
-                    {pwMsg && <p className={`text-sm font-bold ${pwMsg.includes('successfully') ? 'text-emerald-600' : 'text-rose-600'}`}>{pwMsg}</p>}
+                    {pwMsg && <p className={`text-sm font-semibold ${pwMsg.includes('successfully') ? 'text-emerald-600' : 'text-rose-600'}`}>{pwMsg}</p>}
                     <button onClick={handlePasswordChange} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-base"><Save size={18} /> Update Password</button>
                   </div>
                 </div>

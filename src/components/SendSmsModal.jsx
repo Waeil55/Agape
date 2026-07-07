@@ -68,7 +68,7 @@ const SendSmsModal = ({ trips = [], onClose }) => {
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
         <div className="bg-white w-full max-w-md rounded-3xl shadow-sm relative z-10 border border-slate-200 p-6 text-center" onClick={e => e.stopPropagation()}>
           {results.error ? <AlertCircle size={40} className="mx-auto text-rose-500 mb-3" /> : <CheckCircle size={40} className="mx-auto text-emerald-500 mb-3" />}
-          <h3 className="text-lg font-bold text-slate-900 mb-1">{results.error ? 'Failed' : 'Messages Sent'}</h3>
+          <h3 className="text-lg font-semibold text-slate-900 mb-1">{results.error ? 'Failed' : 'Messages Sent'}</h3>
           {results.sent !== undefined && <p className="text-sm text-slate-600 mb-4">{results.sent} sent, {results.failed} failed</p>}
           {results.error && <p className="text-sm text-rose-600 mb-4">{results.error}</p>}
           <button onClick={onClose} className="px-6 py-2 bg-slate-900 text-white font-bold rounded-xl text-sm hover:bg-slate-800 transition-colors">Done</button>
@@ -82,23 +82,23 @@ const SendSmsModal = ({ trips = [], onClose }) => {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="bg-white w-full max-w-lg rounded-3xl shadow-sm relative z-10 border border-slate-200 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-3.5 flex items-center justify-between z-10 rounded-t-3xl">
-          <div className="flex items-center gap-2"><MessageSquare size={16} className="text-blue-600" /><h3 className="text-sm font-bold text-slate-900">Send Confirmation</h3></div>
+          <div className="flex items-center gap-2"><MessageSquare size={16} className="text-blue-600" /><h3 className="text-sm font-semibold text-slate-900">Send Confirmation</h3></div>
           <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Message Template</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Message Template</p>
             <textarea value={template} onChange={e => setTemplate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none" rows={4} />
             <p className="text-[10px] text-slate-400 mt-1">Use {'{patient}'}, {'{time}'}, {'{date}'}, {'{pickup}'}, {'{dropoff}'}</p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Recipients ({trips.length})</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Recipients ({trips.length})</p>
             <div className="space-y-1.5 max-h-48 overflow-y-auto">
               {previews.map((t, i) => (
                 <div key={t.id || i} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">{(t.patient || '?')[0]}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5"><p className="text-xs font-bold text-slate-900">{t.patient}</p><span className="text-[9px] text-slate-400">{getClientPhone(t)}</span></div>
+                    <div className="flex items-center gap-1.5"><p className="text-xs font-semibold text-slate-900">{t.patient}</p><span className="text-[9px] text-slate-400">{getClientPhone(t)}</span></div>
                     <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">{t.preview}</p>
                   </div>
                 </div>

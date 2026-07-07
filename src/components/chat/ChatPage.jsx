@@ -222,7 +222,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
     const online = chat.onlineUsers.has(email);
     return (
       <div className="relative shrink-0">
-        <div className={`${size} rounded-full ${getAvatarColor(email)} flex items-center justify-center text-white text-xs font-bold`}>
+        <div className={`${size} rounded-full ${getAvatarColor(email)} flex items-center justify-center text-white text-xs font-semibold`}>
           {getInitials(name)}
         </div>
         <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
@@ -247,7 +247,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
         {renderAvatar(conversation.others[0] || conversation.participants[0], conversation.title)}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className={`truncate text-[15px] ${conversation.unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-900'}`}>
+            <p className={`truncate text-[15px] ${conversation.unread > 0 ? 'font-semibold text-slate-950' : 'font-semibold text-slate-900'}`}>
               {conversation.title}
             </p>
             {conversation.isAdminReview && (
@@ -287,7 +287,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
         {renderAvatar(employee.email, employee.name)}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className={`truncate text-[15px] ${unread > 0 ? 'font-bold text-slate-950' : 'font-semibold text-slate-900'}`}>
+            <p className={`truncate text-[15px] ${unread > 0 ? 'font-semibold text-slate-950' : 'font-semibold text-slate-900'}`}>
               {employee.name}
             </p>
             <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${getRoleColor(employee.role)}`}>
@@ -322,7 +322,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
               <ChevronLeft size={22} />
             </button>
           )}
-          <h1 className="text-[22px] font-bold text-slate-950 tracking-tight flex-1 flex items-center gap-2">
+          <h1 className="text-[22px] font-semibold text-slate-950 tracking-tight flex-1 flex items-center gap-2">
             Messages
             {chat.totalUnread > 0 && (
               <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white leading-none">
@@ -368,7 +368,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
             >
               <div className="flex items-center gap-2.5">
                 <Folder size={18} className="text-amber-500 fill-amber-50" />
-                <span className="text-sm font-bold text-slate-700">Admin Review</span>
+                <span className="text-sm font-semibold text-slate-700">Admin Review</span>
                 <span className="text-xs font-semibold text-slate-400">({adminReviewConversations.length})</span>
               </div>
               <div className="flex items-center gap-2">
@@ -435,13 +435,13 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
 
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="relative shrink-0">
-                <div className={`w-10 h-10 rounded-full ${getAvatarColor(activeStatusEmail)} flex items-center justify-center text-white font-bold text-sm`}>
+                <div className={`w-10 h-10 rounded-full ${getAvatarColor(activeStatusEmail)} flex items-center justify-center text-white font-semibold text-sm`}>
                   {getInitials(activeTitle)}
                 </div>
                 <span className={`absolute -bottom-0.5 -right-0.5 w-[13px] h-[13px] rounded-full border-2 border-white ${isActiveOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
               </div>
               <div className="min-w-0">
-                <p className="text-[16px] font-bold text-slate-950 truncate leading-tight">{activeTitle}</p>
+                <p className="text-[16px] font-semibold text-slate-950 truncate leading-tight">{activeTitle}</p>
                 <p className={`text-[12px] font-medium truncate ${isTyping ? 'text-blue-500' : isActiveOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
                   {typingLabel}
                 </p>
@@ -511,7 +511,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
         <MessageCircle size={40} className="text-blue-400" />
       </div>
       <div>
-        <p className="text-xl font-bold text-slate-700">Your Messages</p>
+        <p className="text-xl font-semibold text-slate-700">Your Messages</p>
         <p className="text-sm text-slate-400 mt-1">Select a conversation or start a new one</p>
       </div>
     </div>

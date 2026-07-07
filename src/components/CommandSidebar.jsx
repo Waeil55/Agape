@@ -45,7 +45,7 @@ export default function CommandSidebar({
       
       {/* TABS HEADER */}
       <div className="bg-white px-3 pt-3 pb-3 border-b border-slate-200 shrink-0 z-10 md:px-4 md:pt-5 md:pb-4">
-        <h2 className="mb-3 text-lg font-bold tracking-tight text-slate-900 md:mb-4 md:text-xl">Command <span className="text-blue-600">Center</span></h2>
+        <h2 className="mb-3 text-lg font-semibold tracking-tight text-slate-900 md:mb-4 md:text-xl">Command <span className="text-blue-600">Center</span></h2>
         
         {/* Segmented Control */}
         <div className="flex bg-slate-100 p-1 rounded-xl">
@@ -102,7 +102,7 @@ export default function CommandSidebar({
                             fresh && movementState === 'moving' ? 'bg-emerald-500' : fresh ? 'bg-amber-400' : 'bg-slate-400'
                           }`} />
                           <div>
-                            <h4 className="text-base font-bold text-slate-900 leading-tight">{driver.name || 'Unnamed'}</h4>
+                            <h4 className="text-base font-semibold text-slate-900 leading-tight">{driver.name || 'Unnamed'}</h4>
                             <p className="text-xs font-semibold text-slate-500 mt-0.5">
                               {driver.vehicle || 'No vehicle'} <span className="text-slate-300 mx-1">•</span> {formatMovementState(movementState)}
                             </p>
@@ -119,17 +119,17 @@ export default function CommandSidebar({
                        {currentTrip ? (
                          <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                            <div className="flex justify-between items-center mb-1.5">
-                              <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">Current Mission</p>
-                              <span className="text-xs font-bold text-slate-500">{currentTrip.time || ''}</span>
+                              <p className="text-xs font-semibold text-blue-600 uppercase tracking-widest">Current Mission</p>
+                              <span className="text-xs font-semibold text-slate-500">{currentTrip.time || ''}</span>
                            </div>
-                           <p className="text-sm font-bold text-slate-800 mb-0.5">{currentTrip.patient || 'Unknown Client'}</p>
+                            <p className="text-sm font-semibold text-slate-800 mb-0.5">{currentTrip.patient || 'Unknown Client'}</p>
                            <p className="text-xs font-medium text-slate-600 truncate flex items-center gap-1.5">
                              <ArrowRight size={14} className="shrink-0 text-blue-400"/>
                              {getTripPhase(currentTrip).destination}
                            </p>
                          </div>
                        ) : (
-                         <p className="text-xs font-bold text-slate-500 italic py-1 px-1">No active mission</p>
+                          <p className="text-xs font-semibold text-slate-500 italic py-1 px-1">No active mission</p>
                        )}
                        
                         {(upcoming.length > 0 || completed.length > 0) && (
@@ -152,14 +152,14 @@ export default function CommandSidebar({
             {unassignedTrips.length > 0 && (
               <div className="bg-white rounded-2xl border border-rose-200 overflow-hidden shadow-sm">
                 <div className="bg-rose-50 border-b border-rose-100 px-4 py-3 flex justify-between items-center">
-                  <h3 className="text-xs font-bold text-rose-700 uppercase tracking-widest">Needs Assignment</h3>
+                  <h3 className="text-xs font-semibold text-rose-700 uppercase tracking-widest">Needs Assignment</h3>
                   <span className="text-xs font-bold bg-rose-600 text-white px-2 py-0.5 rounded-full shadow-sm">{unassignedTrips.length}</span>
                 </div>
                 <div className="flex flex-col divide-y divide-slate-100">
                   {unassignedTrips.map(t => (
                     <div key={t.id} className="p-4 hover:bg-slate-50 transition-colors cursor-pointer">
-                      <p className="text-xs font-bold text-rose-500 mb-1">{t.time || 'No time'}</p>
-                      <p className="text-sm font-bold text-slate-900">{t.patient || 'Unknown'}</p>
+                      <p className="text-xs font-semibold text-rose-500 mb-1">{t.time || 'No time'}</p>
+                        <p className="text-sm font-semibold text-slate-900">{t.patient || 'Unknown'}</p>
                       <p className="text-xs font-medium text-slate-500 truncate mt-1 flex items-center gap-1">
                         <MapPin size={12} className="text-slate-500"/> {t.pickup}
                       </p>
@@ -172,14 +172,14 @@ export default function CommandSidebar({
             {activeTrips.length > 0 && (
               <div className="bg-white rounded-2xl border border-blue-200 overflow-hidden shadow-sm">
                 <div className="bg-blue-50 border-b border-blue-100 px-4 py-3 flex justify-between items-center">
-                  <h3 className="text-xs font-bold text-blue-700 uppercase tracking-widest">Active Now</h3>
+                  <h3 className="text-xs font-semibold text-blue-700 uppercase tracking-widest">Active Now</h3>
                   <span className="text-xs font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full shadow-sm">{activeTrips.length}</span>
                 </div>
                 <div className="flex flex-col divide-y divide-slate-100">
                   {activeTrips.map(t => (
                     <div key={t.id} className="p-4 hover:bg-slate-50 transition-colors cursor-pointer">
                       <div className="flex justify-between items-start mb-1">
-                        <p className="text-sm font-bold text-slate-900">{t.patient || 'Unknown'}</p>
+                      <p className="text-sm font-semibold text-slate-900">{t.patient || 'Unknown'}</p>
                         <span className="text-xs font-bold text-blue-700 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md">{t.status}</span>
                       </div>
                       <p className="text-xs font-medium text-slate-500 truncate flex items-center gap-1">
@@ -194,7 +194,7 @@ export default function CommandSidebar({
             {completedTrips.length > 0 && (
               <div className="bg-white rounded-2xl border border-emerald-200 overflow-hidden shadow-sm">
                 <div className="bg-emerald-50 border-b border-emerald-100 px-4 py-3 flex justify-between items-center">
-                  <h3 className="text-xs font-bold text-emerald-700 uppercase tracking-widest">Completed</h3>
+                  <h3 className="text-xs font-semibold text-emerald-700 uppercase tracking-widest">Completed</h3>
                   <span className="text-xs font-bold bg-emerald-600 text-white px-2 py-0.5 rounded-full shadow-sm">{completedTrips.length}</span>
                 </div>
               </div>
@@ -208,12 +208,12 @@ export default function CommandSidebar({
             {driverSummaries.map(summary => (
               <div key={summary.driver.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all flex items-center justify-between">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><Truck size={14} className="text-blue-500"/> {summary.driver.vehicle || 'Unknown Vehicle'}</h4>
+                  <h4 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5"><Truck size={14} className="text-blue-500"/> {summary.driver.vehicle || 'Unknown Vehicle'}</h4>
                   <p className="text-xs font-semibold text-slate-500 mt-1">Operated by {summary.driver.name}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xl font-bold text-slate-800 tabular-nums leading-none">{summary.driver?.speedMph ?? summary.driver?.telemetry?.speedMph ?? 0} <span className="text-xs text-slate-500 font-bold ml-0.5">mph</span></p>
-                  <p className="text-xs font-bold text-slate-500 mt-1 uppercase tracking-widest">{formatAge(summary.lastPing)}</p>
+                  <p className="text-xl font-semibold text-slate-800 tabular-nums leading-none">{summary.driver?.speedMph ?? summary.driver?.telemetry?.speedMph ?? 0} <span className="text-xs text-slate-500 font-semibold ml-0.5">mph</span></p>
+                  <p className="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-widest">{formatAge(summary.lastPing)}</p>
                 </div>
               </div>
             ))}

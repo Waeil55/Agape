@@ -38,11 +38,11 @@ const MetricCard = ({ icon: Icon, label, value, detail, tone = 'slate' }) => {
   return (
     <div className={`rounded-lg border ${tc.border} ${tc.bg} px-3 py-2.5 min-w-0`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-500 truncate">{label}</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">{label}</span>
         <Icon size={14} className={tc.text} />
       </div>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className={`text-xl font-bold tabular-nums ${tc.text}`}>{value}</span>
+        <span className={`text-xl font-semibold tabular-nums ${tc.text}`}>{value}</span>
         <span className="text-xs font-semibold text-slate-500 truncate">{detail}</span>
       </div>
     </div>
@@ -216,7 +216,7 @@ const CommandIntelligencePanel = ({
           <div className="flex items-start gap-2.5 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-lg px-3 py-2.5">
             <Sparkles size={14} className="text-indigo-600 mt-0.5 shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-0.5">AI Recommendation</p>
+              <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wider mb-0.5">AI Recommendation</p>
               <p className="text-xs text-indigo-800 leading-relaxed">{aiInsights.aiRecommendedAction}</p>
             </div>
           </div>
@@ -239,7 +239,7 @@ const CommandIntelligencePanel = ({
             <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <AlertTriangle size={14} className="text-amber-600" />
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Exception Queue</h3>
+                <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">Exception Queue</h3>
               </div>
               <span className="text-xs font-bold text-slate-500 tabular-nums">{exceptions.length} active</span>
             </div>
@@ -247,7 +247,7 @@ const CommandIntelligencePanel = ({
               {exceptions.length === 0 ? (
                 <div className="px-3 py-4 flex items-center gap-2 text-emerald-700 bg-emerald-50">
                   <CheckCircle2 size={15} />
-                  <span className="text-xs font-bold">No priority exceptions</span>
+                  <span className="text-xs font-semibold">No priority exceptions</span>
                 </div>
               ) : exceptions.map(item => {
                 const Icon = item.icon;
@@ -260,12 +260,12 @@ const CommandIntelligencePanel = ({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900 truncate">{item.title}</span>
+                        <span className="text-xs font-semibold text-slate-900 truncate">{item.title}</span>
                         <span className={`text-xs font-bold tabular-nums ${tone.text}`}>{item.count}</span>
                       </div>
                       <p className="text-xs font-semibold text-slate-500 truncate mt-0.5">{item.detail}</p>
                     </div>
-                    <span className="text-xs font-bold text-slate-500">{item.action}</span>
+                    <span className="text-xs font-semibold text-slate-500">{item.action}</span>
                   </button>
                 );
               })}
@@ -277,13 +277,13 @@ const CommandIntelligencePanel = ({
             <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Truck size={14} className="text-blue-700" />
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Driver Load</h3>
+                <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">Driver Load</h3>
               </div>
-              <span className="text-xs font-bold text-slate-500">{capacityPressure} trips/driver</span>
+              <span className="text-xs font-semibold text-slate-500">{capacityPressure} trips/driver</span>
             </div>
             <div className="divide-y divide-slate-100">
               {driverLoads.length === 0 ? (
-                <div className="px-3 py-4 text-xs font-bold text-slate-500">No active driver records</div>
+                <div className="px-3 py-4 text-xs font-semibold text-slate-500">No active driver records</div>
               ) : driverLoads.map(d => {
                 const tone = toneClasses[d.tone] || toneClasses.slate;
                 const proximity = aiDriverScores[`${d.nextTrip?.id}-${d.id}`];
@@ -291,7 +291,7 @@ const CommandIntelligencePanel = ({
                   <div key={d.id || d.name} className="px-3 py-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">{d.name}</p>
+                        <p className="text-xs font-semibold text-slate-900 truncate">{d.name}</p>
                         <p className="text-xs font-semibold text-slate-500 truncate">
                           {d.assignedCount} active — {d.vehicle}
                           {proximity != null ? ` — ${Math.round(proximity)} mi` : ''}
@@ -320,16 +320,16 @@ const CommandIntelligencePanel = ({
             <button key={zone.zone} onClick={onFocusUnassigned}
               className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left hover:bg-white hover:border-blue-200 transition">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                   <MapPin size={11} /> Hotspot
                 </span>
                 <span className="text-xs font-bold text-slate-500">{zone.count}</span>
               </div>
-              <p className="mt-1 text-xs font-bold text-slate-800 truncate">{zone.zone}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-800 truncate">{zone.zone}</p>
               <p className="text-xs font-semibold text-slate-500 mt-0.5">{zone.unassigned} unassigned — {zone.late} late</p>
             </button>
           )) : (
-            <div className="md:col-span-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 flex items-center gap-2 text-xs font-bold text-slate-500">
+            <div className="md:col-span-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
               <Activity size={13} /> No route hotspots
             </div>
           )}
@@ -340,7 +340,7 @@ const CommandIntelligencePanel = ({
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5">
             <div className="flex items-center gap-2 mb-1.5">
               <AlertTriangle size={13} className="text-rose-600" />
-              <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">AI Flagged Issues</span>
+              <span className="text-xs font-semibold text-rose-800 uppercase tracking-wider">AI Flagged Issues</span>
             </div>
             {aiInsights.mistakes.slice(0, 3).map((m, i) => (
               <p key={i} className="text-xs text-rose-700 leading-relaxed ml-5">{m}</p>

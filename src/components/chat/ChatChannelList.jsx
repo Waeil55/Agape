@@ -16,7 +16,7 @@ const ChatChannelList = ({ channels, activeChannel, onSelect, onlineUsers, unrea
     <div className="h-full overflow-y-auto overscroll-contain">
       {/* Online users bar */}
       <div className="px-4 py-3 border-b border-slate-100">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Online Now</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Online Now</p>
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
           {onlineUsers.size === 0 ? (
             <span className="text-xs text-slate-400 italic">No one else online</span>
@@ -38,7 +38,7 @@ const ChatChannelList = ({ channels, activeChannel, onSelect, onlineUsers, unrea
 
       {/* Channels */}
       <div className="py-2">
-        <p className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Channels</p>
+        <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Channels</p>
         {channels.map(ch => {
           const Icon = CHANNEL_ICONS[ch.icon] || Hash;
           const isActive = activeChannel === ch.id;

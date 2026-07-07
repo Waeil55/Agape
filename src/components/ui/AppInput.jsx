@@ -24,7 +24,7 @@ export default function AppInput({
   return (
     <div className={containerClassName}>
       {label && (
-        <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
+        <label className="block text-[11px] font-semibold text-slate-600 mb-1.5">
           {label}
         </label>
       )}

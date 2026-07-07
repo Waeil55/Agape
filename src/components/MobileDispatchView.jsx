@@ -84,7 +84,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
               <span className="text-sm font-bold text-slate-700 uppercase">WC</span>
             ) : (
               <>
-                <p className={"text-base font-bold leading-none " + (isLate ? "text-rose-600" : isSoon ? "text-amber-600" : "text-slate-900")}>{timeParts[0]}</p>
+                <p className={"text-base font-semibold leading-none " + (isLate ? "text-rose-600" : isSoon ? "text-amber-600" : "text-slate-900")}>{timeParts[0]}</p>
                 <p className={"text-[9px] font-semibold uppercase tracking-wide mt-0.5 " + (isLate ? "text-rose-400" : isSoon ? "text-amber-400" : "text-slate-400")}>{timeParts[1] || ""}</p>
               </>
             )}
@@ -98,7 +98,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                   return (
                     <>
                       <h3 className="text-[17px] font-extrabold text-slate-950 leading-tight">{parts[0]}</h3>
-                      {parts.length > 1 && <h3 className="text-[13px] font-bold text-slate-600 leading-tight">{parts.slice(1).join(' ')}</h3>}
+                      {parts.length > 1 && <h3 className="text-[13px] font-semibold text-slate-600 leading-tight">{parts.slice(1).join(' ')}</h3>}
                     </>
                   );
                 })()}
@@ -129,11 +129,11 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
             {driver ? (
               <div className="mt-2 flex items-center gap-2 rounded-xl bg-white border border-slate-100 px-2.5 py-1.5">
                 <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 shrink-0 uppercase">{(driver.name||"D")[0]}</div>
-                <span className="text-[11px] font-bold text-slate-700 truncate">{driver.name}</span>
+                <span className="text-[11px] font-semibold text-slate-700 truncate">{driver.name}</span>
                 {ds && <span className={"ml-auto px-1.5 py-0.5 rounded-md text-[8px] font-semibold uppercase tracking-wide " + ds.color}>{ds.label}</span>}
               </div>
             ) : trip.status !== "Completed" && trip.status !== "Cancelled" ? (
-              <div className="mt-2"><span className="text-[10px] font-bold text-rose-500 flex items-center gap-1.5"><User size={11} /> No driver assigned</span></div>
+              <div className="mt-2"><span className="text-[10px] font-semibold text-rose-500 flex items-center gap-1.5"><User size={11} /> No driver assigned</span></div>
             ) : null}
           </div>
         </div>
@@ -195,7 +195,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                         <button key={d.id} type="button" onClick={()=>{assignTripToDriver?.(trip.id,d.id);setShowMenu(false);}}
                           className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 active:bg-slate-100 text-left border-b border-slate-50 last:border-0">
                           <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black text-xs uppercase shrink-0">{(d.name||"D")[0]}</div>
-                          <div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-900 truncate">{d.name}</p><p className="text-[10px] text-slate-400">{d.vehicle||"No vehicle"}</p></div>
+                          <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900 truncate">{d.name}</p><p className="text-[10px] text-slate-400">{d.vehicle||"No vehicle"}</p></div>
                           <span className={"text-[9px] font-black uppercase px-2 py-0.5 rounded "+dss.color}>{dss.label}</span>
                         </button>
                       );
@@ -224,9 +224,9 @@ const DriverRow = ({ driver, trips }) => {
     <div className="bg-white rounded-2xl border border-slate-100 px-3.5 py-3 flex items-center gap-3 shadow-sm">
       <div className={"w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm uppercase shrink-0 "+ds.color}>{(driver.name||"D")[0]}</div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold text-slate-900 truncate">{driver.name}</p>
+        <p className="text-sm font-semibold text-slate-900 truncate">{driver.name}</p>
         <p className="text-[10px] text-slate-400 mt-0.5">{driver.vehicle||"No vehicle"}</p>
-        {active && <p className="text-[10px] text-amber-600 font-bold mt-0.5 truncate">→ {trunc(active.patient||"",22)}</p>}
+        {active && <p className="text-[10px] text-amber-600 font-semibold mt-0.5 truncate">→ {trunc(active.patient||"",22)}</p>}
       </div>
       <span className={"text-[9px] font-semibold uppercase px-2.5 py-1 rounded-lg text-center shrink-0 "+(active ? "bg-amber-100 text-amber-700" : ds.color)}>{activeStatus}</span>
     </div>
@@ -296,7 +296,7 @@ const MobileDispatchView = ({
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2b4c7e]">Dispatch Board</p>
-            <h1 className="text-xl font-bold text-gray-900 mt-0.5 leading-none">{todayFmt}</h1>
+            <h1 className="text-xl font-semibold text-gray-900 mt-0.5 leading-none">{todayFmt}</h1>
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={()=>setShowTools(true)}
@@ -308,8 +308,8 @@ const MobileDispatchView = ({
         <div className="flex gap-2 mb-3">
           {[{label:"Total",value:todayTrips.length,color:"text-gray-900",bg:"bg-gray-50"},{label:"Unassigned",value:unassignedN,color:unassignedN>0?"text-rose-600":"text-gray-900",bg:unassignedN>0?"bg-rose-50":"bg-gray-50"},{label:"Active",value:activeN,color:"text-amber-600",bg:"bg-amber-50"},{label:"Done",value:doneN,color:"text-emerald-600",bg:"bg-emerald-50"}].map(s=>(
             <div key={s.label} className={"flex-1 rounded-xl px-2 py-2 text-center border border-gray-100 " + s.bg}>
-              <p className={"text-lg font-bold leading-none "+s.color}>{s.value}</p>
-              <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wide mt-0.5">{s.label}</p>
+              <p className={"text-lg font-semibold leading-none "+s.color}>{s.value}</p>
+              <p className="text-[8px] font-semibold text-gray-500 uppercase tracking-wide mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
@@ -342,7 +342,7 @@ const MobileDispatchView = ({
             {filtered.length===0 && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4"><Truck size={28} className="opacity-30"/></div>
-                <p className="text-sm font-bold text-slate-500">No trips found</p>
+                <p className="text-sm font-semibold text-slate-500">No trips found</p>
                 <p className="text-xs text-slate-400 mt-1 text-center max-w-[200px]">{localSearch?"Try a different search":"No trips match this filter"}</p>
               </div>
             )}
@@ -363,7 +363,7 @@ const MobileDispatchView = ({
               return (a.name||"").localeCompare(b.name||"");
             }).map(d=><DriverRow key={d.id} driver={d} trips={todayTrips}/>)}
             {drivers.length===0 && (
-              <div className="flex flex-col items-center justify-center py-20"><div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4"><Users size={28} className="opacity-30"/></div><p className="text-sm font-bold text-slate-500">No drivers found</p></div>
+              <div className="flex flex-col items-center justify-center py-20"><div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4"><Users size={28} className="opacity-30"/></div><p className="text-sm font-semibold text-slate-500">No drivers found</p></div>
             )}
           </div>
         )}

@@ -72,7 +72,7 @@ const PWAInstallPrompt = () => {
           <div className="w-16 h-16 mx-auto mb-4 bg-white/20 rounded-2xl flex items-center justify-center">
             <Smartphone size={32} className="text-white" />
           </div>
-          <h2 className="text-xl font-bold text-white">Install Agape Care</h2>
+          <h2 className="text-xl font-semibold text-white">Install Agape Care</h2>
           <p className="text-blue-100 text-sm mt-2">Add to your home screen for the best experience</p>
         </div>
 
@@ -82,7 +82,7 @@ const PWAInstallPrompt = () => {
               <Zap size={18} className="text-blue-600" />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-900">Lightning Fast</p>
+              <p className="text-sm font-semibold text-slate-900">Lightning Fast</p>
               <p className="text-xs text-slate-500">Opens instantly from your home screen</p>
             </div>
           </div>
@@ -92,7 +92,7 @@ const PWAInstallPrompt = () => {
               <Wifi size={18} className="text-green-600" />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-900">Works Offline</p>
+              <p className="text-sm font-semibold text-slate-900">Works Offline</p>
               <p className="text-xs text-slate-500">Access your data even without internet</p>
             </div>
           </div>
@@ -102,7 +102,7 @@ const PWAInstallPrompt = () => {
               <Shield size={18} className="text-purple-600" />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-900">Secure & Private</p>
+              <p className="text-sm font-semibold text-slate-900">Secure & Private</p>
               <p className="text-xs text-slate-500">Your data stays on your device</p>
             </div>
           </div>

@@ -20,7 +20,7 @@ export function AppTableHead({ children, className = '', ...props }) {
 
 export function AppTableHeadCell({ children, className = '', ...props }) {
   return (
-    <th className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider" {...props}>
+    <th className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider" {...props}>
       {children}
     </th>
   );

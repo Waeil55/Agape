@@ -65,7 +65,7 @@ const OfflineIndicator = () => {
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold">
+          <p className="text-sm font-semibold">
             {isOnline ? 'Back Online' : 'You\'re Offline'}
           </p>
           <p className="text-xs opacity-80 mt-0.5">

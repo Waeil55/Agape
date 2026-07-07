@@ -116,7 +116,7 @@ const MobileEnterpriseDashboard = (props) => {
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-bold text-sm text-gray-900">{getProfileTitle()}</h1>
+            <h1 className="font-semibold text-sm text-gray-900">{getProfileTitle()}</h1>
           </div>
           <p className="text-[10px] text-gray-500 font-medium truncate max-w-[220px]">{title} • {currentUser}</p>
         </div>
@@ -256,7 +256,7 @@ const MobileEnterpriseDashboard = (props) => {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2b4c7e]">{role === 'admin' ? 'Admin Driver Work' : 'Dispatcher Driver Work'}</p>
-                <p className="mt-0.5 truncate text-sm font-bold text-gray-900">Operate as driver</p>
+                <p className="mt-0.5 truncate text-sm font-semibold text-gray-900">Operate as driver</p>
               </div>
               <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-semibold ${liveStatus.color}`}>{liveStatus.label}</span>
             </div>
@@ -345,8 +345,8 @@ const MobileEnterpriseDashboard = (props) => {
                     <>
                       <User size={22} strokeWidth={2} className="text-blue-600" />
                       <div className="flex flex-col items-center leading-tight mt-0.5">
-                        <span className="text-[10px] font-bold text-blue-600">{expandedTripInfo.firstName}</span>
-                        {expandedTripInfo.lastName && <span className="text-[10px] font-bold text-blue-600">{expandedTripInfo.lastName}</span>}
+                        <span className="text-[10px] font-semibold text-blue-600">{expandedTripInfo.firstName}</span>
+                        {expandedTripInfo.lastName && <span className="text-[10px] font-semibold text-blue-600">{expandedTripInfo.lastName}</span>}
                       </div>
                     </>
                   ) : (

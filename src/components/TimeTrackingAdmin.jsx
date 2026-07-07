@@ -269,7 +269,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
               <Timer className="w-6 h-6 text-blue-600" />
               Time Tracking Audit
             </h1>
@@ -333,7 +333,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Total Trips</p>
-                  <p className="text-xl font-bold text-gray-900">{summaryStats.totalTrips}</p>
+                  <p className="text-xl font-semibold text-gray-900">{summaryStats.totalTrips}</p>
                 </div>
               </div>
             </div>
@@ -344,7 +344,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Total Gaps</p>
-                  <p className="text-xl font-bold text-gray-900">{summaryStats.totalGaps}</p>
+                  <p className="text-xl font-semibold text-gray-900">{summaryStats.totalGaps}</p>
                 </div>
               </div>
             </div>
@@ -355,7 +355,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Teleport Flags</p>
-                  <p className="text-xl font-bold text-gray-900">{summaryStats.totalTeleports}</p>
+                  <p className="text-xl font-semibold text-gray-900">{summaryStats.totalTeleports}</p>
                 </div>
               </div>
             </div>
@@ -366,7 +366,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Excluded Minutes</p>
-                  <p className="text-xl font-bold text-gray-900">{formatMinutes(summaryStats.excludedMinutes)}</p>
+                  <p className="text-xl font-semibold text-gray-900">{formatMinutes(summaryStats.excludedMinutes)}</p>
                 </div>
               </div>
             </div>
@@ -680,7 +680,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                       <div className="flex justify-end">
                         <div className="text-right">
                           <p className="text-sm text-gray-500">Total Billable Hours</p>
-                          <p className="text-xl font-bold text-gray-900">
+                          <p className="text-xl font-semibold text-gray-900">
                             {driverPayroll.reduce((sum, d) => sum + d.billableHours, 0).toFixed(1)}h
                           </p>
                         </div>

@@ -58,7 +58,7 @@ const ChatMessage = memo(function ChatMessage({
       {!isOwn && (
         <div className="shrink-0 w-8 mr-1.5 self-end pb-[2px]">
           {isLastInSequence ? (
-            <div className={`w-8 h-8 rounded-full ${getAvatarColor(group.senderEmail)} flex items-center justify-center text-white text-[10px] font-bold`}>
+            <div className={`w-8 h-8 rounded-full ${getAvatarColor(group.senderEmail)} flex items-center justify-center text-white text-[10px] font-semibold`}>
               {getInitials(group.senderName)}
             </div>
           ) : (

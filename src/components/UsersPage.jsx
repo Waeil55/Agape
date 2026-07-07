@@ -194,7 +194,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {!activityFeedOnly && (
       <>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">User Management</h2>
+        <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900">User Management</h2>
         <button onClick={() => setShowForm(true)} className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs">
           <Plus size={18} /> Add User
         </button>
@@ -244,7 +244,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {role === 'admin' && !hideAiInsights && (
         <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-3xl overflow-hidden shadow-sm">
           <div className="p-4 sm:p-6 border-b border-indigo-100/50 flex items-center justify-between">
-            <h3 className="text-lg sm:text-xl font-bold text-indigo-900 flex items-center gap-2">
+            <h3 className="text-lg sm:text-xl font-semibold text-indigo-900 flex items-center gap-2">
               <BrainCircuit size={20} className="text-indigo-600" /> AI Activity Oversight
             </h3>
             {analyzingLogs && (
@@ -260,13 +260,13 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             ) : (
               <div className="space-y-4">
                 <div className="bg-white/60 p-4 rounded-2xl border border-white/80">
-                  <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Activity size={14} /> Team Activity Summary</h4>
+                  <h4 className="text-xs font-semibold text-indigo-800 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Activity size={14} /> Team Activity Summary</h4>
                   <p className="text-xs text-slate-700 leading-relaxed">{aiInsights.summary}</p>
                 </div>
                 
                 {aiInsights.mistakes && aiInsights.mistakes.length > 0 && (
                   <div className="bg-rose-50/80 p-4 rounded-2xl border border-rose-100/80">
-                    <h4 className="text-xs font-bold text-rose-800 uppercase tracking-wider mb-2 flex items-center gap-1.5"><AlertCircle size={14} /> AI Flagged Issues</h4>
+                    <h4 className="text-xs font-semibold text-rose-800 uppercase tracking-wider mb-2 flex items-center gap-1.5"><AlertCircle size={14} /> AI Flagged Issues</h4>
                     <ul className="list-disc pl-4 space-y-1">
                       {aiInsights.mistakes.map((mistake, idx) => (
                         <li key={idx} className="text-xs font-medium text-rose-700">{mistake}</li>
@@ -283,7 +283,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* All Users Table */}
       <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
         <div className="p-4 sm:p-6 border-b border-slate-200">
-          <h3 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> All Users ({users.length})</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-slate-900 flex items-center gap-2"><Users size={18} /> All Users ({users.length})</h3>
         </div>
         {loading ? (
           <div className="p-8 sm:p-12 text-center text-slate-500 text-xs">Loading users...</div>
@@ -299,7 +299,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 <div key={user.uid} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-bold text-slate-900">{user.username || authEmailToUsername(user.email)}</p>
+                      <p className="truncate text-xs font-semibold text-slate-900">{user.username || authEmailToUsername(user.email)}</p>
                       <p className="mt-0.5 break-all text-xs font-medium text-slate-400">{user.email}</p>
                       {user.phone && <p className="mt-1 text-xs font-mono text-slate-500">{user.phone}</p>}
                     </div>
@@ -407,7 +407,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* Dispatcher Assignments */}
       <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
         <div className="p-4 sm:p-6 border-b border-slate-200">
-          <h3 className="text-lg sm:text-xl font-bold text-slate-900">Driver Assignments</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-slate-900">Driver Assignments</h3>
           <p className="text-xs sm:text-xs text-slate-500 mt-1">Assign drivers to dispatchers</p>
         </div>
         <div className="space-y-3 p-3 sm:hidden">
@@ -420,7 +420,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 <div key={d.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-bold text-slate-900">{d.name}</p>
+                      <p className="truncate text-xs font-semibold text-slate-900">{d.name}</p>
                       <p className="mt-0.5 text-xs font-medium text-slate-500">{dispatcher?.name || 'Unassigned'}</p>
                     </div>
                     <button onClick={() => {
@@ -537,7 +537,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* System Activity Feed */}
       <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-[500px]">
         <div className="p-4 sm:p-6 border-b border-slate-200 shrink-0">
-          <h3 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
+          <h3 className="text-lg sm:text-xl font-semibold text-slate-900 flex items-center gap-2">
             <Activity size={18} /> System Activity Feed
           </h3>
           <p className="text-xs sm:text-xs text-slate-500 mt-1">Real-time log of worker logins, logouts, and actions.</p>
@@ -621,7 +621,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
           <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm max-w-md w-full mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
-                <h3 className="text-lg sm:text-xl font-bold text-slate-900">Create User</h3>
+                <h3 className="text-lg sm:text-xl font-semibold text-slate-900">Create User</h3>
                 <button onClick={() => { setShowForm(false); setFormError(''); }} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={18} /></button>
               </div>
               <form onSubmit={(e) => { e.preventDefault(); createUser(); }} className="space-y-3 sm:space-y-4">
@@ -654,7 +654,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         <button key={c.key} type="button" onClick={() => setForm({ ...form, role: c.key })}
                           className={`p-2 sm:p-3 rounded-lg border-2 text-center transition ${isActive ? `${c.activeBorder} ${c.activeBg}` : 'border-slate-200 hover:border-slate-300'}`}>
                           <Icon size={16} className={`mx-auto mb-1 ${c.text}`} />
-                          <p className={`text-xs sm:text-xs font-bold ${c.textBold}`}>{c.label}</p>
+                          <p className={`text-xs sm:text-xs font-semibold ${c.textBold}`}>{c.label}</p>
                         </button>
                       );
                     })}
@@ -705,22 +705,22 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             </div>
             
             <div className="p-6 bg-white">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Activity Details</h4>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Activity Details</h4>
               <p className="text-slate-800 leading-relaxed text-base bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 {selectedLog.d}
               </p>
 
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Actor</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Actor</p>
                   <p className="text-xs font-semibold text-slate-800 break-all">{selectedLog.actor || 'System'}</p>
                 </div>
                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Role</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Role</p>
                   <p className="text-xs font-semibold text-slate-800 uppercase">{selectedLog.actorRole || 'system'}</p>
                 </div>
                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Target</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Target</p>
                   <p className="text-xs font-semibold text-slate-800">
                     {selectedLog.meta?.entity ? `${selectedLog.meta.entity}${selectedLog.meta?.id ? ` · ${selectedLog.meta.id}` : ''}` : 'General'}
                   </p>
@@ -729,18 +729,18 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
 
               {selectedLog.meta && selectedLog.meta.diffs && selectedLog.meta.diffs.length > 0 && (
                 <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                  <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Changes</h5>
+                  <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Changes</h5>
                   <div className="space-y-3">
                     {selectedLog.meta.diffs.map((dd, idx) => (
                       <div key={idx} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3">
                         <div className="text-xs font-semibold text-slate-500 w-28 shrink-0">{dd.field}</div>
                         <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
                           <div className="bg-rose-50 rounded-lg p-2 border border-rose-100">
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-rose-500 block mb-0.5">Before</span>
+                            <span className="text-[9px] font-semibold uppercase tracking-wider text-rose-500 block mb-0.5">Before</span>
                             <span className="font-mono text-slate-700 break-all">{dd.before ?? '—'}</span>
                           </div>
                           <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-100">
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500 block mb-0.5">After</span>
+                            <span className="text-[9px] font-semibold uppercase tracking-wider text-emerald-500 block mb-0.5">After</span>
                             <span className="font-mono text-slate-700 break-all">{dd.after ?? '—'}</span>
                           </div>
                         </div>
@@ -820,7 +820,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 if (links.length > 0 && onSmartNavigate) {
                   return (
                     <div className="mt-4 pt-4 border-t border-slate-100">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Suggested Actions</h4>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Suggested Actions</h4>
                       <div className="flex flex-col gap-2">
                         {links.map((link, idx) => (
                           <button

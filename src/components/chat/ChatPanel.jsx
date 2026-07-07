@@ -81,12 +81,12 @@ const ChatPanel = () => {
           <div className="min-w-0">
             {showChannels ? (
               <>
-                <h3 className="text-sm font-bold">Team Chat</h3>
+                <h3 className="text-sm font-semibold">Team Chat</h3>
                 <p className="text-[10px] text-blue-100">{chat.channels.length} channels</p>
               </>
             ) : (
               <>
-                <h3 className="text-sm font-bold truncate">{activeChannelData?.name || 'Chat'}</h3>
+                <h3 className="text-sm font-semibold truncate">{activeChannelData?.name || 'Chat'}</h3>
                 <p className="text-[10px] text-blue-100 truncate">
                   {activeChannelData?.description || `${chat.channels.find(c => c.id === chat.activeChannel)?.roles?.length || 'All'} members`}
                 </p>

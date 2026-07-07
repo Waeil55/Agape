@@ -150,7 +150,7 @@ export default function RouteReplay({ trip, breadcrumbs = [], stopEvents = [] })
           <select
             value={speed}
             onChange={(e) => setSpeed(Number(e.target.value))}
-            className="px-2 py-1 text-[11px] font-bold bg-slate-100 rounded-lg border-none"
+            className="px-2 py-1 text-[11px] font-semibold bg-slate-100 rounded-lg border-none"
           >
             <option value={0.5}>0.5x</option>
             <option value={1}>1x</option>
@@ -169,15 +169,15 @@ export default function RouteReplay({ trip, breadcrumbs = [], stopEvents = [] })
             </div>
             <div>
               <p className="text-[10px] text-slate-500">Distance</p>
-              <p className="text-xs font-bold text-slate-900">{trip.distance || '--'} mi</p>
+              <p className="text-xs font-semibold text-slate-900">{trip.distance || '--'} mi</p>
             </div>
             <div>
               <p className="text-[10px] text-slate-500">Duration</p>
-              <p className="text-xs font-bold text-slate-900">{trip.tripDurationMinutes || '--'} min</p>
+              <p className="text-xs font-semibold text-slate-900">{trip.tripDurationMinutes || '--'} min</p>
             </div>
             <div>
               <p className="text-[10px] text-slate-500">Avg Speed</p>
-              <p className="text-xs font-bold text-slate-900">
+              <p className="text-xs font-semibold text-slate-900">
                 {trip.tripDurationMinutes && trip.distance
                   ? Math.round(trip.distance / (trip.tripDurationMinutes / 60))
                   : '--'} mph

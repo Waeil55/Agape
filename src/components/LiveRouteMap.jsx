@@ -366,7 +366,7 @@ const LiveRouteMap = React.memo(({
     return (
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center">
         <Map size={28} className="mx-auto text-amber-400 mb-2" />
-        <p className="text-sm font-bold text-amber-800">Maps Unavailable</p>
+        <p className="text-sm font-semibold text-amber-800">Maps Unavailable</p>
         <p className="text-xs text-amber-600 mt-1 leading-relaxed max-w-xs mx-auto">{fallbackMsg}</p>
         <div className="flex gap-2 mt-3 justify-center">
           {ordered.length > 0 && (
@@ -473,7 +473,7 @@ const LiveRouteMap = React.memo(({
                 {selectedStop.type === 'pickup' ? 'P' : 'D'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-slate-900 break-words">{selectedStop.patient}</p>
+                <p className="text-xs font-semibold text-slate-900 break-words">{selectedStop.patient}</p>
                 {selectedStop.trip?.bookingId && (
                   <p className="text-[10px] font-bold text-blue-700">{selectedStop.trip.bookingId}</p>
                 )}
