@@ -825,12 +825,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       return { ...prev, [trip.id]: nextProgress };
     });
-    onUpdateTrip?.(trip.id, status, extraFields);
-    saveTripWorkflowUpdate(trip.id, {
-      status,
-      ...extraFields,
-      workflowUpdatedAt,
-    }).catch((err) => {
+    const allFields = { status, ...extraFields, workflowUpdatedAt };
+    onUpdateTrip?.(trip.id, status, allFields);
+    saveTripWorkflowUpdate(trip.id, allFields).catch((err) => {
       console.error('[DriverPage] Failed to persist workflow update:', err);
     });
     if (status === 'In Progress' && me?.id) {

@@ -206,11 +206,29 @@ export async function updateDriverLocation(location) {
 }
 
 export async function saveOdometerReading(tripId, odometerValue) {
-  const tripRef = doc(db, 'tripLedger', tripId);
-  await setDoc(tripRef, {
+  const safeTripId = String(tripId);
+  const ledgerRef = doc(db, 'tripLedger', safeTripId);
+  const tripsRef = doc(db, 'trips', safeTripId);
+  const progressRef = doc(db, 'driverTripProgress', safeTripId);
+  const odometerUpdate = {
+    dropoffOdometer: odometerValue,
+    odometerRecordedAt: new Date().toISOString(),
+    workflowUpdatedAt: new Date().toISOString(),
+  };
+  await setDoc(ledgerRef, {
     dropoffOdometer: odometerValue,
     odometerRecordedAt: serverTimestamp()
   }, { merge: true });
+  setDoc(tripsRef, odometerUpdate, { merge: true }).catch((err) => {
+    console.warn('Odometer trips write skipped:', err);
+  });
+  setDoc(progressRef, {
+    tripId: safeTripId,
+    ...odometerUpdate,
+    updatedAt: serverTimestamp(),
+  }, { merge: true }).catch((err) => {
+    console.warn('Odometer progress write skipped:', err);
+  });
   await emitEventsSafely(({ SYSTEM_EVENT_TYPES }) => [{
     type: SYSTEM_EVENT_TYPES.TRIP_UPDATED,
     aggregateType: 'trip',
