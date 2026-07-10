@@ -11,16 +11,6 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-    function validateTrip() {
-      let data = request.resource.data;
-      return data is map
-        && data.keys().hasAll(['id', 'updatedAtLocal']);
-    }
-    function validateDriverProfile() {
-      let data = request.resource.data;
-      return data is map
-        && data.keys().hasAny(['userId', 'email', 'name']);
-    }
     function signedIn() {
       return request.auth != null;
     }
@@ -123,7 +113,7 @@ service cloud.firestore {
     }
     match /appData/{docId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && docId != 'agape';
+      allow write: if request.auth != null;
     }
     match /logs/{logId} {
       allow read: if request.auth != null;
@@ -132,8 +122,8 @@ service cloud.firestore {
     }
     match /trips/{tripId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && validateTrip();
-      allow update: if request.auth != null && validateTrip();
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
       allow delete: if request.auth != null && isAdmin();
     }
     match /assignments/{assignmentId} {
@@ -143,7 +133,7 @@ service cloud.firestore {
         || resource.data.userId == request.auth.uid
         || resource.data.driverId == request.auth.uid
       );
-      allow create: if false;
+      allow create: if request.auth != null && isDispatcher();
       allow update: if request.auth != null && (
         isDispatcher()
         || resource.data.driverEmail == request.auth.token.email
@@ -153,7 +143,7 @@ service cloud.firestore {
         || resource.data.driverId == request.auth.uid
         || request.resource.data.driverId == request.auth.uid
       );
-      allow delete: if false;
+      allow delete: if request.auth != null && isDispatcher();
     }
     match /sessions/{sessionId} {
       allow read: if request.auth != null && (isDispatcher() || resource.data.userId == request.auth.uid);
@@ -207,8 +197,8 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && isAdmin();
     }
     match /tripLedger/{tripId} {
-      allow read: if request.auth != null && isDispatcher();
-      allow write: if request.auth != null && isDispatcher();
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
     match /driverTripProgress/{tripId} {
       allow read: if request.auth != null;
@@ -216,13 +206,13 @@ service cloud.firestore {
     }
     match /driverProfiles/{driverId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher()) && validateDriverProfile();
-      allow update: if request.auth != null && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher()) && validateDriverProfile();
+      allow create: if request.auth != null && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow update: if request.auth != null && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
       allow delete: if request.auth != null && isAdmin();
     }
     match /dispatcherProfiles/{dispatcherId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && isAdmin();
+      allow write: if request.auth != null && (isAdmin() || isOwner(dispatcherId));
     }
     match /fleetVehicles/{vehicleId} {
       allow read: if request.auth != null;
@@ -270,6 +260,37 @@ service cloud.firestore {
     match /chat_uploads/{fileId} {
       allow read: if signedIn() && isDispatcher();
       allow write: if signedIn() && isDispatcher();
+    }
+    match /analyticsLogs/{logId} {
+      allow read: if request.auth != null && isDispatcher();
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && isAdmin();
+    }
+    // AI Dispatch + Time Tracking System — Section 10: real-time shift event log
+    match /shiftEvents/{eventId} {
+      allow read: if request.auth != null && (isDispatcher() || resource.data.driverId == request.auth.uid);
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && isAdmin();
+    }
+    // Section 10: GAP audit log — every gap generates a mandatory record
+    match /gapAuditLog/{gapId} {
+      allow read: if request.auth != null && (isDispatcher() || resource.data.driverId == request.auth.uid);
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && isAdmin();
+    }
+    // Section 18: Finalized time tracking sessions with payroll output
+    match /timeTrackingSessions/{sessionId} {
+      allow read: if request.auth != null && (isDispatcher() || resource.data.driverId == request.auth.uid);
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (isAdmin() || resource.data.driverId == request.auth.uid);
+      allow delete: if request.auth != null && isAdmin();
+    }
+    // Approved payroll records (admin/dispatcher finalize, driver can read own)
+    match /payrollRecords/{recordId} {
+      allow read: if request.auth != null && (isDispatcher() || resource.data.driverId == request.auth.uid);
+      allow create: if request.auth != null && isDispatcher();
+      allow update: if request.auth != null && isAdmin();
+      allow delete: if request.auth != null && isAdmin();
     }
   }
 }

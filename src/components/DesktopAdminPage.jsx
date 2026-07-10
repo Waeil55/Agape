@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase, Download, MessageCircle } from 'lucide-react';
+import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase, Download, MessageCircle, DollarSign } from 'lucide-react';
 import { sendPasswordResetEmail, auth, db, firebaseConfig, setDoc, doc, deleteApp, initializeApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from '../config/firebase';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiSecurityAnalysis } from '../config/ai';
@@ -10,6 +10,7 @@ import DriverAvatar from './DriverAvatar';
 import DriverPerformanceCard from './DriverPerformanceCard';
 import AdminChatMonitor from './AdminChatMonitor';
 import { getDriverLiveStatus } from '../constants/statuses';
+import PayrollReportPage from './PayrollReportPage';
 
 const getEntityType = (log) => {
   const action = String(log?.t || '').toLowerCase();
@@ -295,6 +296,7 @@ const DesktopAdminPage = ({
   const [creatingUser, setCreatingUser] = useState(false);
   const [vehicleCreateIntent, setVehicleCreateIntent] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [payrollPolicy, setPayrollPolicy] = useState('SMART_MODE');
   const exportRef = useRef(null);
 
   useEffect(() => {
@@ -649,6 +651,15 @@ const DesktopAdminPage = ({
     { id: 'chat', title: 'Chat Monitor', icon: MessageCircle, roles: ['admin'],
       content: (
         <AdminChatMonitor chatUnreadCount={chatUnreadCount} />
+      ) },
+    { id: 'payroll', title: 'Payroll Report', icon: DollarSign, roles: ['admin', 'dispatcher'],
+      content: (
+        <PayrollReportPage
+          drivers={drivers}
+          trips={trips}
+          policyMode={payrollPolicy}
+          onPolicyChange={setPayrollPolicy}
+        />
       ) },
   ];
   const visibleSections = sections.filter((section) => !section.roles || section.roles.includes(role));
