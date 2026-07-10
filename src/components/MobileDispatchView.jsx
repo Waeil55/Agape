@@ -336,7 +336,7 @@ const MobileDispatchView = ({
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto overscroll-contain" style={{paddingBottom:"calc(72px + env(safe-area-inset-bottom,0px))"}}>
+      <div className="flex-1 overflow-y-auto overscroll-contain" style={{paddingBottom:"calc(60px + env(safe-area-inset-bottom,0px))"}}>
         {activeTab==="trips" && (
           <div className="px-2.5 py-3 space-y-3 sm:px-4">
             {filtered.length===0 && (
