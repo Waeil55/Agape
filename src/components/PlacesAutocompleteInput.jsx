@@ -4,6 +4,7 @@ import useGoogleMaps from '../hooks/useGoogleMaps';
 const PlacesAutocompleteInput = ({ value, onChange, placeholder, className, required, onPlaceSelect, disabled }) => {
   const inputRef = useRef(null);
   const { ready } = useGoogleMaps();
+  const skipNextRef = useRef(false);
 
   useEffect(() => {
     if (!ready || !inputRef.current || !window.google?.maps?.places) return;
@@ -16,6 +17,7 @@ const PlacesAutocompleteInput = ({ value, onChange, placeholder, className, requ
       autocomplete.addListener('place_changed', () => {
         const place = autocomplete.getPlace();
         if (place?.formatted_address) {
+          skipNextRef.current = true;
           onChange(place.formatted_address);
           if (onPlaceSelect) onPlaceSelect(place);
         }
@@ -26,12 +28,21 @@ const PlacesAutocompleteInput = ({ value, onChange, placeholder, className, requ
     };
   }, [ready, onChange, onPlaceSelect]);
 
+  useEffect(() => {
+    if (inputRef.current && value !== undefined && inputRef.current.value !== value) {
+      inputRef.current.value = value || '';
+    }
+  }, [value]);
+
   return (
     <input
       ref={inputRef}
       type="text"
-      value={value}
-      onChange={e => onChange(e.target.value)}
+      defaultValue={value || ''}
+      onChange={(e) => {
+        if (skipNextRef.current) { skipNextRef.current = false; return; }
+        onChange(e.target.value);
+      }}
       placeholder={placeholder || 'Search address...'}
       className={className}
       required={required}
