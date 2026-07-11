@@ -1,34 +1,22 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { Activity, KeyRound, Search, Shield, Truck } from 'lucide-react';
+import { Activity, KeyRound, Search, Shield, Truck, Users, UserCog, CircleDot, Loader2, LayoutDashboard } from 'lucide-react';
 import { getDriverLiveStatus } from '../constants/statuses';
 import { auth, sendPasswordResetEmail } from '../config/firebase';
+import {
+  AdminShell, AdminCard, AdminCardHead, AdminStat, AdminBadge,
+  AdminButton, AdminIconButton, AdminAvatar, AdminSearch, AdminEmpty,
+} from './admin/AdminKit';
 
 const ACTIVE_TRIP_STATUSES = new Set([
-  'Assigned',
-  'In Progress',
-  'In Mission',
-  'En Route',
-  'Navigating Pickup',
-  'At Pickup',
-  'In Transit',
-  'Navigating Dropoff',
-  'At Dropoff',
-  'Arrived',
+  'Assigned', 'In Progress', 'In Mission', 'En Route', 'Navigating Pickup',
+  'At Pickup', 'In Transit', 'Navigating Dropoff', 'At Dropoff', 'Arrived',
 ]);
 
-const StatCard = ({ label, value, tone = 'slate' }) => {
-  const tones = {
-    slate: 'bg-slate-50 text-slate-900 border-slate-100',
-    blue: 'bg-blue-50 text-blue-800 border-blue-100',
-    amber: 'bg-amber-50 text-amber-800 border-amber-100',
-    emerald: 'bg-emerald-50 text-emerald-800 border-emerald-100',
-  };
-  return (
-    <div className={`rounded-2xl border px-3 py-3 ${tones[tone] || tones.slate}`}>
-      <p className="text-xl font-bold leading-none">{value}</p>
-      <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">{label}</p>
-    </div>
-  );
+const liveTone = (label) => {
+  const l = String(label || '').toLowerCase();
+  if (l.includes('offline')) return 'offline';
+  if (l.includes('trip') || l.includes('busy')) return 'busy';
+  return 'online';
 };
 
 const MobileAdminPage = ({
@@ -80,9 +68,7 @@ const MobileAdminPage = ({
   }, [drivers, trips]);
 
   const driverStatusCounts = useMemo(() => {
-    let online = 0;
-    let busy = 0;
-    let offline = 0;
+    let online = 0, busy = 0, offline = 0;
     drivers.forEach((driver) => {
       const label = getDriverLiveStatus(driver).label.toLowerCase();
       if (label.includes('offline')) offline += 1;
@@ -123,196 +109,197 @@ const MobileAdminPage = ({
     addAuditLog?.('Role Changed', `${currentUser} changed ${user.name} from ${user._role} to ${newRole}`, 'amber');
   };
 
-  const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'drivers', label: 'Drivers' },
-    { id: 'people', label: 'People' },
-    { id: 'activity', label: 'Activity' },
+  const nav = [{
+    label: 'Operations',
+    items: [
+      { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+      { id: 'drivers', label: 'Drivers', icon: Truck },
+      { id: 'people', label: 'People', icon: Users },
+      { id: 'activity', label: 'Activity', icon: Activity },
+    ],
+  }];
+
+  const mobileNav = [
+    { id: 'overview', label: 'Home', icon: LayoutDashboard },
+    { id: 'drivers', label: 'Drivers', icon: Truck },
+    { id: 'people', label: 'People', icon: Users },
+    { id: 'activity', label: 'Activity', icon: Activity },
   ];
 
+  const subtitles = {
+    overview: 'Live fleet & team snapshot',
+    drivers: `${drivers.length} drivers on roster`,
+    people: 'Dispatchers & drivers',
+    activity: 'Recent audit events',
+  };
+
   return (
-    <div className="flex flex-1 min-h-0 w-full flex-col bg-gray-50 overflow-hidden">
-      <div className="mobile-admin-header sticky top-0 z-20 border-b border-gray-200 bg-white px-3 pb-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2b4c7e]">Command Admin</p>
-            <h1 className="mt-0.5 truncate text-xl font-semibold text-gray-950">Team Control</h1>
+    <AdminShell
+      nav={nav}
+      active={activeTab}
+      onNavigate={setActiveTab}
+      mobileNav={mobileNav}
+      mobileActive={activeTab}
+      onMobileNavigate={setActiveTab}
+      title="Team Control"
+      subtitle={subtitles[activeTab]}
+      eyebrow="Command Admin"
+      actions={
+        <AdminBadge tone="online" dot>
+          {drivers.length + dispatchers.length} people
+        </AdminBadge>
+      }
+    >
+      {activeTab === 'overview' && (
+        <div className="space-y-4">
+          <div className="adm-stats">
+            <AdminStat icon={Users} value={drivers.length} label="Drivers" />
+            <AdminStat icon={UserCog} value={dispatchers.length} label="Dispatchers" />
+            <AdminStat icon={CircleDot} value={driverStatusCounts.online} label="Online" accent="rgba(16,185,129,0.12)" />
+            <AdminStat icon={Loader2} value={driverStatusCounts.busy} label="Busy" accent="rgba(245,158,11,0.14)" />
           </div>
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-            <Shield size={20} />
-          </div>
-        </div>
 
-        <div className="mt-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all ${activeTab === tab.id ? 'bg-[#1e3a5f] text-white shadow-sm' : 'bg-slate-100 text-slate-500'}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 space-y-3 px-2.5 py-3 sm:px-4">
-        {activeTab === 'overview' && (
-          <>
-            <div className="grid grid-cols-2 gap-2">
-              <StatCard label="Drivers" value={drivers.length} tone="blue" />
-              <StatCard label="Dispatchers" value={dispatchers.length} tone="slate" />
-              <StatCard label="Online" value={driverStatusCounts.online} tone="emerald" />
-              <StatCard label="Busy" value={driverStatusCounts.busy} tone="amber" />
-            </div>
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-2">
-                <Truck size={18} className="text-blue-600" />
-                <h2 className="text-sm font-semibold text-slate-900">Driver Workflow Status</h2>
-              </div>
-              <div className="mt-3 space-y-2">
-                {drivers.slice(0, 8).map((driver) => {
-                  const live = getDriverLiveStatus(driver);
-                  return (
-                    <div key={driver.id || driver.email || driver.name} className="flex items-center gap-3 rounded-2xl bg-slate-50 px-3 py-2.5">
-                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold uppercase ${live.color}`}>{(driver.name || '?')[0]}</div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-900">{driver.name}</p>
-                        <p className="truncate text-[11px] font-semibold text-slate-500">{driver.vehicle || 'No vehicle'}</p>
-                      </div>
-                      <span className={`shrink-0 rounded-lg px-2 py-1 text-[9px] font-semibold uppercase ${live.color}`}>{live.label}</span>
+          <AdminCard>
+            <AdminCardHead icon={Truck} title="Driver Workflow Status" />
+            <div className="adm-card-pad space-y-1">
+              {drivers.slice(0, 8).map((driver) => {
+                const live = getDriverLiveStatus(driver);
+                return (
+                  <div key={driver.id || driver.email || driver.name} className="adm-list-row">
+                    <AdminAvatar name={driver.name} size={40} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">{driver.name}</p>
+                      <p className="truncate text-xs font-medium text-slate-500">{driver.vehicle || 'No vehicle'}</p>
                     </div>
-                  );
-                })}
-              </div>
+                    <AdminBadge tone={liveTone(live.label)} dot>{live.label}</AdminBadge>
+                  </div>
+                );
+              })}
+              {drivers.length === 0 && <AdminEmpty icon={Truck} title="No drivers yet" />}
             </div>
-          </>
-        )}
+          </AdminCard>
+        </div>
+      )}
 
-        {activeTab === 'drivers' && (
-          <div className="space-y-3">
-            {drivers.map((driver) => {
-              const live = getDriverLiveStatus(driver);
-              const activeTrip = activeTripsByDriver.get(driver.id);
-              return (
-                <div key={driver.id || driver.email || driver.name} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      {activeTab === 'drivers' && (
+        <div className="space-y-3">
+          {drivers.map((driver) => {
+            const live = getDriverLiveStatus(driver);
+            const activeTrip = activeTripsByDriver.get(driver.id);
+            return (
+              <AdminCard key={driver.id || driver.email || driver.name}>
+                <div className="adm-card-pad">
                   <div className="flex items-start gap-3">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold uppercase ${live.color}`}>{(driver.name || '?')[0]}</div>
+                    <AdminAvatar name={driver.name} brand size={48} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h3 className="truncate text-base font-semibold text-slate-950">{driver.name}</h3>
-                          <p className="mt-0.5 text-xs font-semibold text-slate-500">{driver.vehicle || 'No vehicle'}</p>
+                          <h3 className="truncate text-base font-semibold text-slate-900">{driver.name}</h3>
+                          <p className="mt-0.5 text-xs font-medium text-slate-500">{driver.vehicle || 'No vehicle'}</p>
                         </div>
-                        <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-semibold uppercase ${live.color}`}>{live.label}</span>
+                        <AdminBadge tone={liveTone(live.label)} dot>{live.label}</AdminBadge>
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-2xl bg-slate-50 p-3">
-                          <p className="font-semibold uppercase tracking-wide text-slate-400">Phone</p>
-                          <p className="mt-1 truncate font-semibold text-slate-800">{driver.phone || '-'}</p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Phone</p>
+                          <p className="mt-1 truncate text-sm font-semibold text-slate-800">{driver.phone || '—'}</p>
                         </div>
-                        <div className="rounded-2xl bg-slate-50 p-3">
-                          <p className="font-semibold uppercase tracking-wide text-slate-400">Zone</p>
-                          <p className="mt-1 truncate font-semibold text-slate-800">{driver.currentZone || '-'}</p>
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Zone</p>
+                          <p className="mt-1 truncate text-sm font-semibold text-slate-800">{driver.currentZone || '—'}</p>
                         </div>
                       </div>
                       {activeTrip && (
-                        <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-3">
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">{activeTrip.status}</p>
+                        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700">{activeTrip.status}</p>
                           <p className="mt-1 text-sm font-semibold text-slate-900">{activeTrip.patient}</p>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </AdminCard>
+            );
+          })}
+          {drivers.length === 0 && <AdminEmpty icon={Truck} title="No drivers on roster" hint="Add drivers from the People tab" />}
+        </div>
+      )}
 
-        {activeTab === 'people' && (
-          <>
-            <div className="relative">
-              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search people..."
-                className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold text-slate-900 outline-none focus:border-[#2b4c7e] focus:ring-2 focus:ring-[#2b4c7e]/15"
-              />
-            </div>
-            <div className="space-y-3">
-              {filteredUsers.map((user, i) => {
-                const live = user._role === 'driver' ? getDriverLiveStatus(user) : null;
-                return (
-                  <div key={user.id || i} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-sm font-bold uppercase text-slate-700">
-                          {(user.name || '?')[0]}
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="truncate text-sm font-semibold text-slate-900">{user.name}</h4>
-                          <p className="truncate text-xs font-semibold text-slate-500">{user.email || 'No email'}</p>
-                        </div>
+      {activeTab === 'people' && (
+        <div className="space-y-3">
+          <AdminSearch value={query} onChange={setQuery} placeholder="Search people..." />
+          {filteredUsers.map((user, i) => {
+            const live = user._role === 'driver' ? getDriverLiveStatus(user) : null;
+            return (
+              <AdminCard key={user.id || i}>
+                <div className="adm-card-pad">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <AdminAvatar name={user.name} size={44} />
+                      <div className="min-w-0">
+                        <h4 className="truncate text-sm font-semibold text-slate-900">{user.name}</h4>
+                        <p className="truncate text-xs font-medium text-slate-500">{user.email || 'No email'}</p>
                       </div>
-                      {user._role === 'driver' ? (
-                        <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-semibold ${live.color}`}>{live.label}</span>
-                      ) : (
-                        <span className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold ${statusColor ? statusColor('online') : 'bg-gray-200 text-gray-700'}`}>
-                          Active
-                        </span>
+                    </div>
+                    {user._role === 'driver' ? (
+                      <AdminBadge tone={liveTone(live.label)} dot>{live.label}</AdminBadge>
+                    ) : (
+                      <AdminBadge tone="info" dot>Active</AdminBadge>
+                    )}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+                    <select
+                      value={user._role}
+                      onChange={(e) => {
+                        const newRole = e.target.value;
+                        if (requestAuthAction) requestAuthAction(`Change role for ${user.name}`, () => handleRoleChange(user, newRole));
+                        else handleRoleChange(user, newRole);
+                      }}
+                      className="adm-select"
+                    >
+                      {role === 'admin' && <option value="admin">Admin</option>}
+                      <option value="dispatcher">Dispatcher</option>
+                      <option value="driver">Driver</option>
+                    </select>
+                    <div className="flex items-center gap-2">
+                      {pwResetMsg[user.email] && <span className="text-[11px] font-bold text-emerald-600">{pwResetMsg[user.email]}</span>}
+                      {user.email && (
+                        <AdminIconButton onClick={() => handlePasswordReset(user.email)} title="Send password reset">
+                          <KeyRound size={15} />
+                        </AdminIconButton>
                       )}
                     </div>
-                    <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-                      <select
-                        value={user._role}
-                        onChange={(e) => {
-                          const newRole = e.target.value;
-                          if (requestAuthAction) requestAuthAction(`Change role for ${user.name}`, () => handleRoleChange(user, newRole));
-                          else handleRoleChange(user, newRole);
-                        }}
-                        className="h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-[#2b4c7e]/15"
-                      >
-                        {role === 'admin' && <option value="admin">Admin</option>}
-                        <option value="dispatcher">Dispatcher</option>
-                        <option value="driver">Driver</option>
-                      </select>
-                      <div className="flex items-center gap-2">
-                        {pwResetMsg[user.email] && <span className="text-[10px] font-bold text-emerald-600">{pwResetMsg[user.email]}</span>}
-                        {user.email && (
-                          <button onClick={() => handlePasswordReset(user.email)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600">
-                            <KeyRound size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {activeTab === 'activity' && (
-          <div className="space-y-2">
-            {logs.slice(0, 40).map((log, index) => (
-              <div key={index} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
-                <div className="flex items-start gap-2">
-                  <Activity size={14} className="mt-0.5 shrink-0 text-blue-600" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-900">{log.t || 'Activity'}</p>
-                    <p className="mt-0.5 line-clamp-2 text-xs font-semibold text-slate-500">{log.meta?.summary || log.d}</p>
-                  </div>
-                  <span className="shrink-0 text-[10px] font-bold text-slate-400">{log.time ? new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                 </div>
+              </AdminCard>
+            );
+          })}
+          {filteredUsers.length === 0 && <AdminEmpty icon={Users} title="No matching people" hint="Try a different search" />}
+        </div>
+      )}
+
+      {activeTab === 'activity' && (
+        <div className="space-y-2">
+          {logs.slice(0, 40).map((log, index) => (
+            <AdminCard key={index} className="!shadow-none">
+              <div className="adm-card-pad flex items-start gap-3 py-3">
+                <div className="adm-avatar--brand adm-avatar" style={{ width: 34, height: 34, borderRadius: 10 }}>
+                  <Activity size={16} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-900">{log.t || 'Activity'}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs font-medium text-slate-500">{log.meta?.summary || log.d}</p>
+                </div>
+                <span className="shrink-0 text-[11px] font-bold text-slate-400">
+                  {log.time ? new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                </span>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+            </AdminCard>
+          ))}
+          {logs.length === 0 && <AdminEmpty icon={Activity} title="No activity yet" />}
+        </div>
+      )}
+    </AdminShell>
   );
 };
 
