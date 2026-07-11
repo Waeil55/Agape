@@ -11,7 +11,7 @@ const WEEKDAY_SHORT = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursda
 const generateTripId = () => `TRIP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 const generateBookingId = () => `BK-${Math.floor(100000 + Math.random() * 900000)}`;
 
-const todayStr = () => new Date().toISOString().split('T')[0];
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
 const normalizeLogin = (value = '') => normalizeEmail(value).replace(/@auth\.agapecare\.local$/i, '');
 

@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Archive, Calendar, RefreshCcw, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Check, Edit2, ChevronDown, ChevronRight } from 'lucide-react';
+import { localCalendarYmd } from '../utils/tripDate';
 
-const today = new Date().toISOString().split('T')[0];
+const today = localCalendarYmd();
 
 const formatClock24 = (value) => {
   if (!value) return '—';

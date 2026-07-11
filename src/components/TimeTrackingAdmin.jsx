@@ -6,6 +6,7 @@ import {
   Briefcase, Check, Lock
 } from 'lucide-react';
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES } from '../utils/timeTracking';
+import { localCalendarYmd } from '../utils/tripDate';
 
 const formatMinutes = (minutes) => {
   const h = Math.floor(minutes / 60);
@@ -503,7 +504,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
                   const monday = new Date(d);
                   monday.setDate(monday.getDate() + mondayOffset);
-                  const weekKey = monday.toISOString().split('T')[0];
+                  const weekKey = localCalendarYmd(monday);
                   if (!weekMap[weekKey]) weekMap[weekKey] = { days: [], hours: 0 };
                   const dayHours = Math.round((getDayBillable(byDate[date]) / 60) * 100) / 100;
                   weekMap[weekKey].days.push(date);

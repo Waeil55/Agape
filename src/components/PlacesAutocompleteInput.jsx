@@ -1,35 +1,42 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import useGoogleMaps from '../hooks/useGoogleMaps';
 
 const PlacesAutocompleteInput = ({ value, onChange, placeholder, className, required, onPlaceSelect, disabled }) => {
   const inputRef = useRef(null);
   const { ready } = useGoogleMaps();
-  const skipNextRef = useRef(false);
+  const autocompleteRef = useRef(null);
+  const isSettingRef = useRef(false);
 
   useEffect(() => {
     if (!ready || !inputRef.current || !window.google?.maps?.places) return;
-    let autocomplete;
     try {
-      autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
+      const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
         fields: ['formatted_address', 'address_components', 'geometry', 'place_id'],
         types: ['address'],
+        componentRestrictions: { country: 'us' },
       });
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
+      autocompleteRef.current = ac;
+      ac.addListener('place_changed', () => {
+        const place = ac.getPlace();
         if (place?.formatted_address) {
-          skipNextRef.current = true;
+          isSettingRef.current = true;
+          inputRef.current.value = place.formatted_address;
           onChange(place.formatted_address);
           if (onPlaceSelect) onPlaceSelect(place);
+          setTimeout(() => { isSettingRef.current = false; }, 100);
         }
       });
     } catch {}
     return () => {
-      if (autocomplete) window.google.maps.event.clearInstanceListeners(autocomplete);
+      if (autocompleteRef.current) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+        autocompleteRef.current = null;
+      }
     };
-  }, [ready, onChange, onPlaceSelect]);
+  }, [ready]);
 
   useEffect(() => {
-    if (inputRef.current && value !== undefined && inputRef.current.value !== value) {
+    if (inputRef.current && !isSettingRef.current && document.activeElement !== inputRef.current) {
       inputRef.current.value = value || '';
     }
   }, [value]);
@@ -40,7 +47,7 @@ const PlacesAutocompleteInput = ({ value, onChange, placeholder, className, requ
       type="text"
       defaultValue={value || ''}
       onChange={(e) => {
-        if (skipNextRef.current) { skipNextRef.current = false; return; }
+        if (isSettingRef.current) return;
         onChange(e.target.value);
       }}
       placeholder={placeholder || 'Search address...'}

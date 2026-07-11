@@ -69,6 +69,14 @@ function localYmd(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Convert a UTC ISO timestamp string to a local YYYY-MM-DD date key. */
+export function isoToLocalDateKey(isoString) {
+  if (!isoString || typeof isoString !== 'string') return undefined;
+  const d = new Date(isoString);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return localYmd(d);
+}
+
 /** Local calendar YYYY-MM-DD for a Date (default: now). */
 export function localCalendarYmd(d = new Date()) {
   return localYmd(d);
@@ -131,6 +139,16 @@ export function isTripDateRecent(tripDate) {
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   if (key === localYmd(yesterday)) return true;
   return false;
+}
+
+/**
+ * True if the trip date is today or missing/unparseable.
+ * Used for the driver portal "due" list to exclude trips from previous/future days.
+ */
+export function isTripDateToday(tripDate) {
+  const key = tripCalendarDateKey(tripDate);
+  if (key === undefined) return true;
+  return key === localYmd(new Date());
 }
 
 /** If the trip has no usable date key, it matches any manifest day (legacy / incomplete rows). */

@@ -15,6 +15,7 @@
  */
 
 import { openDB } from 'idb';
+import { localCalendarYmd } from './tripDate';
 
 const DB_NAME = 'agape_fleet_os';
 const DB_VERSION = 2;
@@ -458,7 +459,7 @@ export async function pruneOldTrips(daysToKeep = 90) {
     const db = await getDB();
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - daysToKeep);
-    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const cutoffStr = localCalendarYmd(cutoff);
 
     const trips = await db.getAll(STORES.TRIPS);
     const tx = db.transaction(STORES.TRIPS, 'readwrite');

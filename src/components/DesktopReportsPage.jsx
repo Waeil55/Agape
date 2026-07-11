@@ -464,7 +464,7 @@ const DesktopReportsPage = ({
   const shiftDate = (days) => {
     const next = new Date(`${dateStr}T12:00:00`);
     next.setDate(next.getDate() + days);
-    setDateStr(next.toISOString().split('T')[0]);
+    setDateStr(localCalendarYmd(next));
   };
 
   const markRowsReviewed = (reviewed) => {

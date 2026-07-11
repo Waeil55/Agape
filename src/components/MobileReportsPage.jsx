@@ -97,7 +97,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const shiftDate = (days) => {
     const d = new Date(dateStr + 'T12:00:00');
     d.setDate(d.getDate() + days);
-    setDateStr(d.toISOString().split('T')[0]);
+    setDateStr(localCalendarYmd(d));
   };
 
   const getDriverRecord = (driverId) => drivers.find(d => d.id === driverId);

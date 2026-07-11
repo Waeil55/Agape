@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
-import { tripMatchesTodayOrTomorrow, timeToMinutes, isTripLate, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateRecent } from '../utils/tripDate';
+import { timeToMinutes, isTripLate, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday, isoToLocalDateKey } from '../utils/tripDate';
 import { auth, db, doc, getDocFromServer, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, updateDriverProfile, onSnapshot, collection, addDoc, serverTimestamp } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
@@ -982,7 +982,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const patientLegs = useMemo(() => {
     const counts = {};
     driverScopedTrips.forEach(t => {
-      if (!tripMatchesTodayOrTomorrow(t.date)) return;
+      if (!isTripDateToday(t.date)) return;
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
       counts[key] = (counts[key] || 0) + 1;
@@ -994,7 +994,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const patientActiveLegs = useMemo(() => {
     const counts = {};
     driverScopedTrips.forEach(t => {
-      if (!tripMatchesTodayOrTomorrow(t.date)) return;
+      if (!isTripDateToday(t.date)) return;
       if (isWorkflowTerminalTrip(t)) return;
       const key = (t.patient || '').trim().toLowerCase();
       if (!key) return;
@@ -1069,7 +1069,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const restoreHistoryTrip = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
-    const relatedLegs = driverScopedTrips.filter(t => tripMatchesTodayOrTomorrow(t.date) && (t.patient || '').trim().toLowerCase() === patientKey && isWorkflowTerminalTrip(t));
+    const relatedLegs = driverScopedTrips.filter(t => isTripDateToday(t.date) && (t.patient || '').trim().toLowerCase() === patientKey && isWorkflowTerminalTrip(t));
     if (relatedLegs.length > 1) {
       setRestorePrompt({ trip, legs: relatedLegs });
     } else {
@@ -1123,7 +1123,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }, [driverScopedTrips, role, adminDriverFilter]);
 
   const myTrips = useMemo(() => filteredDriverScopedTrips
-    .filter(t => isTripDateRecent(t.date) || !isWorkflowTerminalTrip(t))
+    .filter(t => isTripDateToday(t.date) || !isWorkflowTerminalTrip(t))
     .sort((a, b) => {
       const aKey = activeSortKeyOverrides[a.id];
       const bKey = activeSortKeyOverrides[b.id];
@@ -1411,7 +1411,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (events.length === 0) return { days: [], weeklyTotal: 0, weeklyOvertime: 0 };
     const byDate = {};
     events.forEach(e => {
-      const dateKey = e.timestamp.slice(0, 10);
+      const dateKey = isoToLocalDateKey(e.timestamp);
+      if (!dateKey) return;
       if (!byDate[dateKey]) byDate[dateKey] = [];
       byDate[dateKey].push(e);
     });
@@ -1421,7 +1422,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     for (let i = 13; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const dateKey = d.toISOString().slice(0, 10);
+      const dateKey = localCalendarYmd(d);
       const dayEvents = (byDate[dateKey] || []).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
       const isInType = (e) => e.type === 'in' || e.type === 'auto_in';
       const isOutType = (e) => e.type === 'out';
@@ -1504,7 +1505,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           driverId,
           driverEmail: currentUser || '',
           driverName: me?.name || '',
-          date: new Date().toISOString().slice(0, 10),
+          date: localCalendarYmd(),
           clockIn: clockIn?.timestamp || null,
           clockInLocation: clockIn?.location || null,
           clockOut: clockOutEv?.timestamp || null,
@@ -2568,7 +2569,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleNoShow = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
     const activeLegs = driverScopedTrips.filter(t =>
-      tripMatchesTodayOrTomorrow(t.date) &&
+      isTripDateToday(t.date) &&
       (t.patient || '').trim().toLowerCase() === patientKey &&
       !isWorkflowTerminalTrip(t)
     );
@@ -2582,7 +2583,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleCancel = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
     const activeLegs = driverScopedTrips.filter(t =>
-      tripMatchesTodayOrTomorrow(t.date) &&
+      isTripDateToday(t.date) &&
       (t.patient || '').trim().toLowerCase() === patientKey &&
       !isWorkflowTerminalTrip(t)
     );
@@ -2596,7 +2597,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleReroute = (trip) => {
     const patientKey = (trip.patient || '').trim().toLowerCase();
     const activeLegs = driverScopedTrips.filter(t =>
-      tripMatchesTodayOrTomorrow(t.date) &&
+      isTripDateToday(t.date) &&
       (t.patient || '').trim().toLowerCase() === patientKey &&
       !isWorkflowTerminalTrip(t)
     );
@@ -2610,7 +2611,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleShowLegs = (task) => {
     const patientKey = (task.patient || task.patientName || '').trim().toLowerCase();
     const allLegs = driverScopedTrips
-      .filter(t => tripMatchesTodayOrTomorrow(t.date) && (t.patient || '').trim().toLowerCase() === patientKey)
+      .filter(t => isTripDateToday(t.date) && (t.patient || '').trim().toLowerCase() === patientKey)
       .map(t => ({
         id: t.id,
         bookingId: t.bookingId,
@@ -2977,7 +2978,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     // Check if all trips are done - offer clock-out with pending timer
     if ((isClockedIn || ttStateRef.current !== TT.OFF_SHIFT) && !clockOutOfferedRef.current) {
       const remaining = driverScopedTrips.filter(t =>
-        tripMatchesTodayOrTomorrow(t.date) && !isWorkflowTerminalTrip(t) && t.id !== showCompleteModal.id
+        isTripDateToday(t.date) && !isWorkflowTerminalTrip(t) && t.id !== showCompleteModal.id
       );
       if (remaining.length === 0) {
         clockOutOfferedRef.current = true;
@@ -5663,7 +5664,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <>
                   <div className="space-y-2">
                     {clockHistory.days.filter(d => d.hasEvents).map(day => {
-                      const todayKey = new Date().toISOString().slice(0, 10);
+                      const todayKey = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
                       const isToday = day.dateKey === todayKey;
                       return (
                         <div key={day.dateKey} className={`rounded-xl border p-3 ${isToday ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'}`}>

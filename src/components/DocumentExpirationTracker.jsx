@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AlertTriangle, CheckCircle, Calendar, FileText, Filter, RefreshCw, X } from 'lucide-react';
+import { localCalendarYmd } from '../utils/tripDate';
 
 const DOC_CATEGORIES = [
   { id: 'driver_license', label: 'Driver License', source: 'driver' },
@@ -46,7 +47,7 @@ function generateDocuments(drivers = [], vehicles = []) {
         entityType: 'driver',
         category: cat.id,
         categoryLabel: cat.label,
-        expiryDate: expiry.toISOString().split('T')[0],
+        expiryDate: localCalendarYmd(expiry),
         renewed: false,
       });
     });
@@ -65,7 +66,7 @@ function generateDocuments(drivers = [], vehicles = []) {
         entityType: 'vehicle',
         category: cat.id,
         categoryLabel: cat.label,
-        expiryDate: expiry.toISOString().split('T')[0],
+        expiryDate: localCalendarYmd(expiry),
         renewed: false,
       });
     });
@@ -99,7 +100,7 @@ export default function DocumentExpirationTracker({ drivers = [], vehicles = [] 
   }, [docsWithStatus]);
 
   const handleRenew = (docId) => {
-    setDocuments(prev => prev.map(d => d.id === docId ? { ...d, renewed: true, expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] } : d));
+    setDocuments(prev => prev.map(d => d.id === docId ? { ...d, renewed: true, expiryDate: localCalendarYmd(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)) } : d));
   };
 
   const filterOptions = [

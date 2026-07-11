@@ -42,7 +42,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
   });
   const [routeName, setRouteName] = useState('');
   const [selectedDriver, setSelectedDriver] = useState(() => localStorage.getItem('agape_rp_driver') || '');
-  const [dateStr, setDateStr] = useState(() => localStorage.getItem('agape_rp_date') || new Date().toISOString().split('T')[0]);
+  const [dateStr, setDateStr] = useState(() => localStorage.getItem('agape_rp_date') || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })());
   const [dragIdx, setDragIdx] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   const [optimizing, setOptimizing] = useState(false);

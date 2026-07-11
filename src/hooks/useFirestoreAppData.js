@@ -22,6 +22,7 @@ import {
   mergeTripCollections,
 } from '../utils/tripLifecycle';
 import { ASSIGNMENT_STATUSES } from '../config/firestoreSchema';
+import { localCalendarYmd } from '../utils/tripDate';
 import {
   filterValidTripRecords,
   isCorruptedTripRecord,
@@ -264,7 +265,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       const liveTrips = [];
       const archivedTrips = [];
       const corruptedIds = [];
-      const todayKey = new Date().toISOString().slice(0, 10);
+      const todayKey = localCalendarYmd();
       snap.forEach((tripDoc) => {
         const trip = { ...tripDoc.data(), id: tripDoc.id };
         if (trip.archiveState === 'archived') {

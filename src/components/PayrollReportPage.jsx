@@ -5,6 +5,7 @@ import {
   FileText, TrendingUp, Filter, RefreshCw, Home, Navigation, Zap, Eye
 } from 'lucide-react';
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES, GAP_CLASSIFICATIONS } from '../utils/timeTracking';
+import { localCalendarYmd } from '../utils/tripDate';
 
 const fmt = (min) => {
   if (!min && min !== 0) return '--';
@@ -36,7 +37,7 @@ const gapColor = (c) => ({
 const abuseColor = (f) => f.length > 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200';
 
 export default function PayrollReportPage({ drivers = [], trips = [], policyMode = POLICY_MODES.SMART_MODE, onPolicyChange }) {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(localCalendarYmd());
   const [selectedDriverId, setSelectedDriverId] = useState('ALL');
   const [expandedDriver, setExpandedDriver] = useState(null);
   const [expandedSection, setExpandedSection] = useState({});

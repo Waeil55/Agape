@@ -11,7 +11,7 @@ import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, s
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
-import { timeToMinutes, tripCalendarDateKey, tripMatchesTodayOrTomorrow, isCalendarDateKeyWithinLastDays } from './utils/tripDate';
+import { timeToMinutes, tripCalendarDateKey, isTripDateToday, isCalendarDateKeyWithinLastDays, localCalendarYmd } from './utils/tripDate';
 import { cleanPhone } from './utils/smartContacts';
 import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, isDriverAssignedToDispatcher, isTripInDispatcherScope, normalizeEmail } from './utils/accessControl';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
@@ -134,7 +134,7 @@ const getLogTextColor = (color) => {
   return colors[color] || 'text-slate-600';
 };
 
-const todayStr = new Date().toISOString().split('T')[0];
+const todayStr = localCalendarYmd();
 const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
 const DRIVER_HISTORY_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted']);
 const normalizeTripStatus = (status) => String(status || '').trim().toLowerCase();
@@ -588,7 +588,7 @@ const App = () => {
           || normalizeEmail(trip.transferRequest?.toDriverEmail) === email
         );
       const activeStatus = !DRIVER_HISTORY_STATUSES.has(normalizeTripStatus(trip.status));
-      const visibleManifestTrip = tripMatchesTodayOrTomorrow(trip.date) || activeStatus || incomingTransfer;
+      const visibleManifestTrip = isTripDateToday(trip.date) || activeStatus || incomingTransfer;
       const visibleHistoryTrip = isRecentDriverHistoryTrip(trip);
       return (assignedToCurrentDriver || incomingTransfer) && (visibleManifestTrip || visibleHistoryTrip);
     });
@@ -1939,7 +1939,7 @@ const App = () => {
           d.setDate(d.getDate() + (week * 7));
           while (d.getDay() !== dayNum) d.setDate(d.getDate() + 1);
           if (d <= today) continue;
-          const dateStr = d.toISOString().split('T')[0];
+          const dateStr = localCalendarYmd(d);
           if (dateStr === tripToAdd.date) continue;
           allTrips.push({
             ...tripToAdd,

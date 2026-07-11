@@ -11,9 +11,11 @@ import {
   generatePendingClockOut, buildTimeEvents, generatePayrollOutput, detectAbuse,
   estimateTravelTimeMinutes, haversineDistanceMiles,
 } from '../utils/timeTracking';
+import { localCalendarYmd } from '../utils/tripDate';
 
 const TT = TIME_TRACKING_STATES;
 const nowIso = () => new Date().toISOString();
+const localToday = () => localCalendarYmd();
 
 const safeAddDoc = async (col, data) => {
   try { await addDoc(collection(db, col), { ...data, createdAt: serverTimestamp() }); }
@@ -59,7 +61,7 @@ export function useTimeTracking({ driver, trips = [], position, policyMode = POL
   const payrollSummary = useMemo(() => {
     if (!sessionEvents.length) return null;
     const d = driverRef.current;
-    const timeData = buildTimeEvents(tripsRef.current, d, d?.clockEvents || [], policyMode, { date: nowIso().slice(0, 10) });
+    const timeData = buildTimeEvents(tripsRef.current, d, d?.clockEvents || [], policyMode, { date: localToday() });
     return generatePayrollOutput(timeData, Number(d?.hourlyRate || 0));
   }, [sessionEvents.length, policyMode]);
 
@@ -74,12 +76,12 @@ export function useTimeTracking({ driver, trips = [], position, policyMode = POL
     const full = { ...evt, driverId, timestamp: evt.timestamp || nowIso() };
     eventsRef.current = [...eventsRef.current, full];
     setSessionEvents(prev => [...prev, full]);
-    safeAddDoc('shiftEvents', { ...full, driverName, date: full.timestamp.slice(0, 10) });
+    safeAddDoc('shiftEvents', { ...full, driverName, date: localToday() });
     return full;
   }, [driverId, driverName]);
 
   const pushGap = useCallback((rec) => {
-    const full = { ...rec, driverId, driverName, date: rec.startTime?.slice(0, 10) || nowIso().slice(0, 10) };
+    const full = { ...rec, driverId, driverName, date: localToday() };
     setGapLog(prev => [...prev, full]);
     safeAddDoc('gapAuditLog', full);
   }, [driverId, driverName]);
@@ -101,14 +103,14 @@ export function useTimeTracking({ driver, trips = [], position, policyMode = POL
     const allClock = [...(d?.clockEvents || []),
       ...events.filter(e => ['CLOCK_IN','AUTO_CLOCK_IN','CLOCK_OUT','BREAK_START','BREAK_END'].includes(e.type))
         .map(e => ({ type: e.type.toLowerCase().replace('_',''), timestamp: e.timestamp, lat: e.location?.lat, lng: e.location?.lng }))];
-    const timeData = buildTimeEvents(tripsRef.current, d, allClock, policyMode, { date: nowIso().slice(0, 10) });
+    const timeData = buildTimeEvents(tripsRef.current, d, allClock, policyMode, { date: localToday() });
     const payroll = generatePayrollOutput(timeData, Number(d?.hourlyRate || 0));
     const abuse = detectAbuse({ breadcrumbs: d?.breadcrumbs || [],
       clockInLocation: events.find(e => e.type === 'CLOCK_IN' || e.type === 'AUTO_CLOCK_IN')?.location,
       clockOutLocation: clockOutEvt?.location, durationMinutes: payroll.payTime?.billableMinutes || 0 });
     const sessionId = `session_${driverId}_${Date.now()}`;
     await safeSetDoc('timeTrackingSessions', sessionId, {
-      sessionId, driverId, driverName, driverEmail: d?.email || '', date: nowIso().slice(0, 10),
+      sessionId, driverId, driverName, driverEmail: d?.email || '', date: localToday(),
       policyMode, events, sessions: timeData.sessions, gapLog: timeData.gapLog,
       payrollOutput: payroll, abuseFlags: abuse.flags, status: 'complete',
       billableMinutes: payroll.payTime?.billableMinutes || 0 });

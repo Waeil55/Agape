@@ -617,14 +617,14 @@ const RoutePlanSection = ({
                   </div>
                   <div className="flex-1 min-w-0">
                     {(stop.clientName || stop.stopTime || stop.stopType) && (
-                      <div className="flex items-center gap-1.5 mb-1 min-w-0">
+                      <div className="flex items-center gap-1 mb-0.5 min-w-0">
                         {stop.stopType && stop.stopType !== 'ORIGIN' && (
-                          <span className={`text-xs font-bold px-1.5 py-[1px] rounded-lg ${stop.stopType === 'PU' ? 'bg-blue-100 text-blue-700' : stop.stopType === 'DO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                          <span className={`text-[7px] font-bold px-1 py-[0px] rounded ${stop.stopType === 'PU' ? 'bg-blue-100 text-blue-700' : stop.stopType === 'DO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
                             {stop.stopType}
                           </span>
                         )}
-                        {stop.clientName && <span className="text-xs font-semibold text-slate-800 truncate">{stop.clientName}</span>}
-                        {stop.stopTime && <span className="text-xs font-semibold text-slate-400">{to12hr(stop.stopTime)}</span>}
+                        {stop.clientName && <span className="text-[7px] font-semibold text-slate-800 truncate">{stop.clientName}</span>}
+                        {stop.stopTime && <span className="text-[7px] font-semibold text-slate-400">{to12hr(stop.stopTime)}</span>}
                       </div>
                     )}
                     <PlacesAutocompleteInput
