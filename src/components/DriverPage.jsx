@@ -4950,7 +4950,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {activeNav === 'chat' && (
         <div 
-          className="driver-page-chat-wrapper flex-1 overflow-hidden flex flex-col"
+          className="driver-page-chat-wrapper flex-1 min-h-0 overflow-hidden flex flex-col"
           style={{ paddingBottom: isChatThreadOpen ? 0 : 'calc(72px + env(safe-area-inset-bottom, 0px))' }}
         >
           <Suspense fallback={<div className="h-full flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
