@@ -542,7 +542,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, chatUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false }) => {
+const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, chatUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false }) => {
   const [phoneNumbersFallback, setPhoneNumbersFallback] = useState(null);
 
   useEffect(() => {
@@ -3493,14 +3493,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
       )}
 
-      {/* ===== TIME TRACKING STATUS INDICATOR ===== */}
-      {isClockedIn && ttState !== TT.OFF_SHIFT && activeNav !== 'settings' && (
-        <div className="absolute top-2 right-16 z-40 flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold border shadow-sm pointer-events-none
-          bg-emerald-50 border-emerald-200 text-emerald-700">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-          <span>{Math.floor(ttBillableMin / 60)}h {ttBillableMin % 60}m</span>
-        </div>
-      )}
+      {/* ===== TIME TRACKING CONTROLS (MOVED TO SETTINGS) ===== */}
 
       {/* ===== ACTIVE TRIP WORK PAGE ===== */}
       {activeNav === 'active-trip' && activeWorkTrip && (
@@ -5319,7 +5312,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Time Tracking Controls */}
-            {isClockedIn && ttState !== TT.OFF_SHIFT && (
+            {!isClockedIn ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center shadow-sm">
+                <div className="w-12 h-12 bg-slate-200 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Clock size={24} />
+                </div>
+                <h3 className="text-base font-bold text-slate-900 mb-1">Shift Ready</h3>
+                <p className="text-xs font-medium text-slate-500 mb-0">Your shift will automatically start based on your company policy (home departure or first trip start).</p>
+              </div>
+            ) : (
               <div className={`rounded-2xl border p-4 shadow-sm ${
                 ttState === TT.ON_BREAK
                   ? 'bg-amber-50 border-amber-200'
@@ -5344,11 +5345,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 </div>
                 <div className="flex gap-2">
                   {ttState === TT.ON_SHIFT_ACTIVE ? (
-                    <button onClick={ttStartBreak} className="flex-1 h-9 rounded-xl bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors text-sm font-bold">Take Break</button>
+                    <button type="button" onClick={ttStartBreak} disabled={driverScopedTrips.length === 0} className={`flex-1 h-11 rounded-xl text-sm font-bold transition-colors ${driverScopedTrips.length === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-amber-100 text-amber-700 hover:bg-amber-200 cursor-pointer'}`}>Take Break</button>
                   ) : (
-                    <button onClick={ttResume} className="flex-1 h-9 rounded-xl bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors text-sm font-bold">Resume</button>
+                    <button type="button" onClick={ttResume} disabled={driverScopedTrips.length === 0} className={`flex-1 h-11 rounded-xl text-sm font-bold transition-colors ${driverScopedTrips.length === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 cursor-pointer'}`}>Resume</button>
                   )}
-                  <button onClick={ttEndShift} className="flex-1 h-9 rounded-xl bg-rose-100 text-rose-700 hover:bg-rose-200 transition-colors text-sm font-bold">End Shift</button>
+                  <button type="button" onClick={ttEndShift} disabled={driverScopedTrips.length === 0} className={`flex-1 h-11 rounded-xl text-sm font-bold transition-colors ${driverScopedTrips.length === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-rose-100 text-rose-700 hover:bg-rose-200 cursor-pointer'}`}>End Shift</button>
                 </div>
               </div>
             )}
@@ -5704,10 +5705,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <Suspense fallback={<div className="h-full flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
             <LazyTimeTrackingAdmin
               onBack={() => setShowTTAdmin(false)}
-              drivers={allDrivers}
+              drivers={[...allDrivers, ...(dispatchers || [])]}
               trips={driverScopedTrips}
               clockEvents={me?.clockEvents || []}
               timeData={{ policyMode: timeTrackingPolicyMode }}
+              onUpdateClockEvents={onUpdateClockEvents}
+              onUpdateHourlyRate={onUpdateHourlyRate}
             />
           </Suspense>
         </div>
@@ -5722,16 +5725,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
             <h3 className="text-lg font-semibold text-slate-900 text-center">All trips complete!</h3>
             <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
-              You've finished all your trips. Would you like to clock out?
+              You've finished all your trips. Would you like to end your shift?
             </p>
 
             <div className="mt-5 space-y-2">
               <button onClick={() => { setShowClockOutOffer(false); handleClockToggle(); }} className="w-full h-7 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition active:scale-95 flex items-center justify-center gap-2">
-                <LogOut size={16} /> Clock Out Now
+                <LogOut size={16} /> End Shift Now
               </button>
 
               <div className="border-t border-slate-100 pt-3 mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Schedule clock-out</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Schedule end of shift</p>
                 <div className="flex items-center gap-2">
                   <input type="time" value={delayedClockOutTarget}
                     onChange={(e) => setDelayedClockOutTarget(e.target.value)}
@@ -5748,7 +5751,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="border-t border-slate-100 pt-3 mt-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Estimate from home</p>
                   <button onClick={() => scheduleDelayedClockOut(clockOutEstimate.targetTime)} className="w-full h-7 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs transition active:scale-95 flex items-center justify-center gap-2">
-                    <Navigation size={16} /> Clock out in ~{clockOutEstimate.label}
+                    <Navigation size={16} /> End shift in ~{clockOutEstimate.label}
                   </button>
                 </div>
               )}
@@ -5770,11 +5773,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
             <h3 className="text-lg font-semibold text-slate-900 text-center">No upcoming trips</h3>
             <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
-              You don't have any trips right now. Would you like to clock out?
+              You don't have any trips right now. Would you like to end your shift?
             </p>
             <div className="grid grid-cols-2 gap-3 mt-6">
               <button onClick={() => { setShowIdleLogoutPrompt(false); handleClockToggle(); }} className="h-7 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition active:scale-95">
-                Clock Out
+                End Shift
               </button>
               <button onClick={() => { setShowIdleLogoutPrompt(false); idlePromptedRef.current = true; }} className="h-7 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition active:scale-95">
                 Stay On
@@ -5985,7 +5988,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {/* ===== PASSWORD CONFIRM MODAL ===== */}
       {passwordPrompt && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 180 }} onClick={(e) => { e.stopPropagation(); }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative pointer-events-auto" style={{ zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
             {/* Header with step indicator */}
             <div className="flex items-center gap-0.5 mb-4">
               <div className="h-1 flex-1 rounded-full bg-emerald-400" />
@@ -6392,7 +6395,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             )}
             {showToast.action === 'geofence-clockout' && (
               <button type="button" onClick={() => { setShowToast(null); handleClockToggle(); }} className="px-4 py-2 bg-rose-500 rounded-xl text-xs font-semibold hover:bg-rose-400 transition-all shrink-0 cursor-pointer">
-                Clock Out
+                End Shift
               </button>
             )}
             <button type="button" onClick={() => setShowToast(null)} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0 cursor-pointer">

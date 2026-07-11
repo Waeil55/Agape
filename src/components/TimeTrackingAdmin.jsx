@@ -1,28 +1,9 @@
-/**
- * TimeTrackingAdmin.jsx - Admin audit view for time tracking sessions.
- * Shows session breakdown, gap logs, abuse flags, and payroll output.
- */
-
 import React, { useState, useMemo } from 'react';
 import {
-  Clock,
-  MapPin,
-  AlertTriangle,
-  Play,
-  Pause,
-  CheckCircle,
-  XCircle,
-  DollarSign,
-  FileText,
-  Filter,
-  Download,
-  ChevronDown,
-  ChevronUp,
-  Shield,
-  Timer,
-  TrendingUp,
-  User,
-  Navigation,
+  Clock, AlertTriangle, Play, Pause, CheckCircle, XCircle,
+  DollarSign, FileText, Download, ChevronDown, ChevronUp,
+  Shield, Timer, User, Navigation, Edit2, Trash2, Plus, X, Save,
+  Briefcase, Check
 } from 'lucide-react';
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES } from '../utils/timeTracking';
 
@@ -46,17 +27,6 @@ const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 };
 
-const getEventIcon = (type) => {
-  switch (type) {
-    case 'CLOCK_IN': case 'AUTO_CLOCK_IN': return <Play className="w-3 h-3 text-green-500" />;
-    case 'CLOCK_OUT': return <XCircle className="w-3 h-3 text-red-500" />;
-    case 'BREAK_START': return <Pause className="w-3 h-3 text-yellow-500" />;
-    case 'BREAK_END': return <Play className="w-3 h-3 text-blue-500" />;
-    case 'TRIP_COMPLETED': return <CheckCircle className="w-3 h-3 text-emerald-500" />;
-    default: return <Clock className="w-3 h-3 text-gray-500" />;
-  }
-};
-
 const getGapClassificationColor = (classification) => {
   switch (classification) {
     case 'SHORT': return 'bg-green-100 text-green-800';
@@ -66,95 +36,55 @@ const getGapClassificationColor = (classification) => {
   }
 };
 
-const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeData = null }) => {
+const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeData = null, onUpdateClockEvents, onBack, onUpdateHourlyRate }) => {
   const [selectedDriver, setSelectedDriver] = useState('ALL');
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [expandedDriver, setExpandedDriver] = useState(null);
   const [activeTab, setActiveTab] = useState('sessions');
+  const [editTimesheet, setEditTimesheet] = useState(null);
+  const [editingRate, setEditingRate] = useState(null);
+  const [rateValue, setRateValue] = useState('');
 
-  // Filter drivers by selected
   const filteredDrivers = useMemo(() => {
     if (selectedDriver === 'ALL') return drivers;
     return drivers.filter(d => d.id === selectedDriver);
   }, [drivers, selectedDriver]);
 
-  // Build sessions per driver from available trip and clock data.
   const driverSessions = useMemo(() => {
     const sessions = {};
-
     const toIso = (value) => {
       if (!value) return null;
-      if (typeof value === 'string') {
-        const date = new Date(value);
-        return Number.isNaN(date.getTime()) ? null : date.toISOString();
-      }
+      if (typeof value === 'string') { const d = new Date(value); return Number.isNaN(d.getTime()) ? null : d.toISOString(); }
       if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
       if (typeof value.toDate === 'function') return value.toDate().toISOString();
       if (value.seconds) return new Date(value.seconds * 1000).toISOString();
       return null;
     };
-
-    const dateKeyFrom = (value) => {
-      const iso = toIso(value);
-      return iso ? iso.slice(0, 10) : null;
-    };
-
+    const dateKeyFrom = (value) => { const iso = toIso(value); return iso ? iso.slice(0, 10) : null; };
     const tripDateKey = (trip) => {
       if (typeof trip?.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(trip.date)) return trip.date.slice(0, 10);
-      return dateKeyFrom(trip?.arrivalTime)
-        || dateKeyFrom(trip?.startTime)
-        || dateKeyFrom(trip?.startedAt)
-        || dateKeyFrom(trip?.arrivalDropoffTime)
-        || dateKeyFrom(trip?.completedAt);
+      return dateKeyFrom(trip?.arrivalTime) || dateKeyFrom(trip?.startTime) || dateKeyFrom(trip?.startedAt) || dateKeyFrom(trip?.arrivalDropoffTime) || dateKeyFrom(trip?.completedAt);
     };
-
     const eventDateKey = (event) => dateKeyFrom(event?.timestamp || event?.at || event?.createdAt || event?.time);
-    const inDateRange = (date) => (
-      !!date
-      && (!dateRange.from || date >= dateRange.from)
-      && (!dateRange.to || date <= dateRange.to)
-    );
+    const inDateRange = (date) => !!date && (!dateRange.from || date >= dateRange.from) && (!dateRange.to || date <= dateRange.to);
 
     const sourceTrips = timeData?.trips || trips || [];
-    const sourceClockEvents = [
-      ...(clockEvents || []),
-      ...(timeData?.clockEvents || []),
-    ];
+    const sourceClockEvents = [...(clockEvents || []), ...(timeData?.clockEvents || [])];
     const sourceGaps = timeData?.gaps || timeData?.gapLog || [];
     const sourceTeleports = timeData?.teleports || [];
 
     filteredDrivers.forEach(driver => {
       const driverId = driver.id;
-      const driverKeys = new Set([
-        driver.id,
-        driver.driverId,
-        driver.uid,
-        driver.email,
-        driver.name,
-      ].filter(Boolean).map(v => String(v).toLowerCase()));
-
+      const driverKeys = new Set([driver.id, driver.driverId, driver.uid, driver.email, driver.name].filter(Boolean).map(v => String(v).toLowerCase()));
       const matchesDriver = (item) => {
-        const values = [
-          item?.driverId,
-          item?.assignedDriverId,
-          item?.driverEmail,
-          item?.assignedDriverEmail,
-          item?.driverName,
-          item?.assignedDriverName,
-          item?.email,
-        ].filter(Boolean).map(v => String(v).toLowerCase());
+        const values = [item?.driverId, item?.assignedDriverId, item?.driverEmail, item?.assignedDriverEmail, item?.driverName, item?.assignedDriverName, item?.email].filter(Boolean).map(v => String(v).toLowerCase());
         return values.length === 0 ? false : values.some(v => driverKeys.has(v));
       };
-
       const driverTrips = sourceTrips.filter(matchesDriver);
-      const driverClockEvents = [
-        ...(driver.clockEvents || []),
-        ...sourceClockEvents.filter(matchesDriver),
-      ];
+      const driverClockEvents = [...(driver.clockEvents || []), ...sourceClockEvents.filter(matchesDriver)];
       const driverGaps = sourceGaps.filter(matchesDriver);
       const driverTeleports = sourceTeleports.filter(matchesDriver);
 
-      // Group by date
       const byDate = {};
       driverTrips.forEach(trip => {
         const date = tripDateKey(trip);
@@ -162,21 +92,18 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
         if (!byDate[date]) byDate[date] = { trips: [], clockEvents: [], gaps: [], teleports: [], events: [], sessions: [], payroll: null };
         byDate[date].trips.push(trip);
       });
-
       driverClockEvents.forEach(event => {
         const date = event.date || eventDateKey(event);
         if (!inDateRange(date)) return;
         if (!byDate[date]) byDate[date] = { trips: [], clockEvents: [], gaps: [], teleports: [], events: [], sessions: [], payroll: null };
         byDate[date].clockEvents.push(event);
       });
-
       driverGaps.forEach(gap => {
         const date = gap.date || dateKeyFrom(gap.startTime || gap.timestamp);
         if (!inDateRange(date)) return;
         if (!byDate[date]) byDate[date] = { trips: [], clockEvents: [], gaps: [], teleports: [], events: [], sessions: [], payroll: null };
         byDate[date].gaps.push(gap);
       });
-
       driverTeleports.forEach(teleport => {
         const date = teleport.date || dateKeyFrom(teleport.timestamp || teleport.createdAt);
         if (!inDateRange(date)) return;
@@ -185,14 +112,8 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
       });
 
       Object.entries(byDate).forEach(([date, day]) => {
-        const model = buildTimeEvents(
-          day.trips,
-          driver,
-          day.clockEvents,
-          timeData?.policyMode || driver.timeTrackingPolicy || POLICY_MODES.SMART_MODE,
-          { date, breadcrumbs: driver.breadcrumbs || [] }
-        );
-        const externalGaps = day.gaps.filter(gap => !model.gapLog.some(modelGap => modelGap.startTime === gap.startTime && modelGap.endTime === gap.endTime));
+        const model = buildTimeEvents(day.trips, driver, day.clockEvents, timeData?.policyMode || driver.timeTrackingPolicy || POLICY_MODES.SMART_MODE, { date, breadcrumbs: driver.breadcrumbs || [] });
+        const externalGaps = day.gaps.filter(gap => !model.gapLog.some(mg => mg.startTime === gap.startTime && mg.endTime === gap.endTime));
         day.trips = model.trips;
         day.clockEvents = model.clockEvents;
         day.events = model.events;
@@ -201,66 +122,95 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
         day.teleports = [...model.teleports, ...day.teleports];
         day.payroll = generatePayrollOutput(model, Number(driver.hourlyRate || 0));
       });
-
       sessions[driverId] = byDate;
     });
     return sessions;
   }, [filteredDrivers, trips, clockEvents, timeData, dateRange.from, dateRange.to]);
 
-  // Summary stats
   const summaryStats = useMemo(() => {
     const allSessions = Object.values(driverSessions).flatMap(byDate => Object.values(byDate));
-    const totalTrips = allSessions.reduce((sum, s) => sum + s.trips.length, 0);
-    const totalGaps = allSessions.reduce((sum, s) => sum + s.gaps.length, 0);
-    const totalTeleports = allSessions.reduce((sum, s) => sum + s.teleports.length, 0);
-    const excludedMinutes = allSessions.reduce((sum, s) =>
-      sum + s.gaps.filter(g => g.payrollEffect === 'EXCLUDED').reduce((s2, g) => s2 + g.durationMinutes, 0), 0
-    );
-
     return {
-      totalTrips,
-      totalGaps,
-      totalTeleports,
-      excludedMinutes,
+      totalTrips: allSessions.reduce((sum, s) => sum + s.trips.length, 0),
+      totalGaps: allSessions.reduce((sum, s) => sum + s.gaps.length, 0),
+      totalTeleports: allSessions.reduce((sum, s) => sum + s.teleports.length, 0),
+      excludedMinutes: allSessions.reduce((sum, s) => sum + s.gaps.filter(g => g.payrollEffect === 'EXCLUDED').reduce((s2, g) => s2 + g.durationMinutes, 0), 0),
     };
   }, [driverSessions]);
 
-  // Export CSV
+  const getDayBillable = (day) => day.payroll?.payTime?.billableMinutes ?? day.sessions.reduce((sum, s) => sum + (s.billableMinutes || 0), 0) ?? day.trips.reduce((sum, t) => sum + (t.billableMinutes || 0), 0);
+
+  const getDayEarnings = (day, hourlyRate) => {
+    const billable = getDayBillable(day);
+    const hours = billable / 60;
+    const regular = Math.min(hours, 8);
+    const overtime = Math.max(0, hours - 8);
+    return regular * hourlyRate + overtime * hourlyRate * 1.5;
+  };
+
+  const handleSaveRate = (driverId, value) => {
+    const num = parseFloat(value);
+    if (!isNaN(num) && num >= 0 && onUpdateHourlyRate) {
+      onUpdateHourlyRate(driverId, num.toFixed(2));
+    }
+    setEditingRate(null);
+    setRateValue('');
+  };
+
   const exportCSV = () => {
-    const rows = [['Driver', 'Date', 'Clock In', 'Clock Out', 'Billable Minutes', 'Break Minutes', 'Gap Minutes', 'Trips', 'Gaps', 'Teleports']];
+    const rows = [['Name', 'Role', 'Date', 'Clock In', 'Clock Out', 'Billable Min', 'Break Min', 'Rate', 'Earnings', 'Trips']];
     Object.entries(driverSessions).forEach(([driverId, byDate]) => {
       const driver = drivers.find(d => d.id === driverId);
+      const rate = Number(driver?.hourlyRate || 0);
       Object.entries(byDate).forEach(([date, session]) => {
         const clockIn = session.clockEvents.find(e => e.type === 'IN' || e.type === 'CLOCK_IN' || e.type === 'AUTO_CLOCK_IN');
         const clockOut = session.clockEvents.find(e => e.type === 'OUT' || e.type === 'CLOCK_OUT');
-        const billable = session.payroll?.payTime?.billableMinutes
-          ?? session.sessions.reduce((sum, s) => sum + (s.billableMinutes || 0), 0)
-          ?? session.trips.reduce((sum, t) => sum + (t.billableMinutes || 0), 0);
+        const billable = getDayBillable(session);
         const breaks = session.gaps.filter(g => g.gapType === 'BREAK').reduce((sum, g) => sum + g.durationMinutes, 0);
-        const gaps = session.gaps.filter(g => g.payrollEffect === 'EXCLUDED').reduce((sum, g) => sum + g.durationMinutes, 0);
-        rows.push([
-          driver?.name || driverId,
-          date,
-          clockIn?.at ? formatTime(clockIn.at) : '',
-          clockOut?.at ? formatTime(clockOut.at) : '',
-          Math.round(billable),
-          Math.round(breaks),
-          Math.round(gaps),
-          session.trips.length,
-          session.gaps.length,
-          session.teleports.length,
-        ]);
+        const earnings = getDayEarnings(session, rate);
+        rows.push([driver?.name || driverId, driver?.role || 'driver', date, clockIn?.timestamp ? formatTime(clockIn.timestamp) : '', clockOut?.timestamp ? formatTime(clockOut.timestamp) : '', Math.round(billable), Math.round(breaks), rate.toFixed(2), earnings.toFixed(2), session.trips.length]);
       });
     });
-
     const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `agape-timetracking-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `agape-payroll-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const RateInput = ({ driver }) => {
+    const isEditing = editingRate === driver.id;
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-gray-400">$</span>
+          <input
+            type="number"
+            step="0.50"
+            min="0"
+            value={rateValue}
+            onChange={(e) => setRateValue(e.target.value)}
+            onBlur={() => handleSaveRate(driver.id, rateValue)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRate(driver.id, rateValue); if (e.key === 'Escape') { setEditingRate(null); setRateValue(''); } }}
+            autoFocus
+            className="w-16 px-1.5 py-0.5 border border-blue-300 rounded text-sm text-right font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <button onClick={() => handleSaveRate(driver.id, rateValue)} className="p-0.5 text-green-600 hover:bg-green-50 rounded"><Check size={12} /></button>
+        </div>
+      );
+    }
+    const rate = Number(driver.hourlyRate || 0);
+    return (
+      <button
+        onClick={() => { setEditingRate(driver.id); setRateValue(rate > 0 ? rate.toFixed(2) : ''); }}
+        className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-1.5 py-0.5 rounded transition-colors"
+        title="Click to edit hourly rate"
+      >
+        {rate > 0 ? `$${rate.toFixed(2)}/hr` : <span className="text-gray-400 italic">Set rate</span>}
+      </button>
+    );
   };
 
   return (
@@ -268,128 +218,93 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
-              <Timer className="w-6 h-6 text-blue-600" />
-              Time Tracking Audit
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">Review driver sessions, gaps, and payroll</p>
-          </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={exportCSV}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              <Download className="w-4 h-4" />
-              Export CSV
-            </button>
+            {onBack && (
+              <button onClick={onBack} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <X size={20} />
+              </button>
+            )}
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+                <Timer className="w-6 h-6 text-blue-600" />
+                Payroll & Time Tracking
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">Review sessions, manage rates, and calculate payroll</p>
+            </div>
           </div>
+          <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+            <Download className="w-4 h-4" />
+            Export CSV
+          </button>
         </div>
 
         {/* Filters */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Driver</label>
-              <select
-                value={selectedDriver}
-                onChange={(e) => setSelectedDriver(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="ALL">All Drivers</option>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Person</label>
+              <select value={selectedDriver} onChange={(e) => setSelectedDriver(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                <option value="ALL">Everyone</option>
                 {drivers.map(d => (
-                  <option key={d.id} value={d.id}>{d.name || d.id}</option>
+                  <option key={d.id} value={d.id}>{d.name || d.id} ({d.role === 'dispatcher' ? 'Dispatcher' : 'Driver'})</option>
                 ))}
               </select>
             </div>
             <div className="min-w-[150px]">
               <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
-              <input
-                type="date"
-                value={dateRange.from}
-                onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              />
+              <input type="date" value={dateRange.from} onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="min-w-[150px]">
               <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
-              <input
-                type="date"
-                value={dateRange.to}
-                onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              />
+              <input type="date" value={dateRange.to} onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
         </div>
 
         {/* Summary Stats */}
-        {summaryStats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Navigation className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Total Trips</p>
-                  <p className="text-xl font-semibold text-gray-900">{summaryStats.totalTrips}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-50 rounded-lg">
-                  <Clock className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Total Gaps</p>
-                  <p className="text-xl font-semibold text-gray-900">{summaryStats.totalGaps}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-50 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Teleport Flags</p>
-                  <p className="text-xl font-semibold text-gray-900">{summaryStats.totalTeleports}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-50 rounded-lg">
-                  <FileText className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Excluded Minutes</p>
-                  <p className="text-xl font-semibold text-gray-900">{formatMinutes(summaryStats.excludedMinutes)}</p>
-                </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 rounded-lg"><Navigation className="w-5 h-5 text-blue-600" /></div>
+              <div>
+                <p className="text-sm text-gray-500">Total Trips</p>
+                <p className="text-xl font-semibold text-gray-900">{summaryStats.totalTrips}</p>
               </div>
             </div>
           </div>
-        )}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-yellow-50 rounded-lg"><Clock className="w-5 h-5 text-yellow-600" /></div>
+              <div>
+                <p className="text-sm text-gray-500">Total Gaps</p>
+                <p className="text-xl font-semibold text-gray-900">{summaryStats.totalGaps}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-50 rounded-lg"><AlertTriangle className="w-5 h-5 text-red-600" /></div>
+              <div>
+                <p className="text-sm text-gray-500">Teleport Flags</p>
+                <p className="text-xl font-semibold text-gray-900">{summaryStats.totalTeleports}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-50 rounded-lg"><DollarSign className="w-5 h-5 text-green-600" /></div>
+              <div>
+                <p className="text-sm text-gray-500">Excluded Min</p>
+                <p className="text-xl font-semibold text-gray-900">{formatMinutes(summaryStats.excludedMinutes)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
-          {[
-            { id: 'sessions', label: 'Sessions' },
-            { id: 'gaps', label: 'Gap Log' },
-            { id: 'abuse', label: 'Abuse Flags' },
-            { id: 'payroll', label: 'Payroll' },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
+          {[{ id: 'sessions', label: 'Sessions' }, { id: 'gaps', label: 'Gap Log' }, { id: 'abuse', label: 'Abuse' }, { id: 'payroll', label: 'Payroll' }].map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === tab.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
               {tab.label}
             </button>
           ))}
@@ -403,23 +318,31 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               const isExpanded = expandedDriver === driverId;
               const dates = Object.keys(byDate).sort().reverse();
               const totalTrips = dates.reduce((sum, d) => sum + byDate[d].trips.length, 0);
+              const totalBillable = dates.reduce((sum, d) => sum + getDayBillable(byDate[d]), 0);
+              const rate = Number(driver?.hourlyRate || 0);
+              const isDispatcher = driver?.role === 'dispatcher';
 
               return (
                 <div key={driverId} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <button
-                    onClick={() => setExpandedDriver(isExpanded ? null : driverId)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50"
-                  >
+                  <button onClick={() => setExpandedDriver(isExpanded ? null : driverId)} className="w-full flex items-center justify-between p-4 hover:bg-gray-50">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <User className="w-5 h-5 text-blue-600" />
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDispatcher ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                        {isDispatcher ? <Briefcase className="w-5 h-5 text-purple-600" /> : <User className="w-5 h-5 text-blue-600" />}
                       </div>
                       <div className="text-left">
-                        <p className="font-medium text-gray-900">{driver?.name || driverId}</p>
-                        <p className="text-sm text-gray-500">{dates.length} days · {totalTrips} trips</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-gray-900">{driver?.name || driverId}</p>
+                          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${isDispatcher ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {isDispatcher ? 'Dispatcher' : 'Driver'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-500">{dates.length} days · {totalTrips} trips · {formatMinutes(totalBillable)} worked</p>
                       </div>
                     </div>
-                    {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    <div className="flex items-center gap-3">
+                      <RateInput driver={driver} />
+                      {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    </div>
                   </button>
 
                   {isExpanded && (
@@ -428,10 +351,9 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                         const day = byDate[date];
                         const clockIn = day.clockEvents.find(e => e.type === 'IN' || e.type === 'CLOCK_IN' || e.type === 'AUTO_CLOCK_IN');
                         const clockOut = day.clockEvents.find(e => e.type === 'OUT' || e.type === 'CLOCK_OUT');
-                        const billable = day.payroll?.payTime?.billableMinutes
-                          ?? day.sessions.reduce((sum, s) => sum + (s.billableMinutes || 0), 0)
-                          ?? day.trips.reduce((sum, t) => sum + (t.billableMinutes || 0), 0);
+                        const billable = getDayBillable(day);
                         const breaks = day.gaps.filter(g => g.gapType === 'BREAK').reduce((sum, g) => sum + g.durationMinutes, 0);
+                        const earnings = getDayEarnings(day, rate);
 
                         return (
                           <div key={date} className="px-4 py-3 border-t border-gray-50">
@@ -439,22 +361,17 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                               <div className="flex items-center gap-3">
                                 <span className="text-sm font-medium text-gray-900">{formatDate(date + 'T12:00:00')}</span>
                                 <span className="text-sm text-gray-500">
-                                  {formatTime(clockIn?.at)} → {formatTime(clockOut?.at)}
+                                  {formatTime(clockIn?.timestamp || clockIn?.at)} → {formatTime(clockOut?.timestamp || clockOut?.at)}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-4 text-sm text-gray-600">
-                                <span className="flex items-center gap-1">
-                                  <Timer className="w-3 h-3" />
-                                  {formatMinutes(billable)}
-                                </span>
-                                <span className="flex items-center gap-1 text-yellow-600">
-                                  <Pause className="w-3 h-3" />
-                                  {formatMinutes(breaks)}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Navigation className="w-3 h-3" />
-                                  {day.trips.length} trips
-                                </span>
+                              <div className="flex items-center gap-3 text-sm text-gray-600">
+                                <span className="flex items-center gap-1"><Timer className="w-3 h-3" />{formatMinutes(billable)}</span>
+                                {breaks > 0 && <span className="flex items-center gap-1 text-yellow-600"><Pause className="w-3 h-3" />{formatMinutes(breaks)}</span>}
+                                <span className="flex items-center gap-1"><Navigation className="w-3 h-3" />{day.trips.length}</span>
+                                {rate > 0 && <span className="font-semibold text-green-700">{formatCurrency(earnings)}</span>}
+                                <button onClick={() => setEditTimesheet({ driverId, date, events: [...day.clockEvents] })} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Edit Timesheet">
+                                  <Edit2 size={14} />
+                                </button>
                               </div>
                             </div>
                             {day.trips.length > 0 && (
@@ -465,9 +382,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                                     <span className="text-gray-700">{trip.patient || trip.id}</span>
                                     <span className="text-gray-400">→</span>
                                     <span className="text-gray-500">{trip.destination || '—'}</span>
-                                    {trip.billableMinutes > 0 && (
-                                      <span className="text-gray-400 text-xs">{formatMinutes(trip.billableMinutes)}</span>
-                                    )}
+                                    {trip.billableMinutes > 0 && <span className="text-gray-400 text-xs">{formatMinutes(trip.billableMinutes)}</span>}
                                   </div>
                                 ))}
                               </div>
@@ -484,7 +399,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
                 <Timer className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500">No time tracking sessions found</p>
-                <p className="text-sm text-gray-400 mt-1">Sessions are created automatically when drivers clock in</p>
+                <p className="text-sm text-gray-400 mt-1">Sessions are created automatically when people clock in</p>
               </div>
             )}
           </div>
@@ -500,41 +415,23 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
             <div className="divide-y divide-gray-100">
               {(() => {
                 const allGaps = Object.entries(driverSessions).flatMap(([driverId, byDate]) =>
-                  Object.entries(byDate).flatMap(([date, session]) =>
-                    session.gaps.map(g => ({ ...g, driverId, date }))
-                  )
+                  Object.entries(byDate).flatMap(([date, session]) => session.gaps.map(g => ({ ...g, driverId, date })))
                 ).sort((a, b) => new Date(b.timestamp || b.startTime) - new Date(a.timestamp || a.startTime));
-
-                if (allGaps.length === 0) {
-                  return (
-                    <div className="p-8 text-center text-gray-500">
-                      No gaps recorded yet
-                    </div>
-                  );
-                }
-
+                if (allGaps.length === 0) return <div className="p-8 text-center text-gray-500">No gaps recorded</div>;
                 return allGaps.map((gap, i) => (
-                  <div key={i} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getGapClassificationColor(gap.classification)}`}>
-                          {gap.classification}
-                        </span>
-                        <div>
-                          <p className="text-sm text-gray-900">
-                            {gap.gapType === 'TRIP' ? 'Between trips' : gap.gapType === 'BREAK' ? 'Break' : 'After trip'}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {formatDate(gap.timestamp || gap.startTime)} at {formatTime(gap.timestamp || gap.startTime)}
-                          </p>
-                        </div>
+                  <div key={i} className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getGapClassificationColor(gap.classification)}`}>{gap.classification}</span>
+                      <div>
+                        <p className="text-sm text-gray-900">{gap.gapType === 'TRIP' ? 'Between trips' : gap.gapType === 'BREAK' ? 'Break' : 'After trip'}</p>
+                        <p className="text-xs text-gray-500">{formatDate(gap.timestamp || gap.startTime)} at {formatTime(gap.timestamp || gap.startTime)}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">{formatMinutes(gap.durationMinutes)}</p>
-                        <p className={`text-xs ${gap.payrollEffect === 'EXCLUDED' ? 'text-red-500' : 'text-green-500'}`}>
-                          {gap.payrollEffect === 'EXCLUDED' ? 'Excluded from payroll' : 'Counted in payroll'}
-                        </p>
-                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-gray-900">{formatMinutes(gap.durationMinutes)}</p>
+                      <p className={`text-xs ${gap.payrollEffect === 'EXCLUDED' ? 'text-red-500' : 'text-green-500'}`}>
+                        {gap.payrollEffect === 'EXCLUDED' ? 'Excluded' : 'Included'}
+                      </p>
                     </div>
                   </div>
                 ));
@@ -547,49 +444,30 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
         {activeTab === 'abuse' && (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="p-4 border-b border-gray-100">
-              <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                <Shield className="w-4 h-4 text-red-500" />
-                Abuse Detection
-              </h3>
-              <p className="text-sm text-gray-500">GPS spoofing, teleport, and abnormal activity flags</p>
+              <h3 className="font-medium text-gray-900 flex items-center gap-2"><Shield className="w-4 h-4 text-red-500" />Abuse Detection</h3>
             </div>
             <div className="divide-y divide-gray-100">
               {(() => {
                 const allFlags = Object.entries(driverSessions).flatMap(([driverId, byDate]) =>
-                  Object.entries(byDate).flatMap(([date, session]) =>
-                    session.teleports.map(t => ({ ...t, driverId, date }))
-                  )
+                  Object.entries(byDate).flatMap(([date, session]) => session.teleports.map(t => ({ ...t, driverId, date })))
                 ).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-                if (allFlags.length === 0) {
-                  return (
-                    <div className="p-8 text-center">
-                      <Shield className="w-12 h-12 text-green-300 mx-auto mb-4" />
-                      <p className="text-green-600 font-medium">No abuse flags detected</p>
-                      <p className="text-sm text-gray-400 mt-1">All GPS activity looks normal</p>
-                    </div>
-                  );
-                }
-
+                if (allFlags.length === 0) return (
+                  <div className="p-8 text-center">
+                    <Shield className="w-12 h-12 text-green-300 mx-auto mb-4" />
+                    <p className="text-green-600 font-medium">No abuse flags detected</p>
+                    <p className="text-sm text-gray-400 mt-1">All GPS activity looks normal</p>
+                  </div>
+                );
                 return allFlags.map((flag, i) => (
-                  <div key={i} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-red-50 rounded-lg">
-                          <AlertTriangle className="w-4 h-4 text-red-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{flag.flagType || 'GPS Anomaly'}</p>
-                          <p className="text-xs text-gray-500">
-                            {formatDate(flag.timestamp)} at {formatTime(flag.timestamp)}
-                            {flag.mph ? ` · ${Math.round(flag.mph)} mph` : ''}
-                          </p>
-                        </div>
+                  <div key={i} className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-red-50 rounded-lg"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{flag.flagType || 'GPS Anomaly'}</p>
+                        <p className="text-xs text-gray-500">{formatDate(flag.timestamp)} at {formatTime(flag.timestamp)}{flag.mph ? ` · ${Math.round(flag.mph)} mph` : ''}</p>
                       </div>
-                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                        {flag.severity || 'HIGH'}
-                      </span>
                     </div>
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-800">{flag.severity || 'HIGH'}</span>
                   </div>
                 ));
               })()}
@@ -605,94 +483,160 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                 <DollarSign className="w-4 h-4 text-green-600" />
                 Payroll Summary
               </h3>
-              <p className="text-sm text-gray-500">Billable hours and estimated payroll by driver</p>
+              <p className="text-sm text-gray-500">Earnings by person with daily and weekly breakdowns</p>
             </div>
-            <div className="divide-y divide-gray-100">
-              {(() => {
-                const driverPayroll = Object.entries(driverSessions).map(([driverId, byDate]) => {
-                  const driver = drivers.find(d => d.id === driverId);
-                  const dates = Object.keys(byDate);
-                  const totalBillable = dates.reduce((sum, d) =>
-                    sum + (
-                      byDate[d].payroll?.payTime?.billableMinutes
-                      ?? byDate[d].sessions.reduce((s, session) => s + (session.billableMinutes || 0), 0)
-                      ?? byDate[d].trips.reduce((s, t) => s + (t.billableMinutes || 0), 0)
-                    ), 0
-                  );
-                  const totalBreaks = dates.reduce((sum, d) =>
-                    sum + byDate[d].gaps.filter(g => g.gapType === 'BREAK').reduce((s, g) => s + g.durationMinutes, 0), 0
-                  );
-                  const totalExcluded = dates.reduce((sum, d) =>
-                    sum + byDate[d].gaps.filter(g => g.payrollEffect === 'EXCLUDED').reduce((s, g) => s + g.durationMinutes, 0), 0
-                  );
-                  const totalTrips = dates.reduce((sum, d) => sum + byDate[d].trips.length, 0);
+            {(() => {
+              const personPayroll = Object.entries(driverSessions).map(([driverId, byDate]) => {
+                const driver = drivers.find(d => d.id === driverId);
+                const rate = Number(driver?.hourlyRate || 0);
+                const dates = Object.keys(byDate);
+                const totalBillable = dates.reduce((sum, d) => sum + getDayBillable(byDate[d]), 0);
+                const totalBreaks = dates.reduce((sum, d) => sum + byDate[d].gaps.filter(g => g.gapType === 'BREAK').reduce((s, g) => s + g.durationMinutes, 0), 0);
+                const totalTrips = dates.reduce((sum, d) => sum + byDate[d].trips.length, 0);
+                const billableHours = Math.round((totalBillable / 60) * 100) / 100;
+                const regularHours = Math.min(billableHours, 8);
+                const overtimeHours = Math.max(0, billableHours - 8);
+                const totalEarnings = regularHours * rate + overtimeHours * rate * 1.5;
 
-                  return {
-                    driver,
-                    driverId,
-                    days: dates.length,
-                    totalTrips,
-                    totalBillable,
-                    totalBreaks,
-                    totalExcluded,
-                    billableHours: Math.round((totalBillable / 60) * 100) / 100,
-                  };
-                }).sort((a, b) => b.billableHours - a.billableHours);
+                const dailyBreakdown = dates.map(date => {
+                  const day = byDate[date];
+                  const dayBillable = getDayBillable(day);
+                  const dayHours = Math.round((dayBillable / 60) * 100) / 100;
+                  const dayEarnings = getDayEarnings(day, rate);
+                  return { date, hours: dayHours, earnings: dayEarnings, trips: day.trips.length };
+                });
 
-                if (driverPayroll.length === 0) {
-                  return (
-                    <div className="p-8 text-center text-gray-500">
-                      No payroll data available
-                    </div>
-                  );
-                }
+                return { driver, driverId, rate, dates: dates.length, totalTrips, totalBillable, totalBreaks, billableHours, regularHours, overtimeHours, totalEarnings, dailyBreakdown };
+              }).sort((a, b) => b.totalEarnings - a.totalEarnings);
 
-                return (
-                  <>
-                    <div className="p-4 bg-gray-50">
-                      <div className="grid grid-cols-6 gap-4 text-xs font-medium text-gray-500 uppercase">
-                        <div>Driver</div>
-                        <div className="text-center">Days</div>
-                        <div className="text-center">Trips</div>
-                        <div className="text-center">Billable</div>
-                        <div className="text-center">Breaks</div>
-                        <div className="text-center">Excluded</div>
-                      </div>
-                    </div>
-                    {driverPayroll.map(({ driver, driverId, days, totalTrips, totalBillable, totalBreaks, totalExcluded, billableHours }) => (
-                      <div key={driverId} className="p-4">
-                        <div className="grid grid-cols-6 gap-4 items-center">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{driver?.name || driverId}</p>
+              const grandTotalEarnings = personPayroll.reduce((sum, p) => sum + p.totalEarnings, 0);
+              const grandTotalHours = personPayroll.reduce((sum, p) => sum + p.billableHours, 0);
+
+              if (personPayroll.length === 0) return <div className="p-8 text-center text-gray-500">No payroll data available</div>;
+
+              return (
+                <div className="divide-y divide-gray-100">
+                  {personPayroll.map(({ driver, driverId, rate, dates: numDays, totalTrips, totalBillable, totalBreaks, billableHours, regularHours, overtimeHours, totalEarnings, dailyBreakdown }) => {
+                    const isExpanded = expandedDriver === `payroll-${driverId}`;
+                    const isDispatcher = driver?.role === 'dispatcher';
+                    return (
+                      <div key={driverId}>
+                        <button onClick={() => setExpandedDriver(isExpanded ? null : `payroll-${driverId}`)} className="w-full p-4 hover:bg-gray-50 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDispatcher ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                              {isDispatcher ? <Briefcase className="w-4 h-4 text-purple-600" /> : <User className="w-4 h-4 text-blue-600" />}
+                            </div>
+                            <div className="text-left">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-gray-900">{driver?.name || driverId}</p>
+                                <span className={`text-[9px] font-semibold uppercase px-1 py-0.5 rounded ${isDispatcher ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                  {isDispatcher ? 'DSP' : 'DRV'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500">{numDays} days · {totalTrips} trips</p>
+                            </div>
                           </div>
-                          <div className="text-center text-sm text-gray-700">{days}</div>
-                          <div className="text-center text-sm text-gray-700">{totalTrips}</div>
-                          <div className="text-center">
-                            <span className="text-sm font-semibold text-gray-900">{billableHours}h</span>
-                            <span className="text-xs text-gray-400 ml-1">({formatMinutes(totalBillable)})</span>
+                          <div className="flex items-center gap-4">
+                            <RateInput driver={driver} />
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-gray-900">{billableHours.toFixed(1)}h</p>
+                              <p className="text-xs text-gray-500">{formatMinutes(totalBillable)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-green-700">{formatCurrency(totalEarnings)}</p>
+                              {overtimeHours > 0 && <p className="text-[10px] text-amber-600">{overtimeHours.toFixed(1)}h OT @ 1.5x</p>}
+                            </div>
+                            {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                           </div>
-                          <div className="text-center text-sm text-yellow-600">{formatMinutes(totalBreaks)}</div>
-                          <div className="text-center text-sm text-red-500">{formatMinutes(totalExcluded)}</div>
-                        </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="px-4 pb-4">
+                            <div className="bg-gray-50 rounded-xl overflow-hidden">
+                              <div className="grid grid-cols-5 gap-2 px-4 py-2 text-[10px] font-semibold text-gray-500 uppercase">
+                                <div>Date</div>
+                                <div className="text-center">Hours</div>
+                                <div className="text-center">Trips</div>
+                                <div className="text-center">Rate</div>
+                                <div className="text-right">Earnings</div>
+                              </div>
+                              {dailyBreakdown.map(day => (
+                                <div key={day.date} className="grid grid-cols-5 gap-2 px-4 py-2 border-t border-gray-100 text-sm">
+                                  <div className="text-gray-700">{formatDate(day.date + 'T12:00:00')}</div>
+                                  <div className="text-center text-gray-700">{day.hours.toFixed(1)}h</div>
+                                  <div className="text-center text-gray-700">{day.trips}</div>
+                                  <div className="text-center text-gray-500">${rate.toFixed(2)}</div>
+                                  <div className="text-right font-medium text-gray-900">{formatCurrency(day.earnings)}</div>
+                                </div>
+                              ))}
+                              <div className="grid grid-cols-5 gap-2 px-4 py-2 border-t border-gray-200 bg-gray-100 text-sm font-semibold">
+                                <div className="text-gray-700">Subtotal</div>
+                                <div className="text-center text-gray-900">{billableHours.toFixed(1)}h</div>
+                                <div className="text-center text-gray-900">{totalTrips}</div>
+                                <div className="text-center text-gray-500">
+                                  {overtimeHours > 0 ? <span className="text-xs">Reg + OT</span> : `$${rate.toFixed(2)}`}
+                                </div>
+                                <div className="text-right text-green-700">{formatCurrency(totalEarnings)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ))}
-                    <div className="p-4 bg-gray-50 border-t">
-                      <div className="flex justify-end">
-                        <div className="text-right">
-                          <p className="text-sm text-gray-500">Total Billable Hours</p>
-                          <p className="text-xl font-semibold text-gray-900">
-                            {driverPayroll.reduce((sum, d) => sum + d.billableHours, 0).toFixed(1)}h
-                          </p>
-                        </div>
-                      </div>
+                    );
+                  })}
+                  <div className="p-4 bg-gray-50 flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700">Total Payroll ({personPayroll.length} people)</p>
+                    <div className="flex items-center gap-6">
+                      <p className="text-sm text-gray-600">{grandTotalHours.toFixed(1)} total hours</p>
+                      <p className="text-xl font-bold text-green-700">{formatCurrency(grandTotalEarnings)}</p>
                     </div>
-                  </>
-                );
-              })()}
-            </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
+
+      {/* Edit Timesheet Modal */}
+      {editTimesheet && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl w-full max-w-lg">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-lg font-bold text-gray-900">Edit Timesheet — {formatDate(editTimesheet.date + 'T12:00:00')}</h3>
+              <button onClick={() => setEditTimesheet(null)} className="p-2 text-gray-400 hover:bg-gray-200 rounded-full transition"><X size={18} /></button>
+            </div>
+            <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
+              {editTimesheet.events.sort((a, b) => new Date(a.timestamp || a.at) - new Date(b.timestamp || b.at)).map((event, index) => (
+                <div key={index} className="flex items-center gap-3 bg-white border border-gray-200 p-3 rounded-xl">
+                  <select value={event.type} onChange={(e) => { const n = [...editTimesheet.events]; n[index].type = e.target.value; setEditTimesheet({ ...editTimesheet, events: n }); }}
+                    className="p-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:outline-none focus:border-blue-500">
+                    <option value="IN">Clock In</option>
+                    <option value="OUT">Clock Out</option>
+                    <option value="BREAK_START">Break Start</option>
+                    <option value="BREAK_END">Break End</option>
+                  </select>
+                  <input type="time" value={new Date(event.timestamp || event.at).toTimeString().slice(0, 5)}
+                    onChange={(e) => { const [h, m] = e.target.value.split(':'); const d = new Date(editTimesheet.date + 'T00:00:00'); d.setHours(parseInt(h), parseInt(m)); const n = [...editTimesheet.events]; n[index].timestamp = d.toISOString(); setEditTimesheet({ ...editTimesheet, events: n }); }}
+                    className="flex-1 p-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
+                  <button onClick={() => setEditTimesheet({ ...editTimesheet, events: editTimesheet.events.filter((_, i) => i !== index) })}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 size={16} /></button>
+                </div>
+              ))}
+              <button onClick={() => { const d = new Date(editTimesheet.date + 'T09:00:00'); setEditTimesheet({ ...editTimesheet, events: [...editTimesheet.events, { type: 'IN', at: d.toISOString(), timestamp: d.toISOString() }] }); }}
+                className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors font-semibold text-sm">
+                <Plus size={16} /> Add Event
+              </button>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex gap-3 bg-gray-50">
+              <button onClick={() => setEditTimesheet(null)} className="flex-1 p-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition">Cancel</button>
+              <button onClick={() => { if (onUpdateClockEvents) onUpdateClockEvents(editTimesheet.driverId, editTimesheet.date, editTimesheet.events); setEditTimesheet(null); }}
+                className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                <Save size={16} /> Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

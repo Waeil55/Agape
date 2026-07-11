@@ -518,7 +518,7 @@ const App = () => {
   const {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
     loading: dataLoading, saving: dataSaving, error: dataError, lastSavedAt,
-    setTrips, setDrivers, upsertDriverProfile, setDispatchers, setVehicles,
+    setTrips, setDrivers, upsertDriverProfile, upsertDriverTrip, setDispatchers, setVehicles,
     setTrashedTrips, setLogs, setPhoneNumbers,
     addLog, initializeAppData,
   } = useFirestoreAppData({ resubscribeKey: realtimeReliability.resubscribeKey, enabled: isAuthenticated });
@@ -758,12 +758,15 @@ const App = () => {
 
   const updateAppSettings = useCallback((updates, isProfileUpdate = false) => {
     if (isProfileUpdate && role === 'driver' && updates.odometer !== undefined) {
-      setDrivers(prev => prev.map(d => d.email === currentUser ? { ...d, odometer: updates.odometer } : d));
-      addToast('Profile Updated', 'Your vehicle odometer has been synchronized.', 'success');
+      const driverId = drivers.find(d => normalizeEmail(d.email) === normalizeEmail(currentUser))?.id;
+      if (driverId) {
+        upsertDriverProfile(driverId, { odometer: updates.odometer });
+        addToast('Profile Updated', 'Your vehicle odometer has been synchronized.', 'success');
+      }
     } else {
       setAppSettings((prev) => ({ ...prev, ...updates }));
     }
-  }, [role, currentUser, setDrivers]);
+  }, [role, currentUser, drivers, upsertDriverProfile, addToast]);
 
   const handleUpdatePhoneNumbers = useCallback((updates) => {
     setPhoneNumbers(prev => ({ ...prev, ...updates }));
@@ -2095,20 +2098,7 @@ const App = () => {
       ...(clockedIn && clockChanged ? { clockedInAt: eventTimestamp } : {}),
     };
     if (merged.clockLocation) delete merged.clockLocation;
-    setDrivers(prevDrivers => {
-      const driverExists = prevDrivers.some(d => d.id === driverId);
-      const workingDrivers = driverExists
-        ? prevDrivers
-        : [...prevDrivers, { ...buildDriverProfileFromEmail(currentUser || '', auth.currentUser?.uid || ''), id: driverId }];
-      const updated = workingDrivers.map(d => d.id === driverId ? {
-        ...d,
-        clockedIn,
-        lastUpdate: now,
-        status: clockedIn ? 'Available' : 'Offline',
-        ...merged,
-      } : d);
-      return updated;
-    });
+    // Local state is updated safely within upsertDriverProfile
     const driverName = prevDriverState?.name || driverId;
     const changed = [];
     if (wasClockedIn !== clockedIn) changed.push({ field: 'clockedIn', before: prevDriverState.clockedIn, after: clockedIn });
@@ -2130,14 +2120,62 @@ const App = () => {
     }
   };
 
+  const handleUpdateClockEvents = (userId, date, events) => {
+    const isDriver = drivers.some(d => d.id === userId);
+    if (isDriver) {
+      const driver = drivers.find(d => d.id === userId);
+      if (!driver) return;
+      const filteredEvents = (driver.clockEvents || []).filter(e => {
+        const eDate = (e.timestamp || e.at || '').slice(0, 10);
+        return eDate !== date;
+      });
+      const newEvents = events.map(e => ({ ...e, timestamp: e.timestamp || e.at }));
+      const newClockEvents = [...filteredEvents, ...newEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      upsertDriverProfile(userId, { clockEvents: newClockEvents });
+      addAuditLog('Timesheet Updated', `${currentUser} updated timesheet for driver ${driver.name || userId}.`, 'blue');
+    } else {
+      const dispatcher = dispatchers.find(d => d.id === userId);
+      if (!dispatcher) return;
+      setDispatchers(prev => prev.map(d => {
+        if (d.id !== userId) return d;
+        const filteredEvents = (d.clockEvents || []).filter(e => {
+          const eDate = (e.timestamp || e.at || '').slice(0, 10);
+          return eDate !== date;
+        });
+        const newEvents = events.map(e => ({ ...e, timestamp: e.timestamp || e.at }));
+        const newClockEvents = [...filteredEvents, ...newEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        return { ...d, clockEvents: newClockEvents };
+      }));
+      addAuditLog('Timesheet Updated', `${currentUser} updated timesheet for dispatcher ${dispatcher.name || userId}.`, 'blue');
+    }
+  };
+
+  const handleUpdateHourlyRate = (userId, hourlyRate) => {
+    const isDriver = drivers.some(d => d.id === userId);
+    if (isDriver) {
+      const driver = drivers.find(d => d.id === userId);
+      upsertDriverProfile(userId, { hourlyRate });
+      addAuditLog('Hourly Rate Updated', `${currentUser} updated hourly rate for driver ${driver?.name || userId} to $${Number(hourlyRate).toFixed(2)}/hr`, 'blue');
+    } else {
+      const dispatcher = dispatchers.find(d => d.id === userId);
+      setDispatchers(prev => prev.map(d => d.id === userId ? { ...d, hourlyRate } : d));
+      addAuditLog('Hourly Rate Updated', `${currentUser} updated hourly rate for dispatcher ${dispatcher?.name || userId} to $${Number(hourlyRate).toFixed(2)}/hr`, 'blue');
+    }
+  };
+
   const handleDispatcherStatusUpdate = (dispatcherId, clockedIn) => {
     const prevState = dispatchers.find(d => d.id === dispatcherId) || {};
     setDispatchers(prevDispatchers => {
-      const updated = prevDispatchers.map(d => d.id === dispatcherId ? {
-        ...d,
-        clockedIn,
-        lastUpdate: new Date().toISOString(),
-      } : d);
+      const updated = prevDispatchers.map(d => {
+        if (d.id !== dispatcherId) return d;
+        const newEvent = { type: clockedIn ? 'in' : 'out', timestamp: new Date().toISOString() };
+        return {
+          ...d,
+          clockedIn,
+          lastUpdate: new Date().toISOString(),
+          clockEvents: [...(d.clockEvents || []), newEvent]
+        };
+      });
       return updated;
     });
     const changed = [];
@@ -2163,8 +2201,13 @@ const App = () => {
       dropoffOdometer: odometer,
       completedAt,
     });
-    setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
-    setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer } : d));
+    if (role === 'driver') {
+      upsertDriverTrip(tripId, nextTrip);
+      upsertDriverProfile(driverId, { odometer });
+    } else {
+      setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
+      setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer } : d));
+    }
     const diffs = [];
     Object.keys(nextTrip || {}).forEach((key) => {
       if (String(trip?.[key]) !== String(nextTrip?.[key])) {
@@ -2986,13 +3029,20 @@ const App = () => {
               onLogout={handleLogout}
               onUpdateAppSettings={updateAppSettings}
               onUpdateMission={(updatedMission) => {
-                setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, activeMission: updatedMission } : d));
-                // Firestore auto-syncs via useFirestoreAppData
+                if (role === 'driver') {
+                  upsertDriverProfile(driverId, { activeMission: updatedMission });
+                } else {
+                  setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, activeMission: updatedMission } : d));
+                }
               }}
               onUpdateDriverLocation={handleUpdateDriverLocation}
               onUpdateTrip={(tripId, status, extraData = {}) => {
                 const prevTrip = trips.find(t => t.id === tripId);
-                setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
+                if (role === 'driver') {
+                  upsertDriverTrip(tripId, { status, ...extraData });
+                } else {
+                  setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
+                }
                 if (prevTrip) {
                   const newTrip = { ...prevTrip, status, ...extraData };
                   const changed = [];
@@ -3008,6 +3058,8 @@ const App = () => {
                 }
               }}
               onDriverStatusUpdate={handleDriverStatusUpdate}
+              onUpdateClockEvents={handleUpdateClockEvents}
+              onUpdateHourlyRate={handleUpdateHourlyRate}
               onCompleteTrip={(tripId, driverId, odometer) => {
                 handleCompleteTrip(tripId, driverId, odometer);
               }}
@@ -3090,11 +3142,22 @@ const App = () => {
               driverWorkTrips={role === 'admin' ? trips : role === 'dispatcher' ? scopedTrips : currentUserDriverTrips}
               allDrivers={drivers}
               onUpdateMission={(updatedMission) => {
-                setDrivers(prev => prev.map(d => normalizeEmail(d.email) === normalizeEmail(currentUser) ? { ...d, activeMission: updatedMission } : d));
+                const targetDriver = drivers.find(d => normalizeEmail(d.email) === normalizeEmail(currentUser));
+                if (targetDriver) {
+                  if (role === 'driver') {
+                    upsertDriverProfile(targetDriver.id, { activeMission: updatedMission });
+                  } else {
+                    setDrivers(prev => prev.map(d => d.id === targetDriver.id ? { ...d, activeMission: updatedMission } : d));
+                  }
+                }
               }}
               onUpdateDriverTrip={(tripId, status, extraData = {}) => {
                 const prevTrip = trips.find(t => t.id === tripId);
-                setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
+                if (role === 'driver') {
+                  upsertDriverTrip(tripId, { status, ...extraData });
+                } else {
+                  setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
+                }
                 if (prevTrip) {
                   const nextTrip = { ...prevTrip, status, ...extraData };
                   const diffs = [];
