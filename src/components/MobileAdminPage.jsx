@@ -275,7 +275,7 @@ const MobileAdminPage = ({
                         }}
                         className="h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-[#2b4c7e]/15"
                       >
-                        <option value="admin">Admin</option>
+                        {role === 'admin' && <option value="admin">Admin</option>}
                         <option value="dispatcher">Dispatcher</option>
                         <option value="driver">Driver</option>
                       </select>

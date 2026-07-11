@@ -37,7 +37,7 @@ const UnifiedRoutePlanner = ({
   aiOptimizing, guidedMode, guidedStepIndex, guidedSteps,
   driverPosition, appSettings, currentUser, role, me,
   onSetGuidedMode, onSetGuidedStepIndex, onSetAiSequence, onSetAiSuggestions,
-  onRunAiOptimization, onSelectAllTrips, selectedTrips, onSetSelectedTrips, etas,
+  onRunAiOptimization, onSelectAllTrips, selectedTrips, onSetSelectedTrips, etas = {},
   onOpenInNav, requestAuthAction = () => {},
   routePlanStops = null, onSetRoutePlanStops = null,
   advanceWorkflow, onApplyRoute, onRouteSaved,
@@ -549,7 +549,7 @@ const UnifiedRoutePlanner = ({
           <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
             {activeTrips.length > 0 ? (
               <div className="space-y-2">
-                {Object.keys(etas).length > 0 && (
+                {Object.keys(etas || {}).length > 0 && (
                   <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-3 mb-3">
                     <div className="flex items-center gap-2 mb-2">
                       <Timer size={14} className="text-amber-500" />

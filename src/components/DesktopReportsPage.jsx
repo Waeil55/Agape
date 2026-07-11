@@ -248,7 +248,7 @@ const DesktopReportsPage = ({
           <select
             ref={inputRef}
             className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-700"
-            value={editingRowSnapshot?.driverId || ''}
+            value={editingRowSnapshot?.driverId ?? trip.driverId ?? ''}
             onChange={e => saveCell(trip, 'driverId', e.target.value)}
             onBlur={() => cancelEdit()}
             autoFocus
@@ -260,13 +260,13 @@ const DesktopReportsPage = ({
           </select>
         );
       }
-      
+
       if (colKey === 'vehicle') {
         return (
           <select
             ref={inputRef}
             className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none bg-white text-slate-700 font-semibold"
-            value={editingRowSnapshot?.completedVehicle || ''}
+            value={editingRowSnapshot?.completedVehicle ?? trip.completedVehicle ?? trip.vehicleId ?? trip.vehicle ?? ''}
             onChange={e => saveCell(trip, 'completedVehicle', e.target.value)}
             onBlur={() => cancelEdit()}
             autoFocus
@@ -283,8 +283,8 @@ const DesktopReportsPage = ({
         return (
           <select
             ref={inputRef}
-            className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-750"
-            value={String(editingRowSnapshot?.paperSignatureConfirmed ?? false)}
+            className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-700"
+            value={String(editingRowSnapshot?.paperSignatureConfirmed ?? trip.paperSignatureConfirmed ?? false)}
             onChange={e => saveCell(trip, 'paperSignatureConfirmed', e.target.value === 'true')}
             onBlur={() => cancelEdit()}
             autoFocus
@@ -299,8 +299,8 @@ const DesktopReportsPage = ({
         return (
           <select
             ref={inputRef}
-            className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-750"
-            value={String(editingRowSnapshot?.reviewed ?? false)}
+            className="w-full px-1 py-2 border border-blue-400 rounded text-xs outline-none bg-white font-semibold text-slate-700"
+            value={String(editingRowSnapshot?.reviewed ?? trip.reviewed ?? false)}
             onChange={e => saveCell(trip, 'reviewed', e.target.value === 'true')}
             onBlur={() => cancelEdit()}
             autoFocus

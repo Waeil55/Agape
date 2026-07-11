@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES } from '../utils/timeTracking';
 import { localCalendarYmd } from '../utils/tripDate';
+import { db, doc, setDoc } from '../config/firebase';
 
 const formatMinutes = (minutes) => {
   const h = Math.floor(minutes / 60);
@@ -45,6 +46,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
   const [editTimesheet, setEditTimesheet] = useState(null);
   const [editingRate, setEditingRate] = useState(null);
   const [rateValue, setRateValue] = useState('');
+  const [approvalMsg, setApprovalMsg] = useState(null);
 
   const filteredDrivers = useMemo(() => {
     if (selectedDriver === 'ALL') return drivers;
@@ -541,6 +543,10 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               const grandTotalEarnings = personPayroll.reduce((sum, p) => sum + p.totalEarnings, 0);
               const grandTotalHours = personPayroll.reduce((sum, p) => sum + p.billableHours, 0);
 
+              const allDates = Array.from(new Set(personPayroll.flatMap(p => p.dailyBreakdown.map(d => d.date)))).sort();
+              const periodStart = allDates[0];
+              const periodEnd = allDates[allDates.length - 1];
+
               if (personPayroll.length === 0) return <div className="p-8 text-center text-gray-500">No payroll data available</div>;
 
               return (
@@ -617,13 +623,18 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                     <div className="flex items-center gap-4 flex-wrap">
                       <p className="text-sm text-gray-600">{grandTotalHours.toFixed(1)} total hours</p>
                       <p className="text-xl font-bold text-green-700">{formatCurrency(grandTotalEarnings)}</p>
+                      {approvalMsg && (
+                        <span className={`text-sm font-semibold ${approvalMsg.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>{approvalMsg.text}</span>
+                      )}
                       <button
                         onClick={() => {
-                          const period = { startDate: dates[0], endDate: dates[dates.length - 1], approvedAt: new Date().toISOString(), approvedBy: 'admin', totalHours: grandTotalHours, totalEarnings: grandTotalEarnings, people: personPayroll.map(p => ({ id: p.driverId, name: p.driver?.name, hours: p.billableHours, earnings: p.totalEarnings, rate: p.rate })) };
-                          import('firebase/firestore').then(({ doc, setDoc, db }) => {
-                            setDoc(doc(db, 'payrollRecords', `${dates[0]}_${dates[dates.length - 1]}`), period, { merge: true });
+                          const period = { startDate: periodStart, endDate: periodEnd, approvedAt: new Date().toISOString(), approvedBy: 'admin', totalHours: grandTotalHours, totalEarnings: grandTotalEarnings, people: personPayroll.map(p => ({ id: p.driverId, name: p.driver?.name, hours: p.billableHours, earnings: p.totalEarnings, rate: p.rate })) };
+                          setDoc(doc(db, 'payrollRecords', `${periodStart}_${periodEnd}`), period, { merge: true }).then(() => {
+                            setApprovalMsg({ type: 'success', text: 'Payroll approved and locked.' });
+                          }).catch((err) => {
+                            console.error('Payroll approval failed:', err);
+                            setApprovalMsg({ type: 'error', text: 'Payroll approval failed.' });
                           });
-                          alert('Payroll approved and locked!');
                         }}
                         className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors flex items-center gap-2"
                       >

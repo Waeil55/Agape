@@ -143,6 +143,7 @@ const SettingsPage = ({
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [pwMsg, setPwMsg] = useState('');
+  const [deleteConfirmTrip, setDeleteConfirmTrip] = useState(null);
 
   const handlePasswordChange = async () => {
     setPwMsg('');
@@ -379,7 +380,7 @@ const SettingsPage = ({
                                   <button onClick={() => restoreTrip?.(trip.id)} className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-200 transition flex items-center gap-1" title="Restore trip">
                                     <RotateCcw size={12} /> Restore
                                   </button>
-                                  <button onClick={() => deleteTrashedTrip?.(trip.id)} className="px-2.5 py-1 bg-rose-100 text-rose-700 rounded-lg text-xs font-bold hover:bg-rose-200 transition flex items-center gap-1" title="Permanently delete">
+                                  <button onClick={() => setDeleteConfirmTrip(trip)} className="px-2.5 py-1 bg-rose-100 text-rose-700 rounded-lg text-xs font-bold hover:bg-rose-200 transition flex items-center gap-1" title="Permanently delete">
                                     <Trash2 size={12} /> Delete
                                   </button>
                                 </div>
@@ -771,6 +772,31 @@ const SettingsPage = ({
       <div className="w-full flex-1 min-w-0">
         {sectionContent()}
       </div>
+      {deleteConfirmTrip && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setDeleteConfirmTrip(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Trash2 size={16} className="text-rose-600" /> Permanently Delete Trip
+              </h3>
+              <p className="text-sm text-slate-500 mt-2">
+                This will permanently delete the archived trip{' '}
+                <span className="font-semibold text-slate-700">{deleteConfirmTrip.patient || deleteConfirmTrip.pickup || deleteConfirmTrip.id}</span>.
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="p-4 flex items-center justify-end gap-2 bg-slate-50">
+              <button onClick={() => setDeleteConfirmTrip(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition">Cancel</button>
+              <button
+                onClick={() => { if (deleteTrashedTrip) deleteTrashedTrip(deleteConfirmTrip.id); setDeleteConfirmTrip(null); }}
+                className="px-4 py-2 text-sm font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 transition"
+              >
+                Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

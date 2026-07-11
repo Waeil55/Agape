@@ -14,6 +14,7 @@ const STATUS_CONFIG = {
   expired: { color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', badge: 'bg-red-100 text-red-700', label: 'Expired', icon: AlertTriangle },
   expiring: { color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700', label: 'Expiring Soon', icon: AlertTriangle },
   valid: { color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700', label: 'Valid', icon: CheckCircle },
+  unknown: { color: 'text-slate-500', bg: 'bg-slate-50', border: 'border-slate-200', badge: 'bg-slate-100 text-slate-600', label: 'No Record', icon: FileText },
 };
 
 function getDaysUntilExpiry(dateStr) {
@@ -24,53 +25,69 @@ function getDaysUntilExpiry(dateStr) {
 }
 
 function getExpiryStatus(dateStr) {
+  if (!dateStr) return 'unknown';
   const days = getDaysUntilExpiry(dateStr);
-  if (days === null) return 'valid';
   if (days < 0) return 'expired';
   if (days <= 30) return 'expiring';
   return 'valid';
 }
 
+const titleCase = (str) => String(str || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+function getEntityDocs(entity, source) {
+  if (!entity || !entity.id) return [];
+  const name = entity.name || entity.plate || 'Unknown';
+  // Prefer a real `documents` array (DocumentManager format) with actual expiry dates
+  if (Array.isArray(entity.documents) && entity.documents.length) {
+    const real = entity.documents
+      .filter(d => d && d.expiryDate)
+      .map(d => ({
+        id: `${entity.id}-${d.type || 'doc'}`,
+        entityId: entity.id,
+        entityName: name,
+        entityType: source,
+        category: d.type || 'doc',
+        categoryLabel: titleCase(d.type || 'Document'),
+        expiryDate: d.expiryDate,
+        renewed: false,
+        source: 'record',
+      }));
+    if (real.length) return real;
+  }
+  const docs = [];
+  if (source === 'vehicle' && entity.insuranceExpiry) {
+    docs.push({
+      id: `${entity.id}-insurance`,
+      entityId: entity.id,
+      entityName: name,
+      entityType: 'vehicle',
+      category: 'insurance',
+      categoryLabel: 'Insurance',
+      expiryDate: entity.insuranceExpiry,
+      renewed: false,
+      source: 'record',
+    });
+  }
+  if (docs.length === 0) {
+    docs.push({
+      id: `${entity.id}-none`,
+      entityId: entity.id,
+      entityName: name,
+      entityType: source,
+      category: 'none',
+      categoryLabel: source === 'vehicle' ? 'Vehicle Documents' : 'Driver Documents',
+      expiryDate: null,
+      renewed: false,
+      source: 'none',
+    });
+  }
+  return docs;
+}
+
 function generateDocuments(drivers = [], vehicles = []) {
   const docs = [];
-  drivers.forEach(driver => {
-    const baseDate = new Date();
-    const seed = parseInt(driver.id?.slice(-2) || '0', 16) || 0;
-    DOC_CATEGORIES.filter(c => c.source === 'driver').forEach(cat => {
-      const offset = ((seed + cat.id.length) % 120) - 30;
-      const expiry = new Date(baseDate);
-      expiry.setDate(expiry.getDate() + offset);
-      docs.push({
-        id: `${driver.id}-${cat.id}`,
-        entityId: driver.id,
-        entityName: driver.name || 'Unknown Driver',
-        entityType: 'driver',
-        category: cat.id,
-        categoryLabel: cat.label,
-        expiryDate: localCalendarYmd(expiry),
-        renewed: false,
-      });
-    });
-  });
-  vehicles.forEach(vehicle => {
-    const baseDate = new Date();
-    const seed = parseInt(vehicle.id?.slice(-2) || '0', 16) || 0;
-    DOC_CATEGORIES.filter(c => c.source === 'vehicle').forEach(cat => {
-      const offset = ((seed + cat.id.length) % 120) - 30;
-      const expiry = new Date(baseDate);
-      expiry.setDate(expiry.getDate() + offset);
-      docs.push({
-        id: `${vehicle.id}-${cat.id}`,
-        entityId: vehicle.id,
-        entityName: vehicle.name || vehicle.plate || 'Unknown Vehicle',
-        entityType: 'vehicle',
-        category: cat.id,
-        categoryLabel: cat.label,
-        expiryDate: localCalendarYmd(expiry),
-        renewed: false,
-      });
-    });
-  });
+  drivers.forEach(driver => docs.push(...getEntityDocs(driver, 'driver')));
+  vehicles.forEach(vehicle => docs.push(...getEntityDocs(vehicle, 'vehicle')));
   return docs;
 }
 
@@ -94,7 +111,7 @@ export default function DocumentExpirationTracker({ drivers = [], vehicles = [] 
   );
 
   const summary = useMemo(() => {
-    const s = { expired: 0, expiring: 0, valid: 0 };
+    const s = { expired: 0, expiring: 0, valid: 0, unknown: 0 };
     docsWithStatus.forEach(d => { s[d.status]++; });
     return s;
   }, [docsWithStatus]);
@@ -108,6 +125,7 @@ export default function DocumentExpirationTracker({ drivers = [], vehicles = [] 
     { key: 'expired', label: 'Expired', count: summary.expired },
     { key: 'expiring', label: 'Expiring Soon', count: summary.expiring },
     { key: 'valid', label: 'Valid', count: summary.valid },
+    { key: 'unknown', label: 'No Record', count: summary.unknown },
   ];
 
   return (
@@ -188,7 +206,7 @@ export default function DocumentExpirationTracker({ drivers = [], vehicles = [] 
                   )}
                 </div>
               </div>
-              {!doc.renewed && (
+              {!doc.renewed && doc.source === 'record' && (
                 <button
                   onClick={() => handleRenew(doc.id)}
                   className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition shrink-0"

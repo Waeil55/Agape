@@ -18,9 +18,13 @@ const MultiDayRoutePlanner = ({ trips = [], onSave }) => {
     if (!trips?.length) return emptyWeek();
     const grouped = emptyWeek();
     trips.forEach((trip) => {
-      const dow = new Date(trip.date).getDay();
+      const parsed = trip.date ? new Date(trip.date) : null;
+      if (!parsed || Number.isNaN(parsed.getTime())) return;
+      const dow = parsed.getDay();
       const idx = dow === 0 ? 6 : dow - 1;
-      grouped[DAYS[idx]]?.push({
+      const bucket = grouped[DAYS[idx]];
+      if (!bucket) return;
+      bucket.push({
         id: trip.id || `trip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         pickup: trip.pickup || trip.pickupAddress || '',
         dropoff: trip.dropoff || trip.dropoffAddress || '',

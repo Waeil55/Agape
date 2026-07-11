@@ -714,7 +714,7 @@ const DriverToolsPage = ({
   aiOptimizing, guidedMode, guidedStepIndex, guidedSteps,
   driverPosition, appSettings, currentUser, role,
   onSetGuidedMode, onSetGuidedStepIndex, onSetAiSequence, onSetAiSuggestions,
-  onRunAiOptimization, onSelectAllTrips, selectedTrips, onSetSelectedTrips, etas,
+  onRunAiOptimization, onSelectAllTrips, selectedTrips, onSetSelectedTrips, etas = {},
   onOpenInNav,
   onOpenSequencer,
   requestAuthAction = () => {},
@@ -966,7 +966,7 @@ const DriverToolsPage = ({
       )}
 
       {/* Trip ETAs */}
-      {activeTrips.length > 0 && Object.keys(etas).length > 0 && (
+      {activeTrips.length > 0 && Object.keys(etas || {}).length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <button
             onClick={() => toggleSection('etas')}
