@@ -1,12 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import {
   LogOut, AlertCircle, Database, Eye, EyeOff, Save, Palette, Navigation, Type, Moon, Sun, Monitor, Route,
   Phone, ShieldCheck, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus,
   LayoutDashboard, Users, Activity, Archive, Settings, User, Bell, KeyRound,
-  Truck, RefreshCw, Trash2, RotateCcw
+  Truck, RefreshCw, Trash2, RotateCcw, FileText
 } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
 import { auth, updatePassword } from '../config/firebase';
+
+const LazySystemHealth = lazy(() => import('./SystemHealthDashboard'));
+const LazyAutomatedAlerts = lazy(() => import('./AutomatedAlertsPanel'));
+const LazyDocumentTracker = lazy(() => import('./DocumentExpirationTracker'));
+const LazyFleetUtilization = lazy(() => import('./FleetUtilizationReport'));
 
 const ActivityRow = ({ index, log }) => {
   const [open, setOpen] = useState(false);
@@ -154,6 +159,10 @@ const SettingsPage = ({
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'users', label: 'User Management', icon: Users },
     { id: 'activity', label: 'System Activity', icon: Activity },
+    { id: 'health', label: 'System Health', icon: Activity },
+    { id: 'alerts', label: 'Automated Alerts', icon: Bell },
+    { id: 'documents', label: 'Document Expiration', icon: FileText },
+    { id: 'fleet', label: 'Fleet Utilization', icon: Truck },
     { id: 'permissions', label: 'Roles & Permissions', icon: ShieldCheck },
     { id: 'archived', label: 'Archived Trips', icon: Archive },
     { id: 'system', label: 'System Settings', icon: Settings },
@@ -384,6 +393,62 @@ const SettingsPage = ({
                 </div>
               )}
             </div>
+          </div>
+        );
+
+      // ===== SYSTEM HEALTH =====
+      case 'health':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-heading text-slate-900 mb-1">System Health</h3>
+              <p className="text-body text-slate-500">Real-time system status and performance metrics.</p>
+            </div>
+            <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
+              <LazySystemHealth trips={trips} drivers={drivers} logs={logs} appSettings={appSettings} />
+            </Suspense>
+          </div>
+        );
+
+      // ===== AUTOMATED ALERTS =====
+      case 'alerts':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-heading text-slate-900 mb-1">Automated Alerts</h3>
+              <p className="text-body text-slate-500">Monitor late trips, missed pickups, and driver status alerts.</p>
+            </div>
+            <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
+              <LazyAutomatedAlerts trips={trips} drivers={drivers} vehicles={vehicles} />
+            </Suspense>
+          </div>
+        );
+
+      // ===== DOCUMENT EXPIRATION =====
+      case 'documents':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-heading text-slate-900 mb-1">Document Expiration Tracker</h3>
+              <p className="text-body text-slate-500">Track driver licenses, insurance, and vehicle registration expirations.</p>
+            </div>
+            <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
+              <LazyDocumentTracker drivers={drivers} vehicles={vehicles} />
+            </Suspense>
+          </div>
+        );
+
+      // ===== FLEET UTILIZATION =====
+      case 'fleet':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-heading text-slate-900 mb-1">Fleet Utilization Report</h3>
+              <p className="text-body text-slate-500">Vehicle usage, driver performance, and fleet efficiency metrics.</p>
+            </div>
+            <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
+              <LazyFleetUtilization trips={trips} drivers={drivers} vehicles={vehicles} />
+            </Suspense>
           </div>
         );
 

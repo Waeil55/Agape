@@ -3,7 +3,7 @@ import {
   Clock, AlertTriangle, Play, Pause, CheckCircle, XCircle,
   DollarSign, FileText, Download, ChevronDown, ChevronUp,
   Shield, Timer, User, Navigation, Edit2, Trash2, Plus, X, Save,
-  Briefcase, Check
+  Briefcase, Check, Lock
 } from 'lucide-react';
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES } from '../utils/timeTracking';
 
@@ -489,14 +489,37 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               const personPayroll = Object.entries(driverSessions).map(([driverId, byDate]) => {
                 const driver = drivers.find(d => d.id === driverId);
                 const rate = Number(driver?.hourlyRate || 0);
-                const dates = Object.keys(byDate);
+                const dates = Object.keys(byDate).sort();
                 const totalBillable = dates.reduce((sum, d) => sum + getDayBillable(byDate[d]), 0);
                 const totalBreaks = dates.reduce((sum, d) => sum + byDate[d].gaps.filter(g => g.gapType === 'BREAK').reduce((s, g) => s + g.durationMinutes, 0), 0);
                 const totalTrips = dates.reduce((sum, d) => sum + byDate[d].trips.length, 0);
                 const billableHours = Math.round((totalBillable / 60) * 100) / 100;
-                const regularHours = Math.min(billableHours, 8);
-                const overtimeHours = Math.max(0, billableHours - 8);
-                const totalEarnings = regularHours * rate + overtimeHours * rate * 1.5;
+
+                // Group days by calendar week (Mon-Sun) for weekly overtime
+                const weekMap = {};
+                dates.forEach(date => {
+                  const d = new Date(date + 'T12:00:00');
+                  const dayOfWeek = d.getDay();
+                  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                  const monday = new Date(d);
+                  monday.setDate(monday.getDate() + mondayOffset);
+                  const weekKey = monday.toISOString().split('T')[0];
+                  if (!weekMap[weekKey]) weekMap[weekKey] = { days: [], hours: 0 };
+                  const dayHours = Math.round((getDayBillable(byDate[date]) / 60) * 100) / 100;
+                  weekMap[weekKey].days.push(date);
+                  weekMap[weekKey].hours += dayHours;
+                });
+
+                let totalRegular = 0;
+                let totalOvertime = 0;
+                Object.values(weekMap).forEach(week => {
+                  const weekRegular = Math.min(week.hours, 40);
+                  const weekOvertime = Math.max(0, week.hours - 40);
+                  totalRegular += weekRegular;
+                  totalOvertime += weekOvertime;
+                });
+
+                const totalEarnings = totalRegular * rate + totalOvertime * rate * 1.5;
 
                 const dailyBreakdown = dates.map(date => {
                   const day = byDate[date];
@@ -506,7 +529,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                   return { date, hours: dayHours, earnings: dayEarnings, trips: day.trips.length };
                 });
 
-                return { driver, driverId, rate, dates: dates.length, totalTrips, totalBillable, totalBreaks, billableHours, regularHours, overtimeHours, totalEarnings, dailyBreakdown };
+                return { driver, driverId, rate, dates: dates.length, totalTrips, totalBillable, totalBreaks, billableHours, regularHours: totalRegular, overtimeHours: totalOvertime, totalEarnings, dailyBreakdown };
               }).sort((a, b) => b.totalEarnings - a.totalEarnings);
 
               const grandTotalEarnings = personPayroll.reduce((sum, p) => sum + p.totalEarnings, 0);
@@ -583,11 +606,23 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                       </div>
                     );
                   })}
-                  <div className="p-4 bg-gray-50 flex items-center justify-between">
+                  <div className="p-4 bg-gray-50 flex items-center justify-between flex-wrap gap-3">
                     <p className="text-sm font-medium text-gray-700">Total Payroll ({personPayroll.length} people)</p>
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4 flex-wrap">
                       <p className="text-sm text-gray-600">{grandTotalHours.toFixed(1)} total hours</p>
                       <p className="text-xl font-bold text-green-700">{formatCurrency(grandTotalEarnings)}</p>
+                      <button
+                        onClick={() => {
+                          const period = { startDate: dates[0], endDate: dates[dates.length - 1], approvedAt: new Date().toISOString(), approvedBy: 'admin', totalHours: grandTotalHours, totalEarnings: grandTotalEarnings, people: personPayroll.map(p => ({ id: p.driverId, name: p.driver?.name, hours: p.billableHours, earnings: p.totalEarnings, rate: p.rate })) };
+                          import('firebase/firestore').then(({ doc, setDoc, db }) => {
+                            setDoc(doc(db, 'payrollRecords', `${dates[0]}_${dates[dates.length - 1]}`), period, { merge: true });
+                          });
+                          alert('Payroll approved and locked!');
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors flex items-center gap-2"
+                      >
+                        <Lock size={14} /> Approve Payroll
+                      </button>
                     </div>
                   </div>
                 </div>

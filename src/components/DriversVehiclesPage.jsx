@@ -12,7 +12,8 @@ const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfi
 const [form, setForm] = useState({ 
   name: '', email: '', phone: '', vehicle: '', status: 'Available',
   currentZone: '', vin: '', insuranceExpiry: '', capacity: '1',
-  licenseNumber: '', cdlStatus: 'Active', assignedDispatcher: '', assignedTo: ''
+  licenseNumber: '', cdlStatus: 'Active', assignedDispatcher: '', assignedTo: '',
+  hourlyRate: ''
 });
   const [assignDriver, setAssignDriver] = useState(null);
   const [selectedTrips, setSelectedTrips] = useState([]);
@@ -107,7 +108,7 @@ const [form, setForm] = useState({
     setFleetSummaryLoading(false);
   }, [filteredDrivers, trips]);
 
-  const resetForm = () => setForm({ name: '', email: '', phone: '', vehicle: '', status: 'Available', currentZone: '', assignedDispatcher: '', assignedTo: '', vin: '', insuranceExpiry: '', capacity: '1', licenseNumber: '', cdlStatus: 'Active' });
+  const resetForm = () => setForm({ name: '', email: '', phone: '', vehicle: '', status: 'Available', currentZone: '', assignedDispatcher: '', assignedTo: '', vin: '', insuranceExpiry: '', capacity: '1', licenseNumber: '', cdlStatus: 'Active', hourlyRate: '' });
 
   const openAdd = () => { setEditing(null); resetForm(); setShowForm(true); };
 
@@ -120,7 +121,7 @@ const [form, setForm] = useState({
       vin: d.vin || '', insuranceExpiry: d.insuranceExpiry || '',
       capacity: d.capacity || '1', licenseNumber: d.licenseNumber || '',
       cdlStatus: d.cdlStatus || 'Active', assignedDispatcher: d.assignedDispatcher || '',
-      assignedTo: d.assignedTo || ''
+      assignedTo: d.assignedTo || '', hourlyRate: d.hourlyRate || ''
     });
     setShowForm(true);
   };
@@ -143,6 +144,7 @@ const [form, setForm] = useState({
           vin: form.vin || '', insuranceExpiry: form.insuranceExpiry || '',
           capacity: form.capacity || '1', licenseNumber: form.licenseNumber || '',
           cdlStatus: form.cdlStatus || 'Active', assignedDispatcher: currentDispatcher?.id || form.assignedDispatcher || '',
+          hourlyRate: form.hourlyRate || ''
         }]);
       addAuditLog('Driver Added', `${currentUser} added driver ${form.name}.`, 'emerald');
     }
@@ -830,8 +832,12 @@ const [form, setForm] = useState({
                   <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="email@example.com" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phone</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
                   <input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="(555) 123-4567" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Hourly Rate ($)</label>
+                  <input type="number" step="0.01" min="0" value={form.hourlyRate} onChange={(e) => setForm({ ...form, hourlyRate: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="e.g. 20.00" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>

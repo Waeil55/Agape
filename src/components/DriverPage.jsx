@@ -684,6 +684,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [showCompleteModal, setShowCompleteModal] = useState(null);
   const [completeOdometer, setCompleteOdometer] = useState('');
   const [completeError, setCompleteError] = useState('');
+  const [completeRating, setCompleteRating] = useState(0);
+  const [completeRatingHover, setCompleteRatingHover] = useState(0);
+  const [showTripReceipt, setShowTripReceipt] = useState(null);
   const [departedTime, setDepartedTime] = useState('');
   const [arrivalDropoffTime, setArrivalDropoffTime] = useState('');
   const [scheduleEditorTrip, setScheduleEditorTrip] = useState(null);
@@ -2934,6 +2937,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       departedPickupTime: toIso(departedTime),
       arrivalDropoffTime: showCompleteModal.arrivalDropoffTime ? showCompleteModal.arrivalDropoffTime : toIso(arrivalDropoffTime),
       completedVehicle: me?.vehicle || '',
+      ...(completeRating > 0 ? { feedback: { overall: completeRating, driverRating: completeRating } } : {}),
     });
     if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
       ttLogTripEvent('TRIP_COMPLETED', showCompleteModal.id, getTripDropoffLocation(showCompleteModal) || getDriverClockLocation());
@@ -2943,6 +2947,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setShowCompleteModal(null);
     setCompleteOdometer('');
     setCompleteError('');
+    setCompleteRating(0);
+    setCompleteRatingHover(0);
+
+    // Show trip receipt
+    setTimeout(() => {
+      setShowTripReceipt({
+        ...showCompleteModal,
+        dropoffOdometer: odo,
+        completedAt: now,
+        driverName: me?.name || currentUser?.displayName || '',
+        vehicle: me?.vehicle || '',
+      });
+    }, 300);
 
     // Save odometer to Firestore directly
     if (navigator.onLine) {
@@ -4779,12 +4796,87 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     Distance: {(parseInt(completeOdometer) - (showCompleteModal.pickupOdometer || 0)).toLocaleString()} mi
                   </div>
                 )}
+                <div className="pt-2 border-t border-slate-100 mt-1">
+                  <p className="text-xs font-semibold text-slate-500 text-center mb-2">Rate this trip (optional)</p>
+                  <div className="flex justify-center gap-1">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setCompleteRating(star === completeRating ? 0 : star)}
+                        onMouseEnter={() => setCompleteRatingHover(star)}
+                        onMouseLeave={() => setCompleteRatingHover(0)}
+                        className="p-0.5 transition-transform hover:scale-110"
+                      >
+                        <svg
+                          width="28" height="28" viewBox="0 0 24 24" fill={(completeRatingHover || completeRating) >= star ? '#f59e0b' : 'none'}
+                          stroke={(completeRatingHover || completeRating) >= star ? '#f59e0b' : '#cbd5e1'}
+                          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                        >
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="flex gap-3 mt-2 shrink-0 pt-2">
-              <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+              <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); setCompleteRating(0); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
               <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== TRIP RECEIPT ===== */}
+      {showTripReceipt && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 140 }}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative pointer-events-auto max-h-[85dvh] flex flex-col" id="trip-receipt">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-lg">
+                <Check size={20} className="text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Trip Receipt</h3>
+              <p className="text-xs text-slate-500 font-medium">Agape Care Transportation</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-slate-500">Patient</span><span className="font-semibold text-slate-900">{showTripReceipt.patient || '—'}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Booking ID</span><span className="font-semibold text-slate-900">{showTripReceipt.bookingId || '—'}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Date</span><span className="font-semibold text-slate-900">{showTripReceipt.completedAt ? new Date(showTripReceipt.completedAt).toLocaleDateString() : new Date().toLocaleDateString()}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Pickup</span><span className="font-semibold text-slate-900 text-right max-w-[60%] truncate">{showTripReceipt.pickup || '—'}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Dropoff</span><span className="font-semibold text-slate-900 text-right max-w-[60%] truncate">{showTripReceipt.dropoff || '—'}</span></div>
+              {showTripReceipt.pickupOdometer && showTripReceipt.dropoffOdometer && (
+                <div className="flex justify-between"><span className="text-slate-500">Distance</span><span className="font-semibold text-slate-900">{(showTripReceipt.dropoffOdometer - showTripReceipt.pickupOdometer).toLocaleString()} mi</span></div>
+              )}
+              {showTripReceipt.driverName && (
+                <div className="flex justify-between"><span className="text-slate-500">Driver</span><span className="font-semibold text-slate-900">{showTripReceipt.driverName}</span></div>
+              )}
+              {showTripReceipt.vehicle && (
+                <div className="flex justify-between"><span className="text-slate-500">Vehicle</span><span className="font-semibold text-slate-900">{showTripReceipt.vehicle}</span></div>
+              )}
+              {showTripReceipt.feedback?.overall && (
+                <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                  <span className="text-slate-500">Rating</span>
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <svg key={s} width="16" height="16" viewBox="0 0 24 24" fill={s <= showTripReceipt.feedback.overall ? '#f59e0b' : 'none'} stroke={s <= showTripReceipt.feedback.overall ? '#f59e0b' : '#cbd5e1'} strokeWidth="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                      </svg>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-4 shrink-0">
+              <button type="button" onClick={() => setShowTripReceipt(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Close</button>
+              <button type="button" onClick={() => {
+                const receipt = document.getElementById('trip-receipt');
+                if (receipt) { const w = window.open('', '_blank'); w.document.write('<html><head><title>Trip Receipt</title><style>body{font-family:sans-serif;padding:20px;max-width:400px;margin:auto}table{width:100%;border-collapse:collapse}td{padding:4px 0}td:first-child{color:#64748b}.sep{border-top:1px solid #e2e8f0;margin:8px 0}</style></head><body>' + receipt.innerHTML + '</body></html>'); w.document.close(); w.print(); }
+              }} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Print</button>
             </div>
           </div>
         </div>

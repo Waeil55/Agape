@@ -538,6 +538,26 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
     return writeField('drivers', next);
   }, [writeField]);
 
+  const upsertDriverTrip = useCallback(async (tripId, updates = {}) => {
+    if (!tripId) return false;
+    const now = new Date().toISOString();
+    const progressDoc = { ...updates, tripId, workflowUpdatedAt: now };
+    
+    // Update local state optimistic UI
+    const currentTrips = dataRef.current.trips || [];
+    const nextTrips = currentTrips.map(t => t.id === tripId ? { ...t, ...updates } : t);
+    dataRef.current = { ...dataRef.current, trips: nextTrips };
+    setState(prev => ({ ...prev, trips: nextTrips }));
+
+    try {
+      await setDoc(doc(db, DRIVER_TRIP_PROGRESS_COLLECTION, tripId), progressDoc, { merge: true });
+      return true;
+    } catch (err) {
+      console.error('Failed to upsert driver trip progress:', err);
+      return false;
+    }
+  }, []);
+
   const upsertDriverProfile = useCallback(async (driverId, updates = {}) => {
     if (!driverId) return false;
     const currentDrivers = dataRef.current.drivers || [];
@@ -578,7 +598,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
     trashedTrips: state.trashedTrips, logs: state.logs, phoneNumbers: state.phoneNumbers,
     loading: state.loading, saving: state.saving, error: state.error,
     initialized: state.initialized, docExists: state.docExists, lastSavedAt: state.lastSavedAt,
-    setTrips, setDrivers, upsertDriverProfile, setDispatchers, setVehicles, setTrashedTrips, setLogs, setPhoneNumbers, addLog, initializeAppData,
+    setTrips, setDrivers, upsertDriverProfile, upsertDriverTrip, setDispatchers, setVehicles, setTrashedTrips, setLogs, setPhoneNumbers, addLog, initializeAppData,
   };
 }
 

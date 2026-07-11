@@ -28,10 +28,11 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showAssign, setShowAssign] = useState(null);
-  const [form, setForm] = useState({ username: '', password: '', role: 'driver', phone: '' });
+  const [form, setForm] = useState({ username: '', password: '', role: 'driver', phone: '', hourlyRate: '' });
   const [formError, setFormError] = useState('');
   const [editingDispatcher, setEditingDispatcher] = useState(null);
   const [editName, setEditName] = useState('');
+  const [editHourlyRate, setEditHourlyRate] = useState('');
   const [selectedLog, setSelectedLog] = useState(null);
   
   // AI Insights State
@@ -98,13 +99,13 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       
       if (form.role === 'dispatcher') {
         const id = profileId;
-        setDispatchers(prev => [...prev, { id, name: username, email: authEmail, username }]);
+        setDispatchers(prev => [...prev, { id, name: username, email: authEmail, username, hourlyRate: form.hourlyRate || '' }]);
       } else if (form.role === 'driver') {
         const id = profileId;
         const newDriver = {
           id, name: username, email: authEmail, username, phone: form.phone, status: 'Available', vehicle: 'Pending', dist: '--',
           currentZone: 'TBD', odometer: 0, nextOilChange: 5000,
-          assignedTo: '', schedule: [], clockedIn: false
+          assignedTo: '', schedule: [], clockedIn: false, hourlyRate: form.hourlyRate || ''
         };
         setDrivers(prev => [...prev, newDriver]);
       }
@@ -112,7 +113,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       addAuditLog('User Created', `${currentUser} created ${form.role} account: ${username}`, 'emerald', { entity: 'user', id: username, diffs: [{ field: 'role', before: null, after: form.role }, { field: 'username', before: null, after: username }] });
       await loadUsers();
       setShowForm(false);
-      setForm({ username: '', password: '', role: 'driver', phone: '' });
+      setForm({ username: '', password: '', role: 'driver', phone: '', hourlyRate: '' });
     } catch (err) {
       if (secondaryApp) await deleteApp(secondaryApp).catch(() => {});
       setFormError(err.message.replace('Firebase: ', ''));
@@ -154,19 +155,21 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   };
 
   const startRenameDispatcher = (dispatcher) => {
-    setEditingDispatcher(dispatcher.id);
+    setEditingDispatcher(dispatcher);
     setEditName(dispatcher.name || dispatcher.username || authEmailToUsername(dispatcher.email));
+    setEditHourlyRate(dispatcher.hourlyRate || '');
   };
 
   const saveDispatcherName = () => {
     if (!editName.trim() || !editingDispatcher) return;
     setDispatchers(prev => prev.map(d =>
-      d.id === editingDispatcher ? { ...d, name: editName.trim() } : d
+      d.id === editingDispatcher.id ? { ...d, name: editName.trim(), hourlyRate: editHourlyRate } : d
     ));
-    const prevName = dispatchers.find(d => d.id === editingDispatcher)?.name || '';
-    addAuditLog('Dispatcher Renamed', `${currentUser} renamed dispatcher to "${editName.trim()}"`, 'blue', { entity: 'dispatcher', id: editingDispatcher, diffs: [{ field: 'name', before: prevName, after: editName.trim() }] });
+    const prevName = editingDispatcher.name || '';
+    addAuditLog('Dispatcher Updated', `${currentUser} updated dispatcher "${editName.trim()}"`, 'blue', { entity: 'dispatcher', id: editingDispatcher.id, diffs: [{ field: 'name', before: prevName, after: editName.trim() }] });
     setEditingDispatcher(null);
     setEditName('');
+    setEditHourlyRate('');
   };
 
   const assignDriver = (driverId, dispatcherId) => {
@@ -311,20 +314,8 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                     {user.role === 'dispatcher' && role === 'admin' && (() => {
                       const disp = dispatchers.find(d => d.email === user.email);
                       if (!disp) return null;
-                      if (editingDispatcher === disp.id) {
-                        return (
-                          <div className="flex w-full items-center gap-2">
-                            <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
-                              className="min-w-0 flex-1 rounded-lg border border-blue-300 px-2 py-1.5 text-xs font-semibold outline-none focus:border-blue-500"
-                              onKeyDown={(e) => { if (e.key === 'Enter') saveDispatcherName(); if (e.key === 'Escape') setEditingDispatcher(null); }}
-                              autoFocus />
-                            <button onClick={saveDispatcherName} className="rounded-lg p-2 text-emerald-600 hover:bg-emerald-50" title="Save"><Check size={14} /></button>
-                            <button onClick={() => setEditingDispatcher(null)} className="rounded-lg p-2 text-slate-400 hover:text-slate-600" title="Cancel"><X size={14} /></button>
-                          </div>
-                        );
-                      }
                       return (
-                        <button onClick={() => startRenameDispatcher(disp)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50" title="Rename dispatcher" aria-label="Rename dispatcher">
+                        <button onClick={() => startRenameDispatcher(disp)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50" title="Edit dispatcher" aria-label="Edit dispatcher">
                           <Edit2 size={14} />
                         </button>
                       );
@@ -369,20 +360,8 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                           {user.role === 'dispatcher' && role === 'admin' && (() => {
                             const disp = dispatchers.find(d => d.email === user.email);
                             if (!disp) return null;
-                            if (editingDispatcher === disp.id) {
-                              return (
-                                <div className="flex items-center gap-1">
-                                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
-                                    className="w-24 px-1.5 py-0.5 border border-blue-300 rounded text-xs font-semibold outline-none focus:border-blue-500"
-                                    onKeyDown={(e) => { if (e.key === 'Enter') saveDispatcherName(); if (e.key === 'Escape') setEditingDispatcher(null); }}
-                                    autoFocus />
-                                  <button onClick={saveDispatcherName} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition" title="Save"><Check size={14} /></button>
-                                  <button onClick={() => setEditingDispatcher(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition" title="Cancel"><X size={14} /></button>
-                                </div>
-                              );
-                            }
                             return (
-                              <button onClick={() => startRenameDispatcher(disp)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Rename dispatcher" aria-label="Rename dispatcher">
+                              <button onClick={() => startRenameDispatcher(disp)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit dispatcher" aria-label="Edit dispatcher">
                                 <Edit2 size={14} />
                               </button>
                             );
@@ -641,6 +620,11 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-xs" placeholder="+1 (555) 000-0000" />
                 </div>
                 <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Hourly Rate ($)</label>
+                  <input type="number" step="0.01" min="0" value={form.hourlyRate} onChange={(e) => setForm({ ...form, hourlyRate: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-xs" placeholder="e.g. 20.00" />
+                </div>
+                <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Role</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
@@ -664,6 +648,36 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-6">
                 <button type="button" onClick={() => { setShowForm(false); setFormError(''); }} className="w-full sm:flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-xs">Cancel</button>
                 <button type="submit" onClick={createUser} className="w-full sm:flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs"><Save size={16} /> Create</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Dispatcher Modal */}
+      {editingDispatcher && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm max-w-sm w-full mx-0 sm:mx-4">
+            <div className="p-4 sm:p-8">
+              <div className="flex justify-between items-center mb-4 sm:mb-6">
+                <h3 className="text-lg sm:text-xl font-semibold text-slate-900">Edit Dispatcher</h3>
+                <button onClick={() => setEditingDispatcher(null)} className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={18} /></button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Name</label>
+                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-xs" placeholder="Name" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Hourly Rate ($)</label>
+                  <input type="number" step="0.01" min="0" value={editHourlyRate} onChange={(e) => setEditHourlyRate(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-xs" placeholder="e.g. 25.00" />
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6">
+                <button type="button" onClick={() => setEditingDispatcher(null)} className="w-full sm:flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-xs">Cancel</button>
+                <button type="button" onClick={saveDispatcherName} className="w-full sm:flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs"><Save size={16} /> Save</button>
               </div>
             </div>
           </div>

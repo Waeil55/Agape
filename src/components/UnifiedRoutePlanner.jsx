@@ -3,13 +3,14 @@ import {
   Route, BrainCircuit, Play, MapPin, Navigation,
   X, AlertTriangle, Timer, Repeat,
   Bookmark, Trash2, ChevronDown, ChevronUp, Calendar,
-  Clock, FolderOpen, Compass
+  Clock, FolderOpen, Compass, Layers
 } from 'lucide-react';
 import DriverToolsPage from './DriverToolsPage';
 import { db, doc, setDoc } from '../config/firebase';
 import { normalizeRouteRecord, ROUTE_ASSIGNMENT_STATUS, ROUTE_STATUS_BADGES } from '../utils/routePlans';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
+const LazyMultiDayPlanner = lazy(() => import('./MultiDayRoutePlanner'));
 
 const SEQUENCES_DOC = 'routeData/sequences';
 
@@ -140,6 +141,7 @@ const UnifiedRoutePlanner = ({
 
   const tabs = [
     { id: 'plan', label: 'Plan', icon: Compass },
+    { id: 'multiday', label: 'Week', icon: Layers },
     { id: 'saved', label: 'Saved', icon: Bookmark },
     { id: 'build', label: 'Route', icon: Route },
     { id: 'navigate', label: 'Nav', icon: Navigation },
@@ -326,6 +328,20 @@ const UnifiedRoutePlanner = ({
               onSetRoutePlanStops={onSetRoutePlanStops}
               onSendToSequencer={handleSendToSequencer}
             />
+          </div>
+        )}
+
+        {/* MULTI-DAY TAB */}
+        {activeTab === 'multiday' && (
+          <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
+            <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
+              <LazyMultiDayPlanner trips={activeTrips || []} onSave={(dayRoutes) => {
+                const plan = { type: 'multiday', dayRoutes, createdAt: new Date().toISOString() };
+                setDoc(doc(db, SEQUENCES_DOC, `multiday_${Date.now()}`), plan, { merge: true }).then(() => {
+                  setShowToast({ type: 'success', message: 'Multi-day plan saved.' });
+                });
+              }} />
+            </Suspense>
           </div>
         )}
 

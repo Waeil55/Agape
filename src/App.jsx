@@ -680,8 +680,6 @@ const App = () => {
   const [messageBanners, setMessageBanners] = useState([]);
   const [selectedTasks, setSelectedTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  // eslint-disable-next-line no-unused-vars
-  const [isInspected, setIsInspected] = useState(false);
 
   const [smartAssignTrip, setSmartAssignTrip] = useState(null);
   const [manualAssignTrip, setManualAssignTrip] = useState(null);
@@ -778,11 +776,6 @@ const App = () => {
     setAuthActionPayload({ label, callback });
     setShowAuthModal(true);
   }, []);
-
-  // eslint-disable-next-line no-unused-vars
-  const [activeManifest, setActiveManifest] = useState(null);
-  // eslint-disable-next-line no-unused-vars
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1930,12 +1923,44 @@ const App = () => {
         return;
       }
     }
+
+    const WEEKDAY_MAP = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+    const allTrips = [tripToAdd];
+
+    if (tripToAdd.recurring && tripToAdd.schedule?.length > 0 && tripToAdd.date) {
+      const baseDate = new Date(tripToAdd.date);
+      const scheduleDays = tripToAdd.schedule.map(d => WEEKDAY_MAP[d]).filter(d => d !== undefined);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (let week = 0; week < 4; week++) {
+        for (const dayNum of scheduleDays) {
+          const d = new Date(baseDate);
+          d.setDate(d.getDate() + (week * 7));
+          while (d.getDay() !== dayNum) d.setDate(d.getDate() + 1);
+          if (d <= today) continue;
+          const dateStr = d.toISOString().split('T')[0];
+          if (dateStr === tripToAdd.date) continue;
+          allTrips.push({
+            ...tripToAdd,
+            id: `${tripToAdd.id}-w${week}-d${dayNum}`,
+            bookingId: `${tripToAdd.bookingId}-W${week}`,
+            date: dateStr,
+            status: tripToAdd.driverId ? 'Assigned' : 'Unassigned',
+            recurring: true,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
     setTrips(prev => {
-      const all = dedupTrips([tripToAdd, ...prev]);
+      const all = dedupTrips([...allTrips, ...prev]);
       return all;
     });
-    addAuditLog('Trip Added', `${currentUser} manually added trip for ${tripToAdd.patient} (${tripToAdd.bookingId}).`, 'emerald');
-    addToast('Trip Added', `${tripToAdd.patient}'s trip has been added successfully.`, 'success');
+    const tripCount = allTrips.length;
+    addAuditLog('Trip Added', `${currentUser} added trip for ${tripToAdd.patient} (${tripToAdd.bookingId})${tripCount > 1 ? ` + ${tripCount - 1} recurring` : ''}.`, 'emerald');
+    addToast('Trip Added', `${tripToAdd.patient}'s trip has been added successfully${tripCount > 1 ? ` (${tripCount} total)` : ''}.`, 'success');
   }, [currentUser, role, currentUserDriverProfile, dedupTrips, drivers, canControlDriver, addAuditLog, addToast]);
 
   const resetSystemData = () => {

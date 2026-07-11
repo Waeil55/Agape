@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronDown, ChevronLeft, ChevronRight, Folder, MessageCircle,
   MoreHorizontal, Radio, Search, Shield, Truck, User, Users, X,
+  Info, Trash2, BellOff, Bell,
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import ChatInput from './ChatInput';
@@ -29,7 +30,10 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
     typeof window !== 'undefined' ? window.innerHeight : 0
   ));
   const [pendingOpenChannelId, setPendingOpenChannelId] = useState('');
+  const [showChannelMenu, setShowChannelMenu] = useState(false);
+  const [channelMenuTarget, setChannelMenuTarget] = useState(null);
   const searchInputRef = useRef(null);
+  const channelMenuRef = useRef(null);
 
   useEffect(() => {
     onThreadActiveChange?.(mobileView === 'chat');
@@ -72,6 +76,22 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
       document.body.classList.remove('keyboard-visible');
     };
   }, []);
+
+  useEffect(() => {
+    if (!showChannelMenu) return undefined;
+    const handleClickOutside = (e) => {
+      if (channelMenuRef.current && !channelMenuRef.current.contains(e.target)) {
+        setShowChannelMenu(false);
+        setChannelMenuTarget(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showChannelMenu]);
 
   useEffect(() => {
     const storedChannel = sessionStorage.getItem('agape_open_chat_channel') || '';
@@ -455,12 +475,73 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
             >
               <Search size={19} />
             </button>
-            <button
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors"
-              aria-label="More options"
-            >
-              <MoreHorizontal size={19} />
-            </button>
+            <div className="relative" ref={channelMenuRef}>
+              <button
+                onClick={() => {
+                  const target = {
+                    channelId: chat.activeChannel,
+                    channel: chat.channels.find(c => c.id === chat.activeChannel),
+                    target: chat.activeDMTarget,
+                  };
+                  setChannelMenuTarget(target);
+                  setShowChannelMenu(!showChannelMenu);
+                }}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors"
+                aria-label="More options"
+              >
+                <MoreHorizontal size={19} />
+              </button>
+              {showChannelMenu && (
+                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-2xl border border-slate-200 shadow-xl py-1.5 z-50">
+                  <button
+                    onClick={() => { focusSearch(); setShowChannelMenu(false); }}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <Search size={16} className="text-slate-400" />
+                    Search Messages
+                  </button>
+                  {channelMenuTarget?.channel && (
+                    <>
+                      <button
+                        onClick={() => {
+                          const ch = channelMenuTarget.channel;
+                          const info = getConversationPeople(ch);
+                          alert(`Channel: ${info.title}\nParticipants: ${info.subtitle}\nType: ${ch.type || 'dm'}`);
+                          setShowChannelMenu(false);
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <Info size={16} className="text-slate-400" />
+                        Channel Info
+                      </button>
+                      <button
+                        onClick={() => {
+                          chat.muteChannel?.(channelMenuTarget.channelId);
+                          setShowChannelMenu(false);
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <BellOff size={16} className="text-slate-400" />
+                        Mute Notifications
+                      </button>
+                      <div className="h-px bg-slate-100 my-1" />
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Clear all messages in this conversation?')) {
+                            chat.clearChannel?.(channelMenuTarget.channelId);
+                          }
+                          setShowChannelMenu(false);
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors"
+                      >
+                        <Trash2 size={16} className="text-rose-400" />
+                        Clear Conversation
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

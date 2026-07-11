@@ -556,6 +556,64 @@ export function useChat() {
 
   const totalUnread = Object.values(unreadCounts).reduce((sum, c) => sum + (Number(c) || 0), 0);
 
+  const muteChannel = useCallback(async (channelId) => {
+    if (!channelId || !userUid) return;
+    try {
+      await updateDoc(doc(db, 'chat_channels', channelId), {
+        [`mutedBy.${userUid}`]: true,
+      });
+    } catch (err) {
+      console.error('[Chat] muteChannel error:', err);
+    }
+  }, [userUid]);
+
+  const clearChannel = useCallback(async (channelId) => {
+    if (!channelId) return;
+    try {
+      const messagesQ = query(
+        collection(db, 'chat_messages'),
+        where('channelId', '==', channelId),
+        fbLimit(500)
+      );
+      const snap = await getDocs(messagesQ);
+      const batch = [];
+      snap.forEach(d => batch.push(d.ref));
+      await Promise.all(batch.map(ref => {
+        import('firebase/firestore').then(({ deleteDoc }) => deleteDoc(ref)).catch(() => {});
+      }));
+      await updateDoc(doc(db, 'chat_channels', channelId), {
+        lastMessage: '',
+        lastMessageAt: serverTimestamp(),
+        lastMessageBy: '',
+      }).catch(() => {});
+    } catch (err) {
+      console.error('[Chat] clearChannel error:', err);
+    }
+  }, []);
+
+  const deleteMessage = useCallback(async (messageId) => {
+    if (!messageId) return;
+    try {
+      const { deleteDoc: delDoc } = await import('firebase/firestore');
+      await delDoc(doc(db, 'chat_messages', messageId));
+    } catch (err) {
+      console.error('[Chat] deleteMessage error:', err);
+    }
+  }, []);
+
+  const editMessage = useCallback(async (messageId, newText) => {
+    if (!messageId || !newText?.trim()) return;
+    try {
+      await updateDoc(doc(db, 'chat_messages', messageId), {
+        text: newText.trim(),
+        edited: true,
+        editedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('[Chat] editMessage error:', err);
+    }
+  }, []);
+
   // PWA App Badging API support to set home screen icon badge
   useEffect(() => {
     try {
@@ -598,6 +656,10 @@ export function useChat() {
     openExistingDM,
     activeDMTarget,
     clearDMTarget,
+    muteChannel,
+    clearChannel,
+    deleteMessage,
+    editMessage,
     currentUser: { uid: userUid, email: userEmail, name: userDisplayName, role: userRole, isAdmin },
   };
 }

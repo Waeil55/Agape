@@ -384,8 +384,10 @@ export const stitchSessions = (events) => {
           });
 
           if (gap.payrollEffect === PAYROLL_EFFECTS.EXCLUDED) {
+            // Record the gap for analytics, but DO NOT automatically deduct it as unpaid break time (excludedGapMinutes)
+            // Drivers are paid for standby time between trips unless they explicitly log a BREAK_START.
             currentSession.gapMinutes += gap.durationMinutes;
-            currentSession.excludedGapMinutes += gap.durationMinutes;
+            
             if (gap.classification === GAP_CLASSIFICATIONS.LONG) {
               currentSession.personalGapMinutes += gap.durationMinutes;
             }
