@@ -320,19 +320,6 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       }
       prevTripCountRef.current = currentCount;
 
-      if (liveTrips.length > 0 && liveTrips.length <= 20) {
-        const FIELDS = ['source', 'arrivalTime', 'pickupOdometer', 'dropoffOdometer', 'distance', 'completedVehicle', 'travelTime', 'departedPickupTime', 'arrivalDropoffTime', 'bookingId', 'patient', 'status', 'date'];
-        liveTrips.slice(0, 3).forEach((t, i) => {
-          const present = {};
-          FIELDS.forEach(f => { present[f] = t[f] !== undefined && t[f] !== null && t[f] !== '' ? t[f] : '(missing)'; });
-          console.log(`[DEBUG] Trip ${i + 1} (id=${t.id}, source=${t.source}):`, JSON.stringify(present));
-        });
-        console.log(`[DEBUG] ${liveTrips.length} live trips, ${corruptedIds.length} corrupted. source breakdown:`, {
-          report_upload: liveTrips.filter(t => t.source === 'report_upload').length,
-          dispatch_upload: liveTrips.filter(t => t.source === 'dispatch_upload').length,
-          other: liveTrips.filter(t => t.source !== 'report_upload' && t.source !== 'dispatch_upload').length,
-        });
-      }
     };
 
     const applyTripProgressSnapshot = (snap) => {
@@ -590,7 +577,6 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
   }, []);
 
   const initializeAppData = useCallback(async () => {
-    console.log('[AppData] Initialized — onSnapshot listeners already active');
     return true;
   }, []);
 

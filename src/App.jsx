@@ -3,9 +3,9 @@ import {
   Truck, Users, MapPin, Clock, Search, ShieldCheck,
   ArrowRight, CheckCircle2, Archive, Map as MapIcon, LogOut, AlertTriangle,
   Settings, BrainCircuit, Zap,
-  Target, Upload, AlertCircle,
+  Target, AlertCircle,
   Activity, Wand2, Lock, Briefcase, User,
-  RefreshCcw, X, MessageCircle
+  X, MessageCircle
 } from 'lucide-react';
 import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
@@ -496,7 +496,6 @@ const App = () => {
           if (data?.type === 'STATIC_CACHE_UPDATED') setRefreshTick(t => t + 1);
         });
 
-        console.log('PWA auto-update enabled');
       } catch (error) {
         console.error('PWA setup error:', error);
       }
@@ -703,7 +702,6 @@ const App = () => {
       return { ...DEFAULT_APP_SETTINGS };
     }
   });
-  const [, setUserSettingsLoaded] = useState(false);
 
   const addToast = useCallback((title, message, type = 'info') => {
     const id = Date.now();
@@ -1019,7 +1017,6 @@ const App = () => {
 
       if (userSettings && Object.keys(userSettings).length > 0) {
         setAppSettings(prev => ({ ...prev, ...userSettings }));
-        setUserSettingsLoaded(true);
       }
 
       requestNotificationPermission().then(token => {
@@ -1084,7 +1081,6 @@ const App = () => {
             const settings = freshDoc.data()?.settings || {};
             if (Object.keys(settings).length > 0) {
               setAppSettings(prev => ({ ...prev, ...settings }));
-              setUserSettingsLoaded(true);
             }
           }).catch(() => { /* background check — ignore network errors */ });
           return;

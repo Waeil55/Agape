@@ -15,7 +15,6 @@ let stateChangeHandler = null;
  */
 export const registerServiceWorker = async () => {
   if (!('serviceWorker' in navigator)) {
-    console.log('Service Workers not supported');
     return null;
   }
 
@@ -31,8 +30,6 @@ export const registerServiceWorker = async () => {
     swRegistration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
     });
-    
-    console.log('Service Worker registered successfully');
 
     // Listen for updates
     updateFoundHandler = () => {

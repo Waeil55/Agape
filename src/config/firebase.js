@@ -27,7 +27,6 @@ try {
   db = initializeFirestore(app, {
     localCache: memoryLocalCache(),
   });
-  console.log('[Firebase] Using memory local cache');
 } catch (err) {
   console.warn('Memory cache failed, using default Firestore:', err.message);
   db = getFirestore(app);

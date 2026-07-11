@@ -70,7 +70,6 @@ export async function archiveTripsForDate(dateKey) {
       count += chunk.length;
     }
 
-    console.log(`Archived ${count} trips for ${dateKey}`);
     return { archived: count, errors: 0 };
   } catch (err) {
     console.error(`Failed to archive trips for ${dateKey}:`, err);
@@ -93,7 +92,6 @@ export async function archiveOldTrips() {
   const totalArchived = results.reduce((sum, r) => sum + r.archived, 0);
   const totalErrors = results.reduce((sum, r) => sum + r.errors, 0);
 
-  console.log(`Archival complete: ${totalArchived} trips archived, ${totalErrors} errors`);
   return { totalArchived, totalErrors, results };
 }
 
