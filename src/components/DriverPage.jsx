@@ -1418,16 +1418,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const today = new Date();
     const days = [];
     let weeklyTotal = 0;
+    const isInType = (e) => e.type === 'in' || e.type === 'auto_in';
+    const isOutType = (e) => e.type === 'out';
     for (let i = 13; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dateKey = localCalendarYmd(d);
       const dayEvents = (byDate[dateKey] || []).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-      const isInType = (e) => e.type === 'in' || e.type === 'auto_in';
-      const isOutType = (e) => e.type === 'out';
-      const clockIn = dayEvents.find(e => isInType(e));
-      const clockOut = [...dayEvents].reverse().find(e => isOutType(e));
+      let sessionHours = 0;
       let breakMin = 0;
+      let firstClockIn = null;
+      let lastClockOut = null;
+      let pendingIn = null;
+      let pendingBreakStart = null;
       const breakStarts = dayEvents.filter(e => e.type === 'break_start');
       const breakEnds = dayEvents.filter(e => e.type === 'break_end');
       breakStarts.forEach((bs, idx) => {
@@ -1438,20 +1441,30 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           breakMin += Math.round((new Date() - new Date(bs.timestamp)) / 60000);
         }
       });
-      let hours = null;
-      if (clockIn) {
-        const endTime = clockOut ? new Date(clockOut.timestamp) : new Date();
-        const diff = endTime - new Date(clockIn.timestamp);
-        if (diff > 0) {
-          const billableMin = Math.max(0, Math.round(diff / 60000) - breakMin);
-          hours = parseFloat((billableMin / 60).toFixed(1));
+      dayEvents.forEach(e => {
+        if (isInType(e)) {
+          pendingIn = e;
+          if (!firstClockIn) firstClockIn = e;
+        } else if (isOutType(e) && pendingIn) {
+          const diff = new Date(e.timestamp) - new Date(pendingIn.timestamp);
+          if (diff > 0) sessionHours += diff / 3600000;
+          lastClockOut = e;
+          pendingIn = null;
         }
+      });
+      let hours = null;
+      if (firstClockIn && !lastClockOut && pendingIn) {
+        const diff = new Date() - new Date(pendingIn.timestamp);
+        if (diff > 0) hours = parseFloat(((Math.max(0, Math.round(diff / 60000) - breakMin) / 60)).toFixed(1));
+      } else if (sessionHours > 0) {
+        const billableMin = Math.max(0, Math.round(sessionHours * 60) - breakMin);
+        hours = parseFloat((billableMin / 60).toFixed(1));
       }
       days.push({
         dateKey,
         hasEvents: dayEvents.length > 0,
-        clockIn: clockIn?.timestamp || null,
-        clockOut: clockOut?.timestamp || null,
+        clockIn: firstClockIn?.timestamp || null,
+        clockOut: lastClockOut?.timestamp || null,
         hours,
         breakMin,
       });
@@ -1497,7 +1510,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             { type: 'out', timestamp: nowIso, ...(clockLocation ? { lat: clockLocation.lat, lng: clockLocation.lng } : {}) },
           ],
           timeTrackingPolicyMode,
-          { date: nowIso.slice(0, 10), breadcrumbs: me?.breadcrumbs || [] }
+          { date: localCalendarYmd(), breadcrumbs: me?.breadcrumbs || [] }
         );
         const payrollOutput = generatePayrollOutput(dailyTimeData, Number(me?.hourlyRate || 0));
         addDoc(collection(db, 'timeTrackingSessions'), {

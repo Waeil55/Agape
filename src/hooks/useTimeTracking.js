@@ -100,9 +100,9 @@ export function useTimeTracking({ driver, trips = [], position, policyMode = POL
   const persistSession = useCallback(async (clockOutEvt) => {
     const events = clockOutEvt ? [...eventsRef.current, clockOutEvt] : [...eventsRef.current];
     const d = driverRef.current;
-    const allClock = [...(d?.clockEvents || []),
-      ...events.filter(e => ['CLOCK_IN','AUTO_CLOCK_IN','CLOCK_OUT','BREAK_START','BREAK_END'].includes(e.type))
-        .map(e => ({ type: e.type.toLowerCase().replace('_',''), timestamp: e.timestamp, lat: e.location?.lat, lng: e.location?.lng }))];
+    const allClock = events
+      .filter(e => ['CLOCK_IN','AUTO_CLOCK_IN','CLOCK_OUT','BREAK_START','BREAK_END'].includes(e.type))
+      .map(e => ({ type: e.type.toLowerCase().replace('_',''), timestamp: e.timestamp, lat: e.location?.lat, lng: e.location?.lng }));
     const timeData = buildTimeEvents(tripsRef.current, d, allClock, policyMode, { date: localToday() });
     const payroll = generatePayrollOutput(timeData, Number(d?.hourlyRate || 0));
     const abuse = detectAbuse({ breadcrumbs: d?.breadcrumbs || [],

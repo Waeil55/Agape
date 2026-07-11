@@ -5,7 +5,7 @@ import {
   FileText, TrendingUp, Filter, RefreshCw, Home, Navigation, Zap, Eye
 } from 'lucide-react';
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES, GAP_CLASSIFICATIONS } from '../utils/timeTracking';
-import { localCalendarYmd } from '../utils/tripDate';
+import { localCalendarYmd, isoToLocalDateKey } from '../utils/tripDate';
 
 const fmt = (min) => {
   if (!min && min !== 0) return '--';
@@ -53,13 +53,13 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
   const reportData = useMemo(() => {
     return filtered.map(driver => {
       const driverTrips = trips.filter(t => {
-        const dateKey = t.date || (t.arrivalTime || t.startedAt || t.completedAt || '').slice(0, 10);
+        const dateKey = t.date || isoToLocalDateKey(t.arrivalTime || t.startedAt || t.completedAt);
         const matchDate = !selectedDate || dateKey === selectedDate;
         const matchDriver = t.driverId === driver.id || (t.driverEmail && t.driverEmail.toLowerCase() === (driver.email || '').toLowerCase());
         return matchDate && matchDriver;
       });
       const clockEvts = (driver.clockEvents || []).filter(e => {
-        const d = (e.timestamp || e.at || e.time || '').slice(0, 10);
+        const d = isoToLocalDateKey(e.timestamp || e.at || e.time);
         return !selectedDate || d === selectedDate;
       });
       const timeData = buildTimeEvents(driverTrips, driver, clockEvts, policyMode, { date: selectedDate, breadcrumbs: driver.breadcrumbs || [] });

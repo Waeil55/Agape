@@ -566,7 +566,9 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
 
   const isoDateKey = (value) => {
     const iso = toIso(value);
-    return iso ? iso.slice(0, 10) : null;
+    if (!iso) return null;
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
   const eventDateKey = (event) => isoDateKey(event.timestamp || event.at || event.createdAt || event.time);
@@ -622,7 +624,7 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     .map((ce) => {
       const timestamp = toIso(ce.timestamp || ce.at || ce.createdAt || ce.time);
       if (!timestamp) return null;
-      const date = timestamp.slice(0, 10);
+      const date = isoDateKey(timestamp);
       if (!shouldIncludeDate(date)) return null;
       return {
         ...ce,
@@ -672,7 +674,7 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
         patient: trip.patient,
         location: location || null,
         driverId: base.driverId,
-        date: timestamp.slice(0, 10),
+        date: isoDateKey(timestamp),
       });
     };
 
@@ -714,7 +716,7 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
   const gapLogWithMeta = gapLog.map((gap) => ({
     ...gap,
     driverId: gap.driverId || driverId,
-    date: gap.date || gap.startTime?.slice(0, 10) || dateFilter,
+    date: gap.date || isoDateKey(gap.startTime) || dateFilter,
   }));
 
   const firstSession = sessions[0] || {};

@@ -61,7 +61,12 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
       if (value.seconds) return new Date(value.seconds * 1000).toISOString();
       return null;
     };
-    const dateKeyFrom = (value) => { const iso = toIso(value); return iso ? iso.slice(0, 10) : null; };
+    const dateKeyFrom = (value) => {
+      const iso = toIso(value);
+      if (!iso) return null;
+      const d = new Date(iso);
+      return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
     const tripDateKey = (trip) => {
       if (typeof trip?.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(trip.date)) return trip.date.slice(0, 10);
       return dateKeyFrom(trip?.arrivalTime) || dateKeyFrom(trip?.startTime) || dateKeyFrom(trip?.startedAt) || dateKeyFrom(trip?.arrivalDropoffTime) || dateKeyFrom(trip?.completedAt);

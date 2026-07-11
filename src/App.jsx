@@ -11,7 +11,7 @@ import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, s
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
-import { timeToMinutes, tripCalendarDateKey, isTripDateToday, isCalendarDateKeyWithinLastDays, localCalendarYmd } from './utils/tripDate';
+import { timeToMinutes, tripCalendarDateKey, isTripDateToday, isCalendarDateKeyWithinLastDays, localCalendarYmd, isoToLocalDateKey } from './utils/tripDate';
 import { cleanPhone } from './utils/smartContacts';
 import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, isDriverAssignedToDispatcher, isTripInDispatcherScope, normalizeEmail } from './utils/accessControl';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
@@ -2147,7 +2147,7 @@ const App = () => {
       const driver = drivers.find(d => d.id === userId);
       if (!driver) return;
       const filteredEvents = (driver.clockEvents || []).filter(e => {
-        const eDate = (e.timestamp || e.at || '').slice(0, 10);
+        const eDate = isoToLocalDateKey(e.timestamp || e.at);
         return eDate !== date;
       });
       const newEvents = events.map(e => ({ ...e, timestamp: e.timestamp || e.at }));
@@ -2160,7 +2160,7 @@ const App = () => {
       setDispatchers(prev => prev.map(d => {
         if (d.id !== userId) return d;
         const filteredEvents = (d.clockEvents || []).filter(e => {
-          const eDate = (e.timestamp || e.at || '').slice(0, 10);
+          const eDate = isoToLocalDateKey(e.timestamp || e.at);
           return eDate !== date;
         });
         const newEvents = events.map(e => ({ ...e, timestamp: e.timestamp || e.at }));
