@@ -19,46 +19,6 @@ const SearchGlyph = ({ size = 16, className }) => (
   </svg>
 );
 
-const ChevronLeftGlyph = ({ size = 20, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M15 18l-6-6 6-6" />
-  </svg>
-);
-
-const PlusGlyph = ({ size = 14, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M12 5v14M5 12h14" />
-  </svg>
-);
-
-const DownloadGlyph = ({ size = 13, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="7 10 12 15 17 10" />
-    <line x1="12" y1="15" x2="12" y2="3" />
-  </svg>
-);
-
-const LoaderGlyph = ({ size = 13, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className={className}>
-    <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-    <path d="M12 2a10 10 0 0 1 10 10" strokeOpacity="1" />
-  </svg>
-);
-
-const ShieldCheckGlyph = ({ size = 13, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" />
-    <path d="M9 12l2 2 4-4" />
-  </svg>
-);
-
-const ChevronLeftGlyphSmall = ({ size = 20, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M15 18l-6-6 6-6" />
-  </svg>
-);
-
 /* =====================================================================
    AdminShell — Top-level layout wrapper
    Handles desktop sidebar + mobile pill bottom nav + topbar
@@ -133,7 +93,7 @@ export const AdminShell = ({
         {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
       </header>
 
-      <main className="adm-content adm-content--mobile md:adm-content md:pb-4 pb-28">
+      <main className="adm-content">
         {children}
       </main>
     </div>

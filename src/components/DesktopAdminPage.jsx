@@ -1,5 +1,10 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2, UserCog, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase, Download, MessageCircle, DollarSign } from 'lucide-react';
+import {
+  Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2,
+  UserCog, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase,
+  MessageCircle, DollarSign, LayoutDashboard, Users, Search,
+  RadioTower, CircleDot, FileDown, UserPlus, BellRing, TrendingUp, CheckCircle2,
+} from 'lucide-react';
 import { sendPasswordResetEmail, auth, db, firebaseConfig, setDoc, doc, deleteApp, initializeApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from '../config/firebase';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiSecurityAnalysis } from '../config/ai';
@@ -11,7 +16,10 @@ import DriverPerformanceCard from './DriverPerformanceCard';
 import AdminChatMonitor from './AdminChatMonitor';
 import { getDriverLiveStatus } from '../constants/statuses';
 import PayrollReportPage from './PayrollReportPage';
-import { AdminShell, AdminCard, AdminButton, AdminBadge, AdminIconButton } from './admin/AdminKit';
+import {
+  AdminShell, AdminCard, AdminButton, AdminBadge,
+  AdminAvatar, AdminSearch, AdminEmpty, AdminCardHead,
+} from './admin/AdminKit';
 
 const getEntityType = (log) => {
   const action = String(log?.t || '').toLowerCase();
@@ -32,7 +40,6 @@ const getTripIdFromLog = (log) => {
 };
 
 const fmtTime = (t) => t ? new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-const fmtDate = (t) => t ? new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
 const displayRef = (trip) => (trip.bookingId || trip.id || '').replace(/^TRIP-/, 'Trip ID: ');
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
@@ -48,18 +55,228 @@ const buildStableProfileId = (role, uid) => {
   return null;
 };
 
-const statusColor = (status) => {
-  if (!status) return 'bg-emerald-100 text-emerald-700';
-  const s = String(status).toLowerCase();
-  if (s === 'busy' || s === 'on trip') return 'bg-amber-100 text-amber-700';
-  return 'bg-emerald-100 text-emerald-700';
+const ACTIVE_TRIP_STATUSES = new Set([
+  'Assigned', 'In Progress', 'In Mission', 'En Route', 'Navigating Pickup',
+  'At Pickup', 'In Transit', 'Navigating Dropoff', 'At Dropoff', 'Arrived',
+]);
+
+const TERMINAL_TRIP_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
+
+const liveTone = (label) => {
+  const l = String(label || '').toLowerCase();
+  if (l.includes('offline')) return 'offline';
+  if (l.includes('trip') || l.includes('busy')) return 'busy';
+  return 'online';
 };
 
-const SectionTab = ({ title, count, isActive, onClick }) => (
-  <button onClick={onClick} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 border ${isActive ? 'bg-slate-900 text-white shadow-sm border-slate-900' : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'}`}>
-    {title}
-    {count !== undefined && <span className={`ml-1 ${isActive ? 'text-blue-200' : 'text-slate-400'}`}>({count})</span>}
-  </button>
+const tripTitle = (trip) => (
+  trip?.patient || trip?.memberName || trip?.clientName || trip?.bookingId || trip?.id || 'Trip'
+);
+
+const tripMeta = (trip) => (
+  [
+    trip?.time || trip?.pickupTime || trip?.appointmentTime || trip?.date,
+    trip?.driverName || trip?.driver || trip?.driverEmail || 'Unassigned',
+  ].filter(Boolean).join(' - ')
+);
+
+const AdminMetricTile = ({ icon: Icon, label, value, hint, tone = 'brand' }) => (
+  <div className={`admin-metric admin-metric--${tone}`}>
+    <div className="admin-metric-icon">{Icon && <Icon size={18} />}</div>
+    <div>
+      <p className="admin-metric-value">{value}</p>
+      <p className="admin-metric-label">{label}</p>
+      {hint && <p className="admin-metric-hint">{hint}</p>}
+    </div>
+  </div>
+);
+
+const AdminSectionFrame = ({ eyebrow, title, children, action }) => (
+  <div className="admin-section-frame">
+    <div className="admin-section-frame-head">
+      <div>
+        {eyebrow && <p className="admin-section-eyebrow">{eyebrow}</p>}
+        <h2>{title}</h2>
+      </div>
+      {action}
+    </div>
+    {children}
+  </div>
+);
+
+const CompactActivityFeed = ({ logs = [], onViewTrip, limit = 8 }) => (
+  <AdminCard pad={false} className="overflow-hidden">
+    <AdminCardHead icon={Activity} title="Recent Activity" />
+    <div className="admin-feed-list">
+      {logs.slice(0, limit).map((log, i) => {
+        const tripId = getTripIdFromLog(log);
+        return (
+          <div key={log.id || log.time || i} className="admin-feed-item">
+            <span className={`admin-feed-dot ${log.c === 'rose' ? 'is-danger' : log.c === 'amber' ? 'is-warning' : log.c === 'emerald' ? 'is-success' : ''}`} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-slate-900">{log.t || 'Activity'}</p>
+              <p className="line-clamp-2 text-xs font-medium text-slate-500">{log.meta?.summary || log.d || 'No details'}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-400">{fmtTime(log.time)}</span>
+              {tripId && onViewTrip && (
+                <button type="button" onClick={() => onViewTrip(tripId)} className="admin-mini-link" aria-label="Open trip">
+                  <ExternalLink size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      {logs.length === 0 && <AdminEmpty icon={Activity} title="No activity yet" />}
+    </div>
+  </AdminCard>
+);
+
+const AdminSignalPanel = ({ openTrips, activeTrips, unassignedTrips, offlineDrivers, chatUnreadCount }) => {
+  const signals = [
+    {
+      label: 'Open Manifest',
+      value: openTrips.length,
+      hint: 'Trips still moving through dispatch',
+      tone: openTrips.length ? 'brand' : 'success',
+    },
+    {
+      label: 'Attention Queue',
+      value: unassignedTrips.length,
+      hint: 'Trips without a ready driver',
+      tone: unassignedTrips.length ? 'danger' : 'success',
+    },
+    {
+      label: 'Live Missions',
+      value: activeTrips.length,
+      hint: 'Drivers actively working',
+      tone: activeTrips.length ? 'warning' : 'muted',
+    },
+    {
+      label: 'Unread Chat',
+      value: chatUnreadCount,
+      hint: 'Messages waiting for admin',
+      tone: chatUnreadCount ? 'info' : 'muted',
+    },
+  ];
+
+  return (
+    <AdminCard pad={false} className="admin-command-panel">
+      <AdminCardHead icon={TrendingUp} title="Operations Intelligence" action={<AdminBadge tone={offlineDrivers ? 'warning' : 'online'} dot>{offlineDrivers ? `${offlineDrivers} offline` : 'Stable'}</AdminBadge>} />
+      <div className="admin-signal-list">
+        {signals.map((signal) => (
+          <div key={signal.label} className={`admin-signal-row admin-signal-row--${signal.tone}`}>
+            <div>
+              <p>{signal.label}</p>
+              <span>{signal.hint}</span>
+            </div>
+            <strong>{signal.value}</strong>
+          </div>
+        ))}
+      </div>
+    </AdminCard>
+  );
+};
+
+const AdminCoveragePanel = ({ counts, total }) => {
+  const safeTotal = Math.max(total, 1);
+  const rows = [
+    { label: 'Online', value: counts.online, tone: 'online' },
+    { label: 'Busy', value: counts.busy, tone: 'busy' },
+    { label: 'Offline', value: counts.offline, tone: 'offline' },
+  ];
+
+  return (
+    <AdminCard pad={false} className="admin-command-panel">
+      <AdminCardHead icon={RadioTower} title="Coverage Mix" action={<AdminBadge tone="brand">{total} drivers</AdminBadge>} />
+      <div className="admin-coverage-list">
+        {rows.map((row) => (
+          <div key={row.label} className="admin-coverage-row">
+            <div className="admin-coverage-head">
+              <span>{row.label}</span>
+              <strong>{row.value}</strong>
+            </div>
+            <div className="admin-coverage-track">
+              <span className={`admin-coverage-fill is-${row.tone}`} style={{ width: `${Math.round((row.value / safeTotal) * 100)}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </AdminCard>
+  );
+};
+
+const AdminPriorityQueue = ({ trips = [], onViewTrip }) => (
+  <AdminCard pad={false} className="admin-command-panel">
+    <AdminCardHead icon={BellRing} title="Priority Queue" action={<AdminBadge tone={trips.length ? 'danger' : 'success'}>{trips.length ? `${trips.length} watch` : 'Clear'}</AdminBadge>} />
+    <div className="admin-priority-list">
+      {trips.slice(0, 5).map((trip, index) => (
+        <div key={trip.id || trip.bookingId || index} className="admin-priority-row">
+          <div className="admin-priority-rank">{index + 1}</div>
+          <div className="min-w-0 flex-1">
+            <div className="admin-priority-title">
+              <p>{tripTitle(trip)}</p>
+              <AdminBadge tone={!trip.driverId || trip.status === 'Unassigned' ? 'danger' : 'warning'}>{trip.status || 'Open'}</AdminBadge>
+            </div>
+            <span>{tripMeta(trip)}</span>
+          </div>
+          {onViewTrip && (
+            <button type="button" onClick={() => onViewTrip(trip.id || trip.bookingId)} className="admin-mini-link" aria-label="Open trip">
+              <ExternalLink size={12} />
+            </button>
+          )}
+        </div>
+      ))}
+      {trips.length === 0 && <AdminEmpty icon={CheckCircle2} title="No priority items" hint="Open work is currently under control" />}
+    </div>
+  </AdminCard>
+);
+
+const TeamMemberCard = ({ user, role, live, pwResetMsg, onRoleChange, onResetPassword, onDelete }) => (
+  <AdminCard className="admin-person-card" pad={false}>
+    <div className="admin-person-top">
+      <AdminAvatar name={user.name} brand={user._role === 'driver'} size={46} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="truncate text-sm font-semibold text-slate-950">{user.name || 'Unnamed'}</h3>
+          <AdminBadge tone={user._role === 'driver' ? liveTone(live?.label) : 'info'} dot>
+            {user._role === 'driver' ? live?.label : 'Dispatcher'}
+          </AdminBadge>
+        </div>
+        <p className="truncate text-xs font-medium text-slate-500">{user.email || 'No email'}</p>
+      </div>
+    </div>
+    <div className="admin-person-body">
+      <div>
+        <p className="admin-field-label">Role</p>
+        <select value={user._role} onChange={(e) => onRoleChange(user, e.target.value)} className="adm-select w-full">
+          {role === 'admin' && <option value="admin">Admin</option>}
+          <option value="dispatcher">Dispatcher</option>
+          <option value="driver">Driver</option>
+        </select>
+      </div>
+      <div>
+        <p className="admin-field-label">Contact</p>
+        <p className="truncate text-sm font-semibold text-slate-800">{user.phone || user.vehicle || 'Not set'}</p>
+      </div>
+    </div>
+    <div className="admin-person-actions">
+      {user.email && (
+        <AdminButton variant="ghost" size="sm" onClick={() => onResetPassword(user.email)}>
+          <KeyRound size={13} /> Reset
+        </AdminButton>
+      )}
+      <AdminButton variant="danger" size="sm" onClick={() => onDelete(user)}>
+        <Trash2 size={13} /> Delete
+      </AdminButton>
+      {pwResetMsg[user.email] && (
+        <span className={`ml-auto text-[11px] font-bold ${pwResetMsg[user.email] === 'Email sent!' ? 'text-emerald-600' : 'text-rose-600'}`}>
+          {pwResetMsg[user.email]}
+        </span>
+      )}
+    </div>
+  </AdminCard>
 );
 
 const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
@@ -177,7 +394,6 @@ const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
 const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
   const dispLogs = logs.filter(l => {
     const d = String(l?.d || '').toLowerCase();
-    const t = String(l?.t || '').toLowerCase();
     return d.includes(dispatcher.name.toLowerCase()) || d.includes((dispatcher.email || '').toLowerCase());
   }).slice(0, 8);
 
@@ -284,13 +500,12 @@ const exportFullJson = (trips, drivers, dispatchers, vehicles, logs) => {
 };
 
 const DesktopAdminPage = ({
-  role, currentUser, drivers, setDrivers, upsertDriverProfile, dispatchers, setDispatchers,
-  addAuditLog, logs = [], trips, vehicles, setVehicles,
+  role, currentUser, drivers = [], setDrivers, upsertDriverProfile, dispatchers = [], setDispatchers,
+  addAuditLog, logs = [], trips = [], vehicles = [], setVehicles,
   assignTripToDriver, requestAuthAction, onViewTrip, chatUnreadCount = 0
 }) => {
-  const [activeSection, setActiveSection] = useState(() => role === 'admin' ? 'dispatchers' : 'drivers');
+  const [activeSection, setActiveSection] = useState('overview');
   const [pwResetMsg, setPwResetMsg] = useState({});
-  const [confirmDelete, setConfirmDelete] = useState(null);
   const [aiSecurity, setAiSecurity] = useState(null);
   const [aiSecLoading, setAiSecLoading] = useState(false);
   const [createUserRole, setCreateUserRole] = useState(null);
@@ -300,6 +515,8 @@ const DesktopAdminPage = ({
   const [vehicleCreateIntent, setVehicleCreateIntent] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [payrollPolicy, setPayrollPolicy] = useState('SMART_MODE');
+  const [driverQuery, setDriverQuery] = useState('');
+  const [teamQuery, setTeamQuery] = useState('');
   const exportRef = useRef(null);
 
   useEffect(() => {
@@ -316,10 +533,6 @@ const DesktopAdminPage = ({
     setAiSecurity(r);
     setAiSecLoading(false);
   }, [drivers, dispatchers, logs]);
-
-  const toggleSection = (id) => {
-    setActiveSection(prev => prev === id ? null : id);
-  };
 
   const openCreateUser = (targetRole) => {
     if (targetRole === 'dispatcher' && role !== 'admin') return;
@@ -444,20 +657,6 @@ const DesktopAdminPage = ({
     return users;
   }, [dispatchers, drivers]);
 
-  const workTimes = useMemo(() => {
-    const times = {};
-    logs.forEach(log => {
-      const action = String(log?.t || '').toLowerCase();
-      const desc = String(log?.d || '').toLowerCase();
-      const name = desc.match(/(\S+)\s+(?:logged|clocked|signed|went)/i)?.[1] || '';
-      if (name && (action.includes('login') || action.includes('logout') || action.includes('clock'))) {
-        if (!times[name]) times[name] = [];
-        times[name].push({ action: log.t, time: log.time });
-      }
-    });
-    return times;
-  }, [logs]);
-
   const handlePasswordReset = async (email) => {
     if (!email) return;
     try {
@@ -495,12 +694,10 @@ const DesktopAdminPage = ({
         setDrivers(prev => prev.filter(d => d.id !== user.id));
       }
       addAuditLog('User Deleted', `${currentUser} deleted ${user.name} (${user._role})`, 'rose');
-      setConfirmDelete(null);
     });
   };
 
   const activeDrivers = useMemo(() => {
-    const now = new Date();
     return drivers
       .filter(d => d.name)
       .sort((a, b) => {
@@ -516,154 +713,256 @@ const DesktopAdminPage = ({
     vehicle: logs.filter(l => getEntityType(l) === 'vehicle'),
   }), [logs]);
 
+  const activeTrips = useMemo(() => trips.filter(t => ACTIVE_TRIP_STATUSES.has(t.status)), [trips]);
+  const completedTrips = useMemo(() => trips.filter(t => t.status === 'Completed'), [trips]);
+  const openTrips = useMemo(() => trips.filter(t => !TERMINAL_TRIP_STATUSES.has(t.status)), [trips]);
+  const unassignedTrips = useMemo(() => openTrips.filter(t => !t.driverId || t.status === 'Unassigned'), [openTrips]);
+  const attentionTrips = useMemo(() => {
+    const ranked = [...openTrips].sort((a, b) => {
+      const aNeedsDriver = (!a.driverId || a.status === 'Unassigned') ? 0 : 1;
+      const bNeedsDriver = (!b.driverId || b.status === 'Unassigned') ? 0 : 1;
+      return aNeedsDriver - bNeedsDriver;
+    });
+    return ranked.slice(0, 8);
+  }, [openTrips]);
+
+  const driverStatusCounts = useMemo(() => {
+    let online = 0;
+    let busy = 0;
+    let offline = 0;
+    drivers.forEach((driver) => {
+      const label = getDriverLiveStatus(driver).label;
+      const tone = liveTone(label);
+      if (tone === 'offline') offline += 1;
+      else if (tone === 'busy') busy += 1;
+      else online += 1;
+    });
+    return { online, busy, offline };
+  }, [drivers]);
+
+  const filteredDrivers = useMemo(() => {
+    const q = driverQuery.trim().toLowerCase();
+    if (!q) return activeDrivers;
+    return activeDrivers.filter((driver) => (
+      String(driver.name || '').toLowerCase().includes(q) ||
+      String(driver.email || '').toLowerCase().includes(q) ||
+      String(driver.vehicle || '').toLowerCase().includes(q) ||
+      String(driver.currentZone || '').toLowerCase().includes(q)
+    ));
+  }, [activeDrivers, driverQuery]);
+
+  const filteredUsers = useMemo(() => {
+    const q = teamQuery.trim().toLowerCase();
+    const sorted = [...allUsers].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    if (!q) return sorted;
+    return sorted.filter((user) => (
+      String(user.name || '').toLowerCase().includes(q) ||
+      String(user.email || '').toLowerCase().includes(q) ||
+      String(user.phone || '').toLowerCase().includes(q) ||
+      String(user.vehicle || '').toLowerCase().includes(q) ||
+      String(user._role || '').toLowerCase().includes(q)
+    ));
+  }, [allUsers, teamQuery]);
+
+  const overviewDrivers = filteredDrivers.slice(0, 6);
+  const overviewDispatchers = dispatchers.filter(d => d.name).slice(0, 4);
+
   const sections = [
-    { id: 'dispatchers', title: 'Dispatcher Activity', icon: ClipboardList, count: dispatchers.length, roles: ['admin'],
+    { id: 'overview', title: 'Command Center', icon: LayoutDashboard, roles: ['admin', 'dispatcher'],
       content: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {dispatchers.filter(d => d.name).map((disp, i) => (
-            <DispatcherActivityCard key={disp.id || i} dispatcher={disp} logs={entityLogs.dispatcher} onViewTrip={onViewTrip} />
-          ))}
-          {dispatchers.filter(d => d.name).length === 0 && (
-            <p className="text-sm text-slate-400 col-span-full text-center py-6">No dispatchers configured.</p>
-          )}
-        </div>
-      ) },
-    { id: 'drivers', title: 'Driver Activity', icon: Truck, count: drivers.length, roles: ['admin', 'dispatcher'],
-      content: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {activeDrivers.map((driver, i) => (
-            <DriverActivityCard key={driver.id || i} driver={driver} trips={trips} logs={entityLogs.driver} onViewTrip={onViewTrip} />
-          ))}
-          {activeDrivers.length === 0 && (
-            <p className="text-sm text-slate-400 col-span-full text-center py-6">No drivers configured.</p>
-          )}
-        </div>
-      ) },
-    { id: 'logins', title: 'Logins & Roles', icon: UserCog, count: allUsers.length, roles: ['admin'],
-      content: (
-        <>
-          <div className="overflow-x-auto rounded-2xl border border-slate-100 shadow-sm">
-            <table className="w-full">
-              <thead className="bg-slate-50/80 border-b border-slate-100">
-                <tr>
-                  <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">User</th>
-                  <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Email</th>
-                  <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Role</th>
-                  <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
-                  <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {allUsers.map((user, i) => (
-                  <tr key={`${user._source}-${user.id || i}`} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-black text-slate-700 uppercase shrink-0">{(user.name || '?')[0]}</div>
-                        <span className="font-semibold text-slate-900 text-sm">{user.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-slate-600">{user.email || '-'}</td>
-                    <td className="px-3 py-2.5">
-                      <select
-                        value={user._role}
-                        onChange={(e) => {
-                          const newRole = e.target.value;
-                          if (newRole === user._role) return;
-                          if (requestAuthAction) {
-                            requestAuthAction(`Change ${user.name} from ${user._role} to ${newRole}`, () => handleRoleChange(user, newRole));
-                          } else {
-                            handleRoleChange(user, newRole);
-                          }
-                        }}
-                        className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      >
-                        <option value="admin">Admin</option>
-                        <option value="dispatcher">Dispatcher</option>
-                        <option value="driver">Driver</option>
-                      </select>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {user._role === 'driver' ? (
-                        <AdminBadge tone={getDriverLiveStatus(user).label.toLowerCase().includes('offline') ? 'offline' : getDriverLiveStatus(user).label.toLowerCase().includes('trip') || getDriverLiveStatus(user).label.toLowerCase().includes('busy') ? 'busy' : 'online'} dot>
-                          {getDriverLiveStatus(user).label}
-                        </AdminBadge>
-                      ) : (
-                        <AdminBadge tone="info" dot>Active</AdminBadge>
-                      )}
-                      {workTimes[user.name]?.length > 0 && (
-                        <div className="mt-1 text-[9px] text-slate-400">
-                          {workTimes[user.name].slice(-2).map((w, j) => (
-                            <span key={j} className="block">{w.action}: {fmtTime(w.time)} {fmtDate(w.time)}</span>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        {user.email && (
-                          <AdminIconButton onClick={() => handlePasswordReset(user.email)} title="Send password reset email">
-                            <KeyRound size={10} /> Reset PW
-                          </AdminIconButton>
-                        )}
-                        <AdminButton variant="ghost" size="sm" onClick={() => handleDeleteUser(user)}>
-                          <Trash2 size={10} /> Delete
-                        </AdminButton>
-                      </div>
-                      {pwResetMsg[user.email] && (
-                        <p className={`text-[9px] mt-1 ${pwResetMsg[user.email] === 'Email sent!' ? 'text-emerald-600' : 'text-rose-600'}`}>{pwResetMsg[user.email]}</p>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="admin-dashboard">
+          <div className="admin-command-hero">
+            <div className="min-w-0">
+              <p className="admin-section-eyebrow">Live operations</p>
+              <h2>Admin command center</h2>
+              <p>Clean overview of people, fleet activity, open trips, system signals, and admin actions.</p>
+              <div className="admin-hero-signal-strip">
+                <span><CheckCircle2 size={13} /> {completedTrips.length} completed</span>
+                <span><BellRing size={13} /> {unassignedTrips.length} needs dispatch</span>
+                <span><MessageCircle size={13} /> {chatUnreadCount} unread</span>
+              </div>
+            </div>
+            <div className="admin-hero-actions">
+              <AdminButton variant="primary" onClick={() => openCreateUser('driver')}><UserPlus size={16} /> Add driver</AdminButton>
+              {role === 'admin' && <AdminButton variant="ghost" onClick={() => openCreateUser('dispatcher')}><Briefcase size={16} /> Add dispatcher</AdminButton>}
+            </div>
           </div>
-        </>
+
+          <div className="admin-metric-grid">
+            <AdminMetricTile icon={Truck} value={drivers.length} label="Drivers" hint={`${driverStatusCounts.online} online`} tone="brand" />
+            <AdminMetricTile icon={RadioTower} value={driverStatusCounts.busy} label="Busy now" hint={`${activeTrips.length} active trips`} tone="warning" />
+            <AdminMetricTile icon={CircleDot} value={unassignedTrips.length} label="Unassigned" hint="Need attention" tone={unassignedTrips.length ? 'danger' : 'success'} />
+            <AdminMetricTile icon={Briefcase} value={dispatchers.length} label="Dispatchers" hint={`${completedTrips.length} completed`} tone="info" />
+          </div>
+
+          <div className="admin-intelligence-grid">
+            <AdminSignalPanel
+              openTrips={openTrips}
+              activeTrips={activeTrips}
+              unassignedTrips={unassignedTrips}
+              offlineDrivers={driverStatusCounts.offline}
+              chatUnreadCount={chatUnreadCount}
+            />
+            <AdminCoveragePanel counts={driverStatusCounts} total={drivers.length} />
+            <AdminPriorityQueue trips={attentionTrips} onViewTrip={onViewTrip} />
+          </div>
+
+          <div className="admin-overview-grid">
+            <AdminCard pad={false} className="overflow-hidden">
+              <AdminCardHead icon={Truck} title="Fleet Snapshot" action={<AdminBadge tone="brand">{openTrips.length} open trips</AdminBadge>} />
+              <div className="admin-live-list">
+                {overviewDrivers.map((driver) => {
+                  const live = getDriverLiveStatus(driver);
+                  const currentTrip = trips.find(t => (t.driverId === driver.id || t.driverName === driver.name) && ACTIVE_TRIP_STATUSES.has(t.status));
+                  return (
+                    <div key={driver.id || driver.email || driver.name} className="admin-live-row">
+                      <AdminAvatar name={driver.name} brand size={42} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-slate-950">{driver.name}</p>
+                          <AdminBadge tone={liveTone(live.label)} dot>{live.label}</AdminBadge>
+                        </div>
+                        <p className="truncate text-xs font-medium text-slate-500">{currentTrip ? `${currentTrip.patient || 'Trip'} - ${currentTrip.status}` : driver.vehicle || 'No vehicle assigned'}</p>
+                      </div>
+                      <span className="text-xs font-bold text-slate-400">{driver.currentZone || '--'}</span>
+                    </div>
+                  );
+                })}
+                {overviewDrivers.length === 0 && <AdminEmpty icon={Truck} title="No drivers available" />}
+              </div>
+            </AdminCard>
+
+            <div className="space-y-4">
+              <AdminCard pad={false} className="overflow-hidden">
+                <AdminCardHead icon={Briefcase} title="Dispatch Desk" action={<AdminBadge tone="info">{overviewDispatchers.length} shown</AdminBadge>} />
+                <div className="admin-live-list">
+                  {overviewDispatchers.map((dispatcher) => (
+                    <div key={dispatcher.id || dispatcher.email || dispatcher.name} className="admin-live-row">
+                      <AdminAvatar name={dispatcher.name} size={38} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-950">{dispatcher.name}</p>
+                        <p className="truncate text-xs font-medium text-slate-500">{dispatcher.email || 'No email'}</p>
+                      </div>
+                      <AdminBadge tone={dispatcher.clockedIn ? 'online' : 'muted'} dot>{dispatcher.clockedIn ? 'Online' : 'Ready'}</AdminBadge>
+                    </div>
+                  ))}
+                  {overviewDispatchers.length === 0 && <AdminEmpty icon={Briefcase} title="No dispatchers configured" />}
+                </div>
+              </AdminCard>
+              <CompactActivityFeed logs={logs} onViewTrip={onViewTrip} limit={5} />
+            </div>
+          </div>
+        </div>
+      ) },
+    { id: 'dispatchers', title: 'Dispatch Desk', icon: ClipboardList, count: dispatchers.length, roles: ['admin'],
+      content: (
+        <AdminSectionFrame eyebrow="Operations team" title="Dispatcher activity">
+          <div className="admin-card-grid">
+            {dispatchers.filter(d => d.name).map((disp, i) => (
+              <DispatcherActivityCard key={disp.id || i} dispatcher={disp} logs={entityLogs.dispatcher} onViewTrip={onViewTrip} />
+            ))}
+            {dispatchers.filter(d => d.name).length === 0 && <AdminEmpty icon={Briefcase} title="No dispatchers configured" />}
+          </div>
+        </AdminSectionFrame>
+      ) },
+    { id: 'drivers', title: 'Fleet Board', icon: Truck, count: drivers.length, roles: ['admin', 'dispatcher'],
+      content: (
+        <AdminSectionFrame
+          eyebrow="Driver operations"
+          title="Fleet board"
+          action={<AdminSearch icon={Search} value={driverQuery} onChange={setDriverQuery} placeholder="Search drivers, vehicle, zone..." />}
+        >
+          <div className="admin-card-grid">
+            {filteredDrivers.map((driver, i) => (
+              <DriverActivityCard key={driver.id || i} driver={driver} trips={trips} logs={entityLogs.driver} onViewTrip={onViewTrip} />
+            ))}
+            {filteredDrivers.length === 0 && <AdminEmpty icon={Truck} title="No matching drivers" hint="Try another name, vehicle, or zone" />}
+          </div>
+        </AdminSectionFrame>
+      ) },
+    { id: 'people', title: 'People & Access', icon: UserCog, count: allUsers.length, roles: ['admin'],
+      content: (
+        <AdminSectionFrame
+          eyebrow="Access control"
+          title="People directory"
+          action={<AdminSearch icon={Search} value={teamQuery} onChange={setTeamQuery} placeholder="Search people..." />}
+        >
+          <div className="admin-people-grid">
+            {filteredUsers.map((user, i) => {
+              const live = user._role === 'driver' ? getDriverLiveStatus(user) : null;
+              return (
+                <TeamMemberCard
+                  key={`${user._source}-${user.id || i}`}
+                  user={user}
+                  role={role}
+                  live={live}
+                  pwResetMsg={pwResetMsg}
+                  onResetPassword={handlePasswordReset}
+                  onDelete={handleDeleteUser}
+                  onRoleChange={(targetUser, newRole) => {
+                    if (newRole === targetUser._role) return;
+                    if (requestAuthAction) requestAuthAction(`Change ${targetUser.name} from ${targetUser._role} to ${newRole}`, () => handleRoleChange(targetUser, newRole));
+                    else handleRoleChange(targetUser, newRole);
+                  }}
+                />
+              );
+            })}
+            {filteredUsers.length === 0 && <AdminEmpty icon={Users} title="No matching people" hint="Try a different name, role, or email" />}
+          </div>
+        </AdminSectionFrame>
       ) },
     { id: 'vehicles', title: 'Vehicles', icon: CarFront, count: vehicles.length, roles: ['admin', 'dispatcher'],
       content: (
-        <DriversVehiclesPage
-          mode="vehicles"
-          role={role} drivers={drivers} setDrivers={setDrivers} upsertDriverProfile={upsertDriverProfile}
-          dispatchers={dispatchers}
-          addAuditLog={addAuditLog} currentUser={currentUser}
-          trips={trips} onAssignTrip={assignTripToDriver}
-          requestAuthAction={requestAuthAction}
-          vehicles={vehicles} setVehicles={setVehicles}
-          createIntent={vehicleCreateIntent}
-          onCreateIntentHandled={() => setVehicleCreateIntent(null)}
-        />
+        <AdminSectionFrame eyebrow="Fleet assets" title="Vehicle operations">
+          <DriversVehiclesPage
+            mode="vehicles"
+            role={role} drivers={drivers} setDrivers={setDrivers} upsertDriverProfile={upsertDriverProfile}
+            dispatchers={dispatchers}
+            addAuditLog={addAuditLog} currentUser={currentUser}
+            trips={trips} onAssignTrip={assignTripToDriver}
+            requestAuthAction={requestAuthAction}
+            vehicles={vehicles} setVehicles={setVehicles}
+            createIntent={vehicleCreateIntent}
+            onCreateIntentHandled={() => setVehicleCreateIntent(null)}
+          />
+        </AdminSectionFrame>
       ) },
-    { id: 'activity', title: 'System Activity', icon: Activity, roles: ['admin', 'dispatcher'],
+    { id: 'activity', title: 'Activity', icon: Activity, roles: ['admin', 'dispatcher'],
       content: (
-        <UsersPage
-          activityFeedOnly
-          drivers={drivers} setDrivers={setDrivers}
-          dispatchers={dispatchers} setDispatchers={setDispatchers}
-          addAuditLog={addAuditLog} currentUser={currentUser}
-          role={role} requestAuthAction={requestAuthAction}
-          logs={logs}
-        />
+        <AdminSectionFrame eyebrow="Audit trail" title="System activity">
+          <UsersPage
+            activityFeedOnly
+            drivers={drivers} setDrivers={setDrivers}
+            dispatchers={dispatchers} setDispatchers={setDispatchers}
+            addAuditLog={addAuditLog} currentUser={currentUser}
+            role={role} requestAuthAction={requestAuthAction}
+            logs={logs}
+          />
+        </AdminSectionFrame>
       ) },
     { id: 'chat', title: 'Chat Monitor', icon: MessageCircle, roles: ['admin'],
       content: (
-        <AdminChatMonitor chatUnreadCount={chatUnreadCount} />
+        <AdminSectionFrame eyebrow="Communication" title="Chat monitor">
+          <AdminChatMonitor chatUnreadCount={chatUnreadCount} />
+        </AdminSectionFrame>
       ) },
-    { id: 'payroll', title: 'Payroll Report', icon: DollarSign, roles: ['admin', 'dispatcher'],
+    { id: 'payroll', title: 'Payroll', icon: DollarSign, roles: ['admin', 'dispatcher'],
       content: (
-        <PayrollReportPage
-          drivers={drivers}
-          trips={trips}
-          policyMode={payrollPolicy}
-          onPolicyChange={setPayrollPolicy}
-        />
+        <AdminSectionFrame eyebrow="Finance" title="Payroll report">
+          <PayrollReportPage
+            drivers={drivers}
+            trips={trips}
+            policyMode={payrollPolicy}
+            onPolicyChange={setPayrollPolicy}
+          />
+        </AdminSectionFrame>
       ) },
   ];
 
   const visibleSections = sections.filter((section) => !section.roles || section.roles.includes(role));
 
   const nav = [{
-    label: 'Manage',
+    label: 'Command',
     items: visibleSections.map(s => ({
       id: s.id,
       label: s.title,
@@ -674,11 +973,12 @@ const DesktopAdminPage = ({
 
   const mobileNav = visibleSections.map(s => ({ id: s.id, label: s.title, icon: s.icon }));
 
-  const activeTitle = visibleSections.find(s => s.id === activeSection)?.title || 'Admin';
-  const activeSubtitle = `${drivers.length} drivers · ${dispatchers.length} dispatchers · ${vehicles?.length || 0} vehicles`;
+  const activeSectionConfig = visibleSections.find(s => s.id === activeSection) || visibleSections[0];
+  const activeTitle = activeSectionConfig?.title || 'Admin';
+  const activeSubtitle = `${openTrips.length} open trips - ${drivers.length} drivers - ${dispatchers.length} dispatchers - ${vehicles?.length || 0} vehicles`;
 
   const topActions = (
-    <div className="relative flex items-center gap-2" ref={exportRef}>
+    <div className="admin-actionbar" ref={exportRef}>
       {role === 'admin' && (
         <AdminButton variant="ghost" size="sm" onClick={runSecurityAnalysis} disabled={aiSecLoading}>
           {aiSecLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
@@ -698,7 +998,7 @@ const DesktopAdminPage = ({
       )}
       <div className="relative">
         <AdminButton variant="ghost" size="sm" onClick={() => setExportOpen(v => !v)}>
-          <Download size={13} /> Export
+          <FileDown size={13} /> Export
         </AdminButton>
         {exportOpen && (
           <div className="absolute right-0 top-full mt-1 z-50 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
@@ -727,13 +1027,7 @@ const DesktopAdminPage = ({
       {role === 'admin' && aiSecurity && (
         <AIInsightsBanner insights={aiSecurity} loading={aiSecLoading} onClose={() => setAiSecurity(null)} />
       )}
-      <div className="space-y-4">
-        {visibleSections.filter(s => activeSection === s.id).map(s => (
-          <AdminCard key={s.id} pad={false} className="overflow-hidden">
-            <div className="p-4 sm:p-5">{s.content}</div>
-          </AdminCard>
-        ))}
-      </div>
+      {activeSectionConfig?.content}
 
       {/* Create User Modal */}
       {createUserRole && (
