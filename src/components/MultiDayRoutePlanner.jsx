@@ -3,6 +3,7 @@ import {
   Calendar, Copy, Trash2, Plus, MapPin, Clock,
   Navigation, Save, ChevronLeft, ChevronRight,
 } from 'lucide-react';
+import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -241,18 +242,16 @@ const MultiDayRoutePlanner = ({ trips = [], onSave }) => {
                   {idx + 1}
                 </span>
                 <div className="flex-1 grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
+                  <PlacesAutocompleteInput
                     placeholder="Pickup address"
                     value={stop.pickup}
-                    onChange={(e) => updateStop(selectedDay, stop.id, 'pickup', e.target.value)}
+                    onChange={(val) => updateStop(selectedDay, stop.id, 'pickup', val)}
                     className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                   />
-                  <input
-                    type="text"
+                  <PlacesAutocompleteInput
                     placeholder="Dropoff address"
                     value={stop.dropoff}
-                    onChange={(e) => updateStop(selectedDay, stop.id, 'dropoff', e.target.value)}
+                    onChange={(val) => updateStop(selectedDay, stop.id, 'dropoff', val)}
                     className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
                   />
                   <input

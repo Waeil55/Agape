@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Edit2, X, Lock, Clock, Ruler, PenSquare, CheckCircle, CheckSquare } from 'lucide-react';
+import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
 const isoToTimeInput = (iso) => {
   if (!iso) return '';
@@ -177,11 +178,11 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
               </div>
               <div className="col-span-2">
                 <label className="text-[0.6875em] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Address</label>
-                <textarea value={editTrip.pickup || ''} onChange={(e) => handleField('pickup', e.target.value)} className={inputClass} rows="2" />
+                <PlacesAutocompleteInput value={editTrip.pickup || ''} onChange={(v) => handleField('pickup', v)} placeholder="Pickup address" className={inputClass} required />
               </div>
               <div className="col-span-2">
                 <label className="text-[0.6875em] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Address</label>
-                <textarea value={editTrip.dropoff || ''} onChange={(e) => handleField('dropoff', e.target.value)} className={inputClass} rows="2" />
+                <PlacesAutocompleteInput value={editTrip.dropoff || ''} onChange={(v) => handleField('dropoff', v)} placeholder="Dropoff address" className={inputClass} required />
               </div>
             </div>
 

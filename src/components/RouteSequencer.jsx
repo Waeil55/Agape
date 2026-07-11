@@ -31,6 +31,7 @@ import {
   Shield
 } from 'lucide-react';
 import { db, doc, getDocFromServer, setDoc } from '../config/firebase';
+import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { timeToMinutes } from '../utils/tripDate';
 import {
   ROUTE_ASSIGNMENT_STATUS,
@@ -1719,13 +1720,13 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
               <div className="p-3 bg-white border border-emerald-100 rounded-2xl space-y-2">
                 <h4 className="text-xs font-semibold text-emerald-800 uppercase tracking-wider flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Pickup</h4>
-                <input type="text" value={tempTripForm.pu} onChange={e => setTempTripForm({...tempTripForm, pu: e.target.value})} placeholder="Pickup address" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500 transition-all" />
+                <PlacesAutocompleteInput value={tempTripForm.pu} onChange={(v) => setTempTripForm({...tempTripForm, pu: v})} placeholder="Pickup address" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500 transition-all" required />
                 <input type="time" value={tempTripForm.puTime} onChange={e => setTempTripForm({...tempTripForm, puTime: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500 transition-all" />
               </div>
 
               <div className="p-3 bg-white border border-red-100 rounded-2xl space-y-2">
                 <h4 className="text-xs font-semibold text-red-800 uppercase tracking-wider flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Dropoff</h4>
-                <input type="text" value={tempTripForm.do} onChange={e => setTempTripForm({...tempTripForm, do: e.target.value})} placeholder="Dropoff address" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-red-500 transition-all" />
+                <PlacesAutocompleteInput value={tempTripForm.do} onChange={(v) => setTempTripForm({...tempTripForm, do: v})} placeholder="Dropoff address" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-red-500 transition-all" required />
                 <input type="time" value={tempTripForm.doTime} onChange={e => setTempTripForm({...tempTripForm, doTime: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-red-500 transition-all" />
               </div>
             </div>

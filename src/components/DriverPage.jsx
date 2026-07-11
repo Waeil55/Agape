@@ -39,6 +39,7 @@ import { normalizeEmail } from '../utils/accessControl';
 import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
 import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
+import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
@@ -5287,11 +5288,21 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               </div>
                               <div className="col-span-2">
                                 <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Pickup Address</label>
-                                <textarea value={ie.pickup} onChange={(e) => setEditingTripData(p => ({ ...p, pickup: e.target.value }))} className={inputCls} rows="2" />
+                                <PlacesAutocompleteInput
+                                  value={ie.pickup}
+                                  onChange={(val) => setEditingTripData(p => ({ ...p, pickup: val }))}
+                                  placeholder="Pickup address"
+                                  className={inputCls}
+                                />
                               </div>
                               <div className="col-span-2">
                                 <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Dropoff Address</label>
-                                <textarea value={ie.dropoff} onChange={(e) => setEditingTripData(p => ({ ...p, dropoff: e.target.value }))} className={inputCls} rows="2" />
+                                <PlacesAutocompleteInput
+                                  value={ie.dropoff}
+                                  onChange={(val) => setEditingTripData(p => ({ ...p, dropoff: val }))}
+                                  placeholder="Dropoff address"
+                                  className={inputCls}
+                                />
                               </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
@@ -5550,10 +5561,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               )}
               {(role === 'admin' || role === 'dispatcher') ? (
               <div className="space-y-2">
-                <input type="text" value={editHomeAddress}
-                  onChange={(e) => setEditHomeAddress(e.target.value)}
+                <PlacesAutocompleteInput
+                  value={editHomeAddress}
+                  onChange={setEditHomeAddress}
                   placeholder="123 Main St, City, State"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:border-blue-500 outline-none"
+                />
                 <div className="flex gap-2">
                   <button
                     type="button"

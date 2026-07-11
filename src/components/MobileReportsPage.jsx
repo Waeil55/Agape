@@ -5,6 +5,7 @@ import {
   Edit2, RotateCcw, PhoneCall, Check, ChevronUp, X, Upload
 } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
+import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
 const DetailRow = ({ label, value, valueColor = "text-gray-900" }) => (
   <div className="grid grid-cols-[130px_1fr] gap-4 py-1.5 items-start">
@@ -327,11 +328,11 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                           </div>
                           <div className="col-span-2">
                             <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Pickup Address</label>
-                            <textarea value={ie.pickup} onChange={(e) => setEditingTripData(p => ({ ...p, pickup: e.target.value }))} className={inputCls} rows="2" />
+                            <PlacesAutocompleteInput value={ie.pickup} onChange={(val) => setEditingTripData(p => ({ ...p, pickup: val }))} className={inputCls} placeholder="Pickup address" />
                           </div>
                           <div className="col-span-2">
                             <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Dropoff Address</label>
-                            <textarea value={ie.dropoff} onChange={(e) => setEditingTripData(p => ({ ...p, dropoff: e.target.value }))} className={inputCls} rows="2" />
+                            <PlacesAutocompleteInput value={ie.dropoff} onChange={(val) => setEditingTripData(p => ({ ...p, dropoff: val }))} className={inputCls} placeholder="Dropoff address" />
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2">

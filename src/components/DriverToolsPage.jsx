@@ -8,6 +8,7 @@ import { impact } from '../utils/haptics';
 import { openMapLink } from '../utils/nativeActions';
 import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
 import { loadGoogleMapsApi } from '../hooks/useGoogleMaps';
+import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
 const timeToMinutes = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return 1440;
@@ -626,13 +627,11 @@ const RoutePlanSection = ({
                         {stop.stopTime && <span className="text-xs font-semibold text-slate-400">{to12hr(stop.stopTime)}</span>}
                       </div>
                     )}
-                    <input
-                      type="text"
+                    <PlacesAutocompleteInput
                       value={stop.label}
-                      onChange={(e) => handleTextChange(index, e.target.value)}
-                      className="text-[7px] font-normal text-slate-400 placeholder:text-slate-300 truncate bg-transparent outline-none w-full"
+                      onChange={(v) => handleTextChange(index, v)}
                       placeholder={index === 0 ? 'Starting point or current location' : `Stop ${stop.letter} address`}
-                      spellCheck="false"
+                      className="text-[7px] font-normal text-slate-400 placeholder:text-slate-300 truncate bg-transparent outline-none w-full"
                     />
                   </div>
                   <div className="w-8 flex justify-end shrink-0 pl-2">

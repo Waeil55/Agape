@@ -17,6 +17,7 @@ import { isInOutTrip } from '../utils/inOutTrips';
 import CommandIntelligencePanel from './CommandIntelligencePanel';
 import { aiPrioritizeTrips } from '../config/ai';
 import { getDriverLiveStatus } from '../constants/statuses';
+import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -2901,11 +2902,11 @@ const OperationsCommandCenter = ({
                   </div>
                   <div className="col-span-2">
                     <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Address</label>
-                    <textarea value={ie.pickup} onChange={(e) => setEditingTripData(p => ({ ...p, pickup: e.target.value }))} className={inputCls} rows="2" />
+                    <PlacesAutocompleteInput value={ie.pickup} onChange={(val) => setEditingTripData(p => ({ ...p, pickup: val }))} className={inputCls} placeholder="Pickup address" />
                   </div>
                   <div className="col-span-2">
                     <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Address</label>
-                    <textarea value={ie.dropoff} onChange={(e) => setEditingTripData(p => ({ ...p, dropoff: e.target.value }))} className={inputCls} rows="2" />
+                    <PlacesAutocompleteInput value={ie.dropoff} onChange={(val) => setEditingTripData(p => ({ ...p, dropoff: val }))} className={inputCls} placeholder="Dropoff address" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">

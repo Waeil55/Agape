@@ -4,6 +4,7 @@ import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, M
 import { suggestBatchAssignment } from '../config/ai';
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import { isNativeShell } from '../utils/platform';
+import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show'];
 
@@ -566,11 +567,23 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Pickup Address</label>
-                  <input type="text" required value={newTrip.pickup} onChange={(e) => setNewTrip({...newTrip, pickup: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <PlacesAutocompleteInput
+                    value={newTrip.pickup}
+                    onChange={(v) => setNewTrip({...newTrip, pickup: v})}
+                    placeholder="Pickup address"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none"
+                    required
+                  />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Dropoff Address</label>
-                  <input type="text" required value={newTrip.dropoff} onChange={(e) => setNewTrip({...newTrip, dropoff: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <PlacesAutocompleteInput
+                    value={newTrip.dropoff}
+                    onChange={(v) => setNewTrip({...newTrip, dropoff: v})}
+                    placeholder="Dropoff address"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none"
+                    required
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Patient Phone</label>
@@ -631,11 +644,23 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Pickup Address</label>
-                  <input type="text" required value={editTrip.pickup || ''} onChange={(e) => setEditTrip({...editTrip, pickup: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <PlacesAutocompleteInput
+                    value={editTrip.pickup || ''}
+                    onChange={(v) => setEditTrip({...editTrip, pickup: v})}
+                    placeholder="Pickup address"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none"
+                    required
+                  />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Dropoff Address</label>
-                  <input type="text" required value={editTrip.dropoff || ''} onChange={(e) => setEditTrip({...editTrip, dropoff: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <PlacesAutocompleteInput
+                    value={editTrip.dropoff || ''}
+                    onChange={(v) => setEditTrip({...editTrip, dropoff: v})}
+                    placeholder="Dropoff address"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none"
+                    required
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Patient Phone</label>
