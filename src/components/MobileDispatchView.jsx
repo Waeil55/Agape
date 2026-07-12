@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Search, Plus, Upload, Route, Users, Truck, MapPin, Phone,
-  ChevronDown, X, User, Edit2, Archive,
-  SlidersHorizontal
+  ChevronDown, X, User, Edit2, Archive, Ban, AlertTriangle,
+  Repeat, MessageSquare, SlidersHorizontal
 } from "lucide-react";
 import { getDriverLiveStatus } from "../constants/statuses";
 
@@ -61,9 +61,10 @@ const trunc = (str, n) => str && str.length > n ? str.slice(0, n) + "…" : str 
 const getAddr = (v) => typeof v === "object" ? v?.address || "" : v || "";
 
 /* ─── Trip Card ───────────────────────────────────────────────────── */
-const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeCall,
-  requestDeleteTrip, onSetTripDetails, role }) => {
+const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeCall, sendSMS,
+  requestDeleteTrip, onSetTripDetails, role, updateTrip, requestAuthAction, currentUser, addToast }) => {
   const [showMenu, setShowMenu] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(null); // { action, label, color }
   const urgency = getUrgency(trip);
   const isLate = urgency === "Late", isSoon = urgency && urgency !== "Late";
   const sty = getStatusStyle(trip.status);
@@ -74,6 +75,28 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
   const isTerminal = TERMINAL.includes(trip.status);
   const available = drivers.filter(d => !["Offline","Unavailable"].includes(d.status));
   const timeParts = trip.time !== "Will Call" ? dispTime.split(" ") : [];
+
+  const markTripException = (status) => {
+    const run = () => {
+      if (updateTrip) {
+        updateTrip(trip.id, {
+          status,
+          workflowUpdatedAt: new Date().toISOString(),
+          updatedBy: currentUser,
+          exceptionAt: new Date().toISOString(),
+          exceptionBy: currentUser,
+          exceptionSource: role,
+        });
+      }
+      addToast?.('Trip Updated', `${trip.patient || trip.id} marked as ${status}.`, status === 'Cancelled' || status === 'No Show' ? 'warning' : 'success');
+    };
+    if (requestAuthAction) {
+      requestAuthAction(`Mark ${trip.patient || 'trip'} as ${status}`, run);
+    } else {
+      run();
+    }
+    setShowConfirm(null);
+  };
 
   return (
     <div className={(isLate ? "bg-rose-50 " : "bg-white ") + "rounded-[22px] border border-slate-200 border-l-[5px] " + sty.border + " shadow-sm overflow-visible transition-all duration-200"}>
@@ -169,21 +192,51 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
             {(trip.patientPhone||trip.pickupPhone||trip.dropoffPhone) && (
               <div className="bg-white rounded-xl border border-slate-100 px-3 py-2.5 shadow-sm space-y-1.5">
                 <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Contacts</p>
-                {trip.patientPhone && <button type="button" onClick={() => makeCall?.(trip.patientPhone,trip.patient)} className="flex items-center gap-2 text-blue-700 active:opacity-70"><Phone size={12}/><span className="text-xs font-bold">{trip.patient}: {trip.patientPhone}</span></button>}
-                {trip.pickupPhone && trip.pickupPhone!==trip.patientPhone && <button type="button" onClick={() => makeCall?.(trip.pickupPhone,"Pickup")} className="flex items-center gap-2 text-emerald-700 active:opacity-70"><Phone size={12}/><span className="text-xs font-bold">Pickup: {trip.pickupPhone}</span></button>}
-                {(trip.hospitalPhone || trip.dropoffPhone) && <button type="button" onClick={() => makeCall?.(trip.hospitalPhone || trip.dropoffPhone,"Hospital")} className="flex items-center gap-2 text-rose-700 active:opacity-70"><Phone size={12}/><span className="text-xs font-bold">Hospital: {trip.hospitalPhone || trip.dropoffPhone}</span></button>}
+                {trip.patientPhone && <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => makeCall?.(trip.patientPhone,trip.patient)} className="flex-1 flex items-center gap-2 text-blue-700 active:opacity-70 py-0.5"><Phone size={12}/><span className="text-xs font-bold">{trip.patient}: {trip.patientPhone}</span></button>
+                  {sendSMS && <button type="button" onClick={() => sendSMS(trip.patientPhone,`Hi ${trip.patient||''}, this is Agape Care.`)} className="shrink-0 w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 active:scale-95"><MessageSquare size={11}/></button>}
+                </div>}
+                {trip.pickupPhone && trip.pickupPhone!==trip.patientPhone && <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => makeCall?.(trip.pickupPhone,"Pickup")} className="flex-1 flex items-center gap-2 text-emerald-700 active:opacity-70 py-0.5"><Phone size={12}/><span className="text-xs font-bold">Pickup: {trip.pickupPhone}</span></button>
+                  {sendSMS && <button type="button" onClick={() => sendSMS(trip.pickupPhone,`Hello, this is Agape Care regarding ${trip.patient||'a patient'}.`)} className="shrink-0 w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 active:scale-95"><MessageSquare size={11}/></button>}
+                </div>}
+                {(trip.hospitalPhone || trip.dropoffPhone) && <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => makeCall?.(trip.hospitalPhone || trip.dropoffPhone,"Hospital")} className="flex-1 flex items-center gap-2 text-rose-700 active:opacity-70 py-0.5"><Phone size={12}/><span className="text-xs font-bold">Hospital: {trip.hospitalPhone || trip.dropoffPhone}</span></button>
+                  {sendSMS && <button type="button" onClick={() => sendSMS(trip.hospitalPhone || trip.dropoffPhone,`Agape Care update for ${trip.patient||'patient'}.`)} className="shrink-0 w-7 h-7 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 active:scale-95"><MessageSquare size={11}/></button>}
+                </div>}
               </div>
             )}
           </div>
-          <div className="px-3.5 pb-3.5 space-y-2 sm:px-4">
+          <div className="px-3.5 pb-3.5 space-y-2.5 sm:px-4">
+            {/* Primary: Open Trip */}
             <button type="button" onClick={()=>onSetTripDetails?.(trip)} className="w-full h-11 rounded-xl bg-slate-900 text-white font-black text-sm flex items-center justify-center gap-2 shadow-sm active:scale-[0.99] transition-all">
               <Edit2 size={14}/> Open Trip
             </button>
+
+            {/* Status Actions (only for non-terminal trips) */}
+            {!isTerminal && (
+              <div className="grid grid-cols-3 gap-2">
+                <button type="button" onClick={()=>setShowConfirm({action:'reroute', label:'Reroute', color:'amber'})}
+                  className="h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-[11px] flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all">
+                  <Repeat size={13}/> Reroute
+                </button>
+                <button type="button" onClick={()=>setShowConfirm({action:'noshow', label:'No Show', color:'rose'})}
+                  className="h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-[11px] flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all">
+                  <Ban size={13}/> No Show
+                </button>
+                <button type="button" onClick={()=>setShowConfirm({action:'cancel', label:'Cancel', color:'slate'})}
+                  className="h-10 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 font-bold text-[11px] flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all">
+                  <AlertTriangle size={13}/> Cancel
+                </button>
+              </div>
+            )}
+
+            {/* Reassign Driver */}
             {!isTerminal && (
               <div className="relative">
                 <button type="button" onClick={() => setShowMenu(p=>!p)}
                   className={"w-full h-11 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all " + (trip.status==="Unassigned" ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-800 hover:bg-gray-900")}>
-                  <Users size={15}/> {trip.status==="Unassigned" ? "Assign Driver" : "Re-assign"}
+                  <Users size={15}/> {trip.status==="Unassigned" ? "Assign Driver" : "Re-assign Driver"}
                   <ChevronDown size={13} className={"transition-transform "+(showMenu?"rotate-180":"")} />
                 </button>
                 {showMenu && (
@@ -191,10 +244,11 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                     <div className="px-3 py-2 border-b border-slate-100 sticky top-0 bg-white"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Select Driver</p></div>
                     {available.length===0 ? <p className="text-xs text-slate-400 text-center py-4">No available drivers</p> : available.map(d=>{
                       const dss=getDriverLiveStatus(d);
+                      const isCurrentDriver = d.id === trip.driverId || d.name === trip.driverName;
                       return (
                         <button key={d.id} type="button" onClick={()=>{assignTripToDriver?.(trip.id,d.id);setShowMenu(false);}}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 active:bg-slate-100 text-left border-b border-slate-50 last:border-0">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black text-xs uppercase shrink-0">{(d.name||"D")[0]}</div>
+                          className={"w-full flex items-center gap-3 px-3 py-2.5 active:bg-slate-100 text-left border-b border-slate-50 last:border-0 "+(isCurrentDriver?"bg-blue-50":"hover:bg-slate-50")}>
+                          <div className={"w-8 h-8 rounded-full flex items-center justify-center font-black text-xs uppercase shrink-0 "+(isCurrentDriver?"bg-blue-200 text-blue-800":"bg-blue-100 text-blue-700")}>{(d.name||"D")[0]}</div>
                           <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900 truncate">{d.name}</p><p className="text-[10px] text-slate-400">{d.vehicle||"No vehicle"}</p></div>
                           <span className={"text-[9px] font-black uppercase px-2 py-0.5 rounded "+dss.color}>{dss.label}</span>
                         </button>
@@ -204,11 +258,46 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                 )}
               </div>
             )}
+
+            {/* Contact & Archive row */}
             <div className="flex gap-2">
               {driver?.phone && <button type="button" onClick={()=>makeCall?.(driver.phone,driver.name)} className="flex-1 h-10 px-3 border border-blue-200 bg-blue-50 text-blue-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-[0.99] transition-all"><Phone size={13}/> Driver</button>}
+              {driver?.phone && sendSMS && <button type="button" onClick={()=>sendSMS(driver.phone,`Hi ${driver.name||''}, from Agape Care dispatch.`)} className="h-10 px-3 border border-blue-200 bg-blue-50 text-blue-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-[0.99] transition-all"><MessageSquare size={13}/></button>}
               {!isTerminal && requestDeleteTrip && <button type="button" onClick={()=>requestDeleteTrip(trip)} className="flex-1 h-10 px-3 border border-rose-200 bg-rose-50 text-rose-600 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-[0.99] transition-all"><Archive size={13}/> Archive</button>}
             </div>
           </div>
+
+          {/* Confirm Modal */}
+          {showConfirm && (() => {
+            const isAmber = showConfirm.color === 'amber';
+            const isRose = showConfirm.color === 'rose';
+            const iconBg = isAmber ? 'bg-amber-100' : isRose ? 'bg-rose-100' : 'bg-slate-100';
+            const iconClr = isAmber ? 'text-amber-600' : isRose ? 'text-rose-600' : 'text-slate-600';
+            const btnBg = isAmber ? 'bg-amber-600' : isRose ? 'bg-rose-600' : 'bg-slate-800';
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-6" onClick={()=>setShowConfirm(null)}>
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"/>
+                <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xs p-5" onClick={e=>e.stopPropagation()}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={"w-10 h-10 rounded-full flex items-center justify-center " + iconBg}>
+                      <AlertTriangle size={20} className={iconClr}/>
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-slate-900">{showConfirm.label} Trip?</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Mark {trip.patient || 'this trip'} as {showConfirm.label}?</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={()=>setShowConfirm(null)} className="flex-1 h-10 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs active:scale-[0.97] transition-all">Keep</button>
+                    <button type="button" onClick={()=>markTripException(showConfirm.action==='noshow'?'No Show':showConfirm.action==='cancel'?'Cancelled':'Rerouted')}
+                      className={"flex-1 h-10 rounded-xl font-bold text-xs text-white active:scale-[0.97] transition-all " + btnBg}>
+                      {showConfirm.label}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -272,6 +361,7 @@ const MobileDispatchView = ({
     if(filter==="unassigned") r=r.filter(t=>t.status==="Unassigned");
     else if(filter==="active") r=r.filter(t=>IN_PROGRESS.includes(t.status));
     else if(filter==="completed") r=r.filter(t=>t.status==="Completed");
+    else if(filter==="cancelled") r=r.filter(t=>t.status==="Cancelled"||t.status==="No Show"||t.status==="Rerouted");
     else if(filter==="willcall") r=r.filter(t=>t.time==="Will Call");
     if(localSearch){const q=localSearch.toLowerCase();r=r.filter(t=>(t.patient||"").toLowerCase().includes(q)||(t.bookingId||"").toLowerCase().includes(q)||getAddr(t.pickup).toLowerCase().includes(q)||getAddr(t.dropoff).toLowerCase().includes(q)||(t.driverName||"").toLowerCase().includes(q));}
     return r;
@@ -281,12 +371,15 @@ const MobileDispatchView = ({
   const activeN=todayTrips.filter(t=>IN_PROGRESS.includes(t.status)).length;
   const doneN=todayTrips.filter(t=>t.status==="Completed").length;
 
+  const cancelledN=todayTrips.filter(t=>t.status==="Cancelled"||t.status==="No Show"||t.status==="Rerouted").length;
+
   const CHIPS=[
     {id:"all",label:"All",n:todayTrips.length},
     {id:"unassigned",label:"Unassigned",n:unassignedN},
     {id:"active",label:"Active",n:activeN},
     {id:"willcall",label:"Will Call",n:todayTrips.filter(t=>t.time==="Will Call").length},
     {id:"completed",label:"Done",n:doneN},
+    ...(cancelledN>0?[{id:"cancelled",label:"Exceptions",n:cancelledN}]:[]),
   ];
 
   const [showSearch, setShowSearch] = useState(false);
@@ -367,9 +460,11 @@ const MobileDispatchView = ({
             {filtered.map(trip=>(
               <TripCard key={trip.id} trip={trip} drivers={drivers} expanded={expandedId===trip.id}
                 onToggle={()=>setExpandedId(expandedId===trip.id?null:trip.id)}
-                assignTripToDriver={assignTripToDriver} makeCall={makeCall}
+                assignTripToDriver={assignTripToDriver} makeCall={makeCall} sendSMS={props.sendSMS}
                 updateTrip={updateTrip} requestDeleteTrip={requestDeleteTrip}
-                onSetTripDetails={setTripDetails} role={role}/>
+                onSetTripDetails={setTripDetails} role={role}
+                requestAuthAction={props.requestAuthAction} currentUser={props.currentUser}
+                addToast={props.addToast}/>
             ))}
           </div>
         )}
