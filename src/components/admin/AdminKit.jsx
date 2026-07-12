@@ -46,8 +46,10 @@ export const AdminShell = ({
       <aside className="adm-sidebar hidden md:flex">
         {!hideBrand && (
           <div className="adm-brand">
-            <div className="adm-brand-mark"><ShieldGlyph /></div>
-            <div className="min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm mr-2">
+              <img src="/agape.png" alt="Agape Care" className="w-6 h-6 object-contain" />
+            </div>
+            <div className="min-w-0 flex-1">
               <div className="adm-brand-name">Agape Care</div>
               <div className="adm-brand-sub">Command Admin</div>
             </div>
@@ -88,13 +90,16 @@ export const AdminShell = ({
     {/* Main Column */}
     <div className="adm-main">
       <header className="adm-topbar">
-        <div className="adm-brand-mark md:hidden" style={{ width: 34, height: 34, borderRadius: 10 }}>
-          <ShieldGlyph small />
+        <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm md:hidden mr-2">
+          <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
         </div>
-        <div className="min-w-0">
-          <div className="adm-eyebrow md:hidden">{eyebrow}</div>
-          <h1 className="adm-topbar-title truncate">{title}</h1>
-          {subtitle && <p className="adm-topbar-sub truncate">{subtitle}</p>}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0 md:hidden">
+            <p className="text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">{eyebrow} Admin</p>
+          </div>
+          <h1 className="adm-topbar-title truncate hidden md:block">{title}</h1>
+          <p className="adm-topbar-sub truncate md:hidden text-xs font-medium text-slate-500 mt-1">{title}</p>
+          {subtitle && <p className="adm-topbar-sub truncate hidden md:block">{subtitle}</p>}
         </div>
         {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
       </header>

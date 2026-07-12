@@ -293,15 +293,22 @@ const MobileDispatchView = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
       {/* Header */}
-      <div className="mobile-dispatch-header shrink-0 px-3 pb-3 bg-white border-b border-gray-200 sm:px-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2b4c7e]">Dispatch Board</p>
-            <h1 className="text-xl font-semibold text-gray-900 mt-0.5 leading-none">{todayFmt}</h1>
+      <div className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md pb-3">
+        <div className="px-3 py-3 flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+            <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <p className="text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">Agape Care Dispatch</p>
+            </div>
+            <div className="mt-1 flex items-center gap-1.5">
+              <p className="text-xs font-medium text-slate-500 truncate">{todayFmt}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
             <button type="button" onClick={()=>setShowTools(true)}
-              className="w-9 h-9 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-600 active:scale-95 transition-all hover:bg-gray-100">
+              className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-all shadow-sm">
               <SlidersHorizontal size={16}/>
             </button>
           </div>
