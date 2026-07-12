@@ -326,7 +326,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
             <p className={`truncate text-[15px] ${unread > 0 ? 'font-semibold text-slate-950' : 'font-semibold text-slate-900'}`}>
               {employee.name}
             </p>
-            <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${getRoleColor(employee.role)}`}>
+            <span className={`agape-chat-role-badge inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${getRoleColor(employee.role)}`}>
               <RoleIcon size={10} />
               {employee.role || 'user'}
             </span>

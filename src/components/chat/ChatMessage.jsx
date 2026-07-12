@@ -15,7 +15,7 @@ function renderTextWithLinks(text, isOwn) {
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className={`${isOwn ? 'text-[#0b63ce] hover:text-[#084ea3] underline decoration-blue-300' : 'text-blue-600 hover:text-blue-700 underline decoration-blue-300'}`}
+          className={`${isOwn ? 'text-white underline decoration-white/60 hover:text-white' : 'text-blue-600 hover:text-blue-700 underline decoration-blue-300'}`}
         >
           {part}
         </a>
@@ -102,8 +102,8 @@ const ChatMessage = memo(function ChatMessage({
                 msg.type === 'image' ? 'overflow-hidden p-0.5' : 'px-[14px] py-[8px]'
               } ${
                 isOwn
-                  ? 'bg-[#dbeafe] text-[#0b63ce] shadow-[0_2px_10px_rgba(37,99,235,0.14)] ring-1 ring-blue-100/70'
-                  : 'bg-[#f3f5f8] text-slate-900 shadow-[0_2px_10px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/60'
+                  ? 'bg-[#0084ff] text-white shadow-[0_2px_10px_rgba(0,132,255,0.18)]'
+                  : 'bg-[#f0f2f5] text-slate-950 shadow-[0_2px_10px_rgba(15,23,42,0.06)]'
               }`}>
                 {msg.type === 'image' && msg.fileUrl && (
                   <img
@@ -203,11 +203,11 @@ const ChatMessage = memo(function ChatMessage({
 
         {isLastInSequence && (
           <div className={`mt-1 flex items-center gap-1 px-1 text-[10px] text-slate-400 ${isOwn ? 'justify-end text-right' : 'justify-start'}`}>
-            <span>{formatChatMessageTime(lastMessage?.timestamp)}</span>
+            <span>{lastMessage?._localPending ? 'Sending' : formatChatMessageTime(lastMessage?.timestamp)}</span>
             {isOwn && (
-              <span className="inline-flex items-center gap-0.5 text-blue-400" title={readByOther ? 'Read' : 'Sent'}>
+              <span className="inline-flex items-center gap-0.5 text-[#0084ff]" title={lastMessage?._localPending ? 'Sending' : readByOther ? 'Read' : 'Sent'}>
                 {readByOther ? <CheckCheck size={12} /> : <Check size={12} />}
-                <span>{readByOther ? 'Read' : 'Sent'}</span>
+                <span>{lastMessage?._localPending ? 'Sending' : readByOther ? 'Read' : 'Sent'}</span>
               </span>
             )}
           </div>

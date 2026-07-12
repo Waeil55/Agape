@@ -13,7 +13,11 @@ const ONLINE_STALE_MS = 90 * 1000;
 const TYPING_STALE_MS = 10 * 1000;
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
-const asMillis = (timestamp) => timestamp?.toMillis?.() || 0;
+const asMillis = (timestamp) => (
+  timestamp?.toMillis?.() ||
+  timestamp?.toDate?.()?.getTime?.() ||
+  (timestamp instanceof Date ? timestamp.getTime() : 0)
+);
 
 export function useChat() {
   const [channels, setChannels] = useState([]);
@@ -344,7 +348,11 @@ export function useChat() {
       const isAtBottom = !bottom || bottom - window.innerHeight < 150;
 
       setMessages(prev => {
-        const sameChannel = prev.filter(m => m.channelId === activeChannel);
+        const realClientIds = new Set(newMsgs.map(m => m.clientMessageId).filter(Boolean));
+        const sameChannel = prev.filter(m => (
+          m.channelId === activeChannel &&
+          !(m._localPending && realClientIds.has(m.clientMessageId))
+        ));
         const prevIds = new Set(sameChannel.map(m => m.id));
         const incoming = newMsgs.filter(m => !prevIds.has(m.id));
 
@@ -416,14 +424,45 @@ export function useChat() {
     if (!channelId || (!text?.trim() && !extra.fileUrl)) return;
     if (!currentUser) return;
 
+    const trimmedText = text?.trim() || '';
+    const clientMessageId = `${userUid || userEmail || 'chat'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const localDate = new Date();
+    const optimisticMessage = {
+      id: clientMessageId,
+      clientMessageId,
+      channelId,
+      senderUid: userUid,
+      senderEmail: userEmail,
+      senderName: userDisplayName,
+      senderRole: userRole || 'user',
+      text: trimmedText,
+      type: extra.fileUrl ? (extra.fileType || 'file') : 'text',
+      fileUrl: extra.fileUrl || '',
+      fileName: extra.fileName || '',
+      fileSize: extra.fileSize || 0,
+      fileType: extra.fileType || '',
+      storagePath: extra.storagePath || '',
+      timestamp: { toDate: () => localDate },
+      readBy: [userEmail],
+      reactions: {},
+      _localPending: true,
+    };
+
+    setMessages(prev => {
+      const withoutDuplicate = prev.filter(m => m.id !== clientMessageId);
+      return [...withoutDuplicate, optimisticMessage].sort((a, b) => asMillis(a.timestamp) - asMillis(b.timestamp));
+    });
+    requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }));
+
     try {
       await addDoc(collection(db, 'chat_messages'), {
+        clientMessageId,
         channelId,
         senderUid: userUid,
         senderEmail: userEmail,
         senderName: userDisplayName,
         senderRole: userRole || 'user',
-        text: text?.trim() || '',
+        text: trimmedText,
         type: extra.fileUrl ? (extra.fileType || 'file') : 'text',
         fileUrl: extra.fileUrl || '',
         fileName: extra.fileName || '',
@@ -438,7 +477,7 @@ export function useChat() {
       // Update channel preview so conversation list shows latest message
       const previewText = extra.fileUrl
         ? (extra.fileType === 'image' ? '📷 Photo' : `📎 ${extra.fileName || 'File'}`)
-        : (text?.trim() || '');
+        : trimmedText;
       updateDoc(doc(db, 'chat_channels', channelId), {
         lastMessage: previewText,
         lastMessageAt: serverTimestamp(),
@@ -447,6 +486,7 @@ export function useChat() {
 
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch (err) {
+      setMessages(prev => prev.filter(m => m.id !== clientMessageId));
       console.error('[Chat] sendMessage error:', err);
     }
   }, [currentUser, userEmail, userDisplayName, userRole, userUid]);

@@ -241,6 +241,7 @@ const MobileDispatchView = ({
   setTripDetails, setShowAddTripModal, setShowUploadModal,
   onOpenSequencer, onOpenLiveMap, searchQuery, setSearchQuery,
   addToast, phoneNumbers,
+  workspaceControls = null,
   activeTab = "trips", // Controlled by parent bottom nav
   expandedId: expandedIdProp, setExpandedId: setExpandedIdProp
 }) => {
@@ -305,14 +306,14 @@ const MobileDispatchView = ({
             </button>
           </div>
         </div>
-        <div className="flex gap-2 mb-3">
+        {!workspaceControls && <div className="flex gap-2 mb-3">
           {[{label:"Total",value:todayTrips.length,color:"text-gray-900",bg:"bg-gray-50"},{label:"Unassigned",value:unassignedN,color:unassignedN>0?"text-rose-600":"text-gray-900",bg:unassignedN>0?"bg-rose-50":"bg-gray-50"},{label:"Active",value:activeN,color:"text-amber-600",bg:"bg-amber-50"},{label:"Done",value:doneN,color:"text-emerald-600",bg:"bg-emerald-50"}].map(s=>(
             <div key={s.label} className={"flex-1 rounded-xl px-2 py-2 text-center border border-gray-100 " + s.bg}>
               <p className={"text-lg font-semibold leading-none "+s.color}>{s.value}</p>
               <p className="text-[8px] font-semibold text-gray-500 uppercase tracking-wide mt-0.5">{s.label}</p>
             </div>
           ))}
-        </div>
+        </div>}
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"/>
           <input type="text" value={localSearch} onChange={e=>setLocalSearch(e.target.value)}
@@ -320,6 +321,7 @@ const MobileDispatchView = ({
             className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-[#2b4c7e] focus:ring-1 focus:ring-[#2b4c7e] transition-all"/>
           {localSearch && <button type="button" onClick={()=>setLocalSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={13}/></button>}
         </div>
+        {workspaceControls}
       </div>
 
       {/* Filter chips */}
@@ -336,7 +338,7 @@ const MobileDispatchView = ({
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto overscroll-contain" style={{paddingBottom:"calc(72px + env(safe-area-inset-bottom,0px))"}}>
+      <div className="flex-1 overflow-y-auto overscroll-contain" style={{paddingBottom:"calc(88px + env(safe-area-inset-bottom,0px))"}}>
         {activeTab==="trips" && (
           <div className="px-2.5 py-3 space-y-3 sm:px-4">
             {filtered.length===0 && (
