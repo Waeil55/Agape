@@ -109,28 +109,24 @@ const MobileEnterpriseDashboard = (props) => {
     return () => window.removeEventListener('agape:open-chat', openChat);
   }, []);
 
-  const getProfileAbbr = () => {
-    return role === 'admin' ? 'AD' : 'DS';
-  };
-
   const getProfileTitle = () => {
     return role === 'admin' ? 'Agape Care Admin' : 'Agape Care Dispatch';
   };
 
   const renderTopBar = (title, showBack = false) => (
-    <div className="mobile-enterprise-header px-4 py-3 flex items-center justify-between bg-white border-b border-gray-100 shrink-0 sticky top-0 z-50">
-      <div className="flex items-center gap-3">
+    <div className="mobile-enterprise-header px-3 py-3 flex items-center justify-between bg-white border-b border-gray-100 shrink-0 sticky top-0 z-50">
+      <div className="flex min-w-0 items-center gap-3">
         {showBack && (
           <button onClick={() => setSubView(null)} className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-1.5 mr-1 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 touch-manipulation">
             <ChevronLeft size={20} />
           </button>
         )}
-        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-semibold border border-blue-100 shrink-0">
-          <span className="text-xs">{getProfileAbbr()}</span>
+        <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+          <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
         </div>
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="font-semibold text-sm text-gray-900">{getProfileTitle()}</h1>
+            <h1 className="truncate text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">{getProfileTitle()}</h1>
           </div>
           <p className="text-[10px] text-gray-500 font-medium truncate max-w-[220px]">{title} • {currentUser}</p>
         </div>
@@ -319,13 +315,15 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
           {dispatchWorkspaceMode === 'operate' ? (
             <div className="absolute inset-0 flex min-h-0 flex-col">
+              {renderTopBar(role === 'admin' ? 'Operations workspace' : 'Dispatch workspace')}
               <div className="mobile-dispatch-header shrink-0 border-b border-gray-200 bg-white px-3 pb-3 sm:px-4">
                 {renderDispatchWorkspaceControls()}
               </div>
               {renderDriverWorkPanel()}
             </div>
           ) : (
-            <div className="absolute inset-0">
+            <div className="absolute inset-0 flex min-h-0 flex-col">
+              {renderTopBar(role === 'admin' ? 'Operations workspace' : 'Dispatch workspace')}
               <ErrorBoundary>
                 <Suspense fallback={<MobileFallback />}>
                   <MobileDispatchView

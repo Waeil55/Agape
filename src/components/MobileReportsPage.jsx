@@ -7,11 +7,11 @@ import { localCalendarYmd } from '../utils/tripDate';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
 const DetailRow = ({ label, value, valueColor = "text-gray-900" }) => (
-  <div className="grid grid-cols-[130px_1fr] gap-4 py-1.5 items-start">
-    <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">
+  <div className="grid grid-cols-[112px_1fr] gap-3 py-1.5 items-start">
+    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-[0.14em] mt-0.5">
       {label}
     </span>
-    <span className={`text-[13px] font-semibold ${valueColor}`}>
+    <span className={`text-[12px] font-semibold leading-5 ${valueColor}`}>
       {value || '-'}
     </span>
   </div>
@@ -198,7 +198,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     if (onUpdateTrip) onUpdateTrip(editingTripId, payload);
   };
 
-  const inputCls = "w-full px-2.5 py-2 bg-white border border-gray-200 rounded-lg font-semibold text-xs focus:border-[#2563EB] outline-none transition-all";
+  const inputCls = "w-full px-2.5 py-2 bg-white border border-gray-200 rounded-lg font-semibold text-[11px] focus:border-[#2563EB] outline-none transition-all";
 
   return (
     <div className="agape-mobile-page agape-mobile-reports w-full flex-1 flex flex-col overflow-hidden overscroll-contain">
@@ -445,7 +445,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             );
           })}
           {filteredTrips.length === 0 && (
-            <div className="text-center py-10 text-gray-400 text-sm font-medium">
+            <div className="text-center py-8 text-gray-400 text-xs font-semibold">
               No trips found for this date/search.
             </div>
           )}

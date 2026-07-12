@@ -2271,7 +2271,7 @@ html, body {
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 0.875rem 1.125rem 0.625rem;
+    padding: 0.625rem 1rem 0.35rem;
     background: var(--agape-mobile-bg);
   }
 
@@ -2327,7 +2327,7 @@ html, body {
   }
 
   .agape-mobile-search-section {
-    padding: 0.5rem 1.125rem 0.875rem;
+    padding: 0.35rem 1rem 0.55rem;
     background: var(--agape-mobile-bg);
   }
 
@@ -2353,7 +2353,7 @@ html, body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.25rem 1.125rem 0.875rem;
+    padding: 0.1rem 1rem 0.5rem;
     background: var(--agape-mobile-bg);
   }
 
@@ -2396,8 +2396,8 @@ html, body {
   .agape-mobile-list {
     display: flex;
     flex-direction: column;
-    gap: 0.9rem;
-    padding: 0.25rem 1.125rem calc(6.75rem + env(safe-area-inset-bottom, 0px));
+    gap: 0.65rem;
+    padding: 0.1rem 1rem calc(6.75rem + env(safe-area-inset-bottom, 0px));
   }
 
   .agape-empty-card,
@@ -2412,7 +2412,7 @@ html, body {
 
   .agape-mobile-reports .agape-trip-list-card,
   .agape-mobile-history .agape-trip-list-card {
-    border-radius: 0.95rem !important;
+    border-radius: 0.8rem !important;
   }
 
   .agape-empty-card {
@@ -2435,12 +2435,12 @@ html, body {
   .agape-trip-pending::before { background: #3b82f6; }
 
   .agape-trip-card-summary {
-    min-height: 6.1rem;
+    min-height: 5.45rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
-    padding: 1.1rem 1.15rem 1.1rem 1.5rem;
+    gap: 0.85rem;
+    padding: 0.9rem 1rem 0.9rem 1.3rem;
     cursor: pointer;
     background: #ffffff;
   }
@@ -2450,7 +2450,7 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 1.08rem;
+    font-size: 0.98rem;
     line-height: 1.15;
     font-weight: 850;
     color: var(--agape-mobile-text);
@@ -2458,11 +2458,11 @@ html, body {
   }
 
   .agape-trip-id {
-    margin-top: 0.6rem;
+    margin-top: 0.4rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.95rem;
+    font-size: 0.84rem;
     line-height: 1.1;
     font-weight: 750;
     color: var(--agape-mobile-blue);
@@ -2471,12 +2471,12 @@ html, body {
   .agape-trip-right {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.55rem;
     flex: 0 0 auto;
   }
 
   .agape-trip-time {
-    font-size: 1.08rem;
+    font-size: 0.96rem;
     line-height: 1;
     font-weight: 850;
     white-space: nowrap;
@@ -2486,8 +2486,8 @@ html, body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.9rem;
-    height: 2.9rem;
+    width: 2.55rem;
+    height: 2.55rem;
     border-radius: 999px;
     border: 1px solid transparent;
     flex: 0 0 auto;
@@ -2524,9 +2524,36 @@ html, body {
   }
 
   .agape-trip-card-details {
-    padding: 1rem;
+    padding: 0.9rem;
     background: linear-gradient(180deg, #f8fafd 0%, #ffffff 100%);
     border-top: 1px solid rgba(231, 237, 245, 0.95);
+  }
+
+  .agape-mobile-reports .agape-mobile-search {
+    min-height: 3.7rem;
+    border-radius: 1.15rem;
+    padding: 0 1rem;
+  }
+
+  .agape-mobile-reports .agape-mobile-search input {
+    font-size: 0.95rem;
+  }
+
+  .agape-mobile-reports .agape-mobile-date-pill {
+    height: 2.75rem;
+    font-size: 0.94rem;
+  }
+
+  .agape-mobile-reports .agape-mobile-icon-btn {
+    min-width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.95rem;
+  }
+
+  .agape-mobile-reports .agape-mobile-chip,
+  .agape-mobile-reports .agape-mobile-review-btn {
+    min-height: 2.1rem;
+    font-size: 0.72rem;
   }
 
   .mobile-ops-workspace {
