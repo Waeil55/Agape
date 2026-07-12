@@ -202,23 +202,6 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
 
   return (
     <div className="agape-mobile-page agape-mobile-reports w-full flex-1 flex flex-col overflow-hidden overscroll-contain">
-      {/* Agape Care Header */}
-      <div className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md">
-        <div className="px-3 py-3 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-            <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 min-w-0">
-              <p className="text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">Agape Care</p>
-            </div>
-            <div className="mt-1 flex items-center gap-1.5">
-              <p className="text-xs font-medium text-slate-500 truncate">Reports & Export</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* DATE & FILTERS BAR */}
       <div className="agape-mobile-toolbar shrink-0">
         <div className="flex min-w-0 items-center gap-2">

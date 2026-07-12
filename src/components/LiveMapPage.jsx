@@ -675,23 +675,6 @@ const LiveMapPage = ({
 
   return (
     <div className="h-full w-full min-h-0 bg-slate-50 flex flex-col overflow-hidden select-none font-outfit">
-      {/* Agape Care Header */}
-      <div className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md md:hidden">
-        <div className="px-3 py-3 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-            <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 min-w-0">
-              <p className="text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">Agape Care Map</p>
-            </div>
-            <div className="mt-1 flex items-center gap-1.5">
-              <p className="text-xs font-medium text-slate-500 truncate">Live Fleet Tracking</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* ===== HUD BAR (36px) ===== */}
       <header className="shrink-0 min-h-10 bg-white border-b border-slate-200 shadow-sm flex flex-wrap items-center gap-2 px-3 py-2 z-30 sm:flex-nowrap sm:gap-3 sm:px-4 sm:py-0">
         <div className="hidden items-center gap-2 md:flex">

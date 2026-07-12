@@ -108,16 +108,29 @@ const MobileEnterpriseDashboard = (props) => {
     window.addEventListener('agape:open-chat', openChat);
     return () => window.removeEventListener('agape:open-chat', openChat);
   }, []);
+  useEffect(() => {
+    if (!VALID_VIEWS.includes(currentView)) setCurrentView('trips');
+  }, [currentView]);
+
+  useEffect(() => {
+    const openChat = () => {
+      setCurrentView('chat');
+      setSubView(null);
+    };
+    if (sessionStorage.getItem('agape_open_chat_channel')) openChat();
+    window.addEventListener('agape:open-chat', openChat);
+    return () => window.removeEventListener('agape:open-chat', openChat);
+  }, []);
 
   const getProfileTitle = () => {
     return role === 'admin' ? 'Agape Care Admin' : 'Agape Care Dispatch';
   };
 
   const renderTopBar = (title, showBack = false) => (
-    <div className="mobile-enterprise-header px-3 py-3 flex items-center justify-between bg-white border-b border-gray-100 shrink-0 sticky top-0 z-50">
-      <div className="flex min-w-0 items-center gap-3">
+    <div className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md">
+      <div className="px-3 py-3 flex items-center gap-3">
         {showBack && (
-          <button onClick={() => setSubView(null)} className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-1.5 mr-1 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 touch-manipulation">
+          <button onClick={() => setSubView(null)} className="min-w-[36px] min-h-[36px] flex items-center justify-center -ml-1.5 text-gray-500 hover:text-gray-800 rounded-full bg-gray-200/50 touch-manipulation transition-all">
             <ChevronLeft size={20} />
           </button>
         )}
@@ -125,10 +138,12 @@ const MobileEnterpriseDashboard = (props) => {
           <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">{getProfileTitle()}</h1>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="text-[15px] font-extrabold text-slate-900 leading-none tracking-tight truncate">{getProfileTitle()}</p>
           </div>
-          <p className="text-[10px] text-gray-500 font-medium truncate max-w-[220px]">{title} • {currentUser}</p>
+          <div className="mt-1 flex items-center gap-1.5">
+            <p className="text-xs font-medium text-slate-500 truncate">{title}</p>
+          </div>
         </div>
       </div>
     </div>
@@ -367,7 +382,8 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'map') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
-          <div className="absolute inset-0">
+          {renderTopBar('Live Fleet Tracking')}
+          <div className="flex-1 relative">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><LiveMapPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
@@ -377,7 +393,10 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'menu') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><MobileMenuPage {...props} setSubView={setSubView} /></Suspense></ErrorBoundary>
+          {renderTopBar('Settings & More')}
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><MobileMenuPage {...props} setSubView={setSubView} /></Suspense></ErrorBoundary>
+          </div>
         </div>
       );
     }

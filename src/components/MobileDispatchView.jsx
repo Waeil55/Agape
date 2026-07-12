@@ -277,7 +277,6 @@ const MobileDispatchView = ({
     return r;
   },[todayTrips,filter,localSearch]);
 
-  const todayFmt=new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
   const unassignedN=todayTrips.filter(t=>t.status==="Unassigned").length;
   const activeN=todayTrips.filter(t=>IN_PROGRESS.includes(t.status)).length;
   const doneN=todayTrips.filter(t=>t.status==="Completed").length;
@@ -292,27 +291,7 @@ const MobileDispatchView = ({
 
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
-      {/* Header */}
-      <div className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md">
-        <div className="px-3 py-3 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-            <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 min-w-0">
-              <p className="text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">Agape Care Dispatch</p>
-            </div>
-            <div className="mt-1 flex items-center gap-1.5">
-              <p className="text-xs font-medium text-slate-500 truncate">{todayFmt}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button type="button" onClick={()=>setShowTools(true)}
-              className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-all shadow-sm">
-              <SlidersHorizontal size={16}/>
-            </button>
-          </div>
-        </div>
+      <div className="px-3 pt-3 pb-3 bg-white border-b border-gray-200 sm:px-4 shrink-0">
         {!workspaceControls && <div className="flex gap-2 mb-3">
           {[{label:"Total",value:todayTrips.length,color:"text-gray-900",bg:"bg-gray-50"},{label:"Unassigned",value:unassignedN,color:unassignedN>0?"text-rose-600":"text-gray-900",bg:unassignedN>0?"bg-rose-50":"bg-gray-50"},{label:"Active",value:activeN,color:"text-amber-600",bg:"bg-amber-50"},{label:"Done",value:doneN,color:"text-emerald-600",bg:"bg-emerald-50"}].map(s=>(
             <div key={s.label} className={"flex-1 rounded-xl px-2 py-2 text-center border border-gray-100 " + s.bg}>
@@ -321,12 +300,18 @@ const MobileDispatchView = ({
             </div>
           ))}
         </div>}
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"/>
-          <input type="text" value={localSearch} onChange={e=>setLocalSearch(e.target.value)}
-            placeholder="Search patient, ID, address…"
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-[#2b4c7e] focus:ring-1 focus:ring-[#2b4c7e] transition-all"/>
-          {localSearch && <button type="button" onClick={()=>setLocalSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={13}/></button>}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"/>
+            <input type="text" value={localSearch} onChange={e=>setLocalSearch(e.target.value)}
+              placeholder="Search patient, ID, address…"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-[#2b4c7e] focus:ring-1 focus:ring-[#2b4c7e] transition-all"/>
+            {localSearch && <button type="button" onClick={()=>setLocalSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={13}/></button>}
+          </div>
+          <button type="button" onClick={()=>setShowTools(true)}
+            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-all shadow-sm shrink-0">
+            <SlidersHorizontal size={16}/>
+          </button>
         </div>
         {workspaceControls}
       </div>
