@@ -4194,7 +4194,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               })}
             </div>
           ) : (
-            <div className="space-y-1 pb-2">
+            <div className="space-y-1 pb-2 px-3">
               {orderedTrips.map((trip, idx) => {
                 const showWcHeader = isWillCall(trip) && (idx === 0 || !isWillCall(orderedTrips[idx - 1])) && willCallTrips.length > 0;
                 const tripIsInOut = isInOutTrip(trip);

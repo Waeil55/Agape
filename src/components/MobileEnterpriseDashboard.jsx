@@ -108,19 +108,6 @@ const MobileEnterpriseDashboard = (props) => {
     window.addEventListener('agape:open-chat', openChat);
     return () => window.removeEventListener('agape:open-chat', openChat);
   }, []);
-  useEffect(() => {
-    if (!VALID_VIEWS.includes(currentView)) setCurrentView('trips');
-  }, [currentView]);
-
-  useEffect(() => {
-    const openChat = () => {
-      setCurrentView('chat');
-      setSubView(null);
-    };
-    if (sessionStorage.getItem('agape_open_chat_channel')) openChat();
-    window.addEventListener('agape:open-chat', openChat);
-    return () => window.removeEventListener('agape:open-chat', openChat);
-  }, []);
 
   const getProfileTitle = () => {
     return role === 'admin' ? 'Agape Care Admin' : 'Agape Care Dispatch';
@@ -407,10 +394,12 @@ const MobileEnterpriseDashboard = (props) => {
   return (
     <div
       className="mobile-enterprise-dashboard-wrapper w-full h-full bg-white flex flex-col relative overflow-hidden"
-      style={{ paddingBottom: 0 }}
     >
       {/* Dynamic Content */}
       {renderContent()}
+
+      {/* Spacer to prevent content from being hidden behind bottom nav */}
+      <div className="shrink-0 h-[calc(56px+8px+env(safe-area-inset-bottom,0px))]" aria-hidden="true" />
 
       {/* BOTTOM NAVIGATION */}
       {!subView && !(currentView === 'chat' && isChatThreadOpen) && (

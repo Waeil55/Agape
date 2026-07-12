@@ -799,22 +799,27 @@ html:not([data-theme="dark"]):not(.theme-dark) .bottom-nav {
 
 /* Hide bottom nav when virtual keyboard is open to prevent layout overlap */
 @media screen and (max-height: 500px) and (max-width: 768px) {
-  .bottom-nav {
+  .bottom-nav, .adm-bottomnav {
     display: none !important;
   }
 }
 /* Hide nav on keyboard open — but only when NOT inside the agape-chat-page (chat manages its own layout) */
-body:has(input:focus, textarea:focus):not(:has(.agape-chat-page)) .bottom-nav {
+body:has(input:focus, textarea:focus):not(:has(.agape-chat-page)) .bottom-nav,
+body:has(input:focus, textarea:focus):not(:has(.agape-chat-page)) .adm-bottomnav {
   display: none !important;
 }
 /* Also hide when inside chat panel (chat manages input positioning itself) */
 body:has(.agape-chat-page input:focus) .bottom-nav,
-body:has(.agape-chat-page textarea:focus) .bottom-nav {
+body:has(.agape-chat-page textarea:focus) .bottom-nav,
+body:has(.agape-chat-page input:focus) .adm-bottomnav,
+body:has(.agape-chat-page textarea:focus) .adm-bottomnav {
   display: none !important;
 }
 
 [data-theme="dark"] .bottom-nav,
-html.theme-dark .bottom-nav {
+html.theme-dark .bottom-nav,
+[data-theme="dark"] .adm-bottomnav,
+html.theme-dark .adm-bottomnav {
   background: #0f172a !important;
   color-scheme: dark;
   border-color: rgba(255, 255, 255, 0.08) !important;
@@ -2165,9 +2170,20 @@ textarea {
   }
 
   [data-theme="dark"] .bottom-nav,
-  html.theme-dark .bottom-nav {
+  html.theme-dark .bottom-nav,
+  [data-theme="dark"] .adm-bottomnav,
+  html.theme-dark .adm-bottomnav {
     background: rgba(15, 23, 42, 0.94) !important;
     border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .adm-bottomnav {
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    left: max(10px, env(safe-area-inset-left, 0px)) !important;
+    right: max(10px, env(safe-area-inset-right, 0px)) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(15, 23, 42, 0.08) !important;
+    box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.25), 0 2px 6px rgba(15, 23, 42, 0.06) !important;
   }
 
   .driver-page-header {
@@ -2397,7 +2413,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
-    padding: 0.1rem 1rem calc(6.75rem + env(safe-area-inset-bottom, 0px));
+    padding: 0.1rem 0.75rem calc(6.75rem + env(safe-area-inset-bottom, 0px));
   }
 
   .agape-empty-card,
@@ -2412,7 +2428,7 @@ html, body {
 
   .agape-mobile-reports .agape-trip-list-card,
   .agape-mobile-history .agape-trip-list-card {
-    border-radius: 0.5rem !important;
+    border-radius: 12px !important;
   }
 
   .agape-empty-card {
@@ -3418,17 +3434,19 @@ html, body {
   left: 8px;
   right: 8px;
   bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-  z-index: 40;
+  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: space-around;
   gap: 4px;
   padding: 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--adm-surface) 86%, transparent);
-  backdrop-filter: blur(18px);
-  border: 1px solid var(--adm-border);
-  box-shadow: 0 18px 40px -12px rgba(15, 23, 42, 0.28);
+  background: rgba(255, 255, 255, 0.94) !important;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.25), 0 2px 6px rgba(15, 23, 42, 0.06);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  color-scheme: light;
 }
 
 .adm-bottomnav-item {
@@ -4611,10 +4629,14 @@ html, body {
   .adm-bottomnav {
     left: max(10px, env(safe-area-inset-left, 0px));
     right: max(10px, env(safe-area-inset-right, 0px));
-    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-    background: color-mix(in srgb, var(--adm-surface) 94%, transparent);
-    backdrop-filter: blur(10px);
-    box-shadow: 0 14px 34px -18px rgba(15, 23, 42, 0.45);
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    height: 56px !important;
+    padding: 4px 10px !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    border: 1px solid rgba(231, 237, 245, 0.9) !important;
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.16), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
+    backdrop-filter: blur(8px) !important;
   }
 
   .adm-bottomnav-item .label {
@@ -4656,5 +4678,13 @@ html, body {
     box-shadow: none;
     border-color: var(--border-strong);
     break-inside: avoid;
+  }
+
+  /* Unified mobile card radius across all portals */
+  .agape-trip-list-card {
+    border-radius: 12px !important;
+  }
+  .adm-card {
+    border-radius: 12px !important;
   }
 }

@@ -7,8 +7,8 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
-  "background_color": "#3d7a96",
-  "theme_color": "#2563eb",
+  "background_color": "#23568E",
+  "theme_color": "#23568E",
   "categories": ["transportation", "business", "productivity"],
   "prefer_related_applications": false,
   "icons": [
@@ -23,21 +23,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [],
-  "shortcuts": [
-    {
-      "name": "View Trips",
-      "short_name": "Trips",
-      "description": "View and manage trips",
-      "url": "/"
-    },
-    {
-      "name": "Live Map",
-      "short_name": "Map",
-      "description": "View fleet locations",
-      "url": "/"
     }
   ]
 }

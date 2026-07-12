@@ -51,7 +51,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
       </div>
 
       {/* Menu Links */}
-      <div className="px-4 py-6 space-y-6">
+      <div className="px-3 py-6 space-y-6">
         {SECTIONS.map((section, idx) => {
           const visibleItems = section.items.filter((item) => role === 'admin' || !['billing'].includes(item.id));
           if (section.title === "Organization" && visibleItems.length === 0) return null;
