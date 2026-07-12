@@ -15,7 +15,7 @@ function renderTextWithLinks(text, isOwn) {
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className={`${isOwn ? 'text-white/90 hover:text-white underline decoration-white/40' : 'text-blue-600 hover:text-blue-700 underline decoration-blue-300'}`}
+          className={`${isOwn ? 'text-[#0b63ce] hover:text-[#084ea3] underline decoration-blue-300' : 'text-blue-600 hover:text-blue-700 underline decoration-blue-300'}`}
         >
           {part}
         </a>
@@ -102,8 +102,8 @@ const ChatMessage = memo(function ChatMessage({
                 msg.type === 'image' ? 'overflow-hidden p-0.5' : 'px-[14px] py-[8px]'
               } ${
                 isOwn
-                  ? 'bg-[#0084ff] text-white shadow-sm shadow-blue-500/20'
-                  : 'bg-white text-slate-800 shadow-[0_1px_4px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70'
+                  ? 'bg-[#dbeafe] text-[#0b63ce] shadow-[0_2px_10px_rgba(37,99,235,0.14)] ring-1 ring-blue-100/70'
+                  : 'bg-[#f3f5f8] text-slate-900 shadow-[0_2px_10px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/60'
               }`}>
                 {msg.type === 'image' && msg.fileUrl && (
                   <img
@@ -124,22 +124,22 @@ const ChatMessage = memo(function ChatMessage({
                       isOwn ? 'hover:bg-blue-400/20' : 'hover:bg-slate-50'
                     } transition-colors`}
                   >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isOwn ? 'bg-white/20' : 'bg-blue-50'}`}>
-                      <FileText size={18} className={isOwn ? 'text-white' : 'text-blue-500'} />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isOwn ? 'bg-white/50' : 'bg-blue-50'}`}>
+                      <FileText size={18} className={isOwn ? 'text-blue-600' : 'text-blue-500'} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-[13px] font-semibold truncate max-w-[160px] ${isOwn ? 'text-white' : 'text-slate-700'}`}>
+                      <p className={`text-[13px] font-semibold truncate max-w-[160px] ${isOwn ? 'text-blue-700' : 'text-slate-700'}`}>
                         {msg.fileName || 'File'}
                       </p>
                       {msg.fileSize > 0 && (
-                        <p className={`text-[10px] mt-0.5 ${isOwn ? 'text-white/70' : 'text-slate-400'}`}>
+                        <p className={`text-[10px] mt-0.5 ${isOwn ? 'text-blue-500' : 'text-slate-400'}`}>
                           {msg.fileSize < 1024 ? `${msg.fileSize} B`
                             : msg.fileSize < 1048576 ? `${(msg.fileSize / 1024).toFixed(1)} KB`
                             : `${(msg.fileSize / 1048576).toFixed(1)} MB`}
                         </p>
                       )}
                     </div>
-                    <Download size={14} className={isOwn ? 'text-white/70' : 'text-slate-400'} />
+                    <Download size={14} className={isOwn ? 'text-blue-500' : 'text-slate-400'} />
                   </a>
                 )}
 

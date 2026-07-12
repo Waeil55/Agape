@@ -9,14 +9,14 @@ const SIZES = {
 };
 
 const VARIANTS = {
-  primary: 'bg-[#23568E] text-white hover:bg-[#1a4270] active:bg-[#153560]',
+  primary: 'bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:bg-[#1E40AF]',
   secondary: 'bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300',
   success: 'bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800',
   danger: 'bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800',
   warning: 'bg-amber-500 text-white hover:bg-amber-600 active:bg-amber-700',
   ghost: 'bg-transparent text-slate-600 hover:bg-slate-100 active:bg-slate-200',
   outline: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 active:bg-slate-100',
-  brand: 'bg-[#23568E] text-white hover:bg-[#1a4270] active:bg-[#153560]',
+  brand: 'bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:bg-[#1E40AF]',
 };
 
 export default function AppButton({

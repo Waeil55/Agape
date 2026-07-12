@@ -684,7 +684,7 @@ const RoutePlanSection = ({
               <button
                 type="button"
                 onClick={sendToSequencer}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-bold text-white bg-[#23568E] rounded-xl active:scale-95 transition hover:bg-[#1B4471] shadow-sm"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-bold text-white bg-[#2563EB] rounded-xl active:scale-95 transition hover:bg-[#1D4ED8] shadow-sm"
               >
                 <Route size={14} /> Send {routeValidation.routeStops.length} to Sequencer
               </button>

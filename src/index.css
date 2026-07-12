@@ -70,74 +70,85 @@
 /* ===== LIGHT THEME (Premium Enterprise) ===== */
 :root,
 [data-theme="light"] {
+  /* Prompt palette aliases */
+  --primary: #2563EB;
+  --primary-hover: #1D4ED8;
+  --primary-light: #EAF2FF;
+  --background: #F4F7FC;
+  --surface: #FFFFFF;
+  --surface-alt: #F8FAFD;
+  --border: #E7EDF5;
+  --error: #EF4444;
+  --error-bg: #FDECEC;
+
   /* Backgrounds */
-  --bg-app: #f4f7fa;
-  --bg-surface: #ffffff;
-  --bg-surface-elevated: #ffffff;
-  --bg-surface-subtle: #f0f4f9;
-  --bg-card: #ffffff;
-  --bg-input: #f4f7fb;
-  --bg-hover: #f0f4f9;
-  --bg-active: #e2e8f0;
+  --bg-app: #F4F7FC;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #FFFFFF;
+  --bg-surface-subtle: #F8FAFD;
+  --bg-card: #FFFFFF;
+  --bg-input: #F8FAFD;
+  --bg-hover: #F8FAFD;
+  --bg-active: #EAF2FF;
 
   /* Text */
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-tertiary: #94a3b8;
-  --text-inverse: #ffffff;
-  --text-link: #3b82f6;
+  --text-primary: #172033;
+  --text-secondary: #64748B;
+  --text-tertiary: #94A3B8;
+  --text-inverse: #FFFFFF;
+  --text-link: #2563EB;
 
-  /* Brand (LinkedIn Blue Theme) */
-  --brand-primary: #23568E;
-  --brand-primary-hover: #1B4471;
-  --brand-primary-light: #dbeafe;
-  --brand-primary-subtle: #eff6ff;
-  --brand-accent: #306FB4;
+  /* Brand (Agape medical enterprise palette) */
+  --brand-primary: #2563EB;
+  --brand-primary-hover: #1D4ED8;
+  --brand-primary-light: #EAF2FF;
+  --brand-primary-subtle: #EEF5FF;
+  --brand-accent: #3B82F6;
 
   /* Status */
-  --success: #059669;
-  --success-bg: #ecfdf5;
-  --success-border: #a7f3d0;
-  --warning: #d97706;
-  --warning-bg: #fffbeb;
-  --warning-border: #fde68a;
-  --danger: #dc2626;
-  --danger-bg: #fef2f2;
-  --danger-border: #fecaca;
-  --info: #2563eb;
-  --info-bg: #eff6ff;
-  --info-border: #bfdbfe;
+  --success: #10B981;
+  --success-bg: #EAFBF4;
+  --success-border: #BFEFDF;
+  --warning: #F59E0B;
+  --warning-bg: #FFF7E6;
+  --warning-border: #FDECC8;
+  --danger: #EF4444;
+  --danger-bg: #FDECEC;
+  --danger-border: #F8CACA;
+  --info: #3B82F6;
+  --info-bg: #EEF5FF;
+  --info-border: #CFE1FF;
 
   /* Borders */
-  --border-default: #e2e8f0;
-  --border-subtle: #f1f5f9;
-  --border-strong: #cbd5e1;
+  --border-default: #E7EDF5;
+  --border-subtle: #F1F5FB;
+  --border-strong: #D8E2EF;
 
-  /* Shadows (Softer, deeper luxury shadows) */
-  --shadow-card: 0 8px 30px -4px rgba(15, 23, 42, 0.06), 0 0 2px rgba(15, 23, 42, 0.03);
-  --shadow-elevated: 0 24px 60px -10px rgba(15, 23, 42, 0.12), 0 0 4px rgba(15, 23, 42, 0.04);
+  /* Shadows */
+  --shadow-card: 0 8px 28px rgba(17, 24, 39, 0.06);
+  --shadow-elevated: 0 14px 38px rgba(17, 24, 39, 0.08);
 
   /* Navigation */
-  --nav-bg: rgba(255, 255, 255, 0.7);
-  --nav-border: rgba(226, 232, 240, 0.4);
-  --nav-blur: 24px;
+  --nav-bg: rgba(255, 255, 255, 0.72);
+  --nav-border: rgba(255, 255, 255, 0.65);
+  --nav-blur: 30px;
 
   /* Glass effects */
-  --glass-bg: rgba(255, 255, 255, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.8);
-  --glass-blur: 16px;
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --glass-blur: 30px;
 
   /* Gradient accents */
-  --gradient-brand: linear-gradient(135deg, #23568E 0%, #306FB4 100%);
-  --gradient-success: linear-gradient(135deg, #059669 0%, #10b981 100%);
-  --gradient-warning: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
-  --gradient-danger: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
-  --gradient-surface: linear-gradient(180deg, #ffffff 0%, #f4f6fb 100%);
+  --gradient-brand: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
+  --gradient-success: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+  --gradient-warning: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
+  --gradient-danger: linear-gradient(135deg, #EF4444 0%, #F87171 100%);
+  --gradient-surface: linear-gradient(180deg, #FFFFFF 0%, #F4F7FC 100%);
 
   /* Admin/Enterprise theme */
-  --admin-bg: #f4f6fb;
-  --admin-surface: #ffffff;
-  --admin-elevated: #f8fafc;
+  --admin-bg: #F4F7FC;
+  --admin-surface: #FFFFFF;
+  --admin-elevated: #F8FAFD;
   --admin-hover-subtle: rgba(15, 23, 42, 0.03);
   --admin-hover-mid: rgba(15, 23, 42, 0.06);
 }
@@ -161,9 +172,9 @@
 
   --brand-primary: #3b82f6;
   --brand-primary-hover: #60a5fa;
-  --brand-primary-light: #1B4471;
+  --brand-primary-light: #1D4ED8;
   --brand-primary-subtle: #172554;
-  --brand-accent: #8b5cf6;
+  --brand-accent: #3B82F6;
 
   --success: #10b981;
   --success-bg: rgba(16, 185, 129, 0.1);
@@ -193,7 +204,7 @@
   --glass-border: rgba(39, 39, 42, 0.5);
   --glass-blur: 16px;
 
-  --gradient-brand: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --gradient-brand: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
   --gradient-success: linear-gradient(135deg, #10b981 0%, #34d399 100%);
   --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
   --gradient-danger: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
@@ -522,10 +533,10 @@ body {
   background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
 }
 .gradient-emerald-premium {
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
 }
 .gradient-deep-blue {
-  background: linear-gradient(180deg, #1B4471 0%, #23568E 100%);
+  background: linear-gradient(180deg, #1D4ED8 0%, #2563EB 100%);
 }
 
 /* ===== BIG TIME DISPLAY ===== */
@@ -823,47 +834,6 @@ body:has(.agape-chat-page textarea:focus) .bottom-nav {
 }
 [data-theme="dark"] .bottom-nav .border-slate-200 {
   border-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-/* ===== CHAT BUBBLE ANIMATIONS ===== */
-@keyframes chat-bubble-in {
-  from {
-    opacity: 0;
-    transform: scale(0.92) translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.chat-bubble-enter {
-  animation: chat-bubble-in 0.2s cubic-bezier(0.34, 1.2, 0.64, 1) both;
-}
-
-/* ===== CHAT PAGE LAYOUT ===== */
-.agape-chat-page {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.agape-chat-messages {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  padding: 8px 12px;
-  background: #f0f2f5;
-}
-
-/* Chat input area — stays above keyboard */
-.agape-chat-input {
-  flex-shrink: 0;
-  width: 100%;
 }
 
 /* Adjust layout elements when keyboard is open on mobile (textarea/input focused) */
@@ -1633,7 +1603,7 @@ table thead,
 table thead[class],
 table thead tr,
 table thead tr[class] {
-  background: #23568E !important;
+  background: #2563EB !important;
 }
 
 table thead th,
@@ -2214,6 +2184,499 @@ html, body {
   padding-right: 0 !important;
 }
 
+/* =====================================================================
+   AGAPE MOBILE REFERENCE SYSTEM
+   Soft native-style surfaces for chat, reports, history, and shared pages.
+   ===================================================================== */
+@media (max-width: 767px) {
+  :root {
+    --agape-mobile-bg: #f4f7fc;
+    --agape-mobile-card: #ffffff;
+    --agape-mobile-muted: #64748b;
+    --agape-mobile-text: #172033;
+    --agape-mobile-border: #e7edf5;
+    --agape-mobile-blue: #2563eb;
+    --agape-mobile-blue-soft: #eaf2ff;
+    --agape-mobile-shadow: 0 10px 28px rgba(15, 23, 42, 0.07);
+    --agape-mobile-shadow-sm: 0 4px 14px rgba(15, 23, 42, 0.055);
+  }
+
+  .mobile-enterprise-dashboard-wrapper,
+  .driver-page-chat-wrapper,
+  .mobile-chat-wrapper,
+  .agape-mobile-page {
+    background: var(--agape-mobile-bg) !important;
+  }
+
+  .driver-page-header,
+  .driver-active-trip-header,
+  .mobile-enterprise-header,
+  .mobile-dispatch-header,
+  .mobile-admin-header,
+  .agape-chat-header {
+    padding-top: max(8px, env(safe-area-inset-top, 0px)) !important;
+    background: rgba(244, 247, 252, 0.96) !important;
+    border-bottom: 1px solid rgba(231, 237, 245, 0.9) !important;
+    box-shadow: none !important;
+  }
+
+  .agape-mobile-page {
+    color: var(--agape-mobile-text);
+    min-height: 0;
+  }
+
+  .agape-mobile-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.875rem 1.125rem 0.625rem;
+    background: var(--agape-mobile-bg);
+  }
+
+  .agape-mobile-icon-btn,
+  .agape-mobile-date-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3rem;
+    height: 3rem;
+    border-radius: 1.15rem;
+    border: 1px solid rgba(231, 237, 245, 0.95);
+    background: var(--agape-mobile-card);
+    color: #334155;
+    box-shadow: var(--agape-mobile-shadow-sm);
+    transition: transform 140ms ease, background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+    flex: 0 0 auto;
+  }
+
+  .agape-mobile-icon-btn:active,
+  .agape-mobile-date-pill:active {
+    transform: scale(0.96);
+  }
+
+  .agape-mobile-icon-btn-primary {
+    background: var(--agape-mobile-blue) !important;
+    border-color: var(--agape-mobile-blue) !important;
+    color: #ffffff !important;
+    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
+  }
+
+  .agape-mobile-icon-btn.agape-mobile-icon-active {
+    background: var(--agape-mobile-blue) !important;
+    border-color: var(--agape-mobile-blue) !important;
+    color: #ffffff !important;
+  }
+
+  .agape-mobile-date-pill {
+    min-width: 0;
+    height: 3rem;
+    gap: 0.35rem;
+    padding: 0 1rem;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    color: var(--agape-mobile-text);
+    white-space: nowrap;
+  }
+
+  .agape-mobile-date-pill span:last-child {
+    color: var(--agape-mobile-blue);
+    font-weight: 800;
+  }
+
+  .agape-mobile-search-section {
+    padding: 0.5rem 1.125rem 0.875rem;
+    background: var(--agape-mobile-bg);
+  }
+
+  .agape-mobile-search,
+  .agape-chat-search-field {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    min-height: 4.25rem;
+    width: 100%;
+    border-radius: 1.65rem;
+    background: #ffffff;
+    border: 1px solid rgba(231, 237, 245, 0.95);
+    box-shadow: var(--agape-mobile-shadow-sm);
+    padding: 0 1.2rem;
+  }
+
+  .agape-mobile-scroll {
+    background: var(--agape-mobile-bg) !important;
+  }
+
+  .agape-mobile-summary-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.25rem 1.125rem 0.875rem;
+    background: var(--agape-mobile-bg);
+  }
+
+  .agape-mobile-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    border-radius: 999px;
+    padding: 0 0.75rem;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--agape-mobile-border);
+    color: var(--agape-mobile-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .agape-mobile-chip-success {
+    color: #059669;
+    background: #eafbf4;
+    border-color: #bfefdf;
+  }
+
+  .agape-mobile-review-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    min-height: 2.35rem;
+    border-radius: 999px;
+    padding: 0 0.875rem;
+    background: #eafbf4;
+    border: 1px solid #bfefdf;
+    color: #047857;
+    font-size: 0.78rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .agape-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 0.25rem 1.125rem calc(6.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .agape-empty-card,
+  .agape-trip-list-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    background: var(--agape-mobile-card);
+    border: 1px solid rgba(231, 237, 245, 0.95);
+    box-shadow: var(--agape-mobile-shadow);
+  }
+
+  .agape-empty-card {
+    padding: 3rem 1.5rem;
+    text-align: center;
+  }
+
+  .agape-trip-list-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0.32rem;
+    background: var(--agape-mobile-blue);
+  }
+
+  .agape-trip-success::before { background: #10b981; }
+  .agape-trip-danger::before { background: #fb7185; }
+  .agape-trip-warning::before { background: #f59e0b; }
+  .agape-trip-info::before { background: #8b5cf6; }
+  .agape-trip-pending::before { background: #3b82f6; }
+
+  .agape-trip-card-summary {
+    min-height: 6.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.3rem 1.25rem 1.6rem;
+    cursor: pointer;
+    background: #ffffff;
+  }
+
+  .agape-trip-title {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.08rem;
+    line-height: 1.15;
+    font-weight: 850;
+    color: var(--agape-mobile-text);
+    letter-spacing: 0;
+  }
+
+  .agape-trip-id {
+    margin-top: 0.6rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.95rem;
+    line-height: 1.1;
+    font-weight: 750;
+    color: var(--agape-mobile-blue);
+  }
+
+  .agape-trip-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 0 0 auto;
+  }
+
+  .agape-trip-time {
+    font-size: 1.08rem;
+    line-height: 1;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  .agape-trip-status-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.9rem;
+    height: 2.9rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    flex: 0 0 auto;
+  }
+
+  .agape-trip-status-success {
+    background: #eafbf4;
+    border-color: #bfefdf;
+    color: #10b981;
+  }
+
+  .agape-trip-status-danger {
+    background: #fdecec;
+    border-color: #f8caca;
+    color: #ef4444;
+  }
+
+  .agape-trip-status-warning {
+    background: #fff7e6;
+    border-color: #fdecc8;
+    color: #d97706;
+  }
+
+  .agape-trip-status-info {
+    background: #f3efff;
+    border-color: #ddd6fe;
+    color: #7c3aed;
+  }
+
+  .agape-trip-status-pending {
+    background: #eef5ff;
+    border-color: #cfe1ff;
+    color: #2563eb;
+  }
+
+  .agape-trip-card-details {
+    padding: 1rem;
+    background: linear-gradient(180deg, #f8fafd 0%, #ffffff 100%);
+    border-top: 1px solid rgba(231, 237, 245, 0.95);
+  }
+
+  .bottom-nav {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 18px !important;
+    right: 18px !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    padding: 4px 10px !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    border: 1px solid rgba(231, 237, 245, 0.9) !important;
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.16), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    backdrop-filter: blur(8px) !important;
+  }
+
+  html:not([data-theme="dark"]) .bottom-nav {
+    background: rgba(255, 255, 255, 0.96) !important;
+    color: #334155 !important;
+  }
+
+  [data-theme="dark"] .bottom-nav {
+    background: rgba(15, 23, 42, 0.94) !important;
+  }
+
+  .messenger-nav-badge,
+  .chat-unread-badge {
+    background: #ff3b30 !important;
+    color: #ffffff !important;
+    border: 2px solid #ffffff !important;
+    box-shadow: 0 5px 12px rgba(255, 59, 48, 0.24) !important;
+  }
+
+  .agape-chat-page {
+    background: #ffffff !important;
+  }
+
+  .agape-chat-sidebar {
+    background: #ffffff;
+  }
+
+  .agape-chat-mobile-list-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: calc(4.25rem + max(8px, env(safe-area-inset-top, 0px)));
+    padding: max(8px, env(safe-area-inset-top, 0px)) 1.125rem 0.85rem;
+    background: var(--agape-mobile-bg);
+    border-bottom: 1px solid rgba(231, 237, 245, 0.65);
+  }
+
+  .agape-chat-mobile-list-header h1 {
+    margin: 0;
+    color: var(--agape-mobile-text);
+    font-size: 1.5rem;
+    line-height: 1;
+    font-weight: 900;
+    letter-spacing: 0;
+  }
+
+  .agape-chat-mobile-list-header p {
+    margin: 0.3rem 0 0;
+    color: var(--agape-mobile-muted);
+    font-size: 0.78rem;
+    line-height: 1;
+    font-weight: 700;
+  }
+
+  .agape-chat-search-section {
+    padding: 0.75rem 1.125rem 0.9rem;
+    background: var(--agape-mobile-bg);
+    border-bottom: 1px solid rgba(231, 237, 245, 0.7);
+  }
+
+  .agape-chat-search-field {
+    min-height: 3.65rem;
+    border-radius: 1.5rem;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.055);
+  }
+
+  .agape-chat-list {
+    background: #ffffff;
+  }
+
+  .agape-chat-list-stack {
+    background: #ffffff;
+  }
+
+  .agape-chat-list-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-height: 5.9rem;
+    padding: 1rem 1.2rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(231, 237, 245, 0.9);
+    background: #ffffff;
+    transition: background-color 140ms ease, transform 140ms ease;
+  }
+
+  .agape-chat-list-row:active {
+    background: #f8fafd;
+    transform: scale(0.995);
+  }
+
+  .agape-chat-list-row.is-active {
+    background: #eef5ff;
+  }
+
+  .agape-chat-list-row.is-unread p:first-child {
+    font-weight: 900 !important;
+  }
+
+  .agape-chat-list-row .rounded-full {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 6px 18px rgba(15, 23, 42, 0.08);
+  }
+
+  .agape-chat-conversation {
+    background: #ffffff !important;
+  }
+
+  .agape-chat-header {
+    min-height: calc(60px + max(8px, env(safe-area-inset-top, 0px))) !important;
+  }
+
+  .agape-chat-header-inner {
+    height: 60px !important;
+    min-height: 60px !important;
+  }
+
+  .agape-chat-messages {
+    background: #ffffff !important;
+    padding: 0.875rem 0.875rem 0.75rem !important;
+  }
+
+  .agape-chat-column,
+  .agape-chat-bubble-stack {
+    max-width: min(82%, 30rem) !important;
+  }
+
+  .agape-chat-bubble {
+    border-radius: 1.35rem !important;
+  }
+
+  .agape-chat-text {
+    font-size: 1.03rem !important;
+    line-height: 1.45 !important;
+    font-weight: 560 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .agape-chat-input {
+    background: #ffffff !important;
+    border-top: 1px solid rgba(231, 237, 245, 0.95) !important;
+    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06);
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  body.keyboard-visible .agape-chat-input {
+    padding-bottom: 6px !important;
+  }
+
+  .agape-chat-composer-row {
+    min-height: 4.25rem !important;
+    align-items: center !important;
+    gap: 0.7rem !important;
+    padding: 0.6rem 0.875rem !important;
+  }
+
+  .agape-chat-composer-pill {
+    min-height: 3.1rem;
+    align-items: center !important;
+    border-radius: 999px !important;
+    background: #ffffff !important;
+    border: 1.5px solid #cfe1ff !important;
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.04), 0 4px 14px rgba(15, 23, 42, 0.055);
+  }
+
+  .agape-chat-icon-button {
+    width: 2.9rem !important;
+    height: 2.9rem !important;
+    color: #64748b !important;
+  }
+
+  .agape-chat-send-button {
+    width: 3.15rem !important;
+    height: 3.15rem !important;
+    background: #2563eb !important;
+    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.24) !important;
+  }
+}
+
 /* Ensure mobile page headers clear the top status bar / safe areas on all mobile devices and browsers (including Safari) */
 @media (max-width: 767px) {
   .driver-page-header,
@@ -2222,7 +2685,7 @@ html, body {
   .mobile-dispatch-header,
   .mobile-admin-header,
   .agape-chat-header {
-    padding-top: calc(max(20px, env(safe-area-inset-top, 0px)) + 12px) !important;
+    padding-top: max(8px, env(safe-area-inset-top, 0px)) !important;
   }
 }
 
@@ -2667,35 +3130,35 @@ html, body {
 
 .adm-badge--online,
 .adm-badge--success {
-  color: #047857;
-  background: #d1fae5;
-  border-color: #a7f3d0;
+  color: var(--success);
+  background: var(--success-bg);
+  border-color: var(--success-border);
 }
 
 .adm-badge--busy,
 .adm-badge--warning {
-  color: #b45309;
-  background: #fef3c7;
-  border-color: #fde68a;
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
 }
 
 .adm-badge--offline,
 .adm-badge--muted {
-  color: #475569;
-  background: #e2e8f0;
-  border-color: #cbd5e1;
+  color: var(--text-secondary);
+  background: var(--surface-alt);
+  border-color: var(--border-default);
 }
 
 .adm-badge--danger {
-  color: #be123c;
-  background: #ffe4e6;
-  border-color: #fecdd3;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
 }
 
 .adm-badge--info {
-  color: #1d4ed8;
-  background: #dbeafe;
-  border-color: #bfdbfe;
+  color: var(--info);
+  background: var(--info-bg);
+  border-color: var(--info-border);
 }
 
 .adm-badge--brand {
@@ -3105,23 +3568,23 @@ html, body {
 }
 
 .admin-signal-row--danger {
-  border-color: #fecdd3;
-  background: #fff1f2;
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
 }
 
 .admin-signal-row--warning {
-  border-color: #fde68a;
-  background: #fffbeb;
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
 }
 
 .admin-signal-row--success {
-  border-color: #a7f3d0;
-  background: #ecfdf5;
+  border-color: var(--success-border);
+  background: var(--success-bg);
 }
 
 .admin-signal-row--info {
-  border-color: #bfdbfe;
-  background: #eff6ff;
+  border-color: var(--info-border);
+  background: var(--info-bg);
 }
 
 .admin-coverage-row {
@@ -3629,10 +4092,10 @@ html, body {
   gap: var(--space-3);
   margin: 0 var(--space-4) var(--space-4);
   padding: var(--space-3);
-  border: 1px solid #fde68a;
+  border: 1px solid var(--warning-border);
   border-radius: 16px;
-  color: #b45309;
-  background: #fef3c7;
+  color: var(--warning);
+  background: var(--warning-bg);
 }
 
 .mobile-admin-contact-lines {

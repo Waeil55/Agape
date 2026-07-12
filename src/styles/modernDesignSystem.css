@@ -5,34 +5,34 @@
 
 :root {
   /* Primary Colors - Modern Gradient */
-  --color-primary: #3b82f6;
-  --color-primary-dark: #1e40af;
-  --color-primary-light: #60a5fa;
+  --color-primary: #2563EB;
+  --color-primary-dark: #1D4ED8;
+  --color-primary-light: #EAF2FF;
 
   /* Secondary Colors */
   --color-emerald: #10b981;
   --color-emerald-light: #6ee7b7;
-  --color-rose: #f43f5e;
-  --color-amber: #f59e0b;
-  --color-indigo: #6366f1;
-  --color-purple: #a855f7;
+  --color-rose: #EF4444;
+  --color-amber: #F59E0B;
+  --color-indigo: #3B82F6;
+  --color-purple: #3B82F6;
 
   /* Neutral Colors */
-  --color-slate-50: #f8fafc;
-  --color-slate-100: #f1f5f9;
-  --color-slate-200: #e2e8f0;
-  --color-slate-300: #cbd5e1;
-  --color-slate-400: #94a3b8;
-  --color-slate-500: #64748b;
-  --color-slate-600: #475569;
+  --color-slate-50: #F8FAFD;
+  --color-slate-100: #F4F7FC;
+  --color-slate-200: #E7EDF5;
+  --color-slate-300: #D8E2EF;
+  --color-slate-400: #94A3B8;
+  --color-slate-500: #64748B;
+  --color-slate-600: #64748B;
   --color-slate-700: #334155;
-  --color-slate-800: #1e293b;
-  --color-slate-900: #0f172a;
+  --color-slate-800: #172033;
+  --color-slate-900: #172033;
 
   /* Backgrounds */
   --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
+  --bg-secondary: #F4F7FC;
+  --bg-tertiary: #F8FAFD;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -202,7 +202,7 @@ html, body {
 }
 
 .btn-emerald {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
   color: white;
   box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
 }
@@ -213,7 +213,7 @@ html, body {
 }
 
 .btn-rose {
-  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  background: linear-gradient(135deg, #EF4444 0%, #F87171 100%);
   color: white;
   box-shadow: 0 4px 20px rgba(244, 63, 94, 0.4);
 }
@@ -289,22 +289,22 @@ html, body {
 
 .badge-success {
   background: rgba(16, 185, 129, 0.1);
-  color: #059669;
+  color: #10B981;
 }
 
 .badge-danger {
-  background: rgba(244, 63, 94, 0.1);
-  color: #e11d48;
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
 }
 
 .badge-warning {
   background: rgba(245, 158, 11, 0.1);
-  color: #d97706;
+  color: #F59E0B;
 }
 
 .badge-info {
-  background: rgba(6, 182, 212, 0.1);
-  color: #0891b2;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3B82F6;
 }
 
 /* Typography */
@@ -577,12 +577,12 @@ h6, .h6 {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  background: linear-gradient(135deg, #2563EB, #3B82F6);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  background: linear-gradient(135deg, #1D4ED8, #2563EB);
 }
 
 /* ===== PRINT STYLES ===== */

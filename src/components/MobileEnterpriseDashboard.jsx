@@ -25,7 +25,7 @@ const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })
 const MobileFallback = () => <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 
 const MobileEnterpriseDashboard = (props) => {
-  const { trips = [], drivers = [], dispatchers = [], currentUser, role, onLogout, chatUnreadCount = 0 } = props;
+  const { trips = [], drivers = [], currentUser, role, onLogout, chatUnreadCount = 0 } = props;
   const [currentView, setCurrentView] = useState('trips');
   const [subView, setSubView] = useState(null); // admin, reports, settings, archives
   const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
@@ -217,7 +217,6 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'chat') {
       return (
         <div className="mobile-chat-wrapper flex-1 min-h-0 overflow-hidden flex flex-col">
-          {renderTopBar('Messages')}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><ChatPage onBack={() => setCurrentView('trips')} onThreadActiveChange={setIsChatThreadOpen} /></Suspense></ErrorBoundary>
           </div>
@@ -257,7 +256,7 @@ const MobileEnterpriseDashboard = (props) => {
           <div className="shrink-0 border-b border-gray-200 bg-white px-3 py-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2b4c7e]">{role === 'admin' ? 'Admin Driver Work' : 'Dispatcher Driver Work'}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2563EB]">{role === 'admin' ? 'Admin Driver Work' : 'Dispatcher Driver Work'}</p>
                 <p className="mt-0.5 truncate text-sm font-semibold text-gray-900">Operate as driver</p>
               </div>
               <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-semibold ${liveStatus.color}`}>{liveStatus.label}</span>
@@ -265,7 +264,7 @@ const MobileEnterpriseDashboard = (props) => {
             <select
               value={activeDriverWorkDriver.id}
               onChange={(event) => setDriverWorkDriverId(event.target.value)}
-              className="mt-3 h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-800 outline-none focus:border-[#2b4c7e] focus:ring-2 focus:ring-[#2b4c7e]/15"
+              className="mt-3 h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-800 outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15"
             >
               {driverWorkDrivers.map((driver) => (
                 <option key={driver.id || driver.email || driver.name} value={driver.id}>

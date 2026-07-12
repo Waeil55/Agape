@@ -794,7 +794,7 @@ const DesktopReportsPage = ({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#f4f7fa] font-sans text-slate-900">
+    <div className="flex min-h-0 flex-1 flex-col bg-[#F4F7FC] font-sans text-slate-900">
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
         <div className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-200 bg-white shrink-0 sticky top-0 z-20 shadow-sm overflow-x-auto">
           {/* View Tabs */}

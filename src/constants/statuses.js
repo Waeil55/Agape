@@ -18,18 +18,18 @@ export const TRIP_STATUSES = {
 };
 
 export const TRIP_STATUS_COLORS = {
-  'Assigned': '#3b82f6',
-  'Accepted': '#8b5cf6',
-  'En Route': '#06b6d4',
-  'Arrived': '#f59e0b',
-  'Pickup Complete': '#a855f7',
-  'Transporting': '#06b6d4',
-  'Arrived Destination': '#f59e0b',
-  'Completed': '#10b981',
-  'Cancelled': '#ef4444',
-  'No Show': '#6b7280',
-  'Delayed': '#f97316',
-  'Emergency': '#dc2626',
+  'Assigned': '#2563EB',
+  'Accepted': '#3B82F6',
+  'En Route': '#3B82F6',
+  'Arrived': '#F59E0B',
+  'Pickup Complete': '#3B82F6',
+  'Transporting': '#3B82F6',
+  'Arrived Destination': '#F59E0B',
+  'Completed': '#10B981',
+  'Cancelled': '#EF4444',
+  'No Show': '#94A3B8',
+  'Delayed': '#F59E0B',
+  'Emergency': '#EF4444',
 };
 
 export const TRIP_STATUS_BADGES = {

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronDown, ChevronLeft, ChevronRight, Folder, MessageCircle,
   MoreHorizontal, Radio, Search, Shield, Truck, User, Users, X,
-  Info, Trash2, BellOff, Bell,
+  Info, Trash2, BellOff,
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import ChatInput from './ChatInput';
@@ -21,10 +21,17 @@ const getRoleColor = (role) => {
   }
 };
 
+const getIsDesktopLayout = () => (
+  typeof window !== 'undefined'
+    ? window.matchMedia('(min-width: 768px)').matches
+    : false
+);
+
 const ChatPage = ({ onBack, onThreadActiveChange }) => {
   const chat = useChat();
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState('sidebar');
+  const [isDesktopLayout, setIsDesktopLayout] = useState(getIsDesktopLayout);
   const [isAdminReviewExpanded, setIsAdminReviewExpanded] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(() => (
     typeof window !== 'undefined' ? window.innerHeight : 0
@@ -34,6 +41,19 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
   const [channelMenuTarget, setChannelMenuTarget] = useState(null);
   const searchInputRef = useRef(null);
   const channelMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const handleChange = () => setIsDesktopLayout(mediaQuery.matches);
+    handleChange();
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
 
   useEffect(() => {
     onThreadActiveChange?.(mobileView === 'chat');
@@ -260,9 +280,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
       <button
         type="button"
         onClick={() => openConversation(conversation)}
-        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-          active ? 'bg-blue-50' : 'hover:bg-slate-50 active:bg-slate-100'
-        }`}
+        className={`agape-chat-list-row ${active ? 'is-active' : ''} ${conversation.unread > 0 ? 'is-unread' : ''}`}
       >
         {renderAvatar(conversation.others[0] || conversation.participants[0], conversation.title)}
         <div className="min-w-0 flex-1">
@@ -300,9 +318,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
       <button
         type="button"
         onClick={() => openPerson(employee)}
-        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-          chat.activeChannel === conversation?.id ? 'bg-blue-50' : 'hover:bg-slate-50 active:bg-slate-100'
-        }`}
+        className={`agape-chat-list-row ${chat.activeChannel === conversation?.id ? 'is-active' : ''} ${unread > 0 ? 'is-unread' : ''}`}
       >
         {renderAvatar(employee.email, employee.name)}
         <div className="min-w-0 flex-1">
@@ -329,7 +345,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
   };
 
   const renderSidebar = () => (
-    <div className="flex h-full w-full min-h-0 flex-col bg-white">
+    <div className="agape-chat-sidebar flex h-full w-full min-h-0 flex-col">
       {/* Desktop Header */}
       <div className="hidden md:block agape-chat-sidebar-header shrink-0 bg-white border-b border-slate-100">
         <div className="flex items-center gap-2 px-4 pt-4 pb-3 md:pt-3">
@@ -353,9 +369,21 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
         </div>
       </div>
 
+      <div className="agape-chat-mobile-list-header md:hidden">
+        <div className="min-w-0 flex-1">
+          <h1>Messages</h1>
+          <p>{unifiedChatList.length} conversations</p>
+        </div>
+        {chat.totalUnread > 0 && (
+          <span className="chat-unread-badge flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-bold text-white">
+            {chat.totalUnread > 99 ? '99+' : chat.totalUnread}
+          </span>
+        )}
+      </div>
+
       {/* Search Input (Shared) */}
-      <div className="px-4 pb-3 pt-2 bg-white border-b border-slate-100/60 shrink-0">
-        <label className="flex h-11 items-center gap-2.5 rounded-2xl bg-slate-100 px-4">
+      <div className="agape-chat-search-section shrink-0">
+        <label className="agape-chat-search-field">
           <Search size={16} className="shrink-0 text-slate-400" />
           <input
             ref={searchInputRef}
@@ -372,7 +400,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
         </label>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div className="agape-chat-list min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {chat.loading && (
           <div className="flex items-center justify-center py-12">
             <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
@@ -384,7 +412,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
             <button
               type="button"
               onClick={() => setIsAdminReviewExpanded(prev => !prev)}
-              className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition-colors"
             >
               <div className="flex items-center gap-2.5">
                 <Folder size={18} className="text-amber-500 fill-amber-50" />
@@ -412,7 +440,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
           </div>
         )}
 
-        <div className="divide-y divide-slate-100/50">
+        <div className="agape-chat-list-stack">
           {unifiedChatList.map(item => (
             item.type === 'conversation'
               ? <ConversationRow key={item.key} conversation={item.data} />
@@ -603,16 +631,18 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
       className={`agape-chat-page flex h-full w-full min-h-0 bg-[#f6f8fb] ${mobileView === 'chat' ? 'agape-chat-page-conversation-active' : ''}`}
       style={{ '--agape-chat-viewport-height': `${viewportHeight}px` }}
     >
-      <div className="hidden h-full min-h-0 w-full md:grid md:grid-cols-[360px_minmax(0,1fr)]">
-        <div className="min-h-0 border-r border-slate-200">{renderSidebar()}</div>
-        <div className="min-h-0">
-          {chat.activeChannel ? renderChatArea() : renderEmptyState()}
+      {isDesktopLayout ? (
+        <div className="grid h-full min-h-0 w-full grid-cols-[360px_minmax(0,1fr)]">
+          <div className="min-h-0 border-r border-slate-200">{renderSidebar()}</div>
+          <div className="min-h-0">
+            {chat.activeChannel ? renderChatArea() : renderEmptyState()}
+          </div>
         </div>
-      </div>
-
-      <div className="flex h-full min-h-0 w-full md:hidden">
-        {mobileView === 'sidebar' ? renderSidebar() : renderChatArea()}
-      </div>
+      ) : (
+        <div className="flex h-full min-h-0 w-full">
+          {mobileView === 'sidebar' ? renderSidebar() : renderChatArea()}
+        </div>
+      )}
     </div>
   );
 };

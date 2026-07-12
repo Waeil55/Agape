@@ -1189,7 +1189,7 @@ const DesktopEnterpriseDashboard = ({
         </Suspense></ErrorBoundary>
       );
       case 'drive': return driverWorkDrivers.length > 0 && activeDriverWorkDriver ? (
-        <div className="flex h-full min-h-0 flex-col bg-[#f4f7fa]">
+        <div className="flex h-full min-h-0 flex-col bg-[#F4F7FC]">
           <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
@@ -1248,7 +1248,7 @@ const DesktopEnterpriseDashboard = ({
 
   // ==================== MAIN LAYOUT ====================
   return (
-    <div className="h-full w-full overflow-hidden bg-[#f4f7fa] font-sans text-slate-900">
+    <div className="h-full w-full overflow-hidden bg-[#F4F7FC] font-sans text-slate-900">
       <div className="flex h-full min-w-0 flex-col">
         {/* Top Header - Desktop only */}
         {renderEnterpriseTopBar()}
@@ -1258,7 +1258,7 @@ const DesktopEnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${activePanel === 'reports' || activePanel === 'chat' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#f4f7fa] ${['operations', 'reports', 'admin', 'drive', 'chat', 'liveMap'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+            <div className={`flex-1 min-h-0 ${activePanel === 'reports' || activePanel === 'chat' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#F4F7FC] ${['operations', 'reports', 'admin', 'drive', 'chat', 'liveMap'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (

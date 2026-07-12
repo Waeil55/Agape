@@ -69,7 +69,7 @@ export default function RouteReplay({ trip, breadcrumbs = [], stopEvents = [] })
                 return `${x},${y}`;
               }).join(' ')}
               fill="none"
-              stroke="#23568E"
+              stroke="#2563EB"
               strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -83,7 +83,7 @@ export default function RouteReplay({ trip, breadcrumbs = [], stopEvents = [] })
               cx={10 + (currentIndex / Math.max(1, points.length - 1)) * 380}
               cy={125 + Math.sin(currentIndex * 0.3) * 50}
               r="8"
-              fill="#23568E"
+              fill="#2563EB"
               stroke="white"
               strokeWidth="3"
             />
@@ -127,7 +127,7 @@ export default function RouteReplay({ trip, breadcrumbs = [], stopEvents = [] })
         <div className="flex items-center gap-3">
           <button
             onClick={handlePlay}
-            className="w-10 h-10 rounded-xl bg-[#23568E] text-white flex items-center justify-center hover:bg-[#1a4270] transition"
+            className="w-10 h-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center hover:bg-[#1D4ED8] transition"
           >
             {isPlaying ? <Pause size={18} /> : <Play size={18} />}
           </button>
@@ -141,7 +141,7 @@ export default function RouteReplay({ trip, breadcrumbs = [], stopEvents = [] })
           {/* Progress bar */}
           <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#23568E] rounded-full transition-all duration-100"
+              className="h-full bg-[#2563EB] rounded-full transition-all duration-100"
               style={{ width: `${progress}%` }}
             />
           </div>

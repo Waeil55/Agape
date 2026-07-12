@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
-import { timeToMinutes, isTripLate, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday, isoToLocalDateKey } from '../utils/tripDate';
-import { auth, db, doc, getDocFromServer, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, updateDriverProfile, onSnapshot, collection, addDoc, serverTimestamp } from '../config/firebase';
+import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday, isoToLocalDateKey } from '../utils/tripDate';
+import { auth, db, doc, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, collection, addDoc, serverTimestamp } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
@@ -12,12 +12,12 @@ const TaskCard = lazy(() => import('./TaskCard'));
 import {
   Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle,
   AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check,
-  ChevronLeft, ChevronUp, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward,
+  ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward,
   Home, Settings, LogOut,
   ArrowRight, Search,
   Repeat, Zap, X, Route, Plus,
-  CheckSquare, Square, Map, BarChart3, Sun, Moon,
-  Download, Trash2, FileText, AlertTriangle, Info,
+  CheckSquare, Map, BarChart3, Sun, Moon,
+  Download, FileText, AlertTriangle, Info,
   Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair
 } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
@@ -275,12 +275,6 @@ const getSortTimestampMs = (value) => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   const ms = new Date(value).getTime();
   return Number.isNaN(ms) ? 0 : ms;
-};
-const getHistoryFinishedPriority = (trip) => {
-  const status = normalizeWorkflowStatus(trip?.status);
-  if (status === 'completed') return 0;
-  if (status === 'no show' || status === 'cancelled' || status === 'rerouted') return 1;
-  return 2;
 };
 const getHistoryFinishedSortMs = (trip) => {
   const candidates = [
@@ -3158,7 +3152,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     };
 
     return (
-      <><div className="min-h-full bg-[#f4f7fb] pb-32">
+      <><div className="min-h-full bg-[#F4F7FC] pb-32">
         <div className="sticky top-0 z-30 bg-white border-b-2 border-amber-400 driver-active-trip-header">
           <div className="px-3 py-2.5 flex items-center gap-2.5">
             <button
@@ -3854,7 +3848,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     : 'text-emerald-700';
                   return (
                     <div key={`${getRoutePlanStopKey(stop)}-done`} className="relative pl-12 pr-2">
-                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#F4F7FC] flex items-center justify-center z-10">
                         <Check size={10} className="text-white font-semibold" />
                       </div>
                       <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl px-3 py-2 opacity-80 flex items-center gap-2">
@@ -3876,7 +3870,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isUpcoming) {
                   return (
                     <div key={`${getRoutePlanStopKey(stop)}-upcoming`} className="relative pl-12 pr-2 opacity-55">
-                      <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                      <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[#F4F7FC] flex items-center justify-center z-10">
                         <span className="text-xs font-medium text-slate-500">{index + 1}</span>
                       </div>
                       <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between gap-3">
@@ -3914,11 +3908,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 return (
                   <div key={`${getRoutePlanStopKey(stop)}-current`} className="relative pl-12 pr-2 my-4">
-                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-[#23568E] border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-[#2563EB] border-4 border-[#F4F7FC] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
                       <span className="text-xs font-semibold text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200">
-                      <div className="bg-[#23568E] px-4 py-3 text-white">
+                      <div className="bg-[#2563EB] px-4 py-3 text-white">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <span className="px-2 py-0.5 rounded-lg bg-white/15 text-xs font-medium tracking-wide uppercase">{stopType === 'DO' ? 'Dropoff' : 'Pickup'}</span>
@@ -4052,7 +4046,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isCompleted) {
                   return (
                     <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2">
-                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#F4F7FC] flex items-center justify-center z-10">
                         <Check size={10} className="text-white font-semibold" />
                       </div>
                       <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl px-3 py-2 opacity-60 flex items-center gap-2">
@@ -4066,7 +4060,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isUpcoming) {
                   return (
                     <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 opacity-50">
-                      <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[#f4f7fb] flex items-center justify-center z-10">
+                      <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[#F4F7FC] flex items-center justify-center z-10">
                         <span className="text-xs font-medium text-slate-500">{index + 1}</span>
                       </div>
                       <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between">
@@ -4119,7 +4113,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 return (
                   <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 my-4">
-                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-indigo-500 border-4 border-[#f4f7fb] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-indigo-500 border-4 border-[#F4F7FC] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
                       <span className="text-xs font-semibold text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
@@ -4572,7 +4566,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
             <div className="flex items-start justify-between mb-6">
               <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-[#23568E] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/20">
+                <div className="w-16 h-16 bg-[#2563EB] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/20">
                   <Gauge size={28} className="text-white" />
                 </div>
                 <h3 className="text-xl     font-semibold text-slate-900">Arrived at Stop</h3>
@@ -4598,7 +4592,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-2 bg-[#23568E] hover:bg-[#1B4471] text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
+                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
               </div>
             </div>
           </div>
@@ -5063,30 +5057,30 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== HISTORY PAGE ===== */}
       {activeNav === 'history' && (
-        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
-          <div className="px-1 pt-2 pb-2">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap">
+        <div className="agape-mobile-page agape-mobile-history flex-1 overflow-y-auto">
+          <div className="agape-mobile-toolbar">
+            <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar whitespace-nowrap">
 
               <button
                 type="button"
                 onClick={() => goToHistoryDay(-1)}
                 disabled={selectedHistoryDate <= historyWindowStart}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-colors text-slate-600 shrink-0"
+                className="agape-mobile-icon-btn disabled:opacity-30"
                 aria-label="Previous history day"
               >
                 <ChevronLeft size={17} />
               </button>
 
-              <div className="h-8 px-2.5 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shrink-0" title={formatHistoryDayLabel(selectedHistoryDate)}>
-                <span className="text-xs font-semibold text-slate-900">{formatHistoryCompactDayLabel(selectedHistoryDate)}</span>
-                <span className="text-xs font-medium text-slate-500">({selectedHistoryDayTrips.length})</span>
+              <div className="agape-mobile-date-pill" title={formatHistoryDayLabel(selectedHistoryDate)}>
+                <span>{formatHistoryCompactDayLabel(selectedHistoryDate)}</span>
+                <span>({selectedHistoryDayTrips.length})</span>
               </div>
 
               <button
                 type="button"
                 onClick={() => goToHistoryDay(1)}
                 disabled={selectedHistoryDate >= historyWindowEnd}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-colors text-slate-600 shrink-0"
+                className="agape-mobile-icon-btn disabled:opacity-30"
                 aria-label="Next history day"
               >
                 <ChevronRight size={17} />
@@ -5115,7 +5109,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     key={f.id}
                     type="button"
                     onClick={() => setHistoryFilter(f.id)}
-                    className={`relative w-8 h-8 rounded-lg border flex items-center justify-center transition-all shrink-0 ${active ? activeClass : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+                    className={`agape-mobile-icon-btn relative ${active ? `${activeClass} agape-mobile-icon-active` : ''}`}
                     title={`${f.label} (${historyStatusCounts[f.id] || 0})`}
                     aria-label={`${f.label} filter, ${historyStatusCounts[f.id] || 0} trips`}
                   >
@@ -5128,7 +5122,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <button
                   type="button"
                   onClick={exportDailyLog}
-                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all flex items-center justify-center shrink-0"
+                  className="agape-mobile-icon-btn agape-mobile-icon-btn-primary"
                   title="Export"
                   aria-label="Export history"
                 >
@@ -5138,16 +5132,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
           </div>
 
-          <div className="relative mb-3 px-1">
-            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+          <div className="agape-mobile-search-section">
+            <div className="agape-mobile-search">
+              <Search size={19} className="text-slate-400 shrink-0" />
             <input type="text" placeholder="Search by patient, booking ID, address..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl font-medium text-xs outline-none focus:border-blue-400" />
-            {historySearch && <button onClick={() => setHistorySearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"><X size={14} /></button>}
+              className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-slate-700 outline-none placeholder:text-slate-400" />
+            {historySearch && <button onClick={() => setHistorySearch('')} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>}
+            </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="agape-mobile-list">
             {filteredHistory.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-12 text-center">
+              <div className="agape-empty-card">
                 <div className="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner">
                   <Clock size={28} className="text-slate-300" />
                 </div>
@@ -5158,6 +5154,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               sortedFilteredHistory.map(trip => {
                 const statusMeta = getHistoryStatusMeta(trip.status);
                 const StatusIcon = statusMeta.Icon;
+                const normalizedHistoryStatus = normalizeWorkflowStatus(trip.status);
+                const historyTone = normalizedHistoryStatus === 'completed'
+                  ? 'success'
+                  : normalizedHistoryStatus === 'cancelled'
+                    ? 'danger'
+                    : normalizedHistoryStatus === 'no show'
+                      ? 'warning'
+                      : normalizedHistoryStatus === 'rerouted'
+                        ? 'info'
+                        : 'pending';
                 const isExpanded = historyExpandedId === trip.id;
                 const isEditing = editingTripId === trip.id;
                 if (isExpanded) {
@@ -5165,26 +5171,21 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   const inputCls = "w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs focus:border-blue-500 focus:bg-white outline-none transition-all";
                   return (
                     <div key={trip.id} className="space-y-3">
-                      <div className="bg-white rounded-2xl overflow-hidden border border-blue-200 shadow-md">
+                      <div className={`agape-trip-list-card agape-trip-${historyTone}`}>
                         <div
                           onClick={() => { if (isEditing) { handleCancelInlineEdit(); } setHistoryExpandedId(null); }}
-                          className="bg-gradient-to-r from-blue-700 to-blue-500 px-4 py-2.5 cursor-pointer"
+                          className="agape-trip-card-summary border-b border-slate-100"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-9 h-9 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-sm shrink-0">
-                                <User size={18} />
-                              </div>
-                              <div className="min-w-0">
-                                <h3 className="text-sm font-semibold text-white uppercase tracking-wide truncate">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
-                                <p className="text-xs font-semibold text-white/90 truncate">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
-                              </div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="agape-trip-title">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
+                              <p className="agape-trip-id">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className={`rounded-lg px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide ${statusMeta.bg}`}>
-                                {statusMeta.label}
+                            <div className="agape-trip-right">
+                              <span className={`agape-trip-status-dot agape-trip-status-${historyTone}`} title={statusMeta.label} aria-label={statusMeta.label}>
+                                <StatusIcon size={15} />
                               </span>
-                              <ChevronDown size={16} className="text-white/80" />
+                              <ChevronDown size={17} className="text-slate-400" />
                             </div>
                           </div>
                         </div>
@@ -5308,26 +5309,23 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   );
                 }
                 return (
-                  <div key={trip.id} className={`bg-white rounded-2xl overflow-hidden transition-all duration-300 border border-slate-200/60 border-l-4 ${statusMeta.border} ${isExpanded ? 'shadow-md border-blue-200' : 'shadow-sm hover:border-slate-300'}`}>
-                    <div onClick={() => setHistoryExpandedId(prev => prev === trip.id ? null : trip.id)} className="p-3 cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${statusMeta.iconBg}`}>
-                            <StatusIcon size={13} />
-                          </div>
-                          <span className="text-sm font-semibold text-slate-900 truncate">{trip.patient}</span>
-                          <span className="text-xs font-mono text-blue-600 font-semibold shrink-0">#{trip.bookingId || trip.id}</span>
+                  <div key={trip.id} className={`agape-trip-list-card agape-trip-${historyTone}`}>
+                    <div onClick={() => setHistoryExpandedId(prev => prev === trip.id ? null : trip.id)} className="agape-trip-card-summary">
+                      <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="agape-trip-title">{trip.patient || 'Trip'}</h3>
+                          <p className="agape-trip-id">#{trip.bookingId || trip.id}</p>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-sm font-semibold text-emerald-600">{to12hr(trip.time)}</span>
+                        <div className="agape-trip-right">
+                          <span className={`agape-trip-time ${historyTone === 'danger' ? 'text-rose-600' : historyTone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>{to12hr(trip.time)}</span>
                           <span
-                            className={`w-6 h-6 rounded-lg flex items-center justify-center ${statusMeta.bg}`}
+                            className={`agape-trip-status-dot agape-trip-status-${historyTone}`}
                             title={statusMeta.label}
                             aria-label={statusMeta.label}
                           >
-                            <StatusIcon size={13} />
+                            <StatusIcon size={15} />
                           </span>
-                          {isExpanded ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
+                          {isExpanded ? <ChevronDown size={17} className="text-slate-400" /> : <ChevronRight size={17} className="text-slate-400" />}
                         </div>
                       </div>
                     </div>
