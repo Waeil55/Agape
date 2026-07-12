@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, lazy, Suspense, Component } from 'react';
 import {
-  Home, Map, MessageCircle, ChevronLeft, User, Menu, Truck, BarChart2
+  Home, Map, MessageCircle, ChevronLeft, User, Menu, Truck, BarChart2, Zap
 } from 'lucide-react';
 
 class ErrorBoundary extends Component {
@@ -19,6 +19,7 @@ const MobileMenuPage = lazy(() => import('./MobileMenuPage'));
 const ArchivesPage = lazy(() => import('./ArchivesPage'));
 const SettingsPage = lazy(() => import('./SettingsPage'));
 const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
+const DriverToolsPage = lazy(() => import('./DriverToolsPage'));
 import { getDriverLiveStatus } from '../constants/statuses';
 const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })));
 
@@ -31,6 +32,7 @@ const MobileEnterpriseDashboard = (props) => {
   const [dispatchWorkspaceMode, setDispatchWorkspaceMode] = useState('board');
   const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [toolsDriverId, setToolsDriverId] = useState(() => localStorage.getItem('agape_toolsDriverId') || '');
   const driverWorkDrivers = props.driverWorkDrivers?.length ? props.driverWorkDrivers : drivers;
   const driverWorkTrips = props.driverWorkTrips?.length ? props.driverWorkTrips : trips;
   const [driverWorkDriverId, setDriverWorkDriverId] = useState(() => localStorage.getItem('agape_mobileDriverWorkDriverId') || 'all');
@@ -94,10 +96,14 @@ const MobileEnterpriseDashboard = (props) => {
     setExpandedId(null);
   };
 
-  const VALID_VIEWS = ['trips', 'map', 'reports', 'chat', 'menu', 'fleet'];
+  const VALID_VIEWS = ['trips', 'map', 'reports', 'chat', 'tools', 'menu', 'fleet'];
   useEffect(() => {
     if (!VALID_VIEWS.includes(currentView)) setCurrentView('trips');
   }, [currentView]);
+
+  useEffect(() => {
+    if (toolsDriverId) localStorage.setItem('agape_toolsDriverId', toolsDriverId);
+  }, [toolsDriverId]);
 
   useEffect(() => {
     const openChat = () => {
@@ -388,6 +394,86 @@ const MobileEnterpriseDashboard = (props) => {
       );
     }
 
+    if (currentView === 'tools') {
+      const toolsDriver = toolsDriverId ? driverWorkDrivers.find(d => d.id === toolsDriverId) : null;
+      const toolsTrips = toolsDriver
+        ? driverWorkTrips.filter(t => (
+            t.driverId === toolsDriver.id ||
+            t.driverName === toolsDriver.name ||
+            String(t.driverEmail || '').trim().toLowerCase() === String(toolsDriver.email || '').trim().toLowerCase()
+          ))
+        : [];
+      const toolsActiveTrips = toolsTrips.filter(t => !['Completed', 'Canceled', 'Archived'].includes(t.status));
+
+      return (
+        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+          {renderTopBar('Route Tools')}
+          <div className="shrink-0 bg-white border-b border-gray-200 px-3 py-2.5">
+            <label className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 shrink-0">Plan for</span>
+              <select
+                value={toolsDriverId}
+                onChange={e => setToolsDriverId(e.target.value)}
+                className="flex-1 min-w-0 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#2b4c7e] focus:ring-1 focus:ring-[#2b4c7e] transition-all"
+              >
+                <option value="">Select a driver…</option>
+                {driverWorkDrivers.map(d => (
+                  <option key={d.id || d.email} value={d.id}>
+                    {d.name || d.email || d.id} {d.vehicle ? `— ${d.vehicle}` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            {toolsDriver ? (
+              <ErrorBoundary>
+                <Suspense fallback={<MobileFallback />}>
+                  <DriverToolsPage
+                    trips={toolsTrips}
+                    activeTrips={toolsActiveTrips}
+                    aiSequence={[]}
+                    aiSuggestions={[]}
+                    aiRideShare={[]}
+                    conflicts={[]}
+                    aiOptimizing={false}
+                    guidedMode={false}
+                    guidedStepIndex={0}
+                    guidedSteps={[]}
+                    driverPosition={null}
+                    appSettings={props.appSettings}
+                    currentUser={toolsDriver.email || toolsDriver.id || currentUser}
+                    role={role}
+                    onSetGuidedMode={() => {}}
+                    onSetGuidedStepIndex={() => {}}
+                    onSetAiSequence={() => {}}
+                    onSetAiSuggestions={() => {}}
+                    onRunAiOptimization={() => {}}
+                    onSelectAllTrips={() => {}}
+                    selectedTrips={[]}
+                    onSetSelectedTrips={() => {}}
+                    etas={{}}
+                    onOpenInNav={props.onOpenInNav}
+                    onOpenSequencer={() => {}}
+                    requestAuthAction={props.requestAuthAction}
+                    routePlanStops={null}
+                    onSetRoutePlanStops={() => {}}
+                    onSendToSequencer={() => {}}
+                  />
+                </Suspense>
+              </ErrorBoundary>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4"><Zap size={28} className="opacity-30"/></div>
+                <p className="text-sm font-semibold text-slate-500">Select a driver above</p>
+                <p className="text-xs text-slate-400 mt-1 text-center max-w-[220px]">Choose a driver to plan routes, optimize trips, and navigate</p>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -454,6 +540,14 @@ const MobileEnterpriseDashboard = (props) => {
                     )}
                   </span>
                   <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
+                </button>
+
+                <button
+                  onClick={() => handleNavClick('tools')}
+                  className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'tools' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+                >
+                  <Zap size={24} strokeWidth={currentView === 'tools' && !subView ? 2.2 : 1.6} />
+                  <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'tools' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Tools</span>
                 </button>
 
                 <button
