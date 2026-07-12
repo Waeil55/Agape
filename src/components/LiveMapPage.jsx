@@ -676,8 +676,8 @@ const LiveMapPage = ({
   return (
     <div className="h-full w-full min-h-0 bg-slate-50 flex flex-col overflow-hidden select-none font-outfit">
       {/* Agape Care Header */}
-      <div className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md pb-2 md:hidden">
-        <div className="px-3 py-2 flex items-center gap-3">
+      <div className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md md:hidden">
+        <div className="px-3 py-3 flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
             <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
           </div>
