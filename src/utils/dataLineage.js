@@ -15,14 +15,11 @@
 
 import { db } from '../config/firebase';
 import {
-  doc,
-  setDoc,
   serverTimestamp,
   collection,
   addDoc,
-  getDocs,
 } from '../config/firebase';
-import { getDB, STORES } from './localDB';
+import { getDB } from './localDB';
 
 const LINEAGE_STORE = 'dataLineage';
 const LINEAGE_COLLECTION = 'dataLineage';

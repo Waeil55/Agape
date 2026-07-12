@@ -12,8 +12,8 @@ export default {
         secondary: '#64748b',
         blue: {
           55: '#F4F7FC',
-          50: '#EEF5FF',
-          100: '#EAF2FF',
+          50: '#E3EEFF',
+          100: '#DBEAFE',
           200: '#BFDBFE',
           300: '#93C5FD',
           400: '#60A5FA',
@@ -25,8 +25,8 @@ export default {
           950: '#172554',
         },
         indigo: {
-          50: '#EEF5FF',
-          100: '#EAF2FF',
+          50: '#E3EEFF',
+          100: '#DBEAFE',
           200: '#BFDBFE',
           300: '#93C5FD',
           400: '#60A5FA',

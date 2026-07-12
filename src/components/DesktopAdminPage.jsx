@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
-  Truck, CarFront, Activity, ExternalLink, ClipboardList, KeyRound, Trash2,
+  Truck, Activity, ExternalLink, KeyRound, Trash2,
   UserCog, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase,
   MessageCircle, DollarSign, LayoutDashboard, Users, Search,
   RadioTower, CircleDot, FileDown, UserPlus, BellRing, TrendingUp, CheckCircle2,
@@ -854,30 +854,33 @@ const DesktopAdminPage = ({
           </div>
         </div>
       ) },
-    { id: 'dispatchers', title: 'Dispatch Desk', icon: ClipboardList, count: dispatchers.length, roles: ['admin'],
-      content: (
-        <AdminSectionFrame eyebrow="Operations team" title="Dispatcher activity">
-          <div className="admin-card-grid">
-            {dispatchers.filter(d => d.name).map((disp, i) => (
-              <DispatcherActivityCard key={disp.id || i} dispatcher={disp} logs={entityLogs.dispatcher} onViewTrip={onViewTrip} />
-            ))}
-            {dispatchers.filter(d => d.name).length === 0 && <AdminEmpty icon={Briefcase} title="No dispatchers configured" />}
-          </div>
-        </AdminSectionFrame>
-      ) },
-    { id: 'drivers', title: 'Fleet Board', icon: Truck, count: drivers.length, roles: ['admin', 'dispatcher'],
+    { id: 'drivers', title: 'Fleet & Vehicles', icon: Truck, count: drivers.length + (vehicles?.length || 0), roles: ['admin', 'dispatcher'],
       content: (
         <AdminSectionFrame
-          eyebrow="Driver operations"
+          eyebrow="Fleet operations"
           title="Fleet board"
-          action={<AdminSearch icon={Search} value={driverQuery} onChange={setDriverQuery} placeholder="Search drivers, vehicle, zone..." />}
+          action={(
+            <div className="flex items-center gap-2">
+              <AdminButton variant="primary" size="sm" onClick={() => openCreateUser('driver')}>
+                <Plus size={14} /> Add driver
+              </AdminButton>
+              <AdminButton variant="ghost" size="sm" onClick={openVehicleCreate}>
+                <Plus size={14} /> Add vehicle
+              </AdminButton>
+            </div>
+          )}
         >
-          <div className="admin-card-grid">
-            {filteredDrivers.map((driver, i) => (
-              <DriverActivityCard key={driver.id || i} driver={driver} trips={trips} logs={entityLogs.driver} onViewTrip={onViewTrip} />
-            ))}
-            {filteredDrivers.length === 0 && <AdminEmpty icon={Truck} title="No matching drivers" hint="Try another name, vehicle, or zone" />}
-          </div>
+          <DriversVehiclesPage
+            mode="all"
+            role={role} drivers={drivers} setDrivers={setDrivers} upsertDriverProfile={upsertDriverProfile}
+            dispatchers={dispatchers}
+            addAuditLog={addAuditLog} currentUser={currentUser}
+            trips={trips} onAssignTrip={assignTripToDriver}
+            requestAuthAction={requestAuthAction}
+            vehicles={vehicles} setVehicles={setVehicles}
+            createIntent={vehicleCreateIntent}
+            onCreateIntentHandled={() => setVehicleCreateIntent(null)}
+          />
         </AdminSectionFrame>
       ) },
     { id: 'people', title: 'People & Access', icon: UserCog, count: allUsers.length, roles: ['admin'],
@@ -885,7 +888,18 @@ const DesktopAdminPage = ({
         <AdminSectionFrame
           eyebrow="Access control"
           title="People directory"
-          action={<AdminSearch icon={Search} value={teamQuery} onChange={setTeamQuery} placeholder="Search people..." />}
+          action={(
+            <div className="flex items-center gap-2">
+              <AdminSearch icon={Search} value={teamQuery} onChange={setTeamQuery} placeholder="Search people..." />
+              <AdminButton variant="ghost" size="sm" onClick={runSecurityAnalysis} disabled={aiSecLoading}>
+                {aiSecLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
+                {aiSecLoading ? 'Scanning' : 'Security'}
+              </AdminButton>
+              <AdminButton variant="primary" size="sm" onClick={() => openCreateUser('dispatcher')}>
+                <Plus size={14} /> Add dispatcher
+              </AdminButton>
+            </div>
+          )}
         >
           <div className="admin-people-grid">
             {filteredUsers.map((user, i) => {
@@ -911,25 +925,26 @@ const DesktopAdminPage = ({
           </div>
         </AdminSectionFrame>
       ) },
-    { id: 'vehicles', title: 'Vehicles', icon: CarFront, count: vehicles.length, roles: ['admin', 'dispatcher'],
-      content: (
-        <AdminSectionFrame eyebrow="Fleet assets" title="Vehicle operations">
-          <DriversVehiclesPage
-            mode="vehicles"
-            role={role} drivers={drivers} setDrivers={setDrivers} upsertDriverProfile={upsertDriverProfile}
-            dispatchers={dispatchers}
-            addAuditLog={addAuditLog} currentUser={currentUser}
-            trips={trips} onAssignTrip={assignTripToDriver}
-            requestAuthAction={requestAuthAction}
-            vehicles={vehicles} setVehicles={setVehicles}
-            createIntent={vehicleCreateIntent}
-            onCreateIntentHandled={() => setVehicleCreateIntent(null)}
-          />
-        </AdminSectionFrame>
-      ) },
     { id: 'activity', title: 'Activity', icon: Activity, roles: ['admin', 'dispatcher'],
       content: (
-        <AdminSectionFrame eyebrow="Audit trail" title="System activity">
+        <AdminSectionFrame
+          eyebrow="Audit trail"
+          title="System activity"
+          action={(
+            <div className="relative" ref={exportRef}>
+              <AdminButton variant="ghost" size="sm" onClick={() => setExportOpen(v => !v)}>
+                <FileDown size={13} /> Export
+              </AdminButton>
+              {exportOpen && (
+                <div className="absolute right-0 top-full mt-1 z-50 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                  <button onClick={() => { exportTripsCsv(trips, drivers); setExportOpen(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">Trips CSV</button>
+                  <button onClick={() => { exportDriversCsv(drivers); setExportOpen(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">Drivers CSV</button>
+                  <button onClick={() => { exportFullJson(trips, drivers, dispatchers, vehicles, logs); setExportOpen(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">Full JSON</button>
+                </div>
+              )}
+            </div>
+          )}
+        >
           <UsersPage
             activityFeedOnly
             drivers={drivers} setDrivers={setDrivers}
@@ -975,41 +990,6 @@ const DesktopAdminPage = ({
 
   const activeSectionConfig = visibleSections.find(s => s.id === activeSection) || visibleSections[0];
   const activeTitle = activeSectionConfig?.title || 'Admin';
-  const activeSubtitle = `${openTrips.length} open trips - ${drivers.length} drivers - ${dispatchers.length} dispatchers - ${vehicles?.length || 0} vehicles`;
-
-  const topActions = (
-    <div className="admin-actionbar" ref={exportRef}>
-      {role === 'admin' && (
-        <AdminButton variant="ghost" size="sm" onClick={runSecurityAnalysis} disabled={aiSecLoading}>
-          {aiSecLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
-          {aiSecLoading ? 'Scanning' : 'Security'}
-        </AdminButton>
-      )}
-      <AdminButton variant="primary" size="sm" onClick={() => openCreateUser('driver')}>
-        <Plus size={14} /> Driver
-      </AdminButton>
-      <AdminButton variant="ghost" size="sm" onClick={openVehicleCreate}>
-        <Plus size={14} /> Vehicle
-      </AdminButton>
-      {role === 'admin' && (
-        <AdminButton variant="primary" size="sm" onClick={() => openCreateUser('dispatcher')}>
-          <Plus size={14} /> Disp.
-        </AdminButton>
-      )}
-      <div className="relative">
-        <AdminButton variant="ghost" size="sm" onClick={() => setExportOpen(v => !v)}>
-          <FileDown size={13} /> Export
-        </AdminButton>
-        {exportOpen && (
-          <div className="absolute right-0 top-full mt-1 z-50 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-            <button onClick={() => { exportTripsCsv(trips, drivers); setExportOpen(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">Trips CSV</button>
-            <button onClick={() => { exportDriversCsv(drivers); setExportOpen(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">Drivers CSV</button>
-            <button onClick={() => { exportFullJson(trips, drivers, dispatchers, vehicles, logs); setExportOpen(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">Full JSON</button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
 
   return (
     <AdminShell
@@ -1020,9 +1000,10 @@ const DesktopAdminPage = ({
       mobileActive={activeSection}
       onMobileNavigate={setActiveSection}
       title={activeTitle}
-      subtitle={activeSubtitle}
-      eyebrow={role === 'admin' ? 'Admin Workspace' : 'Dispatcher Workspace'}
-      actions={topActions}
+      subtitle=""
+      eyebrow=""
+      hideBrand
+      navInline
     >
       {role === 'admin' && aiSecurity && (
         <AIInsightsBanner insights={aiSecurity} loading={aiSecLoading} onClose={() => setAiSecurity(null)} />

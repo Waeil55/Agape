@@ -3,8 +3,8 @@ import {
   Route, MapPin, Clock, Users, AlertTriangle, ArrowDown, ArrowUp, X, CheckCircle2,
   GripVertical, ChevronRight, Search, Flag, Plus, Trash2,
   Play, BrainCircuit, Loader2,
-  Sparkles, Copy, Sun, Moon, Eye, EyeOff, ArrowLeftRight,
-  LogIn, LogOut, Filter, ChevronDown, RefreshCw
+  Sparkles, Copy, Sun, Moon, Eye, ArrowLeftRight,
+  LogIn, LogOut, Filter, Save
 } from 'lucide-react';
 import { timeToMinutes } from '../utils/tripDate';
 import { optimizeRoute as geminiOptimizeRoute } from '../config/ai';
@@ -23,6 +23,8 @@ const getStopLetter = (i) => String.fromCharCode(65 + i);
 const isLate = (time) => { if (!time || time === 'Will Call') return false; const n = new Date(); const m = timeToMinutes(time); const s = new Date(); s.setHours(Math.floor(m / 60), m % 60, 0, 0); return n > s; };
 const makeStopId = (tripId, type) => `${tripId}_${type}`;
 const STORAGE_KEY = 'agape_routePlanner_v3';
+const SAVED_PLANS_KEY = 'agape_routePlanner_savedPlans_v1';
+const TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show']);
 
 const statusColors = {
   Unassigned: 'bg-slate-100 text-slate-600',
@@ -36,13 +38,31 @@ const statusColors = {
   'No Show': 'bg-rose-100 text-rose-700',
 };
 
+const getTodayDateString = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+
+const getTripDateKey = (trip) => {
+  const raw = trip?.date || trip?.scheduledDate || trip?.scheduleDate || trip?.tripDate || trip?.serviceDate || trip?.appointmentDate || '';
+  if (!raw) return '';
+  const normalized = String(raw).trim();
+  const match = normalized.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return `${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,'0')}-${String(parsed.getDate()).padStart(2,'0')}`;
+};
+
+const isActivePlanningStatus = (status) => !TERMINAL_STATUSES.has(status || '');
+
 const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendToSequencer }) => {
   const [stops, setStops] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
   });
   const [routeName, setRouteName] = useState('');
   const [selectedDriver, setSelectedDriver] = useState(() => localStorage.getItem('agape_rp_driver') || '');
-  const [dateStr, setDateStr] = useState(() => localStorage.getItem('agape_rp_date') || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })());
+  const [dateStr, setDateStr] = useState(() => localStorage.getItem('agape_rp_date') || getTodayDateString());
   const [dragIdx, setDragIdx] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   const [optimizing, setOptimizing] = useState(false);
@@ -53,11 +73,16 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
   const [filterStatus, setFilterStatus] = useState('all');
   const [aiMsg, setAiMsg] = useState('');
   const [dark, setDark] = useState(false);
+  const [savedPlans, setSavedPlans] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(SAVED_PLANS_KEY) || '[]'); } catch { return []; }
+  });
+  const [showSavedPlans, setShowSavedPlans] = useState(false);
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(stops)); }, [stops]);
   useEffect(() => { localStorage.setItem('agape_rp_completed_v3', JSON.stringify([...completed])); }, [completed]);
   useEffect(() => { localStorage.setItem('agape_rp_driver', selectedDriver); }, [selectedDriver]);
   useEffect(() => { localStorage.setItem('agape_rp_date', dateStr); }, [dateStr]);
+  useEffect(() => { localStorage.setItem(SAVED_PLANS_KEY, JSON.stringify(savedPlans)); }, [savedPlans]);
 
   const tripStopTypes = useMemo(() => {
     const map = {};
@@ -68,8 +93,20 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
     return map;
   }, [stops]);
 
+  const activeTrips = useMemo(() => {
+    const selectedDate = dateStr || getTodayDateString();
+    return (trips || [])
+      .filter((trip) => trip?.patient)
+      .filter((trip) => isActivePlanningStatus(trip.status))
+      .filter((trip) => {
+        const tripDate = getTripDateKey(trip);
+        if (!tripDate) return true;
+        return tripDate === selectedDate;
+      });
+  }, [trips, dateStr]);
+
   const filteredTrips = useMemo(() => {
-    let list = (trips || []).filter(t => t.patient);
+    let list = [...activeTrips];
     if (filterStatus !== 'all') list = list.filter(t => t.status === filterStatus);
     if (searchQ.trim()) {
       const q = searchQ.toLowerCase();
@@ -82,15 +119,27 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
       );
     }
     return list.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
-  }, [trips, filterStatus, searchQ]);
+  }, [activeTrips, filterStatus, searchQ]);
 
   const availTrips = useMemo(() => {
     return filteredTrips.filter(t => {
       const types = tripStopTypes[t.id];
       if (types?.pickup && types?.dropoff) return false;
-      return !['Completed', 'Cancelled', 'No Show'].includes(t.status);
+      return isActivePlanningStatus(t.status);
     });
   }, [filteredTrips, tripStopTypes]);
+
+  const planStats = useMemo(() => {
+    const assignedCount = activeTrips.filter((trip) => trip.status === 'Assigned').length;
+    const unassignedCount = activeTrips.filter((trip) => trip.status === 'Unassigned' || !trip.driverId).length;
+    const inProgressCount = activeTrips.filter((trip) => ['In Mission', 'En Route', 'At Pickup', 'At Dropoff', 'In Progress', 'Navigating Pickup', 'Navigating Dropoff', 'In Transit', 'Arrived'].includes(trip.status)).length;
+    return {
+      active: activeTrips.length,
+      assigned: assignedCount,
+      unassigned: unassignedCount,
+      inProgress: inProgressCount,
+    };
+  }, [activeTrips]);
 
   const conflicts = useMemo(() => {
     const c = [];
@@ -177,6 +226,50 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
 
   const clearRoute = () => { setStops([]); setCompleted(new Set()); setRouteName(''); setNavMode(false); setAiMsg(''); };
 
+  const createNewPlan = () => {
+    setStops([]);
+    setCompleted(new Set());
+    setRouteName('');
+    setSelectedDriver('');
+    setShowSavedPlans(false);
+    setAiMsg('New plan ready.');
+  };
+
+  const saveCurrentPlan = () => {
+    if (stops.length === 0) {
+      setAiMsg('Add stops before saving a plan.');
+      return;
+    }
+    const trimmedName = routeName.trim() || `Plan ${dateStr}`;
+    const snapshot = {
+      id: `plan-${Date.now()}`,
+      name: trimmedName,
+      date: dateStr,
+      driverId: selectedDriver || '',
+      stopCount: stops.length,
+      stops,
+      savedAt: new Date().toISOString(),
+    };
+    setSavedPlans((prev) => [snapshot, ...prev.filter((plan) => plan.name !== trimmedName || plan.date !== dateStr)].slice(0, 20));
+    setRouteName(trimmedName);
+    setAiMsg(`Saved "${trimmedName}".`);
+    setShowSavedPlans(true);
+  };
+
+  const loadSavedPlan = (plan) => {
+    setRouteName(plan.name || '');
+    setDateStr(plan.date || getTodayDateString());
+    setSelectedDriver(plan.driverId || '');
+    setStops(Array.isArray(plan.stops) ? plan.stops : []);
+    setCompleted(new Set());
+    setShowSavedPlans(false);
+    setAiMsg(`Loaded "${plan.name || 'Saved Plan'}".`);
+  };
+
+  const deleteSavedPlan = (planId) => {
+    setSavedPlans((prev) => prev.filter((plan) => plan.id !== planId));
+  };
+
   const completeStop = (stopId) => {
     setCompleted(prev => { const n = new Set(prev); n.add(stopId); return n; });
     const idx = stops.findIndex(s => s.id === stopId);
@@ -236,7 +329,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
     });
 
     onSendToSequencer({ clients: items, sequence });
-    setAiMsg(`${stops.length} stops sent to Route Sequencer.`);
+    setAiMsg(`${stops.length} stops sent to Route Plan.`);
   };
 
   // === RENDER HELPERS ===
@@ -427,12 +520,29 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
     <div className={`flex-1 flex min-h-0 overflow-hidden flex-col md:flex-row ${bg}`}>
       {/* === LEFT: Schedule / Trip List === */}
       <div className={`w-full max-h-[42dvh] shrink-0 border-b md:w-72 md:max-h-none md:border-b-0 md:border-r xl:w-80 ${dark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} flex flex-col`}>
-        <div className={`sticky top-0 px-3 py-2 border-b ${dark ? 'border-slate-700' : 'border-slate-100'} shrink-0`}>
-          <div className="flex items-center justify-between">
-            <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${dark ? 'text-slate-200' : 'text-slate-700'}`}>
-              <Filter size={11} /> Schedule
-              <span className="text-[9px] font-normal text-slate-400">({filteredTrips.length})</span>
-            </h3>
+        <div className={`sticky top-0 px-3 py-3 border-b ${dark ? 'border-slate-700 bg-slate-900/95' : 'border-slate-100 bg-white/95'} shrink-0 backdrop-blur-sm`}>
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-3 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-600">Current Work</p>
+                <h3 className="mt-1 text-sm font-semibold text-slate-900">Active trips for {dateStr}</h3>
+              </div>
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700">{filteredTrips.length} visible</span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-slate-50 px-2.5 py-2">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Active</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{planStats.active}</p>
+              </div>
+              <div className="rounded-xl bg-amber-50 px-2.5 py-2">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-amber-500">Unassigned</p>
+                <p className="mt-1 text-sm font-semibold text-amber-800">{planStats.unassigned}</p>
+              </div>
+              <div className="rounded-xl bg-emerald-50 px-2.5 py-2">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-emerald-500">Moving</p>
+                <p className="mt-1 text-sm font-semibold text-emerald-800">{planStats.inProgress}</p>
+              </div>
+            </div>
           </div>
           <div className="flex gap-1 mt-1.5">
             <div className="relative flex-1">
@@ -450,8 +560,8 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
         <div className="flex-1 overflow-y-auto overscroll-contain p-2 space-y-1.5">
           {availTrips.length === 0 ? (
             <div className="p-4 text-center">
-              <p className={`text-xs font-semibold ${muted}`}>No trips available</p>
-              <p className="text-[10px] text-slate-400 mt-1">All trips are in the route or completed.</p>
+              <p className={`text-xs font-semibold ${muted}`}>No active trips for this date</p>
+              <p className="text-[10px] text-slate-400 mt-1">This planner now shows current and upcoming work only, not old completed trips.</p>
             </div>
           ) : availTrips.map(renderScheduleTrip)}
         </div>
@@ -461,40 +571,61 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
       <div className="flex-1 flex flex-col min-h-[55dvh] md:min-h-0 overflow-hidden">
         {/* Top Bar */}
         <div className={`sticky top-0 z-10 ${dark ? 'bg-slate-800' : 'bg-white/95 backdrop-blur-sm'} border-b ${dark ? 'border-slate-700' : 'border-slate-100'} shrink-0`}>
-          <div className="px-3 py-2.5 flex items-center gap-2 flex-wrap sm:px-4">
-            <div className="flex items-center gap-1.5">
-              <Route size={16} className="text-blue-600" />
-              <input value={routeName} onChange={e => setRouteName(e.target.value)} placeholder="Route name..." className={`text-sm font-semibold bg-transparent outline-none w-28 placeholder:text-slate-300 ${dark ? 'text-slate-100' : 'text-slate-900'}`} />
+          <div className="px-3 py-3 sm:px-4">
+            <div className="rounded-[24px] border border-slate-200 bg-gradient-to-br from-white via-blue-50/40 to-slate-50 p-3 shadow-sm">
+              <div className="flex items-start gap-3 flex-wrap">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm">
+                    <Route size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">Tools</p>
+                    <input value={routeName} onChange={e => setRouteName(e.target.value)} placeholder="Create plan name..." className={`mt-1 w-full bg-transparent text-base font-semibold outline-none placeholder:text-slate-300 ${dark ? 'text-slate-100' : 'text-slate-900'}`} />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={createNewPlan} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+                    <Plus size={13} /> New
+                  </button>
+                  <button onClick={saveCurrentPlan} disabled={stops.length === 0} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-blue-600 px-3 text-[11px] font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-40">
+                    <Save size={13} /> Save
+                  </button>
+                  <button onClick={() => setShowSavedPlans((prev) => !prev)} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+                    <Eye size={13} /> Plans
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <input type="date" value={dateStr} onChange={e => setDateStr(e.target.value)} className={`h-9 rounded-xl border px-2.5 text-[11px] font-semibold outline-none ${inputBg}`} />
+                <select value={selectedDriver} onChange={e => setSelectedDriver(e.target.value)} className={`h-9 rounded-xl border px-2.5 text-[11px] font-semibold outline-none ${inputBg}`}>
+                  <option value="">Select driver</option>
+                  {(drivers || []).map(d => <option key={d.id || d.email} value={d.id || d.email}>{d.name || d.email}</option>)}
+                </select>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">{stops.length} stops</span>
+                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700">{planStats.active} current trips</span>
+                {completed.size > 0 && <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">{completed.size} done</span>}
+              </div>
             </div>
-            <div className="hidden flex-1 sm:block" />
-            <div className="flex items-center gap-1">
-              <input type="date" value={dateStr} onChange={e => setDateStr(e.target.value)} className={`px-1.5 py-1 text-[10px] rounded-lg border outline-none ${inputBg}`} />
-              <select value={selectedDriver} onChange={e => setSelectedDriver(e.target.value)} className={`px-1.5 py-1 text-[10px] rounded-lg border outline-none max-w-[90px] ${inputBg}`}>
-                <option value="">Driver...</option>
-                {(drivers || []).map(d => <option key={d.id || d.email} value={d.id || d.email}>{d.name || d.email}</option>)}
-              </select>
-            </div>
-            <div className="flex items-center gap-1">
+            <div className="mt-3 flex items-center gap-1 flex-wrap">
               <button onClick={handleOptimize} disabled={stops.length < 2 || optimizing}
-                className="h-7 w-[90px] bg-indigo-600 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-indigo-700 active:scale-95 disabled:opacity-30 shadow-sm">
+                className="h-9 min-w-[108px] bg-indigo-600 text-white rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-indigo-700 active:scale-95 disabled:opacity-30 shadow-sm">
                 {optimizing ? <Loader2 size={11} className="animate-spin" /> : <BrainCircuit size={11} />} Optimize
               </button>
-              <button onClick={copyRoute} disabled={stops.length === 0} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-30" title="Copy route"><Copy size={13} /></button>
-              <button onClick={sendToSequencer} disabled={stops.length === 0 || typeof onSendToSequencer !== 'function'} className="h-7 w-[90px] bg-[#2563EB] text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-[#1D4ED8] active:scale-95 disabled:opacity-30 shadow-sm" title="Send route to sequencer">
-                <Route size={11} /> Sequencer
+              <button onClick={copyRoute} disabled={stops.length === 0} className="h-9 w-9 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl disabled:opacity-30" title="Copy route"><Copy size={13} /></button>
+              <button onClick={sendToSequencer} disabled={stops.length === 0 || typeof onSendToSequencer !== 'function'} className="h-9 min-w-[108px] bg-[#2563EB] text-white rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-[#1D4ED8] active:scale-95 disabled:opacity-30 shadow-sm" title="Send route to plan">
+                <Route size={11} /> Plan
               </button>
-              <button onClick={clearRoute} disabled={stops.length === 0} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg disabled:opacity-30" title="Clear route"><Trash2 size={13} /></button>
-              <button onClick={() => setDark(v => !v)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">{dark ? <Sun size={13} /> : <Moon size={13} />}</button>
+              <button onClick={clearRoute} disabled={stops.length === 0} className="h-9 w-9 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl disabled:opacity-30" title="Clear route"><Trash2 size={13} /></button>
+              <button onClick={() => setDark(v => !v)} className="h-9 w-9 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">{dark ? <Sun size={13} /> : <Moon size={13} />}</button>
             </div>
           </div>
-          {/* Stats bar */}
-          <div className={`flex items-center gap-3 px-4 pb-2 text-[10px] ${muted} flex-wrap`}>
-            <span><strong className={dark ? 'text-slate-200' : 'text-slate-700'}>{stops.length}</strong> stops</span>
-            <span><strong>{stops.filter(s => s.type === 'pickup').length}</strong> PU / <strong>{stops.filter(s => s.type === 'dropoff').length}</strong> DO</span>
-            {completed.size > 0 && <span className="text-emerald-600"><strong>{completed.size}</strong> done</span>}
+          <div className={`flex items-center gap-3 px-4 pb-3 text-[10px] ${muted} flex-wrap`}>
+            <span><strong className={dark ? 'text-slate-200' : 'text-slate-700'}>{stops.filter(s => s.type === 'pickup').length}</strong> PU</span>
+            <span><strong>{stops.filter(s => s.type === 'dropoff').length}</strong> DO</span>
+            <span><strong>{savedPlans.length}</strong> saved plans</span>
             {conflicts.length > 0 && <span className="text-rose-600 font-bold flex items-center gap-1"><AlertTriangle size={10} />{conflicts.length} clash</span>}
             {stops.length > 0 && (
-              <button onClick={startNav} className="ml-auto h-7 w-[90px] bg-emerald-600 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-emerald-700 active:scale-95 shadow-sm">
+              <button onClick={startNav} className="ml-auto h-8 min-w-[100px] bg-emerald-600 text-white rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-emerald-700 active:scale-95 shadow-sm">
                 <Play size={11} /> Navigate
               </button>
             )}
@@ -512,11 +643,40 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
 
         {/* Stops list */}
         <div className="flex-1 overflow-y-auto overscroll-contain p-3">
+          {showSavedPlans && (
+            <div className="mx-auto mb-3 max-w-xl rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">Saved Plans</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">Reuse a saved route plan</p>
+                </div>
+                <button onClick={() => setShowSavedPlans(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="mt-3 space-y-2">
+                {savedPlans.length === 0 ? (
+                  <div className="rounded-2xl bg-slate-50 px-3 py-4 text-center text-xs font-medium text-slate-500">
+                    No saved plans yet.
+                  </div>
+                ) : savedPlans.map((plan) => (
+                  <div key={plan.id} className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">{plan.name}</p>
+                      <p className="mt-1 text-[11px] text-slate-500">{plan.date} • {plan.stopCount || plan.stops?.length || 0} stops</p>
+                    </div>
+                    <button onClick={() => loadSavedPlan(plan)} className="rounded-xl bg-blue-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-blue-700">Load</button>
+                    <button onClick={() => deleteSavedPlan(plan.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50">Delete</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {stops.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+            <div className="flex h-full flex-col items-center justify-center rounded-[28px] border border-dashed border-slate-200 bg-white/70 text-slate-400">
               <Route size={40} className="mb-3 opacity-20" />
-              <p className="text-sm font-semibold text-slate-600">No stops in route</p>
-              <p className={`text-xs ${muted} mt-1`}>Add trips from the left panel to build a route.</p>
+              <p className="text-sm font-semibold text-slate-700">No plan created yet</p>
+              <p className={`mt-1 max-w-xs text-center text-xs ${muted}`}>Use today&apos;s active trips from the left panel, then save the plan when it looks right.</p>
             </div>
           ) : (
             <div className="max-w-xl mx-auto space-y-0">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tripCalendarDateKey, tripMatchesTodayOrTomorrow, tripMatchesCalendarDay } from './tripDate';
+import { tripCalendarDateKey, tripMatchesTodayOrTomorrow } from './tripDate';
 
 describe('tripCalendarDateKey', () => {
   it('parses ISO YYYY-MM-DD without UTC shift', () => {

@@ -1,14 +1,14 @@
 import React from 'react';
 
 const VARIANTS = {
-  default: 'rounded-3xl border border-slate-100/50 bg-white shadow-sm',
-  flat: 'rounded-3xl border border-slate-200 bg-white',
-  elevated: 'rounded-3xl border border-slate-100/50 bg-white shadow-md',
-  ghost: 'rounded-3xl bg-transparent',
-  brand: 'rounded-3xl border border-blue-100 bg-blue-50/50',
-  success: 'rounded-3xl border border-emerald-100 bg-emerald-50/50',
-  warning: 'rounded-3xl border border-amber-100 bg-amber-50/50',
-  danger: 'rounded-3xl border border-rose-100 bg-rose-50/50',
+  default: 'rounded-xl border border-slate-100/50 bg-white shadow-sm',
+  flat: 'rounded-xl border border-slate-200 bg-white',
+  elevated: 'rounded-xl border border-slate-100/50 bg-white shadow-md',
+  ghost: 'rounded-xl bg-transparent',
+  brand: 'rounded-xl border border-blue-100 bg-blue-50/50',
+  success: 'rounded-xl border border-emerald-100 bg-emerald-50/50',
+  warning: 'rounded-xl border border-amber-100 bg-amber-50/50',
+  danger: 'rounded-xl border border-rose-100 bg-rose-50/50',
 };
 
 const PADDINGS = {

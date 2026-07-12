@@ -486,10 +486,10 @@ const RoutePlanSection = ({
 
     if (typeof onSendToSequencer !== 'function') {
       if (openSequencerFallback()) {
-        setRouteNotice('Route Sequencer opened.');
+        setRouteNotice('Route Plan opened.');
         return;
       }
-      setRouteError('Route Sequencer is not available from this screen.');
+      setRouteError('Route Plan is not available from this screen.');
       return;
     }
 
@@ -508,15 +508,15 @@ const RoutePlanSection = ({
 
     if (sequencerStops.length === 0) {
       if (openSequencerFallback()) {
-        setRouteNotice('Route Sequencer opened. Add stops in the sequencer or return to Route Plan.');
+        setRouteNotice('Route Plan opened. Add stops in Tools or return to Route Plan.');
         return;
       }
-      setRouteError('Add at least one stop before opening Route Sequencer.');
+      setRouteError('Add at least one stop before opening Route Plan.');
       return;
     }
     setRouteError('');
     onSendToSequencer(sequencerStops, sequencerOrigin || null);
-    setRouteNotice(`${sequencerStops.length} route stop${sequencerStops.length !== 1 ? 's' : ''} sent to Route Sequencer.`);
+    setRouteNotice(`${sequencerStops.length} route stop${sequencerStops.length !== 1 ? 's' : ''} sent to Route Plan.`);
   };
 
   return (
@@ -686,7 +686,7 @@ const RoutePlanSection = ({
                 onClick={sendToSequencer}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-bold text-white bg-[#2563EB] rounded-xl active:scale-95 transition hover:bg-[#1D4ED8] shadow-sm"
               >
-                <Route size={14} /> Send {routeValidation.routeStops.length} to Sequencer
+                <Route size={14} /> Send {routeValidation.routeStops.length} to Plan
               </button>
             </div>
             <div className="flex justify-between items-center mt-3 px-1">
@@ -831,8 +831,8 @@ const DriverToolsPage = ({
               <Route size={16} className="text-indigo-600" />
             </div>
             <div className="text-left">
-              <h3 className="text-sm font-semibold text-slate-800">Route Sequencer</h3>
-              <p className="text-xs font-semibold text-slate-400">Advanced multi-load engine & templates</p>
+              <h3 className="text-sm font-semibold text-slate-800">Route Plan</h3>
+              <p className="text-xs font-semibold text-slate-400">Advanced planning engine & templates</p>
             </div>
           </div>
           <ChevronRight size={16} className="text-slate-300" />

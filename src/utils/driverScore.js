@@ -37,9 +37,6 @@ export function calculateDriverScore(driver, trips = []) {
 
   const completed = driverTrips.filter(t => t.status === 'Completed');
   const cancelled = driverTrips.filter(t => ['Cancelled', 'No Show'].includes(t.status));
-  const assigned = driverTrips.filter(t => t.status === 'Assigned');
-  const inProgress = driverTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
-
   // On-time score: trips completed on or before scheduled time
   const onTimeTrips = completed.filter(t => {
     if (!t.time || !t.completedAt) return true;

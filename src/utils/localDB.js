@@ -45,7 +45,7 @@ export async function getDB() {
   if (dbPromise) return dbPromise;
 
   dbPromise = openDB(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion, newVersion) {
+    upgrade(db, _oldVersion, _newVersion) {
       // Create object stores
       if (!db.objectStoreNames.contains(STORES.APP_DATA)) {
         db.createObjectStore(STORES.APP_DATA);

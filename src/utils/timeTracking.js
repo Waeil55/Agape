@@ -481,7 +481,7 @@ export const generatePendingClockOut = ({ lastTrip, driver, policyMode }) => {
  * @param {number} params.durationMinutes - Total shift duration
  * @returns {{ flags: Array, suspicious: boolean, details: Object }}
  */
-export const detectAbuse = ({ breadcrumbs, clockInLocation, clockOutLocation, durationMinutes }) => {
+export const detectAbuse = ({ breadcrumbs, clockInLocation, clockOutLocation, durationMinutes: _durationMinutes }) => {
   const flags = [];
   const details = {};
 
@@ -571,7 +571,6 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  const eventDateKey = (event) => isoDateKey(event.timestamp || event.at || event.createdAt || event.time);
   const shouldIncludeDate = (dateKey) => !dateFilter || dateKey === dateFilter;
 
   const locationFrom = (entity, latKey = 'lat', lngKey = 'lng') => {

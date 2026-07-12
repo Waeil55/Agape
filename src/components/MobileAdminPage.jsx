@@ -352,7 +352,9 @@ const MobileAdminPage = ({
       onMobileNavigate={setActiveTab}
       title={activeSection.title}
       subtitle={activeSection.subtitle}
-      eyebrow="Command Admin"
+      eyebrow=""
+      hideBrand
+      navInline
       actions={
         <AdminBadge tone={unassignedTrips.length ? 'danger' : 'online'} dot>
           {unassignedTrips.length ? `${unassignedTrips.length} open` : 'Live'}

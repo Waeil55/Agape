@@ -3804,7 +3804,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   }}
                   className="h-7 w-[100px] text-xs text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-sm"
                 >
-                  <Route size={9} /> Sequencer
+                  <Route size={9} /> Plan
                 </button>
                 </>
               )}
@@ -5007,7 +5007,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 setRoutePlanSequencerOrigin(origin || null);
                 setSequencerKey(k => k + 1);
                 setShowSequencerModal(true);
-                setShowToast({ type: 'success', message: `${stopData.clients.length} route stop${stopData.clients.length !== 1 ? 's' : ''} loaded in Route Sequencer.` });
+                setShowToast({ type: 'success', message: `${stopData.clients.length} route stop${stopData.clients.length !== 1 ? 's' : ''} loaded in Route Plan.` });
                 return;
               }
               setSequencerTripFilter(null);
@@ -5049,7 +5049,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             setRoutePlanSequencerOrigin(origin || null);
             setSequencerKey(k => k + 1);
             setShowSequencerModal(true);
-            setShowToast({ type: 'success', message: `${items.length} route stop${items.length !== 1 ? 's' : ''} loaded in Route Sequencer.` });
+            setShowToast({ type: 'success', message: `${items.length} route stop${items.length !== 1 ? 's' : ''} loaded in Route Plan.` });
           }}
         />
         </Suspense>
@@ -6261,7 +6261,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="bg-white w-full max-w-7xl max-h-[92vh] min-h-[400px] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
             <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm     font-semibold text-slate-900 flex items-center gap-2">
-                <Route size={16} className="text-indigo-700" /> Route Sequencer
+                <Route size={16} className="text-indigo-700" /> Route Plan
               </h2>
               <button onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); setRoutePlanSequencerOrigin(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-500" /></button>
             </div>

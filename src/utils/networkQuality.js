@@ -8,13 +8,6 @@
  * - Detect flaky connections (online but packets dropping)
  */
 
-const SAMPLE_SIZE = 10;
-const SPEED_THRESHOLDS = {
-  fast: 5000,      // > 5 Mbps → green
-  medium: 1000,    // 1-5 Mbps → yellow
-  slow: 0,         // < 1 Mbps → red
-};
-
 class NetworkQualityMonitor {
   constructor() {
     this.listeners = new Set();

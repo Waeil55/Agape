@@ -16,7 +16,7 @@
  */
 
 import { db } from '../config/firebase';
-import { doc, getDoc, collection, getDocs, query, where, orderBy, limit } from '../config/firebase';
+import { collection, getDocs } from '../config/firebase';
 import { connectionMonitor, ConnectionState } from './connectionMonitor';
 import { networkQuality } from './networkQuality';
 

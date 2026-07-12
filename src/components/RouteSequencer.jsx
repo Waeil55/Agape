@@ -861,7 +861,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
             <Route className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-slate-900 leading-tight truncate">Route Sequencer</h2>
+            <h2 className="text-base font-semibold text-slate-900 leading-tight truncate">Route Plan</h2>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">Multi-load Engine · Live Data</p>
           </div>
         </div>

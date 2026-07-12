@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import {
-  Truck, Users, MapPin, Clock, Search, ShieldCheck,
-  ArrowRight, CheckCircle2, Archive, Map as MapIcon, LogOut, AlertTriangle,
-  Settings, BrainCircuit, Zap,
+  Truck, Users, Clock, ShieldCheck,
+  ArrowRight, CheckCircle2, AlertTriangle,
+  BrainCircuit, Zap,
   Target, AlertCircle,
   Activity, Wand2, Lock, Briefcase, User,
   X, MessageCircle
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, collection, addDoc, getDocs, getDocsFromServer, serverTimestamp, onSnapshot, query, where } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -108,10 +108,6 @@ const lazyWithRetry = (componentImport) =>
     }
   });
 
-const LiveMapPage = lazyWithRetry(() => import('./components/LiveMapPage'));
-const DispatchAssistant = lazyWithRetry(() => import('./components/DispatchAssistant'));
-const FileUploadTrips = lazyWithRetry(() => import('./components/FileUploadTrips'));
-const ReportsPage = lazyWithRetry(() => import('./components/ReportsPage'));
 const DriverPage = lazyWithRetry(() => import('./components/DriverPage'));
 const EnterpriseDashboard = lazyWithRetry(() => import('./components/EnterpriseDashboard'));
 const AddTripModal = lazyWithRetry(() => import('./components/AddTripModal'));
@@ -129,12 +125,6 @@ const Badge = ({ children, variant = 'info' }) => {
   return <span className={`badge ${variants[variant]}`}>{children}</span>;
 };
 
-const getLogTextColor = (color) => {
-  const colors = { amber: 'text-amber-600', emerald: 'text-emerald-600', rose: 'text-rose-600', blue: 'text-blue-600', indigo: 'text-indigo-600' };
-  return colors[color] || 'text-slate-600';
-};
-
-const todayStr = localCalendarYmd();
 const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
 const DRIVER_HISTORY_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted']);
 const normalizeTripStatus = (status) => String(status || '').trim().toLowerCase();
@@ -149,15 +139,6 @@ const isRecentDriverHistoryTrip = (trip) => (
   DRIVER_HISTORY_STATUSES.has(normalizeTripStatus(trip?.status))
   && isCalendarDateKeyWithinLastDays(getTripHistoryDateKey(trip), DRIVER_HISTORY_LOOKBACK_DAYS)
 );
-
-function isTripLate(tripTime) {
-  if (!tripTime || tripTime === 'Will Call') return false;
-  const now = new Date();
-  const timeVal = timeToMinutes(tripTime);
-  const scheduled = new Date();
-  scheduled.setHours(Math.floor(timeVal / 60), timeVal % 60, 0, 0);
-  return now > scheduled;
-}
 
 const DEFAULT_APP_SETTINGS = {
   theme: 'light',
@@ -395,21 +376,19 @@ function withTimeout(promise, timeoutMs, label) {
 }
 
 const App = () => {
-  const noopRef = useRef(() => {});
+  const noop = useCallback(() => {}, []);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [startupIssue, setStartupIssue] = useState('');
   const [showLoadingRecovery, setShowLoadingRecovery] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
   const authBootResolvedRef = useRef(false);
   const loginPortalRoleRef = useRef(null);
   const loginInProgressRef = useRef(false);
   const loginAttemptRef = useRef(0);
   const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
-  const loadingStartedAtRef = useRef(Date.now());
+  const loadingStartedAtRef = useRef(0);
   
-  const [refreshTick, setRefreshTick] = useState(0);
   const [role, setRole] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const roleRef = useRef(null);
@@ -425,10 +404,6 @@ const App = () => {
   useEffect(() => {
     initPlatform();
   }, []);
-
-  useEffect(() => {
-    if (isAuthenticated && realtimeReliability.isOnline) setRefreshTick(t => t + 1);
-  }, [isAuthenticated, realtimeReliability.isOnline, realtimeReliability.resubscribeKey]);
 
   // Clear SW reload flag after successful boot to allow future SW updates
   useEffect(() => {
@@ -492,9 +467,7 @@ const App = () => {
         await registerServiceWorker();
         
         // Service worker is static-cache only; Firestore reads own data sync.
-        cleanupSWMessages = setupSWMessageHandler((data) => {
-          if (data?.type === 'STATIC_CACHE_UPDATED') setRefreshTick(t => t + 1);
-        });
+        cleanupSWMessages = setupSWMessageHandler(() => {});
 
       } catch (error) {
         console.error('PWA setup error:', error);
@@ -516,7 +489,7 @@ const App = () => {
   // ALL DATA COMES FROM FIRESTORE — single source of truth
   const {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
-    loading: dataLoading, saving: dataSaving, error: dataError, lastSavedAt,
+    loading: dataLoading, error: dataError,
     setTrips, setDrivers, upsertDriverProfile, upsertDriverTrip, setDispatchers, setVehicles,
     setTrashedTrips, setLogs, setPhoneNumbers,
     addLog, initializeAppData,
@@ -674,7 +647,7 @@ const App = () => {
     });
   }, [getTripKey]);
 
-  const [activeTab, setActiveTab] = useState(() => 'dashboard');
+  const [, setActiveTab] = useState(() => 'dashboard');
   const [toasts, setToasts] = useState([]);
   const [messageBanners, setMessageBanners] = useState([]);
   const [selectedTasks, setSelectedTasks] = useState([]);
@@ -750,7 +723,7 @@ const App = () => {
       addToast('Data Save Error', dataError, 'danger');
     }
     dataErrorRef.current = dataError;
-  }, [dataError]);
+  }, [dataError, addToast]);
 
   const updateAppSettings = useCallback((updates, isProfileUpdate = false) => {
     if (isProfileUpdate && role === 'driver' && updates.odometer !== undefined) {
@@ -763,10 +736,6 @@ const App = () => {
       setAppSettings((prev) => ({ ...prev, ...updates }));
     }
   }, [role, currentUser, drivers, upsertDriverProfile, addToast]);
-
-  const handleUpdatePhoneNumbers = useCallback((updates) => {
-    setPhoneNumbers(prev => ({ ...prev, ...updates }));
-  }, [setPhoneNumbers]);
 
   const requestAuthAction = useCallback((label, callback) => {
     setReAuthError('');
@@ -800,10 +769,7 @@ const App = () => {
     setIsAuthenticated(false);
     setRole(null);
     setCurrentUser(null);
-    setDataLoaded(false);
     setActiveTab('dashboard');
-    setActiveManifest(null);
-    setIsInspected(false);
     setSelectedTasks([]);
     setSearchQuery('');
     setSmartAssignTrip(null);
@@ -873,7 +839,6 @@ const App = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setDriverTelemetry([]);
       return undefined;
     }
     
@@ -898,8 +863,8 @@ const App = () => {
 
   useEffect(() => {
     if (!isLoading) {
-      setShowLoadingRecovery(false);
-      return;
+      const timer = setTimeout(() => setShowLoadingRecovery(false), 0);
+      return () => clearTimeout(timer);
     }
     const timer = setTimeout(() => setShowLoadingRecovery(true), 3000);
     return () => clearTimeout(timer);
@@ -907,11 +872,7 @@ const App = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setDataLoaded(false);
       return;
-    }
-    if (!dataLoading) {
-      setDataLoaded(true);
     }
   }, [isAuthenticated, dataLoading]);
 
@@ -956,13 +917,14 @@ const App = () => {
     if (isAuthenticated && auth.currentUser) {
       persistUserSettings(appSettings);
     }
-  }, [appSettings]);
+  }, [appSettings, isAuthenticated]);
 
   useEffect(() => {
     let unsubData = null;
     let unsubFcm = null;
     let cancelled = false;
     authBootResolvedRef.current = false;
+    loadingStartedAtRef.current = Date.now();
 
     // Watchdog: if nothing resolves, unblock loading and show recovery.
     const bootWatchdog = setTimeout(() => {
@@ -1040,7 +1002,6 @@ const App = () => {
         }
       });
 
-      setDataLoaded(false);
       authBootResolvedRef.current = true;
       const elapsed = Date.now() - loadingStartedAtRef.current;
       const delay = Math.max(0, 1000 - elapsed);
@@ -1289,13 +1250,7 @@ const App = () => {
       if (unsubData) unsubData();
       if (typeof unsubFcm === 'function') unsubFcm();
     };
-  }, [resetSessionState]);
-
-  useEffect(() => {
-    if (startupIssue === 'Worker driver profile was missing and has been provisioned while cloud records sync.') {
-      setStartupIssue('');
-    }
-  }, [startupIssue]);
+  }, [resetSessionState, setDrivers, setDispatchers]);
 
   useEffect(() => {
     const metaTags = [
@@ -1340,10 +1295,10 @@ const App = () => {
     const activeUid = auth.currentUser?.uid || '';
     const activeEmail = normalizeEmail(currentUser || auth.currentUser?.email || '');
     if (!isAuthenticated || !activeUid || !activeEmail) {
-      setChatUnreadCount(0);
+      const timer = setTimeout(() => setChatUnreadCount(0), 0);
       chatUnreadCountsRef.current = {};
       chatUnreadPrimedRef.current = false;
-      return undefined;
+      return () => clearTimeout(timer);
     }
 
     const readUnreadCount = (data) => {
@@ -1434,7 +1389,7 @@ const App = () => {
     } catch (e) { /* ignore */ }
     setLogs(prev => [{ t: title, d: desc, c: color, type: 'audit', timestamp: timeStr, time: now, actor: actorEmail, actorRole, meta }, ...prev].slice(0, 100));
     addLog({ t: title, d: desc, c: color, type: 'audit', time: now, actor: actorEmail, actorRole, meta });
-  }, [currentUser, drivers, dispatchers, addLog]);
+  }, [currentUser, drivers, dispatchers, addLog, setLogs]);
 
 
   const handleCreateAccount = async () => {
@@ -1554,10 +1509,6 @@ const App = () => {
     } finally {
       resetSessionState();
     }
-  };
-
-  const toggleTaskSelection = (id) => {
-    setSelectedTasks(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
   };
 
   const createSharedRide = () => {
@@ -1707,7 +1658,7 @@ const App = () => {
         `${tripToAssign.patient} — ${tripToAssign.pickup} → ${tripToAssign.dropoff}`
       );
     }
-  }, [drivers, trips, currentUser, addAuditLog, notificationsEnabled, canControlDriver, canControlTrip]);
+  }, [drivers, trips, currentUser, addAuditLog, notificationsEnabled, canControlDriver, canControlTrip, setTrips]);
 
   const bulkAssignTrips = useCallback((driverId) => {
     if (selectedTasks.length === 0) return;
@@ -1730,7 +1681,7 @@ const App = () => {
     addAuditLog('Bulk Assignment', `${currentUser} assigned ${allowedSelection.length} trips to ${driver?.name || 'Unknown'}`, 'emerald');
     setSelectedTasks([]);
     setBulkAssignModal(false);
-  }, [selectedTasks, drivers, trips, currentUser, addAuditLog, canControlDriver, canControlTrip]);
+  }, [selectedTasks, drivers, trips, currentUser, addAuditLog, canControlDriver, canControlTrip, setTrips]);
 
   const triggerSmartAssign = async (trip) => {
     if (!canControlTrip(trip)) {
@@ -1957,17 +1908,7 @@ const App = () => {
     const tripCount = allTrips.length;
     addAuditLog('Trip Added', `${currentUser} added trip for ${tripToAdd.patient} (${tripToAdd.bookingId})${tripCount > 1 ? ` + ${tripCount - 1} recurring` : ''}.`, 'emerald');
     addToast('Trip Added', `${tripToAdd.patient}'s trip has been added successfully${tripCount > 1 ? ` (${tripCount} total)` : ''}.`, 'success');
-  }, [currentUser, role, currentUserDriverProfile, dedupTrips, drivers, canControlDriver, addAuditLog, addToast]);
-
-  const resetSystemData = () => {
-    if (role !== 'admin') return;
-    setTrips([]);
-    setTrashedTrips([]);
-    setDrivers([]);
-    setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]);
-    addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose');
-    // Firestore auto-syncs via useFirestoreAppData
-  };
+  }, [currentUser, role, currentUserDriverProfile, dedupTrips, drivers, canControlDriver, addAuditLog, addToast, setTrips]);
 
   const executeDeleteTrip = (tripId) => {
     // CRITICAL FIX: Use refs instead of closures to avoid stale data from Firestore sync
@@ -1987,7 +1928,7 @@ const App = () => {
         });
         
         // Writes directly to Firestore via setTrips/setTrashedTrips
-        const changed = Object.keys(tripToDelete).map(k => ({ field: k, before: tripToDelete[k], after: undefined }));
+        const _changed = Object.keys(tripToDelete).map(k => ({ field: k, before: tripToDelete[k], after: undefined }));
         addAuditLog('Trip Archived', `${currentUser} archived trip ${tripId} (${tripToDelete.patient}).`, 'rose', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'active', after: 'archived' }] });
       }
     }, 0);
@@ -2079,7 +2020,6 @@ const App = () => {
       clockTimestamp,
       autoClockIn,
       clockEventType,
-      timeTrackingState,
       ...persistableExtraFields
     } = extraFields || {};
     const eventTimestamp = clockTimestamp || autoClockIn || now;
@@ -2718,7 +2658,7 @@ const App = () => {
     );
   };
 
-  const renderBulkAssignModal = () => {
+  const _renderBulkAssignModal = () => {
     if (!bulkAssignModal) return null;
     return (
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -2764,7 +2704,7 @@ const App = () => {
       </div>
     );
   };
-  const renderSmartAssignModal = () => {
+  const _renderSmartAssignModal = () => {
     if (!smartAssignTrip) return null;
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-12">
@@ -2850,7 +2790,7 @@ const App = () => {
     );
   };
 
-  const renderManualAssignModal = () => {
+  const _renderManualAssignModal = () => {
     if (!manualAssignTrip) return null;
     const availableDrivers = scopedDrivers.filter(d => d.status === 'Available');
     const otherDrivers = scopedDrivers.filter(d => d.status !== 'Available');
@@ -2920,7 +2860,7 @@ const App = () => {
     );
   };
 
-  const renderOptimizeAllModal = () => {
+  const _renderOptimizeAllModal = () => {
     if (!showOptimizeModal) return null;
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-12">
@@ -3138,7 +3078,7 @@ const App = () => {
               setShowDispatcherArchive={setShowDispatcherArchive}
               addToast={addToast}
               addAuditLog={addAuditLog}
-              persistState={noopRef.current}
+              persistState={noop}
               driverTelemetry={driverTelemetry}
               hasPermission={hasPermission}
               requestAuthAction={requestAuthAction}

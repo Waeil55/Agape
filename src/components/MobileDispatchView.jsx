@@ -388,7 +388,7 @@ const MobileDispatchView = ({
             <div className="px-4 py-3 grid grid-cols-3 gap-3" style={{paddingBottom:"max(1.5rem,env(safe-area-inset-bottom,1.5rem))"}}>
               {[
                 {label:"Upload Trips",icon:Upload,color:"bg-blue-50 text-blue-700 border-blue-200",action:()=>{setShowUploadModal?.(true);setShowTools(false);}},
-                {label:"Route Sequencer",icon:Route,color:"bg-indigo-50 text-indigo-700 border-indigo-200",action:()=>{onOpenSequencer?.();setShowTools(false);}},
+                {label:"Route Plan",icon:Route,color:"bg-indigo-50 text-indigo-700 border-indigo-200",action:()=>{onOpenSequencer?.();setShowTools(false);}},
                 {label:"Live Map",icon:MapPin,color:"bg-emerald-50 text-emerald-700 border-emerald-200",action:()=>{onOpenLiveMap?.();setShowTools(false);}},
                 {label:"Bulk Assign",icon:Users,color:"bg-amber-50 text-amber-700 border-amber-200",action:()=>{setBulkAssignModal?.(true);setShowTools(false);}},
                 {label:"Add Trip",icon:Plus,color:"bg-rose-50 text-rose-700 border-rose-200",action:()=>{setShowAddTripModal?.(true);setShowTools(false);}},

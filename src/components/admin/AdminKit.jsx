@@ -37,47 +37,53 @@ export const AdminShell = ({
   mobileActive,
   onMobileNavigate,
   fab,
+  hideBrand = false,
+  navInline = false,
 }) => (
   <div className="admin-app">
     {/* Desktop Sidebar */}
-    <aside className="adm-sidebar hidden md:flex">
-      <div className="adm-brand">
-        <div className="adm-brand-mark"><ShieldGlyph /></div>
-        <div className="min-w-0">
-          <div className="adm-brand-name">Agape Care</div>
-          <div className="adm-brand-sub">Command Admin</div>
-        </div>
-      </div>
+    {!navInline && (
+      <aside className="adm-sidebar hidden md:flex">
+        {!hideBrand && (
+          <div className="adm-brand">
+            <div className="adm-brand-mark"><ShieldGlyph /></div>
+            <div className="min-w-0">
+              <div className="adm-brand-name">Agape Care</div>
+              <div className="adm-brand-sub">Command Admin</div>
+            </div>
+          </div>
+        )}
 
-      {nav.map((group, gi) => (
-        <div key={gi}>
-          {group.label && <div className="adm-nav-group-label">{group.label}</div>}
-          {group.items.map((item) => {
-            const Icon = item.icon;
-            const isActive = active === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onNavigate?.(item.id)}
-                className={`adm-nav-link ${isActive ? 'is-active' : ''}`}
-              >
-                {Icon && <Icon size={18} className="adm-nav-ico" />}
-                <span className="truncate">{item.label}</span>
-                {item.badge != null && <span className="adm-nav-badge">{item.badge}</span>}
-              </button>
-            );
-          })}
-        </div>
-      ))}
+        {nav.map((group, gi) => (
+          <div key={gi}>
+            {group.label && <div className="adm-nav-group-label">{group.label}</div>}
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              const isActive = active === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onNavigate?.(item.id)}
+                  className={`adm-nav-link ${isActive ? 'is-active' : ''}`}
+                >
+                  {Icon && <Icon size={18} className="adm-nav-ico" />}
+                  <span className="truncate">{item.label}</span>
+                  {item.badge != null && <span className="adm-nav-badge">{item.badge}</span>}
+                </button>
+              );
+            })}
+          </div>
+        ))}
 
-      <div className="adm-sidebar-footer">
-        <div className="flex items-center gap-2 px-2 text-[11px] font-semibold text-slate-400">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          System online
+        <div className="adm-sidebar-footer">
+          <div className="flex items-center gap-2 px-2 text-[11px] font-semibold text-slate-400">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            System online
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    )}
 
     {/* Main Column */}
     <div className="adm-main">
@@ -92,6 +98,34 @@ export const AdminShell = ({
         </div>
         {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
       </header>
+
+      {navInline && nav.length > 0 && (
+        <div className="adm-subnav hidden md:block">
+          {nav.map((group, gi) => (
+            <div key={gi} className="adm-subnav-group">
+              {group.label && <div className="adm-subnav-label">{group.label}</div>}
+              <div className="adm-subnav-row">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = active === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onNavigate?.(item.id)}
+                      className={`adm-subnav-link ${isActive ? 'is-active' : ''}`}
+                    >
+                      {Icon && <Icon size={16} className="adm-nav-ico" />}
+                      <span className="truncate">{item.label}</span>
+                      {item.badge != null && <span className="adm-nav-badge">{item.badge}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <main className="adm-content">
         {children}

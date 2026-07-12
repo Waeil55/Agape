@@ -184,7 +184,7 @@ export async function showNavActionSheet(address, origin, preferredApp) {
       const { ActionSheet } = await import('@capacitor/action-sheet');
       const result = await ActionSheet.showActions({
         title: 'Navigate to',
-        options: items.map((item, i) => ({
+        options: items.map((item) => ({
           title: item.title,
         })),
       });

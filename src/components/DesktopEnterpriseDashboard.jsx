@@ -342,8 +342,8 @@ const DesktopEnterpriseDashboard = ({
     },
     routePlanner: {
       eyebrow: '',
-      title: 'Smart Route Planner',
-      description: 'Intelligent multi-stop route optimization, drag-and-drop planning, and live navigation.',
+      title: 'Tools',
+      description: 'Route planning, multi-stop optimization, drag-and-drop planning, and live navigation.',
     },
     reports: {
       eyebrow: '',
@@ -377,7 +377,7 @@ const DesktopEnterpriseDashboard = ({
   const topNavItems = useMemo(() => {
     const items = [
       { id: 'dispatch', label: 'Dispatch', icon: Zap, active: activePanel === 'operations', action: () => openOperationsWorkspace('manifest') },
-      { id: 'schedule', label: 'Routes', icon: Route, active: showSequencerModal, action: () => setShowSequencerModal(true) },
+      { id: 'schedule', label: 'Tools', icon: Route, active: activePanel === 'routePlanner' || showSequencerModal, action: () => setActivePanel('routePlanner') },
       ...(driverWorkDrivers.length > 0 ? [{ id: 'drive', label: 'Drive', icon: Truck, active: activePanel === 'drive', action: () => setActivePanel('drive') }] : []),
       ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
       { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => setActivePanel('reports') },
@@ -400,7 +400,7 @@ const DesktopEnterpriseDashboard = ({
       case 'liveMap':
         return [
           { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
-          { id: 'routes', label: 'Routes', icon: Route, action: () => setShowSequencerModal(true) },
+          { id: 'routes', label: 'Tools', icon: Route, action: () => setActivePanel('routePlanner') },
         ];
       case 'archives':
         return [
@@ -424,8 +424,8 @@ const DesktopEnterpriseDashboard = ({
   const commands = useMemo(() => [
     { id: 'ops', label: 'Go to Operations', icon: LayoutDashboard, action: () => setActivePanel('operations') },
     { id: 'map', label: 'Go to Live Map', icon: MapPin, action: () => setActivePanel('liveMap') },
-    { id: 'sequencer', label: 'Open Route Sequencer', icon: Route, action: () => setShowSequencerModal(true) },
-    { id: 'routes', label: 'Go to Route Planner', icon: Route, action: () => setActivePanel('routePlanner') },
+    { id: 'sequencer', label: 'Open Tools', icon: Route, action: () => setActivePanel('routePlanner') },
+    { id: 'routes', label: 'Go to Route Plan', icon: Route, action: () => setActivePanel('routePlanner') },
     { id: 'reports', label: 'Go to Reports', icon: BarChart2, action: () => setActivePanel('reports') },
     { id: 'archives', label: 'Go to Archives', icon: Archive, action: () => setActivePanel('archives') },
     { id: 'admin', label: 'Go to Admin', icon: Users, action: () => setActivePanel('admin') },
@@ -1721,14 +1721,14 @@ const DesktopEnterpriseDashboard = ({
         </div>
       )}
 
-      {/* Route Sequencer Modal */}
+      {/* Route Plan Modal */}
       {showSequencerModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} />
           <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
             <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <Route size={16} className="text-indigo-700" /> Route Sequencer
+                <Route size={16} className="text-indigo-700" /> Route Plan
               </h2>
               <button onClick={() => { setShowSequencerModal(false); setRoutePlannerSequencerStops(null); setRoutePlannerSequencerSequence(null); }} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-600" /></button>
             </div>

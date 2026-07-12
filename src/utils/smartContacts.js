@@ -173,7 +173,6 @@ const getPrimaryContact = (trip, allTrips, phoneNumbers = {}) => {
 };
 
 const getContactWarning = (trip, allTrips) => {
-  const contacts = buildContactList(trip, allTrips);
   const primary = getPrimaryContact(trip, allTrips);
   if (!primary) return { show: true, message: 'No contact number available for this trip.', severity: 'error' };
   if (primary.role === 'facility') return { show: true, message: 'No patient mobile available. Calling facility.', severity: 'warning' };

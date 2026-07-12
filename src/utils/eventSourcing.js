@@ -17,7 +17,7 @@
 
 import { db } from '../config/firebase';
 import { doc, setDoc, serverTimestamp } from '../config/firebase';
-import { getDB, STORES } from './localDB';
+import { getDB } from './localDB';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EVENT TYPES
