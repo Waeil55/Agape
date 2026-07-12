@@ -767,8 +767,8 @@ body {
 .bottom-nav {
   position: fixed;
   bottom: 8px;
-  left: 16px;
-  right: 16px;
+  left: 8px;
+  right: 8px;
   z-index: 50;
   height: 56px;
   min-height: 56px;
@@ -776,10 +776,10 @@ body {
   width: auto;
   background: rgba(255, 255, 255, 0.94) !important;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 9999px;
+  border-radius: 999px;
   overflow: hidden;
   box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.25), 0 2px 6px rgba(15, 23, 42, 0.06);
-  padding: 4px 12px;
+  padding: 8px;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
   color-scheme: light;
   -webkit-backdrop-filter: blur(8px);
@@ -2158,12 +2158,12 @@ textarea {
 
   .bottom-nav {
     bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
-    left: 16px !important;
-    right: 16px !important;
+    left: max(10px, env(safe-area-inset-left, 0px)) !important;
+    right: max(10px, env(safe-area-inset-right, 0px)) !important;
     height: 56px !important;
     min-height: 56px !important;
     max-height: 56px !important;
-    border-radius: 9999px !important;
+    border-radius: 999px !important;
     border: 1px solid rgba(15, 23, 42, 0.08) !important;
     background: rgba(255, 255, 255, 0.95) !important;
     box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.25), 0 2px 6px rgba(15, 23, 42, 0.06) !important;
@@ -2723,9 +2723,9 @@ html, body {
   }
 
   .bottom-nav {
-    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
-    left: 18px !important;
-    right: 18px !important;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    left: max(10px, env(safe-area-inset-left, 0px)) !important;
+    right: max(10px, env(safe-area-inset-right, 0px)) !important;
     height: 56px !important;
     min-height: 56px !important;
     max-height: 56px !important;

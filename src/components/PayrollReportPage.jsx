@@ -103,7 +103,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }} className="min-h-screen rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50/50 text-slate-900 shadow-sm">
       {/* Header */}
-      <div className="px-4 pt-6 pb-4">
+      <div className="px-3 sm:px-4 pt-6 pb-4">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-indigo-500 flex items-center justify-center"><DollarSign size={16} /></div>
@@ -117,7 +117,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
       </div>
 
       {/* Filters */}
-      <div className="px-4 pb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="px-3 sm:px-4 pb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
           className="col-span-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-indigo-400" />
         <select value={selectedDriverId} onChange={e => setSelectedDriverId(e.target.value)}
@@ -134,7 +134,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
       </div>
 
       {/* Summary Cards */}
-      <div className="px-4 pb-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="px-3 sm:px-4 pb-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
         {[
           { label: 'Billable', value: fmt(totals.billableMin), icon: <Clock size={14} />, color: 'text-indigo-300' },
           { label: 'Total Pay', value: fmtCurrency(totals.totalPay), icon: <DollarSign size={14} />, color: 'text-emerald-300' },
@@ -150,7 +150,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
       </div>
 
       {/* Driver Cards */}
-      <div className="px-4 pb-8 space-y-3">
+      <div className="px-3 sm:px-4 pb-8 space-y-3">
         {reportData.length === 0 && (
           <div className="text-center py-12 text-slate-500">
             <Calendar size={40} className="mx-auto mb-3 opacity-30" />
