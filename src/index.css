@@ -2427,7 +2427,8 @@ html, body {
   }
 
   .agape-mobile-reports .agape-trip-list-card,
-  .agape-mobile-history .agape-trip-list-card {
+  .agape-mobile-history .agape-trip-list-card,
+  .agape-mobile-history .agape-empty-card {
     border-radius: 12px !important;
   }
 

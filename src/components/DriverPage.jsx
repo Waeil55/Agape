@@ -5369,7 +5369,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 <div className="w-12 h-12 bg-slate-200 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-3">
                   <Clock size={24} />
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mb-1">Shift Ready</h3>
+                <h3 className="text-base font-semibold text-slate-900 mb-1">Shift Ready</h3>
                 <p className="text-xs font-medium text-slate-500 mb-0">Your shift will automatically start based on your company policy (home departure or first trip start).</p>
               </div>
             ) : (
@@ -6207,7 +6207,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {/* ===== BOTTOM NAVIGATION ===== */}
       {!isEmbedded && !(activeNav === 'chat' && isChatThreadOpen) && (
         <nav className="bottom-nav md:hidden">
-          <div className="flex h-full items-center justify-between gap-2 px-3">
+          <div className="flex h-full items-center justify-between gap-1 px-3">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActiveTab = activeNav === item.id;
@@ -6220,11 +6220,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     }
                     setActiveNav(item.id);
                   }}
-                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1.5 py-1 touch-manipulation transition-all duration-200 min-h-[52px] ${
+                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1.5 py-1 touch-manipulation transition-all duration-200 min-h-[56px] ${
                       isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8] hover:text-[#64748b]'
                     }`}>
                     <div className="relative">
-                      <Icon size={22} strokeWidth={isActiveTab ? 2.2 : 1.8}
+                      <Icon size={24} strokeWidth={isActiveTab ? 2.2 : 1.8}
                         className={`transition-all duration-200 ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}
                       />
                       {item.badge > 0 && (
@@ -6429,7 +6429,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== GEOFENCE TOAST ===== */}
       {showToast && (
-        <div className="fixed bottom-6 left-4 right-4 z-50 animate-slide-up">
+        <div className="fixed bottom-6 left-4 right-4 z-50 animate-slide-up" style={{bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))'}}>
           <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-2xl flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0">
               <MapPin size={20} className="text-blue-400" />

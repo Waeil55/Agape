@@ -98,7 +98,7 @@ const MobileEnterpriseDashboard = (props) => {
     setExpandedId(null);
   };
 
-  const VALID_VIEWS = ['trips', 'map', 'reports', 'chat', 'tools', 'menu', 'fleet'];
+  const VALID_VIEWS = ['trips', 'map', 'reports', 'chat', 'tools', 'menu'];
   useEffect(() => {
     if (!VALID_VIEWS.includes(currentView)) setCurrentView('trips');
   }, [currentView]);
@@ -275,7 +275,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Archives', true)}
-          <div className="flex-1 overflow-y-auto overscroll-contain">
+          <div className="flex-1 overflow-y-auto overscroll-contain pb-20">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><ArchivesPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
@@ -286,7 +286,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Settings', true)}
-          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-20">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><SettingsPage {...props} onResetSystem={() => { props.setTrips?.([]); props.setTrashedTrips?.([]); props.setDrivers?.([]); props.setLogs?.([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); props.addAuditLog?.('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} /></Suspense></ErrorBoundary>
           </div>
         </div>
@@ -297,7 +297,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Fleet Management', true)}
-          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-20">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><DriversVehiclesPage {...props} /></Suspense></ErrorBoundary>
           </div>
         </div>
@@ -319,7 +319,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Payroll', true)}
-          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-20">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><PayrollReportPage drivers={drivers} trips={trips} /></Suspense></ErrorBoundary>
           </div>
         </div>
@@ -330,7 +330,7 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Activity Log', true)}
-          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-20">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><TimeTrackingAdmin drivers={drivers} trips={trips} role={role} /></Suspense></ErrorBoundary>
           </div>
         </div>

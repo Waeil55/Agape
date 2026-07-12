@@ -520,7 +520,7 @@ const RoutePlanSection = ({
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-slate-50 transition"
@@ -595,10 +595,10 @@ const RoutePlanSection = ({
                       {index > 0 && (
                         <div className="flex flex-col gap-0.5 text-slate-400">
                           <button onClick={() => handleMoveUp(index)} className="cursor-pointer hover:bg-slate-100 rounded p-0.5 transition-colors disabled:opacity-30" disabled={index <= 1}>
-                            <ArrowUp size={14} className="text-gray-500" />
+                            <ArrowUp size={14} className="text-slate-500" />
                           </button>
                           <button onClick={() => handleMoveDown(index)} className="cursor-pointer hover:bg-slate-100 rounded p-0.5 transition-colors disabled:opacity-30" disabled={index === stops.length - 1}>
-                            <ArrowDown size={14} className="text-gray-500" />
+                            <ArrowDown size={14} className="text-slate-500" />
                           </button>
                         </div>
                       )}
@@ -636,7 +636,7 @@ const RoutePlanSection = ({
                   </div>
                   <div className="w-8 flex justify-end shrink-0 pl-2">
                     {index > 0 && <button onClick={() => handleDelete(index)} className="cursor-pointer hover:bg-rose-50 p-1 rounded-full transition-colors">
-                      <Trash2 size={14} className="text-gray-400" />
+                      <Trash2 size={14} className="text-slate-400" />
                     </button>}
                   </div>
                 </div>

@@ -1,9 +1,12 @@
 {
+  "id": "/",
   "name": "Agape Care Fleet Management",
   "short_name": "Agape Care",
   "description": "Enterprise NEMT Platform - Real-time trip management, driver coordination, and customer communication",
   "start_url": "/",
   "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
@@ -11,6 +14,20 @@
   "theme_color": "#23568E",
   "categories": ["transportation", "business", "productivity"],
   "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Active Trips",
+      "short_name": "Trips",
+      "url": "/",
+      "description": "View and manage active trips"
+    },
+    {
+      "name": "Live Map",
+      "short_name": "Map",
+      "url": "/",
+      "description": "View fleet on live map"
+    }
+  ],
   "icons": [
     {
       "src": "/agape.png",
