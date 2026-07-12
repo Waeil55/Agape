@@ -420,7 +420,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               <h3 className="font-medium text-slate-900">Gap Analysis</h3>
               <p className="text-sm text-slate-500">Gaps between events classified by duration and payroll effect</p>
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-slate-100">
               {(() => {
                 const allGaps = Object.entries(driverSessions).flatMap(([driverId, byDate]) =>
                   Object.entries(byDate).flatMap(([date, session]) => session.gaps.map(g => ({ ...g, driverId, date })))
@@ -454,7 +454,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
             <div className="p-4 border-b border-slate-100">
               <h3 className="font-medium text-slate-900 flex items-center gap-2"><Shield className="w-4 h-4 text-red-500" />Abuse Detection</h3>
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-slate-100">
               {(() => {
                 const allFlags = Object.entries(driverSessions).flatMap(([driverId, byDate]) =>
                   Object.entries(byDate).flatMap(([date, session]) => session.teleports.map(t => ({ ...t, driverId, date })))
@@ -550,7 +550,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               if (personPayroll.length === 0) return <div className="p-8 text-center text-slate-500">No payroll data available</div>;
 
               return (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-slate-100">
                   {personPayroll.map(({ driver, driverId, rate, dates: numDays, totalTrips, totalBillable, totalBreaks, billableHours, regularHours, overtimeHours, totalEarnings, dailyBreakdown }) => {
                     const isExpanded = expandedDriver === `payroll-${driverId}`;
                     const isDispatcher = driver?.role === 'dispatcher';

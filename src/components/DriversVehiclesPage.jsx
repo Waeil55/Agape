@@ -279,7 +279,7 @@ const [form, setForm] = useState({
       </div>
 
       {/* AI Fleet Summary */}
-      <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
+      <div className="bg-white border border-slate-100/50 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
         <button onClick={() => setShowFleetSummary(!showFleetSummary)} className="w-full px-5 py-3 flex items-center justify-between text-xs font-bold text-slate-700 hover:bg-slate-50 transition">
           <span className="flex items-center gap-2"><BrainCircuit size={16} className="text-indigo-600" /> AI Fleet Summary</span>
           <ChevronDown size={16} className={`transition-transform ${showFleetSummary ? 'rotate-180' : ''}`} />
@@ -300,7 +300,7 @@ const [form, setForm] = useState({
       </div>
 
       {resolvedTab === 'drivers' && (
-        <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm">
+        <div className="bg-white border border-slate-100/50 rounded-xl overflow-hidden shadow-sm">
           <div className="space-y-3 p-3 sm:hidden">
             {filteredDrivers.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">
@@ -482,7 +482,7 @@ const [form, setForm] = useState({
       )}
 
       {resolvedTab === 'vehicles' && (
-        <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm">
+        <div className="bg-white border border-slate-100/50 rounded-xl overflow-hidden shadow-sm">
           <div className="space-y-3 p-3 sm:hidden">
             {vehicles.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">No vehicles yet. Click "Add Vehicle" to create one.</div>
@@ -594,7 +594,7 @@ const [form, setForm] = useState({
       {/* Assign Trips Modal */}
       {assignDriver && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white border border-slate-100/50 rounded-3xl overflow-hidden shadow-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-0 sm:mx-4">
+          <div className="bg-white border border-slate-100/50 rounded-xl overflow-hidden shadow-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <div>
@@ -684,7 +684,7 @@ const [form, setForm] = useState({
       {/* Schedule Editor Modal */}
       {editScheduleDriver && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white border border-slate-100/50 rounded-3xl shadow-sm max-w-lg w-full max-h-[90vh] overflow-y-auto mx-0 sm:mx-4">
+          <div className="bg-white border border-slate-100/50 rounded-xl shadow-sm max-w-lg w-full max-h-[90vh] overflow-y-auto mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <div>
@@ -793,7 +793,7 @@ const [form, setForm] = useState({
       {/* AI Driver Analysis Modal */}
       {aiDriverModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-slate-100/50 rounded-3xl shadow-sm max-w-md w-full">
+          <div className="bg-white border border-slate-100/50 rounded-xl shadow-sm max-w-md w-full">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -816,7 +816,7 @@ const [form, setForm] = useState({
 
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-slate-100/50 rounded-3xl shadow-sm max-w-md w-full">
+          <div className="bg-white border border-slate-100/50 rounded-xl shadow-sm max-w-md w-full">
             <div className="p-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold text-slate-900">{editing ? 'Edit Driver' : 'Add Driver'}</h3>
@@ -894,7 +894,7 @@ const [form, setForm] = useState({
       {/* Vehicle Form Modal */}
       {vehicleForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-slate-100/50 rounded-3xl shadow-sm max-w-md w-full">
+          <div className="bg-white border border-slate-100/50 rounded-xl shadow-sm max-w-md w-full">
             <div className="p-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold text-slate-900">{editVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</h3>

@@ -40,7 +40,7 @@ const ActivityRow = ({ index, log }) => {
             </div>
           )}
         </div>
-        <span className="text-[10px] font-bold text-slate-400 flex-shrink-0">{log.timestamp}</span>
+        <span className="text-[10px] font-semibold text-slate-400 flex-shrink-0">{log.timestamp}</span>
       </div>
     </div>
   );
@@ -216,7 +216,7 @@ const SettingsPage = ({
                     <div className={`w-9 h-9 rounded-xl ${stat.color} flex items-center justify-center mb-3`}>
                       <Icon size={16} className="text-white" />
                     </div>
-                    <p className="text-2xl font-black text-slate-900">{stat.value}</p>
+                    <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
                     <p className="text-xs font-semibold text-slate-500 mt-0.5">{stat.label}</p>
                   </div>
                 );
@@ -233,7 +233,7 @@ const SettingsPage = ({
               <h3 className="text-heading text-slate-900 mb-1">User Management</h3>
               <p className="text-body text-slate-500">All registered drivers and dispatchers.</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
@@ -249,16 +249,16 @@ const SettingsPage = ({
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-3 py-1.5 font-semibold text-slate-900">{d.name || '—'}</td>
                         <td className="px-3 py-1.5 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
-                        <td className="px-3 py-1.5"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${ROLE_COLORS[d.role] || 'bg-slate-100 text-slate-600'}`}>{ROLE_LABELS[d.role] || d.role}</span></td>
-                        <td className="px-3 py-1.5"><span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500" />Active</span></td>
+                        <td className="px-3 py-1.5"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${ROLE_COLORS[d.role] || 'bg-slate-100 text-slate-600'}`}>{ROLE_LABELS[d.role] || d.role}</span></td>
+                        <td className="px-3 py-1.5"><span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500" />Active</span></td>
                       </tr>
                     ))}
                     {drivers.map((d, i) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-3 py-1.5 font-semibold text-slate-900">{d.name || '—'}</td>
                         <td className="px-3 py-1.5 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
-                        <td className="px-3 py-1.5"><span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Driver</span></td>
-                        <td className="px-3 py-1.5"><span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500" />Active</span></td>
+                        <td className="px-3 py-1.5"><span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">Driver</span></td>
+                        <td className="px-3 py-1.5"><span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500" />Active</span></td>
                       </tr>
                     ))}
                     {(dispatchers.length + drivers.length) === 0 && (
@@ -279,7 +279,7 @@ const SettingsPage = ({
               <h3 className="text-heading text-slate-900 mb-1">System Activity</h3>
               <p className="text-body text-slate-500">Audit log of all user actions and system events.</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
                 {(() => {
                   const displayedLogs = role === 'dispatcher' ? (logs || []).filter(l => (l.actorRole || '') !== 'admin') : (logs || []);
@@ -304,7 +304,7 @@ const SettingsPage = ({
               <h3 className="text-heading text-slate-900 mb-1">Roles &amp; Permissions</h3>
               <p className="text-body text-slate-500">Capability matrix for every role in the system.</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -344,14 +344,14 @@ const SettingsPage = ({
               <h3 className="text-heading text-slate-900 mb-1">Archived Trips</h3>
               <p className="text-body text-slate-500">Trips that have been archived from operations. Restore to reactivate or permanently delete.</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8">
               {!showArchivedTrips ? (
                 <button onClick={() => setShowArchivedTrips(true)} className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition flex items-center justify-center gap-2 text-base">
                   <Eye size={20} /> View Archived ({trashedTrips.length})
                 </button>
               ) : (
                 <div>
-                  <button onClick={() => setShowArchivedTrips(false)} className="mb-4 px-4 py-2 text-slate-600 hover:text-slate-900 font-bold text-sm">← Hide</button>
+                  <button onClick={() => setShowArchivedTrips(false)} className="mb-4 px-4 py-2 text-slate-600 hover:text-slate-900 font-semibold text-sm">← Hide</button>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-slate-50 border-b border-slate-200">
@@ -470,7 +470,7 @@ const SettingsPage = ({
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-800 font-semibold text-base mb-1"><RefreshCw size={18} /> Data Sync Status</div>
                 <p className="text-sm text-slate-500 mb-4">Firestore real-time sync is active. Data is synchronized across all connected clients.</p>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Live</div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-semibold"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Live</div>
               </div>
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm border-rose-200 bg-rose-50">
@@ -488,7 +488,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Profile</h3><p className="text-body text-slate-500">Your account details and contact numbers.</p></div>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="space-y-5 max-w-3xl">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Username</label>
@@ -529,7 +529,7 @@ const SettingsPage = ({
                       <p className="text-micro">Current Odometer</p>
                       <div className="flex items-center gap-2 mt-2">
                         <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) _updateSettings?.({ odometer: val }, true); }} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-900 focus:border-blue-500 outline-none text-base" />
-                        <span className="text-sm font-bold text-slate-400">mi</span>
+                        <span className="text-sm font-semibold text-slate-400">mi</span>
                       </div>
                     </div>
                   </div>
@@ -549,7 +549,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Appearance</h3><p className="text-body text-slate-500">Choose the theme and reading size that work best for you.</p></div>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8 space-y-8">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8 space-y-8">
               <div>
                 <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold text-base"><Palette size={20} /> Theme</div>
                 <div className="grid grid-cols-3 gap-3 max-w-lg">
@@ -575,7 +575,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Accessibility</h3><p className="text-body text-slate-500">Optimize readability for operational use, especially while driving.</p></div>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8 space-y-8">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8 space-y-8">
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-slate-800 font-semibold text-base"><Type size={20} /> Font Size</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -588,7 +588,7 @@ const SettingsPage = ({
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? (isDriverMode ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white') : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
-                        {active && <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${isDriverMode ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>Active</span>}
+                        {active && <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${isDriverMode ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>Active</span>}
                       </button>
                     );
                   })}
@@ -601,13 +601,13 @@ const SettingsPage = ({
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability !== 'enhanced' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><TextSelect size={20} /></div>
                     <div className="font-semibold text-sm text-slate-900">Standard</div>
                     <p className="text-xs text-slate-500 mt-0.5">Normal contrast and font weights</p>
-                    {appSettings?.readability !== 'enhanced' && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
+                    {appSettings?.readability !== 'enhanced' && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
                   </button>
                   <button onClick={() => _updateSettings?.({ readability: 'enhanced' })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability === 'enhanced' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Eye size={20} /></div>
                     <div className="font-semibold text-sm text-slate-900">Enhanced</div>
                     <p className="text-xs text-slate-500 mt-0.5">Bolder text, stronger contrast, better spacing</p>
-                    {appSettings?.readability === 'enhanced' && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-700">Active</span>}
+                    {appSettings?.readability === 'enhanced' && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-100 text-amber-700">Active</span>}
                   </button>
                 </div>
               </div>
@@ -620,7 +620,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Navigation</h3><p className="text-body text-slate-500">Choose which GPS app opens for directions. Single-trip vs Route Plan can use different apps.</p></div>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="max-w-3xl">
                 <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold text-base"><Route size={20} /> Preferred Navigation App</div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -631,14 +631,14 @@ const SettingsPage = ({
                       <button key={option.value} onClick={() => _updateSettings?.({ navigationApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-semibold text-sm text-slate-900">{option.label}</div>
-                        {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
+                        {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
                       </button>
                     );
                   })}
                 </div>
               </div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="max-w-3xl">
                 <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold text-base"><Route size={20} /> Route Plan Navigation</div>
                 <p className="text-sm text-slate-500 mb-3">GPS app for multi-stop Route Plan tool (Navigate All). Separate from single-trip navigation above.</p>
@@ -650,7 +650,7 @@ const SettingsPage = ({
                       <button key={option.value} onClick={() => _updateSettings?.({ routePlanNavApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-semibold text-sm text-slate-900">{option.label}</div>
-                        {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
+                        {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
                       </button>
                     );
                   })}
@@ -665,7 +665,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Notifications</h3><p className="text-body text-slate-500">Choose which alerts you receive while on duty.</p></div>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="space-y-4 max-w-lg">
                 {[
                   { key: 'tripUpdates', label: 'Trip Updates', desc: 'New assignments, status changes, and cancellations' },
@@ -696,7 +696,7 @@ const SettingsPage = ({
         return (
           <div className="space-y-6">
             <div><h3 className="text-heading text-slate-900 mb-1">Security</h3><p className="text-body text-slate-500">Manage your password and account security.</p></div>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-5 sm:p-8">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="space-y-5 max-w-2xl">
                 <div>
                   <h4 className="font-semibold text-slate-900 mb-4 text-base">Change Password</h4>
@@ -732,7 +732,7 @@ const SettingsPage = ({
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm sticky top-4">
           {navItems.map((group, gi) => (
             <div key={gi}>
-              <div className="px-4 pt-4 pb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">{group.group}</div>
+              <div className="px-4 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">{group.group}</div>
               {group.items.map(item => {
                 const Icon = item.icon;
                 const isActive = activeSection === item.id;
@@ -740,7 +740,7 @@ const SettingsPage = ({
                   <button
                     key={item.id}
                     onClick={() => setActiveSection(item.id)}
-                    className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-all text-sm ${isActive ? 'bg-blue-50 text-blue-700 font-bold border-r-2 border-blue-600' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
+                    className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-all text-sm ${isActive ? 'bg-blue-50 text-blue-700 font-semibold border-r-2 border-blue-600' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
                   >
                     <Icon size={15} className={isActive ? 'text-blue-600' : 'text-slate-400'} />
                     <span>{item.label}</span>
@@ -760,7 +760,7 @@ const SettingsPage = ({
             const Icon = item.icon;
             const isActive = activeSection === item.id;
             return (
-              <button key={item.id} onClick={() => setActiveSection(item.id)} className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl whitespace-nowrap text-xs font-bold transition-all active:scale-[0.97] touch-manipulation ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 active:bg-slate-300'}`}>
+              <button key={item.id} onClick={() => setActiveSection(item.id)} className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl whitespace-nowrap text-xs font-semibold transition-all active:scale-[0.97] touch-manipulation ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 active:bg-slate-300'}`}>
                 <Icon size={14} /> {item.label}
               </button>
             );
@@ -776,7 +776,7 @@ const SettingsPage = ({
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setDeleteConfirmTrip(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
                 <Trash2 size={16} className="text-rose-600" /> Permanently Delete Trip
               </h3>
               <p className="text-sm text-slate-500 mt-2">

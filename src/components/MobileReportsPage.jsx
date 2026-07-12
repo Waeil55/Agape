@@ -6,9 +6,9 @@ import {
 import { localCalendarYmd } from '../utils/tripDate';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
-const DetailRow = ({ label, value, valueColor = "text-gray-900" }) => (
+const DetailRow = ({ label, value, valueColor = "text-slate-900" }) => (
   <div className="grid grid-cols-[112px_1fr] gap-3 py-1.5 items-start">
-    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-[0.14em] mt-0.5">
+    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em] mt-0.5">
       {label}
     </span>
     <span className={`text-[12px] font-semibold leading-5 ${valueColor}`}>
@@ -303,27 +303,27 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                       <div className="space-y-2.5">
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-0.5 block">Patient</label>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Patient</label>
                             <input value={ie.patient} onChange={(e) => setEditingTripData(p => ({ ...p, patient: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-0.5 block">Booking ID</label>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Booking ID</label>
                             <input value={ie.bookingId} onChange={(e) => setEditingTripData(p => ({ ...p, bookingId: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-0.5 block">Date</label>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Date</label>
                             <input type="date" value={ie.date} onChange={(e) => setEditingTripData(p => ({ ...p, date: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-0.5 block">Time</label>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Time</label>
                             <input value={ie.time} onChange={(e) => setEditingTripData(p => ({ ...p, time: e.target.value }))} className={inputCls} placeholder="8:30 AM" />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-0.5 block">Service Type</label>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Service Type</label>
                             <input value={ie.type} onChange={(e) => setEditingTripData(p => ({ ...p, type: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-0.5 block">Status</label>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Status</label>
                             <select value={ie.status} onChange={(e) => setEditingTripData(p => ({ ...p, status: e.target.value }))} className={inputCls}>
                               {['Assigned', 'Navigating Pickup', 'At Pickup', 'In Transit', 'At Dropoff', 'Completed', 'No Show', 'Cancelled', 'Rerouted'].map(s => (
                                 <option key={s} value={s}>{s}</option>
@@ -359,11 +359,11 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-0.5 block">Pickup Phone</label>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Pickup Phone</label>
                             <input value={ie.pickupPhone} onChange={(e) => setEditingTripData(p => ({ ...p, pickupPhone: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-0.5 block">Dropoff Phone</label>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Dropoff Phone</label>
                             <input value={ie.dropoffPhone} onChange={(e) => setEditingTripData(p => ({ ...p, dropoffPhone: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
@@ -371,12 +371,12 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                             <input value={ie.hospitalPhone || ''} onChange={(e) => setEditingTripData(p => ({ ...p, hospitalPhone: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-0.5 block">Distance</label>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Distance</label>
                             <input value={ie.distance} onChange={(e) => setEditingTripData(p => ({ ...p, distance: e.target.value }))} className={inputCls} />
                           </div>
                         </div>
                         <div>
-                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-0.5 block">Notes</label>
+                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Notes</label>
                           <textarea value={ie.notes} onChange={(e) => setEditingTripData(p => ({ ...p, notes: e.target.value }))} className={inputCls} rows="2" placeholder="Update notes..." />
                         </div>
                       </div>
@@ -388,19 +388,19 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                         <DetailRow label="VEHICLE" value={trip.completedVehicle || (driver ? driver.vehicle : '-')} />
                         <DetailRow label="SCHEDULED" value={formatClock(trip.time)} valueColor="text-[#2563EB]" />
 
-                        <div className="my-2 border-t border-gray-300/50"></div>
+                        <div className="my-2 border-t border-slate-300/50"></div>
 
                         <DetailRow label="PICKUP ADDRESS" value={trip.pickup} valueColor="text-emerald-600" />
                         <DetailRow label="PICKUP ARRIVAL" value={formatClock(trip.arrivalTime)} valueColor="text-emerald-600" />
                         <DetailRow label="START ODOMETER" value={trip.pickupOdometer || '-'} valueColor="text-emerald-600" />
 
-                        <div className="my-2 border-t border-gray-300/50"></div>
+                        <div className="my-2 border-t border-slate-300/50"></div>
 
                         <DetailRow label="DROPOFF ADDRESS" value={trip.dropoff} valueColor="text-red-600" />
                         <DetailRow label="DROPOFF ARRIVAL" value={formatClock(trip.arrivalDropoffTime)} valueColor="text-red-600" />
                         <DetailRow label="END ODOMETER" value={trip.dropoffOdometer || '-'} valueColor="text-red-600" />
 
-                        <div className="my-2 border-t border-gray-300/50"></div>
+                        <div className="my-2 border-t border-slate-300/50"></div>
 
                         <DetailRow label="DISTANCE" value={`${calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance)} mi`} />
                         <DetailRow label="TRAVEL TIME" value={trip.travelTime ? `${trip.travelTime}m` : '-'} />
@@ -421,7 +421,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                           </button>
                           <button
                             onClick={cancelInlineEdit}
-                            className="flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-xl py-3 shadow-sm text-gray-700 font-bold text-sm"
+                            className="flex items-center justify-center gap-2 bg-white border border-slate-200 rounded-xl py-3 shadow-sm text-slate-700 font-bold text-sm"
                           >
                             <X className="w-4 h-4" />
                             Cancel
@@ -431,16 +431,16 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                         <>
                           <button
                             onClick={() => startInlineEdit(trip)}
-                            className="flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-xl py-3 shadow-sm hover:bg-gray-50 text-gray-700 font-bold text-sm"
+                            className="flex items-center justify-center gap-2 bg-white border border-slate-200 rounded-xl py-3 shadow-sm hover:bg-slate-50 text-slate-700 font-bold text-sm"
                           >
-                            <Edit2 className="w-4 h-4 text-gray-500" />
+                            <Edit2 className="w-4 h-4 text-slate-500" />
                             Edit
                           </button>
                           <button
                             onClick={() => onUpdateTrip && onUpdateTrip(trip.id, { reviewed: !trip.reviewed })}
-                            className={`flex items-center justify-center gap-2 border rounded-xl py-3 shadow-sm font-bold text-sm transition-colors ${trip.reviewed ? 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50' : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'}`}
+                            className={`flex items-center justify-center gap-2 border rounded-xl py-3 shadow-sm font-bold text-sm transition-colors ${trip.reviewed ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'}`}
                           >
-                            <CheckCircle2 className={`w-4 h-4 ${trip.reviewed ? 'text-gray-500' : 'text-white'}`} />
+                            <CheckCircle2 className={`w-4 h-4 ${trip.reviewed ? 'text-slate-500' : 'text-white'}`} />
                             {trip.reviewed ? 'Un-Review' : 'Review'}
                           </button>
                         </>
@@ -452,7 +452,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             );
           })}
           {filteredTrips.length === 0 && (
-            <div className="text-center py-8 text-gray-400 text-xs font-semibold">
+            <div className="text-center py-8 text-slate-400 text-xs font-semibold">
               No trips found for this date/search.
             </div>
           )}

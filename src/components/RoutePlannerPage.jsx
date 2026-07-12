@@ -644,7 +644,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
         {/* Stops list */}
         <div className="flex-1 overflow-y-auto overscroll-contain p-3">
           {showSavedPlans && (
-            <div className="mx-auto mb-3 max-w-xl rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="mx-auto mb-3 max-w-xl rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">Saved Plans</p>
