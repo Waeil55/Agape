@@ -443,7 +443,7 @@ const MobileAdminPage = ({
 
         {activeTab === 'activity' && (
           <AdminCard pad={false} className="overflow-hidden">
-            <AdminCardHead icon={Loader2} title="System Timeline" />
+            <AdminCardHead icon={Activity} title="System Timeline" />
             <div className="mobile-admin-activity-list">
               {logs.slice(0, 50).map((log, index) => <MobileActivityItem key={log.id || index} log={log} />)}
               {logs.length === 0 && <AdminEmpty icon={Activity} title="No activity yet" />}

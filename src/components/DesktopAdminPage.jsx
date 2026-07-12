@@ -118,7 +118,7 @@ const CompactActivityFeed = ({ logs = [], onViewTrip, limit = 8 }) => (
               <p className="line-clamp-2 text-xs font-medium text-slate-500">{log.meta?.summary || log.d || 'No details'}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-400">{fmtTime(log.time)}</span>
+              <span className="text-[11px] font-semibold text-slate-400">{fmtTime(log.time)}</span>
               {tripId && onViewTrip && (
                 <button type="button" onClick={() => onViewTrip(tripId)} className="admin-mini-link" aria-label="Open trip">
                   <ExternalLink size={12} />
@@ -271,7 +271,7 @@ const TeamMemberCard = ({ user, role, live, pwResetMsg, onRoleChange, onResetPas
         <Trash2 size={13} /> Delete
       </AdminButton>
       {pwResetMsg[user.email] && (
-        <span className={`ml-auto text-[11px] font-bold ${pwResetMsg[user.email] === 'Email sent!' ? 'text-emerald-600' : 'text-rose-600'}`}>
+        <span className={`ml-auto text-[11px] font-semibold ${pwResetMsg[user.email] === 'Email sent!' ? 'text-emerald-600' : 'text-rose-600'}`}>
           {pwResetMsg[user.email]}
         </span>
       )}
@@ -824,7 +824,7 @@ const DesktopAdminPage = ({
                         </div>
                         <p className="truncate text-xs font-medium text-slate-500">{currentTrip ? `${currentTrip.patient || 'Trip'} - ${currentTrip.status}` : driver.vehicle || 'No vehicle assigned'}</p>
                       </div>
-                      <span className="text-xs font-bold text-slate-400">{driver.currentZone || '--'}</span>
+                      <span className="text-xs font-semibold text-slate-400">{driver.currentZone || '--'}</span>
                     </div>
                   );
                 })}

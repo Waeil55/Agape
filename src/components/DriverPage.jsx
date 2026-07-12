@@ -3407,7 +3407,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   if (!me) {
     return (
-      <div className="flex-1 bg-[#F3F4F6] flex items-center justify-center p-8">
+      <div className="flex-1 bg-[#F4F7FC] flex items-center justify-center p-8">
         <div className="text-center">
           <div className="w-20 h-20 bg-white rounded-[2rem] shadow-lg flex items-center justify-center mx-auto mb-6">
             <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
@@ -3421,7 +3421,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   return (
     <div
-      className="w-full h-full overflow-hidden flex flex-col bg-[#F3F4F6] text-slate-900 relative"
+      className="w-full h-full overflow-hidden flex flex-col bg-[#F4F7FC] text-slate-900 relative"
       onTouchStart={handlePullTouchStart}
       onTouchMove={handlePullTouchMove}
       onTouchEnd={handlePullTouchEnd}
@@ -3439,7 +3439,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       )}
       {!(activeNav === 'active-trip' && activeWorkTrip) && (
         <div
-          className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md"
+          className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F4F7FC]/95 backdrop-blur-md"
         >
           <div className="px-3 py-3 flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
@@ -3513,7 +3513,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {activeNav === 'active-trip' && activeWorkTrip && (
         <div
           ref={tripsScrollRef}
-          className="flex-1 overflow-y-auto bg-[#F3F4F6]"
+          className="flex-1 overflow-y-auto bg-[#F4F7FC]"
           style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
         >
           {renderTripWorkPage(activeWorkTrip)}
@@ -3524,7 +3524,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && (
         <div
           ref={tripsScrollRef}
-          className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F3F4F6]"
+          className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F4F7FC]"
           style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
         >
             <>

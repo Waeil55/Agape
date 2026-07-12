@@ -2331,7 +2331,7 @@ html, body {
     gap: 0.35rem;
     padding: 0 1rem;
     font-size: 1rem;
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0;
     color: var(--agape-mobile-text);
     white-space: nowrap;
@@ -2339,7 +2339,7 @@ html, body {
 
   .agape-mobile-date-pill span:last-child {
     color: var(--agape-mobile-blue);
-    font-weight: 800;
+    font-weight: 700;
   }
 
   .agape-mobile-search-section {
@@ -2383,7 +2383,7 @@ html, body {
     border: 1px solid var(--agape-mobile-border);
     color: var(--agape-mobile-muted);
     font-size: 0.75rem;
-    font-weight: 800;
+    font-weight: 600;
     white-space: nowrap;
   }
 
@@ -2405,7 +2405,7 @@ html, body {
     border: 1px solid #bfefdf;
     color: #047857;
     font-size: 0.78rem;
-    font-weight: 800;
+    font-weight: 700;
     white-space: nowrap;
   }
 
@@ -2468,7 +2468,7 @@ html, body {
     white-space: nowrap;
     font-size: 1.05rem;
     line-height: 1.15;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--agape-mobile-text);
     letter-spacing: 0;
   }
@@ -2480,7 +2480,7 @@ html, body {
     white-space: nowrap;
     font-size: 0.75rem;
     line-height: 1.1;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--agape-mobile-blue);
   }
 
@@ -2494,7 +2494,7 @@ html, body {
   .agape-trip-time {
     font-size: 0.9rem;
     line-height: 1;
-    font-weight: 700;
+    font-weight: 600;
     white-space: nowrap;
   }
 
@@ -3729,7 +3729,7 @@ html, body {
 .admin-metric-value,
 .mobile-admin-metric-value {
   color: var(--adm-text);
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -3741,7 +3741,7 @@ html, body {
 .mobile-admin-metric-label {
   margin-top: var(--space-1);
   color: var(--adm-text-mute);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -4144,7 +4144,7 @@ html, body {
 .mobile-admin-eyebrow {
   color: var(--adm-primary);
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -4153,7 +4153,7 @@ html, body {
   margin-top: 0.15rem;
   color: var(--adm-text);
   font-size: 1.25rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0;
 }
@@ -4211,7 +4211,7 @@ html, body {
 .mobile-admin-command-head p {
   color: var(--adm-primary);
   font-size: 0.66rem;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -4220,7 +4220,7 @@ html, body {
   margin-top: 0.15rem;
   color: var(--adm-text);
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0;
 }
 
@@ -4246,14 +4246,14 @@ html, body {
 .mobile-admin-signal-grid strong {
   color: var(--adm-text);
   font-size: 1.05rem;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1;
 }
 
 .mobile-admin-signal-grid span {
   color: var(--adm-text-soft);
   font-size: 0.63rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .mobile-admin-priority-list {
@@ -4282,7 +4282,7 @@ html, body {
   color: #fff;
   background: var(--adm-primary);
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .mobile-admin-priority-title {
@@ -4297,7 +4297,7 @@ html, body {
   overflow: hidden;
   color: var(--adm-text);
   font-size: 0.84rem;
-  font-weight: 900;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -4321,7 +4321,7 @@ html, body {
   padding: var(--space-4);
   color: #047857;
   font-size: 0.82rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .mobile-admin-driver-card,
@@ -4350,7 +4350,7 @@ html, body {
   min-width: 0;
   color: var(--adm-text);
   font-size: 0.98rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.15;
 }
 
@@ -4380,7 +4380,7 @@ html, body {
   display: block;
   color: var(--adm-text-mute);
   font-size: 0.65rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -4392,7 +4392,7 @@ html, body {
   margin-top: var(--space-1);
   color: var(--adm-text);
   font-size: 0.86rem;
-  font-weight: 800;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -4484,14 +4484,14 @@ html, body {
 .mobile-admin-activity-head strong {
   color: var(--adm-text);
   font-size: 0.86rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .mobile-admin-activity-head span {
   flex-shrink: 0;
   color: var(--adm-text-mute);
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .mobile-admin-activity-item p {

@@ -20,6 +20,8 @@ const ArchivesPage = lazy(() => import('./ArchivesPage'));
 const SettingsPage = lazy(() => import('./SettingsPage'));
 const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
 const DriverToolsPage = lazy(() => import('./DriverToolsPage'));
+const PayrollReportPage = lazy(() => import('./PayrollReportPage'));
+const TimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
 import { getDriverLiveStatus } from '../constants/statuses';
 const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })));
 
@@ -123,7 +125,7 @@ const MobileEnterpriseDashboard = (props) => {
     <div className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F3F4F6]/95 backdrop-blur-md">
       <div className="px-3 py-3 flex items-center gap-3">
         {showBack && (
-          <button onClick={() => setSubView(null)} className="min-w-[36px] min-h-[36px] flex items-center justify-center -ml-1.5 text-gray-500 hover:text-gray-800 rounded-full bg-gray-200/50 touch-manipulation transition-all">
+          <button onClick={() => setSubView(null)} className="min-w-[36px] min-h-[36px] flex items-center justify-center -ml-1.5 text-slate-500 hover:text-slate-800 rounded-full bg-slate-200/50 touch-manipulation transition-all">
             <ChevronLeft size={20} />
           </button>
         )}
@@ -249,7 +251,7 @@ const MobileEnterpriseDashboard = (props) => {
     // Handle Sub-views (from Menu)
     if (subView === 'reports') {
       return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Reports & Export', true)}
           <div className="flex-1 overflow-y-auto overscroll-contain">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} /></Suspense></ErrorBoundary>
@@ -260,7 +262,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'admin') {
       return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('User Management', true)}
           <div className="flex-1 overflow-y-auto overscroll-contain">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><AdminPage {...props} /></Suspense></ErrorBoundary>
@@ -271,7 +273,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'archives') {
       return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Archives', true)}
           <div className="flex-1 overflow-y-auto overscroll-contain">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><ArchivesPage {...props} /></Suspense></ErrorBoundary>
@@ -282,7 +284,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'settings') {
       return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Settings', true)}
           <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><SettingsPage {...props} onResetSystem={() => { props.setTrips?.([]); props.setTrashedTrips?.([]); props.setDrivers?.([]); props.setLogs?.([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); props.addAuditLog?.('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} /></Suspense></ErrorBoundary>
@@ -293,7 +295,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'fleet') {
       return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Fleet Management', true)}
           <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><DriversVehiclesPage {...props} /></Suspense></ErrorBoundary>
@@ -304,10 +306,32 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'map') {
       return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Live Map', true)}
           <div className="flex-1 overflow-hidden">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><LiveMapPage trips={trips} drivers={drivers} /></Suspense></ErrorBoundary>
+          </div>
+        </div>
+      );
+    }
+
+    if (subView === 'payroll') {
+      return (
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
+          {renderTopBar('Payroll', true)}
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><PayrollReportPage drivers={drivers} trips={trips} /></Suspense></ErrorBoundary>
+          </div>
+        </div>
+      );
+    }
+
+    if (subView === 'activity') {
+      return (
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
+          {renderTopBar('Activity Log', true)}
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><TimeTrackingAdmin drivers={drivers} trips={trips} role={role} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -320,11 +344,11 @@ const MobileEnterpriseDashboard = (props) => {
         : [activeDriverWorkDriver].filter(Boolean);
 
       return (
-        <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
+        <div className="flex-1 overflow-hidden flex flex-col relative bg-slate-50">
           {dispatchWorkspaceMode === 'operate' ? (
             <div className="absolute inset-0 flex min-h-0 flex-col">
               {renderTopBar(role === 'admin' ? 'Operations workspace' : 'Dispatch workspace')}
-              <div className="mobile-dispatch-header shrink-0 border-b border-gray-200 bg-white px-3 pb-3 sm:px-4">
+              <div className="mobile-dispatch-header shrink-0 border-b border-slate-200 bg-white px-3 pb-3 sm:px-4">
                 {renderDispatchWorkspaceControls()}
               </div>
               {renderDriverWorkPanel()}
@@ -353,7 +377,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (currentView === 'reports') {
       return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Reports & Export')}
           <div className="flex-1 overflow-y-auto overscroll-contain">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} /></Suspense></ErrorBoundary>
@@ -374,7 +398,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (currentView === 'map') {
       return (
-        <div className="flex-1 overflow-hidden flex flex-col relative bg-gray-50">
+        <div className="flex-1 overflow-hidden flex flex-col relative bg-slate-50">
           {renderTopBar('Live Fleet Tracking')}
           <div className="flex-1 relative">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><LiveMapPage {...props} /></Suspense></ErrorBoundary>
@@ -385,7 +409,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (currentView === 'menu') {
       return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Settings & More')}
           <div className="flex-1 overflow-y-auto overscroll-contain">
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><MobileMenuPage {...props} setSubView={setSubView} /></Suspense></ErrorBoundary>
@@ -406,15 +430,15 @@ const MobileEnterpriseDashboard = (props) => {
       const toolsActiveTrips = toolsTrips.filter(t => !['Completed', 'Canceled', 'Archived'].includes(t.status));
 
       return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
           {renderTopBar('Route Tools')}
-          <div className="shrink-0 bg-white border-b border-gray-200 px-3 py-2.5">
+          <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2.5">
             <label className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-500 shrink-0">Plan for</span>
               <select
                 value={toolsDriverId}
                 onChange={e => setToolsDriverId(e.target.value)}
-                className="flex-1 min-w-0 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#2b4c7e] focus:ring-1 focus:ring-[#2b4c7e] transition-all"
+                className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#2b4c7e] focus:ring-1 focus:ring-[#2b4c7e] transition-all"
               >
                 <option value="">Select a driver…</option>
                 {driverWorkDrivers.map(d => (

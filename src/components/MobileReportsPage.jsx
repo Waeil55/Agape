@@ -198,10 +198,18 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     if (onUpdateTrip) onUpdateTrip(editingTripId, payload);
   };
 
-  const inputCls = "w-full px-2.5 py-2 bg-white border border-gray-200 rounded-lg font-semibold text-[11px] focus:border-[#2563EB] outline-none transition-all";
+  const inputCls = "w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg font-semibold text-[11px] focus:border-[#2563EB] outline-none transition-all";
 
   return (
     <div className="agape-mobile-page agape-mobile-reports w-full flex-1 flex flex-col overflow-hidden overscroll-contain">
+      {/* PAGE HEADER */}
+      <div className="shrink-0 px-3 pt-3 pb-2 bg-white border-b border-slate-200">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-amber-500 flex items-center justify-center"><FileText size={16} className="text-white" /></div>
+          <h1 className="text-lg font-semibold text-slate-900">Reports & Export</h1>
+        </div>
+      </div>
+
       {/* DATE & FILTERS BAR */}
       <div className="agape-mobile-toolbar shrink-0">
         <div className="flex min-w-0 items-center gap-2">
@@ -232,7 +240,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             placeholder="Search by patient, booking ID, address..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-slate-700 outline-none placeholder:text-slate-400"
+            className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold text-slate-700 outline-none placeholder:text-slate-400"
           />
         </div>
       </div>

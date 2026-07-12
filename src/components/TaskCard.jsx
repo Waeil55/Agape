@@ -124,7 +124,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
 
   return (
     <div
-      className={`relative bg-white rounded-3xl mb-3
+      className={`relative bg-white rounded-xl mb-3
         ${isExpanded ? 'shadow-2xl ring-2 ring-blue-500/15' : 'shadow-sm border border-slate-100/50 hover:shadow-md'}
         ${isAnotherExpanded ? 'opacity-35 scale-[0.98] blur-[1px] pointer-events-none' : ''}
         ${!isExpanded && timeUrgency.type === 'critical' ? 'border-rose-300 shadow-rose-100 shadow-md bg-rose-50' : ''}

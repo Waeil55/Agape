@@ -34,7 +34,7 @@ const getGapClassificationColor = (classification) => {
     case 'SHORT': return 'bg-green-100 text-green-800';
     case 'MEDIUM': return 'bg-yellow-100 text-yellow-800';
     case 'LONG': return 'bg-red-100 text-red-800';
-    default: return 'bg-gray-100 text-gray-800';
+    default: return 'bg-slate-100 text-slate-800';
   }
 };
 
@@ -193,7 +193,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
     if (isEditing) {
       return (
         <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-400">$</span>
+          <span className="text-xs text-slate-400">$</span>
           <input
             type="number"
             step="0.50"
@@ -216,42 +216,42 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
         className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-1.5 py-0.5 rounded transition-colors"
         title="Click to edit hourly rate"
       >
-        {rate > 0 ? `$${rate.toFixed(2)}/hr` : <span className="text-gray-400 italic">Set rate</span>}
+        {rate > 0 ? `$${rate.toFixed(2)}/hr` : <span className="text-slate-400 italic">Set rate</span>}
       </button>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6">
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 pb-24">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 bg-white border-b border-slate-200 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4 -mt-6 mb-6">
           <div className="flex items-center gap-3">
             {onBack && (
-              <button onClick={onBack} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
+              <button onClick={onBack} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition">
                 <X size={20} />
               </button>
             )}
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+              <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-2">
                 <Timer className="w-6 h-6 text-blue-600" />
                 Payroll & Time Tracking
               </h1>
-              <p className="text-sm text-gray-500 mt-1">Review sessions, manage rates, and calculate payroll</p>
+              <p className="text-sm text-slate-500 mt-1">Review sessions, manage rates, and calculate payroll</p>
             </div>
           </div>
-          <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50">
             <Download className="w-4 h-4" />
             Export CSV
           </button>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Person</label>
-              <select value={selectedDriver} onChange={(e) => setSelectedDriver(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Person</label>
+              <select value={selectedDriver} onChange={(e) => setSelectedDriver(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
                 <option value="ALL">Everyone</option>
                 {drivers.map(d => (
                   <option key={d.id} value={d.id}>{d.name || d.id} ({d.role === 'dispatcher' ? 'Dispatcher' : 'Driver'})</option>
@@ -259,60 +259,60 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               </select>
             </div>
             <div className="min-w-[150px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
-              <input type="date" value={dateRange.from} onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-slate-700 mb-1">From</label>
+              <input type="date" value={dateRange.from} onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="min-w-[150px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
-              <input type="date" value={dateRange.to} onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-slate-700 mb-1">To</label>
+              <input type="date" value={dateRange.to} onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
         </div>
 
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-50 rounded-lg"><Navigation className="w-5 h-5 text-blue-600" /></div>
               <div>
-                <p className="text-sm text-gray-500">Total Trips</p>
-                <p className="text-xl font-semibold text-gray-900">{summaryStats.totalTrips}</p>
+                <p className="text-sm text-slate-500">Total Trips</p>
+                <p className="text-xl font-semibold text-slate-900">{summaryStats.totalTrips}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-yellow-50 rounded-lg"><Clock className="w-5 h-5 text-yellow-600" /></div>
               <div>
-                <p className="text-sm text-gray-500">Total Gaps</p>
-                <p className="text-xl font-semibold text-gray-900">{summaryStats.totalGaps}</p>
+                <p className="text-sm text-slate-500">Total Gaps</p>
+                <p className="text-xl font-semibold text-slate-900">{summaryStats.totalGaps}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-red-50 rounded-lg"><AlertTriangle className="w-5 h-5 text-red-600" /></div>
               <div>
-                <p className="text-sm text-gray-500">Teleport Flags</p>
-                <p className="text-xl font-semibold text-gray-900">{summaryStats.totalTeleports}</p>
+                <p className="text-sm text-slate-500">Teleport Flags</p>
+                <p className="text-xl font-semibold text-slate-900">{summaryStats.totalTeleports}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-50 rounded-lg"><DollarSign className="w-5 h-5 text-green-600" /></div>
               <div>
-                <p className="text-sm text-gray-500">Excluded Min</p>
-                <p className="text-xl font-semibold text-gray-900">{formatMinutes(summaryStats.excludedMinutes)}</p>
+                <p className="text-sm text-slate-500">Excluded Min</p>
+                <p className="text-xl font-semibold text-slate-900">{formatMinutes(summaryStats.excludedMinutes)}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+        <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-lg w-fit">
           {[{ id: 'sessions', label: 'Sessions' }, { id: 'gaps', label: 'Gap Log' }, { id: 'abuse', label: 'Abuse' }, { id: 'payroll', label: 'Payroll' }].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === tab.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               {tab.label}
             </button>
           ))}
@@ -331,30 +331,30 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               const isDispatcher = driver?.role === 'dispatcher';
 
               return (
-                <div key={driverId} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <button onClick={() => setExpandedDriver(isExpanded ? null : driverId)} className="w-full flex items-center justify-between p-4 hover:bg-gray-50">
+                <div key={driverId} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <button onClick={() => setExpandedDriver(isExpanded ? null : driverId)} className="w-full flex items-center justify-between p-4 hover:bg-slate-50">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDispatcher ? 'bg-purple-100' : 'bg-blue-100'}`}>
                         {isDispatcher ? <Briefcase className="w-5 h-5 text-purple-600" /> : <User className="w-5 h-5 text-blue-600" />}
                       </div>
                       <div className="text-left">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-gray-900">{driver?.name || driverId}</p>
+                          <p className="font-medium text-slate-900">{driver?.name || driverId}</p>
                           <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${isDispatcher ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                             {isDispatcher ? 'Dispatcher' : 'Driver'}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-500">{dates.length} days · {totalTrips} trips · {formatMinutes(totalBillable)} worked</p>
+                        <p className="text-sm text-slate-500">{dates.length} days · {totalTrips} trips · {formatMinutes(totalBillable)} worked</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <RateInput driver={driver} />
-                      {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                      {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                     </div>
                   </button>
 
                   {isExpanded && (
-                    <div className="border-t border-gray-100">
+                    <div className="border-t border-slate-100">
                       {dates.map(date => {
                         const day = byDate[date];
                         const clockIn = day.clockEvents.find(e => e.type === 'IN' || e.type === 'CLOCK_IN' || e.type === 'AUTO_CLOCK_IN');
@@ -364,15 +364,15 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                         const earnings = getDayEarnings(day, rate);
 
                         return (
-                          <div key={date} className="px-4 py-3 border-t border-gray-50">
+                          <div key={date} className="px-4 py-3 border-t border-slate-50">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-3">
-                                <span className="text-sm font-medium text-gray-900">{formatDate(date + 'T12:00:00')}</span>
-                                <span className="text-sm text-gray-500">
+                                <span className="text-sm font-medium text-slate-900">{formatDate(date + 'T12:00:00')}</span>
+                                <span className="text-sm text-slate-500">
                                   {formatTime(clockIn?.timestamp || clockIn?.at)} → {formatTime(clockOut?.timestamp || clockOut?.at)}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-3 text-sm text-gray-600">
+                              <div className="flex items-center gap-3 text-sm text-slate-600">
                                 <span className="flex items-center gap-1"><Timer className="w-3 h-3" />{formatMinutes(billable)}</span>
                                 {breaks > 0 && <span className="flex items-center gap-1 text-yellow-600"><Pause className="w-3 h-3" />{formatMinutes(breaks)}</span>}
                                 <span className="flex items-center gap-1"><Navigation className="w-3 h-3" />{day.trips.length}</span>
@@ -387,10 +387,10 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                                 {day.trips.map((trip, i) => (
                                   <div key={trip.id || i} className="flex items-center gap-2 text-sm">
                                     <CheckCircle className="w-3 h-3 text-emerald-500" />
-                                    <span className="text-gray-700">{trip.patient || trip.id}</span>
-                                    <span className="text-gray-400">→</span>
-                                    <span className="text-gray-500">{trip.destination || '—'}</span>
-                                    {trip.billableMinutes > 0 && <span className="text-gray-400 text-xs">{formatMinutes(trip.billableMinutes)}</span>}
+                                    <span className="text-slate-700">{trip.patient || trip.id}</span>
+                                    <span className="text-slate-400">→</span>
+                                    <span className="text-slate-500">{trip.destination || '—'}</span>
+                                    {trip.billableMinutes > 0 && <span className="text-slate-400 text-xs">{formatMinutes(trip.billableMinutes)}</span>}
                                   </div>
                                 ))}
                               </div>
@@ -404,10 +404,10 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               );
             })}
             {Object.keys(driverSessions).length === 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-                <Timer className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No time tracking sessions found</p>
-                <p className="text-sm text-gray-400 mt-1">Sessions are created automatically when people clock in</p>
+              <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                <Timer className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-500">No time tracking sessions found</p>
+                <p className="text-sm text-slate-400 mt-1">Sessions are created automatically when people clock in</p>
               </div>
             )}
           </div>
@@ -415,28 +415,28 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
 
         {/* Gap Log Tab */}
         {activeTab === 'gaps' && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-100">
-              <h3 className="font-medium text-gray-900">Gap Analysis</h3>
-              <p className="text-sm text-gray-500">Gaps between events classified by duration and payroll effect</p>
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100">
+              <h3 className="font-medium text-slate-900">Gap Analysis</h3>
+              <p className="text-sm text-slate-500">Gaps between events classified by duration and payroll effect</p>
             </div>
             <div className="divide-y divide-gray-100">
               {(() => {
                 const allGaps = Object.entries(driverSessions).flatMap(([driverId, byDate]) =>
                   Object.entries(byDate).flatMap(([date, session]) => session.gaps.map(g => ({ ...g, driverId, date })))
                 ).sort((a, b) => new Date(b.timestamp || b.startTime) - new Date(a.timestamp || a.startTime));
-                if (allGaps.length === 0) return <div className="p-8 text-center text-gray-500">No gaps recorded</div>;
+                if (allGaps.length === 0) return <div className="p-8 text-center text-slate-500">No gaps recorded</div>;
                 return allGaps.map((gap, i) => (
                   <div key={i} className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getGapClassificationColor(gap.classification)}`}>{gap.classification}</span>
                       <div>
-                        <p className="text-sm text-gray-900">{gap.gapType === 'TRIP' ? 'Between trips' : gap.gapType === 'BREAK' ? 'Break' : 'After trip'}</p>
-                        <p className="text-xs text-gray-500">{formatDate(gap.timestamp || gap.startTime)} at {formatTime(gap.timestamp || gap.startTime)}</p>
+                        <p className="text-sm text-slate-900">{gap.gapType === 'TRIP' ? 'Between trips' : gap.gapType === 'BREAK' ? 'Break' : 'After trip'}</p>
+                        <p className="text-xs text-slate-500">{formatDate(gap.timestamp || gap.startTime)} at {formatTime(gap.timestamp || gap.startTime)}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">{formatMinutes(gap.durationMinutes)}</p>
+                      <p className="text-sm font-medium text-slate-900">{formatMinutes(gap.durationMinutes)}</p>
                       <p className={`text-xs ${gap.payrollEffect === 'EXCLUDED' ? 'text-red-500' : 'text-green-500'}`}>
                         {gap.payrollEffect === 'EXCLUDED' ? 'Excluded' : 'Included'}
                       </p>
@@ -450,9 +450,9 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
 
         {/* Abuse Flags Tab */}
         {activeTab === 'abuse' && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-100">
-              <h3 className="font-medium text-gray-900 flex items-center gap-2"><Shield className="w-4 h-4 text-red-500" />Abuse Detection</h3>
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100">
+              <h3 className="font-medium text-slate-900 flex items-center gap-2"><Shield className="w-4 h-4 text-red-500" />Abuse Detection</h3>
             </div>
             <div className="divide-y divide-gray-100">
               {(() => {
@@ -463,7 +463,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                   <div className="p-8 text-center">
                     <Shield className="w-12 h-12 text-green-300 mx-auto mb-4" />
                     <p className="text-green-600 font-medium">No abuse flags detected</p>
-                    <p className="text-sm text-gray-400 mt-1">All GPS activity looks normal</p>
+                    <p className="text-sm text-slate-400 mt-1">All GPS activity looks normal</p>
                   </div>
                 );
                 return allFlags.map((flag, i) => (
@@ -471,8 +471,8 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-red-50 rounded-lg"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{flag.flagType || 'GPS Anomaly'}</p>
-                        <p className="text-xs text-gray-500">{formatDate(flag.timestamp)} at {formatTime(flag.timestamp)}{flag.mph ? ` · ${Math.round(flag.mph)} mph` : ''}</p>
+                        <p className="text-sm font-medium text-slate-900">{flag.flagType || 'GPS Anomaly'}</p>
+                        <p className="text-xs text-slate-500">{formatDate(flag.timestamp)} at {formatTime(flag.timestamp)}{flag.mph ? ` · ${Math.round(flag.mph)} mph` : ''}</p>
                       </div>
                     </div>
                     <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-800">{flag.severity || 'HIGH'}</span>
@@ -485,13 +485,13 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
 
         {/* Payroll Tab */}
         {activeTab === 'payroll' && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-100">
-              <h3 className="font-medium text-gray-900 flex items-center gap-2">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100">
+              <h3 className="font-medium text-slate-900 flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-green-600" />
                 Payroll Summary
               </h3>
-              <p className="text-sm text-gray-500">Earnings by person with daily and weekly breakdowns</p>
+              <p className="text-sm text-slate-500">Earnings by person with daily and weekly breakdowns</p>
             </div>
             {(() => {
               const personPayroll = Object.entries(driverSessions).map(([driverId, byDate]) => {
@@ -547,7 +547,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               const periodStart = allDates[0];
               const periodEnd = allDates[allDates.length - 1];
 
-              if (personPayroll.length === 0) return <div className="p-8 text-center text-gray-500">No payroll data available</div>;
+              if (personPayroll.length === 0) return <div className="p-8 text-center text-slate-500">No payroll data available</div>;
 
               return (
                 <div className="divide-y divide-gray-100">
@@ -556,61 +556,63 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                     const isDispatcher = driver?.role === 'dispatcher';
                     return (
                       <div key={driverId}>
-                        <button onClick={() => setExpandedDriver(isExpanded ? null : `payroll-${driverId}`)} className="w-full p-4 hover:bg-gray-50 flex items-center justify-between">
+                        <button onClick={() => setExpandedDriver(isExpanded ? null : `payroll-${driverId}`)} className="w-full p-4 hover:bg-slate-50 flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDispatcher ? 'bg-purple-100' : 'bg-blue-100'}`}>
                               {isDispatcher ? <Briefcase className="w-4 h-4 text-purple-600" /> : <User className="w-4 h-4 text-blue-600" />}
                             </div>
                             <div className="text-left">
                               <div className="flex items-center gap-2">
-                                <p className="text-sm font-medium text-gray-900">{driver?.name || driverId}</p>
+                                <p className="text-sm font-medium text-slate-900">{driver?.name || driverId}</p>
                                 <span className={`text-[9px] font-semibold uppercase px-1 py-0.5 rounded ${isDispatcher ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                   {isDispatcher ? 'DSP' : 'DRV'}
                                 </span>
                               </div>
-                              <p className="text-xs text-gray-500">{numDays} days · {totalTrips} trips</p>
+                              <p className="text-xs text-slate-500">{numDays} days · {totalTrips} trips</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-4">
                             <RateInput driver={driver} />
                             <div className="text-right">
-                              <p className="text-sm font-semibold text-gray-900">{billableHours.toFixed(1)}h</p>
-                              <p className="text-xs text-gray-500">{formatMinutes(totalBillable)}</p>
+                              <p className="text-sm font-semibold text-slate-900">{billableHours.toFixed(1)}h</p>
+                              <p className="text-xs text-slate-500">{formatMinutes(totalBillable)}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-sm font-bold text-green-700">{formatCurrency(totalEarnings)}</p>
+                              <p className="text-sm font-semibold text-green-700">{formatCurrency(totalEarnings)}</p>
                               {overtimeHours > 0 && <p className="text-[10px] text-amber-600">{overtimeHours.toFixed(1)}h OT @ 1.5x</p>}
                             </div>
-                            {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                            {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                           </div>
                         </button>
                         {isExpanded && (
                           <div className="px-4 pb-4">
-                            <div className="bg-gray-50 rounded-xl overflow-hidden">
-                              <div className="grid grid-cols-5 gap-2 px-4 py-2 text-[10px] font-semibold text-gray-500 uppercase">
-                                <div>Date</div>
-                                <div className="text-center">Hours</div>
-                                <div className="text-center">Trips</div>
-                                <div className="text-center">Rate</div>
-                                <div className="text-right">Earnings</div>
-                              </div>
-                              {dailyBreakdown.map(day => (
-                                <div key={day.date} className="grid grid-cols-5 gap-2 px-4 py-2 border-t border-gray-100 text-sm">
-                                  <div className="text-gray-700">{formatDate(day.date + 'T12:00:00')}</div>
-                                  <div className="text-center text-gray-700">{day.hours.toFixed(1)}h</div>
-                                  <div className="text-center text-gray-700">{day.trips}</div>
-                                  <div className="text-center text-gray-500">${rate.toFixed(2)}</div>
-                                  <div className="text-right font-medium text-gray-900">{formatCurrency(day.earnings)}</div>
+                            <div className="bg-slate-50 rounded-xl overflow-x-auto">
+                              <div className="min-w-[480px]">
+                                <div className="grid grid-cols-5 gap-2 px-4 py-2 text-[10px] font-semibold text-slate-500 uppercase">
+                                  <div>Date</div>
+                                  <div className="text-center">Hours</div>
+                                  <div className="text-center">Trips</div>
+                                  <div className="text-center">Rate</div>
+                                  <div className="text-right">Earnings</div>
                                 </div>
-                              ))}
-                              <div className="grid grid-cols-5 gap-2 px-4 py-2 border-t border-gray-200 bg-gray-100 text-sm font-semibold">
-                                <div className="text-gray-700">Subtotal</div>
-                                <div className="text-center text-gray-900">{billableHours.toFixed(1)}h</div>
-                                <div className="text-center text-gray-900">{totalTrips}</div>
-                                <div className="text-center text-gray-500">
-                                  {overtimeHours > 0 ? <span className="text-xs">Reg + OT</span> : `$${rate.toFixed(2)}`}
+                                {dailyBreakdown.map(day => (
+                                  <div key={day.date} className="grid grid-cols-5 gap-2 px-4 py-2 border-t border-slate-100 text-sm">
+                                    <div className="text-slate-700">{formatDate(day.date + 'T12:00:00')}</div>
+                                    <div className="text-center text-slate-700">{day.hours.toFixed(1)}h</div>
+                                    <div className="text-center text-slate-700">{day.trips}</div>
+                                    <div className="text-center text-slate-500">${rate.toFixed(2)}</div>
+                                    <div className="text-right font-medium text-slate-900">{formatCurrency(day.earnings)}</div>
+                                  </div>
+                                ))}
+                                <div className="grid grid-cols-5 gap-2 px-4 py-2 border-t border-slate-200 bg-slate-100 text-sm font-semibold">
+                                  <div className="text-slate-700">Subtotal</div>
+                                  <div className="text-center text-slate-900">{billableHours.toFixed(1)}h</div>
+                                  <div className="text-center text-slate-900">{totalTrips}</div>
+                                  <div className="text-center text-slate-500">
+                                    {overtimeHours > 0 ? <span className="text-xs">Reg + OT</span> : `$${rate.toFixed(2)}`}
+                                  </div>
+                                  <div className="text-right text-green-700">{formatCurrency(totalEarnings)}</div>
                                 </div>
-                                <div className="text-right text-green-700">{formatCurrency(totalEarnings)}</div>
                               </div>
                             </div>
                           </div>
@@ -618,11 +620,11 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                       </div>
                     );
                   })}
-                  <div className="p-4 bg-gray-50 flex items-center justify-between flex-wrap gap-3">
-                    <p className="text-sm font-medium text-gray-700">Total Payroll ({personPayroll.length} people)</p>
+                  <div className="p-4 bg-slate-50 flex items-center justify-between flex-wrap gap-3">
+                    <p className="text-sm font-medium text-slate-700">Total Payroll ({personPayroll.length} people)</p>
                     <div className="flex items-center gap-4 flex-wrap">
-                      <p className="text-sm text-gray-600">{grandTotalHours.toFixed(1)} total hours</p>
-                      <p className="text-xl font-bold text-green-700">{formatCurrency(grandTotalEarnings)}</p>
+                      <p className="text-sm text-slate-600">{grandTotalHours.toFixed(1)} total hours</p>
+                      <p className="text-xl font-semibold text-green-700">{formatCurrency(grandTotalEarnings)}</p>
                       {approvalMsg && (
                         <span className={`text-sm font-semibold ${approvalMsg.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>{approvalMsg.text}</span>
                       )}
@@ -652,16 +654,16 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
       {/* Edit Timesheet Modal */}
       {editTimesheet && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl w-full max-w-lg">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="text-lg font-bold text-gray-900">Edit Timesheet — {formatDate(editTimesheet.date + 'T12:00:00')}</h3>
-              <button onClick={() => setEditTimesheet(null)} className="p-2 text-gray-400 hover:bg-gray-200 rounded-full transition"><X size={18} /></button>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-2xl w-full max-w-lg">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="text-lg font-semibold text-slate-900">Edit Timesheet — {formatDate(editTimesheet.date + 'T12:00:00')}</h3>
+              <button onClick={() => setEditTimesheet(null)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
               {editTimesheet.events.sort((a, b) => new Date(a.timestamp || a.at) - new Date(b.timestamp || b.at)).map((event, index) => (
-                <div key={index} className="flex items-center gap-3 bg-white border border-gray-200 p-3 rounded-xl">
+                <div key={index} className="flex items-center gap-3 bg-white border border-slate-200 p-3 rounded-xl">
                   <select value={event.type} onChange={(e) => { const n = [...editTimesheet.events]; n[index].type = e.target.value; setEditTimesheet({ ...editTimesheet, events: n }); }}
-                    className="p-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:outline-none focus:border-blue-500">
+                    className="p-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:outline-none focus:border-blue-500">
                     <option value="IN">Clock In</option>
                     <option value="OUT">Clock Out</option>
                     <option value="BREAK_START">Break Start</option>
@@ -669,18 +671,18 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                   </select>
                   <input type="time" value={new Date(event.timestamp || event.at).toTimeString().slice(0, 5)}
                     onChange={(e) => { const [h, m] = e.target.value.split(':'); const d = new Date(editTimesheet.date + 'T00:00:00'); d.setHours(parseInt(h), parseInt(m)); const n = [...editTimesheet.events]; n[index].timestamp = d.toISOString(); setEditTimesheet({ ...editTimesheet, events: n }); }}
-                    className="flex-1 p-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
+                    className="flex-1 p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
                   <button onClick={() => setEditTimesheet({ ...editTimesheet, events: editTimesheet.events.filter((_, i) => i !== index) })}
                     className="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 size={16} /></button>
                 </div>
               ))}
               <button onClick={() => { const d = new Date(editTimesheet.date + 'T09:00:00'); setEditTimesheet({ ...editTimesheet, events: [...editTimesheet.events, { type: 'IN', at: d.toISOString(), timestamp: d.toISOString() }] }); }}
-                className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors font-semibold text-sm">
+                className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors font-bold text-sm">
                 <Plus size={16} /> Add Event
               </button>
             </div>
-            <div className="p-6 border-t border-gray-100 flex gap-3 bg-gray-50">
-              <button onClick={() => setEditTimesheet(null)} className="flex-1 p-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition">Cancel</button>
+            <div className="p-6 border-t border-slate-100 flex gap-3 bg-slate-50">
+              <button onClick={() => setEditTimesheet(null)} className="flex-1 p-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition">Cancel</button>
               <button onClick={() => { if (onUpdateClockEvents) onUpdateClockEvents(editTimesheet.driverId, editTimesheet.date, editTimesheet.events); setEditTimesheet(null); }}
                 className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2">
                 <Save size={16} /> Save

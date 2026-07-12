@@ -101,15 +101,15 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
   const toggleSect = (id, sect) => setExpandedSection(prev => ({ ...prev, [`${id}_${sect}`]: !prev[`${id}_${sect}`] }));
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }} className="min-h-screen rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50/50 text-slate-900 shadow-sm">
+    <div className="min-h-screen text-slate-900">
       {/* Header */}
-      <div className="px-3 sm:px-4 pt-6 pb-4">
+      <div className="px-3 sm:px-4 pt-4 pb-3 bg-white border-b border-slate-200">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-indigo-500 flex items-center justify-center"><DollarSign size={16} /></div>
-            <h1 className="text-lg font-bold">Payroll Report</h1>
+            <h1 className="text-lg font-semibold">Payroll Report</h1>
           </div>
-          <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold transition-colors">
+          <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold transition-colors">
             <Download size={13} /> Export CSV
           </button>
         </div>
@@ -142,15 +142,15 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
           { label: 'Gap Events', value: totals.gaps, icon: <TrendingUp size={14} />, color: 'text-amber-300' },
           { label: 'Abuse Flags', value: totals.abuse, icon: <Shield size={14} />, color: totals.abuse > 0 ? 'text-red-300' : 'text-slate-400' },
         ].map(c => (
-          <div key={c.label} className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
+          <div key={c.label} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
             <div className={`flex items-center gap-1 text-xs mb-1 ${c.color}`}>{c.icon}<span>{c.label}</span></div>
-            <div className="text-base font-bold text-slate-900">{c.value}</div>
+            <div className="text-base font-semibold text-slate-900">{c.value}</div>
           </div>
         ))}
       </div>
 
       {/* Driver Cards */}
-      <div className="px-3 sm:px-4 pb-8 space-y-3">
+      <div className="px-3 sm:px-4 pb-24 space-y-3">
         {reportData.length === 0 && (
           <div className="text-center py-12 text-slate-500">
             <Calendar size={40} className="mx-auto mb-3 opacity-30" />
@@ -167,7 +167,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
           const excludedMin = gaps.filter(g => g.payrollEffect === 'EXCLUDED').reduce((s, g) => s + (g.durationMinutes || 0), 0);
 
           return (
-            <div key={driver.id} className={`rounded-2xl border transition-all shadow-sm ${hasAbuse ? 'border-red-200 bg-red-50/70' : 'border-slate-200 bg-white'}`}>
+            <div key={driver.id} className={`rounded-xl border transition-all shadow-sm ${hasAbuse ? 'border-red-200 bg-red-50/70' : 'border-slate-200 bg-white'}`}>
               {/* Driver Header */}
               <button onClick={() => toggle(driver.id)} className="w-full flex items-center justify-between p-4 text-left">
                 <div className="flex items-center gap-3">
@@ -199,7 +199,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
               {isExpanded && (
                 <div className="border-t border-slate-200 p-4 space-y-4">
                   {/* Pay Summary */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { label: 'Regular', value: `${pt?.regularHours || 0}h`, sub: fmtCurrency(pt?.regularPay) },
                       { label: 'Overtime', value: `${pt?.overtimeHours || 0}h`, sub: fmtCurrency(pt?.overtimePay) },
@@ -207,7 +207,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
                     ].map(c => (
                       <div key={c.label} className="bg-slate-50 rounded-xl p-3 text-center">
                         <div className="text-[10px] text-slate-500 uppercase tracking-wide">{c.label}</div>
-                        <div className="text-base font-bold mt-1">{c.value}</div>
+                        <div className="text-base font-semibold mt-1">{c.value}</div>
                         <div className="text-xs text-slate-500">{c.sub}</div>
                       </div>
                     ))}
