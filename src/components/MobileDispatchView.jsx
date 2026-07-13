@@ -99,10 +99,10 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
   };
 
   return (
-    <div className={(isLate ? "bg-rose-50 " : "bg-white ") + "rounded-[22px] border border-slate-200 border-l-[5px] " + sty.border + " shadow-sm overflow-visible transition-all duration-200"}>
+    <div className={(isLate ? "bg-rose-50 " : "bg-white ") + "rounded-xl border border-slate-200 border-l-[5px] " + sty.border + " shadow-sm overflow-visible transition-all duration-200"}>
       <button type="button" onClick={onToggle} className="w-full text-left px-3 pt-2.5 pb-2 focus:outline-none active:bg-slate-50/70 sm:px-3.5">
         <div className="flex items-start gap-2.5">
-          <div className="shrink-0 text-center w-[50px] rounded-2xl bg-slate-50 border border-slate-100 py-1.5">
+          <div className="shrink-0 text-center w-[50px] rounded-xl bg-slate-50 border border-slate-100 py-1.5">
             {trip.time === "Will Call" ? (
               <span className="text-sm font-bold text-slate-700 uppercase">WC</span>
             ) : (
@@ -120,8 +120,8 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                   const parts = (trip.patient || "Unknown").trim().split(/\s+/);
                   return (
                     <>
-                      <h3 className="text-[17px] font-extrabold text-slate-950 leading-tight">{parts[0]}</h3>
-                      {parts.length > 1 && <h3 className="text-[13px] font-semibold text-slate-600 leading-tight">{parts.slice(1).join(' ')}</h3>}
+                      <h3 className="text-[15px] font-bold text-slate-950 leading-tight">{parts[0]}</h3>
+                      {parts.length > 1 && <h4 className="text-[11px] font-semibold text-slate-500 leading-tight mt-0.5">{parts.slice(1).join(' ')}</h4>}
                     </>
                   );
                 })()}
@@ -132,7 +132,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                 <ChevronDown size={13} className={"text-slate-400 transition-transform duration-200 " + (expanded ? "rotate-180" : "")} />
               </div>
             </div>
-            <div className="mt-2 rounded-2xl bg-slate-50/80 border border-slate-100 px-2.5 py-2">
+            <div className="mt-2 rounded-xl bg-slate-50/80 border border-slate-100 px-2.5 py-2">
               <div className="grid grid-cols-[12px_1fr] gap-x-2.5 gap-y-2">
                 <div className="flex flex-col items-center pt-[5px] row-span-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
@@ -310,7 +310,7 @@ const DriverRow = ({ driver, trips }) => {
   const active = trips.find(t => IN_PROGRESS.includes(t.status) && (t.driverId===driver.id||t.driverName===driver.name));
   const activeStatus = active?.status || ds.label;
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 px-3.5 py-3 flex items-center gap-3 shadow-sm">
+    <div className="bg-white rounded-xl border border-slate-100 px-3.5 py-3 flex items-center gap-3 shadow-sm">
       <div className={"w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm uppercase shrink-0 "+ds.color}>{(driver.name||"D")[0]}</div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-slate-900 truncate">{driver.name}</p>
