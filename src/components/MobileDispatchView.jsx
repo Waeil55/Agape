@@ -326,7 +326,7 @@ const DriverRow = ({ driver, trips }) => {
 const MobileDispatchView = ({
   role, currentUser, trips=[], drivers=[], dispatchers=[],
   assignTripToDriver, bulkAssignTrips, setBulkAssignModal,
-  requestDeleteTrip, updateTrip, makeCall,
+  requestDeleteTrip, updateTrip, makeCall, sendSMS, requestAuthAction,
   setTripDetails, setShowAddTripModal, setShowUploadModal,
   onOpenSequencer, onOpenLiveMap, searchQuery, setSearchQuery,
   addToast, phoneNumbers,
@@ -460,11 +460,11 @@ const MobileDispatchView = ({
             {filtered.map(trip=>(
               <TripCard key={trip.id} trip={trip} drivers={drivers} expanded={expandedId===trip.id}
                 onToggle={()=>setExpandedId(expandedId===trip.id?null:trip.id)}
-                assignTripToDriver={assignTripToDriver} makeCall={makeCall} sendSMS={props.sendSMS}
+                assignTripToDriver={assignTripToDriver} makeCall={makeCall} sendSMS={sendSMS}
                 updateTrip={updateTrip} requestDeleteTrip={requestDeleteTrip}
                 onSetTripDetails={setTripDetails} role={role}
-                requestAuthAction={props.requestAuthAction} currentUser={props.currentUser}
-                addToast={props.addToast}/>
+                requestAuthAction={requestAuthAction} currentUser={currentUser}
+                addToast={addToast}/>
             ))}
           </div>
         )}
