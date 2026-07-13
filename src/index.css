@@ -3593,8 +3593,8 @@ html, body {
 .mobile-admin-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding-bottom: var(--space-4);
+  gap: var(--space-6);
+  padding-bottom: var(--space-6);
 }
 
 .admin-command-hero {
@@ -3935,7 +3935,7 @@ html, body {
 .mobile-admin-activity-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-3);
 }
 
@@ -4121,8 +4121,8 @@ html, body {
 .mobile-admin-hero {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-4);
+  padding: var(--space-5);
   border: 1px solid var(--adm-border);
   border-radius: var(--adm-radius);
   background:
@@ -4133,8 +4133,8 @@ html, body {
 
 .mobile-admin-hero-icon {
   display: grid;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
   place-items: center;
   border-radius: 16px;
@@ -4152,30 +4152,30 @@ html, body {
 }
 
 .mobile-admin-hero h2 {
-  margin-top: 0.15rem;
+  margin-top: 0.2rem;
   color: var(--adm-text);
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0;
 }
 
 .mobile-admin-hero p:not(.mobile-admin-eyebrow) {
-  margin-top: var(--space-1);
+  margin-top: var(--space-2);
   color: var(--adm-text-soft);
-  font-size: 0.86rem;
+  font-size: 0.9rem;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .mobile-admin-metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .mobile-admin-metric {
-  padding: var(--space-3);
+  padding: var(--space-4);
   border-radius: var(--adm-radius-sm);
 }
 
@@ -4186,15 +4186,15 @@ html, body {
 }
 
 .mobile-admin-metric-value {
-  font-size: 1.35rem;
+  font-size: 1.5rem;
 }
 
 .mobile-admin-metric-label {
-  font-size: 0.66rem;
+  font-size: 0.72rem;
 }
 
 .mobile-admin-metric-hint {
-  font-size: 0.74rem;
+  font-size: 0.78rem;
 }
 
 .mobile-admin-command-card {
@@ -4206,7 +4206,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: var(--space-5);
   border-bottom: 1px solid var(--adm-border-soft);
 }
 
@@ -4229,8 +4229,8 @@ html, body {
 .mobile-admin-signal-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-2);
-  padding: var(--space-3);
+  gap: var(--space-3);
+  padding: var(--space-4);
 }
 
 .mobile-admin-signal-grid div {
@@ -4247,29 +4247,29 @@ html, body {
 
 .mobile-admin-signal-grid strong {
   color: var(--adm-text);
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-weight: 700;
   line-height: 1;
 }
 
 .mobile-admin-signal-grid span {
   color: var(--adm-text-soft);
-  font-size: 0.63rem;
+  font-size: 0.68rem;
   font-weight: 600;
 }
 
 .mobile-admin-priority-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  gap: var(--space-3);
+  padding: var(--space-4);
 }
 
 .mobile-admin-priority-row {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-4);
   border-radius: 16px;
   background: var(--adm-elevated);
 }
@@ -4298,7 +4298,7 @@ html, body {
 .mobile-admin-priority-title strong {
   overflow: hidden;
   color: var(--adm-text);
-  font-size: 0.84rem;
+  font-size: 0.9rem;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4307,10 +4307,10 @@ html, body {
 .mobile-admin-priority-row span {
   display: block;
   overflow: hidden;
-  margin-top: 0.15rem;
+  margin-top: 0.2rem;
   color: var(--adm-text-soft);
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: 0.78rem;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -4319,25 +4319,26 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-6);
   color: #047857;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   font-weight: 700;
 }
 
 .mobile-admin-driver-card,
 .mobile-admin-person-card {
   overflow: hidden;
-  border-radius: var(--adm-radius-sm);
-  box-shadow: 0 10px 28px -22px rgba(15, 23, 42, 0.6);
+  border-radius: var(--adm-radius);
+  box-shadow: 0 4px 16px -4px rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--adm-border);
 }
 
 .mobile-admin-card-top {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-4) var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-2);
 }
 
 .mobile-admin-card-title-row {
@@ -4351,22 +4352,22 @@ html, body {
 .mobile-admin-card-title-row h3 {
   min-width: 0;
   color: var(--adm-text);
-  font-size: 0.98rem;
+  font-size: 1rem;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .mobile-admin-card-top p {
-  margin-top: 0.2rem;
+  margin-top: 0.25rem;
   color: var(--adm-text-soft);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 600;
 }
 
 .mobile-admin-field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: 0 var(--space-4) var(--space-4);
 }
 
@@ -4374,14 +4375,14 @@ html, body {
   min-width: 0;
   border-radius: 14px;
   background: var(--adm-elevated);
-  padding: var(--space-3);
+  padding: var(--space-4);
 }
 
 .mobile-admin-field-grid span,
 .mobile-admin-trip-strip span {
   display: block;
   color: var(--adm-text-mute);
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -4393,7 +4394,7 @@ html, body {
   overflow: hidden;
   margin-top: var(--space-1);
   color: var(--adm-text);
-  font-size: 0.86rem;
+  font-size: 0.92rem;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4405,7 +4406,7 @@ html, body {
   justify-content: space-between;
   gap: var(--space-3);
   margin: 0 var(--space-4) var(--space-4);
-  padding: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--warning-border);
   border-radius: 16px;
   color: var(--warning);
@@ -4436,7 +4437,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4);
   border-top: 1px solid var(--adm-border-soft);
   background: var(--adm-elevated);
 }
@@ -4455,7 +4456,7 @@ html, body {
 .mobile-admin-activity-item {
   display: flex;
   gap: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-4);
   border-radius: 16px;
 }
 
@@ -4485,25 +4486,25 @@ html, body {
 
 .mobile-admin-activity-head strong {
   color: var(--adm-text);
-  font-size: 0.86rem;
+  font-size: 0.9rem;
   font-weight: 700;
 }
 
 .mobile-admin-activity-head span {
   flex-shrink: 0;
   color: var(--adm-text-mute);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 600;
 }
 
 .mobile-admin-activity-item p {
   display: -webkit-box;
-  margin-top: 0.18rem;
+  margin-top: 0.2rem;
   overflow: hidden;
   color: var(--adm-text-soft);
-  font-size: 0.76rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.4;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
