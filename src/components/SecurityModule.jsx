@@ -287,7 +287,7 @@ export const ComplianceChecklist = () => {
                 {getStatusIcon(item.status)}
                 <p className="font-semibold text-slate-900">{item.title}</p>
               </div>
-              <p className="text-sm font-bold text-slate-600">{item.percentage}%</p>
+              <p className="text-sm font-semibold text-slate-600">{item.percentage}%</p>
             </div>
             <div className="h-2 bg-white/50 rounded-full overflow-hidden">
               <div
@@ -369,7 +369,7 @@ const SecurityModule = ({ user, onLogout }) => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <p className="font-semibold text-slate-900">🔐 Password Strength</p>
-                    <span className="text-sm font-bold text-emerald-600">Strong</span>
+                    <span className="text-sm font-semibold text-emerald-600">Strong</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <p className="font-semibold text-slate-900">📱 2FA Status</p>
@@ -377,7 +377,7 @@ const SecurityModule = ({ user, onLogout }) => {
                   </div>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <p className="font-semibold text-slate-900">🌐 Active Sessions</p>
-                    <span className="text-sm font-bold text-slate-600">1</span>
+                    <span className="text-sm font-semibold text-slate-600">1</span>
                   </div>
                 </div>
               </div>

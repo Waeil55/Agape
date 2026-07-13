@@ -410,7 +410,7 @@ const UnifiedRoutePlanner = ({
                             </span>
                           )}
                           {createdStr && (
-                            <span className="text-[9px] font-bold text-slate-400 ml-auto">
+                            <span className="text-[9px] font-semibold text-slate-400 ml-auto">
                               {createdStr}
                             </span>
                           )}

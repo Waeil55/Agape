@@ -200,7 +200,7 @@ export default function DocumentExpirationTracker({ drivers = [], vehicles = [] 
                     {doc.expiryDate}
                   </span>
                   {doc.daysLeft !== null && (
-                    <span className={`text-[10px] font-bold ${doc.daysLeft < 0 ? 'text-red-500' : doc.daysLeft <= 30 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    <span className={`text-[10px] font-semibold ${doc.daysLeft < 0 ? 'text-red-500' : doc.daysLeft <= 30 ? 'text-amber-600' : 'text-emerald-600'}`}>
                       {doc.daysLeft < 0 ? `${Math.abs(doc.daysLeft)}d overdue` : `${doc.daysLeft}d left`}
                     </span>
                   )}

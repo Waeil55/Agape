@@ -120,7 +120,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                   const parts = (trip.patient || "Unknown").trim().split(/\s+/);
                   return (
                     <>
-                      <h3 className="text-[15px] font-bold text-slate-950 leading-tight">{parts[0]}</h3>
+                      <h3 className="text-[15px] font-semibold text-slate-950 leading-tight">{parts[0]}</h3>
                       {parts.length > 1 && <h4 className="text-[11px] font-semibold text-slate-500 leading-tight mt-0.5">{parts.slice(1).join(' ')}</h4>}
                     </>
                   );

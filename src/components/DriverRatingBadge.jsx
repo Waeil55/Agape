@@ -52,7 +52,7 @@ export const DriverRatingBadge = memo(function DriverRatingBadge({ driver, trips
     return (
       <div className="flex items-center gap-1">
         <Star size={10} className="text-amber-400 fill-amber-400" />
-        <span className={`text-[11px] font-bold ${getRatingColor(rating.average)}`}>
+        <span className={`text-[11px] font-semibold ${getRatingColor(rating.average)}`}>
           {formatRating(rating.average)}
         </span>
         {rating.count > 0 && (
