@@ -158,7 +158,7 @@ export default function FleetUtilizationReport({ trips = [], drivers = [], vehic
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen p-6 space-y-6">
+    <div className="bg-slate-50 min-h-0 p-4 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <BarChart3 size={24} className="text-blue-600" />
