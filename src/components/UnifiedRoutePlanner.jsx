@@ -599,7 +599,7 @@ const UnifiedRoutePlanner = ({
               </div>
             ) : (
               <div className="text-center py-12 sm:py-20">
-                <div className="w-16 h-16 rounded-3xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
                   <Navigation size={24} className="text-slate-300" />
                 </div>
                 <p className="text-sm font-semibold text-slate-400">No active trips</p>

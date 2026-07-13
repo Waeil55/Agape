@@ -1628,7 +1628,7 @@ const OperationsCommandCenter = ({
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
         {manifestFeedTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">
-            <div className="max-w-sm rounded-3xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
+            <div className="max-w-sm rounded-xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
                 <FileText size={28} />
               </div>
@@ -1640,7 +1640,7 @@ const OperationsCommandCenter = ({
           <>
             <div className={`grid gap-3 ${manifestGroupBy === 'driver' ? '2xl:grid-cols-2' : 'xl:grid-cols-2'}`}>
               {manifestGroupedSections.map((section) => (
-                <section key={section.key} className="rounded-3xl border border-slate-100/50 bg-white shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+                <section key={section.key} className="rounded-xl border border-slate-100/50 bg-white shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
                   <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 bg-slate-50/70">
                     <div className="min-w-0">
                       <div className="truncate text-base font-semibold text-slate-900">{section.label}</div>
@@ -1671,7 +1671,7 @@ const OperationsCommandCenter = ({
               ))}
             </div>
 
-            <div className="mt-3 flex items-center justify-between rounded-3xl border border-slate-100/50 bg-white px-4 py-3 text-sm font-medium text-slate-500 shadow-sm">
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-100/50 bg-white px-4 py-3 text-sm font-medium text-slate-500 shadow-sm">
               <span>Showing {visibleTrips.length} of {manifestFeedTrips.length} manifest trips</span>
               {manifestFeedTrips.length > visibleTrips.length && (
                 <button
@@ -1687,7 +1687,7 @@ const OperationsCommandCenter = ({
         )}
       </div>
 
-      <div className="hidden lg:flex flex-col min-h-0 bg-slate-50 border border-slate-200/60 rounded-3xl p-4 shadow-inner">
+      <div className="hidden lg:flex flex-col min-h-0 bg-slate-50 border border-slate-200/60 rounded-xl p-4 shadow-inner">
         <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200">
           <Activity size={18} className="text-blue-600" />
           <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">Drivers Activity</h3>
@@ -1744,7 +1744,7 @@ const OperationsCommandCenter = ({
       <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
         {manifestFeedTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">
-            <div className="max-w-sm rounded-3xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
+            <div className="max-w-sm rounded-xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
                 <FileText size={28} />
               </div>
@@ -1755,7 +1755,7 @@ const OperationsCommandCenter = ({
         ) : (
           <>
             {/* Sort Toolbar */}
-            <div className="mb-3 rounded-3xl border border-slate-100/50 bg-white px-3 py-2 shadow-sm">
+            <div className="mb-3 rounded-xl border border-slate-100/50 bg-white px-3 py-2 shadow-sm">
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                 <div className="flex items-center gap-1.5 shrink-0 pr-2 border-r border-slate-200">
                   {CARD_SORT_OPTIONS.map((opt) => (
@@ -1804,7 +1804,7 @@ const OperationsCommandCenter = ({
                 return (
                   <div
                     key={trip.id}
-                    className={`rounded-3xl border shadow-sm overflow-hidden transition-all duration-150 ${
+                    className={`rounded-xl border shadow-sm overflow-hidden transition-all duration-150 ${
                       isSelected
                         ? 'border-blue-300 ring-2 ring-blue-500/20 bg-white'
                         : isLate
@@ -2011,7 +2011,7 @@ const OperationsCommandCenter = ({
               })}
             </div>
 
-            <div className="mt-3 flex items-center justify-between rounded-3xl border border-slate-100/50 bg-white px-4 py-3 text-xs font-medium text-slate-500 shadow-sm">
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-100/50 bg-white px-4 py-3 text-xs font-medium text-slate-500 shadow-sm">
               <span>
                 Showing {visibleTrips.length} of {manifestFeedTrips.length} trip
                 {manifestFeedTrips.length !== 1 ? 's' : ''}
@@ -2037,7 +2037,7 @@ const OperationsCommandCenter = ({
     <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
       {manifestFeedTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
-          <div className="bg-white border border-slate-100/50 rounded-3xl p-8 text-center max-w-xs shadow-sm">
+          <div className="bg-white border border-slate-100/50 rounded-xl p-8 text-center max-w-xs shadow-sm">
             <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500">
               <FileText size={28} />
             </div>
@@ -2046,7 +2046,7 @@ const OperationsCommandCenter = ({
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-slate-100/50 bg-white shadow-sm">
           <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -2504,19 +2504,19 @@ const OperationsCommandCenter = ({
   const renderFleetMatrix = () => (
     <div className="flex-1 overflow-y-auto overscroll-contain p-3">
       <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <div className="rounded-3xl border border-slate-100/50 bg-white px-4 py-3 shadow-sm">
+        <div className="rounded-xl border border-slate-100/50 bg-white px-4 py-3 shadow-sm">
           <div className="text-xs uppercase tracking-wide text-slate-500">Drivers</div>
           <div className="mt-1 text-2xl text-slate-900">{fleetDrivers.length}</div>
         </div>
-        <div className="rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-3 shadow-sm">
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 shadow-sm">
           <div className="text-xs uppercase tracking-wide text-emerald-700">Available</div>
           <div className="mt-1 text-2xl text-emerald-800">{availableDrivers.length}</div>
         </div>
-        <div className="rounded-3xl border border-amber-100 bg-amber-50 px-4 py-3 shadow-sm">
+        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 shadow-sm">
           <div className="text-xs uppercase tracking-wide text-amber-700">Busy</div>
           <div className="mt-1 text-2xl text-amber-800">{busyDrivers.length}</div>
         </div>
-        <div className="rounded-3xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-sm">
+        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-sm">
           <div className="text-xs uppercase tracking-wide text-blue-700">Active Trips</div>
           <div className="mt-1 text-2xl text-blue-800">{inProgressTrips.length}</div>
         </div>
@@ -2527,7 +2527,7 @@ const OperationsCommandCenter = ({
           const isExpanded = expandedDriver === d.id;
           const isMaintenanceDue = d.nextOilChange != null && d.odometer != null && (d.nextOilChange - d.odometer < 200);
           return (
-            <div key={d.id} className={`bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm transition-all duration-300 ${
+            <div key={d.id} className={`bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm transition-all duration-300 ${
               d.status === 'Available' ? 'border-emerald-200' : ''
             } ${isMaintenanceDue ? 'border-rose-200' : ''}`}>
               {/* Driver header */}
@@ -2695,7 +2695,7 @@ const OperationsCommandCenter = ({
     <div className="flex-1 overflow-y-auto overscroll-contain p-3">
       {willCallTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
-          <div className="bg-white border border-slate-200 rounded-3xl p-8 text-center max-w-xs shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-xl p-8 text-center max-w-xs shadow-sm">
             <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500">
               <Phone size={28} />
             </div>
@@ -2715,7 +2715,7 @@ const OperationsCommandCenter = ({
             const routeAssignments = routeTripMap[t.id] || [];
             const visibleRouteAssignments = routeAssignments.slice(0, densityProfile.routeChipLimit);
             return (
-            <div key={t.id} className="group bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
+            <div key={t.id} className="group bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
               {/* Top Status Indicator */}
               <div className="h-1.5 w-full bg-blue-500" />
               <div className={`${isLeanDensity ? 'p-3 sm:p-3.5' : 'p-4 sm:p-5'} cursor-pointer`} onClick={() => openTripDetails(t)}>
@@ -2847,7 +2847,7 @@ const OperationsCommandCenter = ({
         return (
           <div className="fixed inset-0 z-[120] flex items-center justify-center p-3">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={cancelInlineEdit} />
-            <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl relative z-10 border border-slate-200 max-h-[90vh] overflow-hidden flex flex-col" style={{ fontSize: '97%' }}>
+            <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl relative z-10 border border-slate-200 max-h-[90vh] overflow-hidden flex flex-col" style={{ fontSize: '97%' }}>
               <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
                 <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2"><Edit2 size={16} className="text-blue-500" /> Edit Trip</h3>
                 <button onClick={cancelInlineEdit} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={16} /></button>

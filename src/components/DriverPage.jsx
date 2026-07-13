@@ -3819,7 +3819,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
           {/* Trip Cards */}
           {orderedTrips.length === 0 && assignedRoutePlanStops.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-10 text-center mt-2">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-10 text-center mt-2">
               <div className="w-20 h-20 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-[2rem] flex items-center justify-center mx-auto mb-5 shadow-inner">
                 <CheckCircle2 size={36} className="text-emerald-400" />
               </div>
@@ -3911,7 +3911,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-[#2563EB] border-4 border-[#F4F7FC] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
                       <span className="text-xs font-semibold text-white">{index + 1}</span>
                     </div>
-                    <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200">
+                    <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200">
                       <div className="bg-[#2563EB] px-4 py-3 text-white">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -4880,7 +4880,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Smart Contacts Section */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
               <h3 className="text-micro font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-2"><PhoneForwarded size={16} /> Contacts</h3>
               {(() => {
                 const contacts = getContactsForTrip(showTripDetails);
@@ -5407,7 +5407,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             )}
 
             {/* Analytics */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <button onClick={() => setShowAnalytics(!showAnalytics)} className="w-full p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
@@ -5467,7 +5467,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Odometer */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-micro font-semibold uppercase tracking-wide text-slate-500">Odometer</p>
@@ -5479,7 +5479,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Vehicle Info */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4">
               <p className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-3">Vehicle Info</p>
               <div className="space-y-2.5 text-sm">
                 {[
@@ -5501,7 +5501,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Home Location — admin/dispatcher can edit, driver can view only */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><MapPin size={16} /> Home Location</div>
               {me?.homeAddress ? (
                 <p className="text-xs text-slate-500 font-semibold mb-2">{me.homeAddress}</p>
@@ -5572,7 +5572,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Clock History (last 14 days) */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 text-slate-800 font-semibold"><Clock size={16} /> Clock History</div>
                 {clockHistory.days.some(d => d.hasEvents) && (
@@ -5667,7 +5667,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Navigation App */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Route size={16} /> Preferred Navigation App</div>
               <div className="grid grid-cols-1 gap-2">
                 {[
@@ -5689,7 +5689,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             {/* Appearance */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Sun size={16} /> Theme</div>
               <div className="grid grid-cols-2 gap-2">
                 {[
@@ -5732,7 +5732,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
             {/* Time Tracking Admin (admin/dispatcher only) */}
             {(role === 'admin' || role === 'dispatcher') && (
-              <button onClick={() => setShowTTAdmin(true)} className="w-full flex items-center justify-between px-4 py-3.5 bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:bg-blue-50/50 transition-all">
+              <button onClick={() => setShowTTAdmin(true)} className="w-full flex items-center justify-between px-4 py-3.5 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:bg-blue-50/50 transition-all">
                 <div className="flex items-center gap-3">
                   <BarChart3 size={17} className="text-blue-500" />
                   <span className="font-medium text-sm text-slate-700">Time Tracking Audit</span>
@@ -5742,7 +5742,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             )}
 
             {/* Sign Out */}
-            <button onClick={() => onLogout?.()} className="w-full flex items-center justify-between px-4 py-3.5 bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:bg-rose-50/50 transition-all">
+              <button onClick={() => onLogout?.()} className="w-full flex items-center justify-between px-4 py-3.5 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:bg-rose-50/50 transition-all">
               <div className="flex items-center gap-3">
                 <LogOut size={17} className="text-rose-400" />
                 <span className="font-medium text-sm text-rose-600">Sign Out</span>

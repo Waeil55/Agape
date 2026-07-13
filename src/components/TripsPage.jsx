@@ -503,7 +503,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
             layoutMode === 'grouped' ? (
               <div className="space-y-4 p-3 sm:p-4">
                 {groupedTrips.map((section) => (
-                  <section key={section.key} className="rounded-3xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                  <section key={section.key} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
                         <h4 className="text-sm font-black text-slate-900">{section.label}</h4>
@@ -783,7 +783,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         return (
           <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" onClick={() => setLegsDetailPatient(null)}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className="bg-white w-full max-w-lg rounded-3xl p-5 relative z-10 shadow-2xl border border-white/20 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-white w-full max-w-lg rounded-xl p-5 relative z-10 shadow-2xl border border-white/20 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-slate-900">{patientName}</h3>
                 <button onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200" aria-label="Close"><X size={16} /></button>

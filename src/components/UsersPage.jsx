@@ -227,7 +227,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
         ].map(c => {
           const Icon = c.Icon;
           return (
-            <div key={c.key} className={`${c.bg} border ${c.border} rounded-3xl p-4 sm:p-6 shadow-sm overflow-hidden`}>
+            <div key={c.key} className={`${c.bg} border ${c.border} rounded-xl p-4 sm:p-6 shadow-sm overflow-hidden`}>
               <div className="flex items-center gap-3 mb-3">
                 <div className={`w-9 sm:w-10 h-9 sm:h-10 rounded-lg ${c.iconBg} text-white flex items-center justify-center`}>
                   <Icon size={18} />
@@ -245,7 +245,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
 
       {/* AI Activity Insights (Admin Only) */}
       {role === 'admin' && !hideAiInsights && (
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-3xl overflow-hidden shadow-sm">
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl overflow-hidden shadow-sm">
           <div className="p-4 sm:p-6 border-b border-indigo-100/50 flex items-center justify-between">
             <h3 className="text-lg sm:text-xl font-semibold text-indigo-900 flex items-center gap-2">
               <BrainCircuit size={20} className="text-indigo-600" /> AI Activity Oversight
@@ -284,7 +284,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       )}
 
       {/* All Users Table */}
-      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
         <div className="p-4 sm:p-6 border-b border-slate-200">
           <h3 className="text-lg sm:text-xl font-semibold text-slate-900 flex items-center gap-2"><Users size={18} /> All Users ({users.length})</h3>
         </div>
@@ -384,7 +384,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       </div>
 
       {/* Dispatcher Assignments */}
-      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
         <div className="p-4 sm:p-6 border-b border-slate-200">
           <h3 className="text-lg sm:text-xl font-semibold text-slate-900">Driver Assignments</h3>
           <p className="text-xs sm:text-xs text-slate-500 mt-1">Assign drivers to dispatchers</p>
@@ -514,7 +514,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {!hideActivityFeed && (
       <div className={`w-full ${singleColumn || activityFeedOnly ? '' : 'xl:w-1/2'} shrink-0 flex flex-col ${activityFeedOnly ? 'h-full' : ''}`}>
       {/* System Activity Feed */}
-      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-[500px]">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-[500px]">
         <div className="p-4 sm:p-6 border-b border-slate-200 shrink-0">
           <h3 className="text-lg sm:text-xl font-semibold text-slate-900 flex items-center gap-2">
             <Activity size={18} /> System Activity Feed
@@ -597,7 +597,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* Add User Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm max-w-md w-full mx-0 sm:mx-4">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm max-w-md w-full mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <h3 className="text-lg sm:text-xl font-semibold text-slate-900">Create User</h3>
@@ -657,7 +657,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* Edit Dispatcher Modal */}
       {editingDispatcher && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm max-w-sm w-full mx-0 sm:mx-4">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm max-w-sm w-full mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <h3 className="text-lg sm:text-xl font-semibold text-slate-900">Edit Dispatcher</h3>
@@ -687,7 +687,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       {/* Log Details Modal */}
       {selectedLog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedLog(null)}>
-          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl w-full max-w-md animate-zoom-in" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-xl overflow-hidden shadow-2xl w-full max-w-md animate-zoom-in" onClick={e => e.stopPropagation()}>
             <div className={`p-6 border-b ${
               selectedLog.c === 'emerald' ? 'bg-emerald-50 border-emerald-100' :
               selectedLog.c === 'rose' ? 'bg-rose-50 border-rose-100' :

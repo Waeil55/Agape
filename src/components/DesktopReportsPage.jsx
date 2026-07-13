@@ -538,7 +538,7 @@ const DesktopReportsPage = ({
 
   const renderInvoiceTable = () => (
     <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
-    <div className="overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100/50 bg-white shadow-sm">
       <div className="overflow-x-auto">
       <table className="w-full table-fixed text-xs">
         <colgroup>
@@ -694,7 +694,7 @@ const DesktopReportsPage = ({
 
     return (
     <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
-    <div className="overflow-hidden rounded-3xl border border-slate-100/50 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100/50 bg-white shadow-sm">
       <div className="overflow-x-auto">
       <table className="w-full table-fixed text-xs">
         {(() => {
