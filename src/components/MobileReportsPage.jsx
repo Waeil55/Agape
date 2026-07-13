@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, 
-  XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Upload
+  XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Upload, FileText
 } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
