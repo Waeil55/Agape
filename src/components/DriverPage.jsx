@@ -5068,7 +5068,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 className="agape-mobile-icon-btn disabled:opacity-30"
                 aria-label="Previous history day"
               >
-                <ChevronLeft size={17} />
+                <ChevronLeft size={15} />
               </button>
 
               <div className="agape-mobile-date-pill" title={formatHistoryDayLabel(selectedHistoryDate)}>
@@ -5083,7 +5083,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 className="agape-mobile-icon-btn disabled:opacity-30"
                 aria-label="Next history day"
               >
-                <ChevronRight size={17} />
+                <ChevronRight size={15} />
               </button>
 
               {[
@@ -5113,7 +5113,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     title={`${f.label} (${historyStatusCounts[f.id] || 0})`}
                     aria-label={`${f.label} filter, ${historyStatusCounts[f.id] || 0} trips`}
                   >
-                    <FilterIcon size={15} />
+                    <FilterIcon size={13} />
                   </button>
                 );
               })}
@@ -5134,10 +5134,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
           <div className="agape-mobile-search-section">
             <div className="agape-mobile-search">
-              <Search size={19} className="text-slate-400 shrink-0" />
+              <Search size={16} className="text-slate-400 shrink-0" />
             <input type="text" placeholder="Search by patient, booking ID, address..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-slate-700 outline-none placeholder:text-slate-400" />
-            {historySearch && <button onClick={() => setHistorySearch('')} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>}
+              className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-700 outline-none placeholder:text-slate-400" />
+            {historySearch && <button onClick={() => setHistorySearch('')} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>}
             </div>
           </div>
 
