@@ -347,7 +347,7 @@ const MobileDispatchView = ({
 
   const todayTrips = useMemo(()=>
     trips
-      .filter(t=>t.date===todayStr||!t.date)
+      .filter(t=>t.date===todayStr)
       .sort((a,b)=>{
         const aT=TERMINAL.includes(a.status),bT=TERMINAL.includes(b.status);
         if(aT&&!bT) return 1; if(!aT&&bT) return -1;

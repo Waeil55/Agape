@@ -23,7 +23,7 @@ const toneClasses = {
 };
 
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
-const isTodayTrip = (t) => tripCalendarDateKey(t?.date) === undefined || tripCalendarDateKey(t?.date) === localCalendarYmd();
+const isTodayTrip = (t) => tripCalendarDateKey(t?.date) === localCalendarYmd();
 const isWillCall = (t) => String(t?.time || '').trim().toUpperCase() === 'WILL CALL';
 const minutesUntil = (trip) => {
   if (!trip?.time || isWillCall(trip)) return null;

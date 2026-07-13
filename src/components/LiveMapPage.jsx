@@ -342,7 +342,7 @@ const LiveMapPage = ({
   }, [currentUser, drivers]);
 
   const todaysTrips = useMemo(
-    () => trips.filter(trip => tripMatchesCalendarDay(trip.date, today) || !trip.date),
+    () => trips.filter(trip => tripMatchesCalendarDay(trip.date, today)),
     [trips, today]
   );
 

@@ -99,12 +99,12 @@ export function isCalendarDateKeyWithinLastDays(dateKey, days = 14, from = new D
 }
 
 /**
- * True if trip service date is today or tomorrow (local calendar), or date is missing/unparseable.
- * Used for driver manifest so next-day assignments are visible.
+ * True if trip service date is today or tomorrow (local calendar).
+ * Returns false for missing/unparseable dates (trips without a date are excluded).
  */
 export function tripMatchesTodayOrTomorrow(tripDate) {
   const key = tripCalendarDateKey(tripDate);
-  if (key === undefined) return true;
+  if (key === undefined) return false;
   const now = new Date();
   const todayKey = localYmd(now);
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -125,12 +125,12 @@ export function isTripLate(tripTime) {
 }
 
 /**
- * True if the trip date is today, tomorrow, yesterday, or missing/unparseable.
- * Used for the active trip list to exclude stale trips from previous days.
+ * True if the trip date is today, tomorrow, or yesterday.
+ * Returns false for missing/unparseable dates.
  */
 export function isTripDateRecent(tripDate) {
   const key = tripCalendarDateKey(tripDate);
-  if (key === undefined) return true;
+  if (key === undefined) return false;
   const now = new Date();
   const todayKey = localYmd(now);
   if (key === todayKey) return true;
@@ -142,18 +142,18 @@ export function isTripDateRecent(tripDate) {
 }
 
 /**
- * True if the trip date is today or missing/unparseable.
- * Used for the driver portal "due" list to exclude trips from previous/future days.
+ * True if the trip date is today.
+ * Returns false for missing/unparseable dates.
  */
 export function isTripDateToday(tripDate) {
   const key = tripCalendarDateKey(tripDate);
-  if (key === undefined) return true;
+  if (key === undefined) return false;
   return key === localYmd(new Date());
 }
 
-/** If the trip has no usable date key, it matches any manifest day (legacy / incomplete rows). */
+/** Trips with no usable date key are excluded from manifest days. */
 export function tripMatchesCalendarDay(tripDate, dayKey) {
   const key = tripCalendarDateKey(tripDate);
-  if (key === undefined) return true;
+  if (key === undefined) return false;
   return key === dayKey;
 }

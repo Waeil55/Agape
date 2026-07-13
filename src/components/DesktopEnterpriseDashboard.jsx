@@ -293,7 +293,7 @@ const DesktopEnterpriseDashboard = ({
   ].filter(item => item.roles.includes(role))
     .filter(item => item.id !== 'drive' || driverWorkDrivers.length > 0);
 
-  const todayTrips = trips.filter(t => t.date === todayStr || !t.date);
+  const todayTrips = trips.filter(t => t.date === todayStr);
   const activeTrips = todayTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
   const unassignedTrips = activeTrips.filter(t => t.status === 'Unassigned');
   const assignedTrips = activeTrips.filter(t => t.status === 'Assigned');
