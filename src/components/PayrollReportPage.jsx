@@ -101,7 +101,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
   const toggleSect = (id, sect) => setExpandedSection(prev => ({ ...prev, [`${id}_${sect}`]: !prev[`${id}_${sect}`] }));
 
   return (
-    <div className="min-h-screen text-slate-900">
+    <div className="min-h-0 flex-1 text-slate-900">
       {/* Header */}
       <div className="px-3 sm:px-4 pt-4 pb-3 bg-white border-b border-slate-200">
         <div className="flex items-center justify-between mb-1">

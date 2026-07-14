@@ -102,8 +102,8 @@ const ChatMessage = memo(function ChatMessage({
                 msg.type === 'image' ? 'overflow-hidden p-0.5' : 'px-[14px] py-[8px]'
               } ${
                 isOwn
-                  ? 'bg-[#0084ff] text-white shadow-[0_2px_10px_rgba(0,132,255,0.18)]'
-                  : 'bg-[#f0f2f5] text-slate-950 shadow-[0_2px_10px_rgba(15,23,42,0.06)]'
+                  ? 'bg-blue-500 text-white shadow-[0_2px_10px_rgba(0,132,255,0.18)]'
+                  : 'bg-slate-50 text-slate-950 shadow-[0_2px_10px_rgba(15,23,42,0.06)]'
               }`}>
                 {msg.type === 'image' && msg.fileUrl && (
                   <img
@@ -205,7 +205,7 @@ const ChatMessage = memo(function ChatMessage({
           <div className={`mt-1 flex items-center gap-1 px-1 text-[10px] text-slate-400 ${isOwn ? 'justify-end text-right' : 'justify-start'}`}>
             <span>{lastMessage?._localPending ? 'Sending' : formatChatMessageTime(lastMessage?.timestamp)}</span>
             {isOwn && (
-              <span className="inline-flex items-center gap-0.5 text-[#0084ff]" title={lastMessage?._localPending ? 'Sending' : readByOther ? 'Read' : 'Sent'}>
+              <span className="inline-flex items-center gap-0.5 text-blue-500" title={lastMessage?._localPending ? 'Sending' : readByOther ? 'Read' : 'Sent'}>
                 {readByOther ? <CheckCheck size={12} /> : <Check size={12} />}
                 <span>{lastMessage?._localPending ? 'Sending' : readByOther ? 'Read' : 'Sent'}</span>
               </span>

@@ -1415,22 +1415,22 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
               <div className="bg-blue-50 p-3 sm:p-4 rounded-xl">
                 <p className="text-xs sm:text-xs text-blue-600 font-semibold mb-1">Total</p>
-                <p className="text-lg sm:text-2xl font-bold text-blue-700">{mappedTrips.length}</p>
+                <p className="text-lg sm:text-2xl font-semibold text-blue-700">{mappedTrips.length}</p>
                 <p className="text-xs sm:text-xs text-blue-500">from file</p>
               </div>
               <div className="bg-emerald-50 p-3 sm:p-4 rounded-xl">
                 <p className="text-xs sm:text-xs text-emerald-600 font-semibold mb-1">Clean</p>
-                <p className="text-lg sm:text-2xl font-bold text-emerald-700">{mappedTrips.length - withIssues}</p>
+                <p className="text-lg sm:text-2xl font-semibold text-emerald-700">{mappedTrips.length - withIssues}</p>
                 <p className="text-xs sm:text-xs text-emerald-500">no issues</p>
               </div>
               <div className={`p-3 sm:p-4 rounded-xl ${withIssues > 0 ? 'bg-amber-50' : 'bg-slate-50'}`}>
                 <p className="text-xs sm:text-xs text-slate-600 font-semibold mb-1">Warnings</p>
-                <p className={`text-lg sm:text-2xl font-bold ${withIssues > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{withIssues}</p>
+                <p className={`text-lg sm:text-2xl font-semibold ${withIssues > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{withIssues}</p>
                 <p className="text-xs sm:text-xs text-slate-500">flagged</p>
               </div>
               <div className="bg-indigo-50 p-3 sm:p-4 rounded-xl">
                 <p className="text-xs sm:text-xs text-indigo-600 font-semibold mb-1">AI Confidence</p>
-                <p className="text-lg sm:text-2xl font-bold text-indigo-700">{avgConfidence}%</p>
+                <p className="text-lg sm:text-2xl font-semibold text-indigo-700">{avgConfidence}%</p>
                 <p className="text-xs sm:text-xs text-indigo-500">avg score</p>
               </div>
             </div>

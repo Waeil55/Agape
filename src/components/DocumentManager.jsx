@@ -112,7 +112,7 @@ export default function DocumentManager({ driver, documents = [], onUpdate, read
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <p className="text-[11px] font-semibold text-slate-900 truncate">{docType.label}</p>
-                  {docType.required && <span className="text-[8px] text-rose-500 font-bold">REQUIRED</span>}
+                  {docType.required && <span className="text-[8px] text-rose-500 font-semibold">REQUIRED</span>}
                 </div>
                 {doc?.fileUrl ? (
                   <div className="flex items-center gap-1.5 mt-0.5">

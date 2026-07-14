@@ -222,7 +222,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-0 flex-1 bg-slate-50">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 pb-24">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 bg-white border-b border-slate-200 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4 -mt-6 mb-6">

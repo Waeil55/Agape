@@ -606,11 +606,11 @@ const RoutePlanSection = ({
                     <div className="w-6 flex justify-center items-center">
                       {stop.type === 'origin' ? (
                         <div className="w-[22px] h-[22px] border border-blue-200 rounded-full bg-blue-50 flex items-center justify-center">
-                          <span className="text-xs font-bold text-blue-700 leading-none">O</span>
+                          <span className="text-xs font-semibold text-blue-700 leading-none">O</span>
                         </div>
                       ) : (
                         <div className="w-[22px] h-[22px] border border-slate-300 rounded-full bg-white flex items-center justify-center">
-                          <span className="text-xs font-bold text-slate-800 leading-none">{stop.letter}</span>
+                          <span className="text-xs font-semibold text-slate-800 leading-none">{stop.letter}</span>
                         </div>
                       )}
                     </div>
@@ -619,7 +619,7 @@ const RoutePlanSection = ({
                     {(stop.clientName || stop.stopTime || stop.stopType) && (
                       <div className="flex items-center gap-1 mb-0.5 min-w-0">
                         {stop.stopType && stop.stopType !== 'ORIGIN' && (
-                          <span className={`text-[7px] font-bold px-1 py-[0px] rounded ${stop.stopType === 'PU' ? 'bg-blue-100 text-blue-700' : stop.stopType === 'DO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                          <span className={`text-[7px] font-semibold px-1 py-[0px] rounded ${stop.stopType === 'PU' ? 'bg-blue-100 text-blue-700' : stop.stopType === 'DO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
                             {stop.stopType}
                           </span>
                         )}
@@ -684,7 +684,7 @@ const RoutePlanSection = ({
               <button
                 type="button"
                 onClick={sendToSequencer}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-bold text-white bg-[#2563EB] rounded-xl active:scale-95 transition hover:bg-[#1D4ED8] shadow-sm"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-bold text-white bg-blue-600 rounded-xl active:scale-95 transition hover:bg-blue-700 shadow-sm"
               >
                 <Route size={14} /> Send {routeValidation.routeStops.length} to Plan
               </button>
@@ -864,7 +864,7 @@ const DriverToolsPage = ({
                 return (
                   <React.Fragment key={id}>
                     {i > 0 && <ChevronRight size={11} className="text-slate-300 shrink-0" />}
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${t && !['Assigned','Unassigned'].includes(t.status) ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${t && !['Assigned','Unassigned'].includes(t.status) ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
                       {t?.patient || id}
                     </span>
                   </React.Fragment>
@@ -931,12 +931,12 @@ const DriverToolsPage = ({
                         <span className="block truncate text-xs font-semibold text-slate-800">{trip.patient}</span>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {trip.bookingId && (
-                          <span className="rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-xs font-bold text-blue-700">
+                          <span className="rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-xs font-semibold text-blue-700">
                             {trip.bookingId}
                           </span>
                         )}
                         {(trip.type || trip.serviceType) && (
-                          <span className="rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">
+                          <span className="rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600">
                             {trip.type || trip.serviceType}
                           </span>
                         )}
@@ -988,7 +988,7 @@ const DriverToolsPage = ({
                     <div className="min-w-0">
                       <span className="block truncate text-xs font-medium text-slate-700">{trip.patient}</span>
                       {trip.bookingId && (
-                        <span className="mt-1 inline-flex rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-xs font-bold text-blue-700">
+                        <span className="mt-1 inline-flex rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-xs font-semibold text-blue-700">
                           {trip.bookingId}
                         </span>
                       )}

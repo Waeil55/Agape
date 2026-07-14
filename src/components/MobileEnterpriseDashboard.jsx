@@ -122,7 +122,7 @@ const MobileEnterpriseDashboard = (props) => {
   };
 
   const renderTopBar = (title, showBack = false) => (
-    <div className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F4F7FC]/95 backdrop-blur-md">
+    <div className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[var(--bg-app)]/95 backdrop-blur-md">
       <div className="px-3 py-3 flex items-center gap-3">
         {showBack && (
           <button onClick={() => setSubView(null)} className="min-w-[36px] min-h-[36px] flex items-center justify-center -ml-1.5 text-slate-500 hover:text-slate-800 rounded-full bg-slate-200/50 touch-manipulation transition-all">
@@ -438,7 +438,7 @@ const MobileEnterpriseDashboard = (props) => {
               <select
                 value={toolsDriverId}
                 onChange={e => setToolsDriverId(e.target.value)}
-                className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#2b4c7e] focus:ring-1 focus:ring-[#2b4c7e] transition-all"
+                className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all"
               >
                 <option value="">Select a driver…</option>
                 {driverWorkDrivers.map(d => (

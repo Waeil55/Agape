@@ -44,7 +44,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
           <div>
             <h2 className="text-xl font-extrabold text-slate-900 tracking-wide truncate">{currentUser || 'User'}</h2>
             <div className="flex items-center gap-2 mt-1">
-              <Shield size={12} className="text-[#2b4c7e]" />
+              <Shield size={12} className="text-blue-600" />
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">{role === 'admin' ? 'Administrator' : 'Dispatcher'}</p>
             </div>
           </div>

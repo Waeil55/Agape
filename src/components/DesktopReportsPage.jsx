@@ -482,7 +482,7 @@ const DesktopReportsPage = ({
             <div key={trip.id} className="rounded-xl shadow-sm overflow-hidden border border-slate-200 bg-white transition-all duration-200 hover:shadow-md hover:border-slate-300">
               <button
                 type="button"
-                className="w-full bg-[#2b4c7e] px-4 py-3 flex items-center justify-between cursor-pointer select-none transition-colors hover:bg-[#203a60] text-left"
+                className="w-full bg-blue-600 px-4 py-3 flex items-center justify-between cursor-pointer select-none transition-colors hover:bg-[#203a60] text-left"
                 onClick={() => setExpandedTripId(prev => (prev === trip.id ? null : trip.id))}
               >
                 <div className="min-w-0">
@@ -490,7 +490,7 @@ const DesktopReportsPage = ({
                   <p className="text-blue-200 text-xs font-semibold truncate">#{trip.bookingId || trip.id}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                  <span className={`text-xs font-extrabold px-2 py-1 rounded uppercase tracking-wider shadow-sm ${trip.status === 'Completed' ? 'bg-[#c2f0d9] text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>
+                  <span className={`text-xs font-extrabold px-2 py-1 rounded uppercase tracking-wider shadow-sm ${trip.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>
                     {trip.status || 'Scheduled'}
                   </span>
                   <ChevronDown className={`w-5 h-5 text-blue-200 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -498,11 +498,11 @@ const DesktopReportsPage = ({
               </button>
 
               {isExpanded && (
-                <div className="bg-[#eaf0f6] p-4">
+                <div className="bg-slate-50 p-4">
                   <DetailRow label="Trip ID" value={trip.bookingId || trip.id} valueColor="text-blue-700" />
                   <DetailRow label="Driver" value={driver?.name || trip.driverName || DASH} />
                   <DetailRow label="Vehicle" value={trip.completedVehicle || driver?.vehicle || DASH} />
-                  <DetailRow label="Scheduled" value={formatClock(trip.time)} valueColor="text-[#2b4c7e]" />
+                  <DetailRow label="Scheduled" value={formatClock(trip.time)} valueColor="text-blue-600" />
                   <div className="my-3 border-t border-slate-300/50" />
                   <DetailRow label="Pickup Address" value={trip.pickup} valueColor="text-emerald-700" />
                   <DetailRow label="Pickup Arrival" value={formatClock(trip.arrivalTime || trip.pickupTime)} valueColor="text-emerald-700" />
@@ -554,7 +554,7 @@ const DesktopReportsPage = ({
           <col className="w-[8%]" />
           <col className="w-[7%]" />
         </colgroup>
-        <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
+        <thead className="sticky top-0 z-10 bg-blue-600 text-white shadow-sm">
           <tr>
             <th className="rounded-tl-xl px-3 py-1.5 text-left font-semibold">Edit</th>
             <th className="px-3 py-1.5 text-left font-semibold">Date</th>
@@ -723,7 +723,7 @@ const DesktopReportsPage = ({
               <colgroup>
                 {cols.map(c => <col key={c.key} className={c.w} />)}
               </colgroup>
-              <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
+              <thead className="sticky top-0 z-10 bg-blue-600 text-white shadow-sm">
                 <tr>
                   {cols.map((c, i) => (
                     <th key={c.key} className={`px-3 py-1.5 text-left font-semibold ${i === 0 ? 'rounded-tl-xl' : ''} ${i === cols.length - 1 ? 'rounded-tr-xl' : ''}`}>
@@ -775,7 +775,7 @@ const DesktopReportsPage = ({
               {!hiddenColumns.includes('dropoffTime') && <td className="px-3 py-1.5 font-mono text-rose-700">{renderCell(trip, 'arrivalDropoffTime', formatClock(trip.arrivalDropoffTime || trip.completedAt), 'arrivalDropoffTime', 'time')}</td>}
               {!hiddenColumns.includes('endOdo') && <td className="px-3 py-1.5 font-mono text-rose-700">{renderCell(trip, 'dropoffOdometer', trip.dropoffOdometer || DASH, 'dropoffOdometer', 'number')}</td>}
               {!hiddenColumns.includes('travelTime') && <td className="px-3 py-1.5 font-mono text-slate-700">{renderCell(trip, 'travelTime', formatMinutes(travelMinutes), 'travelTime')}</td>}
-              {!hiddenColumns.includes('distance') && <td className="px-3 py-1.5 font-mono text-[#2f5b96]">{renderCell(trip, 'distance', calcMiles(trip), 'distance', 'number')}</td>}
+              {!hiddenColumns.includes('distance') && <td className="px-3 py-1.5 font-mono text-blue-600">{renderCell(trip, 'distance', calcMiles(trip), 'distance', 'number')}</td>}
               {!hiddenColumns.includes('signature') && <td className="px-3 py-1.5 text-emerald-700">{renderCell(trip, 'signature', trip.paperSignatureConfirmed ? 'Yes' : 'No', 'paperSignatureConfirmed')}</td>}
               {!hiddenColumns.includes('review') && <td className="px-3 py-1.5 text-slate-500">{renderCell(trip, 'reviewed', trip.reviewed ? 'Done' : 'Pending', 'reviewed')}</td>}
             </tr>
@@ -794,7 +794,7 @@ const DesktopReportsPage = ({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#F4F7FC] font-sans text-slate-900">
+    <div className="flex min-h-0 flex-1 flex-col bg-[var(--bg-app)] font-sans text-slate-900">
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
         <div className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-200 bg-white shrink-0 sticky top-0 z-20 shadow-sm overflow-x-auto">
           {/* View Tabs */}

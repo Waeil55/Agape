@@ -426,7 +426,7 @@ const LiveRouteMap = React.memo(({
         {etaText && (
           <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md rounded-xl px-3 py-1.5 shadow-sm border border-slate-200/50 flex items-center gap-1.5">
             <Navigation size={12} className="text-blue-600" />
-            <span className="text-xs font-bold text-slate-800">{etaText}</span>
+            <span className="text-xs font-semibold text-slate-800">{etaText}</span>
           </div>
         )}
 
@@ -434,14 +434,14 @@ const LiveRouteMap = React.memo(({
         {routeLoading && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-indigo-600/90 backdrop-blur-md rounded-xl px-3 py-1.5 shadow-sm flex items-center gap-1.5">
             <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            <span className="text-xs font-bold text-white">Calculating route...</span>
+            <span className="text-xs font-semibold text-white">Calculating route...</span>
           </div>
         )}
 
         {/* Route Error */}
         {routeError && routeError !== 'ZERO_RESULTS' && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-rose-600/90 backdrop-blur-md rounded-xl px-3 py-1.5 shadow-sm">
-            <span className="text-xs font-bold text-white">Route unavailable</span>
+            <span className="text-xs font-semibold text-white">Route unavailable</span>
           </div>
         )}
 
@@ -453,7 +453,7 @@ const LiveRouteMap = React.memo(({
                 const isActive = t.id === activeTripId;
                 const done = ['Completed', 'Cancelled', 'No Show'].includes(t.status);
                 return (
-                  <div key={t.id} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 ${isActive ? 'bg-blue-100 text-blue-700' : done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                  <div key={t.id} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 ${isActive ? 'bg-blue-100 text-blue-700' : done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                     {done ? <Circle size={8} className="fill-emerald-500 text-emerald-500" /> : <span className="w-3.5 h-3.5 rounded-full bg-current text-white flex items-center justify-center text-xs leading-none">{i + 1}</span>}
                     <span className="break-words">{t.patient}</span>
                     {t.bookingId && <span className="rounded-full bg-white/80 px-1 py-0.5 text-[10px] font-black text-blue-700">{t.bookingId}</span>}
@@ -475,7 +475,7 @@ const LiveRouteMap = React.memo(({
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-slate-900 break-words">{selectedStop.patient}</p>
                 {selectedStop.trip?.bookingId && (
-                  <p className="text-[10px] font-bold text-blue-700">{selectedStop.trip.bookingId}</p>
+                  <p className="text-[10px] font-semibold text-blue-700">{selectedStop.trip.bookingId}</p>
                 )}
                 <p className="text-xs text-slate-500 truncate">{selectedStop.address}</p>
               </div>

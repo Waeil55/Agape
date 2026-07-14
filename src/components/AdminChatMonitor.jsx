@@ -75,7 +75,7 @@ const AdminChatMonitor = () => {
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search conversations..." className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
         </div>
-        <span className="text-[10px] font-bold text-slate-400 shrink-0">{channels.length} chats</span>
+        <span className="text-[10px] font-semibold text-slate-400 shrink-0">{channels.length} chats</span>
       </div>
 
       <div className="flex flex-1 min-h-0 gap-3">
@@ -110,7 +110,7 @@ const AdminChatMonitor = () => {
         </div>
 
         {/* Message view (desktop only) */}
-        <div className="hidden sm:flex flex-1 flex-col min-h-0 rounded-xl border border-slate-100 bg-[#f0f2f5]">
+        <div className="hidden sm:flex flex-1 flex-col min-h-0 rounded-xl border border-slate-100 bg-slate-50">
           {!selectedChannel && (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
               <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center text-blue-500 mb-3">

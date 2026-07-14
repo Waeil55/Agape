@@ -574,7 +574,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
         </div>
 
         {chat.loadingMessages && chat.messages.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center bg-[#f6f8fb]">
+          <div className="flex flex-1 items-center justify-center bg-slate-50">
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 rounded-full border-[3px] border-blue-500 border-t-transparent animate-spin" />
               <p className="text-sm text-slate-400 font-medium">Loading messages...</p>
@@ -628,7 +628,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
 
   return (
     <div
-      className={`agape-chat-page flex h-full w-full min-h-0 bg-[#f6f8fb] ${mobileView === 'chat' ? 'agape-chat-page-conversation-active' : ''}`}
+      className={`agape-chat-page flex h-full w-full min-h-0 bg-slate-50 ${mobileView === 'chat' ? 'agape-chat-page-conversation-active' : ''}`}
       style={{ '--agape-chat-viewport-height': `${viewportHeight}px` }}
     >
       {isDesktopLayout ? (

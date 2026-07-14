@@ -1307,7 +1307,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                         className={`relative z-10 flex gap-2 lg:gap-3 items-stretch group transition-all ${isDragging && draggedIndex === idx ? 'opacity-40 scale-95' : 'opacity-100'}`}
                       >
                         <div className="flex flex-col items-center pt-1">
-                          <div className={`w-7 h-7 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-lg sm:rounded-xl flex items-center justify-center font-bold text-xs sm:text-sm border-2 sm:border-4 border-[#F4F7FC] shadow-sm flex-shrink-0 z-10 ${isPU ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                          <div className={`w-7 h-7 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-lg sm:rounded-xl flex items-center justify-center font-bold text-xs sm:text-sm border-2 sm:border-4 border-[var(--bg-app)] shadow-sm flex-shrink-0 z-10 ${isPU ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
                             {idx + 1}
                           </div>
                         </div>

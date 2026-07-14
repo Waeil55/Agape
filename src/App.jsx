@@ -2614,7 +2614,7 @@ const App = () => {
 
               {loginError && <p className={`text-sm font-semibold text-center mt-2 p-3 rounded-lg border ${loginError.toLowerCase().includes('sent') ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100'}`}>{loginError}</p>}
               
-              <button type="submit" className="w-full py-4 mt-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-full font-bold text-lg transition-all shadow-md shadow-blue-800/10 active:scale-95">Authorize Access</button>
+              <button type="submit" className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-lg transition-all shadow-md shadow-blue-800/10 active:scale-95">Authorize Access</button>
               
               <div className="pt-2 flex items-center justify-between text-sm font-semibold">
                 <button type="button" onClick={handleCreateAccount} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-semibold transition text-sm">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>

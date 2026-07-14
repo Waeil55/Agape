@@ -3152,7 +3152,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     };
 
     return (
-      <><div className="min-h-full bg-[#F4F7FC] pb-32">
+      <><div className="min-h-full bg-[var(--bg-app)] pb-32">
         <div className="sticky top-0 z-30 bg-white border-b-2 border-amber-400 driver-active-trip-header">
           <div className="px-3 py-2.5 flex items-center gap-2.5">
             <button
@@ -3407,7 +3407,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   if (!me) {
     return (
-      <div className="flex-1 bg-[#F4F7FC] flex items-center justify-center p-8">
+      <div className="flex-1 bg-[var(--bg-app)] flex items-center justify-center p-8">
         <div className="text-center">
           <div className="w-20 h-20 bg-white rounded-[2rem] shadow-lg flex items-center justify-center mx-auto mb-6">
             <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
@@ -3421,7 +3421,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   return (
     <div
-      className="w-full h-full overflow-hidden flex flex-col bg-[#F4F7FC] text-slate-900 relative"
+      className="w-full h-full overflow-hidden flex flex-col bg-[var(--bg-app)] text-slate-900 relative"
       onTouchStart={handlePullTouchStart}
       onTouchMove={handlePullTouchMove}
       onTouchEnd={handlePullTouchEnd}
@@ -3439,7 +3439,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       )}
       {!(activeNav === 'active-trip' && activeWorkTrip) && (
         <div
-          className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[#F4F7FC]/95 backdrop-blur-md"
+          className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[var(--bg-app)]/95 backdrop-blur-md"
         >
           <div className="px-3 py-3 flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
@@ -3513,7 +3513,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {activeNav === 'active-trip' && activeWorkTrip && (
         <div
           ref={tripsScrollRef}
-          className="flex-1 overflow-y-auto bg-[#F4F7FC]"
+          className="flex-1 overflow-y-auto bg-[var(--bg-app)]"
           style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
         >
           {renderTripWorkPage(activeWorkTrip)}
@@ -3524,7 +3524,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && (
         <div
           ref={tripsScrollRef}
-          className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[#F4F7FC]"
+          className="flex-1 overflow-y-auto pb-28 px-3 pt-2 space-y-2 bg-[var(--bg-app)]"
           style={{ overflowAnchor: 'none', scrollBehavior: 'smooth' }}
         >
             <>
@@ -3848,7 +3848,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     : 'text-emerald-700';
                   return (
                     <div key={`${getRoutePlanStopKey(stop)}-done`} className="relative pl-12 pr-2">
-                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#F4F7FC] flex items-center justify-center z-10">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[var(--bg-app)] flex items-center justify-center z-10">
                         <Check size={10} className="text-white font-semibold" />
                       </div>
                       <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl px-3 py-2 opacity-80 flex items-center gap-2">
@@ -3870,7 +3870,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isUpcoming) {
                   return (
                     <div key={`${getRoutePlanStopKey(stop)}-upcoming`} className="relative pl-12 pr-2 opacity-55">
-                      <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[#F4F7FC] flex items-center justify-center z-10">
+                      <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[var(--bg-app)] flex items-center justify-center z-10">
                         <span className="text-xs font-medium text-slate-500">{index + 1}</span>
                       </div>
                       <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between gap-3">
@@ -3908,11 +3908,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 return (
                   <div key={`${getRoutePlanStopKey(stop)}-current`} className="relative pl-12 pr-2 my-4">
-                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-[#2563EB] border-4 border-[#F4F7FC] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-blue-600 border-4 border-[var(--bg-app)] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
                       <span className="text-xs font-semibold text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200">
-                      <div className="bg-[#2563EB] px-4 py-3 text-white">
+                      <div className="bg-blue-600 px-4 py-3 text-white">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <span className="px-2 py-0.5 rounded-lg bg-white/15 text-xs font-medium tracking-wide uppercase">{stopType === 'DO' ? 'Dropoff' : 'Pickup'}</span>
@@ -4046,7 +4046,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isCompleted) {
                   return (
                     <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2">
-                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[#F4F7FC] flex items-center justify-center z-10">
+                      <div className="absolute left-[25px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-emerald-500 border-2 border-[var(--bg-app)] flex items-center justify-center z-10">
                         <Check size={10} className="text-white font-semibold" />
                       </div>
                       <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl px-3 py-2 opacity-60 flex items-center gap-2">
@@ -4060,7 +4060,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 if (isUpcoming) {
                   return (
                     <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 opacity-50">
-                      <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[#F4F7FC] flex items-center justify-center z-10">
+                      <div className="absolute left-[23px] top-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-slate-200 border-2 border-[var(--bg-app)] flex items-center justify-center z-10">
                         <span className="text-xs font-medium text-slate-500">{index + 1}</span>
                       </div>
                       <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 flex items-center justify-between">
@@ -4113,7 +4113,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
                 return (
                   <div key={`${step.tripId}-${step.type}-${index}`} className="relative pl-12 pr-2 my-4">
-                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-indigo-500 border-4 border-[#F4F7FC] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
+                    <div className="absolute left-[20px] top-4 w-7 h-7 rounded-full bg-indigo-500 border-4 border-[var(--bg-app)] flex items-center justify-center z-10 shadow-md shadow-indigo-300/50">
                       <span className="text-xs font-semibold text-white">{index + 1}</span>
                     </div>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
@@ -4566,7 +4566,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
             <div className="flex items-start justify-between mb-6">
               <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-[#2563EB] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/20">
+                <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/20">
                   <Gauge size={28} className="text-white" />
                 </div>
                 <h3 className="text-xl     font-semibold text-slate-900">Arrived at Stop</h3>
@@ -4592,7 +4592,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
+                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
               </div>
             </div>
           </div>
@@ -6223,11 +6223,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     setActiveNav(item.id);
                   }}
                     className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1.5 py-1 touch-manipulation transition-all duration-200 min-h-[56px] ${
-                      isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8] hover:text-[#64748b]'
+                      isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
                     }`}>
                     <div className="relative">
                       <Icon size={24} strokeWidth={isActiveTab ? 2.2 : 1.8}
-                        className={`transition-all duration-200 ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}
+                        className={`transition-all duration-200 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}
                       />
                       {item.badge > 0 && (
                         <span key={item.badge} className="messenger-nav-badge absolute -right-2.5 -top-2 badge-messenger badge-pop badge-pulse">
@@ -6237,15 +6237,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     </div>
                     {item.sublabel ? (
                       <div className="flex flex-col items-center leading-none">
-                        <span className={`max-w-full truncate text-[10px] font-semibold tracking-wide ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}>
+                        <span className={`max-w-full truncate text-[10px] font-semibold tracking-wide ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
                           {item.label}
                         </span>
-                        <span className={`max-w-full truncate text-[9px] font-medium tracking-wide ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}>
+                        <span className={`max-w-full truncate text-[9px] font-medium tracking-wide ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
                           {item.sublabel}
                         </span>
                       </div>
                     ) : (
-                      <span className={`max-w-full truncate text-[11px] font-medium tracking-wide transition-all leading-none ${isActiveTab ? 'text-[#2563eb]' : 'text-[#94a3b8]'}`}>
+                      <span className={`max-w-full truncate text-[11px] font-medium tracking-wide transition-all leading-none ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
                         {item.label}
                       </span>
                     )}
@@ -6323,7 +6323,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <p className="text-slate-500 text-xs font-semibold mb-4">{legs.length} leg{legs.length !== 1 ? 's' : ''}</p>
               <div className="space-y-2">
                 {legs.map((leg, idx) => (
-                  <div key={leg.id} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4">
+                  <div key={leg.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-micro font-semibold uppercase tracking-wide text-slate-500">Leg {idx + 1}</span>
                       <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${leg.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : leg.status === 'In Transit' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{leg.status}</span>

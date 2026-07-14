@@ -612,7 +612,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
                 {optimizing ? <Loader2 size={11} className="animate-spin" /> : <BrainCircuit size={11} />} Optimize
               </button>
               <button onClick={copyRoute} disabled={stops.length === 0} className="h-9 w-9 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl disabled:opacity-30" title="Copy route"><Copy size={13} /></button>
-              <button onClick={sendToSequencer} disabled={stops.length === 0 || typeof onSendToSequencer !== 'function'} className="h-9 min-w-[108px] bg-[#2563EB] text-white rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-[#1D4ED8] active:scale-95 disabled:opacity-30 shadow-sm" title="Send route to plan">
+              <button onClick={sendToSequencer} disabled={stops.length === 0 || typeof onSendToSequencer !== 'function'} className="h-9 min-w-[108px] bg-blue-600 text-white rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-blue-700 active:scale-95 disabled:opacity-30 shadow-sm" title="Send route to plan">
                 <Route size={11} /> Plan
               </button>
               <button onClick={clearRoute} disabled={stops.length === 0} className="h-9 w-9 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl disabled:opacity-30" title="Clear route"><Trash2 size={13} /></button>

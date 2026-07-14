@@ -410,7 +410,7 @@ const MobileDispatchView = ({
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/>
                 <input ref={searchInputRef} type="text" value={localSearch} onChange={e=>setLocalSearch(e.target.value)}
                   placeholder="Search patient, ID, address…"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#2b4c7e] focus:ring-1 focus:ring-[#2b4c7e] transition-all"/>
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all"/>
                 {localSearch && <button type="button" onClick={()=>setLocalSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={13}/></button>}
               </div>
               <button type="button" onClick={()=>{setShowSearch(false);setLocalSearch("");}}
@@ -438,7 +438,7 @@ const MobileDispatchView = ({
         <div className="shrink-0 flex gap-2 px-3 py-2.5 overflow-x-auto bg-white border-b border-slate-100 sm:px-4" style={{scrollbarWidth:"none"}}>
           {CHIPS.map(c=>(
             <button key={c.id} type="button" onClick={()=>setFilter(c.id)}
-              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all active:scale-95 "+(filter===c.id?"bg-[#1e3a5f] text-white shadow-sm":"bg-slate-100 text-slate-500 hover:bg-slate-200")}>
+              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all active:scale-95 "+(filter===c.id?"bg-blue-600 text-white shadow-sm":"bg-slate-100 text-slate-500 hover:bg-slate-200")}>
               {c.label}
               <span className={"text-[9px] px-1 py-0.5 rounded-full font-semibold "+(filter===c.id?"bg-white/20 text-white":"bg-slate-200 text-slate-500")}>{c.n}</span>
             </button>
@@ -484,7 +484,7 @@ const MobileDispatchView = ({
 
       {/* FAB */}
       <button type="button" onClick={()=>setShowAddTripModal?.(true)}
-        className="fixed z-20 right-4 w-14 h-14 rounded-full shadow-xl flex items-center justify-center bg-[#2b4c7e] active:scale-95 transition-all border border-[#1e3a5f]"
+        className="fixed z-20 right-4 w-14 h-14 rounded-full shadow-xl flex items-center justify-center bg-blue-600 active:scale-95 transition-all border border-blue-700"
         style={{bottom:"calc(80px + env(safe-area-inset-bottom,0px))",boxShadow:"0 8px 24px rgba(43,76,126,0.3)"}}>
         <Plus size={24} className="text-white"/>
       </button>

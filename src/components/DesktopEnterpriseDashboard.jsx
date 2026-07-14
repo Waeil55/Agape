@@ -569,7 +569,7 @@ const DesktopEnterpriseDashboard = ({
 
   // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="bg-gradient-to-r from-[#1e3a5f] via-[#274b7c] to-[#1a3355] text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <header className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm shadow-inner">
         <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain brightness-0 invert" />
       </div>
@@ -582,7 +582,7 @@ const DesktopEnterpriseDashboard = ({
         <button
           onClick={toggleRightPanel}
           className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold shadow-sm transition-colors ${
-            showRightPanel ? 'bg-white text-[#1e3a5f]' : 'bg-white/10 text-white hover:bg-white/20'
+            showRightPanel ? 'bg-white text-blue-600' : 'bg-white/10 text-white hover:bg-white/20'
           }`}
         >
           <PanelRight size={16} /> Panel
@@ -1189,7 +1189,7 @@ const DesktopEnterpriseDashboard = ({
         </Suspense></ErrorBoundary>
       );
       case 'drive': return driverWorkDrivers.length > 0 && activeDriverWorkDriver ? (
-        <div className="flex h-full min-h-0 flex-col bg-[#F4F7FC]">
+        <div className="flex h-full min-h-0 flex-col bg-[var(--bg-app)]">
           <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
@@ -1248,7 +1248,7 @@ const DesktopEnterpriseDashboard = ({
 
   // ==================== MAIN LAYOUT ====================
   return (
-    <div className="h-full w-full overflow-hidden bg-[#F4F7FC] font-sans text-slate-900">
+    <div className="h-full w-full overflow-hidden bg-[var(--bg-app)] font-sans text-slate-900">
       <div className="flex h-full min-w-0 flex-col">
         {/* Top Header - Desktop only */}
         {renderEnterpriseTopBar()}
@@ -1258,7 +1258,7 @@ const DesktopEnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${activePanel === 'reports' || activePanel === 'chat' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[#F4F7FC] ${['operations', 'reports', 'admin', 'drive', 'chat', 'liveMap'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+            <div className={`flex-1 min-h-0 ${activePanel === 'reports' || activePanel === 'chat' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'chat', 'liveMap'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
@@ -1603,7 +1603,7 @@ const DesktopEnterpriseDashboard = ({
               <div className="space-y-2">
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-emerald-500/20">
-                    <span className="text-xs font-bold text-white">P</span>
+                    <span className="text-xs font-semibold text-white">P</span>
                   </div>
                   <div className="flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pickup</p>
@@ -1615,7 +1615,7 @@ const DesktopEnterpriseDashboard = ({
                 </div>
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-rose-500/20">
-                    <span className="text-xs font-bold text-white">D</span>
+                    <span className="text-xs font-semibold text-white">D</span>
                   </div>
                   <div className="flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Dropoff</p>

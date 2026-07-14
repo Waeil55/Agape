@@ -17,7 +17,7 @@ export default function DriverPerformanceCard({ driver, trips = [], compact = fa
           <div className="flex items-center gap-1">
             <Star size={10} className="text-amber-500 fill-amber-500" />
             <span className="text-[11px] font-semibold text-slate-900">{score.overall}/100</span>
-            <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${tierInfo.bg} ${tierInfo.text}`}>{tierInfo.label}</span>
+            <span className={`px-1 py-0.5 rounded text-[8px] font-semibold ${tierInfo.bg} ${tierInfo.text}`}>{tierInfo.label}</span>
           </div>
           <p className="text-[9px] text-slate-500">{score.totalTrips} trips · {score.onTimeRate}% on-time</p>
         </div>
@@ -38,7 +38,7 @@ export default function DriverPerformanceCard({ driver, trips = [], compact = fa
               <div className="flex items-center gap-2">
                 <Star size={14} className="text-amber-500 fill-amber-500" />
                 <span className="text-base font-black text-slate-900">{score.overall}/100</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${tierInfo.bg} ${tierInfo.text}`}>{tierInfo.label}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${tierInfo.bg} ${tierInfo.text}`}>{tierInfo.label}</span>
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">{formatScore(score.overall)} · {score.totalTrips} total trips</p>
             </div>

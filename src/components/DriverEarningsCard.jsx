@@ -8,7 +8,7 @@ export function TripEarningsBadge({ trip, compact = false }) {
 
   if (compact) {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold">
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-semibold">
         <DollarSign size={10} />
         {earnings.total.toFixed(2)}
       </span>

@@ -33,7 +33,7 @@ function showWebFallbackModal(type, phone, name) {
           ${safeName ? `<strong>${safeName}</strong><br/>` : ''}${formatted || cleaned}
         </p>
         <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-          <button id="copyBtn" style="flex: 1; padding: 10px 16px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; color: #374151; transition: all 0.2s;">
+          <button id="copyBtn" style="flex: 1; padding: 10px 16px; background: #f1f5f9; border: 1px solid #e5e7eb; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; color: #374151; transition: all 0.2s;">
             Copy
           </button>
           <button id="closeBtn" style="flex: 1; padding: 10px 16px; background: #111827; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; color: white; transition: all 0.2s;">

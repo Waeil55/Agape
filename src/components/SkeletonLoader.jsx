@@ -28,7 +28,7 @@ const SkeletonLoader = ({ type = 'page', rows = 5 }) => {
 
   if (type === 'chat') {
     return (
-      <div className="flex-1 min-h-0 bg-[#f0f2f5] p-4 space-y-4">
+      <div className="flex-1 min-h-0 bg-slate-50 p-4 space-y-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
             <div className={`max-w-[70%] space-y-1 ${i % 2 === 0 ? 'items-start' : 'items-end'}`}>

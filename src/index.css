@@ -1293,8 +1293,6 @@ table tbody tr:hover {
 [data-theme="light"] {
   .text-slate-300 { color: #64748b !important; }
   .text-slate-400 { color: #475569 !important; }
-  .text-gray-300 { color: #64748b !important; }
-  .text-gray-400 { color: #475569 !important; }
 }
 
 /* Dark mode keeps original colors */

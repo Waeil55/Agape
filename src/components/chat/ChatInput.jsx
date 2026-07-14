@@ -147,7 +147,7 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
       )}
 
       {showEmoji && (
-        <div className="mx-3 mt-2 rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="mx-3 mt-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
           <div className="flex flex-wrap gap-1">
             {EMOJI_QUICK.map(emoji => (
               <button

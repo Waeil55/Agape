@@ -230,7 +230,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     if (onUpdateTrip) onUpdateTrip(editingTripId, payload);
   };
 
-  const inputCls = "w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg font-semibold text-[11px] focus:border-[#2563EB] outline-none transition-all";
+  const inputCls = "w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg font-semibold text-[11px] focus:border-blue-600 outline-none transition-all";
 
   return (
     <div className="agape-mobile-page agape-mobile-reports w-full flex-1 flex flex-col overflow-hidden overscroll-contain">
@@ -494,7 +494,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                         <>
                           <button
                             onClick={saveInlineEdit}
-                            className="flex items-center justify-center gap-2 bg-[#2563EB] border border-[#1D4ED8] rounded-xl py-3 shadow-sm text-white font-bold text-sm"
+                            className="flex items-center justify-center gap-2 bg-blue-600 border border-blue-700 rounded-xl py-3 shadow-sm text-white font-bold text-sm"
                           >
                             <Check className="w-4 h-4" />
                             Save

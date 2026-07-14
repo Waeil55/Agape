@@ -109,7 +109,7 @@ const APIConfiguration = ({ integrationKey, integration, onConnect }) => {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-slate-900">{integration.name}</h3>
         {integration.status === 'connected' && (
-          <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+          <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
             <CheckCircle size={14} />
             Connected
           </span>
@@ -232,7 +232,7 @@ const WebhookManager = () => {
               </div>
               <div className="flex items-center gap-2 ml-3">
                 {webhook.active && (
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+                  <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
                     Active
                   </span>
                 )}
@@ -337,7 +337,7 @@ const APIDocumentation = () => {
         {endpoints.map((ep, i) => (
           <div key={i} className="p-3 bg-slate-50 rounded-lg border border-slate-200 font-mono text-xs">
             <div className="flex items-center gap-2 mb-1">
-              <span className={`px-2 py-1 rounded font-bold text-white ${
+              <span className={`px-2 py-1 rounded font-semibold text-white ${
                 ep.method === 'GET' ? 'bg-blue-600' :
                 ep.method === 'POST' ? 'bg-emerald-600' :
                 ep.method === 'PUT' ? 'bg-amber-600' :

@@ -115,7 +115,7 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
             <div className="bg-slate-50 rounded-xl px-3.5 py-3 border border-slate-200">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[0.875em] font-semibold text-slate-900 truncate min-w-0">{editTrip.patient || editTrip.patientName}</p>
-                {editTrip.bookingId && <span className="text-[0.6875em] font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded shrink-0">Trip: {editTrip.bookingId}</span>}
+                {editTrip.bookingId && <span className="text-[0.6875em] font-mono font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded shrink-0">Trip: {editTrip.bookingId}</span>}
               </div>
               <p className="text-[0.6875em] text-slate-500 mt-0.5">{editTrip.time || ''} &middot; {editTrip.date || ''}</p>
             </div>

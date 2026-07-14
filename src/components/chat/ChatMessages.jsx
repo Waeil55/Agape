@@ -66,7 +66,7 @@ const ChatMessages = ({ messages, currentUser, onlineUsers, onReaction, hasMore,
   };
 
   return (
-    <div ref={containerRef} className="agape-chat-messages flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[#f6f8fb] px-3 sm:px-4 py-2">
+    <div ref={containerRef} className="agape-chat-messages flex-1 min-h-0 overflow-y-auto overscroll-contain bg-slate-50 px-3 sm:px-4 py-2">
       {hasMore && (
         <button onClick={onLoadMore} disabled={loadingMore}
           className="w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-xs text-blue-500 hover:text-blue-600 font-medium transition-colors">
