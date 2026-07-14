@@ -4943,7 +4943,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               )}
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm p-4 space-y-3">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
               <h3 className="text-micro font-semibold uppercase tracking-wide text-slate-500">Actions</h3>
               <div className="flex gap-2">
                 <button type="button" onClick={() => openInNavApp(showTripDetails.pickup, 'google')} className="flex-1 h-7 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"><Map size={16} /> Google Maps</button>

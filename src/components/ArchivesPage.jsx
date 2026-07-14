@@ -404,7 +404,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
           <p className="truncate text-sm font-semibold text-slate-900">{renderCellValue(trip, { key: 'patient' })}</p>
           <p className="mt-0.5 text-xs font-mono font-semibold text-blue-600">{renderCellValue(trip, { key: 'bookingId' })}</p>
         </div>
-        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">{renderCellValue(trip, { key: 'time' })}</span>
+        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{renderCellValue(trip, { key: 'time' })}</span>
       </div>
       <div className="mt-3 space-y-2 text-xs font-medium text-slate-600">
         <p className="flex items-start gap-2"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><span className="break-words text-emerald-700">{renderCellValue(trip, { key: 'pickup' })}</span></p>

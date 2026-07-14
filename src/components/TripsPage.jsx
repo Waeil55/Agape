@@ -257,9 +257,9 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
             {/* Header Row: Time, Status, Badges */}
             <div className="mb-2 flex items-center gap-2 flex-wrap">
               <span className={`text-lg font-black leading-none ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-slate-700'}`}>{trip.time}</span>
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${getManifestStatusClass(trip.status)}`}>{trip.status}</span>
-              {trip.type && <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{trip.type}</span>}
-              {trip.bookingId && <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{trip.bookingId}</span>}
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${getManifestStatusClass(trip.status)}`}>{trip.status}</span>
+              {trip.type && <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{trip.type}</span>}
+              {trip.bookingId && <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{trip.bookingId}</span>}
             </div>
 
             {/* Patient Name */}
@@ -508,8 +508,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                       <div>
                         <h4 className="text-sm font-black text-slate-900">{section.label}</h4>
                         <div className="mt-1 flex flex-wrap gap-1">
-                          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600">{section.trips.length} trip{section.trips.length !== 1 ? 's' : ''}</span>
-                          {section.late > 0 && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">{section.late} late</span>}
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">{section.trips.length} trip{section.trips.length !== 1 ? 's' : ''}</span>
+                          {section.late > 0 && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">{section.late} late</span>}
                         </div>
                       </div>
                       <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{groupBy}</span>
@@ -794,7 +794,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                   <div key={leg.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-slate-400 uppercase">Leg {idx + 1}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
                     </div>
                     <p className="text-sm font-semibold text-slate-400 mb-1">Booking: {leg.bookingId || '—'}</p>
                     <div className="space-y-1.5">

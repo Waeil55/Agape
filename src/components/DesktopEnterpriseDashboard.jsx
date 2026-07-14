@@ -717,7 +717,7 @@ const DesktopEnterpriseDashboard = ({
                           <p className="text-[10px] text-slate-500 truncate">{isBusy ? driverTrip.patient || 'On trip' : driver.vehicle || 'Available'}</p>
                         </div>
                         {driverCompleted > 0 && (
-                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{driverCompleted} done</span>
+                          <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{driverCompleted} done</span>
                         )}
                       </div>
                     );
@@ -800,7 +800,7 @@ const DesktopEnterpriseDashboard = ({
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Status</p>
-                  <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-bold ${
+                  <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-semibold ${
                     tripDetails.status === 'Unassigned' ? 'bg-rose-100 text-rose-700' :
                     tripDetails.status === 'Assigned' ? 'bg-blue-100 text-blue-700' :
                     tripDetails.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
@@ -835,7 +835,7 @@ const DesktopEnterpriseDashboard = ({
                     <p className="text-xs font-semibold uppercase tracking-wider text-indigo-500 mb-1">Route Plans</p>
                     <div className="flex flex-wrap gap-1.5">
                       {tripDetails.routeAssignments.map((route, index) => (
-                        <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 border border-indigo-100">
+                        <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700 border border-indigo-100">
                           {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` • ${route.statusLabel}` : ''}
                         </span>
                       ))}
@@ -1210,7 +1210,7 @@ const DesktopEnterpriseDashboard = ({
                     </option>
                   ))}
                 </select>
-                <span className={`hidden rounded-lg px-2 py-1 text-xs font-bold sm:inline-flex ${getDriverLiveStatus(activeDriverWorkDriver).color}`}>
+                <span className={`hidden rounded-lg px-2 py-1 text-xs font-semibold sm:inline-flex ${getDriverLiveStatus(activeDriverWorkDriver).color}`}>
                   {getDriverLiveStatus(activeDriverWorkDriver).label}
                 </span>
               </div>
@@ -1399,7 +1399,7 @@ const DesktopEnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs ring-1 ring-blue-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-500">{d.vehicle} • <span className={`px-1 py-0.5 rounded text-xs font-bold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span></p>
+                       <p className="text-xs text-slate-500">{d.vehicle} • <span className={`px-1 py-0.5 rounded text-xs font-semibold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span></p>
                     </div>
                   </div>
                   <span className="text-blue-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
@@ -1454,7 +1454,7 @@ const DesktopEnterpriseDashboard = ({
                     <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs ring-1 ring-slate-200">{String(d?.name || '?').charAt(0)}</div>
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{d.name}</p>
-                      <p className="text-xs text-slate-500"><span className={`px-1 py-0.5 rounded text-xs font-bold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span> • {d.vehicle}</p>
+                       <p className="text-xs text-slate-500"><span className={`px-1 py-0.5 rounded text-xs font-semibold ${getDriverLiveStatus(d).color}`}>{getDriverLiveStatus(d).label}</span> • {d.vehicle}</p>
                     </div>
                   </div>
                   <span className="text-slate-500 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Assign →</span>
@@ -1581,7 +1581,7 @@ const DesktopEnterpriseDashboard = ({
                   {getClientIdentifier(tripDetails) && <p className="text-xs text-slate-500 mt-0.5">Client ID: {getClientIdentifier(tripDetails)}</p>}
                   {(tripDetails.type || tripDetails.serviceType) && <p className="text-xs text-slate-500 mt-0.5">Service: {tripDetails.type || tripDetails.serviceType}</p>}
                 </div>
-                <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
+                <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
                   tripDetails.status === 'Unassigned' ? 'bg-rose-100 text-rose-700' :
                   tripDetails.status === 'Assigned' ? 'bg-blue-100 text-blue-700' :
                   tripDetails.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
@@ -1631,9 +1631,9 @@ const DesktopEnterpriseDashboard = ({
                   <p className="text-xs font-semibold uppercase tracking-wider text-indigo-500">Route Plans</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {tripDetails.routeAssignments.map((route, index) => (
-                      <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
-                        {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` • ${route.statusLabel}` : ''}
-                      </span>
+                        <span key={`${route.templateId || route.routeName}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                          {route.routeName}{route.time ? ` @ ${route.time}` : ''}{route.statusLabel ? ` • ${route.statusLabel}` : ''}
+                        </span>
                     ))}
                   </div>
                 </div>

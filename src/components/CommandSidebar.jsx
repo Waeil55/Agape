@@ -134,8 +134,8 @@ export default function CommandSidebar({
                        
                         {(upcoming.length > 0 || completed.length > 0) && (
                           <div className="flex items-center gap-2 pt-1">
-                            {upcoming.length > 0 && <span className="text-xs text-slate-600 font-bold bg-slate-100 border border-slate-200 px-2 py-1 rounded-md">{upcoming.length} upcoming</span>}
-                            {completed.length > 0 && <span className="text-xs text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md flex items-center gap-1"><span className="text-emerald-500">✓</span> {completed.length} completed</span>}
+                            {upcoming.length > 0 && <span className="text-xs text-slate-600 font-semibold bg-slate-100 border border-slate-200 px-2 py-1 rounded-md">{upcoming.length} upcoming</span>}
+                            {completed.length > 0 && <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md flex items-center gap-1"><span className="text-emerald-500">✓</span> {completed.length} completed</span>}
                          </div>
                        )}
                      </div>
@@ -153,7 +153,7 @@ export default function CommandSidebar({
               <div className="bg-white rounded-2xl border border-rose-200 overflow-hidden shadow-sm">
                 <div className="bg-rose-50 border-b border-rose-100 px-4 py-3 flex justify-between items-center">
                   <h3 className="text-xs font-semibold text-rose-700 uppercase tracking-widest">Needs Assignment</h3>
-                  <span className="text-xs font-bold bg-rose-600 text-white px-2 py-0.5 rounded-full shadow-sm">{unassignedTrips.length}</span>
+                  <span className="text-xs font-semibold bg-rose-600 text-white px-2 py-0.5 rounded-full shadow-sm">{unassignedTrips.length}</span>
                 </div>
                 <div className="flex flex-col divide-y divide-slate-100">
                   {unassignedTrips.map(t => (
@@ -173,14 +173,14 @@ export default function CommandSidebar({
               <div className="bg-white rounded-2xl border border-blue-200 overflow-hidden shadow-sm">
                 <div className="bg-blue-50 border-b border-blue-100 px-4 py-3 flex justify-between items-center">
                   <h3 className="text-xs font-semibold text-blue-700 uppercase tracking-widest">Active Now</h3>
-                  <span className="text-xs font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full shadow-sm">{activeTrips.length}</span>
+                  <span className="text-xs font-semibold bg-blue-600 text-white px-2 py-0.5 rounded-full shadow-sm">{activeTrips.length}</span>
                 </div>
                 <div className="flex flex-col divide-y divide-slate-100">
                   {activeTrips.map(t => (
                     <div key={t.id} className="p-4 hover:bg-slate-50 transition-colors cursor-pointer">
                       <div className="flex justify-between items-start mb-1">
                       <p className="text-sm font-semibold text-slate-900">{t.patient || 'Unknown'}</p>
-                        <span className="text-xs font-bold text-blue-700 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md">{t.status}</span>
+                        <span className="text-xs font-semibold text-blue-700 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md">{t.status}</span>
                       </div>
                       <p className="text-xs font-medium text-slate-500 truncate flex items-center gap-1">
                         <ArrowRight size={12} className="text-slate-500"/> {t.dropoff}
@@ -195,7 +195,7 @@ export default function CommandSidebar({
               <div className="bg-white rounded-2xl border border-emerald-200 overflow-hidden shadow-sm">
                 <div className="bg-emerald-50 border-b border-emerald-100 px-4 py-3 flex justify-between items-center">
                   <h3 className="text-xs font-semibold text-emerald-700 uppercase tracking-widest">Completed</h3>
-                  <span className="text-xs font-bold bg-emerald-600 text-white px-2 py-0.5 rounded-full shadow-sm">{completedTrips.length}</span>
+                  <span className="text-xs font-semibold bg-emerald-600 text-white px-2 py-0.5 rounded-full shadow-sm">{completedTrips.length}</span>
                 </div>
               </div>
             )}

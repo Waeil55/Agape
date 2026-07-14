@@ -104,7 +104,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
         <div className="flex items-start gap-2.5">
           <div className="shrink-0 text-center w-[50px] rounded-xl bg-slate-50 border border-slate-100 py-1.5">
             {trip.time === "Will Call" ? (
-              <span className="text-sm font-bold text-slate-700 uppercase">WC</span>
+              <span className="text-sm font-semibold text-slate-700 uppercase">WC</span>
             ) : (
               <>
                 <p className={"text-base font-semibold leading-none " + (isLate ? "text-rose-600" : isSoon ? "text-amber-600" : "text-slate-900")}>{timeParts[0]}</p>
@@ -125,7 +125,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
                     </>
                   );
                 })()}
-                <p className="text-[10px] font-bold text-slate-400 mt-0.5">#{trip.bookingId || trip.id || "—"}</p>
+                <p className="text-[10px] font-semibold text-slate-400 mt-0.5">#{trip.bookingId || trip.id || "—"}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className={"px-2 py-1 rounded-lg border text-[10px] font-semibold uppercase tracking-wide " + sty.pill}>{trip.status || "Unknown"}</span>

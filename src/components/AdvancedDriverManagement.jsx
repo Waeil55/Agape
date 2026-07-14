@@ -35,7 +35,7 @@ const DriverScoreCard = React.memo(({ driver, onClick }) => {
           <h4 className="font-semibold text-slate-900">{driver.name}</h4>
           <p className="text-xs text-slate-500">{driver.email}</p>
         </div>
-        <div className={`px-3 py-1.5 rounded-lg font-bold text-sm ${getScoreColor(score)}`}>
+        <div className={`px-3 py-1.5 rounded-lg font-semibold text-sm ${getScoreColor(score)}`}>
           {score}
         </div>
       </div>
@@ -187,7 +187,7 @@ const SafetyMonitoring = ({ driver, recentTrips = [] }) => {
         {violations.map((v) => (
           <div key={v.type} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-semibold text-sm ${
                 v.status === 'good' ? 'bg-emerald-100 text-emerald-600' :
                 v.status === 'warning' ? 'bg-amber-100 text-amber-600' :
                 'bg-blue-100 text-blue-600'
@@ -196,7 +196,7 @@ const SafetyMonitoring = ({ driver, recentTrips = [] }) => {
               </div>
               <p className="font-semibold text-slate-900">{v.type}</p>
             </div>
-            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
               v.status === 'good' ? 'bg-emerald-100 text-emerald-700' :
               v.status === 'warning' ? 'bg-amber-100 text-amber-700' :
               'bg-blue-100 text-blue-700'
@@ -250,11 +250,11 @@ const WellnessPanel = ({ driver }) => {
         <div className="grid grid-cols-2 gap-3">
           <button onClick={handleWellness} className="p-3 bg-white rounded-lg border border-pink-100 hover:bg-pink-50 transition-colors text-center">
             <p className="text-xl mb-1">🧘</p>
-            <p className="text-xs font-bold text-slate-900">Wellness</p>
+            <p className="text-xs font-semibold text-slate-900">Wellness</p>
           </button>
           <button onClick={handleTraining} className="p-3 bg-white rounded-lg border border-pink-100 hover:bg-pink-50 transition-colors text-center">
             <p className="text-xl mb-1">🎓</p>
-            <p className="text-xs font-bold text-slate-900">Training</p>
+            <p className="text-xs font-semibold text-slate-900">Training</p>
           </button>
         </div>
 

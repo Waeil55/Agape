@@ -243,7 +243,7 @@ const StatusPill = ({ children, tone = 'slate' }) => {
     slate: 'bg-slate-50 text-slate-600 border-slate-200',
   };
   return (
-    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-bold ${classes[tone] || classes.slate}`}>
+    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold ${classes[tone] || classes.slate}`}>
       {children}
     </span>
   );
@@ -681,14 +681,14 @@ const LiveMapPage = ({
           <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
             <img src="/agape.png" alt="Agape Care" className="w-5 h-5 object-contain" />
           </div>
-          <span className="text-[12px] font-bold text-slate-900 tracking-wide">Agape Care</span>
+          <span className="text-[12px] font-semibold text-slate-900 tracking-wide">Agape Care</span>
         </div>
         <div className="hidden h-4 w-px bg-slate-200 sm:block" />
-        <span className="flex items-center gap-1.5 text-[11px] font-bold"><span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" /><span className="text-slate-600">{fleetStats.live}/{drivers.length} live</span></span>
-        <span className="hidden items-center gap-1.5 text-[11px] font-bold sm:flex"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-sm" /><span className="text-blue-700">{fleetStats.moving} moving</span></span>
-        <span className="hidden items-center gap-1.5 text-[11px] font-bold sm:flex"><span className="w-2 h-2 rounded-full bg-amber-400 shadow-sm" /><span className="text-amber-700">{fleetStats.stopped} stopped</span></span>
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold"><span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" /><span className="text-slate-600">{fleetStats.live}/{drivers.length} live</span></span>
+        <span className="hidden items-center gap-1.5 text-[11px] font-semibold sm:flex"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-sm" /><span className="text-blue-700">{fleetStats.moving} moving</span></span>
+        <span className="hidden items-center gap-1.5 text-[11px] font-semibold sm:flex"><span className="w-2 h-2 rounded-full bg-amber-400 shadow-sm" /><span className="text-amber-700">{fleetStats.stopped} stopped</span></span>
         <span className="text-emerald-600 text-[11px] font-black flex items-center gap-0.5"><span className="text-emerald-500">✓</span> {fleetStats.complete}</span>
-        <span className="text-slate-400 text-[11px] font-bold">| {fleetStats.remaining} remaining</span>
+        <span className="text-slate-400 text-[11px] font-semibold">| {fleetStats.remaining} remaining</span>
         <div className="hidden flex-1 sm:block" />
         <div className="relative flex w-full items-center sm:w-auto">
           <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
@@ -890,7 +890,7 @@ const LiveMapPage = ({
                       <div className="text-right shrink-0">
                         <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Last ping</p>
                         <p className="mt-1 text-lg font-black text-slate-900 tabular-nums">{formatAge(selectedSummary?.lastPing)}</p>
-                        <p className="text-xs font-bold text-slate-500 mt-1">{selectedDriver?.speedMph ?? selectedDriver?.telemetry?.speedMph ?? 0} mph</p>
+                        <p className="text-xs font-semibold text-slate-500 mt-1">{selectedDriver?.speedMph ?? selectedDriver?.telemetry?.speedMph ?? 0} mph</p>
                       </div>
                     </div>
                   </div>
@@ -935,7 +935,7 @@ const LiveMapPage = ({
                                   <p className="truncate text-base font-black text-slate-900 leading-tight">{trip.patient || 'Unknown client'}</p>
                                   <p className="text-xs font-semibold text-slate-500 mt-1">{trip.time || 'Will Call'} · {trip.status}</p>
                                 </div>
-                                <span className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-md border ${
+                                <span className={`shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-md border ${
                                   phase.color === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                                   phase.color === 'emerald' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                                   'bg-amber-50 text-amber-700 border-amber-200'
@@ -976,7 +976,7 @@ const LiveMapPage = ({
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-600 text-[10px] font-black text-white shrink-0">{index + 1}</span>
                                 <p className="truncate text-base font-black text-slate-900">{trip.patient || 'Unknown client'}</p>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-700">{trip.status || 'Open'}</span>
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-100 text-amber-700">{trip.status || 'Open'}</span>
                               </div>
                               <p className="mt-2 text-xs font-semibold text-slate-500 line-clamp-2">{trip.pickup}</p>
                               <p className="mt-1.5 text-[11px] font-semibold text-slate-600">{trip.time || 'Will Call'} · {formatMiles(miles)} · {formatEta(etaMinutes)}</p>

@@ -196,10 +196,10 @@ const CommandIntelligencePanel = ({
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`px-2 py-0.5 rounded-md border text-xs font-bold uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
+              <span className={`px-2 py-0.5 rounded-md border text-xs font-semibold uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
                 {aiInsights ? 'AI Intelligence' : 'Operations Monitor'}
               </span>
-              <span className={`px-2 py-0.5 rounded-md border text-xs font-bold uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
+              <span className={`px-2 py-0.5 rounded-md border text-xs font-semibold uppercase tracking-wider ${toneClasses[riskTone].bg} ${toneClasses[riskTone].border} ${toneClasses[riskTone].text}`}>
                 {riskLabel} {heuristic.score}
               </span>
             </div>
@@ -241,7 +241,7 @@ const CommandIntelligencePanel = ({
                 <AlertTriangle size={14} className="text-amber-600" />
                 <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">Exception Queue</h3>
               </div>
-              <span className="text-xs font-bold text-slate-500 tabular-nums">{exceptions.length} active</span>
+              <span className="text-xs font-semibold text-slate-500 tabular-nums">{exceptions.length} active</span>
             </div>
             <div className="divide-y divide-slate-100">
               {exceptions.length === 0 ? (
@@ -261,7 +261,7 @@ const CommandIntelligencePanel = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-slate-900 truncate">{item.title}</span>
-                        <span className={`text-xs font-bold tabular-nums ${tone.text}`}>{item.count}</span>
+                        <span className={`text-xs font-semibold tabular-nums ${tone.text}`}>{item.count}</span>
                       </div>
                       <p className="text-xs font-semibold text-slate-500 truncate mt-0.5">{item.detail}</p>
                     </div>
@@ -297,7 +297,7 @@ const CommandIntelligencePanel = ({
                           {proximity != null ? ` — ${Math.round(proximity)} mi` : ''}
                         </p>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-md border text-xs font-bold ${tone.bg} ${tone.border} ${tone.text}`}>
+                      <span className={`px-2 py-0.5 rounded-md border text-xs font-semibold ${tone.bg} ${tone.border} ${tone.text}`}>
                         Active
                       </span>
                     </div>
@@ -323,7 +323,7 @@ const CommandIntelligencePanel = ({
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                   <MapPin size={11} /> Hotspot
                 </span>
-                <span className="text-xs font-bold text-slate-500">{zone.count}</span>
+                <span className="text-xs font-semibold text-slate-500">{zone.count}</span>
               </div>
               <p className="mt-1 text-xs font-semibold text-slate-800 truncate">{zone.zone}</p>
               <p className="text-xs font-semibold text-slate-500 mt-0.5">{zone.unassigned} unassigned — {zone.late} late</p>

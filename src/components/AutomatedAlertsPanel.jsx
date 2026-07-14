@@ -43,7 +43,7 @@ function AlertCard({ alert, onDismiss }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5">
-          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${style.badge}`}>{alert.severity.toUpperCase()}</span>
+          <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${style.badge}`}>{alert.severity.toUpperCase()}</span>
           <span className="text-[10px] font-semibold text-slate-500">{ALERT_TYPE_LABELS[alert.type]}</span>
         </div>
         <p className="text-xs font-semibold text-slate-800 leading-snug">{alert.message}</p>
@@ -188,7 +188,7 @@ const AutomatedAlertsPanel = ({ trips = [], drivers = [], vehicles = [], thresho
             <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center relative">
               {muted ? <BellOff size={16} className="text-orange-500" /> : <Bell size={16} className="text-orange-600" />}
               {counts.total > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full flex items-center justify-center text-[8px] font-bold">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full flex items-center justify-center text-[8px] font-semibold">
                   {counts.total > 9 ? '9+' : counts.total}
                 </span>
               )}
@@ -216,10 +216,10 @@ const AutomatedAlertsPanel = ({ trips = [], drivers = [], vehicles = [], thresho
             >
               {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
               {f !== 'all' && (
-                <span className="ml-1 text-[9px] font-bold">{counts[f]}</span>
+                <span className="ml-1 text-[9px] font-semibold">{counts[f]}</span>
               )}
               {f === 'all' && (
-                <span className="ml-1 text-[9px] font-bold">{counts.total}</span>
+                <span className="ml-1 text-[9px] font-semibold">{counts.total}</span>
               )}
             </button>
           ))}

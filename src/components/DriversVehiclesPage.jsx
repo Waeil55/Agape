@@ -316,7 +316,7 @@ const [form, setForm] = useState({
                         <h3 className="truncate text-base font-semibold text-slate-900">{d.name}</h3>
                         <p className="mt-0.5 text-xs font-medium text-slate-500">{d.currentZone || 'No zone'} - {d.vehicle || 'No vehicle'}</p>
                       </div>
-                       <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-700`}>Active</span>
+                       <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700`}>Active</span>
                     </div>
 
                     <div className="mt-3 grid grid-cols-1 gap-2">
@@ -440,7 +440,7 @@ const [form, setForm] = useState({
                           </select>
                         </td>
                         <td className="px-3 sm:px-6 py-1.5">
-                           <span className={`px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-100 text-emerald-700`}>Active</span>
+                           <span className={`px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-700`}>Active</span>
                           {assignedCount > 0 && <span className="ml-1 text-xs text-blue-600 font-semibold">({assignedCount})</span>}
                         </td>
                         <td className="px-3 sm:px-6 py-1.5">
@@ -496,7 +496,7 @@ const [form, setForm] = useState({
                         <h3 className="truncate text-base font-semibold text-slate-900">{v.name}</h3>
                         <p className="mt-0.5 text-xs font-medium text-slate-500">{v.make || '-'} {v.model || ''} - {v.year || 'No year'} / {v.color || 'No color'}</p>
                       </div>
-                      <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">{v.plate || 'No plate'}</span>
+                      <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{v.plate || 'No plate'}</span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                       <div className="rounded-xl bg-slate-50 p-3">
@@ -628,7 +628,7 @@ const [form, setForm] = useState({
                                   {trip.bookingId ? `Booking ${trip.bookingId}` : trip.clientId ? `Client ${trip.clientId}` : trip.id}
                                 </p>
                               </div>
-                              <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-[10px] sm:text-xs font-bold shrink-0">{trip.status || 'Assigned'}</span>
+                              <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-[10px] sm:text-xs font-semibold shrink-0">{trip.status || 'Assigned'}</span>
                             </div>
                             <p className="text-xs mt-2 break-words"><span className="text-emerald-600">{trip.pickup}</span> <span className="text-slate-300">→</span> <span className="text-rose-600">{trip.dropoff}</span></p>
                             <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
