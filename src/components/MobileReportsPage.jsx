@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, 
-  XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Upload, FileText
+  XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Upload, FileText,
+  Download, Repeat
 } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
@@ -75,6 +76,15 @@ const getReportStatusIcon = (tone) => {
   return Clock;
 };
 
+const normalizeStatus = (status) => {
+  const s = String(status || '').trim().toLowerCase();
+  if (s === 'completed') return 'completed';
+  if (s.includes('cancel')) return 'cancelled';
+  if (s.includes('no show')) return 'noshow';
+  if (s.includes('reroute')) return 'rerouted';
+  return 'other';
+};
+
 const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUploadModal }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateStr, setDateStr] = useState(localCalendarYmd());
@@ -82,6 +92,15 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
   const [sortKeyOverrides, setSortKeyOverrides] = useState({});
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [driverFilter, setDriverFilter] = useState('All Drivers');
+
+  const uniqueDrivers = useMemo(() => ['All Drivers', ...new Set(
+    trips.filter(t => t.date === dateStr).map(t => {
+      const d = drivers.find(d => d.id === t.driverId);
+      return d ? d.name : (t.driverName || '');
+    }).filter(Boolean)
+  )], [trips, drivers, dateStr]);
 
   const filteredTrips = useMemo(() => {
     let filtered = trips.filter(t => t.date === dateStr);
@@ -94,12 +113,25 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         (t.dropoff && t.dropoff.toLowerCase().includes(q))
       );
     }
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(t => {
+        const ns = normalizeStatus(t.status);
+        return ns === statusFilter;
+      });
+    }
+    if (driverFilter !== 'All Drivers') {
+      filtered = filtered.filter(t => {
+        const d = drivers.find(d => d.id === t.driverId);
+        const name = d ? d.name : (t.driverName || '');
+        return name === driverFilter;
+      });
+    }
     return filtered.sort((a, b) => {
       const aKey = sortKeyOverrides[a.id] ?? (a.time || '');
       const bKey = sortKeyOverrides[b.id] ?? (b.time || '');
       return aKey.localeCompare(bKey);
     });
-  }, [trips, dateStr, searchQuery, sortKeyOverrides]);
+  }, [trips, dateStr, searchQuery, statusFilter, driverFilter, drivers, sortKeyOverrides]);
 
   useEffect(() => {
     if (!editingTripId && Object.keys(sortKeyOverrides).length > 0) {
@@ -223,25 +255,68 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
           <button onClick={() => shiftDate(1)} className="agape-mobile-icon-btn" aria-label="Next date">
             <ChevronRight className="w-5 h-5" />
           </button>
+
+          {[
+            { id: 'all', label: 'All', Icon: Clock },
+            { id: 'completed', label: 'Completed', Icon: CheckCircle2 },
+            { id: 'cancelled', label: 'Cancelled', Icon: XCircle },
+            { id: 'noshow', label: 'No Show', Icon: AlertTriangle },
+            { id: 'rerouted', label: 'Rerouted', Icon: Repeat },
+          ].map(f => {
+            const FilterIcon = f.Icon;
+            const active = statusFilter === f.id;
+            const activeClass = f.id === 'rerouted'
+              ? 'bg-purple-600 text-white border-purple-600'
+              : f.id === 'cancelled'
+                ? 'bg-rose-600 text-white border-rose-600'
+                : f.id === 'noshow'
+                  ? 'bg-amber-500 text-white border-amber-500'
+                  : f.id === 'completed'
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-blue-600 text-white border-blue-600';
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setStatusFilter(f.id)}
+                className={`agape-mobile-icon-btn relative ${active ? `${activeClass} agape-mobile-icon-active` : ''}`}
+                title={f.label}
+                aria-label={`${f.label} filter`}
+              >
+                <FilterIcon size={13} />
+              </button>
+            );
+          })}
         </div>
         {setShowUploadModal && (
           <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Upload reports">
-            <Upload className="w-5 h-5" />
+            <Download className="w-5 h-5" />
           </button>
         )}
       </div>
 
-      {/* SEARCH BAR */}
+      {/* SEARCH BAR & DRIVER FILTER */}
       <div className="agape-mobile-search-section shrink-0">
-        <div className="agape-mobile-search">
-          <Search className="w-5 h-5 text-slate-400 shrink-0" />
-          <input 
-            type="text" 
-            placeholder="Search by patient, booking ID, address..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold text-slate-700 outline-none placeholder:text-slate-400"
-          />
+        <div className="flex gap-2">
+          <div className="agape-mobile-search flex-1">
+            <Search className="w-5 h-5 text-slate-400 shrink-0" />
+            <input 
+              type="text" 
+              placeholder="Search by patient, ID..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold text-slate-700 outline-none placeholder:text-slate-400"
+            />
+          </div>
+          <select
+            value={driverFilter}
+            onChange={(e) => setDriverFilter(e.target.value)}
+            className="bg-white rounded-xl shadow-sm px-3 py-2 outline-none text-slate-600 text-[13px] font-semibold max-w-[130px] border border-slate-200"
+          >
+            {uniqueDrivers.map(driver => (
+              <option key={driver} value={driver}>{driver}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -287,9 +362,14 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                     <p className="agape-trip-id">#{isEditing ? ie.bookingId : (trip.bookingId || trip.id)}</p>
                   </div>
                   <div className="agape-trip-right">
-                    <span className={`agape-trip-time ${tone === 'danger' ? 'text-rose-600' : tone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>
-                      {formatClock(isEditing ? ie.time : trip.time)}
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className={`text-[15px] font-semibold ${tone === 'danger' ? 'text-rose-600' : tone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                        {formatClock(isEditing ? ie.time : trip.time)}
+                      </span>
+                      <span className="text-[12px] text-slate-500 mt-0.5 font-medium">
+                        Driver: {driver ? driver.name : (trip.driverName || '-')}
+                      </span>
+                    </div>
                     <span className={`agape-trip-status-dot agape-trip-status-${tone}`} title={displayStatus} aria-label={displayStatus}>
                       <StatusIcon className="w-4 h-4" />
                     </span>

@@ -5176,17 +5176,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                           onClick={() => { if (isEditing) { handleCancelInlineEdit(); } setHistoryExpandedId(null); }}
                           className="agape-trip-card-summary border-b border-slate-100"
                         >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <h3 className="agape-trip-title">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
-                              <p className="agape-trip-id">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="agape-trip-title">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
+                            <p className="agape-trip-id">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
+                          </div>
+                          <div className="agape-trip-right">
+                            <div className="flex flex-col items-end">
+                              <span className="text-[12px] text-slate-500 font-medium">Driver: {me?.name || '-'}</span>
                             </div>
-                            <div className="agape-trip-right">
-                              <span className={`agape-trip-status-dot agape-trip-status-${historyTone}`} title={statusMeta.label} aria-label={statusMeta.label}>
-                                <StatusIcon size={15} />
-                              </span>
-                              <ChevronDown size={17} className="text-slate-400" />
-                            </div>
+                            <span className={`agape-trip-status-dot agape-trip-status-${historyTone}`} title={statusMeta.label} aria-label={statusMeta.label}>
+                              <StatusIcon size={15} />
+                            </span>
+                            <ChevronDown size={17} className="text-slate-400" />
                           </div>
                         </div>
                         {isEditing ? (
@@ -5311,22 +5312,23 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 return (
                   <div key={trip.id} className={`agape-trip-list-card agape-trip-${historyTone}`}>
                     <div onClick={() => setHistoryExpandedId(prev => prev === trip.id ? null : trip.id)} className="agape-trip-card-summary">
-                      <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <h3 className="agape-trip-title">{trip.patient || 'Trip'}</h3>
-                          <p className="agape-trip-id">#{trip.bookingId || trip.id}</p>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="agape-trip-title">{trip.patient || 'Trip'}</h3>
+                        <p className="agape-trip-id">#{trip.bookingId || trip.id}</p>
+                      </div>
+                      <div className="agape-trip-right">
+                        <div className="flex flex-col items-end">
+                          <span className={`text-[15px] font-semibold ${historyTone === 'danger' ? 'text-rose-600' : historyTone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>{to12hr(trip.time)}</span>
+                          <span className="text-[12px] text-slate-500 mt-0.5 font-medium">Driver: {me?.name || '-'}</span>
                         </div>
-                        <div className="agape-trip-right">
-                          <span className={`agape-trip-time ${historyTone === 'danger' ? 'text-rose-600' : historyTone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>{to12hr(trip.time)}</span>
-                          <span
-                            className={`agape-trip-status-dot agape-trip-status-${historyTone}`}
-                            title={statusMeta.label}
-                            aria-label={statusMeta.label}
-                          >
-                            <StatusIcon size={15} />
-                          </span>
-                          {isExpanded ? <ChevronDown size={17} className="text-slate-400" /> : <ChevronRight size={17} className="text-slate-400" />}
-                        </div>
+                        <span
+                          className={`agape-trip-status-dot agape-trip-status-${historyTone}`}
+                          title={statusMeta.label}
+                          aria-label={statusMeta.label}
+                        >
+                          <StatusIcon size={15} />
+                        </span>
+                        {isExpanded ? <ChevronDown size={17} className="text-slate-400" /> : <ChevronRight size={17} className="text-slate-400" />}
                       </div>
                     </div>
 
