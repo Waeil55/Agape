@@ -6,38 +6,12 @@ export const useAccessibility = () => useContext(AccessibilityContext);
 
 export const AccessibilityProvider = ({ children }) => {
   const [fontScale, setFontScale] = useState(() => localStorage.getItem('agape_fontScale') || 'md');
-  const [theme, setTheme] = useState(() => localStorage.getItem('agape_theme') || 'light');
 
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.fontScale = fontScale;
     localStorage.setItem('agape_fontScale', fontScale);
   }, [fontScale]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'system') {
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.dataset.theme = isDark ? 'dark' : 'light';
-      root.classList.toggle('dark', isDark);
-    } else {
-      root.dataset.theme = theme;
-      root.classList.toggle('dark', theme === 'dark');
-    }
-    localStorage.setItem('agape_theme', theme);
-  }, [theme]);
-
-  // Listen for system theme changes if set to system
-  useEffect(() => {
-    if (theme !== 'system') return;
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      const root = document.documentElement;
-      root.dataset.theme = e.matches ? 'dark' : 'light';
-    };
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [theme]);
 
   const increaseFontScale = () => {
     const scales = ['sm', 'md', 'lg', 'xl', 'driver'];
@@ -56,7 +30,7 @@ export const AccessibilityProvider = ({ children }) => {
   };
 
   return (
-    <AccessibilityContext.Provider value={{ fontScale, setFontScale, increaseFontScale, decreaseFontScale, theme, setTheme }}>
+    <AccessibilityContext.Provider value={{ fontScale, setFontScale, increaseFontScale, decreaseFontScale }}>
       {children}
     </AccessibilityContext.Provider>
   );
