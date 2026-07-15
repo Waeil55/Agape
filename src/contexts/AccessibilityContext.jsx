@@ -6,7 +6,7 @@ export const useAccessibility = () => useContext(AccessibilityContext);
 
 export const AccessibilityProvider = ({ children }) => {
   const [fontScale, setFontScale] = useState(() => localStorage.getItem('agape_fontScale') || 'md');
-  const [theme, setTheme] = useState(() => localStorage.getItem('agape_theme') || 'system');
+  const [theme, setTheme] = useState(() => localStorage.getItem('agape_theme') || 'light');
 
   useEffect(() => {
     const root = document.documentElement;
