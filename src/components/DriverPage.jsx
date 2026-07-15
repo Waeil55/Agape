@@ -6226,7 +6226,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
                     }`}>
                     <div className="relative">
-                      <Icon size={24} strokeWidth={isActiveTab ? 2.2 : 1.8}
+                      <Icon size={24} strokeWidth={isActiveTab ? 1.8 : 1.3}
                         className={`transition-all duration-200 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}
                       />
                       {item.badge > 0 && (
@@ -6237,15 +6237,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                     </div>
                     {item.sublabel ? (
                       <div className="flex flex-col items-center leading-none">
-                        <span className={`max-w-full truncate text-[10px] font-semibold tracking-wide ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
+                        <span className={`max-w-full truncate text-[10px] font-normal tracking-wide ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
                           {item.label}
                         </span>
-                        <span className={`max-w-full truncate text-[9px] font-medium tracking-wide ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
+                        <span className={`max-w-full truncate text-[9px] font-normal tracking-wide ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
                           {item.sublabel}
                         </span>
                       </div>
                     ) : (
-                      <span className={`max-w-full truncate text-[11px] font-medium tracking-wide transition-all leading-none ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
+                      <span className={`max-w-full truncate text-[11px] font-normal tracking-wide transition-all leading-none ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
                         {item.label}
                       </span>
                     )}

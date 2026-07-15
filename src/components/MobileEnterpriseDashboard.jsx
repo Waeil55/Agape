@@ -521,16 +521,16 @@ const MobileEnterpriseDashboard = (props) => {
                 >
                   {expandedTripInfo?.showStackedName ? (
                     <>
-                      <User size={22} strokeWidth={2} className="text-blue-600" />
+                      <User size={22} strokeWidth={1.6} className="text-blue-600" />
                       <div className="flex flex-col items-center leading-tight mt-0.5">
-                        <span className="text-[10px] font-semibold text-blue-600">{expandedTripInfo.firstName}</span>
-                        {expandedTripInfo.lastName && <span className="text-[10px] font-semibold text-blue-600">{expandedTripInfo.lastName}</span>}
+                        <span className="text-[10px] font-normal text-blue-600">{expandedTripInfo.firstName}</span>
+                        {expandedTripInfo.lastName && <span className="text-[10px] font-normal text-blue-600">{expandedTripInfo.lastName}</span>}
                       </div>
                     </>
                   ) : (
                     <>
-                      <Home size={24} strokeWidth={currentView === 'trips' && !subView ? 2.2 : 1.6} />
-                      <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Trips</span>
+                      <Home size={24} strokeWidth={currentView === 'trips' && !subView ? 1.8 : 1.3} />
+                      <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Trips</span>
                     </>
                   )}
                 </button>
@@ -539,16 +539,16 @@ const MobileEnterpriseDashboard = (props) => {
                   onClick={() => handleNavClick('map')}
                   className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
-                  <Map size={24} strokeWidth={currentView === 'map' && !subView ? 2.2 : 1.6} />
-                  <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Map</span>
+                  <Map size={24} strokeWidth={currentView === 'map' && !subView ? 1.8 : 1.3} />
+                  <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Map</span>
                 </button>
 
                 <button
                   onClick={() => handleNavClick('reports')}
                   className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
-                  <BarChart2 size={24} strokeWidth={currentView === 'reports' && !subView ? 2.2 : 1.6} />
-                  <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Reports</span>
+                  <BarChart2 size={24} strokeWidth={currentView === 'reports' && !subView ? 1.8 : 1.3} />
+                  <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Reports</span>
                 </button>
 
                 <button
@@ -556,30 +556,30 @@ const MobileEnterpriseDashboard = (props) => {
                   className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
                   <span className="relative inline-flex">
-                    <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 2.2 : 1.6} />
+                    <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 1.8 : 1.3} />
                     {chatUnreadCount > 0 && (
                       <span key={chatUnreadCount} className="messenger-nav-badge absolute -right-2.5 -top-1.5 badge-messenger badge-pop badge-pulse">
                         {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                       </span>
                     )}
                   </span>
-                  <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
+                  <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
                 </button>
 
                 <button
                   onClick={() => handleNavClick('tools')}
                   className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'tools' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
-                  <Zap size={24} strokeWidth={currentView === 'tools' && !subView ? 2.2 : 1.6} />
-                  <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'tools' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Tools</span>
+                  <Zap size={24} strokeWidth={currentView === 'tools' && !subView ? 1.8 : 1.3} />
+                  <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'tools' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Tools</span>
                 </button>
 
                 <button
                   onClick={() => handleNavClick('menu')}
                   className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'menu' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
                 >
-                  <Menu size={24} strokeWidth={currentView === 'menu' ? 2.2 : 1.6} />
-                  <span className={`max-w-full truncate text-[11px] font-medium leading-none mt-1 ${currentView === 'menu' ? 'text-blue-600' : 'text-slate-400'}`}>More</span>
+                  <Menu size={24} strokeWidth={currentView === 'menu' ? 1.8 : 1.3} />
+                  <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'menu' ? 'text-blue-600' : 'text-slate-400'}`}>More</span>
                 </button>
         </div>
       </nav>
