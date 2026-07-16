@@ -2436,26 +2436,24 @@ html, body {
   }
 
   .agape-trip-list-card::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 0.32rem;
-    background: var(--agape-mobile-blue);
+    display: none;
   }
 
-  .agape-trip-success::before { background: #10b981; }
-  .agape-trip-danger::before { background: #fb7185; }
-  .agape-trip-warning::before { background: #f59e0b; }
-  .agape-trip-info::before { background: #8b5cf6; }
-  .agape-trip-pending::before { background: #3b82f6; }
+  .agape-trip-success::before,
+  .agape-trip-danger::before,
+  .agape-trip-warning::before,
+  .agape-trip-info::before,
+  .agape-trip-pending::before {
+    display: none;
+  }
 
   .agape-trip-card-summary {
-    min-height: 5.18rem;
+    min-height: 3.8rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.85rem;
-    padding: 0.8rem 1rem 0.8rem 1.3rem;
+    padding: 0.45rem 1rem 0.45rem 1.3rem;
     cursor: pointer;
     background: #ffffff;
   }
@@ -2465,7 +2463,7 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 1.05rem;
+    font-size: 0.85rem;
     line-height: 1.15;
     font-weight: 600;
     color: var(--agape-mobile-text);

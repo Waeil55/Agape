@@ -48,13 +48,13 @@ const IN_PROGRESS = ["In Mission","En Route","At Pickup","At Dropoff","In Progre
   "Navigating Pickup","Navigating Dropoff","In Transit","Arrived","Assigned"];
 
 const getStatusStyle = (status) => {
-  if (status === "Unassigned") return { pill: "bg-rose-100 text-rose-700 border-rose-200", border: "border-l-rose-500" };
-  if (status === "Assigned") return { pill: "bg-blue-100 text-blue-700 border-blue-200", border: "border-l-blue-500" };
-  if (IN_PROGRESS.includes(status)) return { pill: "bg-amber-100 text-amber-700 border-amber-200", border: "border-l-amber-500" };
-  if (status === "Completed") return { pill: "bg-emerald-100 text-emerald-700 border-emerald-200", border: "border-l-emerald-500" };
-  if (status === "Cancelled") return { pill: "bg-slate-100 text-slate-500 border-slate-200", border: "border-l-slate-400" };
-  if (status === "No Show") return { pill: "bg-orange-100 text-orange-700 border-orange-200", border: "border-l-orange-500" };
-  return { pill: "bg-slate-100 text-slate-700 border-slate-200", border: "border-l-slate-400" };
+  if (status === "Unassigned") return { pill: "bg-rose-100 text-rose-700 border-rose-200" };
+  if (status === "Assigned") return { pill: "bg-blue-100 text-blue-700 border-blue-200" };
+  if (IN_PROGRESS.includes(status)) return { pill: "bg-amber-100 text-amber-700 border-amber-200" };
+  if (status === "Completed") return { pill: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+  if (status === "Cancelled") return { pill: "bg-slate-100 text-slate-500 border-slate-200" };
+  if (status === "No Show") return { pill: "bg-orange-100 text-orange-700 border-orange-200" };
+  return { pill: "bg-slate-100 text-slate-700 border-slate-200" };
 };
 
 const trunc = (str, n) => str && str.length > n ? str.slice(0, n) + "…" : str || "";
@@ -99,7 +99,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
   };
 
   return (
-    <div className={(isLate ? "bg-rose-50 " : "bg-white ") + "rounded-xl border border-slate-200 border-l-[5px] " + sty.border + " shadow-sm overflow-visible transition-all duration-200"}>
+    <div className={(isLate ? "bg-rose-50 " : "bg-white ") + "rounded-xl border border-slate-200 shadow-sm overflow-visible transition-all duration-200"}>
       <button type="button" onClick={onToggle} className="w-full text-left px-3 pt-2.5 pb-2 focus:outline-none active:bg-slate-50/70 sm:px-3.5">
         <div className="flex items-start gap-2.5">
           <div className="shrink-0 text-center w-[50px] rounded-xl bg-slate-50 border border-slate-100 py-1.5">
@@ -164,7 +164,7 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
 
       {expanded && (
         <div className="border-t border-slate-100 bg-slate-50/80">
-          <div className="px-3.5 py-3 space-y-3 sm:px-4">
+          <div className="px-3 py-3 space-y-3">
             {trip.notes && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5">
                 <p className="text-[10px] font-black uppercase tracking-wider text-amber-600 mb-1">Driver Notes</p>
@@ -469,7 +469,7 @@ const MobileDispatchView = ({
           </div>
         )}
         {activeTab==="drivers" && (
-          <div className="px-2.5 py-3 space-y-2 sm:px-4">
+          <div className="px-3 py-3 space-y-3">
             {[...drivers].sort((a,b)=>{
               const aA=!["Offline","Unavailable"].includes(a.status),bA=!["Offline","Unavailable"].includes(b.status);
               if(aA&&!bA) return -1; if(!aA&&bA) return 1;
