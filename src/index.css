@@ -2450,12 +2450,12 @@ html, body {
   .agape-trip-pending::before { background: #3b82f6; }
 
   .agape-trip-card-summary {
-    min-height: 5.45rem;
+    min-height: 5.18rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.85rem;
-    padding: 0.9rem 1rem 0.9rem 1.3rem;
+    padding: 0.8rem 1rem 0.8rem 1.3rem;
     cursor: pointer;
     background: #ffffff;
   }
