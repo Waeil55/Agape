@@ -105,10 +105,6 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
       {/* Header */}
       <div className="px-3 sm:px-4 pt-4 pb-3 bg-white border-b border-slate-200">
         <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-indigo-500 flex items-center justify-center"><DollarSign size={16} /></div>
-            <h1 className="text-lg font-semibold">Payroll Report</h1>
-          </div>
           <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold transition-colors">
             <Download size={13} /> Export CSV
           </button>

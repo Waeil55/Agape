@@ -236,10 +236,6 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     <div className="agape-mobile-page agape-mobile-reports w-full flex-1 flex flex-col overflow-hidden overscroll-contain">
       {/* PAGE HEADER */}
       <div className="shrink-0 px-3 pt-3 pb-2 bg-white border-b border-slate-200">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-amber-500 flex items-center justify-center"><FileText size={16} className="text-white" /></div>
-          <h1 className="text-lg font-semibold text-slate-900">Reports & Export</h1>
-        </div>
       </div>
 
       {/* DATE & FILTERS BAR */}

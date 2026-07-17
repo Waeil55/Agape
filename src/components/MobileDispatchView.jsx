@@ -1,8 +1,10 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, Suspense, lazy } from "react";
 import {
   Search, Plus, Upload, Route, Users, Truck, MapPin, Phone,
   ChevronDown, X, User, Edit2, Archive, Ban, AlertTriangle,
-  Repeat, MessageSquare, SlidersHorizontal
+  Repeat, MessageSquare, SlidersHorizontal, ChevronRight,
+  Navigation, Clock, CheckCircle2, XCircle, Play, UserCheck,
+  MoreHorizontal
 } from "lucide-react";
 import { getDriverLiveStatus } from "../constants/statuses";
 
@@ -47,36 +49,35 @@ const TERMINAL = ["Completed", "Cancelled", "No Show", "Rerouted"];
 const IN_PROGRESS = ["In Mission","En Route","At Pickup","At Dropoff","In Progress",
   "Navigating Pickup","Navigating Dropoff","In Transit","Arrived","Assigned"];
 
-const getStatusStyle = (status) => {
-  if (status === "Unassigned") return { pill: "bg-rose-100 text-rose-700 border-rose-200" };
-  if (status === "Assigned") return { pill: "bg-blue-100 text-blue-700 border-blue-200" };
-  if (IN_PROGRESS.includes(status)) return { pill: "bg-amber-100 text-amber-700 border-amber-200" };
-  if (status === "Completed") return { pill: "bg-emerald-100 text-emerald-700 border-emerald-200" };
-  if (status === "Cancelled") return { pill: "bg-slate-100 text-slate-500 border-slate-200" };
-  if (status === "No Show") return { pill: "bg-orange-100 text-orange-700 border-orange-200" };
-  return { pill: "bg-slate-100 text-slate-700 border-slate-200" };
+const getStatusConfig = (status) => {
+  if (status === "Unassigned") return { bg: "bg-rose-500", text: "text-rose-700", pill: "bg-rose-100 text-rose-700 border-rose-200", dot: "bg-rose-500" };
+  if (status === "Assigned") return { bg: "bg-blue-500", text: "text-blue-700", pill: "bg-blue-100 text-blue-700 border-blue-200", dot: "bg-blue-500" };
+  if (IN_PROGRESS.includes(status)) return { bg: "bg-amber-500", text: "text-amber-700", pill: "bg-amber-100 text-amber-700 border-amber-200", dot: "bg-amber-500" };
+  if (status === "Completed") return { bg: "bg-emerald-500", text: "text-emerald-700", pill: "bg-emerald-100 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" };
+  if (status === "Cancelled") return { bg: "bg-slate-400", text: "text-slate-500", pill: "bg-slate-100 text-slate-500 border-slate-200", dot: "bg-slate-400" };
+  if (status === "No Show") return { bg: "bg-orange-500", text: "text-orange-700", pill: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-500" };
+  return { bg: "bg-slate-400", text: "text-slate-700", pill: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" };
 };
 
 const trunc = (str, n) => str && str.length > n ? str.slice(0, n) + "…" : str || "";
 const getAddr = (v) => typeof v === "object" ? v?.address || "" : v || "";
 
-/* ─── Trip Card ───────────────────────────────────────────────────── */
-const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeCall, sendSMS,
-  requestDeleteTrip, onSetTripDetails, role, updateTrip, requestAuthAction, currentUser, addToast }) => {
-  const [showMenu, setShowMenu] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(null); // { action, label, color }
+/* ─── Admin Trip Card ─────────────────────────────────────────────── */
+const AdminTripCard = ({ 
+  trip, drivers, onOpenTrip, assignTripToDriver, makeCall, sendSMS,
+  requestDeleteTrip, updateTrip, requestAuthAction, currentUser, addToast, role
+}) => {
+  const [showActions, setShowActions] = useState(false);
+  const statusCfg = getStatusConfig(trip.status);
   const urgency = getUrgency(trip);
-  const isLate = urgency === "Late", isSoon = urgency && urgency !== "Late";
-  const sty = getStatusStyle(trip.status);
   const driver = drivers.find(d => d.id === trip.driverId || (trip.driverName && d.name === trip.driverName));
-  const ds = driver ? getDriverLiveStatus(driver) : null;
-  const pickup = getAddr(trip.pickup), dropoff = getAddr(trip.dropoff);
-  const dispTime = to12hr(trip.time);
   const isTerminal = TERMINAL.includes(trip.status);
-  const available = drivers.filter(d => !["Offline","Unavailable"].includes(d.status));
-  const timeParts = trip.time !== "Will Call" ? dispTime.split(" ") : [];
+  const isActive = IN_PROGRESS.includes(trip.status);
+  const pickup = getAddr(trip.pickup);
+  const dropoff = getAddr(trip.dropoff);
+  const timeLabel = trip.time === "Will Call" || !trip.time ? "Will Call" : to12hr(trip.time);
 
-  const markTripException = (status) => {
+  const markException = (status) => {
     const run = () => {
       if (updateTrip) {
         updateTrip(trip.id, {
@@ -88,219 +89,287 @@ const TripCard = ({ trip, drivers, expanded, onToggle, assignTripToDriver, makeC
           exceptionSource: role,
         });
       }
-      addToast?.('Trip Updated', `${trip.patient || trip.id} marked as ${status}.`, status === 'Cancelled' || status === 'No Show' ? 'warning' : 'success');
+      addToast?.("Trip Updated", `${trip.patient || trip.id} marked as ${status}.`, "warning");
+      setShowActions(false);
     };
     if (requestAuthAction) {
-      requestAuthAction(`Mark ${trip.patient || 'trip'} as ${status}`, run);
+      requestAuthAction(`Mark ${trip.patient || "trip"} as ${status}`, run);
     } else {
       run();
     }
-    setShowConfirm(null);
+  };
+
+  const availableDrivers = drivers.filter(d => !["Offline","Unavailable"].includes(d.status));
+
+  const handleQuickAssign = (e) => {
+    e.stopPropagation();
+    if (!assignTripToDriver) return;
+    if (driver) {
+      // Already assigned — show reassign sheet via actions
+      setShowActions(true);
+      return;
+    }
+    if (availableDrivers.length === 1) {
+      assignTripToDriver(trip.id, availableDrivers[0].id);
+      addToast?.("Trip Assigned", `Assigned to ${availableDrivers[0].name}`, "success");
+    } else {
+      setShowActions(true);
+    }
   };
 
   return (
-    <div className={(isLate ? "bg-rose-50 " : "bg-white ") + "rounded-xl border border-slate-200 shadow-sm overflow-visible transition-all duration-200"}>
-      <button type="button" onClick={onToggle} className="w-full text-left px-3 pt-2.5 pb-2 focus:outline-none active:bg-slate-50/70 sm:px-3.5">
-        <div className="flex items-start gap-2.5">
-          <div className="shrink-0 text-center w-[50px] rounded-xl bg-slate-50 border border-slate-100 py-1.5">
-            {trip.time === "Will Call" ? (
-              <span className="text-sm font-semibold text-slate-700 uppercase">WC</span>
-            ) : (
-              <>
-                <p className={"text-base font-semibold leading-none " + (isLate ? "text-rose-600" : isSoon ? "text-amber-600" : "text-slate-900")}>{timeParts[0]}</p>
-                <p className={"text-[9px] font-semibold uppercase tracking-wide mt-0.5 " + (isLate ? "text-rose-400" : isSoon ? "text-amber-400" : "text-slate-400")}>{timeParts[1] || ""}</p>
-              </>
-            )}
-            {urgency && <span className={"mt-1.5 inline-block px-1.5 py-0.5 rounded-md text-[9px] font-semibold uppercase " + (isLate ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700")}>{urgency}</span>}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                {(() => {
-                  const parts = (trip.patient || "Unknown").trim().split(/\s+/);
-                  return (
-                    <>
-                      <h3 className="text-[15px] font-semibold text-slate-950 leading-tight">{parts[0]}</h3>
-                      {parts.length > 1 && <h4 className="text-[11px] font-semibold text-slate-500 leading-tight mt-0.5">{parts.slice(1).join(' ')}</h4>}
-                    </>
-                  );
-                })()}
-                <p className="text-[10px] font-semibold text-slate-400 mt-0.5">#{trip.bookingId || trip.id || "—"}</p>
+    <>
+      {/* Main Trip Card — full tap opens DriverPage trip view */}
+      <button
+        type="button"
+        onClick={() => onOpenTrip?.(trip)}
+        className={`w-full text-left bg-white rounded-2xl border shadow-sm active:scale-[0.985] transition-all duration-150 overflow-hidden ${
+          isActive ? "border-amber-200 shadow-amber-100/60" : 
+          isTerminal ? "border-slate-100 opacity-80" : 
+          trip.status === "Unassigned" ? "border-rose-200 shadow-rose-50" : "border-slate-200"
+        }`}
+        style={{ WebkitTapHighlightColor: "transparent" }}
+      >
+        {/* Status accent line */}
+        <div className={`h-0.5 w-full ${statusCfg.bg} opacity-60`} />
+        
+        <div className="px-3.5 pt-3 pb-2.5">
+          {/* Row 1: Time + Patient + Status */}
+          <div className="flex items-start gap-2.5">
+            {/* Time badge */}
+            <div className={`shrink-0 text-center px-2 py-1.5 rounded-xl min-w-[52px] ${
+              urgency === "Late" ? "bg-rose-600 text-white" :
+              urgency ? "bg-amber-50 border border-amber-200" :
+              "bg-slate-50 border border-slate-200"
+            }`}>
+              <p className={`text-[13px] font-black leading-none ${
+                urgency === "Late" ? "text-white" :
+                urgency ? "text-amber-700" : "text-slate-800"
+              }`}>{timeLabel}</p>
+              {urgency && (
+                <p className={`text-[9px] font-semibold mt-0.5 ${urgency === "Late" ? "text-white/80" : "text-amber-600"}`}>
+                  {urgency}
+                </p>
+              )}
+            </div>
+
+            {/* Patient + booking */}
+            <div className="flex-1 min-w-0 pt-0.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="text-[15px] font-bold text-slate-900 truncate leading-tight">
+                  {trip.patient || "Unknown Patient"}
+                </p>
+                {trip.urgentTrip && (
+                  <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-rose-600 text-white text-[8px] font-black uppercase tracking-wide">
+                    URGENT
+                  </span>
+                )}
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className={"px-2 py-1 rounded-lg border text-[10px] font-semibold uppercase tracking-wide " + sty.pill}>{trip.status || "Unknown"}</span>
-                <ChevronDown size={13} className={"text-slate-400 transition-transform duration-200 " + (expanded ? "rotate-180" : "")} />
+              {trip.bookingId && (
+                <p className="text-[10px] font-semibold text-slate-400 mt-0.5">#{trip.bookingId}</p>
+              )}
+            </div>
+
+            {/* Status pill + chevron */}
+            <div className="shrink-0 flex flex-col items-end gap-1.5 pt-0.5">
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusCfg.pill}`}>
+                {trip.status || "Open"}
+              </span>
+              <ChevronRight size={14} className="text-slate-300" />
+            </div>
+          </div>
+
+          {/* Row 2: Pickup → Dropoff */}
+          {(pickup || dropoff) && (
+            <div className="mt-2.5 flex items-start gap-1.5">
+              <div className="shrink-0 mt-1 flex flex-col items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 border-2 border-white shadow-sm shadow-emerald-200" />
+                <div className="w-px h-4 bg-slate-200" />
+                <div className="w-2 h-2 rounded-full bg-rose-500 border-2 border-white shadow-sm shadow-rose-200" />
+              </div>
+              <div className="flex-1 min-w-0 space-y-1">
+                <p className="text-[11px] font-semibold text-slate-600 truncate leading-tight">
+                  {trunc(pickup, 45) || "Pickup pending"}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-600 truncate leading-tight">
+                  {trunc(dropoff, 45) || "Dropoff pending"}
+                </p>
               </div>
             </div>
-            <div className="mt-2 rounded-xl bg-slate-50/80 border border-slate-100 px-2.5 py-2">
-              <div className="grid grid-cols-[12px_1fr] gap-x-2.5 gap-y-2">
-                <div className="flex flex-col items-center pt-[5px] row-span-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
-                  <span className="w-px flex-1 min-h-[20px] my-1 bg-gradient-to-b from-blue-300 to-emerald-400" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-blue-600">Pickup</p>
-                  <p className="text-[11px] font-semibold leading-snug text-slate-800 line-clamp-2">{pickup || "-"}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-emerald-600">Dropoff</p>
-                  <p className="text-[11px] font-semibold leading-snug text-slate-800 line-clamp-2">{dropoff || "-"}</p>
-                </div>
-              </div>
+          )}
+
+          {/* Row 3: Driver info + quick action buttons */}
+          <div className="mt-2.5 flex items-center justify-between gap-2">
+            {/* Driver info */}
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              {driver ? (
+                <>
+                  <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                    <span className="text-[9px] font-black text-blue-700">{(driver.name || "D")[0]}</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-600 truncate">{driver.name}</span>
+                </>
+              ) : (
+                <span className={`text-[11px] font-semibold ${trip.status === "Unassigned" ? "text-rose-500" : "text-slate-400"}`}>
+                  {trip.driverName || "Unassigned"}
+                </span>
+              )}
             </div>
-            {driver ? (
-              <div className="mt-2 flex items-center gap-2 rounded-xl bg-white border border-slate-100 px-2.5 py-1.5">
-                <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 shrink-0 uppercase">{(driver.name||"D")[0]}</div>
-                <span className="text-[11px] font-semibold text-slate-700 truncate">{driver.name}</span>
-                {ds && <span className={"ml-auto px-1.5 py-0.5 rounded-md text-[8px] font-semibold uppercase tracking-wide " + ds.color}>{ds.label}</span>}
-              </div>
-            ) : trip.status !== "Completed" && trip.status !== "Cancelled" ? (
-              <div className="mt-2"><span className="text-[10px] font-semibold text-rose-500 flex items-center gap-1.5"><User size={11} /> No driver assigned</span></div>
-            ) : null}
+
+            {/* Quick action buttons */}
+            <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+              {!isTerminal && (
+                <button
+                  type="button"
+                  onClick={handleQuickAssign}
+                  className="h-7 px-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-semibold flex items-center gap-1 active:scale-95 transition-all"
+                >
+                  <UserCheck size={11} />
+                  {driver ? "Reassign" : "Assign"}
+                </button>
+              )}
+              {trip.patientPhone && (
+                <button
+                  type="button"
+                  onClick={() => makeCall?.(trip.patientPhone, trip.patient)}
+                  className="w-7 h-7 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center active:scale-95 transition-all"
+                >
+                  <Phone size={12} />
+                </button>
+              )}
+              {!isTerminal && (
+                <button
+                  type="button"
+                  onClick={() => setShowActions(true)}
+                  className="w-7 h-7 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 flex items-center justify-center active:scale-95 transition-all"
+                >
+                  <MoreHorizontal size={14} />
+                </button>
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* Open trip hint */}
+        <div className={`px-3.5 py-1.5 border-t flex items-center justify-between ${
+          isActive ? "bg-amber-50/60 border-amber-100" : "bg-slate-50/60 border-slate-100"
+        }`}>
+          <span className={`text-[10px] font-semibold ${isActive ? "text-amber-600" : "text-slate-400"}`}>
+            {isActive ? "▶ Trip in progress — tap to manage" : isTerminal ? "Tap to view details" : "Tap to open trip workflow"}
+          </span>
+          {trip.mileage && (
+            <span className="text-[10px] font-semibold text-slate-400">{trip.mileage} mi</span>
+          )}
         </div>
       </button>
 
-      {expanded && (
-        <div className="border-t border-slate-100 bg-slate-50/80">
-          <div className="px-3 py-3 space-y-3">
-            {trip.notes && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5">
-                <p className="text-[10px] font-black uppercase tracking-wider text-amber-600 mb-1">Driver Notes</p>
-                <p className="text-[12px] font-semibold text-amber-900 leading-relaxed">{trip.notes}</p>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              {trip.time && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Scheduled</p><p className="text-sm font-black text-slate-900 mt-0.5">{dispTime}</p></div>}
-              {trip.date && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Date</p><p className="text-sm font-black text-slate-900 mt-0.5">{trip.date}</p></div>}
-              {trip.startOdometer != null && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Start Odo</p><p className="text-sm font-black text-slate-900 mt-0.5">{Number(trip.startOdometer).toLocaleString()}</p></div>}
-              {trip.endOdometer != null && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-rose-600">End Odo</p><p className="text-sm font-black text-slate-900 mt-0.5">{Number(trip.endOdometer).toLocaleString()}</p></div>}
-              {trip.mileage && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Distance</p><p className="text-sm font-black text-slate-900 mt-0.5">{trip.mileage} mi</p></div>}
-              {trip.signature != null && <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Signature</p><p className="text-sm font-black text-slate-900 mt-0.5">{trip.signature ? "Yes" : "No"}</p></div>}
+      {/* Actions Bottom Sheet */}
+      {showActions && (
+        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowActions(false)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="relative w-full bg-white rounded-t-3xl shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-slate-200" />
             </div>
-            <div className="bg-white rounded-xl border border-slate-100 px-3 py-2.5 shadow-sm space-y-2">
-              <div className="flex items-start gap-2.5">
-                <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
-                <div><p className="text-[9px] font-black uppercase tracking-wider text-blue-600">Pickup</p><p className="text-xs font-semibold text-slate-800 leading-relaxed mt-0.5">{pickup||"—"}</p></div>
-              </div>
-              <div className="border-t border-dashed border-slate-100 pt-2 flex items-start gap-2.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                <div><p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Dropoff</p><p className="text-xs font-semibold text-slate-800 leading-relaxed mt-0.5">{dropoff||"—"}</p></div>
-              </div>
+            <div className="px-4 pt-2 pb-2 border-b border-slate-100">
+              <p className="text-sm font-black text-slate-900">{trip.patient || "Trip"}</p>
+              <p className="text-[11px] text-slate-400 font-semibold">{timeLabel} · {trip.status}</p>
             </div>
-            {(trip.patientPhone||trip.pickupPhone||trip.dropoffPhone) && (
-              <div className="bg-white rounded-xl border border-slate-100 px-3 py-2.5 shadow-sm space-y-1.5">
-                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Contacts</p>
-                {trip.patientPhone && <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => makeCall?.(trip.patientPhone,trip.patient)} className="flex-1 flex items-center gap-2 text-blue-700 active:opacity-70 py-0.5"><Phone size={12}/><span className="text-xs font-bold">{trip.patient}: {trip.patientPhone}</span></button>
-                  {sendSMS && <button type="button" onClick={() => sendSMS(trip.patientPhone,`Hi ${trip.patient||''}, this is Agape Care.`)} className="shrink-0 w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 active:scale-95"><MessageSquare size={11}/></button>}
-                </div>}
-                {trip.pickupPhone && trip.pickupPhone!==trip.patientPhone && <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => makeCall?.(trip.pickupPhone,"Pickup")} className="flex-1 flex items-center gap-2 text-emerald-700 active:opacity-70 py-0.5"><Phone size={12}/><span className="text-xs font-bold">Pickup: {trip.pickupPhone}</span></button>
-                  {sendSMS && <button type="button" onClick={() => sendSMS(trip.pickupPhone,`Hello, this is Agape Care regarding ${trip.patient||'a patient'}.`)} className="shrink-0 w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 active:scale-95"><MessageSquare size={11}/></button>}
-                </div>}
-                {(trip.hospitalPhone || trip.dropoffPhone) && <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => makeCall?.(trip.hospitalPhone || trip.dropoffPhone,"Hospital")} className="flex-1 flex items-center gap-2 text-rose-700 active:opacity-70 py-0.5"><Phone size={12}/><span className="text-xs font-bold">Hospital: {trip.hospitalPhone || trip.dropoffPhone}</span></button>
-                  {sendSMS && <button type="button" onClick={() => sendSMS(trip.hospitalPhone || trip.dropoffPhone,`Agape Care update for ${trip.patient||'patient'}.`)} className="shrink-0 w-7 h-7 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 active:scale-95"><MessageSquare size={11}/></button>}
-                </div>}
-              </div>
-            )}
-          </div>
-          <div className="px-3.5 pb-3.5 space-y-2.5 sm:px-4">
-            {/* Primary: Open Trip */}
-            <button type="button" onClick={()=>onSetTripDetails?.(trip)} className="w-full h-11 rounded-xl bg-slate-900 text-white font-black text-sm flex items-center justify-center gap-2 shadow-sm active:scale-[0.99] transition-all">
-              <Edit2 size={14}/> Open Trip
-            </button>
-
-            {/* Status Actions (only for non-terminal trips) */}
-            {!isTerminal && (
-              <div className="grid grid-cols-3 gap-2">
-                <button type="button" onClick={()=>setShowConfirm({action:'reroute', label:'Reroute', color:'amber'})}
-                  className="h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-[11px] flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all">
-                  <Repeat size={13}/> Reroute
-                </button>
-                <button type="button" onClick={()=>setShowConfirm({action:'noshow', label:'No Show', color:'rose'})}
-                  className="h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-[11px] flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all">
-                  <Ban size={13}/> No Show
-                </button>
-                <button type="button" onClick={()=>setShowConfirm({action:'cancel', label:'Cancel', color:'slate'})}
-                  className="h-10 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 font-bold text-[11px] flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all">
-                  <AlertTriangle size={13}/> Cancel
-                </button>
-              </div>
-            )}
-
-            {/* Reassign Driver */}
-            {!isTerminal && (
-              <div className="relative">
-                <button type="button" onClick={() => setShowMenu(p=>!p)}
-                  className={"w-full h-11 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all " + (trip.status==="Unassigned" ? "bg-blue-600 hover:bg-blue-700" : "bg-slate-800 hover:bg-slate-900")}>
-                  <Users size={15}/> {trip.status==="Unassigned" ? "Assign Driver" : "Re-assign Driver"}
-                  <ChevronDown size={13} className={"transition-transform "+(showMenu?"rotate-180":"")} />
-                </button>
-                {showMenu && (
-                  <div className="absolute bottom-full mb-2 left-0 right-0 bg-white rounded-2xl border border-slate-200 shadow-2xl z-20 overflow-hidden max-h-52 overflow-y-auto">
-                    <div className="px-3 py-2 border-b border-slate-100 sticky top-0 bg-white"><p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Select Driver</p></div>
-                    {available.length===0 ? <p className="text-xs text-slate-400 text-center py-4">No available drivers</p> : available.map(d=>{
-                      const dss=getDriverLiveStatus(d);
-                      const isCurrentDriver = d.id === trip.driverId || d.name === trip.driverName;
-                      return (
-                        <button key={d.id} type="button" onClick={()=>{assignTripToDriver?.(trip.id,d.id);setShowMenu(false);}}
-                          className={"w-full flex items-center gap-3 px-3 py-2.5 active:bg-slate-100 text-left border-b border-slate-50 last:border-0 "+(isCurrentDriver?"bg-blue-50":"hover:bg-slate-50")}>
-                          <div className={"w-8 h-8 rounded-full flex items-center justify-center font-black text-xs uppercase shrink-0 "+(isCurrentDriver?"bg-blue-200 text-blue-800":"bg-blue-100 text-blue-700")}>{(d.name||"D")[0]}</div>
-                          <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-900 truncate">{d.name}</p><p className="text-[10px] text-slate-400">{d.vehicle||"No vehicle"}</p></div>
-                          <span className={"text-[9px] font-black uppercase px-2 py-0.5 rounded "+dss.color}>{dss.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Contact & Archive row */}
-            <div className="flex gap-2">
-              {driver?.phone && <button type="button" onClick={()=>makeCall?.(driver.phone,driver.name)} className="flex-1 h-10 px-3 border border-blue-200 bg-blue-50 text-blue-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-[0.99] transition-all"><Phone size={13}/> Driver</button>}
-              {driver?.phone && sendSMS && <button type="button" onClick={()=>sendSMS(driver.phone,`Hi ${driver.name||''}, from Agape Care dispatch.`)} className="h-10 px-3 border border-blue-200 bg-blue-50 text-blue-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-[0.99] transition-all"><MessageSquare size={13}/></button>}
-              {!isTerminal && requestDeleteTrip && <button type="button" onClick={()=>requestDeleteTrip(trip)} className="flex-1 h-10 px-3 border border-rose-200 bg-rose-50 text-rose-600 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-[0.99] transition-all"><Archive size={13}/> Archive</button>}
-            </div>
-          </div>
-
-          {/* Confirm Modal */}
-          {showConfirm && (() => {
-            const isAmber = showConfirm.color === 'amber';
-            const isRose = showConfirm.color === 'rose';
-            const iconBg = isAmber ? 'bg-amber-100' : isRose ? 'bg-rose-100' : 'bg-slate-100';
-            const iconClr = isAmber ? 'text-amber-600' : isRose ? 'text-rose-600' : 'text-slate-600';
-            const btnBg = isAmber ? 'bg-amber-600' : isRose ? 'bg-rose-600' : 'bg-slate-800';
-            return (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-6" onClick={()=>setShowConfirm(null)}>
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"/>
-                <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xs p-5" onClick={e=>e.stopPropagation()}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={"w-10 h-10 rounded-full flex items-center justify-center " + iconBg}>
-                      <AlertTriangle size={20} className={iconClr}/>
-                    </div>
-                    <div>
-                      <p className="text-sm font-black text-slate-900">{showConfirm.label} Trip?</p>
-                      <p className="text-xs text-slate-500 mt-0.5">Mark {trip.patient || 'this trip'} as {showConfirm.label}?</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={()=>setShowConfirm(null)} className="flex-1 h-10 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs active:scale-[0.97] transition-all">Keep</button>
-                    <button type="button" onClick={()=>markTripException(showConfirm.action==='noshow'?'No Show':showConfirm.action==='cancel'?'Cancelled':'Rerouted')}
-                      className={"flex-1 h-10 rounded-xl font-bold text-xs text-white active:scale-[0.97] transition-all " + btnBg}>
-                      {showConfirm.label}
-                    </button>
+            <div className="px-4 py-3 space-y-2" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom, 1.5rem))" }}>
+              {/* Assign to driver */}
+              {!isTerminal && availableDrivers.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Assign to Driver</p>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {availableDrivers.map(d => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => {
+                          assignTripToDriver?.(trip.id, d.id);
+                          addToast?.("Trip Assigned", `Assigned to ${d.name}`, "success");
+                          setShowActions(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all active:scale-[0.98] text-left ${
+                          d.id === trip.driverId 
+                            ? "border-blue-200 bg-blue-50" 
+                            : "border-slate-100 bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 font-black text-sm flex items-center justify-center shrink-0">
+                          {(d.name || "D")[0]}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-900 truncate">{d.name}</p>
+                          <p className="text-[11px] text-slate-400 font-semibold">{d.vehicle || "No vehicle"} · {d.currentZone || "--"}</p>
+                        </div>
+                        {d.id === trip.driverId && (
+                          <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide shrink-0">Current</span>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </div>
-            );
-          })()}
+              )}
+              {/* Exception actions */}
+              {!isTerminal && (
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => markException("No Show")}
+                    className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-orange-200 bg-orange-50 text-orange-700 text-[11px] font-semibold active:scale-95 transition-all"
+                  >
+                    <XCircle size={18} />
+                    No Show
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => markException("Cancelled")}
+                    className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 text-[11px] font-semibold active:scale-95 transition-all"
+                  >
+                    <Ban size={18} />
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => markException("Rerouted")}
+                    className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold active:scale-95 transition-all"
+                  >
+                    <Repeat size={18} />
+                    Reroute
+                  </button>
+                </div>
+              )}
+              {/* Call patient */}
+              {trip.patientPhone && (
+                <button
+                  type="button"
+                  onClick={() => { makeCall?.(trip.patientPhone, trip.patient); setShowActions(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold active:scale-95 transition-all"
+                >
+                  <Phone size={18} /> Call Patient
+                </button>
+              )}
+              {/* Open full trip */}
+              <button
+                type="button"
+                onClick={() => { onOpenTrip?.(trip); setShowActions(false); }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-blue-600 text-white text-sm font-bold active:scale-95 transition-all shadow-sm"
+              >
+                <Play size={16} /> Open Trip Workflow
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowActions(false)}
+                className="w-full text-center text-sm font-semibold text-slate-500 py-2"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
@@ -309,15 +378,28 @@ const DriverRow = ({ driver, trips }) => {
   const ds = getDriverLiveStatus(driver);
   const active = trips.find(t => IN_PROGRESS.includes(t.status) && (t.driverId===driver.id||t.driverName===driver.name));
   const activeStatus = active?.status || ds.label;
+  const todayCount = trips.filter(t => t.driverId === driver.id || t.driverName === driver.name).length;
   return (
-    <div className="bg-white rounded-xl border border-slate-100 px-3.5 py-3 flex items-center gap-3 shadow-sm">
-      <div className={"w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm uppercase shrink-0 "+ds.color}>{(driver.name||"D")[0]}</div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-slate-900 truncate">{driver.name}</p>
-        <p className="text-[10px] text-slate-400 mt-0.5">{driver.vehicle||"No vehicle"}</p>
-        {active && <p className="text-[10px] text-amber-600 font-semibold mt-0.5 truncate">→ {trunc(active.patient||"",22)}</p>}
+    <div className="bg-white rounded-2xl border border-slate-100 px-3.5 py-3 flex items-center gap-3 shadow-sm">
+      <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm uppercase shrink-0 ${ds.color}`}>
+        {(driver.name || "D")[0]}
       </div>
-      <span className={"text-[9px] font-semibold uppercase px-2.5 py-1 rounded-lg text-center shrink-0 "+(active ? "bg-amber-100 text-amber-700" : ds.color)}>{activeStatus}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-bold text-slate-900 truncate">{driver.name}</p>
+          <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${active ? "bg-amber-100 text-amber-700" : ds.color}`}>
+            {activeStatus}
+          </span>
+        </div>
+        <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">{driver.vehicle || "No vehicle"}</p>
+        {active && (
+          <p className="text-[10px] text-amber-600 font-semibold mt-0.5 truncate">▶ {trunc(active.patient || "", 30)}</p>
+        )}
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-base font-black text-slate-900">{todayCount}</p>
+        <p className="text-[9px] font-semibold text-slate-400 uppercase">trips</p>
+      </div>
     </div>
   );
 };
@@ -335,55 +417,12 @@ const MobileDispatchView = ({
   expandedId: expandedIdProp, setExpandedId: setExpandedIdProp
 }) => {
   const [filter, setFilter] = useState("all");
-  const [localExpandedId, setLocalExpandedId] = useState(null);
-  const expandedId = expandedIdProp !== undefined ? expandedIdProp : localExpandedId;
-  const setExpandedId = setExpandedIdProp || setLocalExpandedId;
   const [showTools, setShowTools] = useState(false);
-  const [localSearch, setLocalSearch] = useState(searchQuery||"");
-
-  useEffect(()=>{ const t=setTimeout(()=>setSearchQuery?.(localSearch),250); return()=>clearTimeout(t); },[localSearch,setSearchQuery]);
-
-  const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
-
-  const todayTrips = useMemo(()=>
-    trips
-      .filter(t=>t.date===todayStr)
-      .sort((a,b)=>{
-        const aT=TERMINAL.includes(a.status),bT=TERMINAL.includes(b.status);
-        if(aT&&!bT) return 1; if(!aT&&bT) return -1;
-        return timeToMinutes(a.time)-timeToMinutes(b.time);
-      }),
-    [trips,todayStr]
-  );
-
-  const filtered = useMemo(()=>{
-    let r=todayTrips;
-    if(filter==="unassigned") r=r.filter(t=>t.status==="Unassigned");
-    else if(filter==="active") r=r.filter(t=>IN_PROGRESS.includes(t.status));
-    else if(filter==="completed") r=r.filter(t=>t.status==="Completed");
-    else if(filter==="cancelled") r=r.filter(t=>t.status==="Cancelled"||t.status==="No Show"||t.status==="Rerouted");
-    else if(filter==="willcall") r=r.filter(t=>t.time==="Will Call");
-    if(localSearch){const q=localSearch.toLowerCase();r=r.filter(t=>(t.patient||"").toLowerCase().includes(q)||(t.bookingId||"").toLowerCase().includes(q)||getAddr(t.pickup).toLowerCase().includes(q)||getAddr(t.dropoff).toLowerCase().includes(q)||(t.driverName||"").toLowerCase().includes(q));}
-    return r;
-  },[todayTrips,filter,localSearch]);
-
-  const unassignedN=todayTrips.filter(t=>t.status==="Unassigned").length;
-  const activeN=todayTrips.filter(t=>IN_PROGRESS.includes(t.status)).length;
-  const doneN=todayTrips.filter(t=>t.status==="Completed").length;
-
-  const cancelledN=todayTrips.filter(t=>t.status==="Cancelled"||t.status==="No Show"||t.status==="Rerouted").length;
-
-  const CHIPS=[
-    {id:"all",label:"All",n:todayTrips.length},
-    {id:"unassigned",label:"Unassigned",n:unassignedN},
-    {id:"active",label:"Active",n:activeN},
-    {id:"willcall",label:"Will Call",n:todayTrips.filter(t=>t.time==="Will Call").length},
-    {id:"completed",label:"Done",n:doneN},
-    ...(cancelledN>0?[{id:"cancelled",label:"Exceptions",n:cancelledN}]:[]),
-  ];
-
+  const [localSearch, setLocalSearch] = useState(searchQuery || "");
   const [showSearch, setShowSearch] = useState(false);
   const searchInputRef = useRef(null);
+
+  useEffect(() => { const t = setTimeout(() => setSearchQuery?.(localSearch), 250); return () => clearTimeout(t); }, [localSearch, setSearchQuery]);
 
   useEffect(() => {
     if (showSearch && searchInputRef.current) {
@@ -391,42 +430,130 @@ const MobileDispatchView = ({
     }
   }, [showSearch]);
 
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  })();
+
+  const todayTrips = useMemo(() =>
+    trips
+      .filter(t => t.date === todayStr)
+      .sort((a, b) => {
+        const aT = TERMINAL.includes(a.status), bT = TERMINAL.includes(b.status);
+        if (aT && !bT) return 1; if (!aT && bT) return -1;
+        return timeToMinutes(a.time) - timeToMinutes(b.time);
+      }),
+    [trips, todayStr]
+  );
+
+  const filtered = useMemo(() => {
+    let r = todayTrips;
+    if (filter === "unassigned") r = r.filter(t => t.status === "Unassigned");
+    else if (filter === "active") r = r.filter(t => IN_PROGRESS.includes(t.status));
+    else if (filter === "completed") r = r.filter(t => t.status === "Completed");
+    else if (filter === "cancelled") r = r.filter(t => t.status === "Cancelled" || t.status === "No Show" || t.status === "Rerouted");
+    else if (filter === "willcall") r = r.filter(t => t.time === "Will Call");
+    if (localSearch) {
+      const q = localSearch.toLowerCase();
+      r = r.filter(t => 
+        (t.patient || "").toLowerCase().includes(q) ||
+        (t.bookingId || "").toLowerCase().includes(q) ||
+        getAddr(t.pickup).toLowerCase().includes(q) ||
+        getAddr(t.dropoff).toLowerCase().includes(q) ||
+        (t.driverName || "").toLowerCase().includes(q)
+      );
+    }
+    return r;
+  }, [todayTrips, filter, localSearch]);
+
+  const unassignedN = todayTrips.filter(t => t.status === "Unassigned").length;
+  const activeN = todayTrips.filter(t => IN_PROGRESS.includes(t.status)).length;
+  const doneN = todayTrips.filter(t => t.status === "Completed").length;
+  const cancelledN = todayTrips.filter(t => t.status === "Cancelled" || t.status === "No Show" || t.status === "Rerouted").length;
+
+  const CHIPS = [
+    { id: "all", label: "All", n: todayTrips.length },
+    { id: "unassigned", label: "Unassigned", n: unassignedN },
+    { id: "active", label: "Active", n: activeN },
+    { id: "willcall", label: "Will Call", n: todayTrips.filter(t => t.time === "Will Call").length },
+    { id: "completed", label: "Done", n: doneN },
+    ...(cancelledN > 0 ? [{ id: "cancelled", label: "Exceptions", n: cancelledN }] : []),
+  ];
+
   return (
     <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
-      <div className="px-3 pt-3 pb-3 bg-white border-b border-slate-200 sm:px-4 shrink-0">
-        {!workspaceControls && <div className="flex gap-2 mb-3">
-          {[{label:"Total",value:todayTrips.length,color:"text-slate-900",bg:"bg-slate-50"},{label:"Unassigned",value:unassignedN,color:unassignedN>0?"text-rose-600":"text-slate-900",bg:unassignedN>0?"bg-rose-50":"bg-slate-50"},{label:"Active",value:activeN,color:"text-amber-600",bg:"bg-amber-50"},{label:"Done",value:doneN,color:"text-emerald-600",bg:"bg-emerald-50"}].map(s=>(
-            <div key={s.label} className={"flex-1 rounded-xl px-2 py-2 text-center border border-slate-100 " + s.bg}>
-              <p className={"text-lg font-semibold leading-none "+s.color}>{s.value}</p>
-              <p className="text-[8px] font-semibold text-slate-500 uppercase tracking-wide mt-0.5">{s.label}</p>
-            </div>
-          ))}
-        </div>}
+      {/* Header: stats + workspace controls + search */}
+      <div className="px-3 pt-3 pb-2 bg-white border-b border-slate-200 sm:px-4 shrink-0">
+        {/* Stats row (only when no workspace controls) */}
+        {!workspaceControls && (
+          <div className="flex gap-2 mb-2.5">
+            {[
+              { label: "Total", value: todayTrips.length, color: "text-slate-900", bg: "bg-slate-50", border: "border-slate-200" },
+              { label: "Dispatch", value: unassignedN, color: unassignedN > 0 ? "text-rose-600" : "text-slate-900", bg: unassignedN > 0 ? "bg-rose-50" : "bg-slate-50", border: unassignedN > 0 ? "border-rose-200" : "border-slate-200" },
+              { label: "Live", value: activeN, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
+              { label: "Done", value: doneN, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
+            ].map(s => (
+              <div key={s.label} className={`flex-1 rounded-xl px-2 py-2 text-center border ${s.bg} ${s.border}`}>
+                <p className={`text-lg font-black leading-none ${s.color}`}>{s.value}</p>
+                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wide mt-0.5">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
         {workspaceControls}
+
+        {/* Search + tools row */}
         <div className="flex items-center gap-2 mt-2">
           {showSearch ? (
             <div className="relative flex-1 flex items-center gap-2">
               <div className="relative flex-1">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/>
-                <input ref={searchInputRef} type="text" value={localSearch} onChange={e=>setLocalSearch(e.target.value)}
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={localSearch}
+                  onChange={e => setLocalSearch(e.target.value)}
                   placeholder="Search patient, ID, address…"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all"/>
-                {localSearch && <button type="button" onClick={()=>setLocalSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={13}/></button>}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all"
+                />
+                {localSearch && (
+                  <button type="button" onClick={() => setLocalSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <X size={13} />
+                  </button>
+                )}
               </div>
-              <button type="button" onClick={()=>{setShowSearch(false);setLocalSearch("");}}
-                className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95 transition-all shrink-0">
-                <X size={16}/>
+              <button
+                type="button"
+                onClick={() => { setShowSearch(false); setLocalSearch(""); }}
+                className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95 transition-all shrink-0"
+              >
+                <X size={16} />
               </button>
             </div>
           ) : (
             <>
-              <button type="button" onClick={()=>setShowSearch(true)}
-                className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-all shadow-sm shrink-0">
-                <Search size={16}/>
+              <button
+                type="button"
+                onClick={() => setShowSearch(true)}
+                className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-all shadow-sm shrink-0"
+              >
+                <Search size={16} />
               </button>
-              <button type="button" onClick={()=>setShowTools(true)}
-                className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-all shadow-sm shrink-0">
-                <SlidersHorizontal size={16}/>
+              <button
+                type="button"
+                onClick={() => setShowTools(true)}
+                className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-all shadow-sm shrink-0"
+              >
+                <SlidersHorizontal size={16} />
+              </button>
+              {/* Add trip button */}
+              <button
+                type="button"
+                onClick={() => setShowAddTripModal?.(true)}
+                className="h-9 px-3 rounded-xl bg-blue-600 text-white text-[12px] font-bold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm ml-auto"
+              >
+                <Plus size={14} /> Add Trip
               </button>
             </>
           )}
@@ -434,79 +561,121 @@ const MobileDispatchView = ({
       </div>
 
       {/* Filter chips */}
-      {activeTab==="trips" && (
-        <div className="shrink-0 flex gap-2 px-3 py-2.5 overflow-x-auto bg-white border-b border-slate-100 sm:px-4" style={{scrollbarWidth:"none"}}>
-          {CHIPS.map(c=>(
-            <button key={c.id} type="button" onClick={()=>setFilter(c.id)}
-              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all active:scale-95 "+(filter===c.id?"bg-blue-600 text-white shadow-sm":"bg-slate-100 text-slate-500 hover:bg-slate-200")}>
+      {activeTab === "trips" && (
+        <div className="shrink-0 flex gap-1.5 px-3 py-2.5 overflow-x-auto bg-white border-b border-slate-100 sm:px-4" style={{ scrollbarWidth: "none" }}>
+          {CHIPS.map(c => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setFilter(c.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all active:scale-95 ${
+                filter === c.id ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+              }`}
+            >
               {c.label}
-              <span className={"text-[9px] px-1 py-0.5 rounded-full font-semibold "+(filter===c.id?"bg-white/20 text-white":"bg-slate-200 text-slate-500")}>{c.n}</span>
+              <span className={`text-[9px] px-1 py-0.5 rounded-full font-semibold ${filter === c.id ? "bg-white/20 text-white" : "bg-slate-200 text-slate-500"}`}>
+                {c.n}
+              </span>
             </button>
           ))}
         </div>
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto overscroll-contain" style={{paddingBottom:"calc(88px + env(safe-area-inset-bottom,0px))"}}>
-        {activeTab==="trips" && (
-          <div className="px-3 py-3 space-y-3">
-            {filtered.length===0 && (
+      <div
+        className="flex-1 overflow-y-auto overscroll-contain"
+        style={{ paddingBottom: "calc(88px + env(safe-area-inset-bottom,0px))" }}
+      >
+        {/* Trips tab */}
+        {activeTab === "trips" && (
+          <div className="px-3 py-3 space-y-2.5">
+            {filtered.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4"><Truck size={28} className="opacity-30"/></div>
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                  <Truck size={28} className="opacity-30" />
+                </div>
                 <p className="text-sm font-semibold text-slate-500">No trips found</p>
-                <p className="text-xs text-slate-400 mt-1 text-center max-w-[200px]">{localSearch?"Try a different search":"No trips match this filter"}</p>
+                <p className="text-xs text-slate-400 mt-1 text-center max-w-[200px]">
+                  {localSearch ? "Try a different search" : "No trips match this filter for today"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowAddTripModal?.(true)}
+                  className="mt-4 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold active:scale-95 transition-all"
+                >
+                  + Add New Trip
+                </button>
               </div>
             )}
-            {filtered.map(trip=>(
-              <TripCard key={trip.id} trip={trip} drivers={drivers} expanded={expandedId===trip.id}
-                onToggle={()=>setExpandedId(expandedId===trip.id?null:trip.id)}
-                assignTripToDriver={assignTripToDriver} makeCall={makeCall} sendSMS={sendSMS}
-                updateTrip={updateTrip} requestDeleteTrip={requestDeleteTrip}
-                onSetTripDetails={setTripDetails} role={role}
-                requestAuthAction={requestAuthAction} currentUser={currentUser}
-                addToast={addToast}/>
+            {filtered.map(trip => (
+              <AdminTripCard
+                key={trip.id}
+                trip={trip}
+                drivers={drivers}
+                onOpenTrip={setTripDetails}
+                assignTripToDriver={assignTripToDriver}
+                makeCall={makeCall}
+                sendSMS={sendSMS}
+                requestDeleteTrip={requestDeleteTrip}
+                updateTrip={updateTrip}
+                requestAuthAction={requestAuthAction}
+                currentUser={currentUser}
+                addToast={addToast}
+                role={role}
+              />
             ))}
           </div>
         )}
-        {activeTab==="drivers" && (
-          <div className="px-3 py-3 space-y-3">
-            {[...drivers].sort((a,b)=>{
-              const aA=!["Offline","Unavailable"].includes(a.status),bA=!["Offline","Unavailable"].includes(b.status);
-              if(aA&&!bA) return -1; if(!aA&&bA) return 1;
-              return (a.name||"").localeCompare(b.name||"");
-            }).map(d=><DriverRow key={d.id} driver={d} trips={todayTrips}/>)}
-            {drivers.length===0 && (
-              <div className="flex flex-col items-center justify-center py-20"><div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4"><Users size={28} className="opacity-30"/></div><p className="text-sm font-semibold text-slate-500">No drivers found</p></div>
+
+        {/* Drivers tab */}
+        {activeTab === "drivers" && (
+          <div className="px-3 py-3 space-y-2.5">
+            {[...drivers].sort((a, b) => {
+              const aA = !["Offline","Unavailable"].includes(a.status);
+              const bA = !["Offline","Unavailable"].includes(b.status);
+              if (aA && !bA) return -1; if (!aA && bA) return 1;
+              return (a.name || "").localeCompare(b.name || "");
+            }).map(d => <DriverRow key={d.id} driver={d} trips={todayTrips} />)}
+            {drivers.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20">
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                  <Users size={28} className="opacity-30" />
+                </div>
+                <p className="text-sm font-semibold text-slate-500">No drivers found</p>
+              </div>
             )}
           </div>
         )}
       </div>
 
-      {/* FAB */}
-      <button type="button" onClick={()=>setShowAddTripModal?.(true)}
-        className="fixed z-20 right-4 w-14 h-14 rounded-full shadow-xl flex items-center justify-center bg-blue-600 active:scale-95 transition-all border border-blue-700"
-        style={{bottom:"calc(80px + env(safe-area-inset-bottom,0px))",boxShadow:"0 8px 24px rgba(43,76,126,0.3)"}}>
-        <Plus size={24} className="text-white"/>
-      </button>
-
-      {/* Tools Sheet */}
+      {/* Tools Bottom Sheet */}
       {showTools && (
-        <div className="fixed inset-0 z-50 flex items-end" onClick={()=>setShowTools(false)}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"/>
-          <div className="relative w-full bg-white rounded-t-3xl shadow-2xl overflow-hidden" onClick={e=>e.stopPropagation()}>
-            <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200"/></div>
-            <div className="px-5 pb-2 pt-2"><h2 className="text-sm font-black text-slate-900">Dispatch Tools</h2><p className="text-xs text-slate-400 mt-0.5">Quick access to all operations</p></div>
-            <div className="px-4 py-3 grid grid-cols-3 gap-3" style={{paddingBottom:"max(1.5rem,env(safe-area-inset-bottom,1.5rem))"}}>
+        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowTools(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative w-full bg-white rounded-t-3xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-slate-200" />
+            </div>
+            <div className="px-5 pb-2 pt-2 border-b border-slate-100">
+              <h2 className="text-sm font-black text-slate-900">Dispatch Tools</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Quick access to all operations</p>
+            </div>
+            <div className="px-4 py-3 grid grid-cols-3 gap-3" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom, 1.5rem))" }}>
               {[
-                {label:"Upload Trips",icon:Upload,color:"bg-blue-50 text-blue-700 border-blue-200",action:()=>{setShowUploadModal?.(true);setShowTools(false);}},
-                {label:"Route Plan",icon:Route,color:"bg-indigo-50 text-indigo-700 border-indigo-200",action:()=>{onOpenSequencer?.();setShowTools(false);}},
-                {label:"Live Map",icon:MapPin,color:"bg-emerald-50 text-emerald-700 border-emerald-200",action:()=>{onOpenLiveMap?.();setShowTools(false);}},
-                {label:"Bulk Assign",icon:Users,color:"bg-amber-50 text-amber-700 border-amber-200",action:()=>{setBulkAssignModal?.(true);setShowTools(false);}},
-                {label:"Add Trip",icon:Plus,color:"bg-rose-50 text-rose-700 border-rose-200",action:()=>{setShowAddTripModal?.(true);setShowTools(false);}},
-              ].map(item=>(
-                <button key={item.label} type="button" onClick={item.action}
-                  className={"flex flex-col items-center justify-center gap-2 h-20 rounded-2xl border font-black text-xs transition-all active:scale-95 "+item.color}>
-                  <item.icon size={20}/><span className="text-center leading-tight px-1">{item.label}</span>
+                { label: "Upload Trips", icon: Upload, color: "bg-blue-50 text-blue-700 border-blue-200", action: () => { setShowUploadModal?.(true); setShowTools(false); } },
+                { label: "Route Plan", icon: Route, color: "bg-indigo-50 text-indigo-700 border-indigo-200", action: () => { onOpenSequencer?.(); setShowTools(false); } },
+                { label: "Live Map", icon: MapPin, color: "bg-emerald-50 text-emerald-700 border-emerald-200", action: () => { onOpenLiveMap?.(); setShowTools(false); } },
+                { label: "Bulk Assign", icon: Users, color: "bg-amber-50 text-amber-700 border-amber-200", action: () => { setBulkAssignModal?.(true); setShowTools(false); } },
+                { label: "Add Trip", icon: Plus, color: "bg-rose-50 text-rose-700 border-rose-200", action: () => { setShowAddTripModal?.(true); setShowTools(false); } },
+              ].map(item => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={item.action}
+                  className={`flex flex-col items-center justify-center gap-2 h-20 rounded-2xl border font-black text-xs transition-all active:scale-95 ${item.color}`}
+                >
+                  <item.icon size={20} />
+                  <span className="text-center leading-tight px-1">{item.label}</span>
                 </button>
               ))}
             </div>

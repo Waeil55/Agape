@@ -160,10 +160,6 @@ export default function FleetUtilizationReport({ trips = [], drivers = [], vehic
   return (
     <div className="bg-slate-50 min-h-0 p-4 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <BarChart3 size={24} className="text-blue-600" />
-          <h1 className="text-2xl font-semibold text-slate-900">Fleet Utilization Report</h1>
-        </div>
         <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
           <Download size={16} />
           Export CSV

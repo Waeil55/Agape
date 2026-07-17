@@ -268,9 +268,6 @@ const [form, setForm] = useState({
       )}
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 sticky top-[52px] z-10 bg-slate-100 py-2">
-        <h2 className="text-xl sm:text-2xl font-semibold text-slate-900">
-          {resolvedTab === 'drivers' ? 'Drivers' : 'Vehicles'}
-        </h2>
         {(role === 'admin' || role === 'dispatcher') && (
           <button onClick={resolvedTab === 'drivers' ? openAdd : openVAdd} className="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2 text-xs">
             <Plus size={18} /> Add {resolvedTab === 'drivers' ? 'Driver' : 'Vehicle'}

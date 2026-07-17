@@ -368,7 +368,6 @@ const MobileAdminPage = ({
               <div className="mobile-admin-hero-icon"><ShieldCheck size={22} /></div>
               <div className="min-w-0">
                 <p className="mobile-admin-eyebrow">Agape command</p>
-                <h2>Admin control room</h2>
                 <p>Live team, trips, drivers, and access signals in one clean mobile workspace.</p>
               </div>
             </div>

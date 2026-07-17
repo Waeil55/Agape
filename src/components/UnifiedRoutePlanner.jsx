@@ -164,10 +164,6 @@ const UnifiedRoutePlanner = ({
       <div className="shrink-0 bg-white border-b border-slate-200/80 shadow-sm">
         <div className="px-4 pt-3 pb-0">
           <div className="flex items-center justify-between mb-3">
-            <div>
-              <h1 className="text-lg font-black text-slate-900 tracking-tight">Route Planner</h1>
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">Plan · Saved · Build · Navigate</p>
-            </div>
             {guidedMode && (
               <button onClick={() => { onSetGuidedMode(false); onSetAiSequence(null); onSetAiSuggestions([]); }}
                 className="flex items-center gap-1.5 px-3 min-h-[44px] bg-blue-50 rounded-full border border-blue-100 active:scale-95 transition cursor-pointer">

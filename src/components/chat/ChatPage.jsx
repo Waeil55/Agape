@@ -370,10 +370,6 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
       </div>
 
       <div className="agape-chat-mobile-list-header md:hidden">
-        <div className="min-w-0 flex-1">
-          <h1>Messages</h1>
-          <p>{unifiedChatList.length} conversations</p>
-        </div>
         {chat.totalUnread > 0 && (
           <span className="chat-unread-badge flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-bold text-white">
             {chat.totalUnread > 99 ? '99+' : chat.totalUnread}

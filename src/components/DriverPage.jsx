@@ -537,7 +537,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, chatUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false }) => {
+const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, chatUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, onEmbeddedClose = null }) => {
   const [phoneNumbersFallback, setPhoneNumbersFallback] = useState(null);
 
   useEffect(() => {
@@ -587,8 +587,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     return !!normalizedCurrentUserEmail && resolvedDriverEmail === normalizedCurrentUserEmail;
   }, [driverIdentityIds, normalizedCurrentUserEmail, drivers, allDrivers]);
   const rawDriverScopedTrips = useMemo(
-    () => (Array.isArray(trips) ? trips.filter(tripBelongsToCurrentDriver) : []),
-    [trips, tripBelongsToCurrentDriver]
+    () => {
+      if (!Array.isArray(trips)) return [];
+      const filtered = trips.filter(tripBelongsToCurrentDriver);
+      if (defaultTripId && !filtered.some(t => t.id === defaultTripId)) {
+        const defaultTrip = trips.find(t => t.id === defaultTripId);
+        if (defaultTrip) filtered.push(defaultTrip);
+      }
+      return filtered;
+    },
+    [trips, tripBelongsToCurrentDriver, defaultTripId]
   );
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9@._-]/g, '_');
   const workflowStorageKey = `agape_drvWorkflow_${userKey}`;
@@ -626,6 +634,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   }, [workflowProgressState.storageKey, workflowStorageKey, workflowProgress]);
 
   const [activeNav, setActiveNav] = useState(() => {
+    if (defaultTripId) return 'active-trip';
     const savedNav = localStorage.getItem(`agape_drvNav_${userKey}`) || 'trips';
     return ['trips', 'tools', 'chat', 'history', 'settings', 'active-trip'].includes(savedNav) ? savedNav : 'trips';
   });
@@ -687,6 +696,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [scheduleEditDraft, setScheduleEditDraft] = useState(null);
   const [scheduleEditError, setScheduleEditError] = useState('');
   const [activeWorkTripId, setActiveWorkTripIdRaw] = useState(() => {
+    if (defaultTripId) return defaultTripId;
     try {
       return localStorage.getItem(`agape_drvActiveTrip_${userKey}`) || null;
     } catch {
@@ -2967,7 +2977,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setSelectedTrips(prev => prev.filter(id => id !== showCompleteModal.id));
     setExpandedTripId(null);
     setActiveWorkTripId(null);
-    setActiveNav('trips');
+    if (isEmbedded && onEmbeddedClose) { onEmbeddedClose(); } else { setActiveNav('trips'); }
     setWorkNotesOpen(false);
 
     // Check if all trips are done - offer clock-out with pending timer
@@ -3157,7 +3167,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="px-3 py-2.5 flex items-center gap-2.5">
             <button
               type="button"
-              onClick={() => { setActiveNav('trips'); setWorkNotesOpen(false); }}
+              onClick={() => { if (isEmbedded && onEmbeddedClose) { onEmbeddedClose(); } else { setActiveNav('trips'); setWorkNotesOpen(false); } }}
               className="w-8 h-11 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer"
               aria-label="Back to trips"
             >
@@ -4961,7 +4971,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           style={{ paddingBottom: isChatThreadOpen ? 0 : 'calc(72px + env(safe-area-inset-bottom, 0px))' }}
         >
           <Suspense fallback={<div className="h-full flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
-            <ChatPage onBack={() => setActiveNav('trips')} onThreadActiveChange={setIsChatThreadOpen} />
+            <ChatPage onBack={() => { if (isEmbedded && onEmbeddedClose) { onEmbeddedClose(); } else { setActiveNav('trips'); } }} onThreadActiveChange={setIsChatThreadOpen} />
           </Suspense>
         </div>
       )}
@@ -5343,10 +5353,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       {/* ===== SETTINGS PAGE ===== */}
       {activeNav === 'settings' && (
         <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
-          <div className="px-1 pt-2 pb-3">
-            <h2 className="text-xl font-semibold text-slate-900">Settings</h2>
-            <p className="text-slate-500 text-xs font-semibold mt-0.5">Account and app preferences</p>
-          </div>
           <div className="space-y-4 px-1">
             {/* Profile Card */}
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/90 to-indigo-700/90 shadow-lg shadow-blue-600/10">
