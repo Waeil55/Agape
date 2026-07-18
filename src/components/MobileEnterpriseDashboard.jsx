@@ -1,6 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense, Component } from 'react';
 import {
-  Map, ChevronLeft, Menu, BarChart2, Zap, Shield, X, MessageCircle
+  Map, ChevronLeft, Menu, BarChart2, Zap, Shield, X, MessageCircle, Home
 } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
 import { useChat } from '../hooks/useChat';
@@ -23,6 +23,7 @@ const AdminPage = lazy(() => import('./AdminPage'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
 const LiveMapPage = lazy(() => import('./LiveMapPage'));
 const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
+const DriverPage = lazy(() => import('./DriverPage'));
 
 const MobileMenuPage = lazy(() => import('./MobileMenuPage'));
 const ArchivesPage = lazy(() => import('./ArchivesPage'));
@@ -52,6 +53,7 @@ const MobileEnterpriseDashboard = (props) => {
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [toolsDriverId, setToolsDriverId] = useState(() => localStorage.getItem('agape_toolsDriverId') || '');
+  const [tripsDriverId, setTripsDriverId] = useState(() => localStorage.getItem('agape_tripsDriverId') || '');
   const driverWorkDrivers = props.driverWorkDrivers?.length ? props.driverWorkDrivers : drivers;
   const driverWorkTrips = props.driverWorkTrips?.length ? props.driverWorkTrips : trips;
 
@@ -60,7 +62,7 @@ const MobileEnterpriseDashboard = (props) => {
     setSubView(null);
   };
 
-  const VALID_VIEWS = ['map', 'reports', 'tools', 'menu', 'chat'];
+  const VALID_VIEWS = ['trips', 'map', 'reports', 'tools', 'menu', 'chat'];
   useEffect(() => {
     if (!VALID_VIEWS.includes(currentView)) setCurrentView('map');
   }, [currentView]);
@@ -68,6 +70,15 @@ const MobileEnterpriseDashboard = (props) => {
   useEffect(() => {
     if (toolsDriverId) localStorage.setItem('agape_toolsDriverId', toolsDriverId);
   }, [toolsDriverId]);
+
+  useEffect(() => {
+    if (!tripsDriverId && driverWorkDrivers.length) setTripsDriverId(driverWorkDrivers[0].id);
+    else if (tripsDriverId && !driverWorkDrivers.some(driver => driver.id === tripsDriverId)) setTripsDriverId(driverWorkDrivers[0]?.id || '');
+  }, [driverWorkDrivers, tripsDriverId]);
+
+  useEffect(() => {
+    if (tripsDriverId) localStorage.setItem('agape_tripsDriverId', tripsDriverId);
+  }, [tripsDriverId]);
 
 
 
@@ -361,6 +372,41 @@ const MobileEnterpriseDashboard = (props) => {
       );
     }
 
+    if (currentView === 'trips') {
+      const selectedDriver = driverWorkDrivers.find(driver => driver.id === tripsDriverId) || driverWorkDrivers[0];
+      const selectedTrips = selectedDriver ? driverWorkTrips.filter(trip => (
+        trip.driverId === selectedDriver.id || trip.driverName === selectedDriver.name ||
+        String(trip.driverEmail || '').trim().toLowerCase() === String(selectedDriver.email || '').trim().toLowerCase()
+      )) : [];
+      return (
+        <div className="flex min-h-0 flex-1 flex-col bg-[var(--bg-app)]">
+          <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600">Driver trips</p><p className="truncate text-sm font-extrabold text-slate-950">{role === 'admin' ? 'Admin' : 'Dispatcher'} workflow view</p></div>
+              <select value={selectedDriver?.id || ''} onChange={event => setTripsDriverId(event.target.value)} className="max-w-[55%] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500">
+                {driverWorkDrivers.map(driver => <option key={driver.id || driver.email} value={driver.id}>{driver.name || driver.email || driver.id}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {selectedDriver ? <ErrorBoundary><Suspense fallback={<MobileFallback />}><DriverPage
+              currentUser={selectedDriver.email || selectedDriver.id || currentUser}
+              role={role} isEmbedded={true} onEmbeddedClose={() => handleNavClick('map')}
+              drivers={[selectedDriver]} allDrivers={props.allDrivers || drivers}
+              trips={selectedTrips} dispatchers={props.dispatchers || []} phoneNumbers={props.phoneNumbers || {}}
+              onUpdateTrip={props.onUpdateDriverTrip || props.updateTrip} onCompleteTrip={props.onCompleteTrip}
+              onDriverStatusUpdate={props.onDriverStatusUpdate} onUpdateClockEvents={props.onUpdateClockEvents}
+              onUpdateHourlyRate={props.onUpdateHourlyRate} onUpdateDriverLocation={props.handleUpdateDriverLocation || props.updateDriverLocation}
+              onAddAuditLog={props.addAuditLog} requestAuthAction={props.requestAuthAction}
+              appSettings={props.appSettings} onUpdateAppSettings={props.updateAppSettings}
+              onOpenSettings={() => setSubView('settings')} onLogout={props.onLogout}
+              onAddTrip={props.addTrip} showAddTripModal={props.showAddTripModal} setShowAddTripModal={props.setShowAddTripModal}
+            /></Suspense></ErrorBoundary> : <div className="flex h-full flex-col items-center justify-center px-8 text-center"><Home size={34} className="text-slate-300" /><p className="mt-3 text-sm font-bold text-slate-700">No accessible drivers</p><p className="mt-1 text-xs text-slate-500">Driver access must be assigned before trips can be opened.</p></div>}
+          </div>
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -469,6 +515,11 @@ const MobileEnterpriseDashboard = (props) => {
       {showNav && (
         <nav className="bottom-nav">
           <div className="flex h-full items-center justify-around gap-1">
+
+            <button onClick={() => handleNavClick('trips')} className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}>
+              <Home size={24} strokeWidth={currentView === 'trips' && !subView ? 1.8 : 1.3} />
+              <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Trips</span>
+            </button>
 
 
             {/* Map */}
