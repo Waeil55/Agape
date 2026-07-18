@@ -5,6 +5,15 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    match /chat_attachments/{userId}/{fileName} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid == userId &&
+        request.resource.size < 10 * 1024 * 1024 &&
+        request.resource.contentType.matches('(image/.*|application/pdf|text/plain)');
+      allow delete: if signedIn() && request.auth.uid == userId;
+      allow update: if false;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

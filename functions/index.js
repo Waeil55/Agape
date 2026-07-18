@@ -17,7 +17,7 @@ exports.notifyChatMessage = functions.firestore
     if (!channelSnap.exists) return null;
 
     const channel = channelSnap.data() || {};
-    const recipientIds = (channel.participants || []).filter((uid) => uid && uid !== message.senderId);
+    const recipientIds = (channel.participants || []).filter((uid) => uid && uid !== message.senderId && !channel.mutedBy?.[uid]);
     if (!recipientIds.length) return null;
 
     const recipients = await Promise.all(recipientIds.map((uid) => admin.firestore().doc(`users/${uid}`).get()));

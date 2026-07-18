@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Phone, Info, Search, Plus, Smile, ThumbsUp, Send,
-  MessageSquare, Loader2, X, Mail, ShieldCheck, Briefcase, CheckCheck
+  MessageSquare, Loader2, X, Mail, ShieldCheck, Briefcase, CheckCheck,
+  Paperclip, FileText, Download, Pencil, Trash2, Bell, BellOff
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import { makeCall } from '../../utils/nativeActions';
+import { storage, storageRef, uploadBytes, getDownloadURL } from '../../config/firebase';
+import { isAllowedChatAttachment, isMessageSeen } from '../../utils/chatLifecycle';
 
 export const formatDisplayName = (user) => {
   if (!user) return 'User';
@@ -31,7 +34,13 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     sendMessage,
     startDirectChat,
     unreadByChannel,
-    unreadCount
+    unreadCount,
+    setTyping,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
+    contactPresence,
+    toggleMute
   } = useChat({ alerts: false });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,7 +52,13 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [pendingFile, setPendingFile] = useState(null);
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [editingText, setEditingText] = useState('');
+  const [typingClock, setTypingClock] = useState(() => Date.now());
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const typingTimerRef = useRef(null);
 
   // Notify parent of active thread state change
   useEffect(() => {
@@ -57,20 +72,46 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, activeChannelId]);
 
+  useEffect(() => () => {
+    clearTimeout(typingTimerRef.current);
+    setTyping(false);
+  }, [setTyping]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTypingClock(Date.now()), 2000);
+    return () => clearInterval(timer);
+  }, []);
+
   const handleSend = async (textToSend = null) => {
     const text = (textToSend || composerText).trim();
     if ((!text && !textToSend) || isSending) return;
     setIsSending(true);
     setSendError('');
     try {
-      await sendMessage(text || '👍');
+      let attachment = null;
+      if (pendingFile) {
+        const safeName = pendingFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const fileRef = storageRef(storage, `chat_attachments/${currentUser.id}/${Date.now()}-${safeName}`);
+        await uploadBytes(fileRef, pendingFile, { contentType: pendingFile.type });
+        attachment = { url: await getDownloadURL(fileRef), name: pendingFile.name, type: pendingFile.type, size: pendingFile.size };
+      }
+      await sendMessage(text || (attachment ? '' : '👍'), attachment);
       if (!textToSend) setComposerText('');
+      setPendingFile(null);
+      setTyping(false);
     } catch (error) {
       console.error('Message send failed:', error);
       setSendError('Message could not be sent. Check your connection and try again.');
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleComposerChange = (value) => {
+    setComposerText(value);
+    setTyping(Boolean(value.trim()));
+    clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => setTyping(false), 1800);
   };
 
   const getOtherParticipant = (channel) => {
@@ -82,6 +123,15 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
 
   const activeChannel = channels.find(c => c.id === activeChannelId) || (draftChannel?.id === activeChannelId ? draftChannel : null);
   const otherContact = getOtherParticipant(activeChannel);
+  const isMuted = Boolean(activeChannel?.mutedBy?.[currentUser?.id]);
+  const otherUserId = activeChannel?.participants?.find(id => id !== currentUser?.id);
+  const otherReadAt = activeChannel?.readBy?.[otherUserId]?.toMillis?.() || 0;
+  const otherTyping = activeChannel && currentUser
+    ? Object.entries(activeChannel.typing || {}).some(([userId, state]) => userId !== currentUser.id && state && typingClock - new Date(state.updatedAt || 0).getTime() < 5000)
+    : false;
+  const presenceMs = contactPresence?.lastSeenAt?.toMillis?.() || 0;
+  const isContactOnline = contactPresence?.state === 'online' && typingClock - presenceMs < 70000;
+  const presenceLabel = isContactOnline ? 'Online' : presenceMs ? `Last active ${new Date(presenceMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Offline';
   const visibleMessages = threadQuery.trim()
     ? messages.filter(message => (message.text || '').toLowerCase().includes(threadQuery.trim().toLowerCase()))
     : messages;
@@ -259,7 +309,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
 
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold text-slate-900 truncate leading-tight">{formatDisplayName(otherContact)}</h3>
-                  <p className="text-[11px] font-semibold text-emerald-600 capitalize flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active · {otherContact.role || 'Driver'}</p>
+                  <p className={`text-[11px] font-semibold capitalize flex items-center gap-1.5 ${isContactOnline ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-1.5 h-1.5 rounded-full ${isContactOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} /> {presenceLabel} · {otherContact.role || 'Driver'}</p>
                 </div>
               </div>
 
@@ -301,9 +351,14 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                     ) : !isSent ? <span className="w-7 shrink-0" /> : null}
                     <div className={`agape-messenger-bubble-group ${isSent ? 'is-sent' : 'is-received'}`}>
                       <div className="agape-messenger-bubble">
-                        {msg.text}
+                        {msg.deletedAt ? <span className="italic opacity-70">Message removed</span> : editingMessageId === msg.id ? (
+                          <div className="flex items-center gap-2"><input autoFocus value={editingText} onChange={event => setEditingText(event.target.value)} className="min-w-0 flex-1 rounded-lg bg-white/90 px-2 py-1 text-slate-900 outline-none" /><button onClick={async () => { await editMessage(msg.id, editingText); setEditingMessageId(null); }} className="text-xs font-black">Save</button></div>
+                        ) : <>{msg.text}{msg.editedAt && <span className="ml-1 text-[9px] opacity-60">edited</span>}</>}
+                        {msg.attachment && !msg.deletedAt && (msg.attachment.type?.startsWith('image/') ? <a href={msg.attachment.url} target="_blank" rel="noreferrer"><img src={msg.attachment.url} alt={msg.attachment.name} className="mt-2 max-h-64 rounded-xl object-cover" /></a> : <a href={msg.attachment.url} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-xl bg-white/15 p-2"><FileText size={18} /><span className="truncate text-xs font-bold">{msg.attachment.name}</span><Download size={14} /></a>)}
                       </div>
-                      {isLastInGroup && <span className="agape-message-meta">{formatMessageTime(msg.timestamp)}{isSent && <CheckCheck size={12} />}</span>}
+                      {!msg.deletedAt && <div className={`flex items-center gap-1 ${isSent ? 'justify-end' : 'justify-start'}`}><button onClick={() => toggleReaction(msg, '👍')} className="rounded-full px-1.5 py-0.5 text-xs hover:bg-slate-200">👍</button>{isSent && <><button onClick={() => { setEditingMessageId(msg.id); setEditingText(msg.text || ''); }} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Edit message"><Pencil size={11} /></button><button onClick={() => deleteMessage(msg.id)} className="p-1 text-slate-400 hover:text-rose-600" aria-label="Delete message"><Trash2 size={11} /></button></>}</div>}
+                      {msg.reactions && <div className="flex flex-wrap gap-1">{Object.entries(msg.reactions).filter(([, ids]) => ids?.length).map(([emoji, ids]) => <button key={emoji} onClick={() => toggleReaction(msg, emoji)} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] shadow-sm">{emoji} {ids.length}</button>)}</div>}
+                      {isLastInGroup && <span className="agape-message-meta">{formatMessageTime(msg.timestamp)}{isSent && <><CheckCheck size={12} />{isMessageSeen(msg, otherReadAt) && <span>Seen</span>}</>}</span>}
                     </div>
                   </div>
                 );
@@ -311,12 +366,17 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
 
               {visibleMessages.length === 0 && threadQuery && <div className="m-auto text-center"><Search size={28} className="mx-auto text-slate-300" /><p className="mt-2 text-sm font-bold text-slate-500">No matching messages</p></div>}
 
+              {otherTyping && <div className="agape-messenger-bubble-row is-received"><img src={getAvatarUrl(otherContact)} alt="" className="agape-messenger-bubble-avatar" /><div className="agape-messenger-typing" aria-label={`${formatDisplayName(otherContact)} is typing`}><span className="agape-messenger-typing-dot" /><span className="agape-messenger-typing-dot" /><span className="agape-messenger-typing-dot" /></div></div>}
+
               <div ref={messagesEndRef} />
             </div>
 
             {/* Composer Bar */}
             {sendError && <div className="bg-rose-50 border-t border-rose-100 px-4 py-2 text-center text-[11px] font-bold text-rose-700">{sendError}</div>}
+            {pendingFile && <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700"><FileText size={15} /><span className="min-w-0 flex-1 truncate">{pendingFile.name}</span><button onClick={() => setPendingFile(null)} aria-label="Remove attachment"><X size={15} /></button></div>}
             <div className="agape-messenger-composer border-t border-slate-200 bg-white px-4 md:px-6 py-3.5 flex items-center gap-3 shrink-0 relative">
+              <input ref={fileInputRef} type="file" accept="image/*,.pdf,.txt" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (isAllowedChatAttachment(file)) setPendingFile(file); else if (file) setSendError('Choose an image, PDF, or text file up to 10 MB.'); event.target.value = ''; }} />
+              <button onClick={() => fileInputRef.current?.click()} className="w-9 h-9 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center" title="Attach file"><Paperclip size={19} /></button>
               <button onClick={() => setShowEmojiPicker(value => !value)} className="w-9 h-9 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center flex-shrink-0" title="Add emoji">
                 <Smile size={20} strokeWidth={2.2} />
               </button>
@@ -327,13 +387,13 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                   type="text"
                   placeholder="Aa"
                   value={composerText}
-                  onChange={e => setComposerText(e.target.value)}
+                  onChange={e => handleComposerChange(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) handleSend(); }}
                 />
               </div>
 
               <div className="flex-shrink-0">
-                {composerText.trim() ? (
+                {composerText.trim() || pendingFile ? (
                   <button
                     onClick={() => handleSend()}
                     disabled={isSending}
@@ -366,7 +426,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
         <aside className="hidden xl:flex w-[300px] h-full shrink-0 border-l border-slate-200 bg-white flex-col">
           <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">Directory</p><h3 className="mt-1 text-sm font-black text-slate-900">Conversation details</h3></div><button onClick={() => setShowDetails(false)} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"><X size={16} /></button></div>
           <div className="p-6 text-center border-b border-slate-100"><img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="w-20 h-20 mx-auto rounded-2xl shadow-lg" /><h4 className="mt-3 text-base font-black text-slate-950">{formatDisplayName(otherContact)}</h4><p className="mt-1 text-xs font-semibold text-slate-500 capitalize">{otherContact.role || 'Team member'}</p><span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Available</span></div>
-          <div className="p-4 space-y-2"><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Briefcase size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Role</p><p className="text-xs font-bold text-slate-700 capitalize">{otherContact.role || 'Team member'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Mail size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Email</p><p className="text-xs font-bold text-slate-700 truncate">{otherContact.email || 'Not available'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-blue-50 p-3"><ShieldCheck size={16} className="text-blue-600" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-blue-500">Privacy</p><p className="text-xs font-bold text-blue-900">Internal team channel</p></div></div></div>
+          <div className="p-4 space-y-2"><button onClick={toggleMute} disabled={activeChannel.isDraft} className="w-full flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-left disabled:opacity-40">{isMuted ? <BellOff size={16} className="text-rose-600" /> : <Bell size={16} className="text-blue-600" />}<div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Notifications</p><p className="text-xs font-bold text-slate-700">{isMuted ? 'Muted' : 'Alerts enabled'}</p></div></button><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Briefcase size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Role</p><p className="text-xs font-bold text-slate-700 capitalize">{otherContact.role || 'Team member'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Mail size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Email</p><p className="text-xs font-bold text-slate-700 truncate">{otherContact.email || 'Not available'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-blue-50 p-3"><ShieldCheck size={16} className="text-blue-600" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-blue-500">Privacy</p><p className="text-xs font-bold text-blue-900">Internal team channel</p></div></div></div>
         </aside>
       )}
 
