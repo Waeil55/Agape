@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  db, auth, collection, doc, setDoc, addDoc, query, where,
+  db, auth, collection, doc, setDoc, query, where,
   orderBy, onSnapshot, serverTimestamp, increment, getDoc, updateDoc, writeBatch
 } from '../config/firebase';
 import { playMessageSound, playMessageSentSound } from '../utils/notificationSound';
@@ -215,11 +215,13 @@ export const useChat = ({ alerts = true } = {}) => {
             [currentUser.id]: {
               name: currentUser.name || currentUser.username || currentUser.email,
               email: currentUser.email,
+              phone: currentUser.phone || currentUser.phoneNumber || '',
               role: currentUser.role || 'driver'
             },
             [otherUser.id]: {
               name: otherUser.name || otherUser.username || otherUser.email,
               email: otherUser.email,
+              phone: otherUser.phone || otherUser.phoneNumber || '',
               role: otherUser.role || 'driver'
             }
           },

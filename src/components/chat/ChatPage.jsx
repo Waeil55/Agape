@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  ArrowLeft, Phone, Video, Info, Search, Plus, Smile, ThumbsUp, Send,
-  Camera, Image as ImageIcon, MessageSquare, Loader2, X
+  ArrowLeft, Phone, Info, Search, Plus, Smile, ThumbsUp, Send,
+  MessageSquare, Loader2, X, Mail, ShieldCheck, Briefcase, CheckCheck
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
+import { makeCall } from '../../utils/nativeActions';
 
 export const formatDisplayName = (user) => {
   if (!user) return 'User';
@@ -12,7 +13,7 @@ export const formatDisplayName = (user) => {
     raw = raw.split('@')[0];
   }
   return raw
-    .split(/[\._\-]/)
+    .split(/[._-]/)
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 };
@@ -35,6 +36,11 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [composerText, setComposerText] = useState('');
   const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showThreadSearch, setShowThreadSearch] = useState(false);
+  const [threadQuery, setThreadQuery] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef(null);
 
   // Notify parent of active thread state change
@@ -49,21 +55,44 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, activeChannelId]);
 
-  const handleSend = (textToSend = null) => {
+  const handleSend = async (textToSend = null) => {
     const text = (textToSend || composerText).trim();
-    if (!text && !textToSend) return;
-    sendMessage(text || '👍');
-    if (!textToSend) setComposerText('');
+    if ((!text && !textToSend) || isSending) return;
+    setIsSending(true);
+    try {
+      await sendMessage(text || '👍');
+      if (!textToSend) setComposerText('');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const getOtherParticipant = (channel) => {
     if (!channel || !currentUser || !channel.participants) return null;
     const otherId = channel.participants.find(pId => pId !== currentUser.id);
-    return channel.participantDetails?.[otherId] || { name: 'User', email: '' };
+    const directoryUser = users.find(user => user.id === otherId) || {};
+    return { ...directoryUser, ...(channel.participantDetails?.[otherId] || {}), id: otherId };
   };
 
   const activeChannel = channels.find(c => c.id === activeChannelId);
   const otherContact = getOtherParticipant(activeChannel);
+  const visibleMessages = threadQuery.trim()
+    ? messages.filter(message => (message.text || '').toLowerCase().includes(threadQuery.trim().toLowerCase()))
+    : messages;
+
+  const formatMessageTime = (timestamp) => {
+    const date = timestamp?.toDate?.();
+    if (!date) return '';
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  };
+
+  const formatConversationTime = (timestamp) => {
+    const date = timestamp?.toDate?.();
+    if (!date) return '';
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
 
   // Filter channels based on search
   const filteredChannels = channels.filter(ch => {
@@ -105,9 +134,9 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   return (
     <div className="agape-messenger-container h-full flex">
       {/* Left Column: Chat List (Visible on Desktop always, on Mobile only if no active channel) */}
-      <div className={`agape-messenger-sidebar w-full md:w-[360px] flex flex-col h-full border-r border-slate-100 bg-white shrink-0 ${activeChannelId ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`agape-messenger-sidebar w-full md:w-[380px] flex flex-col h-full border-r border-slate-200 bg-white shrink-0 ${activeChannelId ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
-        <div className="px-4 pt-5 pb-2 flex items-center justify-between bg-white shrink-0">
+        <div className="agape-chat-sidebar-head px-5 pt-5 pb-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             {onBack && (
               <button
@@ -118,14 +147,15 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
               </button>
             )}
             <div>
-              <h1 className="text-2xl font-black text-slate-900 leading-none tracking-tight">Chats</h1>
-              {unreadCount > 0 && <p className="mt-1 text-[11px] font-bold text-blue-600">{unreadCount} unread {unreadCount === 1 ? 'conversation' : 'conversations'}</p>}
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Team workspace</p>
+              <h1 className="mt-1 text-2xl font-black text-slate-950 leading-none tracking-tight">Messages</h1>
+              <p className="mt-1.5 text-[11px] font-semibold text-slate-500">{unreadCount > 0 ? `${unreadCount} unread ${unreadCount === 1 ? 'message' : 'messages'}` : 'You’re all caught up'}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowNewChatModal(true)}
-              className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-800 hover:bg-slate-200 transition"
+              className="w-10 h-10 rounded-xl bg-slate-950 flex items-center justify-center text-white hover:bg-blue-700 transition shadow-lg shadow-slate-900/15"
               title="Start new chat"
             >
               <Plus size={18} strokeWidth={2.5} />
@@ -134,18 +164,18 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
         </div>
 
         {/* Search Bar */}
-        <div className="agape-messenger-search-bar flex items-center bg-slate-100 rounded-full px-4 py-2 mx-4 my-2 shrink-0">
+        <div className="agape-messenger-search-bar flex items-center bg-slate-100/80 rounded-xl px-4 py-2.5 mx-4 my-2 shrink-0 border border-slate-200/70">
           <Search size={16} className="text-slate-400 mr-2 flex-shrink-0" />
           <input
             type="text"
-            placeholder="Search"
+            placeholder="Search people and conversations"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
 
         {/* Stories Carousel */}
-        <div className="agape-messenger-stories flex gap-4 overflow-x-auto px-4 py-2 scrollbar-none border-b border-slate-100 bg-white shrink-0">
+        <div className="agape-messenger-stories flex gap-4 overflow-x-auto px-4 py-3 scrollbar-none border-b border-slate-100 bg-white shrink-0">
           {users.slice(0, 8).map(u => (
             <div
               key={u.id}
@@ -170,7 +200,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
               <div
                 key={ch.id}
                 onClick={() => setActiveChannelId(ch.id)}
-                className={`agape-messenger-row flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition border-b border-slate-50 ${activeChannelId === ch.id ? 'bg-slate-100' : ''}`}
+                className={`agape-messenger-row ${unreadByChannel[ch.id] ? 'is-unread' : ''} flex items-center gap-3 mx-2 my-1 px-3 py-3 cursor-pointer transition rounded-xl ${activeChannelId === ch.id ? 'is-active' : ''}`}
               >
                 <div className="agape-messenger-avatar-wrap flex-shrink-0">
                   <img src={getAvatarUrl(other)} alt={formatDisplayName(other)} className="agape-messenger-avatar" />
@@ -180,6 +210,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                 <div className="agape-messenger-row-content flex-1 min-w-0">
                   <div className="agape-messenger-row-header flex justify-between items-baseline mb-0.5 gap-2">
                     <span className="agape-messenger-row-name text-sm font-bold text-slate-900 truncate">{formatDisplayName(other)}</span>
+                    <span className="text-[10px] font-semibold text-slate-400 shrink-0">{formatConversationTime(ch.lastMessage?.timestamp)}</span>
                     {unreadByChannel[ch.id] > 0 && <span className="agape-unread-badge" aria-label={`${unreadByChannel[ch.id]} unread messages`}>{unreadByChannel[ch.id] > 99 ? '99+' : unreadByChannel[ch.id]}</span>}
                   </div>
                   <div className="agape-messenger-row-snippet text-xs text-slate-500 font-semibold flex items-center justify-between gap-2">
@@ -201,11 +232,11 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
       </div>
 
       {/* Right Column: Chat Thread */}
-      <div className={`agape-messenger-main flex-1 h-full flex flex-col bg-white ${activeChannelId ? 'flex' : 'hidden md:flex'}`}>
+      <div className={`agape-messenger-main flex-1 h-full flex flex-col bg-slate-50 ${activeChannelId ? 'flex' : 'hidden md:flex'}`}>
         {activeChannel && otherContact ? (
           <div className="agape-messenger-thread h-full flex flex-col">
             {/* Thread Header */}
-            <div className="agape-messenger-thread-header flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-white shrink-0">
+            <div className="agape-messenger-thread-header flex items-center justify-between px-4 md:px-6 py-3 border-b border-slate-200 bg-white/95 shrink-0">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setActiveChannelId(null)}
@@ -222,51 +253,59 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
 
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold text-slate-900 truncate leading-tight">{formatDisplayName(otherContact)}</h3>
-                  <p className="text-[11px] font-semibold text-slate-500 capitalize">{otherContact.role || 'Driver'}</p>
+                  <p className="text-[11px] font-semibold text-emerald-600 capitalize flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active · {otherContact.role || 'Driver'}</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 text-blue-600">
-                <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"><Phone size={18} strokeWidth={2.2} /></button>
-                <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"><Video size={18} strokeWidth={2.2} /></button>
-                <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"><Info size={18} strokeWidth={2.2} /></button>
+              <div className="flex items-center gap-1.5 text-slate-600">
+                <button onClick={() => { setShowThreadSearch(value => !value); setThreadQuery(''); }} className={`w-10 h-10 flex items-center justify-center rounded-xl transition ${showThreadSearch ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-100'}`} title="Search this conversation"><Search size={18} strokeWidth={2.2} /></button>
+                <button onClick={() => otherContact.phone && makeCall(otherContact.phone)} disabled={!otherContact.phone} className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed" title={otherContact.phone ? 'Call contact' : 'No phone number available'}><Phone size={18} strokeWidth={2.2} /></button>
+                <button onClick={() => setShowDetails(value => !value)} className={`w-10 h-10 flex items-center justify-center rounded-xl transition ${showDetails ? 'bg-slate-900 text-white' : 'hover:bg-slate-100'}`} title="Conversation details"><Info size={18} strokeWidth={2.2} /></button>
               </div>
             </div>
 
-            {/* Messages Feed */}
-            <div className="agape-messenger-thread-messages flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-white">
-              <div className="agape-messenger-date-divider">Live Chat</div>
+            {showThreadSearch && (
+              <div className="px-4 md:px-6 py-2.5 bg-white border-b border-slate-200 flex items-center gap-2">
+                <Search size={15} className="text-slate-400" />
+                <input autoFocus value={threadQuery} onChange={event => setThreadQuery(event.target.value)} placeholder="Find a message in this conversation" className="flex-1 bg-transparent outline-none text-sm font-medium text-slate-800 placeholder:text-slate-400" />
+                {threadQuery && <span className="text-[11px] font-bold text-slate-400">{visibleMessages.length} found</span>}
+              </div>
+            )}
 
-              {messages.map((msg, index) => {
+            {/* Messages Feed */}
+            <div className="agape-messenger-thread-messages flex-1 overflow-y-auto p-4 md:px-8 md:py-6 flex flex-col gap-3">
+              <div className="agape-messenger-date-divider">Secure team conversation</div>
+
+              {visibleMessages.map((msg, index) => {
                 const isSent = msg.senderId === currentUser.id;
+                const nextMessage = visibleMessages[index + 1];
+                const isLastInGroup = !nextMessage || nextMessage.senderId !== msg.senderId;
                 return (
                   <div key={msg.id || index} className={`agape-messenger-bubble-row ${isSent ? 'is-sent' : 'is-received'}`}>
-                    {!isSent && (
+                    {!isSent && isLastInGroup ? (
                       <img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="agape-messenger-bubble-avatar" />
-                    )}
+                    ) : !isSent ? <span className="w-7 shrink-0" /> : null}
                     <div className={`agape-messenger-bubble-group ${isSent ? 'is-sent' : 'is-received'}`}>
                       <div className="agape-messenger-bubble">
                         {msg.text}
                       </div>
+                      {isLastInGroup && <span className="agape-message-meta">{formatMessageTime(msg.timestamp)}{isSent && <CheckCheck size={12} />}</span>}
                     </div>
                   </div>
                 );
               })}
 
+              {visibleMessages.length === 0 && threadQuery && <div className="m-auto text-center"><Search size={28} className="mx-auto text-slate-300" /><p className="mt-2 text-sm font-bold text-slate-500">No matching messages</p></div>}
+
               <div ref={messagesEndRef} />
             </div>
 
             {/* Composer Bar */}
-            <div className="agape-messenger-composer border-t border-slate-100 bg-white px-4 py-3 flex items-center gap-3 shrink-0">
-              <button className="text-blue-600 hover:text-blue-700 transition flex-shrink-0">
-                <Plus size={20} strokeWidth={2.5} />
+            <div className="agape-messenger-composer border-t border-slate-200 bg-white px-4 md:px-6 py-3.5 flex items-center gap-3 shrink-0 relative">
+              <button onClick={() => setShowEmojiPicker(value => !value)} className="w-9 h-9 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center flex-shrink-0" title="Add emoji">
+                <Smile size={20} strokeWidth={2.2} />
               </button>
-              <button className="text-blue-600 hover:text-blue-700 transition flex-shrink-0">
-                <Camera size={20} strokeWidth={2.2} />
-              </button>
-              <button className="text-blue-600 hover:text-blue-700 transition flex-shrink-0">
-                <ImageIcon size={20} strokeWidth={2.2} />
-              </button>
+              {showEmojiPicker && <div className="absolute bottom-[64px] left-4 md:left-6 bg-white border border-slate-200 shadow-2xl rounded-2xl p-2 flex gap-1 z-20">{['👍','❤️','😊','🎉','✅','🙏'].map(emoji => <button key={emoji} onClick={() => { setComposerText(value => value + emoji); setShowEmojiPicker(false); }} className="w-9 h-9 rounded-xl hover:bg-slate-100 text-lg">{emoji}</button>)}</div>}
 
               <div className="agape-messenger-input-wrap flex-1 bg-slate-100 rounded-full px-4 py-2 flex items-center">
                 <input
@@ -274,7 +313,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                   placeholder="Aa"
                   value={composerText}
                   onChange={e => setComposerText(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSend()}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) handleSend(); }}
                 />
               </div>
 
@@ -282,9 +321,10 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                 {composerText.trim() ? (
                   <button
                     onClick={() => handleSend()}
+                    disabled={isSending}
                     className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition active:scale-90"
                   >
-                    <Send size={14} strokeWidth={2.5} className="ml-0.5" />
+                    {isSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} strokeWidth={2.5} className="ml-0.5" />}
                   </button>
                 ) : (
                   <button
@@ -305,6 +345,14 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
           </div>
         )}
       </div>
+
+      {activeChannel && otherContact && showDetails && (
+        <aside className="hidden lg:flex w-[300px] h-full shrink-0 border-l border-slate-200 bg-white flex-col">
+          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">Directory</p><h3 className="mt-1 text-sm font-black text-slate-900">Conversation details</h3></div><button onClick={() => setShowDetails(false)} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"><X size={16} /></button></div>
+          <div className="p-6 text-center border-b border-slate-100"><img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="w-20 h-20 mx-auto rounded-2xl shadow-lg" /><h4 className="mt-3 text-base font-black text-slate-950">{formatDisplayName(otherContact)}</h4><p className="mt-1 text-xs font-semibold text-slate-500 capitalize">{otherContact.role || 'Team member'}</p><span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Available</span></div>
+          <div className="p-4 space-y-2"><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Briefcase size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Role</p><p className="text-xs font-bold text-slate-700 capitalize">{otherContact.role || 'Team member'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Mail size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Email</p><p className="text-xs font-bold text-slate-700 truncate">{otherContact.email || 'Not available'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-blue-50 p-3"><ShieldCheck size={16} className="text-blue-600" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-blue-500">Privacy</p><p className="text-xs font-bold text-blue-900">Internal team channel</p></div></div></div>
+        </aside>
+      )}
 
       {/* Directory Modal */}
       {showNewChatModal && (

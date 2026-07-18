@@ -4828,8 +4828,55 @@ html, body {
   display: flex;
   height: 100%;
   width: 100%;
-  background-color: #ffffff;
+  background-color: #f8fafc;
   overflow: hidden;
+}
+
+.agape-chat-sidebar-head {
+  background:
+    radial-gradient(circle at 100% 0%, rgb(37 99 235 / 10%), transparent 42%),
+    linear-gradient(180deg, #fff 0%, #fbfdff 100%);
+}
+
+.agape-messenger-row.is-active {
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fbff 100%);
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.agape-messenger-row.is-unread:not(.is-active) {
+  background: #f8fbff;
+}
+
+.agape-message-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.agape-messenger-thread-messages {
+  background:
+    radial-gradient(circle at 50% 0%, rgb(37 99 235 / 4%), transparent 34%),
+    #f8fafc;
+}
+
+.agape-messenger-composer {
+  box-shadow: 0 -10px 30px rgb(15 23 42 / 3%);
+}
+
+.agape-messenger-input-wrap {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.agape-messenger-input-wrap:focus-within {
+  border-color: #93c5fd;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgb(37 99 235 / 8%);
 }
 
 .agape-unread-badge {
@@ -4850,8 +4897,8 @@ html, body {
 
 @media (min-width: 768px) {
   .agape-messenger-sidebar {
-    width: 360px;
-    border-right: 1px solid #f0f2f5;
+    width: 380px;
+    border-right: 1px solid #e2e8f0;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -4862,7 +4909,16 @@ html, body {
     display: flex;
     flex-direction: column;
     height: 100%;
-    background-color: #ffffff;
+    background-color: #f8fafc;
+  }
+
+  .agape-messenger-bubble-group {
+    max-width: min(68%, 680px);
+  }
+
+  .agape-messenger-bubble {
+    padding: 10px 14px;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
   }
 }
 
