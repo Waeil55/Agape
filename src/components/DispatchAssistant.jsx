@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { tripMatchesCalendarDay } from '../utils/tripDate';
+import { tripMatchesCalendarDay, tripCalendarDateKey } from '../utils/tripDate';
 import { Clock, MapPin, Truck, BrainCircuit, X, Zap, AlertCircle, UserCheck } from 'lucide-react';
 import { suggestOptimalDriver, getDriverScheduleStatus, getScheduleBlocks } from '../config/ai';
 
@@ -139,7 +139,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
     const currentMins = now.getHours() * 60 + now.getMinutes();
     
     trips.forEach(t => {
-      if (t.date !== manifestDate || ['Completed', 'Cancelled', 'No Show', 'At Dropoff'].includes(t.status)) return;
+      if (tripCalendarDateKey(t.date) !== manifestDate || ['Completed', 'Cancelled', 'No Show', 'At Dropoff'].includes(t.status)) return;
       const match = t.time?.match(/(\d+):(\d+)\s*(AM|PM)/i);
       if (match) {
         let h = parseInt(match[1]);
@@ -161,7 +161,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
 
     // Conflict detection (simplified: multiple assigned trips within 30 mins)
     const driverTrips = {};
-    trips.filter(t => t.date === manifestDate && t.status === 'Assigned' && t.driverId).forEach(t => {
+    trips.filter(t => tripCalendarDateKey(t.date) === manifestDate && t.status === 'Assigned' && t.driverId).forEach(t => {
       if (!driverTrips[t.driverId]) driverTrips[t.driverId] = [];
       const match = t.time?.match(/(\d+):(\d+)\s*(AM|PM)/i);
       if (match) {

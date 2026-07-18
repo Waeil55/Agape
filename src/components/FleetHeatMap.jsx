@@ -59,28 +59,28 @@ export function FleetHeatMap({ drivers = [], trips = [], driverTelemetry = [] })
     <div className="space-y-4">
       {/* Activity Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 text-center">
+        <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
           <div className="w-8 h-8 mx-auto rounded-lg bg-emerald-50 flex items-center justify-center mb-2">
             <Truck size={16} className="text-emerald-600" />
           </div>
           <p className="text-xl font-black text-slate-900">{activityStats.activeDrivers}</p>
           <p className="text-[10px] text-slate-500">Active Drivers</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 text-center">
+        <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
           <div className="w-8 h-8 mx-auto rounded-lg bg-blue-50 flex items-center justify-center mb-2">
             <Activity size={16} className="text-blue-600" />
           </div>
           <p className="text-xl font-black text-slate-900">{activityStats.movingDrivers}</p>
           <p className="text-[10px] text-slate-500">Moving Now</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 text-center">
+        <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
           <div className="w-8 h-8 mx-auto rounded-lg bg-amber-50 flex items-center justify-center mb-2">
             <Clock size={16} className="text-amber-600" />
           </div>
           <p className="text-xl font-black text-slate-900">{activityStats.stoppedDrivers}</p>
           <p className="text-[10px] text-slate-500">Stopped</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 text-center">
+        <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
           <div className="w-8 h-8 mx-auto rounded-lg bg-purple-50 flex items-center justify-center mb-2">
             <TrendingUp size={16} className="text-purple-600" />
           </div>
@@ -90,7 +90,7 @@ export function FleetHeatMap({ drivers = [], trips = [], driverTelemetry = [] })
       </div>
 
       {/* Hot Zones */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100">
           <h3 className="text-sm font-semibold text-slate-900">Hot Zones</h3>
           <p className="text-[10px] text-slate-500">Most active pickup/dropoff locations</p>
@@ -132,7 +132,7 @@ export function FleetHeatMap({ drivers = [], trips = [], driverTelemetry = [] })
       </div>
 
       {/* Driver Activity Grid */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100">
           <h3 className="text-sm font-semibold text-slate-900">Driver Activity</h3>
           <p className="text-[10px] text-slate-500">Current status of all drivers</p>

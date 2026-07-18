@@ -212,7 +212,7 @@ const SettingsPage = ({
               ].map((stat, i) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                     <div className={`w-9 h-9 rounded-xl ${stat.color} flex items-center justify-center mb-3`}>
                       <Icon size={16} className="text-white" />
                     </div>
@@ -462,18 +462,18 @@ const SettingsPage = ({
               <p className="text-body text-slate-500">Global system controls and data management.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-800 font-semibold text-base mb-1"><Database size={18} /> System Logs</div>
                 <p className="text-sm text-slate-500 mb-4">View all system logs and user activities from the dashboard audit panel.</p>
                 <button onClick={() => setActiveSection('activity')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition text-sm flex items-center gap-2"><Eye size={16} /> View Logs</button>
               </div>
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-800 font-semibold text-base mb-1"><RefreshCw size={18} /> Data Sync Status</div>
                 <p className="text-sm text-slate-500 mb-4">Firestore real-time sync is active. Data is synchronized across all connected clients.</p>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-semibold"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Live</div>
               </div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm border-rose-200 bg-rose-50">
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm border-rose-200 bg-rose-50">
               <h4 className="font-semibold text-rose-900 mb-2 flex items-center gap-2 text-base"><AlertCircle size={20} /> Master Reset</h4>
               <p className="text-sm text-rose-700 mb-4">Warning: This will permanently delete all trips, drivers, and fleet data. This action cannot be undone.</p>
               <button onClick={() => { requestAuthAction?.('Master System Reset — This will permanently delete ALL trips, drivers, and fleet data. This action cannot be undone.', () => onResetSystem?.()); }} className="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition text-sm shadow-lg shadow-rose-600/20">
@@ -499,7 +499,7 @@ const SettingsPage = ({
                   <input type="text" value={role || ''} readOnly className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-600 uppercase font-semibold text-base" />
                 </div>
                 {(role === 'admin' || role === 'dispatcher') && (
-                  <div className="bg-blue-50/30 border border-blue-100 rounded-2xl p-5 space-y-4">
+                  <div className="bg-blue-50/30 border border-blue-100 rounded-xl p-5 space-y-4">
                     <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2"><Phone size={16} className="text-blue-600" /> Contact Numbers</h4>
                     <div className="grid grid-cols-1 gap-4">
                       <div>
@@ -521,11 +521,11 @@ const SettingsPage = ({
                 )}
                 {role === 'driver' && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                    <div className="bg-white border border-slate-200 rounded-xl p-4">
                       <p className="text-micro">Vehicle</p>
                       <p className="text-lg font-semibold text-slate-900 mt-2">{driverProfile?.vehicle || 'Not Assigned'}</p>
                     </div>
-                    <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                    <div className="bg-white border border-slate-200 rounded-xl p-4">
                       <p className="text-micro">Current Odometer</p>
                       <div className="flex items-center gap-2 mt-2">
                         <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) _updateSettings?.({ odometer: val }, true); }} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-900 focus:border-blue-500 outline-none text-base" />
@@ -557,7 +557,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.theme === option.value;
                     return (
-                      <button key={option.value} onClick={() => _updateSettings?.({ theme: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => _updateSettings?.({ theme: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
@@ -584,7 +584,7 @@ const SettingsPage = ({
                     const active = appSettings?.fontScale === option.value;
                     const isDriverMode = option.value === 'driver';
                     return (
-                      <button key={option.value} onClick={() => _updateSettings?.({ fontScale: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? (isDriverMode ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'card-active bg-blue-50') : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => _updateSettings?.({ fontScale: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? (isDriverMode ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'card-active bg-blue-50') : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? (isDriverMode ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white') : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
@@ -597,13 +597,13 @@ const SettingsPage = ({
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-slate-800 font-semibold text-base"><Accessibility size={20} /> Readability Mode</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
-                  <button onClick={() => _updateSettings?.({ readability: 'normal' })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${appSettings?.readability !== 'enhanced' ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                  <button onClick={() => _updateSettings?.({ readability: 'normal' })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${appSettings?.readability !== 'enhanced' ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability !== 'enhanced' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><TextSelect size={20} /></div>
                     <div className="font-semibold text-sm text-slate-900">Standard</div>
                     <p className="text-xs text-slate-500 mt-0.5">Normal contrast and font weights</p>
                     {appSettings?.readability !== 'enhanced' && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
                   </button>
-                  <button onClick={() => _updateSettings?.({ readability: 'enhanced' })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
+                  <button onClick={() => _updateSettings?.({ readability: 'enhanced' })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability === 'enhanced' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Eye size={20} /></div>
                     <div className="font-semibold text-sm text-slate-900">Enhanced</div>
                     <p className="text-xs text-slate-500 mt-0.5">Bolder text, stronger contrast, better spacing</p>
@@ -628,7 +628,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.navigationApp === option.value;
                     return (
-                      <button key={option.value} onClick={() => _updateSettings?.({ navigationApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => _updateSettings?.({ navigationApp: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
@@ -647,7 +647,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.routePlanNavApp === option.value;
                     return (
-                      <button key={option.value} onClick={() => _updateSettings?.({ routePlanNavApp: option.value })} className={`bg-white border border-slate-200 rounded-2xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => _updateSettings?.({ routePlanNavApp: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
@@ -726,10 +726,10 @@ const SettingsPage = ({
   };
 
   return (
-    <div className="flex min-h-0 w-full flex-col gap-3 lg:flex-row lg:gap-6 overflow-y-auto overscroll-contain">
+    <div className="flex min-h-0 w-full flex-col gap-3 lg:flex-row lg:gap-6 lg:overflow-y-auto lg:overscroll-contain">
       {/* Sidebar */}
       <div className="w-56 flex-shrink-0 hidden lg:block">
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm sticky top-4">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm sticky top-4">
           {navItems.map((group, gi) => (
             <div key={gi}>
               <div className="px-4 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">{group.group}</div>
@@ -774,7 +774,7 @@ const SettingsPage = ({
       </div>
       {deleteConfirmTrip && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setDeleteConfirmTrip(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-slate-100">
               <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
                 <Trash2 size={16} className="text-rose-600" /> Permanently Delete Trip

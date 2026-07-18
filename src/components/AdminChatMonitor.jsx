@@ -136,7 +136,7 @@ const AdminChatMonitor = () => {
                   const isSystem = msg.type === 'system';
                   return (
                     <div key={msg.id} className="flex justify-start">
-                      <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${isSystem ? 'bg-slate-200 text-slate-600 text-xs italic mx-auto' : 'bg-white shadow-sm text-slate-800'}`}>
+                      <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm ${isSystem ? 'bg-slate-200 text-slate-600 text-xs italic mx-auto' : 'bg-white shadow-sm text-slate-800'}`}>
                         {!isSystem && <p className="text-[10px] font-semibold text-slate-500 mb-0.5">{msg.senderName || msg.senderEmail}</p>}
                         <p className="break-words">{msg.text}</p>
                         {msg.fileUrl && <p className="text-xs text-blue-500 mt-1 underline">📎 Attachment</p>}

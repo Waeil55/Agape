@@ -152,7 +152,7 @@ const SmsConversationModal = ({ trip, onClose }) => {
               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 pt-1">History</p>
               {messages.map(m => (
                 <div key={m.id || m.messageId} className={`flex ${m.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 ${m.direction === 'outbound' ? 'bg-blue-600 text-white rounded-br-md' : 'bg-slate-100 text-slate-800 rounded-bl-md'}`}>
+                  <div className={`max-w-[80%] rounded-xl px-3.5 py-2 ${m.direction === 'outbound' ? 'bg-blue-600 text-white rounded-br-md' : 'bg-slate-100 text-slate-800 rounded-bl-md'}`}>
                     <p className="text-xs leading-relaxed whitespace-pre-wrap">{m.text}</p>
                     <p className={`text-[9px] mt-1 ${m.direction === 'outbound' ? 'text-blue-200' : 'text-slate-400'}`}>
                       {formatTime(m.timestamp)}

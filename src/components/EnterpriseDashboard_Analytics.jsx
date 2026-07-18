@@ -20,7 +20,7 @@ const KPICard = ({ title, value, unit, trend, icon: Icon, status = 'neutral', on
   const bgColor = status === 'good' ? 'bg-emerald-50' : status === 'warning' ? 'bg-amber-50' : 'bg-slate-50';
 
   return (
-    <div onClick={onClick} className={`${bgColor} p-6 rounded-2xl border border-slate-100 hover:shadow-lg transition-all cursor-pointer group`}>
+    <div onClick={onClick} className={`${bgColor} p-6 rounded-xl border border-slate-100 hover:shadow-lg transition-all cursor-pointer group`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm font-semibold text-slate-600 mb-2">{title}</p>
@@ -79,7 +79,7 @@ const MiniChart = ({ data, title, type = 'line' }) => {
  */
 const AlertsPanel = ({ alerts = [], onAction }) => {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 p-6">
+    <div className="bg-white rounded-xl border border-slate-100 p-6">
       <div className="flex items-center gap-3 mb-4">
         <AlertTriangle size={20} className="text-amber-600" />
         <h3 className="text-lg font-semibold text-slate-900">Active Alerts</h3>
@@ -236,7 +236,7 @@ const EnterpriseDashboard = ({ trips = [], drivers = [], vehicles = [], onViewDe
       {/* Content */}
       <div className="flex-1 overflow-auto p-6 space-y-6">
         {selectedMetric && (
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
             <span>Reviewing alert: {selectedMetric}</span>
             <button onClick={() => setSelectedMetric(null)} className="rounded-lg bg-white/70 px-3 py-1 text-xs font-bold text-amber-700 hover:bg-white">
               Clear
@@ -324,7 +324,7 @@ const EnterpriseDashboard = ({ trips = [], drivers = [], vehicles = [], onViewDe
           <AlertsPanel alerts={alerts} onAction={(alert) => setSelectedMetric(alert.title)} />
 
           {/* AI Insights Card */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-6">
+          <div className="bg-white rounded-xl border border-slate-100 p-6">
             <div className="flex items-center gap-3 mb-4">
               <BrainCircuit size={20} className="text-blue-600" />
               <h3 className="text-lg font-semibold text-slate-900">AI Insights</h3>
@@ -346,7 +346,7 @@ const EnterpriseDashboard = ({ trips = [], drivers = [], vehicles = [], onViewDe
         </div>
 
         {/* Detailed Metrics */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6">
+        <div className="bg-white rounded-xl border border-slate-100 p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <BarChart3 size={20} className="text-blue-600" />
             Performance Metrics

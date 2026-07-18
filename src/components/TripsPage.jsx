@@ -337,7 +337,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {/* Assignment Success Feedback */}
       {assignmentFeedback && (
         <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 animate-in">
-          <div className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-semibold text-base shadow-xl shadow-emerald-500/30 flex items-center gap-2">
+          <div className="bg-emerald-600 text-white px-6 py-4 rounded-xl font-semibold text-base shadow-xl shadow-emerald-500/30 flex items-center gap-2">
             <Check size={20} /> {assignmentFeedback}
           </div>
         </div>
@@ -476,7 +476,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
           { label: 'Open', value: manifestSummary.unassigned, tone: manifestSummary.unassigned > 0 ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-slate-600 bg-slate-50 border-slate-200' },
           { label: 'Assigned', value: manifestSummary.assigned, tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
         ].map((metric) => (
-          <div key={metric.label} className={`rounded-2xl border px-4 py-3 shadow-sm ${metric.tone}`}>
+          <div key={metric.label} className={`rounded-xl border px-4 py-3 shadow-sm ${metric.tone}`}>
             <p className="text-[10px] font-semibold uppercase tracking-widest">{metric.label}</p>
             <p className="mt-1 text-2xl font-black">{metric.value}</p>
           </div>
@@ -551,19 +551,19 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Patient Name</label>
-                  <input type="text" required value={newTrip.patient} onChange={(e) => setNewTrip({...newTrip, patient: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="text" required value={newTrip.patient} onChange={(e) => setNewTrip({...newTrip, patient: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Booking ID</label>
-                  <input type="text" value={newTrip.bookingId} onChange={(e) => setNewTrip({...newTrip, bookingId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" placeholder="Optional" />
+                  <input type="text" value={newTrip.bookingId} onChange={(e) => setNewTrip({...newTrip, bookingId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" placeholder="Optional" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Pickup Time</label>
-                  <input type="text" required placeholder="08:00 AM" value={newTrip.time} onChange={(e) => setNewTrip({...newTrip, time: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="text" required placeholder="08:00 AM" value={newTrip.time} onChange={(e) => setNewTrip({...newTrip, time: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Service Type</label>
-                  <input type="text" required placeholder="AM1" value={newTrip.type} onChange={(e) => setNewTrip({...newTrip, type: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="text" required placeholder="AM1" value={newTrip.type} onChange={(e) => setNewTrip({...newTrip, type: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Pickup Address</label>
@@ -571,7 +571,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                     value={newTrip.pickup}
                     onChange={(v) => setNewTrip({...newTrip, pickup: v})}
                     placeholder="Pickup address"
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none"
                     required
                   />
                 </div>
@@ -581,31 +581,31 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                     value={newTrip.dropoff}
                     onChange={(v) => setNewTrip({...newTrip, dropoff: v})}
                     placeholder="Dropoff address"
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none"
                     required
                   />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Patient Phone</label>
-                  <input type="text" value={newTrip.pickupPhone} onChange={(e) => setNewTrip({...newTrip, pickupPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="text" value={newTrip.pickupPhone} onChange={(e) => setNewTrip({...newTrip, pickupPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Hospital Phone</label>
-                  <input type="text" value={newTrip.dropoffPhone} onChange={(e) => setNewTrip({...newTrip, dropoffPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="text" value={newTrip.dropoffPhone} onChange={(e) => setNewTrip({...newTrip, dropoffPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Notes</label>
-                <textarea value={newTrip.notes} onChange={(e) => setNewTrip({...newTrip, notes: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" rows="2" placeholder="Special instructions, comments..." />
+                <textarea value={newTrip.notes} onChange={(e) => setNewTrip({...newTrip, notes: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" rows="2" placeholder="Special instructions, comments..." />
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Assign to Driver</label>
-                <select value={newTrip.driverId} onChange={(e) => setNewTrip({...newTrip, driverId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none">
+                <select value={newTrip.driverId} onChange={(e) => setNewTrip({...newTrip, driverId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none">
                   <option value="">Unassigned</option>
                   {drivers.map(d => <option key={d.id} value={d.id}>{d.name} {d.vehicle ? `(${d.vehicle})` : ''}</option>)}
                 </select>
               </div>
-              <button type="submit" className="w-full py-5 bg-emerald-600 text-white rounded-2xl font-bold text-base shadow-xl shadow-emerald-500/20 active:scale-[0.98] transition">Create Manifest Entry</button>
+              <button type="submit" className="w-full py-5 bg-emerald-600 text-white rounded-xl font-bold text-base shadow-xl shadow-emerald-500/20 active:scale-[0.98] transition">Create Manifest Entry</button>
             </form>
           </div>
         </div>
@@ -624,23 +624,23 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Patient Name</label>
-                  <input type="text" required value={editTrip.patient} onChange={(e) => setEditTrip({...editTrip, patient: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="text" required value={editTrip.patient} onChange={(e) => setEditTrip({...editTrip, patient: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Booking ID</label>
-                  <input type="text" value={editTrip.bookingId || ''} onChange={(e) => setEditTrip({...editTrip, bookingId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" placeholder="Optional" />
+                  <input type="text" value={editTrip.bookingId || ''} onChange={(e) => setEditTrip({...editTrip, bookingId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" placeholder="Optional" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Date</label>
-                  <input type="date" required value={editTrip.date || ''} onChange={(e) => setEditTrip({...editTrip, date: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="date" required value={editTrip.date || ''} onChange={(e) => setEditTrip({...editTrip, date: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Pickup Time</label>
-                  <input type="text" required placeholder="08:00 AM" value={editTrip.time || ''} onChange={(e) => setEditTrip({...editTrip, time: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="text" required placeholder="08:00 AM" value={editTrip.time || ''} onChange={(e) => setEditTrip({...editTrip, time: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Service Type</label>
-                  <input type="text" required placeholder="AM1" value={editTrip.type || ''} onChange={(e) => setEditTrip({...editTrip, type: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="text" required placeholder="AM1" value={editTrip.type || ''} onChange={(e) => setEditTrip({...editTrip, type: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Pickup Address</label>
@@ -648,7 +648,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                     value={editTrip.pickup || ''}
                     onChange={(v) => setEditTrip({...editTrip, pickup: v})}
                     placeholder="Pickup address"
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none"
                     required
                   />
                 </div>
@@ -658,31 +658,31 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                     value={editTrip.dropoff || ''}
                     onChange={(v) => setEditTrip({...editTrip, dropoff: v})}
                     placeholder="Dropoff address"
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none"
                     required
                   />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Patient Phone</label>
-                  <input type="text" value={editTrip.pickupPhone || ''} onChange={(e) => setEditTrip({...editTrip, pickupPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="text" value={editTrip.pickupPhone || ''} onChange={(e) => setEditTrip({...editTrip, pickupPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Hospital Phone</label>
-                  <input type="text" value={editTrip.dropoffPhone || ''} onChange={(e) => setEditTrip({...editTrip, dropoffPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="text" value={editTrip.dropoffPhone || ''} onChange={(e) => setEditTrip({...editTrip, dropoffPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Notes</label>
-                <textarea value={editTrip.notes || ''} onChange={(e) => setEditTrip({...editTrip, notes: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none" rows="2" placeholder="Special instructions, comments..." />
+                <textarea value={editTrip.notes || ''} onChange={(e) => setEditTrip({...editTrip, notes: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" rows="2" placeholder="Special instructions, comments..." />
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Assign to Driver</label>
-                <select value={editTrip.driverId || ''} onChange={(e) => setEditTrip({...editTrip, driverId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-semibold text-base focus:border-blue-500 outline-none">
+                <select value={editTrip.driverId || ''} onChange={(e) => setEditTrip({...editTrip, driverId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none">
                   <option value="">Unassigned</option>
                   {drivers.map(d => <option key={d.id} value={d.id}>{d.name} {d.vehicle ? `(${d.vehicle})` : ''}</option>)}
                 </select>
               </div>
-              <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-bold text-base shadow-xl shadow-blue-500/20 active:scale-[0.98] transition">Update Trip Information</button>
+              <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-xl font-bold text-base shadow-xl shadow-blue-500/20 active:scale-[0.98] transition">Update Trip Information</button>
             </form>
           </div>
         </div>
@@ -692,7 +692,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {showAssign && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowAssign(false)} />
-          <div className="bg-white w-full max-w-md rounded-2xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col">
+          <div className="bg-white w-full max-w-md rounded-xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 {assignMode === 'mission' ? (
@@ -740,7 +740,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       {showReassignModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowReassignModal(false)} />
-          <div className="bg-white w-full max-w-md rounded-2xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col">
+          <div className="bg-white w-full max-w-md rounded-xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <UserCheck size={20} className="text-amber-600" /> Reassign
@@ -791,7 +791,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               <p className="text-xs text-slate-500 font-medium mb-4">{legs.length} leg{legs.length !== 1 ? 's' : ''}</p>
               <div className="space-y-2">
                 {legs.map((leg, idx) => (
-                  <div key={leg.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <div key={leg.id} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-slate-400 uppercase">Leg {idx + 1}</span>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Assigned' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>

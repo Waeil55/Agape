@@ -54,7 +54,7 @@ Answer in 2-3 sentences maximum. Be specific and actionable.` }] }],
   return (
     <>
       {open && (
-        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-5 z-[9999] w-80 h-96 bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
+        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-5 z-[9999] w-80 h-96 bg-white rounded-xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
           <div className="flex items-center justify-between px-3 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
             <div className="flex items-center gap-2">
               <Bot size={16} />

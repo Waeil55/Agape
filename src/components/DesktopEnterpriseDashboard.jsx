@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 import { openMapLink } from '../utils/nativeActions';
-import { timeToMinutes, isTripLate } from '../utils/tripDate';
+import { timeToMinutes, isTripLate, tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
 import { getDriverLiveStatus } from '../constants/statuses';
 const ArchivesPage = lazy(() => import('./ArchivesPage'));
 const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
@@ -273,7 +273,7 @@ const DesktopEnterpriseDashboard = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+  const todayStr = localCalendarYmd();
 
   useEffect(() => {
     const openChat = () => setActivePanel('chat');
@@ -293,7 +293,7 @@ const DesktopEnterpriseDashboard = ({
   ].filter(item => item.roles.includes(role))
     .filter(item => item.id !== 'drive' || driverWorkDrivers.length > 0);
 
-  const todayTrips = trips.filter(t => t.date === todayStr);
+  const todayTrips = trips.filter(t => tripCalendarDateKey(t.date) === todayStr);
   const activeTrips = todayTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
   const unassignedTrips = activeTrips.filter(t => t.status === 'Unassigned');
   const assignedTrips = activeTrips.filter(t => t.status === 'Assigned');

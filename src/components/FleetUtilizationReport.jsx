@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Truck, TrendingUp, Calendar, Download, BarChart3, Clock, MapPin, Filter } from 'lucide-react';
+import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
 
 const DATE_RANGES = [
   { label: 'Today', value: 'today' },
@@ -23,8 +24,9 @@ function filterByDate(trips, range) {
     return trips;
   }
   return trips.filter((t) => {
-    const d = new Date(t.date || t.pickupTime || t.createdAt);
-    return d >= start && d <= now;
+    const dk = tripCalendarDateKey(t.date || t.pickupTime || t.createdAt);
+    if (!dk) return false;
+    return dk >= localCalendarYmd(start) && dk <= localCalendarYmd(now);
   });
 }
 
@@ -79,12 +81,10 @@ export default function FleetUtilizationReport({ trips = [], drivers = [], vehic
   const filteredTrips = useMemo(() => {
     let result = filterByDate(trips, dateRange);
     if (dateRange === 'custom' && customStart && customEnd) {
-      const s = new Date(customStart);
-      const e = new Date(customEnd);
-      e.setHours(23, 59, 59, 999);
       result = trips.filter((t) => {
-        const d = new Date(t.date || t.pickupTime || t.createdAt);
-        return d >= s && d <= e;
+        const dk = tripCalendarDateKey(t.date || t.pickupTime || t.createdAt);
+        if (!dk) return false;
+        return dk >= customStart && dk <= customEnd;
       });
     }
     return result;

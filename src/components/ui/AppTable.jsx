@@ -2,7 +2,7 @@ import React from 'react';
 
 export function AppTable({ children, className = '', ...props }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200">
+    <div className="overflow-x-auto rounded-xl border border-slate-200">
       <table className={`w-full text-left ${className}`} {...props}>
         {children}
       </table>
@@ -12,7 +12,7 @@ export function AppTable({ children, className = '', ...props }) {
 
 export function AppTableHead({ children, className = '', ...props }) {
   return (
-    <thead className={`bg-[#2563EB] text-white ${className}`} {...props}>
+    <thead className={`bg-blue-600 text-white ${className}`} {...props}>
       {children}
     </thead>
   );

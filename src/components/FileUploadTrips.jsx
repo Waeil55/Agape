@@ -6,6 +6,7 @@ import { GEMINI_API_CONFIG } from '../config/firebase';
 import { annotateInOutPairs, hasInOutMarker, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
 import { isCorruptedTripRecord } from '../utils/tripIntegrity';
 import { normalizeDateValue } from '../utils/normalizeDate';
+import { tripCalendarDateKey } from '../utils/tripDate';
 
 const timeToMinutes = (t) => {
   if (!t) return 1440;
@@ -1257,14 +1258,11 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       const resolvedDate = effectiveDateMode === 'manual' ? manualDate : (trip.date || (() => {
         for (const field of ['scheduledDate', 'scheduleDate', 'tripDate']) {
           if (trip[field]) {
-            const d = new Date(trip[field]);
-            if (!isNaN(d.getTime())) {
-              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            }
+            const dk = tripCalendarDateKey(trip[field]);
+            if (dk) return dk;
           }
         }
-        const now = new Date();
-        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        return tripCalendarDateKey(new Date());
       })());
 
       const dateKey = resolvedDate;
@@ -1517,7 +1515,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             </div>
 
             {/* ── Date Assignment Panel ── */}
-            <div className="mt-4 sm:mt-6 p-4 bg-violet-50 border border-violet-200 rounded-2xl">
+            <div className="mt-4 sm:mt-6 p-4 bg-violet-50 border border-violet-200 rounded-xl">
               <div className="flex items-center gap-2 mb-3">
                 <Calendar size={18} className="text-violet-600 shrink-0" />
                 <span className="text-sm font-black text-slate-900">Service Date</span>
@@ -1575,7 +1573,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             </div>
 
             {uploadContext !== 'reports' && (
-            <div className="mt-4 sm:mt-6 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+            <div className="mt-4 sm:mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
               <div className="flex items-center justify-between mb-3">
                 <label className="text-sm font-black text-slate-900 flex items-center gap-2">
                   <Truck size={18} className="text-blue-600" /> Assign Trips to Drivers

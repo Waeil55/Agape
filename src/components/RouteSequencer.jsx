@@ -965,7 +965,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
         {/* LEFT: Trip Pool */}
         <div className={`h-full min-h-0 w-full flex-col gap-3 overflow-hidden flex-shrink-0 lg:w-[400px] xl:w-[440px] ${mobileView === 'pool' ? 'flex' : 'hidden lg:flex'}`}>
-          <div className="flex h-full min-h-0 flex-col overflow-hidden border-y border-slate-200 bg-white shadow-sm lg:rounded-2xl lg:border">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden border-y border-slate-200 bg-white shadow-sm lg:rounded-xl lg:border">
 
             {/* Pool header */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 px-3 sm:px-4 py-3 border-b border-slate-100">
@@ -1035,7 +1035,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
             {/* Pool list */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 sm:p-3 space-y-2">
               {availableToday.length === 0 ? (
-                <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-300 mt-4">
+                <div className="text-center p-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 mt-4">
                   <Route className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                   <p className="font-semibold text-slate-500 text-sm">No trips for {currentDay}</p>
                   <p className="text-xs text-slate-500 mt-1">
@@ -1054,7 +1054,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 </div>
               ) : (
                 availableToday.map(client => (
-                  <div key={client.id} className={`bg-white border shadow-sm rounded-2xl p-3 hover:border-indigo-300 transition-all duration-300 group ${
+                  <div key={client.id} className={`bg-white border shadow-sm rounded-xl p-3 hover:border-indigo-300 transition-all duration-300 group ${
                     client.urgency === 2 ? 'border-rose-300 shadow-rose-200/30 animate-pulse' :
                     client.urgency === 1 ? 'border-amber-300 shadow-amber-200/20' :
                     'border-slate-200'
@@ -1192,7 +1192,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
         </div>
 
         {/* RIGHT: Sequence Builder */}
-        <div className={`h-full min-h-0 flex-1 flex-col overflow-hidden border-y border-slate-200 bg-white shadow-sm lg:rounded-2xl lg:border ${mobileView === 'sequence' ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`h-full min-h-0 flex-1 flex-col overflow-hidden border-y border-slate-200 bg-white shadow-sm lg:rounded-xl lg:border ${mobileView === 'sequence' ? 'flex' : 'hidden lg:flex'}`}>
 
           {/* Validation errors */}
           {sequenceValidation.errors.length > 0 && (
@@ -1229,7 +1229,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-slate-100 p-2.5 sm:p-4 lg:p-5">
             {sequence.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-500">
-                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center mb-4">
+                <div className="w-16 h-16 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center justify-center mb-4">
                   <Route className="w-7 h-7 text-slate-300" />
                 </div>
                 <p className="font-semibold text-slate-600 text-base">Build Your Sequence</p>
@@ -1307,7 +1307,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                             {idx + 1}
                           </div>
                         </div>
-                        <div className={`min-w-0 flex-1 bg-white rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-sm flex items-start sm:items-center gap-2 transition-all border ${isPU ? 'border-emerald-100 hover:border-emerald-300' : 'border-red-100 hover:border-red-300'} ${isOverCap ? 'ring-2 ring-red-400' : ''} ${client.urgency === 2 ? 'shadow-[0_0_12px_-2px_rgba(225,29,72,0.4)] border-rose-300' : client.urgency === 1 ? 'shadow-[0_0_10px_-2px_rgba(245,158,11,0.3)] border-amber-300' : ''} ${effectiveOverride ? (effectiveOverride.color === 'rose' ? 'ring-2 ring-rose-300 bg-rose-50/30' : effectiveOverride.color === 'amber' ? 'ring-2 ring-amber-300 bg-amber-50/30' : effectiveOverride.color === 'red' ? 'ring-2 ring-red-400 bg-red-50/30 line-through opacity-60' : effectiveOverride.color === 'emerald' ? 'ring-2 ring-emerald-300 bg-emerald-50/30' : 'ring-2 ring-slate-300 bg-slate-50/30 line-through opacity-60') : ''}`}>
+                        <div className={`min-w-0 flex-1 bg-white rounded-xl sm:rounded-xl p-2 sm:p-3 shadow-sm flex items-start sm:items-center gap-2 transition-all border ${isPU ? 'border-emerald-100 hover:border-emerald-300' : 'border-red-100 hover:border-red-300'} ${isOverCap ? 'ring-2 ring-red-400' : ''} ${client.urgency === 2 ? 'shadow-[0_0_12px_-2px_rgba(225,29,72,0.4)] border-rose-300' : client.urgency === 1 ? 'shadow-[0_0_10px_-2px_rgba(245,158,11,0.3)] border-amber-300' : ''} ${effectiveOverride ? (effectiveOverride.color === 'rose' ? 'ring-2 ring-rose-300 bg-rose-50/30' : effectiveOverride.color === 'amber' ? 'ring-2 ring-amber-300 bg-amber-50/30' : effectiveOverride.color === 'red' ? 'ring-2 ring-red-400 bg-red-50/30 line-through opacity-60' : effectiveOverride.color === 'emerald' ? 'ring-2 ring-emerald-300 bg-emerald-50/30' : 'ring-2 ring-slate-300 bg-slate-50/30 line-through opacity-60') : ''}`}>
                           <div className="cursor-grab active:cursor-grabbing p-1 sm:p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-300 rounded-lg transition-colors hidden sm:flex flex-shrink-0"><GripVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-0.5">
@@ -1401,7 +1401,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 </button>
               </div>
               ) : (
-                <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
+                <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wider text-blue-500">Driver Route</p>
                   <p className="text-sm font-semibold text-blue-900 mt-0.5">This route will save for you only.</p>
                 </div>
@@ -1441,7 +1441,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                     </div>
                   </div>
                   ) : (
-                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Assigned Driver</p>
                       <p className="text-sm font-semibold text-slate-900 mt-1">{currentDriver?.name || currentUser || 'You'}</p>
                     </div>
@@ -1590,7 +1590,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 </div>
               ) : (
                 [...savedTemplates].reverse().map((tpl) => (
-                  <div key={tpl.id} className="bg-white border border-slate-200 p-4 rounded-2xl flex flex-col gap-3 shadow-sm hover:shadow-md transition-all">
+                  <div key={tpl.id} className="bg-white border border-slate-200 p-4 rounded-xl flex flex-col gap-3 shadow-sm hover:shadow-md transition-all">
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                       <div className="min-w-0">
                         <h4 className="font-semibold text-slate-900 text-base">{tpl.name}</h4>
@@ -1714,13 +1714,13 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 </div>
               </div>
 
-              <div className="p-3 bg-white border border-emerald-100 rounded-2xl space-y-2">
+              <div className="p-3 bg-white border border-emerald-100 rounded-xl space-y-2">
                 <h4 className="text-xs font-semibold text-emerald-800 uppercase tracking-wider flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Pickup</h4>
                 <PlacesAutocompleteInput value={tempTripForm.pu} onChange={(v) => setTempTripForm({...tempTripForm, pu: v})} placeholder="Pickup address" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500 transition-all" required />
                 <input type="time" value={tempTripForm.puTime} onChange={e => setTempTripForm({...tempTripForm, puTime: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500 transition-all" />
               </div>
 
-              <div className="p-3 bg-white border border-red-100 rounded-2xl space-y-2">
+              <div className="p-3 bg-white border border-red-100 rounded-xl space-y-2">
                 <h4 className="text-xs font-semibold text-red-800 uppercase tracking-wider flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Dropoff</h4>
                 <PlacesAutocompleteInput value={tempTripForm.do} onChange={(v) => setTempTripForm({...tempTripForm, do: v})} placeholder="Dropoff address" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-red-500 transition-all" required />
                 <input type="time" value={tempTripForm.doTime} onChange={e => setTempTripForm({...tempTripForm, doTime: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-red-500 transition-all" />

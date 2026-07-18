@@ -398,7 +398,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
   const isEditingCell = (tripId, colKey) => editingCell?.tripId === tripId && editingCell?.field === colKey;
 
   const renderMobileArchiveCard = (trip) => (
-    <div key={trip.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div key={trip.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-900">{renderCellValue(trip, { key: 'patient' })}</p>
@@ -502,7 +502,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                     <col className="w-[7%]" />
                     <col className="w-20" />
                   </colgroup>
-                  <thead className="sticky top-0 z-10 bg-[#2f5b96] text-white shadow-sm">
+                  <thead className="sticky top-0 z-10 bg-slate-800 text-white shadow-sm">
                     <tr>
                       <th className="rounded-tl-xl px-3 py-1.5 text-left font-semibold">Date</th>
                       <th className="px-3 py-1.5 text-left font-semibold">Driver</th>

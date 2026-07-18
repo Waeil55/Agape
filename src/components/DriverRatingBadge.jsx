@@ -63,7 +63,7 @@ export const DriverRatingBadge = memo(function DriverRatingBadge({ driver, trips
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="px-4 py-3 bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-slate-200">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">

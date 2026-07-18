@@ -38,7 +38,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
       {/* Header Profile Section */}
       <div className="px-6 pt-6 pb-6 bg-white border-b border-slate-200">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center text-xl font-black text-blue-600 shadow-sm border border-blue-100">
+          <div className="w-16 h-16 rounded-xl bg-blue-50 flex items-center justify-center text-xl font-black text-blue-600 shadow-sm border border-blue-100">
             {getInitials(currentUser)}
           </div>
           <div>
@@ -60,7 +60,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
           return (
             <div key={idx} className="space-y-2">
               <h3 className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{section.title}</h3>
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                 {visibleItems.map((item, i) => (
                   <button
                     key={item.id}
@@ -87,7 +87,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
       <div className="px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-4">
         <button
           onClick={onLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-white border border-rose-200 text-rose-600 font-bold hover:bg-rose-50 active:scale-95 transition-all shadow-sm"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-white border border-rose-200 text-rose-600 font-bold hover:bg-rose-50 active:scale-95 transition-all shadow-sm"
         >
           <LogOut size={16} />
           Sign Out

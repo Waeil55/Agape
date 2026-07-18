@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Route, Truck, ArrowRight, Target, MapPin, Compass } from 'lucide-react';
+import { Users, Route, Truck, ArrowRight, Target, MapPin, Compass, ChevronUp, ChevronDown } from 'lucide-react';
 import { formatMovementState, formatTelemetryDuration } from '../utils/driverTelemetry';
 
 function formatAge(iso) {
@@ -35,17 +35,27 @@ export default function CommandSidebar({
   setShowDetailModal,
   hudSearch
 }) {
+  const [isCollapsed, setIsCollapsed] = useState(window.innerWidth < 768);
   const [leftTab, setLeftTab] = useState('drivers');
 
   const activeTrips = todaysTrips.filter(t => ACTIVE_STATUSES.has(t.status));
   const completedTrips = todaysTrips.filter(t => t.status === 'Completed');
 
   return (
-    <div className="w-full max-h-[46dvh] shrink-0 border-b border-slate-200/60 bg-slate-50 flex flex-col z-20 shadow-sm relative font-outfit md:w-[400px] md:max-h-none md:border-b-0 md:border-r md:shadow-2xl xl:w-[450px]">
+    <div className={`w-full transition-all duration-300 shrink-0 border-t border-slate-200 bg-slate-50 flex flex-col z-20 shadow-sm relative font-outfit md:border-t-0 md:border-r md:shadow-2xl md:w-[400px] md:h-full md:max-h-none xl:w-[450px] ${isCollapsed ? 'h-[56px] overflow-hidden' : 'h-[40dvh]'}`}>
       
       {/* TABS HEADER */}
       <div className="bg-white px-3 pt-3 pb-3 border-b border-slate-200 shrink-0 z-10 md:px-4 md:pt-5 md:pb-4">
-        <h2 className="mb-3 text-lg font-semibold tracking-tight text-slate-900 md:mb-4 md:text-xl">Command <span className="text-blue-600">Center</span></h2>
+        <div className="flex items-center justify-between mb-2 md:mb-4">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 md:text-xl">Command <span className="text-blue-600">Center</span></h2>
+          <button 
+            type="button" 
+            onClick={() => setIsCollapsed(!isCollapsed)} 
+            className="md:hidden p-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors"
+          >
+            {isCollapsed ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </button>
+        </div>
         
         {/* Segmented Control */}
         <div className="flex bg-slate-100 p-1 rounded-xl">
@@ -89,7 +99,7 @@ export default function CommandSidebar({
                 return (
                   <div 
                     key={driver.id} 
-                    className={`bg-white rounded-2xl p-4 transition-all duration-300 cursor-pointer border ${
+                    className={`bg-white rounded-xl p-4 transition-all duration-300 cursor-pointer border ${
                       isSelected 
                         ? 'border-blue-300 shadow-md ring-4 ring-blue-50' 
                         : 'border-slate-200 hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5'
@@ -150,7 +160,7 @@ export default function CommandSidebar({
         {leftTab === 'trips' && (
           <div className="space-y-5">
             {unassignedTrips.length > 0 && (
-              <div className="bg-white rounded-2xl border border-rose-200 overflow-hidden shadow-sm">
+              <div className="bg-white rounded-xl border border-rose-200 overflow-hidden shadow-sm">
                 <div className="bg-rose-50 border-b border-rose-100 px-4 py-3 flex justify-between items-center">
                   <h3 className="text-xs font-semibold text-rose-700 uppercase tracking-widest">Needs Assignment</h3>
                   <span className="text-xs font-semibold bg-rose-600 text-white px-2 py-0.5 rounded-full shadow-sm">{unassignedTrips.length}</span>
@@ -170,7 +180,7 @@ export default function CommandSidebar({
             )}
 
             {activeTrips.length > 0 && (
-              <div className="bg-white rounded-2xl border border-blue-200 overflow-hidden shadow-sm">
+              <div className="bg-white rounded-xl border border-blue-200 overflow-hidden shadow-sm">
                 <div className="bg-blue-50 border-b border-blue-100 px-4 py-3 flex justify-between items-center">
                   <h3 className="text-xs font-semibold text-blue-700 uppercase tracking-widest">Active Now</h3>
                   <span className="text-xs font-semibold bg-blue-600 text-white px-2 py-0.5 rounded-full shadow-sm">{activeTrips.length}</span>
@@ -192,7 +202,7 @@ export default function CommandSidebar({
             )}
             
             {completedTrips.length > 0 && (
-              <div className="bg-white rounded-2xl border border-emerald-200 overflow-hidden shadow-sm">
+              <div className="bg-white rounded-xl border border-emerald-200 overflow-hidden shadow-sm">
                 <div className="bg-emerald-50 border-b border-emerald-100 px-4 py-3 flex justify-between items-center">
                   <h3 className="text-xs font-semibold text-emerald-700 uppercase tracking-widest">Completed</h3>
                   <span className="text-xs font-semibold bg-emerald-600 text-white px-2 py-0.5 rounded-full shadow-sm">{completedTrips.length}</span>
@@ -206,7 +216,7 @@ export default function CommandSidebar({
         {leftTab === 'vehicles' && (
           <div className="flex flex-col gap-3">
             {driverSummaries.map(summary => (
-              <div key={summary.driver.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all flex items-center justify-between">
+              <div key={summary.driver.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5"><Truck size={14} className="text-blue-500"/> {summary.driver.vehicle || 'Unknown Vehicle'}</h4>
                   <p className="text-xs font-semibold text-slate-500 mt-1">Operated by {summary.driver.name}</p>

@@ -4,6 +4,7 @@ import {
   Shield, Bell, Settings as SettingsIcon, Users, FileText, Clock, Archive,
   Activity, CreditCard, MapPin, X, ChevronRight
 } from 'lucide-react';
+import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
@@ -33,6 +34,8 @@ const PayrollReportPage = lazy(() => import('./PayrollReportPage'));
 const TimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
 import { getDriverLiveStatus } from '../constants/statuses';
 const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })));
+const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
+const RoutePlannerPage = lazy(() => import('./RoutePlannerPage'));
 
 const MobileFallback = () => (
   <div className="flex items-center justify-center h-32">
@@ -48,15 +51,15 @@ const MobileEnterpriseDashboard = (props) => {
   const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [tripDetails, setTripDetails] = useState(null);
+  const [tripWorkflowActive, setTripWorkflowActive] = useState(false);
+  const [bulkAssignModal, setBulkAssignModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [toolsDriverId, setToolsDriverId] = useState(() => localStorage.getItem('agape_toolsDriverId') || '');
   const driverWorkDrivers = props.driverWorkDrivers?.length ? props.driverWorkDrivers : drivers;
   const driverWorkTrips = props.driverWorkTrips?.length ? props.driverWorkTrips : trips;
   const [driverWorkDriverId, setDriverWorkDriverId] = useState(() => localStorage.getItem('agape_mobileDriverWorkDriverId') || 'all');
 
-  const todayKey = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }, []);
+  const todayKey = useMemo(() => localCalendarYmd(), []);
 
   const expandedTripInfo = useMemo(() => {
     if (!expandedId) return null;
@@ -172,7 +175,7 @@ const MobileEnterpriseDashboard = (props) => {
 
   const renderDispatchWorkspaceControls = () => {
     const selectedDriver = activeDriverWorkDriver;
-    const scopedTripCount = activeDriverWorkTrips.filter((trip) => trip.date === todayKey || !trip.date).length;
+    const scopedTripCount = activeDriverWorkTrips.filter((trip) => tripCalendarDateKey(trip.date) === todayKey || !trip.date).length;
     const workspaceModes = [
       { id: 'board', label: 'Board', count: scopedTripCount },
       { id: 'drivers', label: 'Drivers', count: driverWorkDriverId === 'all' ? driverWorkDrivers.length : (selectedDriver ? 1 : 0) },
@@ -188,7 +191,16 @@ const MobileEnterpriseDashboard = (props) => {
               <button
                 key={mode.id}
                 type="button"
-                onClick={() => setDispatchWorkspaceMode(mode.id)}
+                onClick={() => {
+                  setDispatchWorkspaceMode(mode.id);
+                  if (mode.id === 'board' || mode.id === 'drivers') {
+                    setDriverWorkDriverId('all');
+                  } else if (mode.id === 'operate') {
+                    if (driverWorkDriverId === 'all' && driverWorkDrivers[0]?.id) {
+                      setDriverWorkDriverId(driverWorkDrivers[0].id);
+                    }
+                  }
+                }}
                 className={`mobile-ops-mode ${active ? 'is-active' : ''}`}
               >
                 <span>{mode.label}</span>
@@ -222,7 +234,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (!activeDriverWorkDriver) {
       return (
         <div className="mobile-driver-work-empty">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
             <Truck size={26} />
           </div>
           <p className="text-sm font-semibold text-slate-700">Select a driver to operate</p>
@@ -282,12 +294,16 @@ const MobileEnterpriseDashboard = (props) => {
     );
   };
 
-  // Common layout wrapper for subviews - keeps proper overflow + navbar spacing
+  // Common layout wrapper for subviews — always shows bottom nav below
+  // paddingBottom ensures scroll content clears the fixed bottom nav pill
+  const NAV_BOTTOM_CLEARANCE = 'calc(76px + env(safe-area-inset-bottom, 0px))';
   const SubViewWrapper = ({ title, onBack, children, fullHeight = false }) => (
     <div className="flex-1 overflow-hidden flex flex-col bg-slate-50 min-h-0">
       {renderTopBar(title, true, onBack)}
-      <div className={`flex-1 ${fullHeight ? 'overflow-hidden relative' : 'overflow-y-auto overscroll-contain px-4 py-4'}`}
-           style={{ paddingBottom: fullHeight ? undefined : 'calc(80px + env(safe-area-inset-bottom,0px))' }}>
+      <div
+        className={`flex-1 ${fullHeight ? 'overflow-hidden relative' : 'overflow-y-auto overscroll-contain px-4 py-4'}`}
+        style={{ paddingBottom: fullHeight ? undefined : NAV_BOTTOM_CLEARANCE }}
+      >
         {children}
       </div>
     </div>
@@ -295,6 +311,23 @@ const MobileEnterpriseDashboard = (props) => {
 
   const renderContent = () => {
     // ── Sub-views (from Menu) ─────────────────────────────────────────────────
+    if (subView === 'route_planner') {
+      return (
+        <SubViewWrapper title="AI Route Planner" fullHeight>
+          <ErrorBoundary>
+            <Suspense fallback={<MobileFallback />}>
+              <RoutePlannerPage
+                trips={trips}
+                drivers={drivers}
+                role={role}
+                currentUser={currentUser}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        </SubViewWrapper>
+      );
+    }
+
     if (subView === 'reports') {
       return (
         <SubViewWrapper title="Reports & Export">
@@ -374,42 +407,99 @@ const MobileEnterpriseDashboard = (props) => {
 
     // ── Main Navigation Views ─────────────────────────────────────────────────
     if (currentView === 'trips') {
-      const scopedDrivers = driverWorkDriverId === 'all'
-        ? drivers
-        : [activeDriverWorkDriver].filter(Boolean);
-
-      return (
-        <div className="flex-1 overflow-hidden flex flex-col relative bg-slate-50 min-h-0">
-          {dispatchWorkspaceMode === 'operate' ? (
-            <div className="absolute inset-0 flex min-h-0 flex-col">
-              {renderTopBar(role === 'admin' ? 'Operations workspace' : 'Dispatch workspace')}
-              <div className="mobile-dispatch-header shrink-0 border-b border-slate-200 bg-white px-3 pb-3 sm:px-4">
-                {renderDispatchWorkspaceControls()}
-              </div>
-              {renderDriverWorkPanel()}
-            </div>
-          ) : (
-            <div className="absolute inset-0 flex min-h-0 flex-col">
-              {renderTopBar(role === 'admin' ? 'Operations workspace' : 'Dispatch workspace')}
+      if (driverWorkDriverId === 'all') {
+        return (
+          <div className="flex-1 overflow-hidden flex flex-col bg-slate-50 min-h-0">
+            {dispatchWorkspaceMode === 'board' ? (
               <ErrorBoundary>
                 <Suspense fallback={<MobileFallback />}>
                   <MobileDispatchView
                     {...props}
-                    trips={activeDriverWorkTrips}
-                    drivers={scopedDrivers}
-                    activeTab={dispatchWorkspaceMode === 'drivers' ? 'drivers' : 'trips'}
-                    expandedId={expandedId}
-                    setExpandedId={setExpandedId}
-                    setTripDetails={setTripDetails}
+                    trips={trips}
+                    drivers={drivers}
+                    onOpenTripDetails={(trip) => {
+                      setTripDetails(trip);
+                      setTripWorkflowActive(false);
+                    }}
+                    onOpenTripWorkflow={(trip) => {
+                      setTripDetails(trip);
+                      setTripWorkflowActive(true);
+                    }}
+                    assignTripToDriver={props.assignTripToDriver || props.updateTrip}
+                    updateTrip={props.updateTrip}
+                    currentUser={currentUser}
+                    role={role}
                     workspaceControls={renderDispatchWorkspaceControls()}
+                    setShowAddTripModal={props.setShowAddTripModal}
+                    setShowUploadModal={setShowUploadModal}
+                    setBulkAssignModal={setBulkAssignModal}
+                    onOpenSequencer={() => setSubView('route_planner')}
+                    onOpenLiveMap={() => handleNavClick('map')}
+                    addToast={(title, message, type) => {
+                      if (props.addToast) props.addToast(title, message, type);
+                    }}
                   />
                 </Suspense>
               </ErrorBoundary>
-            </div>
-          )}
-        </div>
-      );
+            ) : (
+              <>
+                {renderTopBar('Select Driver Portfolio')}
+                {renderDispatchWorkspaceControls()}
+                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 pb-24">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 mb-4 shadow-sm">
+                    <p className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-1">Operate As Driver</p>
+                    <p className="text-xs font-semibold text-blue-950 leading-relaxed">
+                      Select any active driver below to view, track, and manage their trips exactly as they see them on their mobile workflow page.
+                    </p>
+                  </div>
+
+                  {driverWorkDrivers.map((driver) => {
+                    const driverTrips = driverWorkTrips.filter(t => 
+                      t.driverId === driver.id || 
+                      (driver.name && t.driverName === driver.name) ||
+                      (t.driverEmail && (d => (d.email || '').toLowerCase() === t.driverEmail.toLowerCase())(driver))
+                    );
+                    
+                    return (
+                      <button
+                        key={driver.id}
+                        onClick={() => {
+                          setDriverWorkDriverId(driver.id);
+                          setDispatchWorkspaceMode('operate');
+                        }}
+                        className="w-full text-left bg-white hover:bg-slate-50 active:bg-slate-100 border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm transition-all"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center font-bold text-blue-700 text-sm uppercase shrink-0">
+                            {(driver.name || driver.email || 'D')[0]}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-semibold text-slate-900 truncate">{driver.name || driver.email}</h4>
+                            <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                              {driver.vehicle ? `Vehicle: ${driver.vehicle}` : 'No vehicle assigned'}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide shrink-0 border border-slate-200">
+                            {driverTrips.length} {driverTrips.length === 1 ? 'trip' : 'trips'}
+                          </span>
+                          <ChevronRight size={16} className="text-slate-400 shrink-0" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        );
+      }
+
+      return null;
     }
+
 
     if (currentView === 'reports') {
       return (
@@ -532,7 +622,7 @@ const MobileEnterpriseDashboard = (props) => {
               </ErrorBoundary>
             ) : (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center mb-4">
                   <Zap size={28} className="opacity-30" />
                 </div>
                 <p className="text-sm font-semibold text-slate-500">Select a driver above</p>
@@ -549,8 +639,61 @@ const MobileEnterpriseDashboard = (props) => {
     return null;
   };
 
-  // Whether to show the navbar
+  // Show the bottom nav everywhere EXCEPT:
+  // 1. When a trip detail overlay is open (full-screen DriverPage)
+  // 2. When a chat thread is open inside chat view (thread takes full screen)
   const showNav = !tripDetails && !(currentView === 'chat' && isChatThreadOpen);
+
+  if (currentView === 'trips' && driverWorkDriverId !== 'all') {
+    const activeDriver = activeDriverWorkDriver;
+    const driverEmail = activeDriver?.email || currentUser;
+
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<MobileFallback />}>
+          <DriverPage
+            {...props}
+            currentUser={driverEmail}
+            role={role}
+            drivers={drivers}
+            allDrivers={props.allDrivers || drivers}
+            trips={trips}
+            isEmbedded={false}
+            defaultTripId={null}
+            onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip}
+            onCompleteTrip={props.onCompleteTrip}
+            onDriverStatusUpdate={props.onDriverStatusUpdate}
+            onUpdateClockEvents={props.onUpdateClockEvents}
+            onUpdateHourlyRate={props.onUpdateHourlyRate}
+            onLogout={onLogout}
+            onOpenSettings={() => setSubView('settings')}
+            appSettings={props.appSettings}
+            phoneNumbers={props.phoneNumbers || {}}
+            onUpdateDriverLocation={props.handleUpdateDriverLocation || props.updateDriverLocation}
+            onUpdateAppSettings={props.updateAppSettings}
+            onAddAuditLog={props.addAuditLog}
+            requestAuthAction={props.requestAuthAction}
+            assignTripToDriver={props.assignTripToDriver}
+            requestDeleteTrip={props.requestDeleteTrip}
+            bulkAssignTrips={props.bulkAssignTrips}
+            dispatchers={props.dispatchers || []}
+            driverAssignments={props.driverAssignments || []}
+            assignmentUnreadCount={props.assignmentUnreadCount || 0}
+            chatUnreadCount={chatUnreadCount}
+            onAcknowledgeAssignment={props.onAcknowledgeAssignment || (() => {})}
+            onAcceptAssignment={props.onAcceptAssignment || (() => {})}
+            onAddTrip={props.addTrip}
+            showAddTripModal={props.showAddTripModal}
+            setShowAddTripModal={props.setShowAddTripModal}
+            onEmbeddedClose={() => {
+              setDriverWorkDriverId('all');
+              setDispatchWorkspaceMode('board');
+            }}
+          />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <div className="mobile-enterprise-dashboard-wrapper w-full h-full bg-white flex flex-col relative overflow-hidden">
@@ -559,31 +702,36 @@ const MobileEnterpriseDashboard = (props) => {
       {tripDetails && (() => {
         const trip = tripDetails;
         // Find driver for this trip — use their email so DriverPage loads their profile
-        const driverObj = drivers.find(d => d.id === trip.driverId || (trip.driverName && d.name === trip.driverName));
-        // Pass current admin/dispatcher email but give them all trip access via allDrivers
-        const driverEmail = driverObj?.email || currentUser;
+        const driverObj = drivers.find(d =>
+          d.id === trip.driverId ||
+          (trip.driverName && d.name === trip.driverName) ||
+          (trip.driverEmail && (d.email || '').toLowerCase() === trip.driverEmail.toLowerCase())
+        );
+        // Use driver email so DriverPage finds the trip; role stays admin/dispatcher for full feature access
+        const driverEmail = driverObj?.email || trip.driverEmail || currentUser;
         return (
           <div className="fixed inset-0 z-[200] flex flex-col bg-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-            {/* Close bar */}
-            <div className="shrink-0 flex items-center gap-3 px-3 py-2.5 bg-white border-b border-slate-200 shadow-sm">
+            {/* Back bar — styled like a top navigation bar */}
+            <div className="shrink-0 flex items-center gap-2.5 px-3 py-2.5 bg-white border-b border-slate-200 shadow-sm">
               <button
                 onClick={() => setTripDetails(null)}
-                className="flex items-center gap-2 text-sm font-semibold text-blue-600 active:text-blue-800 transition-colors"
+                className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] text-blue-600 active:text-blue-800 transition-colors touch-manipulation"
+                aria-label="Back to dispatch board"
               >
-                <ChevronLeft size={18} />
-                Back to Trips
+                <ChevronLeft size={20} strokeWidth={2} />
+                <span className="text-sm font-semibold">Back</span>
               </button>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-slate-900 truncate">{trip.patient || 'Trip Details'}</p>
-                <p className="text-[10px] text-slate-400 font-semibold">{trip.bookingId ? `#${trip.bookingId}` : trip.id}</p>
+                <p className="text-sm font-semibold text-slate-900 truncate leading-tight">{trip.patient || 'Trip Details'}</p>
+                <p className="text-[10px] text-slate-400 font-semibold">{trip.bookingId ? `#${trip.bookingId}` : trip.id} · {trip.status || 'Open'}</p>
               </div>
-              <div className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
+              <div className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${
                 role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
               }`}>
                 {role === 'admin' ? 'Admin' : 'Dispatch'}
               </div>
             </div>
-            {/* Full DriverPage embedded */}
+            {/* Full DriverPage embedded — role='admin'/'dispatcher' unlocks all admin controls inside DriverPage */}
             <div className="min-h-0 flex-1 overflow-hidden">
               <ErrorBoundary>
                 <Suspense fallback={<MobileFallback />}>
@@ -595,20 +743,25 @@ const MobileEnterpriseDashboard = (props) => {
                     allDrivers={props.allDrivers || drivers}
                     trips={trips}
                     isEmbedded={true}
-                    defaultTripId={trip.id}
+                    defaultTripId={tripWorkflowActive ? trip.id : null}
+                    initialShowDetailsId={!tripWorkflowActive ? trip.id : null}
                     onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip}
                     onCompleteTrip={props.onCompleteTrip}
                     onDriverStatusUpdate={props.onDriverStatusUpdate}
                     onUpdateClockEvents={props.onUpdateClockEvents}
                     onUpdateHourlyRate={props.onUpdateHourlyRate}
-                    onLogout={() => setTripDetails(null)}
-                    onOpenSettings={() => { setTripDetails(null); setSubView('settings'); }}
+                    onLogout={() => { setTripDetails(null); setTripWorkflowActive(false); }}
+                    onEmbeddedClose={() => { setTripDetails(null); setTripWorkflowActive(false); }}
+                    onOpenSettings={() => { setTripDetails(null); setTripWorkflowActive(false); setSubView('settings'); }}
                     appSettings={props.appSettings}
                     phoneNumbers={props.phoneNumbers || {}}
                     onUpdateDriverLocation={props.handleUpdateDriverLocation || props.updateDriverLocation}
                     onUpdateAppSettings={props.updateAppSettings}
                     onAddAuditLog={props.addAuditLog}
                     requestAuthAction={props.requestAuthAction}
+                    assignTripToDriver={props.assignTripToDriver}
+                    requestDeleteTrip={props.requestDeleteTrip}
+                    bulkAssignTrips={props.bulkAssignTrips}
                     dispatchers={props.dispatchers || []}
                     driverAssignments={props.driverAssignments || []}
                     assignmentUnreadCount={props.assignmentUnreadCount || 0}
@@ -618,7 +771,6 @@ const MobileEnterpriseDashboard = (props) => {
                     onAddTrip={props.addTrip}
                     showAddTripModal={props.showAddTripModal}
                     setShowAddTripModal={props.setShowAddTripModal}
-                    onEmbeddedClose={() => setTripDetails(null)}
                   />
                 </Suspense>
               </ErrorBoundary>
@@ -632,9 +784,9 @@ const MobileEnterpriseDashboard = (props) => {
         {renderContent()}
       </div>
 
-      {/* ── Spacer (only when nav is visible) ───────────────────────── */}
+      {/* ── Spacer so content isn't hidden behind the fixed bottom nav ── */}
       {showNav && (
-        <div className="shrink-0 h-[calc(56px+8px+env(safe-area-inset-bottom,0px))]" aria-hidden="true" />
+        <div className="shrink-0" style={{ height: 'calc(56px + 8px + env(safe-area-inset-bottom, 0px))' }} aria-hidden="true" />
       )}
 
       {/* ── BOTTOM NAVIGATION ────────────────────────────────────────── */}
@@ -715,6 +867,58 @@ const MobileEnterpriseDashboard = (props) => {
             </button>
           </div>
         </nav>
+      )}
+
+      {showUploadModal && (
+        <div className="fixed inset-0 z-[250] bg-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <div className="shrink-0 flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900">Upload & OCR Trips</h3>
+            <button onClick={() => setShowUploadModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <ErrorBoundary>
+              <Suspense fallback={<MobileFallback />}>
+                <FileUploadTrips
+                  {...props}
+                  onClose={() => setShowUploadModal(false)}
+                />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
+        </div>
+      )}
+
+      {bulkAssignModal && (
+        <div className="fixed inset-0 z-[250] bg-black/60 flex items-center justify-center p-6" onClick={() => setBulkAssignModal(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <h3 className="text-sm font-bold text-slate-900">Bulk Assign Active Trips</h3>
+              <button onClick={() => setBulkAssignModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Assign all currently unassigned trips for today to a single driver.
+            </p>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {driverWorkDrivers.map(d => (
+                <button
+                  key={d.id}
+                  onClick={() => {
+                    if (props.bulkAssignTrips) props.bulkAssignTrips(d.id);
+                    setBulkAssignModal(false);
+                    if (props.addToast) props.addToast('Bulk Assignment', `All unassigned trips assigned to ${d.name || d.email}.`, 'success');
+                  }}
+                  className="w-full text-left px-4 py-2.5 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl text-xs font-semibold text-slate-800 transition"
+                >
+                  {d.name || d.email} {d.vehicle ? `(${d.vehicle})` : ''}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

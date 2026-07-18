@@ -196,7 +196,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
           <div className="p-5 space-y-5">
 
             {/* Section: Patient Info */}
-            <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
+            <div className="bg-slate-50 rounded-xl p-4 space-y-4">
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                 <User size={12} className="text-blue-600" /> Patient Information
               </h3>
@@ -240,7 +240,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
             </div>
 
             {/* Section: Schedule */}
-            <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
+            <div className="bg-slate-50 rounded-xl p-4 space-y-4">
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                 <Calendar size={12} className="text-indigo-600" /> Schedule
               </h3>
@@ -355,7 +355,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
             </div>
 
             {/* Section: Route */}
-            <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
+            <div className="bg-slate-50 rounded-xl p-4 space-y-4">
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                 <Navigation size={12} className="text-emerald-600" /> Route
               </h3>
@@ -420,7 +420,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
 
             {/* Section: Driver Assignment */}
             {selectableDrivers.length > 0 && (
-              <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
+              <div className="bg-slate-50 rounded-xl p-4 space-y-4">
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                   <Truck size={12} className="text-blue-600" /> Driver Assignment
                 </h3>
@@ -456,7 +456,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
             )}
 
             {/* Section: Notes */}
-            <div className="bg-slate-50 rounded-2xl p-4">
+            <div className="bg-slate-50 rounded-xl p-4">
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-3">
                 <FileText size={12} className="text-amber-600" /> Notes & Special Requirements
               </h3>
@@ -477,7 +477,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-3 rounded-2xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition-all"
+            className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition-all"
           >
             Cancel
           </button>
@@ -485,7 +485,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
             type="submit"
             onClick={handleSubmit}
             disabled={submitting}
-            className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {submitting ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

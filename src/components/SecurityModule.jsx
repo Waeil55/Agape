@@ -41,7 +41,7 @@ export const TwoFactorSetup = ({ user, onComplete }) => {
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white rounded-2xl border border-slate-200">
+    <div className="max-w-md mx-auto p-6 bg-white rounded-xl border border-slate-200">
       <div className="flex items-center gap-3 mb-6">
         <Smartphone size={24} className="text-blue-600" />
         <h3 className="text-xl font-semibold text-slate-900">Set Up 2-Factor Authentication</h3>
@@ -167,7 +167,7 @@ export const AuditLogViewer = ({ logs = [] }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+    <div className="bg-white rounded-xl border border-slate-200 p-6">
       <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
         <Clock size={20} className="text-blue-600" />
         Audit Log
@@ -258,7 +258,7 @@ export const ComplianceChecklist = () => {
   const totalPercentage = Math.round(items.reduce((sum, item) => sum + item.percentage, 0) / items.length);
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+    <div className="bg-white rounded-xl border border-slate-200 p-6">
       <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
         <Shield size={20} className="text-blue-600" />
         Compliance Status
@@ -359,7 +359,7 @@ const SecurityModule = ({ user, onLogout }) => {
         {activeTab === 'overview' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl">
             <ComplianceChecklist />
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Security Overview</h3>
               <div className="space-y-4">
                 <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
@@ -390,7 +390,7 @@ const SecurityModule = ({ user, onLogout }) => {
             {show2FASetup ? (
               <TwoFactorSetup user={user} onComplete={() => setShow2FASetup(false)} />
             ) : (
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="bg-white rounded-xl border border-slate-200 p-6">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Authentication Methods</h3>
                 <button
                   onClick={() => setShow2FASetup(true)}

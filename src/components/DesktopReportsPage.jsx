@@ -4,7 +4,7 @@ import {
   ChevronRight, Clock, Download, Edit2, FileText, RefreshCw, Search, Upload,
   XCircle,
 } from 'lucide-react';
-import { localCalendarYmd } from '../utils/tripDate';
+import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 
 const DASH = '-';
 
@@ -408,7 +408,7 @@ const DesktopReportsPage = ({
   const reportRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return trips
-      .filter((trip) => trip.date === dateStr)
+      .filter((trip) => tripCalendarDateKey(trip.date) === dateStr)
       .filter((trip) => {
         if (statusFilter !== 'all' && trip.status !== statusFilter) return false;
         if (driverFilter !== 'all' && trip.driverId !== driverFilter) return false;
@@ -433,7 +433,7 @@ const DesktopReportsPage = ({
   }, [trips, drivers, dateStr, searchQuery, statusFilter, driverFilter, reviewFilter, sortKeyOverrides]);
 
   const allDayRows = useMemo(() => trips
-    .filter((trip) => trip.date === dateStr)
+    .filter((trip) => tripCalendarDateKey(trip.date) === dateStr)
     .map((trip) => ({
       trip,
       driver: getTripDriver(trip, drivers),

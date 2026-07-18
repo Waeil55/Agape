@@ -99,7 +99,7 @@ const DriverCoachingPanel = ({ driver, performanceData }) => {
   }, [driver, performanceData]);
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-6">
+    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
       <div className="flex items-center gap-3 mb-4">
         <Brain size={24} className="text-blue-600" />
         <h3 className="text-lg font-semibold text-slate-900">AI Coaching</h3>
@@ -177,7 +177,7 @@ const SafetyMonitoring = ({ driver, recentTrips = [] }) => {
   ];
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 p-6">
+    <div className="bg-white rounded-xl border border-slate-100 p-6">
       <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
         <Activity size={20} className="text-red-600" />
         Safety Monitoring
@@ -229,7 +229,7 @@ const WellnessPanel = ({ driver }) => {
   };
 
   return (
-    <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl border border-pink-200 p-6">
+    <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-xl border border-pink-200 p-6">
       <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
         <Heart size={20} className="text-pink-600" />
         Wellness & Support
@@ -391,7 +391,7 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
           <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - Driver Info */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-100 p-6">
+              <div className="bg-white rounded-xl border border-slate-100 p-6">
                 <button
                   onClick={() => setSelectedDriver(null)}
                   className="mb-4 text-blue-600 text-sm font-bold hover:underline"
@@ -438,7 +438,7 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
               <WellnessPanel driver={selectedDriver} />
 
               {/* Quick Actions */}
-              <div className="bg-white rounded-2xl border border-slate-100 p-6">
+              <div className="bg-white rounded-xl border border-slate-100 p-6">
                 <h3 className="font-semibold text-slate-900 mb-3">Quick Actions</h3>
                 <div className="space-y-2">
                   <button onClick={handleCallDriver} className="w-full p-3 text-left text-sm font-semibold text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">

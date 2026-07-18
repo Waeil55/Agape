@@ -57,7 +57,7 @@ const PWAUpdatePrompt = () => {
 
   return (
     <div className="fixed top-[calc(1rem+env(safe-area-inset-top,0px))] left-4 right-4 z-[9998] sm:left-auto sm:right-4 sm:w-96">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-slide-down">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-slide-down">
         <div className="flex items-center gap-3 p-4">
           <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
             <ArrowUp size={18} className="text-blue-600" />

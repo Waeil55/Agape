@@ -262,13 +262,13 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               <p className="text-xs text-indigo-400 font-medium">No insights available right now.</p>
             ) : (
               <div className="space-y-4">
-                <div className="bg-white/60 p-4 rounded-2xl border border-white/80">
+                <div className="bg-white/60 p-4 rounded-xl border border-white/80">
                   <h4 className="text-xs font-semibold text-indigo-800 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Activity size={14} /> Team Activity Summary</h4>
                   <p className="text-xs text-slate-700 leading-relaxed">{aiInsights.summary}</p>
                 </div>
                 
                 {aiInsights.mistakes && aiInsights.mistakes.length > 0 && (
-                  <div className="bg-rose-50/80 p-4 rounded-2xl border border-rose-100/80">
+                  <div className="bg-rose-50/80 p-4 rounded-xl border border-rose-100/80">
                     <h4 className="text-xs font-semibold text-rose-800 uppercase tracking-wider mb-2 flex items-center gap-1.5"><AlertCircle size={14} /> AI Flagged Issues</h4>
                     <ul className="list-disc pl-4 space-y-1">
                       {aiInsights.mistakes.map((mistake, idx) => (
@@ -299,7 +299,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               const roleStyle = user.role === 'admin' ? 'bg-blue-100 text-blue-700' : user.role === 'dispatcher' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700';
               const RoleIcon = user.role === 'admin' ? ShieldCheck : user.role === 'dispatcher' ? Briefcase : Truck;
               return (
-                <div key={user.uid} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div key={user.uid} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-xs font-semibold text-slate-900">{user.username || authEmailToUsername(user.email)}</p>
@@ -391,12 +391,12 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
         </div>
         <div className="space-y-3 p-3 sm:hidden">
           {drivers.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">No drivers yet.</div>
+            <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">No drivers yet.</div>
           ) : (
             drivers.map(d => {
               const dispatcher = dispatchers.find(ds => ds.id === (d.assignedDispatcher || d.assignedTo));
               return (
-                <div key={d.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div key={d.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-xs font-semibold text-slate-900">{d.name}</p>
@@ -524,10 +524,10 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
         <div className="flex-1 overflow-y-auto">
           <div className="space-y-3 p-3 sm:hidden">
             {visibleLogs.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">No activity recorded yet.</div>
+              <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">No activity recorded yet.</div>
             ) : (
               visibleLogs.map((log, i) => (
-                <button key={i} type="button" onClick={() => setSelectedLog(log)} className="block w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50">
+                <button key={i} type="button" onClick={() => setSelectedLog(log)} className="block w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50">
                   <div className="flex items-start justify-between gap-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold
                       ${log.c === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
@@ -695,7 +695,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               'bg-blue-50 border-blue-100'
             }`}>
               <div className="flex justify-between items-start mb-4">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                   selectedLog.c === 'emerald' ? 'bg-emerald-200 text-emerald-700' :
                   selectedLog.c === 'rose' ? 'bg-rose-200 text-rose-700' :
                   selectedLog.c === 'amber' ? 'bg-amber-200 text-amber-700' :
@@ -720,20 +720,20 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             
             <div className="p-6 bg-white">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Activity Details</h4>
-              <p className="text-slate-800 leading-relaxed text-base bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <p className="text-slate-800 leading-relaxed text-base bg-slate-50 p-4 rounded-xl border border-slate-100">
                 {selectedLog.d}
               </p>
 
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Actor</p>
                   <p className="text-xs font-semibold text-slate-800 break-all">{selectedLog.actor || 'System'}</p>
                 </div>
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Role</p>
                   <p className="text-xs font-semibold text-slate-800 uppercase">{selectedLog.actorRole || 'system'}</p>
                 </div>
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Target</p>
                   <p className="text-xs font-semibold text-slate-800">
                     {selectedLog.meta?.entity ? `${selectedLog.meta.entity}${selectedLog.meta?.id ? ` · ${selectedLog.meta.id}` : ''}` : 'General'}
@@ -742,7 +742,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               </div>
 
               {selectedLog.meta && selectedLog.meta.diffs && selectedLog.meta.diffs.length > 0 && (
-                <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
                   <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Changes</h5>
                   <div className="space-y-3">
                     {selectedLog.meta.diffs.map((dd, idx) => (

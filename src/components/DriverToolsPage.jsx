@@ -520,13 +520,13 @@ const RoutePlanSection = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-slate-50 transition"
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center shrink-0">
             <MapIcon size={17} />
           </div>
           <div className="text-left min-w-0">
@@ -552,7 +552,7 @@ const RoutePlanSection = ({
               ['Time', isCalculating ? '...' : routeSummary.duration],
               ['Miles', routeSummary.distance],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-2xl bg-slate-50 border border-slate-100 px-2 py-2">
+              <div key={label} className="rounded-xl bg-slate-50 border border-slate-100 px-2 py-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
                 <div className="text-xs font-semibold text-slate-900 truncate">{value}</div>
               </div>
@@ -562,17 +562,17 @@ const RoutePlanSection = ({
           {(routeError || routeNotice || routeValidation.errors.length > 0 || routeValidation.warnings.length > 0) && (
             <div className="space-y-1.5 mb-3">
               {(routeError || routeValidation.errors[0]) && (
-                <div className="rounded-2xl bg-rose-50 border border-rose-100 px-3 py-2 text-xs font-semibold text-rose-700 flex items-start gap-2">
+                <div className="rounded-xl bg-rose-50 border border-rose-100 px-3 py-2 text-xs font-semibold text-rose-700 flex items-start gap-2">
                   <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {routeError || routeValidation.errors[0]}
                 </div>
               )}
               {!routeError && routeValidation.warnings[0] && (
-                <div className="rounded-2xl bg-orange-50 border border-orange-100 px-3 py-2 text-xs font-semibold text-orange-700 flex items-start gap-2">
+                <div className="rounded-xl bg-orange-50 border border-orange-100 px-3 py-2 text-xs font-semibold text-orange-700 flex items-start gap-2">
                   <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {routeValidation.warnings[0]}
                 </div>
               )}
               {routeNotice && (
-                <div className="rounded-2xl bg-blue-50 border border-blue-100 px-3 py-2 text-xs font-semibold text-blue-700 flex items-start gap-2">
+                <div className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2 text-xs font-semibold text-blue-700 flex items-start gap-2">
                   <CheckSquare size={13} className="mt-0.5 shrink-0" /> {routeNotice}
                 </div>
               )}
@@ -583,7 +583,7 @@ const RoutePlanSection = ({
             {stops.map((stop, index) => (
               <React.Fragment key={stop.id}>
                 <div
-                  className={`flex items-center w-full rounded-2xl border bg-white px-2 py-2 shadow-sm transition ${index === 0 ? 'border-blue-100' : 'border-slate-100 hover:border-slate-200'}`}
+                  className={`flex items-center w-full rounded-xl border bg-white px-2 py-2 shadow-sm transition ${index === 0 ? 'border-blue-100' : 'border-slate-100 hover:border-slate-200'}`}
                   draggable={index > 0}
                   onDragStart={() => handleDragStart(index)}
                   onDragEnter={() => handleDragEnter(index)}
@@ -803,7 +803,7 @@ const DriverToolsPage = ({
 
       {/* AI Optimize Button */}
       {selectedTrips.length >= 1 && (
-        <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-3 flex items-center justify-between gap-2">
+        <div className="bg-white rounded-xl border border-blue-100 shadow-sm p-3 flex items-center justify-between gap-2">
           <span className="text-xs font-semibold text-blue-700">{selectedTrips.length} selected</span>
           <div className="flex gap-2">
             <button onClick={() => onSelectAllTrips()} className="px-3 h-8 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95 transition border border-blue-100 hover:bg-blue-100">
@@ -821,7 +821,7 @@ const DriverToolsPage = ({
       )}
 
       {/* Advanced Tools Section */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-2">
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden mb-2">
         <button
           onClick={onOpenSequencer}
           className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-50 transition"
@@ -852,8 +852,8 @@ const DriverToolsPage = ({
 
       {/* Smart Route Panel */}
       {aiSequence && aiSequence.length >= 2 && !guidedMode && (
-        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl p-[1.5px] shadow-lg shadow-indigo-200/50">
-          <div className="bg-white rounded-2xl p-4">
+        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-[1.5px] shadow-lg shadow-indigo-200/50">
+          <div className="bg-white rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <BrainCircuit size={16} className="text-indigo-600" />
               <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Smart Route</span>
@@ -895,7 +895,7 @@ const DriverToolsPage = ({
 
       {/* AI Suggestions (fallback) */}
       {aiSuggestions.length > 0 && (!aiSequence || aiSequence.length < 2) && (
-        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-2xl p-3">
+        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-3">
           <div className="flex items-start gap-2">
             <BrainCircuit size={14} className="text-indigo-600 mt-0.5 shrink-0" />
             <div className="flex-1">
@@ -910,7 +910,7 @@ const DriverToolsPage = ({
 
       {/* Route Quick Nav */}
       {activeTrips.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
           <button
             onClick={() => toggleSection('quicknav')}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition"
@@ -967,7 +967,7 @@ const DriverToolsPage = ({
 
       {/* Trip ETAs */}
       {activeTrips.length > 0 && Object.keys(etas || {}).length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
           <button
             onClick={() => toggleSection('etas')}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition"

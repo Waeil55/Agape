@@ -185,7 +185,7 @@ const ChatMessage = memo(function ChatMessage({
               </div>
 
               {showEmojiPicker && (
-                <div className={`absolute z-50 top-full mt-1 ${isOwn ? 'right-0' : 'left-0'} bg-white rounded-2xl border border-slate-200 shadow-xl p-2 flex flex-wrap gap-1 w-[200px]`}>
+                <div className={`absolute z-50 top-full mt-1 ${isOwn ? 'right-0' : 'left-0'} bg-white rounded-3xl border border-slate-200 shadow-xl p-2 flex flex-wrap gap-1 w-[200px]`}>
                   {EMOJI_QUICK.map(emoji => (
                     <button
                       key={emoji}

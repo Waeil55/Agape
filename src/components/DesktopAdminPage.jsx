@@ -1013,10 +1013,10 @@ const DesktopAdminPage = ({
       {/* Create User Modal */}
       {createUserRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 sm:p-4">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200 bg-white shadow-2xl">
+          <div className="w-full max-w-md overflow-hidden rounded-xl sm:rounded-3xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 sm:px-5 py-3 sm:py-4">
               <div className="flex items-center gap-3">
-                <div className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl sm:rounded-2xl text-white ${createUserRole === 'dispatcher' ? 'bg-blue-600' : 'bg-emerald-600'}`}>
+                <div className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl sm:rounded-xl text-white ${createUserRole === 'dispatcher' ? 'bg-blue-600' : 'bg-emerald-600'}`}>
                   {createUserRole === 'dispatcher' ? <Briefcase size={18} /> : <Truck size={18} />}
                 </div>
                 <div>
@@ -1030,7 +1030,7 @@ const DesktopAdminPage = ({
             </div>
             <form onSubmit={(e) => { e.preventDefault(); createRoleUser(); }} className="space-y-4 p-4 sm:p-5">
               {createError && (
-                <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+                <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" /> {createError}
                 </div>
               )}

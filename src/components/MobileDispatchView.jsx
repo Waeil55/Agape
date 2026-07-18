@@ -7,6 +7,7 @@ import {
   MoreHorizontal
 } from "lucide-react";
 import { getDriverLiveStatus } from "../constants/statuses";
+import { tripCalendarDateKey, localCalendarYmd } from "../utils/tripDate";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 const timeToMinutes = (t) => {
@@ -64,7 +65,7 @@ const getAddr = (v) => typeof v === "object" ? v?.address || "" : v || "";
 
 /* ─── Admin Trip Card ─────────────────────────────────────────────── */
 const AdminTripCard = ({ 
-  trip, drivers, onOpenTrip, assignTripToDriver, makeCall, sendSMS,
+  trip, drivers, onOpenTripDetails, onOpenTripWorkflow, assignTripToDriver, makeCall, sendSMS,
   requestDeleteTrip, updateTrip, requestAuthAction, currentUser, addToast, role
 }) => {
   const [showActions, setShowActions] = useState(false);
@@ -122,8 +123,8 @@ const AdminTripCard = ({
       {/* Main Trip Card — full tap opens DriverPage trip view */}
       <button
         type="button"
-        onClick={() => onOpenTrip?.(trip)}
-        className={`w-full text-left bg-white rounded-2xl border shadow-sm active:scale-[0.985] transition-all duration-150 overflow-hidden ${
+        onClick={() => onOpenTripDetails?.(trip)}
+        className={`w-full text-left bg-white rounded-xl border shadow-sm active:scale-[0.985] transition-all duration-150 overflow-hidden ${
           isActive ? "border-amber-200 shadow-amber-100/60" : 
           isTerminal ? "border-slate-100 opacity-80" : 
           trip.status === "Unassigned" ? "border-rose-200 shadow-rose-50" : "border-slate-200"
@@ -229,13 +230,24 @@ const AdminTripCard = ({
                 </button>
               )}
               {trip.patientPhone && (
-                <button
-                  type="button"
-                  onClick={() => makeCall?.(trip.patientPhone, trip.patient)}
-                  className="w-7 h-7 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center active:scale-95 transition-all"
-                >
-                  <Phone size={12} />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => makeCall?.(trip.patientPhone, trip.patient)}
+                    className="w-7 h-7 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center active:scale-95 transition-all"
+                    title="Call patient"
+                  >
+                    <Phone size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => sendSMS?.(trip.patientPhone, trip.patient)}
+                    className="w-7 h-7 rounded-xl bg-sky-50 border border-sky-200 text-sky-700 flex items-center justify-center active:scale-95 transition-all"
+                    title="SMS patient"
+                  >
+                    <MessageSquare size={12} />
+                  </button>
+                </>
               )}
               {!isTerminal && (
                 <button
@@ -317,7 +329,7 @@ const AdminTripCard = ({
                   <button
                     type="button"
                     onClick={() => markException("No Show")}
-                    className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-orange-200 bg-orange-50 text-orange-700 text-[11px] font-semibold active:scale-95 transition-all"
+                    className="flex flex-col items-center gap-1.5 py-3 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 text-[11px] font-semibold active:scale-95 transition-all"
                   >
                     <XCircle size={18} />
                     No Show
@@ -325,7 +337,7 @@ const AdminTripCard = ({
                   <button
                     type="button"
                     onClick={() => markException("Cancelled")}
-                    className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 text-[11px] font-semibold active:scale-95 transition-all"
+                    className="flex flex-col items-center gap-1.5 py-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-[11px] font-semibold active:scale-95 transition-all"
                   >
                     <Ban size={18} />
                     Cancel
@@ -333,7 +345,7 @@ const AdminTripCard = ({
                   <button
                     type="button"
                     onClick={() => markException("Rerouted")}
-                    className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold active:scale-95 transition-all"
+                    className="flex flex-col items-center gap-1.5 py-3 rounded-xl border border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold active:scale-95 transition-all"
                   >
                     <Repeat size={18} />
                     Reroute
@@ -343,18 +355,38 @@ const AdminTripCard = ({
               {/* Call patient */}
               {trip.patientPhone && (
                 <button
+                    type="button"
+                    onClick={() => { makeCall?.(trip.patientPhone, trip.patient); setShowActions(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold active:scale-95 transition-all"
+                  >
+                    <Phone size={18} /> Call Patient
+                  </button>
+              )}
+              {/* SMS patient */}
+              {trip.patientPhone && (
+                <button
                   type="button"
-                  onClick={() => { makeCall?.(trip.patientPhone, trip.patient); setShowActions(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold active:scale-95 transition-all"
+                  onClick={() => { sendSMS?.(trip.patientPhone, trip.patient); setShowActions(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-sm font-semibold active:scale-95 transition-all"
                 >
-                  <Phone size={18} /> Call Patient
+                  <MessageSquare size={18} /> SMS Patient
                 </button>
               )}
-              {/* Open full trip */}
+              {/* Edit trip */}
+              {!isTerminal && updateTrip && (
+                <button
+                  type="button"
+                  onClick={() => { onOpenTripDetails?.(trip); setShowActions(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm font-semibold active:scale-95 transition-all"
+                >
+                  <Edit2 size={18} /> Edit Trip
+                </button>
+              )}
+              {/* Open full trip workflow */}
               <button
                 type="button"
-                onClick={() => { onOpenTrip?.(trip); setShowActions(false); }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-blue-600 text-white text-sm font-bold active:scale-95 transition-all shadow-sm"
+                onClick={() => { onOpenTripWorkflow?.(trip); setShowActions(false); }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold active:scale-95 transition-all shadow-sm"
               >
                 <Play size={16} /> Open Trip Workflow
               </button>
@@ -380,7 +412,7 @@ const DriverRow = ({ driver, trips }) => {
   const activeStatus = active?.status || ds.label;
   const todayCount = trips.filter(t => t.driverId === driver.id || t.driverName === driver.name).length;
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 px-3.5 py-3 flex items-center gap-3 shadow-sm">
+    <div className="bg-white rounded-xl border border-slate-100 px-3.5 py-3 flex items-center gap-3 shadow-sm">
       <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm uppercase shrink-0 ${ds.color}`}>
         {(driver.name || "D")[0]}
       </div>
@@ -411,7 +443,7 @@ const MobileDispatchView = ({
   requestDeleteTrip, updateTrip, makeCall, sendSMS, requestAuthAction,
   setTripDetails, setShowAddTripModal, setShowUploadModal,
   onOpenSequencer, onOpenLiveMap, searchQuery, setSearchQuery,
-  addToast, phoneNumbers,
+  addToast, phoneNumbers, onOpenTripDetails, onOpenTripWorkflow,
   workspaceControls = null,
   activeTab = "trips", // Controlled by parent bottom nav
   expandedId: expandedIdProp, setExpandedId: setExpandedIdProp
@@ -430,14 +462,11 @@ const MobileDispatchView = ({
     }
   }, [showSearch]);
 
-  const todayStr = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  })();
+  const todayStr = localCalendarYmd();
 
   const todayTrips = useMemo(() =>
     trips
-      .filter(t => t.date === todayStr)
+      .filter(t => tripCalendarDateKey(t.date) === todayStr)
       .sort((a, b) => {
         const aT = TERMINAL.includes(a.status), bT = TERMINAL.includes(b.status);
         if (aT && !bT) return 1; if (!aT && bT) return -1;
@@ -591,7 +620,7 @@ const MobileDispatchView = ({
           <div className="px-3 py-3 space-y-2.5">
             {filtered.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center mb-4">
                   <Truck size={28} className="opacity-30" />
                 </div>
                 <p className="text-sm font-semibold text-slate-500">No trips found</p>
@@ -612,7 +641,8 @@ const MobileDispatchView = ({
                 key={trip.id}
                 trip={trip}
                 drivers={drivers}
-                onOpenTrip={setTripDetails}
+                onOpenTripDetails={onOpenTripDetails}
+                onOpenTripWorkflow={onOpenTripWorkflow}
                 assignTripToDriver={assignTripToDriver}
                 makeCall={makeCall}
                 sendSMS={sendSMS}
@@ -638,7 +668,7 @@ const MobileDispatchView = ({
             }).map(d => <DriverRow key={d.id} driver={d} trips={todayTrips} />)}
             {drivers.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20">
-                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center mb-4">
                   <Users size={28} className="opacity-30" />
                 </div>
                 <p className="text-sm font-semibold text-slate-500">No drivers found</p>
@@ -672,7 +702,7 @@ const MobileDispatchView = ({
                   key={item.label}
                   type="button"
                   onClick={item.action}
-                  className={`flex flex-col items-center justify-center gap-2 h-20 rounded-2xl border font-black text-xs transition-all active:scale-95 ${item.color}`}
+                  className={`flex flex-col items-center justify-center gap-2 h-20 rounded-xl border font-black text-xs transition-all active:scale-95 ${item.color}`}
                 >
                   <item.icon size={20} />
                   <span className="text-center leading-tight px-1">{item.label}</span>

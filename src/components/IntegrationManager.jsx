@@ -105,7 +105,7 @@ const APIConfiguration = ({ integrationKey, integration, onConnect }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+    <div className="bg-white rounded-xl border border-slate-200 p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-slate-900">{integration.name}</h3>
         {integration.status === 'connected' && (
@@ -212,7 +212,7 @@ const WebhookManager = () => {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+    <div className="bg-white rounded-xl border border-slate-200 p-6">
       <h3 className="text-lg font-semibold text-slate-900 mb-4">Webhooks</h3>
 
       {/* Current Webhooks */}
@@ -327,7 +327,7 @@ const APIDocumentation = () => {
   ];
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+    <div className="bg-white rounded-xl border border-slate-200 p-6">
       <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
         <Globe size={20} className="text-blue-600" />
         API Documentation

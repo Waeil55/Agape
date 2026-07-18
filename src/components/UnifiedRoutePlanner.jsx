@@ -210,7 +210,7 @@ const UnifiedRoutePlanner = ({
           <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
             {/* AI Quick Actions */}
             {selectedTrips.length >= 1 && (
-              <div className="mb-3 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl p-3 shadow-lg shadow-indigo-200/50">
+              <div className="mb-3 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-xl p-3 shadow-lg shadow-indigo-200/50">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
@@ -238,7 +238,7 @@ const UnifiedRoutePlanner = ({
 
             {/* Smart Route */}
             {aiSequence && aiSequence.length >= 2 && !guidedMode && (
-              <div className="mb-3 rounded-2xl overflow-hidden shadow-lg shadow-blue-900/10 bg-gradient-to-br from-blue-600 to-blue-500">
+              <div className="mb-3 rounded-xl overflow-hidden shadow-lg shadow-blue-900/10 bg-gradient-to-br from-blue-600 to-blue-500">
                 <div className="p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <BrainCircuit size={14} className="text-white/80" />
@@ -269,7 +269,7 @@ const UnifiedRoutePlanner = ({
 
             {/* AI Suggestions */}
             {aiSuggestions.length > 0 && (!aiSequence || aiSequence.length < 2) && (
-              <div className="mb-3 bg-indigo-50 border border-indigo-100 rounded-2xl p-3 flex items-start gap-2">
+              <div className="mb-3 bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex items-start gap-2">
                 <BrainCircuit size={14} className="text-indigo-400 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   {aiSuggestions.map((s, i) => <p key={i} className="text-[11px] font-semibold text-indigo-600 leading-relaxed">{s}</p>)}
@@ -280,7 +280,7 @@ const UnifiedRoutePlanner = ({
 
             {/* Conflicts */}
             {conflicts.length > 0 && (
-              <div className="mb-3 bg-amber-50 border border-amber-200/60 rounded-2xl p-3 flex items-start gap-2">
+              <div className="mb-3 bg-amber-50 border border-amber-200/60 rounded-xl p-3 flex items-start gap-2">
                 <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   {conflicts.map((c, i) => <p key={i} className="text-[11px] font-semibold text-amber-700">{c.text || `${c.a} ↔ ${c.b} (${c.gap}m)`}</p>)}
@@ -290,7 +290,7 @@ const UnifiedRoutePlanner = ({
 
             {/* Ride Share */}
             {aiRideShare.length > 0 && (
-              <div className="mb-3 bg-emerald-50 border border-emerald-200/60 rounded-2xl p-3 flex items-start gap-2">
+              <div className="mb-3 bg-emerald-50 border border-emerald-200/60 rounded-xl p-3 flex items-start gap-2">
                 <Repeat size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   {aiRideShare.map((r, i) => <p key={i} className="text-[11px] font-semibold text-emerald-700">{r.text || r}</p>)}
@@ -360,7 +360,7 @@ const UnifiedRoutePlanner = ({
                     ? `${createdDate.getMonth() + 1}/${createdDate.getDate()}`
                     : '';
                   return (
-                    <div key={tpl.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                    <div key={tpl.id} className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
                       <div className="px-3.5 py-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
@@ -484,7 +484,7 @@ const UnifiedRoutePlanner = ({
                 })}
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-6 sm:p-8 text-center">
+              <div className="bg-white rounded-xl border border-dashed border-slate-200 p-6 sm:p-8 text-center">
                 <Bookmark size={24} className="text-slate-200 mx-auto mb-3" />
                 <p className="text-[12px] font-semibold text-slate-400">No saved plans yet</p>
                 <p className="text-[10px] text-slate-300 mt-1">Create a route in the Route tab and save it</p>
@@ -546,7 +546,7 @@ const UnifiedRoutePlanner = ({
             {activeTrips.length > 0 ? (
               <div className="space-y-2">
                 {Object.keys(etas || {}).length > 0 && (
-                  <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-3 mb-3">
+                  <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-3 mb-3">
                     <div className="flex items-center gap-2 mb-2">
                       <Timer size={14} className="text-amber-500" />
                       <span className="text-[11px] font-extrabold text-slate-700">Trip ETAs</span>
@@ -567,7 +567,7 @@ const UnifiedRoutePlanner = ({
                 )}
 
                 {activeTrips.map(trip => (
-                  <div key={trip.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                  <div key={trip.id} className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
                     <div className="px-3.5 py-2.5">
                       <div className="flex items-center justify-between mb-2">
                         <div className="min-w-0 flex-1">

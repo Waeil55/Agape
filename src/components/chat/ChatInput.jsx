@@ -134,20 +134,20 @@ const ChatInput = ({ onSend, onTyping, onStopTyping, channelName, currentUser })
       onDragLeave={handleDragLeave}
     >
       {uploadProgress && (
-        <div className="mx-3 mt-2 rounded-2xl bg-blue-50 border border-blue-100 px-3 py-2 flex items-center gap-2">
+        <div className="mx-3 mt-2 rounded-xl bg-blue-50 border border-blue-100 px-3 py-2 flex items-center gap-2">
           {uploading && <div className="w-4 h-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />}
           <span className="text-[11px] text-blue-700 font-medium">{uploadProgress}</span>
         </div>
       )}
 
       {dragOver && (
-        <div className="mx-3 mt-2 rounded-2xl bg-blue-50 border border-blue-200 px-4 py-2 text-center">
+        <div className="mx-3 mt-2 rounded-xl bg-blue-50 border border-blue-200 px-4 py-2 text-center">
           <p className="text-xs text-blue-600 font-semibold">Drop file to upload</p>
         </div>
       )}
 
       {showEmoji && (
-        <div className="mx-3 mt-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="mx-3 mt-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
           <div className="flex flex-wrap gap-1">
             {EMOJI_QUICK.map(emoji => (
               <button

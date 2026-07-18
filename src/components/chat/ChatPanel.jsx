@@ -48,7 +48,7 @@ const ChatPanel = () => {
   if (isMinimized) {
     return (
       <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-6 z-[100]">
-        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white cursor-pointer" onClick={() => setIsMinimized(false)}>
             <MessageCircle size={16} />
             <span className="text-sm font-semibold">Team Chat</span>
@@ -67,7 +67,7 @@ const ChatPanel = () => {
   }
 
   return (
-    <div className="fixed bottom-0 right-0 md:bottom-6 md:right-6 z-[100] pb-[env(safe-area-inset-bottom,0px)] w-full h-full md:w-[420px] md:h-[600px] md:max-h-[80vh] md:rounded-2xl overflow-hidden shadow-2xl border border-slate-200 flex flex-col bg-white animate-in slide-in-from-bottom-4 duration-300">
+    <div className="fixed bottom-0 right-0 md:bottom-6 md:right-6 z-[100] pb-[env(safe-area-inset-bottom,0px)] w-full h-full md:w-[420px] md:h-[600px] md:max-h-[80vh] md:rounded-3xl overflow-hidden shadow-2xl border border-slate-200 flex flex-col bg-white animate-in slide-in-from-bottom-4 duration-300">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white shrink-0">
         <div className="flex items-center gap-2 min-w-0">

@@ -7,7 +7,7 @@ const SkeletonLoader = ({ type = 'page', rows = 5 }) => {
         <div className="h-8 w-48 bg-slate-200 rounded-xl animate-pulse" />
         <div className="space-y-3">
           {Array.from({ length: rows }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl p-4 space-y-3">
+            <div key={i} className="bg-white rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-slate-200 rounded-full animate-pulse" />
                 <div className="flex-1 space-y-2">
@@ -36,7 +36,7 @@ const SkeletonLoader = ({ type = 'page', rows = 5 }) => {
                 <div className="w-8 h-8 bg-slate-300 rounded-full animate-pulse" />
                 <div className="h-3 bg-slate-300 rounded-lg w-16 animate-pulse" />
               </div>
-              <div className={`h-10 ${i % 2 === 0 ? 'bg-white rounded-2xl rounded-bl-md' : 'bg-blue-500 rounded-2xl rounded-br-md'} animate-pulse`} />
+              <div className={`h-10 ${i % 2 === 0 ? 'bg-white rounded-xl rounded-bl-md' : 'bg-blue-500 rounded-xl rounded-br-md'} animate-pulse`} />
             </div>
           </div>
         ))}
@@ -63,7 +63,7 @@ const SkeletonLoader = ({ type = 'page', rows = 5 }) => {
 
   if (type === 'card') {
     return (
-      <div className="bg-white rounded-2xl p-4 space-y-3">
+      <div className="bg-white rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-slate-200 rounded-xl animate-pulse" />
           <div className="flex-1 space-y-2">

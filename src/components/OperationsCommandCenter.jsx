@@ -1697,7 +1697,7 @@ const OperationsCommandCenter = ({
             <div className="text-center py-10 text-xs text-slate-400">No recent driver activity logs</div>
           ) : (
             logs.slice(0, 30).map((log, i) => (
-              <div key={log.timestamp || log.id || `log-${i}`} className="p-3 bg-white border border-slate-200/75 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
+              <div key={log.timestamp || log.id || `log-${i}`} className="p-3 bg-white border border-slate-200/75 rounded-xl shadow-sm hover:shadow-md transition-all duration-200">
                 <div className="flex items-start gap-2.5">
                   <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ring-1 ring-slate-200 ${
                     log.c === 'rose' ? 'bg-rose-500 ring-rose-500/20' :
@@ -2251,7 +2251,7 @@ const OperationsCommandCenter = ({
                             {trip.pickup || '—'}
                           </div>
                         ) : (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-blue-100 bg-blue-50/70 rounded-lg px-2 py-1' : 'border border-blue-100 bg-blue-50/70 rounded-2xl px-3 py-2'}`}>
+                          <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-blue-100 bg-blue-50/70 rounded-lg px-2 py-1' : 'border border-blue-100 bg-blue-50/70 rounded-xl px-3 py-2'}`}>
                             {densityProfile.lineCount >= 3 && <div className="text-xs uppercase tracking-wide text-blue-700 truncate">Pickup</div>}
                             {densityProfile.lineCount >= 3 && densityProfile.showFacilityNames && pickupFacilityName && (
                               <div className="text-xs uppercase tracking-wide text-blue-800 truncate">{pickupFacilityName}</div>
@@ -2274,7 +2274,7 @@ const OperationsCommandCenter = ({
                             {trip.dropoff || '—'}
                           </div>
                         ) : (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-emerald-100 bg-emerald-50/70 rounded-lg px-2 py-1' : 'border border-emerald-100 bg-emerald-50/70 rounded-2xl px-3 py-2'}`}>
+                          <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between min-w-0 ${isLeanDensity ? 'border border-emerald-100 bg-emerald-50/70 rounded-lg px-2 py-1' : 'border border-emerald-100 bg-emerald-50/70 rounded-xl px-3 py-2'}`}>
                             {densityProfile.lineCount >= 3 && <div className="text-xs uppercase tracking-wide text-emerald-700 truncate">Dropoff</div>}
                             {densityProfile.lineCount >= 3 && densityProfile.showFacilityNames && dropoffFacilityName && (
                               <div className="text-xs uppercase tracking-wide text-emerald-800 truncate">{dropoffFacilityName}</div>
@@ -2298,7 +2298,7 @@ const OperationsCommandCenter = ({
                             )}
                           </div>
                         ) : densityProfile.lineCount === 2 ? (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-center ${isLeanDensity ? 'border border-slate-200 bg-slate-50 rounded-lg px-2 py-1' : 'rounded-2xl px-3 py-2'} ${densityProfile.showExecutiveAccent ? 'bg-slate-900 text-white' : 'bg-slate-50'}`}>
+                          <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-center ${isLeanDensity ? 'border border-slate-200 bg-slate-50 rounded-lg px-2 py-1' : 'rounded-xl px-3 py-2'} ${densityProfile.showExecutiveAccent ? 'bg-slate-900 text-white' : 'bg-slate-50'}`}>
                             {driver ? (
                               <div className="text-xs text-slate-900 truncate">{driver.name}</div>
                             ) : (
@@ -2313,7 +2313,7 @@ const OperationsCommandCenter = ({
                             )}
                           </div>
                         ) : (
-                          <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between border border-slate-200 ${isLeanDensity ? 'rounded-lg px-2.5 py-1.5' : 'rounded-2xl px-3 py-2'} ${densityProfile.showExecutiveAccent ? 'bg-slate-900 text-white' : 'bg-slate-50'}`}>
+                          <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-between border border-slate-200 ${isLeanDensity ? 'rounded-lg px-2.5 py-1.5' : 'rounded-xl px-3 py-2'} ${densityProfile.showExecutiveAccent ? 'bg-slate-900 text-white' : 'bg-slate-50'}`}>
                             <div>
                               <div className={`text-xs uppercase tracking-wide ${densityProfile.showExecutiveAccent ? 'text-slate-300' : 'text-slate-500'}`}>Driver</div>
                               {driver ? (

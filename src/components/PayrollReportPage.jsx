@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Clock, DollarSign, AlertTriangle, CheckCircle, XCircle, Download,
   User, Calendar, ChevronDown, ChevronUp, Shield, MapPin, Play, Pause,
@@ -109,7 +109,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
             <Download size={13} /> Export CSV
           </button>
         </div>
-        <p className="text-xs text-slate-500 ml-10">Event-driven · GPS-verified · Audit-logged</p>
+        <p className="text-xs text-slate-500 ml-10">Event-driven � GPS-verified � Audit-logged</p>
       </div>
 
       {/* Filters */}
@@ -173,11 +173,11 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm">{driver.name || driver.email}</span>
-                      {hasAbuse && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white">⚠ ABUSE FLAG</span>}
+                      {hasAbuse && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white">? ABUSE FLAG</span>}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                       <span className="flex items-center gap-1"><Clock size={10} />{fmt(pt?.billableMinutes)}</span>
-                      <span>·</span>
+                      <span>�</span>
                       <span className="flex items-center gap-1 text-emerald-600"><DollarSign size={10} />{fmtCurrency(pt?.totalPay)}</span>
                       {driver.hourlyRate && <span className="text-slate-500">@ ${Number(driver.hourlyRate).toFixed(2)}/hr</span>}
                     </div>
@@ -226,7 +226,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
                     {expandedSection[`${driver.id}_sessions`] && sessions.map((s, i) => (
                       <div key={i} className="bg-slate-50 rounded-xl p-3 mb-2 text-xs">
                         <div className="flex justify-between mb-1">
-                          <span className="text-slate-600">{fmtTime(s.clockIn)} → {s.clockOut === 'OPEN' ? <span className="text-green-600">OPEN</span> : fmtTime(s.clockOut)}</span>
+                          <span className="text-slate-600">{fmtTime(s.clockIn)} ? {s.clockOut === 'OPEN' ? <span className="text-green-600">OPEN</span> : fmtTime(s.clockOut)}</span>
                           <span className="font-semibold text-indigo-600">{fmt(s.billableMinutes)} billable</span>
                         </div>
                         <div className="flex gap-3 text-slate-500">
@@ -243,14 +243,14 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
                   {gaps.length > 0 && (
                     <div>
                       <button onClick={() => toggleSect(driver.id, 'gaps')} className="w-full flex items-center justify-between text-xs font-semibold text-slate-700 mb-2">
-                        <span className="flex items-center gap-1"><TrendingUp size={11} /> Gap Log ({gaps.length}) · {fmt(excludedMin)} excluded</span>
+                        <span className="flex items-center gap-1"><TrendingUp size={11} /> Gap Log ({gaps.length}) � {fmt(excludedMin)} excluded</span>
                         {expandedSection[`${driver.id}_gaps`] ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                       </button>
                       {expandedSection[`${driver.id}_gaps`] && gaps.map((g, i) => (
                         <div key={i} className="flex items-center justify-between bg-slate-50 rounded-xl p-2.5 mb-1.5 text-xs">
                           <div>
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold mr-2 ${gapColor(g.classification)}`}>{g.classification}</span>
-                            <span className="text-slate-500">{fmtTime(g.startTime)} → {fmtTime(g.endTime)}</span>
+                            <span className="text-slate-500">{fmtTime(g.startTime)} ? {fmtTime(g.endTime)}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-slate-700">{fmt(g.durationMinutes)}</span>

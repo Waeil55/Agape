@@ -69,7 +69,7 @@ const PWAInstallPrompt = () => {
           >
             <X size={16} />
           </button>
-          <div className="w-16 h-16 mx-auto mb-4 bg-white/20 rounded-2xl flex items-center justify-center">
+          <div className="w-16 h-16 mx-auto mb-4 bg-white/20 rounded-xl flex items-center justify-center">
             <Smartphone size={32} className="text-white" />
           </div>
           <h2 className="text-xl font-semibold text-white">Install Agape Care</h2>
@@ -77,7 +77,7 @@ const PWAInstallPrompt = () => {
         </div>
 
         <div className="px-6 py-5 space-y-3">
-          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
+          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
             <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
               <Zap size={18} className="text-blue-600" />
             </div>
@@ -87,7 +87,7 @@ const PWAInstallPrompt = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
+          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
             <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
               <Wifi size={18} className="text-green-600" />
             </div>
@@ -97,7 +97,7 @@ const PWAInstallPrompt = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
+          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
             <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center shrink-0">
               <Shield size={18} className="text-purple-600" />
             </div>
@@ -111,14 +111,14 @@ const PWAInstallPrompt = () => {
         <div className="px-6 pb-6 flex gap-3">
           <button
             onClick={handleDismiss}
-            className="flex-1 h-12 rounded-2xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 active:scale-95 transition-all"
+            className="flex-1 h-12 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 active:scale-95 transition-all"
           >
             Not Now
           </button>
           <button
             onClick={handleInstall}
             disabled={isInstalling}
-            className="flex-1 h-12 rounded-2xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            className="flex-1 h-12 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {isInstalling ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

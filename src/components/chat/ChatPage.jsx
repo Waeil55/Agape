@@ -516,7 +516,7 @@ const ChatPage = ({ onBack, onThreadActiveChange }) => {
                 <MoreHorizontal size={19} />
               </button>
               {showChannelMenu && (
-                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-2xl border border-slate-200 shadow-xl py-1.5 z-50">
+                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-3xl border border-slate-200 shadow-xl py-1.5 z-50">
                   <button
                     onClick={() => { focusSearch(); setShowChannelMenu(false); }}
                     className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"

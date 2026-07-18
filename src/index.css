@@ -769,21 +769,21 @@ body {
   bottom: 8px;
   left: 8px;
   right: 8px;
-  z-index: 50;
+  z-index: 60;
   height: 56px;
   min-height: 56px;
   max-height: 56px;
   width: auto;
-  background: rgba(255, 255, 255, 0.94) !important;
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid rgba(15, 23, 42, 0.07);
   border-radius: 999px;
   overflow: hidden;
-  box-shadow: 0 4px 16px -4px rgba(15, 23, 42, 0.12), 0 1px 4px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 4px 20px -4px rgba(15, 23, 42, 0.14), 0 1px 4px rgba(15, 23, 42, 0.04);
   padding: 8px;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
   color-scheme: light;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 .bottom-nav > div {
@@ -859,6 +859,18 @@ html.theme-dark .bottom-nav .border-slate-200 {
 
 .mobile-enterprise-dashboard-wrapper {
   transition: padding-bottom 0.22s cubic-bezier(0.3, 0.9, 0.4, 1) !important;
+}
+
+/* When adm-bottomnav (internal sub-view nav) and main bottom-nav coexist,
+   lift the adm-bottomnav above the main nav pill (72px nav + 8px gap + 8px margin) */
+.mobile-enterprise-dashboard-wrapper .adm-bottomnav {
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  z-index: 55;
+}
+
+/* Also increase adm-content padding to clear BOTH navs */
+.mobile-enterprise-dashboard-wrapper .adm-content {
+  padding-bottom: calc(var(--adm-bottomnav-h) + 76px + env(safe-area-inset-bottom, 0px) + var(--space-5)) !important;
 }
 
 /* Driver Page Chat wrapper layout padding */

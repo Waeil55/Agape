@@ -26,7 +26,7 @@ export default function DriverPerformanceCard({ driver, trips = [], compact = fa
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
         <div className="flex items-center justify-between">

@@ -458,13 +458,13 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
         </div>
         <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-6">
           <div className="max-w-lg mx-auto text-center mb-6">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black mx-auto mb-3 shadow-lg ${isPuNav ? 'bg-blue-600 text-white' : 'bg-amber-600 text-white'}`}>
+            <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-lg font-black mx-auto mb-3 shadow-lg ${isPuNav ? 'bg-blue-600 text-white' : 'bg-amber-600 text-white'}`}>
               {isPuNav ? 'PU' : 'DO'}
             </div>
             <p className={`text-lg font-semibold ${dark ? 'text-slate-200' : 'text-slate-800'}`}>{current.patient}</p>
             <p className={`text-sm ${muted} mt-0.5`}>Stop {navStep + 1} — {isPuNav ? 'Pickup' : 'Dropoff'}</p>
           </div>
-          <div className={`${cardBg} rounded-2xl border p-4 mb-4 space-y-3 shadow-sm`}>
+          <div className={`${cardBg} rounded-xl border p-4 mb-4 space-y-3 shadow-sm`}>
             <div className="flex items-start gap-3">
               <div className={`w-8 h-8 rounded-xl ${isPuNav ? 'bg-blue-50' : 'bg-amber-50'} flex items-center justify-center shrink-0`}>
                 {isPuNav ? <LogIn size={14} className="text-blue-600" /> : <LogOut size={14} className="text-amber-600" />}
@@ -521,7 +521,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
       {/* === LEFT: Schedule / Trip List === */}
       <div className={`w-full max-h-[42dvh] shrink-0 border-b md:w-72 md:max-h-none md:border-b-0 md:border-r xl:w-80 ${dark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} flex flex-col`}>
         <div className={`sticky top-0 px-3 py-3 border-b ${dark ? 'border-slate-700 bg-slate-900/95' : 'border-slate-100 bg-white/95'} shrink-0 backdrop-blur-sm`}>
-          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-3 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-3 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-600">Current Work</p>
@@ -575,7 +575,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
             <div className="rounded-[24px] border border-slate-200 bg-gradient-to-br from-white via-blue-50/40 to-slate-50 p-3 shadow-sm">
               <div className="flex items-start gap-3 flex-wrap">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
                     <Route size={18} />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -656,11 +656,11 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
               </div>
               <div className="mt-3 space-y-2">
                 {savedPlans.length === 0 ? (
-                  <div className="rounded-2xl bg-slate-50 px-3 py-4 text-center text-xs font-medium text-slate-500">
+                  <div className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs font-medium text-slate-500">
                     No saved plans yet.
                   </div>
                 ) : savedPlans.map((plan) => (
-                  <div key={plan.id} className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <div key={plan.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-slate-900">{plan.name}</p>
                       <p className="mt-1 text-[11px] text-slate-500">{plan.date} • {plan.stopCount || plan.stops?.length || 0} stops</p>

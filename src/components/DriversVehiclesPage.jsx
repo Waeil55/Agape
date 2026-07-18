@@ -300,14 +300,14 @@ const [form, setForm] = useState({
         <div className="bg-white border border-slate-100/50 rounded-xl overflow-hidden shadow-sm">
           <div className="space-y-3 p-3 sm:hidden">
             {filteredDrivers.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">
+              <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">
                 {role === 'dispatcher' ? 'No drivers assigned to you yet.' : 'No drivers yet. Click "Add Driver" to create one.'}
               </div>
             ) : (
               filteredDrivers.map((d) => {
                 const assignedCount = trips.filter(t => tripBelongsToDriver(t, d)).length;
                 return (
-                  <div key={d.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div key={d.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="truncate text-base font-semibold text-slate-900">{d.name}</h3>
@@ -482,12 +482,12 @@ const [form, setForm] = useState({
         <div className="bg-white border border-slate-100/50 rounded-xl overflow-hidden shadow-sm">
           <div className="space-y-3 p-3 sm:hidden">
             {vehicles.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">No vehicles yet. Click "Add Vehicle" to create one.</div>
+              <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">No vehicles yet. Click "Add Vehicle" to create one.</div>
             ) : (
               vehicles.map((v) => {
                 const assignedDriver = drivers.find(d => d.vehicle === v.name);
                 return (
-                  <div key={v.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div key={v.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="truncate text-base font-semibold text-slate-900">{v.name}</h3>

@@ -2564,7 +2564,7 @@ const App = () => {
                   };
                   return (
                     <button key={r.key} onClick={() => handleRoleSelect(r.key)} 
-                      className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 hover:border-blue-200 active:scale-[0.98] transition-all duration-300 group text-left shadow-sm min-h-[84px]">
+                      className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-blue-200 active:scale-[0.98] transition-all duration-300 group text-left shadow-sm min-h-[84px]">
                       <div className={`${colorMap[r.color]} rounded-xl text-white shadow-lg shrink-0 transition-transform group-hover:scale-105 flex items-center justify-center w-12 h-12`}>
                         <Icon size={22} strokeWidth={2.5} />
                       </div>
@@ -2580,7 +2580,7 @@ const App = () => {
             </div>
           ) : (
             <form onSubmit={submitLogin} className="space-y-4">
-              <div className="flex items-center gap-4 mb-5 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="flex items-center gap-4 mb-5 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <button type="button" onClick={() => {
                   loginPortalRoleRef.current = null;
                   setPendingRole(null);
@@ -2598,7 +2598,7 @@ const App = () => {
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Username</label>
                 <div className="relative">
                   <input type="text" required autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="waeil.admin" value={email} onChange={(e) => setEmail(e.target.value)} 
-                    className="w-full p-3.5 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
+                    className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
 
@@ -2606,7 +2606,7 @@ const App = () => {
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
                 <div className="relative">
                   <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} 
-                    className="w-full p-3.5 bg-slate-50 rounded-2xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
+                    className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
 
@@ -2669,7 +2669,7 @@ const App = () => {
             <button onClick={() => setBulkAssignModal(false)} className="p-2 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
           </div>
           
-          <div className="bg-emerald-50 rounded-2xl p-4 mb-6 border border-emerald-100">
+          <div className="bg-emerald-50 rounded-xl p-4 mb-6 border border-emerald-100">
             <p className="text-sm font-semibold text-emerald-900">Assigning {selectedTasks.length} Trips</p>
             <p className="text-sm font-medium text-emerald-700 mt-0.5">Select a driver below to assign all selected tasks.</p>
           </div>
@@ -2678,7 +2678,7 @@ const App = () => {
             <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-widest px-1">Available Fleet</h4>
             <div className="grid grid-cols-1 gap-2">
               {scopedDrivers.map(d => (
-                <button key={d.id} onClick={() => bulkAssignTrips(d.id)} className="w-full flex items-center justify-between p-4 bg-white/50 border border-slate-200 rounded-2xl hover:bg-white hover:border-blue-300 hover:shadow-md transition-all group text-left">
+                <button key={d.id} onClick={() => bulkAssignTrips(d.id)} className="w-full flex items-center justify-between p-4 bg-white/50 border border-slate-200 rounded-xl hover:bg-white hover:border-blue-300 hover:shadow-md transition-all group text-left">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
                       <User size={20} />
@@ -2697,7 +2697,7 @@ const App = () => {
             </div>
           </div>
           
-          <button onClick={() => setBulkAssignModal(false)} className="w-full mt-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold active:scale-95 transition-all">Cancel</button>
+          <button onClick={() => setBulkAssignModal(false)} className="w-full mt-6 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold active:scale-95 transition-all">Cancel</button>
         </div>
       </div>
     );
@@ -2720,7 +2720,7 @@ const App = () => {
             </div>
             <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
           </div>
-          <div className="bg-slate-50/80 rounded-2xl p-4 mb-6 border border-slate-200/50">
+          <div className="bg-slate-50/80 rounded-xl p-4 mb-6 border border-slate-200/50">
             <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-600">
               <div><span className="text-slate-500 block mb-1">Time</span>{smartAssignTrip.time}</div>
               <div><span className="text-slate-500 block mb-1">Type</span>{smartAssignTrip.type}</div>
@@ -2776,7 +2776,7 @@ const App = () => {
                   );
                 })()
               ) : smartAssignResult && !smartAssignResult.driverId ? (
-                <div className="p-6 text-center bg-slate-50 rounded-2xl">
+                <div className="p-6 text-center bg-slate-50 rounded-xl">
                   <AlertCircle size={24} className="mx-auto text-amber-500 mb-2" />
                   <p className="text-xs font-semibold text-slate-600">{smartAssignResult.reason || 'No suitable driver found'}</p>
                 </div>
@@ -2817,7 +2817,7 @@ const App = () => {
                 <div className="grid grid-cols-1 gap-2">
                   {availableDrivers.map(d => (
                     <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
-                      className="flex items-center justify-between p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl hover:bg-emerald-50 active:scale-[0.98] transition-all group">
+                      className="flex items-center justify-between p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl hover:bg-emerald-50 active:scale-[0.98] transition-all group">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-semibold">{String(d?.name || '?').charAt(0)}</div>
                         <div className="text-left">
@@ -2838,7 +2838,7 @@ const App = () => {
                 <div className="grid grid-cols-1 gap-2">
                   {otherDrivers.map(d => (
                     <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
-                      className="flex items-center justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:bg-slate-50 active:scale-[0.98] transition-all group opacity-80 hover:opacity-100">
+                      className="flex items-center justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition-all group opacity-80 hover:opacity-100">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-semibold">{String(d?.name || '?').charAt(0)}</div>
                         <div className="text-left">
@@ -3164,7 +3164,7 @@ const App = () => {
                   key={banner.id}
                   type="button"
                   onClick={() => openMessageBanner(banner)}
-                  className="group flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 text-left shadow-xl shadow-slate-900/10 ring-1 ring-white/80 transition hover:bg-white"
+                  className="group flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white/95 p-3 text-left shadow-xl shadow-slate-900/10 ring-1 ring-white/80 transition hover:bg-white"
                 >
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-black uppercase text-white shadow-sm">
                     {(banner.senderName || banner.senderEmail || 'M').slice(0, 1)}

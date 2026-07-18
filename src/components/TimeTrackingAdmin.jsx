@@ -649,7 +649,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
       {/* Edit Timesheet Modal */}
       {editTimesheet && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl overflow-hidden shadow-2xl w-full max-w-lg">
+          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl w-full max-w-lg">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-lg font-semibold text-slate-900">Edit Timesheet — {formatDate(editTimesheet.date + 'T12:00:00')}</h3>
               <button onClick={() => setEditTimesheet(null)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition"><X size={18} /></button>

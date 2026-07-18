@@ -47,7 +47,7 @@ const OfflineIndicator = () => {
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
       <div
-        className={`mx-2 mt-2 sm:mx-4 sm:mt-3 rounded-2xl shadow-lg border px-4 py-3 flex items-center gap-3 ${
+        className={`mx-2 mt-2 sm:mx-4 sm:mt-3 rounded-xl shadow-lg border px-4 py-3 flex items-center gap-3 ${
           isOnline
             ? 'bg-green-50 border-green-200 text-green-800'
             : 'bg-amber-50 border-amber-200 text-amber-800'

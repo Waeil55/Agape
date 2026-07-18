@@ -4,7 +4,7 @@ import {
   XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Upload, FileText,
   Download, Repeat
 } from 'lucide-react';
-import { localCalendarYmd } from '../utils/tripDate';
+import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
 const DetailRow = ({ label, value, valueColor = "text-slate-900" }) => (
@@ -96,14 +96,14 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [driverFilter, setDriverFilter] = useState('All Drivers');
 
   const uniqueDrivers = useMemo(() => ['All Drivers', ...new Set(
-    trips.filter(t => t.date === dateStr).map(t => {
+    trips.filter(t => tripCalendarDateKey(t.date) === dateStr).map(t => {
       const d = drivers.find(d => d.id === t.driverId);
       return d ? d.name : (t.driverName || '');
     }).filter(Boolean)
   )], [trips, drivers, dateStr]);
 
   const filteredTrips = useMemo(() => {
-    let filtered = trips.filter(t => t.date === dateStr);
+    let filtered = trips.filter(t => tripCalendarDateKey(t.date) === dateStr);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(t => 
@@ -462,7 +462,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                         <DetailRow label="DATE" value={trip.date} />
                         <DetailRow label="DRIVER" value={driver ? driver.name : (trip.driverName || '-')} />
                         <DetailRow label="VEHICLE" value={trip.completedVehicle || (driver ? driver.vehicle : '-')} />
-                        <DetailRow label="SCHEDULED" value={formatClock(trip.time)} valueColor="text-[#2563EB]" />
+                        <DetailRow label="SCHEDULED" value={formatClock(trip.time)} valueColor="text-blue-600" />
 
                         <div className="my-2 border-t border-slate-300/50"></div>
 

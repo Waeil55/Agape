@@ -364,7 +364,7 @@ const LiveRouteMap = React.memo(({
   if (showFallback) {
     const fallbackMsg = initError || mapsError?.message || 'Google Maps is not available for your account.';
     return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center">
         <Map size={28} className="mx-auto text-amber-400 mb-2" />
         <p className="text-sm font-semibold text-amber-800">Maps Unavailable</p>
         <p className="text-xs text-amber-600 mt-1 leading-relaxed max-w-xs mx-auto">{fallbackMsg}</p>
@@ -395,7 +395,7 @@ const LiveRouteMap = React.memo(({
 
   if (!ready) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
         <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2" />
         <p className="text-xs font-medium text-slate-500">Loading map...</p>
       </div>
@@ -405,7 +405,7 @@ const LiveRouteMap = React.memo(({
   return (
     <>
       <style>{pulseCss}</style>
-      <div className={`relative rounded-2xl overflow-hidden border border-slate-200/60 shadow-sm ${fullscreen ? 'fixed inset-0 z-[200] rounded-none border-0' : ''}`}>
+      <div className={`relative rounded-xl overflow-hidden border border-slate-200/60 shadow-sm ${fullscreen ? 'fixed inset-0 z-[200] rounded-none border-0' : ''}`}>
         {/* Map Controls Overlay */}
         <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5">
           <button onClick={() => setMapTheme(p => p === 'light' ? 'dark' : 'light')}

@@ -690,7 +690,7 @@ const LiveMapPage = ({
         <span className="text-emerald-600 text-[11px] font-black flex items-center gap-0.5"><span className="text-emerald-500">✓</span> {fleetStats.complete}</span>
         <span className="text-slate-400 text-[11px] font-semibold">| {fleetStats.remaining} remaining</span>
         <div className="hidden flex-1 sm:block" />
-        <div className="relative flex w-full items-center sm:w-auto">
+        <div className="relative flex items-center flex-1 max-w-[150px] sm:flex-initial sm:w-auto">
           <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
           <input
             value={hudSearch}
@@ -721,7 +721,7 @@ const LiveMapPage = ({
       </header>
 
       {/* ===== COMMAND CENTER LAYOUT ===== */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 md:flex-row">
+      <div className="flex-1 flex flex-col-reverse overflow-hidden bg-slate-50 md:flex-row">
         
         {/* ===== LEFT DATA PANEL ===== */}
         <CommandSidebar 
@@ -786,8 +786,7 @@ const LiveMapPage = ({
             <button
               type="button"
               onClick={() => setShowTrail(p => !p)}
-              className="absolute right-4 bottom-8 z-20 flex items-center gap-1.5 h-9 px-4 rounded-xl bg-white/90 backdrop-blur-md border border-slate-200 text-xs font-bold shadow-lg transition-colors hover:bg-white"
-              style={{ color: showTrail ? '#2563EB' : '#64748B' }}
+              className={`absolute right-4 bottom-8 z-20 flex items-center gap-1.5 h-9 px-4 rounded-xl bg-white/90 backdrop-blur-md border border-slate-200 text-xs font-bold shadow-lg transition-colors hover:bg-white ${showTrail ? 'text-blue-600' : 'text-slate-500'}`}
             >
               {trailLoading ? <Loader2 size={14} className="animate-spin" /> : <Map size={14} />}
               {showTrail ? `${driverTrailPoints.length} trail` : 'Show Trail'}
@@ -810,7 +809,7 @@ const LiveMapPage = ({
             {/* Modal header */}
             <div className="flex items-center justify-between gap-3 px-4 py-4 border-b border-slate-100 bg-slate-50/50 sm:px-6 sm:py-5">
               <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl font-black text-xl shadow-sm border ${
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl font-black text-xl shadow-sm border ${
                   selectedSummary?.fresh && selectedSummary?.movementState === 'moving'
                     ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                     : selectedSummary?.fresh ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-100 text-slate-500 border-slate-200'
@@ -849,22 +848,22 @@ const LiveMapPage = ({
                 <>
                   {/* Time stats grid */}
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                    <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Moving</p>
                       <p className="mt-1 text-2xl font-black text-blue-600 tabular-nums">{formatTelemetryDuration(selectedTracking?.totalMovingMinutes || selectedSummary?.movingMinutes || 0)}</p>
                       <p className="text-[10px] font-semibold text-slate-500 mt-0.5 uppercase">today</p>
                     </div>
-                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                    <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Stopped</p>
                       <p className="mt-1 text-2xl font-black text-amber-500 tabular-nums">{formatTelemetryDuration(selectedTracking?.totalStoppedMinutes || selectedSummary?.dwellMinutes || 0)}</p>
                       <p className="text-[10px] font-semibold text-slate-500 mt-0.5 uppercase">today</p>
                     </div>
-                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                    <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Longest</p>
                       <p className="mt-1 text-2xl font-black text-rose-500 tabular-nums">{formatTelemetryDuration(selectedTracking?.longestStopMinutes || 0)}</p>
                       <p className="text-[10px] font-semibold text-slate-500 mt-0.5 uppercase">stop</p>
                     </div>
-                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                    <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Miles</p>
                       <p className="mt-1 text-2xl font-black text-emerald-600 tabular-nums">{selectedTracking ? `${Number(selectedTracking.totalTrackedMiles || 0).toFixed(1)}` : '0.0'}</p>
                       <p className="text-[10px] font-semibold text-slate-500 mt-0.5 uppercase">tracked</p>
@@ -872,7 +871,7 @@ const LiveMapPage = ({
                   </div>
 
                   {/* Current status card */}
-                  <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+                  <div className="rounded-xl bg-white border border-slate-200 p-5 shadow-sm">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Current status</p>
@@ -897,12 +896,12 @@ const LiveMapPage = ({
 
                   {/* Stops + upcoming summary */}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                    <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Stops</p>
                       <p className="mt-1 text-2xl font-black text-slate-900 tabular-nums">{selectedTracking?.stopCount || 0}</p>
                       <p className="text-[10px] font-semibold text-slate-500 uppercase mt-0.5">today</p>
                     </div>
-                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                    <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Trips done</p>
                       <p className="mt-1 text-2xl font-black text-emerald-600 tabular-nums">{selectedSummary?.completed || 0}</p>
                       <p className="text-[10px] font-semibold text-slate-500 uppercase mt-0.5">{selectedSummary?.upcoming?.length || 0} upcoming</p>
@@ -910,7 +909,7 @@ const LiveMapPage = ({
                   </div>
 
                   {/* Location coordinates */}
-                  <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                  <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Coordinates</p>
                     <p className="mt-1 font-mono text-sm font-semibold text-slate-700">{selectedPoint ? `${selectedPoint.lat.toFixed(6)}, ${selectedPoint.lng.toFixed(6)}` : 'No coordinates'}</p>
                     <p className="text-[11px] font-semibold text-slate-500 mt-1">Accuracy: {selectedDriver?.locationAccuracy ? `${Math.round(selectedDriver.locationAccuracy)}m` : 'Unknown'}</p>
@@ -929,7 +928,7 @@ const LiveMapPage = ({
                         {selectedSummary.activeTrips.map(trip => {
                           const phase = getTripPhase(trip);
                           return (
-                            <div key={trip.id} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                            <div key={trip.id} className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <p className="truncate text-base font-black text-slate-900 leading-tight">{trip.patient || 'Unknown client'}</p>
@@ -967,10 +966,10 @@ const LiveMapPage = ({
                     <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Nearest pickups</h4>
                     <div className="space-y-3">
                       {nearestTrips.length === 0 && (
-                        <p className="text-sm font-semibold text-slate-500 py-6 text-center border-2 border-dashed border-slate-200 rounded-2xl">Select a driver with GPS to show nearest pickups.</p>
+                        <p className="text-sm font-semibold text-slate-500 py-6 text-center border-2 border-dashed border-slate-200 rounded-xl">Select a driver with GPS to show nearest pickups.</p>
                       )}
                       {nearestTrips.slice(0, 5).map(({ trip, miles, etaMinutes }, index) => (
-                        <div key={trip.id} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                        <div key={trip.id} className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 mb-1">
@@ -1003,7 +1002,7 @@ const LiveMapPage = ({
                       <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Upcoming ({selectedSummary.upcoming.length})</h4>
                       <div className="space-y-3">
                         {selectedSummary.upcoming.slice(0, 5).map(trip => (
-                          <div key={trip.id} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                          <div key={trip.id} className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                             <p className="truncate text-base font-black text-slate-900">{trip.patient || 'Unknown client'}</p>
                             <p className="text-[11px] font-semibold text-slate-500 mt-1">{trip.time || 'Will Call'} · {trip.status}</p>
                             <p className="mt-2 line-clamp-2 text-xs font-medium text-slate-600">{trip.pickup}</p>
@@ -1019,7 +1018,7 @@ const LiveMapPage = ({
                       <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Ride-share savings</h4>
                       <div className="space-y-3">
                         {rideShareCandidates.map(candidate => (
-                          <div key={candidate.id} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                          <div key={candidate.id} className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <p className="text-base font-black text-slate-900"><Zap size={14} className="inline text-amber-500 mr-1.5 mb-0.5" />{candidate.a.patient} + {candidate.b.patient}</p>
@@ -1062,7 +1061,7 @@ const LiveMapPage = ({
                         </div>
                       ))}
                       {(!selectedTracking?.breadcrumbs || selectedTracking.breadcrumbs.length === 0) && (
-                        <p className="text-sm font-semibold text-slate-500 py-6 text-center border-2 border-dashed border-slate-200 rounded-2xl">No breadcrumb history yet.</p>
+                        <p className="text-sm font-semibold text-slate-500 py-6 text-center border-2 border-dashed border-slate-200 rounded-xl">No breadcrumb history yet.</p>
                       )}
                     </div>
                   </div>
@@ -1085,22 +1084,22 @@ const LiveMapPage = ({
                         </div>
                       ))}
                       {(!selectedTracking?.stopEvents || selectedTracking.stopEvents.length === 0) && (
-                        <p className="text-sm font-semibold text-slate-500 py-6 text-center border-2 border-dashed border-slate-200 rounded-2xl">No stop events recorded today.</p>
+                        <p className="text-sm font-semibold text-slate-500 py-6 text-center border-2 border-dashed border-slate-200 rounded-xl">No stop events recorded today.</p>
                       )}
                     </div>
                   </div>
 
                   {/* Telemetry stats */}
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                    <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ping count</p>
                       <p className="mt-1 text-2xl font-black text-slate-900 tabular-nums">{selectedTracking?.totalPings || 0}</p>
                     </div>
-                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                    <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">GPS age</p>
                       <p className="mt-1 text-2xl font-black text-slate-900 tabular-nums">{formatAge(selectedSummary?.lastPing)}</p>
                     </div>
-                    <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                    <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Speed</p>
                       <p className="mt-1 text-2xl font-black text-slate-900 tabular-nums">{selectedDriver?.speedMph ?? selectedDriver?.telemetry?.speedMph ?? 0} mph</p>
                     </div>

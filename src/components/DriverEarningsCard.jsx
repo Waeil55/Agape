@@ -29,7 +29,7 @@ export const DriverEarningsCard = memo(function DriverEarningsCard({ driver, tri
   const weekly = calculateWeeklyEarnings(driver, trips);
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="px-4 py-3 bg-gradient-to-r from-emerald-50 to-green-50 border-b border-slate-200">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">

@@ -3,6 +3,7 @@ import {
   Activity, Wifi, AlertTriangle, CheckCircle, Clock,
   Truck, Database, RefreshCw, TrendingUp, TrendingDown, Shield, Zap
 } from 'lucide-react';
+import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
 
 const StatusDot = ({ status }) => {
   const colors = {
@@ -14,7 +15,7 @@ const StatusDot = ({ status }) => {
 };
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
-  <div className="bg-white rounded-2xl border border-slate-200 p-3 text-center">
+  <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
     <div className={`w-8 h-8 mx-auto rounded-lg ${color} flex items-center justify-center mb-2`}>
       <Icon size={16} />
     </div>
@@ -34,15 +35,12 @@ const SectionHeader = ({ icon: Icon, title, status }) => (
 );
 
 export default function SystemHealthDashboard({ trips = [], drivers = [], logs = [], appSettings = {} }) {
-  const todayKey = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }, []);
+  const todayKey = useMemo(() => localCalendarYmd(), []);
 
   const appStats = useMemo(() => {
     const todayTrips = trips.filter(t => {
       const d = t.date || t.tripDate || '';
-      return d === todayKey;
+      return tripCalendarDateKey(d) === todayKey;
     });
     const onlineDrivers = drivers.filter(d => d.status === 'Online' || d.status === 'Active' || d.clockedIn);
     return {
@@ -164,7 +162,7 @@ export default function SystemHealthDashboard({ trips = [], drivers = [], logs =
         <StatCard icon={Zap} label="Total Drivers" value={appStats.totalDrivers} color="bg-amber-50 text-amber-600" />
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <SectionHeader icon={Database} title="System Status" status={systemStatus.firestoreStatus} />
         <div className="divide-y divide-slate-100">
           <div className="px-4 py-2.5 flex items-center justify-between">
@@ -204,7 +202,7 @@ export default function SystemHealthDashboard({ trips = [], drivers = [], logs =
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <SectionHeader icon={TrendingUp} title="Performance Metrics" />
         <div className="grid grid-cols-3 divide-x divide-slate-100">
           <div className="px-4 py-3 text-center">
@@ -228,7 +226,7 @@ export default function SystemHealthDashboard({ trips = [], drivers = [], logs =
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <SectionHeader icon={AlertTriangle} title="Recent Alerts" />
         <div className="divide-y divide-slate-100">
           {alerts.length === 0 ? (
@@ -254,7 +252,7 @@ export default function SystemHealthDashboard({ trips = [], drivers = [], logs =
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <SectionHeader icon={Truck} title="Fleet Status" status={fleetStatus.status} />
         <div className="grid grid-cols-3 divide-x divide-slate-100">
           <div className="px-4 py-3 text-center">
