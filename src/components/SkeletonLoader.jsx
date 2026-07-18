@@ -26,23 +26,7 @@ const SkeletonLoader = ({ type = 'page', rows = 5 }) => {
     );
   }
 
-  if (type === 'chat') {
-    return (
-      <div className="flex-1 min-h-0 bg-slate-50 p-4 space-y-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
-            <div className={`max-w-[70%] space-y-1 ${i % 2 === 0 ? 'items-start' : 'items-end'}`}>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-slate-300 rounded-full animate-pulse" />
-                <div className="h-3 bg-slate-300 rounded-lg w-16 animate-pulse" />
-              </div>
-              <div className={`h-10 ${i % 2 === 0 ? 'bg-white rounded-xl rounded-bl-md' : 'bg-blue-500 rounded-xl rounded-br-md'} animate-pulse`} />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
+
 
   if (type === 'list') {
     return (

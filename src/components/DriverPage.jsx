@@ -33,7 +33,7 @@ import {
 } from '../utils/timeTracking';
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
-const ChatPage = lazy(() => import('./chat/ChatPage'));
+
 import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
 import { normalizeEmail } from '../utils/accessControl';
 import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
@@ -537,7 +537,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, chatUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
+const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
   const [phoneNumbersFallback, setPhoneNumbersFallback] = useState(null);
 
   useEffect(() => {
@@ -636,9 +636,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [activeNav, setActiveNav] = useState(() => {
     if (defaultTripId) return 'active-trip';
     const savedNav = localStorage.getItem(`agape_drvNav_${userKey}`) || 'trips';
-    return ['trips', 'tools', 'chat', 'history', 'settings', 'active-trip'].includes(savedNav) ? savedNav : 'trips';
+    return ['trips', 'tools', 'history', 'settings', 'active-trip'].includes(savedNav) ? savedNav : 'trips';
   });
-  const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState(() => localStorage.getItem(`agape_drvHistFilter_${userKey}`) || 'all');
   const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
   const [historyDate, setHistoryDate] = useState(() => localCalendarYmd());
@@ -649,12 +648,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     localStorage.setItem(`agape_drvHistSearch_${userKey}`, historySearch);
   }, [activeNav, historyFilter, historySearch, userKey]);
 
-  useEffect(() => {
-    const openChat = () => setActiveNav('chat');
-    if (sessionStorage.getItem('agape_open_chat_channel')) openChat();
-    window.addEventListener('agape:open-chat', openChat);
-    return () => window.removeEventListener('agape:open-chat', openChat);
-  }, []);
+
   const [selectedTrips, setSelectedTrips] = useState([]);
   const [routePlanStops, setRoutePlanStops] = useState(null);
   const [aiOptimizing, setAiOptimizing] = useState(false);
@@ -3442,7 +3436,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const items = [
       { id: 'trips', label: 'Trips', icon: Home },
       { id: 'tools', label: 'Tools', icon: Zap },
-      { id: 'chat', label: 'Chat', icon: MessageCircle, badge: chatUnreadCount },
+
       { id: 'history', label: 'History', icon: Clock },
       { id: 'settings', label: 'Settings', icon: Settings },
     ];
@@ -3455,7 +3449,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       items.splice(1, 0, { id: 'active-trip', label: firstName, sublabel: lastName, icon: Truck });
     }
     return items;
-  }, [activeWorkTripId, activeWorkTrip, chatUnreadCount]);
+  }, [activeWorkTripId, activeWorkTrip]);
 
   const navApp = appSettings.navigationApp || 'google';
 
@@ -5131,16 +5125,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
       )}
 
-      {activeNav === 'chat' && (
-        <div 
-          className="driver-page-chat-wrapper flex-1 min-h-0 overflow-hidden flex flex-col"
-          style={{ paddingBottom: isChatThreadOpen ? 0 : 'calc(72px + env(safe-area-inset-bottom, 0px))' }}
-        >
-          <Suspense fallback={<div className="h-full flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
-            <ChatPage onBack={() => { if (isEmbedded && onEmbeddedClose) { onEmbeddedClose(); } else { setActiveNav('trips'); } }} onThreadActiveChange={setIsChatThreadOpen} />
-          </Suspense>
-        </div>
-      )}
+
 
       {/* ===== TOOLS PAGE ===== */}
       {activeNav === 'tools' && (
@@ -6389,7 +6374,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       })()}
 
       {/* ===== BOTTOM NAVIGATION ===== */}
-      {!isEmbedded && !(activeNav === 'chat' && isChatThreadOpen) && (
+      {!isEmbedded && (
         <nav className="bottom-nav md:hidden">
           <div className="flex h-full items-center justify-between gap-1 px-3">
               {navItems.map((item) => {

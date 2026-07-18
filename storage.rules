@@ -5,22 +5,6 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    function allowedChatUploadType() {
-      return request.resource.contentType.matches(
-        'image/.*|application/pdf|text/plain|text/csv|application/msword|application/vnd.ms-excel|application/vnd.openxmlformats-officedocument.*'
-      );
-    }
-
-    match /chat_uploads/{userId}/{fileName} {
-      allow read: if signedIn();
-      allow create: if signedIn()
-        && request.auth.uid == userId
-        && request.resource.size <= 10 * 1024 * 1024
-        && allowedChatUploadType();
-      allow update: if false;
-      allow delete: if signedIn() && request.auth.uid == userId;
-    }
-
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -13,7 +13,7 @@ import DriversVehiclesPage from './DriversVehiclesPage';
 import UsersPage from './UsersPage';
 import DriverAvatar from './DriverAvatar';
 import DriverPerformanceCard from './DriverPerformanceCard';
-import AdminChatMonitor from './AdminChatMonitor';
+
 import { getDriverLiveStatus } from '../constants/statuses';
 import PayrollReportPage from './PayrollReportPage';
 import {
@@ -133,7 +133,7 @@ const CompactActivityFeed = ({ logs = [], onViewTrip, limit = 8 }) => (
   </AdminCard>
 );
 
-const AdminSignalPanel = ({ openTrips, activeTrips, unassignedTrips, offlineDrivers, chatUnreadCount }) => {
+const AdminSignalPanel = ({ openTrips, activeTrips, unassignedTrips, offlineDrivers }) => {
   const signals = [
     {
       label: 'Open Manifest',
@@ -152,12 +152,6 @@ const AdminSignalPanel = ({ openTrips, activeTrips, unassignedTrips, offlineDriv
       value: activeTrips.length,
       hint: 'Drivers actively working',
       tone: activeTrips.length ? 'warning' : 'muted',
-    },
-    {
-      label: 'Unread Chat',
-      value: chatUnreadCount,
-      hint: 'Messages waiting for admin',
-      tone: chatUnreadCount ? 'info' : 'muted',
     },
   ];
 
@@ -502,7 +496,7 @@ const exportFullJson = (trips, drivers, dispatchers, vehicles, logs) => {
 const DesktopAdminPage = ({
   role, currentUser, drivers = [], setDrivers, upsertDriverProfile, dispatchers = [], setDispatchers,
   addAuditLog, logs = [], trips = [], vehicles = [], setVehicles,
-  assignTripToDriver, requestAuthAction, onViewTrip, chatUnreadCount = 0
+  assignTripToDriver, requestAuthAction, onViewTrip
 }) => {
   const [activeSection, setActiveSection] = useState('overview');
   const [pwResetMsg, setPwResetMsg] = useState({});
@@ -779,7 +773,6 @@ const DesktopAdminPage = ({
               <div className="admin-hero-signal-strip">
                 <span><CheckCircle2 size={13} /> {completedTrips.length} completed</span>
                 <span><BellRing size={13} /> {unassignedTrips.length} needs dispatch</span>
-                <span><MessageCircle size={13} /> {chatUnreadCount} unread</span>
               </div>
             </div>
             <div className="admin-hero-actions">
@@ -801,7 +794,6 @@ const DesktopAdminPage = ({
               activeTrips={activeTrips}
               unassignedTrips={unassignedTrips}
               offlineDrivers={driverStatusCounts.offline}
-              chatUnreadCount={chatUnreadCount}
             />
             <AdminCoveragePanel counts={driverStatusCounts} total={drivers.length} />
             <AdminPriorityQueue trips={attentionTrips} onViewTrip={onViewTrip} />
@@ -955,12 +947,7 @@ const DesktopAdminPage = ({
           />
         </AdminSectionFrame>
       ) },
-    { id: 'chat', title: 'Chat Monitor', icon: MessageCircle, roles: ['admin'],
-      content: (
-        <AdminSectionFrame eyebrow="Communication" title="Chat monitor">
-          <AdminChatMonitor chatUnreadCount={chatUnreadCount} />
-        </AdminSectionFrame>
-      ) },
+
     { id: 'payroll', title: 'Payroll', icon: DollarSign, roles: ['admin', 'dispatcher'],
       content: (
         <AdminSectionFrame eyebrow="Finance" title="Payroll report">
@@ -982,7 +969,7 @@ const DesktopAdminPage = ({
       id: s.id,
       label: s.title,
       icon: s.icon,
-      badge: s.id === 'chat' ? (chatUnreadCount > 0 ? chatUnreadCount : undefined) : (s.count != null ? s.count : undefined),
+      badge: s.count != null ? s.count : undefined,
     })),
   }];
 

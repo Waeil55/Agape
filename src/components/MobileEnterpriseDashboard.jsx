@@ -33,7 +33,7 @@ const DriverToolsPage = lazy(() => import('./DriverToolsPage'));
 const PayrollReportPage = lazy(() => import('./PayrollReportPage'));
 const TimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
 import { getDriverLiveStatus } from '../constants/statuses';
-const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })));
+
 const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
 const RoutePlannerPage = lazy(() => import('./RoutePlannerPage'));
 
@@ -44,11 +44,10 @@ const MobileFallback = () => (
 );
 
 const MobileEnterpriseDashboard = (props) => {
-  const { trips = [], drivers = [], currentUser, role, onLogout, chatUnreadCount = 0 } = props;
+  const { trips = [], drivers = [], currentUser, role, onLogout } = props;
   const [currentView, setCurrentView] = useState('trips');
   const [subView, setSubView] = useState(null);
   const [dispatchWorkspaceMode, setDispatchWorkspaceMode] = useState('board');
-  const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [tripDetails, setTripDetails] = useState(null);
   const [tripWorkflowActive, setTripWorkflowActive] = useState(false);
@@ -116,7 +115,7 @@ const MobileEnterpriseDashboard = (props) => {
     setExpandedId(null);
   };
 
-  const VALID_VIEWS = ['trips', 'map', 'reports', 'chat', 'tools', 'menu'];
+  const VALID_VIEWS = ['trips', 'map', 'reports', 'tools', 'menu'];
   useEffect(() => {
     if (!VALID_VIEWS.includes(currentView)) setCurrentView('trips');
   }, [currentView]);
@@ -125,15 +124,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (toolsDriverId) localStorage.setItem('agape_toolsDriverId', toolsDriverId);
   }, [toolsDriverId]);
 
-  useEffect(() => {
-    const openChat = () => {
-      setCurrentView('chat');
-      setSubView(null);
-    };
-    if (sessionStorage.getItem('agape_open_chat_channel')) openChat();
-    window.addEventListener('agape:open-chat', openChat);
-    return () => window.removeEventListener('agape:open-chat', openChat);
-  }, []);
+
 
   const getProfileTitle = () => {
     return role === 'admin' ? 'Agape Care Admin' : 'Agape Care Dispatch';
@@ -282,7 +273,6 @@ const MobileEnterpriseDashboard = (props) => {
                 dispatchers={props.dispatchers || []}
                 driverAssignments={props.driverAssignments || []}
                 assignmentUnreadCount={props.assignmentUnreadCount || 0}
-                chatUnreadCount={chatUnreadCount}
                 onAcknowledgeAssignment={props.onAcknowledgeAssignment || (() => {})}
                 onAcceptAssignment={props.onAcceptAssignment || (() => {})}
                 isEmbedded
@@ -512,19 +502,7 @@ const MobileEnterpriseDashboard = (props) => {
       );
     }
 
-    if (currentView === 'chat') {
-      return (
-        <div className="mobile-chat-wrapper flex-1 min-h-0 overflow-hidden flex flex-col">
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <ErrorBoundary>
-              <Suspense fallback={<MobileFallback />}>
-                <ChatPage onBack={() => setCurrentView('trips')} onThreadActiveChange={setIsChatThreadOpen} />
-              </Suspense>
-            </ErrorBoundary>
-          </div>
-        </div>
-      );
-    }
+
 
     if (currentView === 'map') {
       return (
@@ -642,7 +620,7 @@ const MobileEnterpriseDashboard = (props) => {
   // Show the bottom nav everywhere EXCEPT:
   // 1. When a trip detail overlay is open (full-screen DriverPage)
   // 2. When a chat thread is open inside chat view (thread takes full screen)
-  const showNav = !tripDetails && !(currentView === 'chat' && isChatThreadOpen);
+  const showNav = !tripDetails;
 
   if (currentView === 'trips' && driverWorkDriverId !== 'all') {
     const activeDriver = activeDriverWorkDriver;
@@ -679,7 +657,7 @@ const MobileEnterpriseDashboard = (props) => {
             dispatchers={props.dispatchers || []}
             driverAssignments={props.driverAssignments || []}
             assignmentUnreadCount={props.assignmentUnreadCount || 0}
-            chatUnreadCount={chatUnreadCount}
+
             onAcknowledgeAssignment={props.onAcknowledgeAssignment || (() => {})}
             onAcceptAssignment={props.onAcceptAssignment || (() => {})}
             onAddTrip={props.addTrip}
@@ -765,7 +743,7 @@ const MobileEnterpriseDashboard = (props) => {
                     dispatchers={props.dispatchers || []}
                     driverAssignments={props.driverAssignments || []}
                     assignmentUnreadCount={props.assignmentUnreadCount || 0}
-                    chatUnreadCount={chatUnreadCount}
+
                     onAcknowledgeAssignment={props.onAcknowledgeAssignment || (() => {})}
                     onAcceptAssignment={props.onAcceptAssignment || (() => {})}
                     onAddTrip={props.addTrip}
@@ -832,21 +810,7 @@ const MobileEnterpriseDashboard = (props) => {
               <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Reports</span>
             </button>
 
-            {/* Chat */}
-            <button
-              onClick={() => handleNavClick('chat')}
-              className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
-            >
-              <span className="relative inline-flex">
-                <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 1.8 : 1.3} />
-                {chatUnreadCount > 0 && (
-                  <span key={chatUnreadCount} className="messenger-nav-badge absolute -right-2.5 -top-1.5 badge-messenger badge-pop badge-pulse">
-                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-                  </span>
-                )}
-              </span>
-              <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
-            </button>
+
 
             {/* Tools */}
             <button

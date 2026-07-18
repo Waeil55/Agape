@@ -21,7 +21,7 @@ const MobileDispatchView = lazy(() => import('./MobileDispatchView'));
 const AdminPage = lazy(() => import('./AdminPage'));
 const DriverPage = lazy(() => import('./DriverPage'));
 const RoutePlannerPage = lazy(() => import('./RoutePlannerPage'));
-const ChatPage = lazy(() => import('./chat').then(m => ({ default: m.ChatPage })));
+
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LiveMapPage = lazy(() => import('./LiveMapPage'));
 const DispatchAssistant = lazy(() => import('./DispatchAssistant'));
@@ -148,10 +148,10 @@ const DesktopEnterpriseDashboard = ({
   makeCall, sendSMS, handleUpdateDriverLocation, addTrip, showAddTripModal, setShowAddTripModal,
   driverTelemetry = [],
   onDispatcherStatusUpdate, driverWorkDrivers = [], driverWorkTrips = [], allDrivers = [],
-  onUpdateMission, onUpdateDriverTrip, onDriverStatusUpdate, onCompleteTrip, onLogout, chatUnreadCount = 0
+  onUpdateMission, onUpdateDriverTrip, onDriverStatusUpdate, onCompleteTrip, onLogout
 }) => {
   const displayLoginId = String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '');
-  const VALID_PANELS = ['operations', 'liveMap', 'archives', 'reports', 'admin', 'settings', 'drive', 'chat', 'routePlanner', 'dispatch'];
+  const VALID_PANELS = ['operations', 'liveMap', 'archives', 'reports', 'admin', 'settings', 'drive', 'routePlanner', 'dispatch'];
   const [activePanel, setActivePanel] = useState(() => {
     const saved = localStorage.getItem('agape_activePanel');
     return saved && VALID_PANELS.includes(saved) ? saved : 'operations';
@@ -275,12 +275,7 @@ const DesktopEnterpriseDashboard = ({
 
   const todayStr = localCalendarYmd();
 
-  useEffect(() => {
-    const openChat = () => setActivePanel('chat');
-    if (sessionStorage.getItem('agape_open_chat_channel')) openChat();
-    window.addEventListener('agape:open-chat', openChat);
-    return () => window.removeEventListener('agape:open-chat', openChat);
-  }, [setActivePanel]);
+
 
   const sidebarItems = [
     { id: 'operations', label: 'Dispatch', icon: LayoutDashboard, roles: ['admin', 'dispatcher'] },
@@ -381,12 +376,11 @@ const DesktopEnterpriseDashboard = ({
       ...(driverWorkDrivers.length > 0 ? [{ id: 'drive', label: 'Drive', icon: Truck, active: activePanel === 'drive', action: () => setActivePanel('drive') }] : []),
       ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
       { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => setActivePanel('reports') },
-      { id: 'chat', label: 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat'), badge: chatUnreadCount },
       { id: 'map', label: 'Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
       { id: 'settings', label: 'Settings', icon: Settings, active: activePanel === 'settings', action: () => setActivePanel('settings') },
     ];
     return items;
-  }, [activePanel, chatUnreadCount, driverWorkDrivers.length, openOperationsWorkspace, role, setActivePanel, showSequencerModal]);
+  }, [activePanel, driverWorkDrivers.length, openOperationsWorkspace, role, setActivePanel, showSequencerModal]);
 
   const topActionItems = useMemo(() => {
     switch (activePanel) {
@@ -494,11 +488,6 @@ const DesktopEnterpriseDashboard = ({
               >
                 <span className="relative inline-flex">
                   <Icon size={13} />
-                  {item.badge > 0 && (
-                    <span key={item.badge} className="messenger-nav-badge absolute -right-2.5 -top-2 badge-messenger badge-pop badge-pulse">
-                      {item.badge > 99 ? '99+' : item.badge}
-                    </span>
-                  )}
                 </span>
                 <span>{item.label}</span>
               </button>
@@ -1162,7 +1151,7 @@ const DesktopEnterpriseDashboard = ({
           <ReportsPage trips={trips} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} />
         </Suspense></ErrorBoundary>
       );
-      case 'chat': return <ErrorBoundary><Suspense fallback={<LazyFallback />}><ChatPage onBack={() => setActivePanel('operations')} /></Suspense></ErrorBoundary>;
+
       case 'archives': return <ErrorBoundary><Suspense fallback={<LazyFallback />}><ArchivesPage trashedTrips={trashedTrips} restoreTrip={restoreTrip} drivers={drivers} role={role} updateTrashedTrip={updateTrashedTrip} /></Suspense></ErrorBoundary>;
       case 'admin': return (
         <ErrorBoundary><Suspense fallback={<LazyFallback />}>
@@ -1258,7 +1247,7 @@ const DesktopEnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${activePanel === 'reports' || activePanel === 'chat' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'chat', 'liveMap'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+            <div className={`flex-1 min-h-0 ${activePanel === 'reports' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
@@ -1267,7 +1256,7 @@ const DesktopEnterpriseDashboard = ({
               </Suspense></ErrorBoundary>
             ) : (
               <div className={
-                activePanel === 'drive' || activePanel === 'admin' || activePanel === 'chat'
+                activePanel === 'drive' || activePanel === 'admin'
                   ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0'
                   : 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm overflow-hidden'
               }>
