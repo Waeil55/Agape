@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   db, auth, collection, doc, setDoc, query, where,
-  orderBy, onSnapshot, serverTimestamp, increment, updateDoc, writeBatch, arrayUnion, arrayRemove
+  orderBy, limit, startAfter, getDocs, onSnapshot, serverTimestamp, increment, updateDoc, writeBatch, arrayUnion, arrayRemove
 } from '../config/firebase';
 import { playMessageSound, playMessageSentSound } from '../utils/notificationSound';
 import { showLocalNotification } from '../config/notifications';
@@ -18,6 +18,9 @@ export const useChat = ({ alerts = true } = {}) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [contactPresence, setContactPresence] = useState(null);
+  const [oldestMessageCursor, setOldestMessageCursor] = useState(null);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const initializedChannelsRef = useRef(false);
 
   // 1. Subscribe to Current User Profile
@@ -154,18 +157,36 @@ export const useChat = ({ alerts = true } = {}) => {
     }
 
     const messagesRef = collection(db, 'chat_channels', activeChannelId, 'messages');
-    const q = query(messagesRef, orderBy('timestamp', 'asc'));
+    const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(100));
 
     const unsubMessages = onSnapshot(q, (snap) => {
       const list = [];
       snap.forEach((doc) => {
         list.push({ id: doc.id, ...doc.data() });
       });
-      setMessages(list);
+      setMessages(list.reverse());
+      setOldestMessageCursor(snap.docs[snap.docs.length - 1] || null);
+      setHasOlderMessages(snap.size === 100);
     });
 
     return () => unsubMessages();
   }, [activeChannelId, draftChannel]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!activeChannelId || !oldestMessageCursor || loadingOlderMessages || !hasOlderMessages) return;
+    setLoadingOlderMessages(true);
+    try {
+      const messagesRef = collection(db, 'chat_channels', activeChannelId, 'messages');
+      const olderQuery = query(messagesRef, orderBy('timestamp', 'desc'), startAfter(oldestMessageCursor), limit(100));
+      const snapshot = await getDocs(olderQuery);
+      const older = snapshot.docs.map(item => ({ id: item.id, ...item.data() })).reverse();
+      setMessages(current => [...older, ...current]);
+      setOldestMessageCursor(snapshot.docs[snapshot.docs.length - 1] || oldestMessageCursor);
+      setHasOlderMessages(snapshot.size === 100);
+    } finally {
+      setLoadingOlderMessages(false);
+    }
+  }, [activeChannelId, oldestMessageCursor, loadingOlderMessages, hasOlderMessages]);
 
   const markChannelRead = useCallback(async (channelId) => {
     if (!currentUser || !channelId || draftChannel?.id === channelId) return;
@@ -184,7 +205,7 @@ export const useChat = ({ alerts = true } = {}) => {
   }, [activeChannelId, messages.length, markChannelRead]);
 
   // 5. Send Message Action
-  const sendMessage = useCallback(async (text, attachment = null) => {
+  const sendMessage = useCallback(async (text, attachment = null, requestId = null, replyTo = null) => {
     if (!currentUser || !activeChannelId || (!text.trim() && !attachment)) return;
 
     const messagesRef = collection(db, 'chat_channels', activeChannelId, 'messages');
@@ -193,13 +214,15 @@ export const useChat = ({ alerts = true } = {}) => {
     const batch = writeBatch(db);
     
     // Add Message Doc
-    const newMsgRef = doc(messagesRef);
+    const newMsgRef = requestId ? doc(messagesRef, requestId) : doc(messagesRef);
     batch.set(newMsgRef, {
       text,
       senderId: currentUser.id,
       senderName: currentUser.name || currentUser.username || currentUser.email,
       timestamp: serverTimestamp(),
+      clientRequestId: newMsgRef.id,
       ...(attachment ? { attachment } : {}),
+      ...(replyTo ? { replyTo } : {}),
     });
 
     // Update Channel Doc
@@ -389,5 +412,8 @@ export const useChat = ({ alerts = true } = {}) => {
     unreadByChannel,
     unreadCount,
     contactPresence,
+    loadOlderMessages,
+    hasOlderMessages,
+    loadingOlderMessages,
   };
 };

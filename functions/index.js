@@ -56,6 +56,34 @@ exports.notifyChatMessage = functions.firestore
     return null;
   });
 
+exports.auditChatMessageChanges = functions.firestore
+  .document("chat_channels/{channelId}/messages/{messageId}")
+  .onWrite(async (change, context) => {
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.exists ? change.after.data() : null;
+    let action = "chat.message.created";
+    if (!after) action = "chat.message.deleted";
+    else if (after.deletedAt && !before?.deletedAt) action = "chat.message.removed";
+    else if (after.editedAt && (!before?.editedAt || !after.editedAt.isEqual(before.editedAt))) action = "chat.message.edited";
+    else if (before && JSON.stringify(after.reactions || {}) !== JSON.stringify(before.reactions || {})) action = "chat.message.reaction_changed";
+    else if (before) return null;
+
+    await admin.firestore().collection("audit_logs").add({
+      action,
+      entityType: "chat_message",
+      entityId: context.params.messageId,
+      channelId: context.params.channelId,
+      actorId: after?.deletedBy || after?.senderId || before?.senderId || "unknown",
+      hasAttachment: Boolean(after?.attachment || before?.attachment),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    if (after?.deletedAt && !before?.deletedAt && after.attachment?.path) {
+      await admin.storage().bucket().file(after.attachment.path).delete({ ignoreNotFound: true });
+    }
+    return null;
+  });
+
 function normalizePhone(raw) {
   if (!raw) return raw;
   const digits = raw.replace(/\D/g, "");

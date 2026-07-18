@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Phone, Info, Search, Plus, Smile, ThumbsUp, Send,
   MessageSquare, Loader2, X, Mail, ShieldCheck, Briefcase, CheckCheck,
-  Paperclip, FileText, Download, Pencil, Trash2, Bell, BellOff
+  Paperclip, FileText, Download, Pencil, Trash2, Bell, BellOff, Reply
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import { makeCall } from '../../utils/nativeActions';
@@ -40,7 +40,10 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     deleteMessage,
     toggleReaction,
     contactPresence,
-    toggleMute
+    toggleMute,
+    loadOlderMessages,
+    hasOlderMessages,
+    loadingOlderMessages
   } = useChat({ alerts: false });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,10 +58,13 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   const [pendingFile, setPendingFile] = useState(null);
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingText, setEditingText] = useState('');
+  const [replyTo, setReplyTo] = useState(null);
   const [typingClock, setTypingClock] = useState(() => Date.now());
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const typingTimerRef = useRef(null);
+  const sendRequestIdRef = useRef(null);
+  const suppressNextScrollRef = useRef(false);
 
   // Notify parent of active thread state change
   useEffect(() => {
@@ -69,8 +75,21 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
 
   // Scroll to bottom of message list on new messages
   useEffect(() => {
+    if (suppressNextScrollRef.current) { suppressNextScrollRef.current = false; return; }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, activeChannelId]);
+
+  useEffect(() => {
+    if (!activeChannelId) { setComposerText(''); return; }
+    setComposerText(localStorage.getItem(`agape_chat_draft_${activeChannelId}`) || '');
+  }, [activeChannelId]);
+
+  useEffect(() => {
+    if (!activeChannelId) return;
+    const key = `agape_chat_draft_${activeChannelId}`;
+    if (composerText) localStorage.setItem(key, composerText);
+    else localStorage.removeItem(key);
+  }, [activeChannelId, composerText]);
 
   useEffect(() => () => {
     clearTimeout(typingTimerRef.current);
@@ -93,11 +112,14 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
         const safeName = pendingFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
         const fileRef = storageRef(storage, `chat_attachments/${currentUser.id}/${Date.now()}-${safeName}`);
         await uploadBytes(fileRef, pendingFile, { contentType: pendingFile.type });
-        attachment = { url: await getDownloadURL(fileRef), name: pendingFile.name, type: pendingFile.type, size: pendingFile.size };
+        attachment = { url: await getDownloadURL(fileRef), path: fileRef.fullPath, name: pendingFile.name, type: pendingFile.type, size: pendingFile.size };
       }
-      await sendMessage(text || (attachment ? '' : '👍'), attachment);
+      if (!sendRequestIdRef.current) sendRequestIdRef.current = crypto.randomUUID();
+      await sendMessage(text || (attachment ? '' : '👍'), attachment, sendRequestIdRef.current, replyTo ? { id: replyTo.id, senderName: replyTo.senderName, text: (replyTo.text || 'Attachment').slice(0, 180) } : null);
       if (!textToSend) setComposerText('');
       setPendingFile(null);
+      setReplyTo(null);
+      sendRequestIdRef.current = null;
       setTyping(false);
     } catch (error) {
       console.error('Message send failed:', error);
@@ -331,6 +353,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
             {/* Messages Feed */}
             <div className="agape-messenger-thread-messages flex-1 overflow-y-auto p-4 md:px-8 md:py-6 flex flex-col gap-3">
               <div className="agape-messenger-date-divider">{activeChannel.isDraft ? 'New private conversation' : 'Secure team conversation'}</div>
+              {hasOlderMessages && <button onClick={() => { suppressNextScrollRef.current = true; loadOlderMessages(); }} disabled={loadingOlderMessages} className="mx-auto mb-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 shadow-sm disabled:opacity-50">{loadingOlderMessages ? 'Loading history…' : 'Load older messages'}</button>}
 
               {activeChannel.isDraft && messages.length === 0 && !threadQuery && (
                 <div className="m-auto max-w-sm text-center px-6">
@@ -351,12 +374,13 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                     ) : !isSent ? <span className="w-7 shrink-0" /> : null}
                     <div className={`agape-messenger-bubble-group ${isSent ? 'is-sent' : 'is-received'}`}>
                       <div className="agape-messenger-bubble">
+                        {msg.replyTo && <div className="mb-2 rounded-lg border-l-2 border-current bg-black/5 px-2 py-1 text-[10px] opacity-75"><strong>{msg.replyTo.senderName || 'Message'}</strong><div className="truncate">{msg.replyTo.text}</div></div>}
                         {msg.deletedAt ? <span className="italic opacity-70">Message removed</span> : editingMessageId === msg.id ? (
                           <div className="flex items-center gap-2"><input autoFocus value={editingText} onChange={event => setEditingText(event.target.value)} className="min-w-0 flex-1 rounded-lg bg-white/90 px-2 py-1 text-slate-900 outline-none" /><button onClick={async () => { await editMessage(msg.id, editingText); setEditingMessageId(null); }} className="text-xs font-black">Save</button></div>
                         ) : <>{msg.text}{msg.editedAt && <span className="ml-1 text-[9px] opacity-60">edited</span>}</>}
                         {msg.attachment && !msg.deletedAt && (msg.attachment.type?.startsWith('image/') ? <a href={msg.attachment.url} target="_blank" rel="noreferrer"><img src={msg.attachment.url} alt={msg.attachment.name} className="mt-2 max-h-64 rounded-xl object-cover" /></a> : <a href={msg.attachment.url} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-xl bg-white/15 p-2"><FileText size={18} /><span className="truncate text-xs font-bold">{msg.attachment.name}</span><Download size={14} /></a>)}
                       </div>
-                      {!msg.deletedAt && <div className={`flex items-center gap-1 ${isSent ? 'justify-end' : 'justify-start'}`}><button onClick={() => toggleReaction(msg, '👍')} className="rounded-full px-1.5 py-0.5 text-xs hover:bg-slate-200">👍</button>{isSent && <><button onClick={() => { setEditingMessageId(msg.id); setEditingText(msg.text || ''); }} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Edit message"><Pencil size={11} /></button><button onClick={() => deleteMessage(msg.id)} className="p-1 text-slate-400 hover:text-rose-600" aria-label="Delete message"><Trash2 size={11} /></button></>}</div>}
+                      {!msg.deletedAt && <div className={`flex items-center gap-1 ${isSent ? 'justify-end' : 'justify-start'}`}><button onClick={() => setReplyTo(msg)} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Reply to message"><Reply size={11} /></button><button onClick={() => toggleReaction(msg, '👍')} className="rounded-full px-1.5 py-0.5 text-xs hover:bg-slate-200">👍</button>{isSent && <><button onClick={() => { setEditingMessageId(msg.id); setEditingText(msg.text || ''); }} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Edit message"><Pencil size={11} /></button><button onClick={() => deleteMessage(msg.id)} className="p-1 text-slate-400 hover:text-rose-600" aria-label="Delete message"><Trash2 size={11} /></button></>}</div>}
                       {msg.reactions && <div className="flex flex-wrap gap-1">{Object.entries(msg.reactions).filter(([, ids]) => ids?.length).map(([emoji, ids]) => <button key={emoji} onClick={() => toggleReaction(msg, emoji)} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] shadow-sm">{emoji} {ids.length}</button>)}</div>}
                       {isLastInGroup && <span className="agape-message-meta">{formatMessageTime(msg.timestamp)}{isSent && <><CheckCheck size={12} />{isMessageSeen(msg, otherReadAt) && <span>Seen</span>}</>}</span>}
                     </div>
@@ -374,6 +398,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
             {/* Composer Bar */}
             {sendError && <div className="bg-rose-50 border-t border-rose-100 px-4 py-2 text-center text-[11px] font-bold text-rose-700">{sendError}</div>}
             {pendingFile && <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700"><FileText size={15} /><span className="min-w-0 flex-1 truncate">{pendingFile.name}</span><button onClick={() => setPendingFile(null)} aria-label="Remove attachment"><X size={15} /></button></div>}
+            {replyTo && <div className="flex items-center gap-2 border-t border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-900"><Reply size={14} /><div className="min-w-0 flex-1"><strong>Replying to {replyTo.senderName || 'message'}</strong><p className="truncate text-[10px] opacity-70">{replyTo.text || 'Attachment'}</p></div><button onClick={() => setReplyTo(null)} aria-label="Cancel reply"><X size={15} /></button></div>}
             <div className="agape-messenger-composer border-t border-slate-200 bg-white px-4 md:px-6 py-3.5 flex items-center gap-3 shrink-0 relative">
               <input ref={fileInputRef} type="file" accept="image/*,.pdf,.txt" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (isAllowedChatAttachment(file)) setPendingFile(file); else if (file) setSendError('Choose an image, PDF, or text file up to 10 MB.'); event.target.value = ''; }} />
               <button onClick={() => fileInputRef.current?.click()} className="w-9 h-9 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center" title="Attach file"><Paperclip size={19} /></button>
