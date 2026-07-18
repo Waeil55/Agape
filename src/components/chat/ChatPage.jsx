@@ -5,6 +5,18 @@ import {
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 
+export const formatDisplayName = (user) => {
+  if (!user) return 'User';
+  let raw = user.name || user.username || user.email || 'User';
+  if (raw.includes('@')) {
+    raw = raw.split('@')[0];
+  }
+  return raw
+    .split(/[\._\-]/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 export const ChatPage = ({ onBack, onThreadActive }) => {
   const {
     currentUser,
@@ -72,9 +84,8 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
 
   const getAvatarUrl = (user) => {
     if (!user) return '';
-    // Generate a premium UI avatar using UI Avatars service
-    const name = user.name || user.username || user.email || 'U';
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128&rounded=true&bold=true`;
+    const displayName = formatDisplayName(user);
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=0D8ABC&color=fff&size=128&rounded=true&bold=true`;
   };
 
   if (loading) {
@@ -104,12 +115,12 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
             </button>
             
             <div className="agape-messenger-avatar-wrap">
-              <img src={getAvatarUrl(otherContact)} alt={otherContact.name} className="agape-messenger-avatar" />
+              <img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="agape-messenger-avatar" />
               <div className="agape-messenger-status-dot" />
             </div>
 
             <div className="min-w-0">
-              <h3 className="text-sm font-bold text-slate-900 truncate leading-tight">{otherContact.name}</h3>
+              <h3 className="text-sm font-bold text-slate-900 truncate leading-tight">{formatDisplayName(otherContact)}</h3>
               <p className="text-[11px] font-semibold text-slate-500 capitalize">{otherContact.role || 'Driver'}</p>
             </div>
           </div>
@@ -226,19 +237,18 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
         />
       </div>
 
-      {/* Stories Carousel (Active Contacts) */}
       <div className="agape-messenger-stories flex gap-4 overflow-x-auto px-4 py-2 scrollbar-none border-b border-slate-100 bg-white shrink-0">
-        {users.map(u => (
+        {users.slice(0, 8).map(u => (
           <div
             key={u.id}
             onClick={() => startDirectChat(u)}
             className="agape-messenger-story flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer"
           >
             <div className="agape-messenger-avatar-wrap">
-              <img src={getAvatarUrl(u)} alt={u.name} className="agape-messenger-avatar w-12 h-12 rounded-full object-cover" />
+              <img src={getAvatarUrl(u)} alt={formatDisplayName(u)} className="agape-messenger-avatar w-12 h-12 rounded-full object-cover" />
               <div className="agape-messenger-status-dot" />
             </div>
-            <span className="text-[11px] font-semibold text-slate-500 truncate w-14 text-center">{u.name || u.username}</span>
+            <span className="text-[11px] font-semibold text-slate-500 truncate w-14 text-center">{formatDisplayName(u)}</span>
           </div>
         ))}
       </div>
@@ -261,7 +271,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
 
               <div className="agape-messenger-row-content flex-1 min-w-0">
                 <div className="agape-messenger-row-header flex justify-between items-baseline mb-0.5">
-                  <span className="agape-messenger-row-name text-sm font-bold text-slate-900 truncate">{other.name}</span>
+                  <span className="agape-messenger-row-name text-sm font-bold text-slate-900 truncate">{formatDisplayName(other)}</span>
                 </div>
                 <div className="agape-messenger-row-snippet text-xs text-slate-500 font-semibold flex items-center justify-between gap-2">
                   <span className="truncate">{ch.lastMessage?.text || 'No messages yet'}</span>
@@ -300,9 +310,9 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                   }}
                   className="w-full flex items-center gap-3 px-3 py-2 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-2xl text-left transition"
                 >
-                  <img src={getAvatarUrl(u)} alt={u.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                  <img src={getAvatarUrl(u)} alt={formatDisplayName(u)} className="w-9 h-9 rounded-full object-cover shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">{u.name || u.username}</h4>
+                    <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">{formatDisplayName(u)}</h4>
                     <p className="text-[10px] text-slate-500 capitalize">{u.role || 'Driver'}</p>
                   </div>
                 </button>
