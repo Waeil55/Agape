@@ -178,7 +178,7 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants;
-        allow create: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants;
+        allow create: if request.auth != null && request.auth.uid in getAfter(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants;
         allow update, delete: if request.auth != null && request.auth.uid == resource.data.senderId;
       }
     }

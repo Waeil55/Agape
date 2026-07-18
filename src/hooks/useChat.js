@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  db, auth, collection, doc, setDoc, query, where,
-  orderBy, onSnapshot, serverTimestamp, increment, getDoc, updateDoc, writeBatch
+  db, auth, collection, doc, query, where,
+  orderBy, onSnapshot, serverTimestamp, increment, updateDoc, writeBatch
 } from '../config/firebase';
 import { playMessageSound, playMessageSentSound } from '../utils/notificationSound';
 import { showLocalNotification } from '../config/notifications';
@@ -13,6 +13,7 @@ export const useChat = ({ alerts = true } = {}) => {
   const [channels, setChannels] = useState([]);
   const [messages, setMessages] = useState([]);
   const [activeChannelId, setActiveChannelId] = useState(null);
+  const [draftChannel, setDraftChannel] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const initializedChannelsRef = useRef(false);
@@ -42,6 +43,7 @@ export const useChat = ({ alerts = true } = {}) => {
         setChannels([]);
         setMessages([]);
         setActiveChannelId(null);
+        setDraftChannel(null);
         setLoading(false);
       }
     });
@@ -92,6 +94,7 @@ export const useChat = ({ alerts = true } = {}) => {
         return tB - tA;
       });
       setChannels(list);
+      setDraftChannel((draft) => draft && list.some((channel) => channel.id === draft.id) ? null : draft);
       // Do not alert for the initial snapshot; only messages that arrive afterwards.
       if (!initializedChannelsRef.current) {
         list.forEach((channel) => {
@@ -122,7 +125,7 @@ export const useChat = ({ alerts = true } = {}) => {
 
   // 4. Subscribe to Messages in Active Channel
   useEffect(() => {
-    if (!activeChannelId) {
+    if (!activeChannelId || draftChannel?.id === activeChannelId) {
       setMessages([]);
       return;
     }
@@ -139,10 +142,10 @@ export const useChat = ({ alerts = true } = {}) => {
     });
 
     return () => unsubMessages();
-  }, [activeChannelId]);
+  }, [activeChannelId, draftChannel]);
 
   const markChannelRead = useCallback(async (channelId) => {
-    if (!currentUser || !channelId) return;
+    if (!currentUser || !channelId || draftChannel?.id === channelId) return;
     try {
       await updateDoc(doc(db, 'chat_channels', channelId), {
         [`readBy.${currentUser.id}`]: serverTimestamp(),
@@ -151,7 +154,7 @@ export const useChat = ({ alerts = true } = {}) => {
     } catch (err) {
       console.warn('Unable to mark chat read:', err);
     }
-  }, [currentUser]);
+  }, [currentUser, draftChannel]);
 
   useEffect(() => {
     if (activeChannelId) markChannelRead(activeChannelId);
@@ -177,11 +180,12 @@ export const useChat = ({ alerts = true } = {}) => {
 
     // Update Channel Doc
     const channel = channels.find((item) => item.id === activeChannelId);
+    const participants = channel?.participants || draftChannel?.participants || [];
     const unreadUpdates = {};
-    (channel?.participants || []).forEach((participantId) => {
+    participants.forEach((participantId) => {
       unreadUpdates[`unreadCounts.${participantId}`] = participantId === currentUser.id ? 0 : increment(1);
     });
-    batch.update(channelRef, {
+    const channelUpdate = {
       lastMessage: {
         text,
         senderId: currentUser.id,
@@ -191,25 +195,40 @@ export const useChat = ({ alerts = true } = {}) => {
       updatedAt: serverTimestamp(),
       [`readBy.${currentUser.id}`]: serverTimestamp(),
       ...unreadUpdates,
-    });
+    };
+    if (channel) {
+      batch.update(channelRef, channelUpdate);
+    } else if (draftChannel) {
+      const recipientId = draftChannel.participants.find((id) => id !== currentUser.id);
+      batch.set(channelRef, {
+        participants: draftChannel.participants,
+        participantDetails: draftChannel.participantDetails,
+        type: 'direct',
+        createdAt: serverTimestamp(),
+        readBy: { [currentUser.id]: serverTimestamp() },
+        unreadCounts: { [currentUser.id]: 0, [recipientId]: 1 },
+        lastMessage: channelUpdate.lastMessage,
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      return;
+    }
 
     await batch.commit();
     playMessageSentSound();
-  }, [currentUser, activeChannelId, channels]);
+  }, [currentUser, activeChannelId, channels, draftChannel]);
 
   // 6. Start / Retrieve Direct Chat Channel
-  const startDirectChat = useCallback(async (otherUser) => {
+  const startDirectChat = useCallback((otherUser) => {
     if (!currentUser || !otherUser) return null;
 
     try {
-      // Deterministic channel ID based on sorted UIDs
       const sortedIds = [currentUser.id, otherUser.id].sort();
       const channelId = `dm_${sortedIds[0]}_${sortedIds[1]}`;
-      const channelRef = doc(db, 'chat_channels', channelId);
-
-      const docSnap = await getDoc(channelRef);
-      if (!docSnap.exists()) {
-        await setDoc(channelRef, {
+      const existingChannel = channels.find((channel) => channel.id === channelId);
+      if (!existingChannel) {
+        setDraftChannel({
+          id: channelId,
           participants: [currentUser.id, otherUser.id],
           participantDetails: {
             [currentUser.id]: {
@@ -226,30 +245,39 @@ export const useChat = ({ alerts = true } = {}) => {
             }
           },
           type: 'direct',
-          readBy: { [currentUser.id]: serverTimestamp() },
-          unreadCounts: { [currentUser.id]: 0, [otherUser.id]: 0 },
-          lastMessage: {
-            text: 'Started a new chat',
-            senderId: 'system',
-            timestamp: serverTimestamp()
-          },
-          updatedAt: serverTimestamp()
+          isDraft: true,
         });
+      } else {
+        setDraftChannel(null);
       }
 
       setActiveChannelId(channelId);
+      setMessages([]);
       return channelId;
     } catch (err) {
       console.error("Error starting direct chat:", err);
       return null;
     }
-  }, [currentUser]);
+  }, [currentUser, channels]);
+
+  const selectChannel = useCallback((channelId) => {
+    if (!channelId) setDraftChannel(null);
+    else if (channelId !== draftChannel?.id) setDraftChannel(null);
+    setActiveChannelId(channelId);
+    setMessages([]);
+  }, [draftChannel]);
+
+  const visibleChannels = useMemo(() => channels.filter((channel) => {
+    const message = channel.lastMessage;
+    return message && message.senderId !== 'system' && message.text !== 'Started a new chat';
+  }), [channels]);
 
   const unreadByChannel = useMemo(() => Object.fromEntries(channels.map((channel) => {
     const message = channel.lastMessage;
     const lastRead = channel.readBy?.[currentUser?.id];
     const messageMs = message?.timestamp?.toMillis?.() || 0;
     const readMs = lastRead?.toMillis?.() || 0;
+    if (!message || message.senderId === 'system') return [channel.id, 0];
     const storedCount = Number(channel.unreadCounts?.[currentUser?.id] || 0);
     return [channel.id, storedCount || (message && message.senderId !== currentUser?.id && messageMs > readMs ? 1 : 0)];
   })), [channels, currentUser]);
@@ -277,10 +305,11 @@ export const useChat = ({ alerts = true } = {}) => {
 
   return {
     currentUser,
-    channels,
+    channels: visibleChannels,
+    draftChannel,
     messages,
     activeChannelId,
-    setActiveChannelId,
+    setActiveChannelId: selectChannel,
     users,
     loading,
     sendMessage,

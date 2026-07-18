@@ -4832,6 +4832,68 @@ html, body {
   overflow: hidden;
 }
 
+@media (max-width: 767px) {
+  .agape-messenger-container {
+    background: #fff;
+  }
+
+  .agape-chat-sidebar-head {
+    padding: 16px 16px 10px;
+  }
+
+  .agape-messenger-stories {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .agape-messenger-row {
+    margin: 2px 8px;
+    padding: 11px 10px;
+  }
+
+  .agape-messenger-thread-header {
+    min-height: 64px;
+    padding: 8px 10px;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  }
+
+  .agape-messenger-thread-header .agape-messenger-avatar {
+    width: 38px;
+    height: 38px;
+  }
+
+  .agape-messenger-thread-messages {
+    padding: 14px 12px 18px;
+    gap: 7px;
+    overscroll-behavior: contain;
+  }
+
+  .agape-messenger-bubble-group {
+    max-width: 82%;
+  }
+
+  .agape-messenger-bubble {
+    padding: 9px 13px;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .agape-messenger-composer {
+    gap: 8px;
+    padding: 9px 10px;
+    padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .agape-messenger-input-wrap {
+    min-width: 0;
+    padding: 7px 12px;
+  }
+
+  .agape-messenger-date-divider {
+    margin: 7px 0 10px;
+  }
+}
+
 .agape-chat-sidebar-head {
   background:
     radial-gradient(circle at 100% 0%, rgb(37 99 235 / 10%), transparent 42%),
@@ -4910,6 +4972,7 @@ html, body {
     flex-direction: column;
     height: 100%;
     background-color: #f8fafc;
+    min-width: 0;
   }
 
   .agape-messenger-bubble-group {

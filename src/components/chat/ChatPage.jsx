@@ -22,6 +22,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   const {
     currentUser,
     channels,
+    draftChannel,
     messages,
     activeChannelId,
     setActiveChannelId,
@@ -41,6 +42,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   const [threadQuery, setThreadQuery] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState('');
   const messagesEndRef = useRef(null);
 
   // Notify parent of active thread state change
@@ -59,9 +61,13 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     const text = (textToSend || composerText).trim();
     if ((!text && !textToSend) || isSending) return;
     setIsSending(true);
+    setSendError('');
     try {
       await sendMessage(text || '👍');
       if (!textToSend) setComposerText('');
+    } catch (error) {
+      console.error('Message send failed:', error);
+      setSendError('Message could not be sent. Check your connection and try again.');
     } finally {
       setIsSending(false);
     }
@@ -74,7 +80,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     return { ...directoryUser, ...(channel.participantDetails?.[otherId] || {}), id: otherId };
   };
 
-  const activeChannel = channels.find(c => c.id === activeChannelId);
+  const activeChannel = channels.find(c => c.id === activeChannelId) || (draftChannel?.id === activeChannelId ? draftChannel : null);
   const otherContact = getOtherParticipant(activeChannel);
   const visibleMessages = threadQuery.trim()
     ? messages.filter(message => (message.text || '').toLowerCase().includes(threadQuery.trim().toLowerCase()))
@@ -274,7 +280,15 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
 
             {/* Messages Feed */}
             <div className="agape-messenger-thread-messages flex-1 overflow-y-auto p-4 md:px-8 md:py-6 flex flex-col gap-3">
-              <div className="agape-messenger-date-divider">Secure team conversation</div>
+              <div className="agape-messenger-date-divider">{activeChannel.isDraft ? 'New private conversation' : 'Secure team conversation'}</div>
+
+              {activeChannel.isDraft && messages.length === 0 && !threadQuery && (
+                <div className="m-auto max-w-sm text-center px-6">
+                  <img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="w-20 h-20 mx-auto rounded-3xl shadow-xl" />
+                  <h4 className="mt-4 text-lg font-black text-slate-950">Start a conversation with {formatDisplayName(otherContact)}</h4>
+                  <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">This person will only appear in your chats after you send the first message.</p>
+                </div>
+              )}
 
               {visibleMessages.map((msg, index) => {
                 const isSent = msg.senderId === currentUser.id;
@@ -301,6 +315,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
             </div>
 
             {/* Composer Bar */}
+            {sendError && <div className="bg-rose-50 border-t border-rose-100 px-4 py-2 text-center text-[11px] font-bold text-rose-700">{sendError}</div>}
             <div className="agape-messenger-composer border-t border-slate-200 bg-white px-4 md:px-6 py-3.5 flex items-center gap-3 shrink-0 relative">
               <button onClick={() => setShowEmojiPicker(value => !value)} className="w-9 h-9 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center flex-shrink-0" title="Add emoji">
                 <Smile size={20} strokeWidth={2.2} />
@@ -329,6 +344,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                 ) : (
                   <button
                     onClick={() => handleSend('👍')}
+                    disabled={isSending}
                     className="agape-messenger-like-btn text-blue-600 hover:text-blue-700 transition"
                   >
                     <ThumbsUp size={22} strokeWidth={2.2} />
@@ -352,6 +368,17 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
           <div className="p-6 text-center border-b border-slate-100"><img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="w-20 h-20 mx-auto rounded-2xl shadow-lg" /><h4 className="mt-3 text-base font-black text-slate-950">{formatDisplayName(otherContact)}</h4><p className="mt-1 text-xs font-semibold text-slate-500 capitalize">{otherContact.role || 'Team member'}</p><span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Available</span></div>
           <div className="p-4 space-y-2"><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Briefcase size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Role</p><p className="text-xs font-bold text-slate-700 capitalize">{otherContact.role || 'Team member'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Mail size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Email</p><p className="text-xs font-bold text-slate-700 truncate">{otherContact.email || 'Not available'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-blue-50 p-3"><ShieldCheck size={16} className="text-blue-600" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-blue-500">Privacy</p><p className="text-xs font-bold text-blue-900">Internal team channel</p></div></div></div>
         </aside>
+      )}
+
+      {activeChannel && otherContact && showDetails && (
+        <div className="lg:hidden fixed inset-0 z-[320] bg-slate-950/45 backdrop-blur-sm flex items-end" onClick={() => setShowDetails(false)}>
+          <div className="w-full rounded-t-[28px] bg-white p-5 pb-[calc(24px+env(safe-area-inset-bottom,0px))] shadow-2xl" onClick={event => event.stopPropagation()}>
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
+            <div className="flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">Contact</p><h3 className="mt-1 text-base font-black text-slate-950">Conversation details</h3></div><button onClick={() => setShowDetails(false)} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center"><X size={17} /></button></div>
+            <div className="mt-5 flex items-center gap-4 rounded-2xl bg-slate-50 p-4"><img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="h-16 w-16 rounded-2xl shadow-md" /><div className="min-w-0"><h4 className="text-base font-black text-slate-950 truncate">{formatDisplayName(otherContact)}</h4><p className="mt-1 text-xs font-semibold text-slate-500 capitalize">{otherContact.role || 'Team member'}</p><span className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Available</span></div></div>
+            <div className="mt-3 grid grid-cols-2 gap-3"><button onClick={() => otherContact.phone && makeCall(otherContact.phone)} disabled={!otherContact.phone} className="h-12 rounded-2xl bg-slate-950 text-white text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-40"><Phone size={16} /> Call</button><a href={otherContact.email ? `mailto:${otherContact.email}` : undefined} className={`h-12 rounded-2xl bg-blue-50 text-blue-700 text-xs font-bold flex items-center justify-center gap-2 ${!otherContact.email ? 'opacity-40 pointer-events-none' : ''}`}><Mail size={16} /> Email</a></div>
+          </div>
+        </div>
       )}
 
       {/* Directory Modal */}
