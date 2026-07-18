@@ -321,6 +321,29 @@ export const useChat = ({ alerts = true } = {}) => {
     });
   }, [activeChannelId, currentUser]);
 
+  const forwardMessage = useCallback(async (message, targetChannelId) => {
+    const target = channels.find(channel => channel.id === targetChannelId);
+    if (!currentUser || !message || !target) return;
+    const messageRef = doc(collection(db, 'chat_channels', targetChannelId, 'messages'));
+    const batch = writeBatch(db);
+    const attachments = message.attachments || (message.attachment ? [message.attachment] : []);
+    batch.set(messageRef, {
+      text: message.text || '', senderId: currentUser.id,
+      senderName: currentUser.name || currentUser.email,
+      timestamp: serverTimestamp(), clientRequestId: messageRef.id,
+      forwarded: true, forwardedFrom: { channelId: activeChannelId, messageId: message.id },
+      ...(attachments.length ? { attachments } : {}),
+    });
+    const updates = {
+      lastMessage: { id: messageRef.id, text: message.text || 'Forwarded an attachment', senderId: currentUser.id, senderName: currentUser.name || currentUser.email, timestamp: serverTimestamp() },
+      updatedAt: serverTimestamp(), [`readBy.${currentUser.id}`]: serverTimestamp(),
+    };
+    target.participants.forEach(id => { updates[`unreadCounts.${id}`] = id === currentUser.id ? 0 : increment(1); });
+    batch.update(doc(db, 'chat_channels', targetChannelId), updates);
+    await batch.commit();
+    playMessageSentSound();
+  }, [channels, currentUser, activeChannelId]);
+
   // 6. Start / Retrieve Direct Chat Channel
   const startDirectChat = useCallback((otherUser) => {
     if (!currentUser || !otherUser) return null;
@@ -445,6 +468,7 @@ export const useChat = ({ alerts = true } = {}) => {
     deleteMessage,
     toggleReaction,
     togglePin,
+    forwardMessage,
     toggleMute,
     unreadByChannel,
     unreadCount,

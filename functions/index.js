@@ -560,6 +560,54 @@ exports.cleanupOldTelemetry = functions.pubsub.schedule("0 3 * * *").onRun(async
   functions.logger.info(`cleanupOldTelemetry: deleted ${deleted} telemetry docs older than ${cutoff.toISOString()}`);
 });
 
+exports.enforceChatRetention = functions.pubsub.schedule("30 3 * * *").onRun(async () => {
+  const db = admin.firestore();
+  const policySnap = await db.doc("systemConfig/chatRetention").get();
+  const policy = policySnap.exists ? policySnap.data() : {};
+  if (!policy.enabled || policy.legalHold === true) {
+    functions.logger.info("Chat retention skipped", { enabled: Boolean(policy.enabled), legalHold: Boolean(policy.legalHold) });
+    return null;
+  }
+  const retentionDays = Math.min(3650, Math.max(30, Number(policy.retentionDays) || 365));
+  const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - retentionDays * 86400000);
+  const snapshot = await db.collectionGroup("messages").where("timestamp", "<", cutoff).limit(400).get();
+  let deleted = 0;
+  let attachmentsDeleted = 0;
+  for (const messageDoc of snapshot.docs) {
+    const message = messageDoc.data();
+    if (message.legalHold === true || message.pinned === true) continue;
+    const attachments = message.attachments || (message.attachment ? [message.attachment] : []);
+    await Promise.all(attachments.filter(item => item?.path).map(async item => {
+      await admin.storage().bucket().file(item.path).delete({ ignoreNotFound: true });
+      attachmentsDeleted += 1;
+    }));
+    await messageDoc.ref.delete();
+    deleted += 1;
+  }
+  await db.collection("audit_logs").add({
+    action: "chat.retention.enforced", entityType: "chat_retention", actorId: "system",
+    retentionDays, deleted, attachmentsDeleted, cutoff,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  functions.logger.info("Chat retention complete", { retentionDays, deleted, attachmentsDeleted });
+  return null;
+});
+
+exports.auditChatRetentionPolicy = functions.firestore
+  .document("systemConfig/chatRetention")
+  .onWrite(async (change) => {
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.exists ? change.after.data() : null;
+    await admin.firestore().collection("audit_logs").add({
+      action: "chat.retention.policy_changed", entityType: "chat_retention",
+      actorId: after?.updatedBy || "unknown",
+      before: before ? { enabled: before.enabled, legalHold: before.legalHold, retentionDays: before.retentionDays } : null,
+      after: after ? { enabled: after.enabled, legalHold: after.legalHold, retentionDays: after.retentionDays } : null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return null;
+  });
+
 exports.createUser = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
   const ref = await admin.firestore().collection("users").add(data);

@@ -193,7 +193,9 @@ service cloud.firestore {
         allow create: if request.auth != null &&
           request.auth.uid in getAfter(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants &&
           request.resource.data.senderId == request.auth.uid &&
-          request.resource.data.text is string && request.resource.data.text.size() <= 10000;
+          request.resource.data.text is string && request.resource.data.text.size() <= 10000 &&
+          (!request.resource.data.keys().hasAny(['forwardedFrom']) ||
+            request.resource.data.forwardedFrom.channelId is string);
         allow update: if request.auth != null &&
           request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'editedAt', 'deletedAt', 'deletedBy', 'reactions', 'pinned', 'pinnedBy', 'pinnedAt']) &&

@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Phone, Info, Search, Plus, Smile, ThumbsUp, Send,
   MessageSquare, Loader2, X, Mail, ShieldCheck, Briefcase, CheckCheck,
-  Paperclip, FileText, Download, Pencil, Trash2, Bell, BellOff, Reply, Users, Check, Pin
+  Paperclip, FileText, Download, Pencil, Trash2, Bell, BellOff, Reply, Users, Check, Pin, Forward
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import { makeCall } from '../../utils/nativeActions';
-import { storage, storageRef, uploadBytes, getDownloadURL } from '../../config/firebase';
+import { storage, storageRef, uploadBytesResumable, getDownloadURL } from '../../config/firebase';
 import { isAllowedChatAttachment, isMessageSeen } from '../../utils/chatLifecycle';
 
 export const formatDisplayName = (user) => {
@@ -41,6 +41,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     deleteMessage,
     toggleReaction,
     togglePin,
+    forwardMessage,
     contactPresence,
     toggleMute,
     loadOlderMessages,
@@ -57,13 +58,16 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState('');
-  const [pendingFile, setPendingFile] = useState(null);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingText, setEditingText] = useState('');
   const [replyTo, setReplyTo] = useState(null);
   const [newChatMode, setNewChatMode] = useState('direct');
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const [groupName, setGroupName] = useState('');
+  const [forwardingMessage, setForwardingMessage] = useState(null);
+  const [outbox, setOutbox] = useState(() => { try { return JSON.parse(localStorage.getItem('agape_chat_outbox') || '[]'); } catch { return []; } });
   const [typingClock, setTypingClock] = useState(() => Date.now());
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -108,31 +112,59 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
 
   const handleSend = async (textToSend = null) => {
     const text = (textToSend || composerText).trim();
-    if ((!text && !textToSend) || isSending) return;
+    if ((!text && !textToSend && pendingFiles.length === 0) || isSending) return;
     setIsSending(true);
     setSendError('');
+    let uploadedAttachments = [];
     try {
-      let attachment = null;
-      if (pendingFile) {
-        const safeName = pendingFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const fileRef = storageRef(storage, `chat_attachments/${currentUser.id}/${Date.now()}-${safeName}`);
-        await uploadBytes(fileRef, pendingFile, { contentType: pendingFile.type });
-        attachment = { url: await getDownloadURL(fileRef), path: fileRef.fullPath, name: pendingFile.name, type: pendingFile.type, size: pendingFile.size };
+      const attachments = [];
+      for (let index = 0; index < pendingFiles.length; index += 1) {
+        const file = pendingFiles[index];
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const fileRef = storageRef(storage, `chat_attachments/${currentUser.id}/${Date.now()}-${crypto.randomUUID()}-${safeName}`);
+        const task = uploadBytesResumable(fileRef, file, { contentType: file.type });
+        await new Promise((resolve, reject) => task.on('state_changed', snapshot => setUploadProgress(Math.round(((index + snapshot.bytesTransferred / snapshot.totalBytes) / pendingFiles.length) * 100)), reject, resolve));
+        attachments.push({ url: await getDownloadURL(fileRef), path: fileRef.fullPath, name: file.name, type: file.type, size: file.size });
       }
+      uploadedAttachments = attachments;
       if (!sendRequestIdRef.current) sendRequestIdRef.current = crypto.randomUUID();
-      await sendMessage(text || (attachment ? '' : '👍'), attachment, sendRequestIdRef.current, replyTo ? { id: replyTo.id, senderName: replyTo.senderName, text: (replyTo.text || 'Attachment').slice(0, 180) } : null);
+      const reply = replyTo ? { id: replyTo.id, senderName: replyTo.senderName, text: (replyTo.text || 'Attachment').slice(0, 180) } : null;
+      await sendMessage(text || (attachments.length ? '' : '👍'), attachments, sendRequestIdRef.current, reply);
       if (!textToSend) setComposerText('');
-      setPendingFile(null);
+      setPendingFiles([]);
+      setUploadProgress(0);
       setReplyTo(null);
       sendRequestIdRef.current = null;
       setTyping(false);
     } catch (error) {
       console.error('Message send failed:', error);
-      setSendError('Message could not be sent. Check your connection and try again.');
+      const queued = { id: sendRequestIdRef.current || crypto.randomUUID(), channelId: activeChannelId, text, attachments: uploadedAttachments, replyTo: replyTo ? { id: replyTo.id, senderName: replyTo.senderName, text: (replyTo.text || 'Attachment').slice(0, 180) } : null, queuedAt: Date.now() };
+      setOutbox(current => { const next = [...current.filter(item => item.id !== queued.id), queued]; localStorage.setItem('agape_chat_outbox', JSON.stringify(next)); return next; });
+      setSendError('Message queued safely. Retry when your connection returns.');
     } finally {
       setIsSending(false);
     }
   };
+
+  const retryOutbox = async () => {
+    if (!outbox.length || isSending) return;
+    setIsSending(true);
+    const remaining = [];
+    for (const item of outbox) {
+      if (item.channelId !== activeChannelId) { remaining.push(item); continue; }
+      try { await sendMessage(item.text, item.attachments || [], item.id, item.replyTo || null); }
+      catch { remaining.push(item); }
+    }
+    setOutbox(remaining); localStorage.setItem('agape_chat_outbox', JSON.stringify(remaining));
+    setSendError(remaining.some(item => item.channelId === activeChannelId) ? 'Some queued messages still need a connection.' : '');
+    setIsSending(false);
+  };
+
+  useEffect(() => {
+    const retry = () => retryOutbox();
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  });
 
   const handleComposerChange = (value) => {
     setComposerText(value);
@@ -386,7 +418,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                         ) : <>{msg.text}{msg.editedAt && <span className="ml-1 text-[9px] opacity-60">edited</span>}</>}
                         {(msg.attachments || (msg.attachment ? [msg.attachment] : [])).map((attachment, attachmentIndex) => !msg.deletedAt && (attachment.type?.startsWith('image/') ? <a key={attachment.path || attachmentIndex} href={attachment.url} target="_blank" rel="noreferrer"><img src={attachment.url} alt={attachment.name} className="mt-2 max-h-64 rounded-xl object-cover" /></a> : <a key={attachment.path || attachmentIndex} href={attachment.url} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-xl bg-white/15 p-2"><FileText size={18} /><span className="truncate text-xs font-bold">{attachment.name}</span><Download size={14} /></a>))}
                       </div>
-                      {!msg.deletedAt && <div className={`flex items-center gap-1 ${isSent ? 'justify-end' : 'justify-start'}`}><button onClick={() => setReplyTo(msg)} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Reply to message"><Reply size={11} /></button><button onClick={() => togglePin(msg)} className={`p-1 ${msg.pinned ? 'text-amber-600' : 'text-slate-400 hover:text-amber-600'}`} aria-label={msg.pinned ? 'Unpin message' : 'Pin message'}><Pin size={11} /></button><button onClick={() => toggleReaction(msg, '👍')} className="rounded-full px-1.5 py-0.5 text-xs hover:bg-slate-200">👍</button>{isSent && <><button onClick={() => { setEditingMessageId(msg.id); setEditingText(msg.text || ''); }} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Edit message"><Pencil size={11} /></button><button onClick={() => deleteMessage(msg.id)} className="p-1 text-slate-400 hover:text-rose-600" aria-label="Delete message"><Trash2 size={11} /></button></>}</div>}
+                      {!msg.deletedAt && <div className={`flex items-center gap-1 ${isSent ? 'justify-end' : 'justify-start'}`}><button onClick={() => setReplyTo(msg)} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Reply to message"><Reply size={11} /></button><button onClick={() => setForwardingMessage(msg)} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Forward message"><Forward size={11} /></button><button onClick={() => togglePin(msg)} className={`p-1 ${msg.pinned ? 'text-amber-600' : 'text-slate-400 hover:text-amber-600'}`} aria-label={msg.pinned ? 'Unpin message' : 'Pin message'}><Pin size={11} /></button><button onClick={() => toggleReaction(msg, '👍')} className="rounded-full px-1.5 py-0.5 text-xs hover:bg-slate-200">👍</button>{isSent && <><button onClick={() => { setEditingMessageId(msg.id); setEditingText(msg.text || ''); }} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Edit message"><Pencil size={11} /></button><button onClick={() => deleteMessage(msg.id)} className="p-1 text-slate-400 hover:text-rose-600" aria-label="Delete message"><Trash2 size={11} /></button></>}</div>}
                       {msg.reactions && <div className="flex flex-wrap gap-1">{Object.entries(msg.reactions).filter(([, ids]) => ids?.length).map(([emoji, ids]) => <button key={emoji} onClick={() => toggleReaction(msg, emoji)} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] shadow-sm">{emoji} {ids.length}</button>)}</div>}
                       {isLastInGroup && <span className="agape-message-meta">{formatMessageTime(msg.timestamp)}{isSent && <><CheckCheck size={12} />{isMessageSeen(msg, otherReadAt) && <span>Seen</span>}</>}</span>}
                     </div>
@@ -402,11 +434,11 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
             </div>
 
             {/* Composer Bar */}
-            {sendError && <div className="bg-rose-50 border-t border-rose-100 px-4 py-2 text-center text-[11px] font-bold text-rose-700">{sendError}</div>}
-            {pendingFile && <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700"><FileText size={15} /><span className="min-w-0 flex-1 truncate">{pendingFile.name}</span><button onClick={() => setPendingFile(null)} aria-label="Remove attachment"><X size={15} /></button></div>}
+            {sendError && <div className="flex items-center justify-center gap-3 bg-rose-50 border-t border-rose-100 px-4 py-2 text-center text-[11px] font-bold text-rose-700"><span>{sendError}</span>{outbox.some(item => item.channelId === activeChannelId) && <button onClick={retryOutbox} className="rounded-full bg-rose-700 px-2.5 py-1 text-white">Retry queued</button>}</div>}
+            {pendingFiles.length > 0 && <div className="border-t border-slate-200 bg-slate-50 px-4 py-2"><div className="flex flex-wrap gap-2">{pendingFiles.map((file, index) => <div key={`${file.name}-${index}`} className="flex max-w-[220px] items-center gap-2 rounded-lg bg-white px-2 py-1 text-xs font-bold text-slate-700"><FileText size={15} /><span className="min-w-0 flex-1 truncate">{file.name}</span><button onClick={() => setPendingFiles(files => files.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remove attachment"><X size={15} /></button></div>)}</div>{isSending && uploadProgress > 0 && <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full bg-blue-600 transition-all" style={{ width: `${uploadProgress}%` }} /></div>}</div>}
             {replyTo && <div className="flex items-center gap-2 border-t border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-900"><Reply size={14} /><div className="min-w-0 flex-1"><strong>Replying to {replyTo.senderName || 'message'}</strong><p className="truncate text-[10px] opacity-70">{replyTo.text || 'Attachment'}</p></div><button onClick={() => setReplyTo(null)} aria-label="Cancel reply"><X size={15} /></button></div>}
             <div className="agape-messenger-composer border-t border-slate-200 bg-white px-4 md:px-6 py-3.5 flex items-center gap-3 shrink-0 relative">
-              <input ref={fileInputRef} type="file" accept="image/*,.pdf,.txt" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (isAllowedChatAttachment(file)) setPendingFile(file); else if (file) setSendError('Choose an image, PDF, or text file up to 10 MB.'); event.target.value = ''; }} />
+              <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.txt" className="hidden" onChange={event => { const files = Array.from(event.target.files || []); const allowed = files.filter(isAllowedChatAttachment); if (allowed.length !== files.length) setSendError('Choose images, PDFs, or text files up to 10 MB each.'); setPendingFiles(current => [...current, ...allowed].slice(0, 5)); event.target.value = ''; }} />
               <button onClick={() => fileInputRef.current?.click()} className="w-9 h-9 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center" title="Attach file"><Paperclip size={19} /></button>
               <button onClick={() => setShowEmojiPicker(value => !value)} className="w-9 h-9 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center flex-shrink-0" title="Add emoji">
                 <Smile size={20} strokeWidth={2.2} />
@@ -424,7 +456,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
               </div>
 
               <div className="flex-shrink-0">
-                {composerText.trim() || pendingFile ? (
+                {composerText.trim() || pendingFiles.length ? (
                   <button
                     onClick={() => handleSend()}
                     disabled={isSending}
@@ -520,6 +552,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
           </div>
         </div>
       )}
+      {forwardingMessage && <div className="fixed inset-0 z-[330] flex items-end justify-center bg-slate-950/55 p-0 sm:items-center sm:p-6" onClick={() => setForwardingMessage(null)}><div className="max-h-[75vh] w-full max-w-sm overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={event => event.stopPropagation()}><div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-wider text-blue-600">Forward</p><h3 className="text-base font-black text-slate-950">Choose a conversation</h3></div><button onClick={() => setForwardingMessage(null)} className="h-8 w-8 rounded-full bg-slate-100"><X size={15} className="mx-auto" /></button></div><div className="space-y-2">{channels.filter(channel => channel.id !== activeChannelId).map(channel => { const contact = getOtherParticipant(channel); return <button key={channel.id} onClick={async () => { await forwardMessage(forwardingMessage, channel.id); setForwardingMessage(null); }} className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left hover:border-blue-200 hover:bg-blue-50"><img src={getAvatarUrl(contact)} alt="" className="h-9 w-9 rounded-full" /><span className="text-sm font-bold text-slate-800">{formatDisplayName(contact)}</span></button>; })}</div></div></div>}
     </div>
   );
 };

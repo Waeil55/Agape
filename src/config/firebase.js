@@ -4,7 +4,7 @@ import { initializeAuth, getAuth, browserSessionPersistence, setPersistence, bro
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { buildOperationalTripRecord } from '../utils/tripLifecycle';
 import { buildLocationFraudSignals } from '../utils/locationFraud';
 import { isCorruptedTripRecord } from '../utils/tripIntegrity';
@@ -55,7 +55,7 @@ const functions = getFunctions(app);
 const storage = getStorage(app);
 
 export default app;
-export { app, db, auth, analytics, messaging, storage, storageRef, uploadBytes, getDownloadURL, deleteObject, deleteApp, initializeApp, firebaseConfig,
+export { app, db, auth, analytics, messaging, storage, storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, deleteApp, initializeApp, firebaseConfig,
   getFirestore, collection, getDocs, doc, updateDoc, addDoc, serverTimestamp, increment,
   writeBatch, setDoc, getDoc, getDocFromServer, getDocsFromServer, deleteDoc, deleteField, arrayUnion, arrayRemove, query, where, orderBy, limit, startAfter, runTransaction, enableNetwork, onSnapshot,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,

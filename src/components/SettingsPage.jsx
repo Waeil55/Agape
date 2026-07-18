@@ -3,10 +3,10 @@ import {
   LogOut, AlertCircle, Database, Eye, EyeOff, Save, Palette, Navigation, Type, Moon, Sun, Monitor, Route,
   Phone, ShieldCheck, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus,
   LayoutDashboard, Users, Activity, Archive, Settings, User, Bell, KeyRound,
-  Truck, RefreshCw, Trash2, RotateCcw, FileText
+  Truck, RefreshCw, Trash2, RotateCcw, FileText, MessageSquare
 } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
-import { auth, updatePassword } from '../config/firebase';
+import { auth, db, doc, setDoc, onSnapshot, updatePassword } from '../config/firebase';
 
 const LazySystemHealth = lazy(() => import('./SystemHealthDashboard'));
 const LazyAutomatedAlerts = lazy(() => import('./AutomatedAlertsPanel'));
@@ -144,6 +144,15 @@ const SettingsPage = ({
   const [confirmPw, setConfirmPw] = useState('');
   const [pwMsg, setPwMsg] = useState('');
   const [deleteConfirmTrip, setDeleteConfirmTrip] = useState(null);
+  const [chatRetention, setChatRetention] = useState({ enabled: false, legalHold: false, retentionDays: 365 });
+  const [chatPolicyStatus, setChatPolicyStatus] = useState('');
+
+  useEffect(() => {
+    if (role !== 'admin') return undefined;
+    return onSnapshot(doc(db, 'systemConfig', 'chatRetention'), snapshot => {
+      if (snapshot.exists()) setChatRetention(current => ({ ...current, ...snapshot.data() }));
+    });
+  }, [role]);
 
   const handlePasswordChange = async () => {
     setPwMsg('');
@@ -167,6 +176,7 @@ const SettingsPage = ({
     { id: 'permissions', label: 'Roles & Permissions', icon: ShieldCheck },
     { id: 'archived', label: 'Archived Trips', icon: Archive },
     { id: 'system', label: 'System Settings', icon: Settings },
+    { id: 'chat-governance', label: 'Chat Governance', icon: MessageSquare },
   ];
 
   const personalNav = [
@@ -661,6 +671,20 @@ const SettingsPage = ({
         );
 
       // ===== NOTIFICATIONS =====
+      case 'chat-governance':
+        return (
+          <div className="space-y-6">
+            <div><h3 className="text-heading text-slate-900 mb-1">Chat Governance</h3><p className="text-body text-slate-500">Retention and legal-hold controls for enterprise messaging.</p></div>
+            <div className="max-w-2xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <label className="flex items-center justify-between gap-4"><div><p className="text-sm font-bold text-slate-900">Automated retention</p><p className="text-xs text-slate-500">Permanently remove eligible messages after the configured period.</p></div><input type="checkbox" checked={chatRetention.enabled} onChange={event => setChatRetention(value => ({ ...value, enabled: event.target.checked }))} /></label>
+              <label className="block"><span className="text-xs font-bold text-slate-700">Retention period (30–3650 days)</span><input type="number" min="30" max="3650" value={chatRetention.retentionDays} onChange={event => setChatRetention(value => ({ ...value, retentionDays: Math.min(3650, Math.max(30, Number(event.target.value) || 30)) }))} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" /></label>
+              <label className="flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4"><div><p className="text-sm font-bold text-amber-950">Organization legal hold</p><p className="text-xs text-amber-800">Immediately suspends all automated chat deletion.</p></div><input type="checkbox" checked={chatRetention.legalHold} onChange={event => setChatRetention(value => ({ ...value, legalHold: event.target.checked }))} /></label>
+              <button onClick={async () => { setChatPolicyStatus('Saving…'); await setDoc(doc(db, 'systemConfig', 'chatRetention'), { ...chatRetention, updatedAt: new Date().toISOString(), updatedBy: auth.currentUser?.uid || '' }, { merge: true }); setChatPolicyStatus('Policy saved and auditable.'); }} className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white">Save governance policy</button>
+              {chatPolicyStatus && <p className="text-xs font-bold text-emerald-700">{chatPolicyStatus}</p>}
+            </div>
+          </div>
+        );
+
       case 'notifications':
         return (
           <div className="space-y-6">
