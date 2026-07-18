@@ -30,7 +30,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     startDirectChat,
     unreadByChannel,
     unreadCount
-  } = useChat();
+  } = useChat({ alerts: false });
 
   const [searchQuery, setSearchQuery] = useState('');
   const [composerText, setComposerText] = useState('');
@@ -180,7 +180,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                 <div className="agape-messenger-row-content flex-1 min-w-0">
                   <div className="agape-messenger-row-header flex justify-between items-baseline mb-0.5 gap-2">
                     <span className="agape-messenger-row-name text-sm font-bold text-slate-900 truncate">{formatDisplayName(other)}</span>
-                    {unreadByChannel[ch.id] && <span className="agape-unread-badge" aria-label="Unread message">1</span>}
+                    {unreadByChannel[ch.id] > 0 && <span className="agape-unread-badge" aria-label={`${unreadByChannel[ch.id]} unread messages`}>{unreadByChannel[ch.id] > 99 ? '99+' : unreadByChannel[ch.id]}</span>}
                   </div>
                   <div className="agape-messenger-row-snippet text-xs text-slate-500 font-semibold flex items-center justify-between gap-2">
                     <span className={`truncate ${unreadByChannel[ch.id] ? 'text-slate-900 font-bold' : ''}`}>{ch.lastMessage?.text || 'No messages yet'}</span>

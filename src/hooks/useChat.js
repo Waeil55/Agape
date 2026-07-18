@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   db, auth, collection, doc, setDoc, addDoc, query, where,
-  orderBy, onSnapshot, serverTimestamp, getDoc, updateDoc, writeBatch
+  orderBy, onSnapshot, serverTimestamp, increment, getDoc, updateDoc, writeBatch
 } from '../config/firebase';
-import { playMessageSound } from '../utils/notificationSound';
+import { playMessageSound, playMessageSentSound } from '../utils/notificationSound';
 import { showLocalNotification } from '../config/notifications';
+
+const globallyNotifiedMessages = new Set();
 
 export const useChat = ({ alerts = true } = {}) => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -14,7 +16,6 @@ export const useChat = ({ alerts = true } = {}) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const initializedChannelsRef = useRef(false);
-  const notifiedMessageIdsRef = useRef(new Set());
 
   // 1. Subscribe to Current User Profile
   useEffect(() => {
@@ -92,23 +93,23 @@ export const useChat = ({ alerts = true } = {}) => {
       });
       setChannels(list);
       // Do not alert for the initial snapshot; only messages that arrive afterwards.
-      if (initializedChannelsRef.current && alerts) {
+      if (!initializedChannelsRef.current) {
+        list.forEach((channel) => {
+          const message = channel.lastMessage;
+          globallyNotifiedMessages.add(`${channel.id}:${message?.timestamp?.toMillis?.() || ''}:${message?.text || ''}`);
+        });
+        initializedChannelsRef.current = true;
+      } else if (alerts) {
         list.forEach((channel) => {
           const lastMessage = channel.lastMessage;
           const key = `${channel.id}:${lastMessage?.timestamp?.toMillis?.() || ''}:${lastMessage?.text || ''}`;
-          if (lastMessage?.senderId && lastMessage.senderId !== currentUser.id && !notifiedMessageIdsRef.current.has(key)) {
-            notifiedMessageIdsRef.current.add(key);
+          if (lastMessage?.senderId && lastMessage.senderId !== currentUser.id && !globallyNotifiedMessages.has(key)) {
+            globallyNotifiedMessages.add(key);
             playMessageSound();
             const sender = lastMessage.senderName || channel.participantDetails?.[lastMessage.senderId]?.name || 'New message';
             showLocalNotification(sender, lastMessage.text || 'Sent you a message', 'message');
           }
         });
-      } else {
-        list.forEach((channel) => {
-          const message = channel.lastMessage;
-          notifiedMessageIdsRef.current.add(`${channel.id}:${message?.timestamp?.toMillis?.() || ''}:${message?.text || ''}`);
-        });
-        initializedChannelsRef.current = true;
       }
       setLoading(false);
     }, (err) => {
@@ -145,6 +146,7 @@ export const useChat = ({ alerts = true } = {}) => {
     try {
       await updateDoc(doc(db, 'chat_channels', channelId), {
         [`readBy.${currentUser.id}`]: serverTimestamp(),
+        [`unreadCounts.${currentUser.id}`]: 0,
       });
     } catch (err) {
       console.warn('Unable to mark chat read:', err);
@@ -174,6 +176,11 @@ export const useChat = ({ alerts = true } = {}) => {
     });
 
     // Update Channel Doc
+    const channel = channels.find((item) => item.id === activeChannelId);
+    const unreadUpdates = {};
+    (channel?.participants || []).forEach((participantId) => {
+      unreadUpdates[`unreadCounts.${participantId}`] = participantId === currentUser.id ? 0 : increment(1);
+    });
     batch.update(channelRef, {
       lastMessage: {
         text,
@@ -181,12 +188,14 @@ export const useChat = ({ alerts = true } = {}) => {
         senderName: currentUser.name || currentUser.username || currentUser.email,
         timestamp: serverTimestamp()
       },
-      updatedAt: serverTimestamp()
-      , [`readBy.${currentUser.id}`]: serverTimestamp()
+      updatedAt: serverTimestamp(),
+      [`readBy.${currentUser.id}`]: serverTimestamp(),
+      ...unreadUpdates,
     });
 
     await batch.commit();
-  }, [currentUser, activeChannelId]);
+    playMessageSentSound();
+  }, [currentUser, activeChannelId, channels]);
 
   // 6. Start / Retrieve Direct Chat Channel
   const startDirectChat = useCallback(async (otherUser) => {
@@ -216,6 +225,7 @@ export const useChat = ({ alerts = true } = {}) => {
           },
           type: 'direct',
           readBy: { [currentUser.id]: serverTimestamp() },
+          unreadCounts: { [currentUser.id]: 0, [otherUser.id]: 0 },
           lastMessage: {
             text: 'Started a new chat',
             senderId: 'system',
@@ -238,9 +248,30 @@ export const useChat = ({ alerts = true } = {}) => {
     const lastRead = channel.readBy?.[currentUser?.id];
     const messageMs = message?.timestamp?.toMillis?.() || 0;
     const readMs = lastRead?.toMillis?.() || 0;
-    return [channel.id, Boolean(message && message.senderId !== currentUser?.id && messageMs > readMs)];
+    const storedCount = Number(channel.unreadCounts?.[currentUser?.id] || 0);
+    return [channel.id, storedCount || (message && message.senderId !== currentUser?.id && messageMs > readMs ? 1 : 0)];
   })), [channels, currentUser]);
-  const unreadCount = Object.values(unreadByChannel).filter(Boolean).length;
+  const unreadCount = Object.values(unreadByChannel).reduce((total, count) => total + Number(count || 0), 0);
+
+  useEffect(() => {
+    const baseTitle = 'Agape Care';
+    document.title = unreadCount > 0 ? `(${unreadCount > 99 ? '99+' : unreadCount}) ${baseTitle}` : baseTitle;
+    if ('setAppBadge' in navigator) {
+      if (unreadCount > 0) navigator.setAppBadge(unreadCount).catch(() => {});
+      else navigator.clearAppBadge?.().catch(() => {});
+    }
+  }, [unreadCount]);
+
+  useEffect(() => {
+    if (!currentUser || channels.length === 0) return;
+    const channelId = new URLSearchParams(window.location.search).get('chatChannel');
+    if (channelId && channels.some((channel) => channel.id === channelId)) {
+      setActiveChannelId(channelId);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('chatChannel');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  }, [currentUser, channels]);
 
   return {
     currentUser,

@@ -89,6 +89,16 @@ export function playMessageSound() {
   } catch {}
 }
 
+export function playMessageSentSound() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    playTone(ctx, 660, now, 0.08, 0.16);
+    playTone(ctx, 990, now + 0.055, 0.14, 0.13);
+  } catch {}
+}
+
 export function playAlertSound() {
   try {
     const ctx = getAudioContext();

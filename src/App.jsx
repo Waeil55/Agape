@@ -963,6 +963,8 @@ const App = () => {
       });
 
       unsubFcm = onForegroundMessage((payload) => {
+        // Chat snapshots own foreground Messenger alerts; avoid duplicate sound/toast from FCM.
+        if ((payload.data?.type || '') === 'message') return;
         const title = payload.notification?.title || payload.data?.title || 'Agape Care';
         const body = payload.notification?.body || payload.data?.body || '';
         if (title && body) {
