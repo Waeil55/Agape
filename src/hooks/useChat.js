@@ -58,6 +58,8 @@ export const useChat = () => {
         }
       });
       setUsers(list);
+    }, (err) => {
+      console.error("Users list sub error:", err);
     });
 
     return () => unsubUsers();
@@ -85,6 +87,9 @@ export const useChat = () => {
         return tB - tA;
       });
       setChannels(list);
+      setLoading(false);
+    }, (err) => {
+      console.error("Channels list sub error:", err);
       setLoading(false);
     });
 
@@ -148,39 +153,44 @@ export const useChat = () => {
   const startDirectChat = useCallback(async (otherUser) => {
     if (!currentUser || !otherUser) return null;
 
-    // Deterministic channel ID based on sorted UIDs
-    const sortedIds = [currentUser.id, otherUser.id].sort();
-    const channelId = `dm_${sortedIds[0]}_${sortedIds[1]}`;
-    const channelRef = doc(db, 'chat_channels', channelId);
+    try {
+      // Deterministic channel ID based on sorted UIDs
+      const sortedIds = [currentUser.id, otherUser.id].sort();
+      const channelId = `dm_${sortedIds[0]}_${sortedIds[1]}`;
+      const channelRef = doc(db, 'chat_channels', channelId);
 
-    const docSnap = await getDoc(channelRef);
-    if (!docSnap.exists()) {
-      await setDoc(channelRef, {
-        participants: [currentUser.id, otherUser.id],
-        participantDetails: {
-          [currentUser.id]: {
-            name: currentUser.name || currentUser.username || currentUser.email,
-            email: currentUser.email,
-            role: currentUser.role || 'driver'
+      const docSnap = await getDoc(channelRef);
+      if (!docSnap.exists()) {
+        await setDoc(channelRef, {
+          participants: [currentUser.id, otherUser.id],
+          participantDetails: {
+            [currentUser.id]: {
+              name: currentUser.name || currentUser.username || currentUser.email,
+              email: currentUser.email,
+              role: currentUser.role || 'driver'
+            },
+            [otherUser.id]: {
+              name: otherUser.name || otherUser.username || otherUser.email,
+              email: otherUser.email,
+              role: otherUser.role || 'driver'
+            }
           },
-          [otherUser.id]: {
-            name: otherUser.name || otherUser.username || otherUser.email,
-            email: otherUser.email,
-            role: otherUser.role || 'driver'
-          }
-        },
-        type: 'direct',
-        lastMessage: {
-          text: 'Started a new chat',
-          senderId: 'system',
-          timestamp: serverTimestamp()
-        },
-        updatedAt: serverTimestamp()
-      });
-    }
+          type: 'direct',
+          lastMessage: {
+            text: 'Started a new chat',
+            senderId: 'system',
+            timestamp: serverTimestamp()
+          },
+          updatedAt: serverTimestamp()
+        });
+      }
 
-    setActiveChannelId(channelId);
-    return channelId;
+      setActiveChannelId(channelId);
+      return channelId;
+    } catch (err) {
+      console.error("Error starting direct chat:", err);
+      return null;
+    }
   }, [currentUser]);
 
   return {

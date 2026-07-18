@@ -55,18 +55,20 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   const filteredChannels = channels.filter(ch => {
     const other = getOtherParticipant(ch);
     if (!other) return false;
-    return (
-      other.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      other.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ch.lastMessage?.text?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const name = (other.name || other.username || '').toLowerCase();
+    const email = (other.email || '').toLowerCase();
+    const lastMsgText = (ch.lastMessage?.text || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+    return name.includes(query) || email.includes(query) || lastMsgText.includes(query);
   });
 
   // Filter contacts (users not in active chats or all search matching contacts)
-  const filteredContacts = users.filter(u =>
-    u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredContacts = users.filter(u => {
+    const name = (u.name || u.username || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+    return name.includes(query) || email.includes(query);
+  });
 
   const getAvatarUrl = (user) => {
     if (!user) return '';
