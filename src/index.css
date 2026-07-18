@@ -4959,7 +4959,7 @@ html, body {
 
 @media (min-width: 768px) {
   .agape-messenger-sidebar {
-    width: 380px;
+    width: 340px;
     border-right: 1px solid #e2e8f0;
     display: flex;
     flex-direction: column;
@@ -4982,6 +4982,12 @@ html, body {
   .agape-messenger-bubble {
     padding: 10px 14px;
     box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
+  }
+}
+
+@media (min-width: 1280px) {
+  .agape-messenger-sidebar {
+    width: 380px;
   }
 }
 

@@ -226,11 +226,14 @@ export const useChat = ({ alerts = true } = {}) => {
       const sortedIds = [currentUser.id, otherUser.id].sort();
       const channelId = `dm_${sortedIds[0]}_${sortedIds[1]}`;
       const existingChannel = channels.find((channel) => channel.id === channelId);
-      if (!existingChannel) {
+      const hasRealMessage = existingChannel?.lastMessage &&
+        existingChannel.lastMessage.senderId !== 'system' &&
+        existingChannel.lastMessage.text !== 'Started a new chat';
+      if (!hasRealMessage) {
         setDraftChannel({
           id: channelId,
           participants: [currentUser.id, otherUser.id],
-          participantDetails: {
+          participantDetails: existingChannel?.participantDetails || {
             [currentUser.id]: {
               name: currentUser.name || currentUser.username || currentUser.email,
               email: currentUser.email,

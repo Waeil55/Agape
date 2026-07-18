@@ -140,7 +140,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   return (
     <div className="agape-messenger-container h-full flex">
       {/* Left Column: Chat List (Visible on Desktop always, on Mobile only if no active channel) */}
-      <div className={`agape-messenger-sidebar w-full md:w-[380px] flex flex-col h-full border-r border-slate-200 bg-white shrink-0 ${activeChannelId ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`agape-messenger-sidebar w-full md:w-[340px] xl:w-[380px] flex flex-col h-full border-r border-slate-200 bg-white shrink-0 ${activeChannelId ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
         <div className="agape-chat-sidebar-head px-5 pt-5 pb-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -363,7 +363,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
       </div>
 
       {activeChannel && otherContact && showDetails && (
-        <aside className="hidden lg:flex w-[300px] h-full shrink-0 border-l border-slate-200 bg-white flex-col">
+        <aside className="hidden xl:flex w-[300px] h-full shrink-0 border-l border-slate-200 bg-white flex-col">
           <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">Directory</p><h3 className="mt-1 text-sm font-black text-slate-900">Conversation details</h3></div><button onClick={() => setShowDetails(false)} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"><X size={16} /></button></div>
           <div className="p-6 text-center border-b border-slate-100"><img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="w-20 h-20 mx-auto rounded-2xl shadow-lg" /><h4 className="mt-3 text-base font-black text-slate-950">{formatDisplayName(otherContact)}</h4><p className="mt-1 text-xs font-semibold text-slate-500 capitalize">{otherContact.role || 'Team member'}</p><span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Available</span></div>
           <div className="p-4 space-y-2"><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Briefcase size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Role</p><p className="text-xs font-bold text-slate-700 capitalize">{otherContact.role || 'Team member'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Mail size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Email</p><p className="text-xs font-bold text-slate-700 truncate">{otherContact.email || 'Not available'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-blue-50 p-3"><ShieldCheck size={16} className="text-blue-600" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-blue-500">Privacy</p><p className="text-xs font-bold text-blue-900">Internal team channel</p></div></div></div>
@@ -371,7 +371,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
       )}
 
       {activeChannel && otherContact && showDetails && (
-        <div className="lg:hidden fixed inset-0 z-[320] bg-slate-950/45 backdrop-blur-sm flex items-end" onClick={() => setShowDetails(false)}>
+        <div className="xl:hidden fixed inset-0 z-[320] bg-slate-950/45 backdrop-blur-sm flex items-end" onClick={() => setShowDetails(false)}>
           <div className="w-full rounded-t-[28px] bg-white p-5 pb-[calc(24px+env(safe-area-inset-bottom,0px))] shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
             <div className="flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">Contact</p><h3 className="mt-1 text-base font-black text-slate-950">Conversation details</h3></div><button onClick={() => setShowDetails(false)} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center"><X size={17} /></button></div>
