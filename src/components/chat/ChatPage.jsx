@@ -27,7 +27,9 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     users,
     loading,
     sendMessage,
-    startDirectChat
+    startDirectChat,
+    unreadByChannel,
+    unreadCount
   } = useChat();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,193 +101,207 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     );
   }
 
-  // Thread View (Active Chat)
-  if (activeChannel && otherContact) {
-    return (
-      <div className="agape-messenger-thread h-full flex flex-col">
+  // Responsive Two-Column Layout (Desktop split, Mobile switch)
+  return (
+    <div className="agape-messenger-container h-full flex">
+      {/* Left Column: Chat List (Visible on Desktop always, on Mobile only if no active channel) */}
+      <div className={`agape-messenger-sidebar w-full md:w-[360px] flex flex-col h-full border-r border-slate-100 bg-white shrink-0 ${activeChannelId ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
-        <div className="agape-messenger-thread-header flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-white">
+        <div className="px-4 pt-5 pb-2 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setActiveChannelId(null)}
-              className="w-10 h-10 flex items-center justify-center text-blue-600 rounded-full hover:bg-slate-100 transition"
-              aria-label="Back to chat list"
-            >
-              <ArrowLeft size={20} strokeWidth={2.5} />
-            </button>
-            
-            <div className="agape-messenger-avatar-wrap">
-              <img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="agape-messenger-avatar" />
-              <div className="agape-messenger-status-dot" />
-            </div>
-
-            <div className="min-w-0">
-              <h3 className="text-sm font-bold text-slate-900 truncate leading-tight">{formatDisplayName(otherContact)}</h3>
-              <p className="text-[11px] font-semibold text-slate-500 capitalize">{otherContact.role || 'Driver'}</p>
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="w-9 h-9 flex items-center justify-center text-slate-600 rounded-full hover:bg-slate-100 transition mr-1"
+              >
+                <ArrowLeft size={18} strokeWidth={2.5} />
+              </button>
+            )}
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 leading-none tracking-tight">Chats</h1>
+              {unreadCount > 0 && <p className="mt-1 text-[11px] font-bold text-blue-600">{unreadCount} unread {unreadCount === 1 ? 'conversation' : 'conversations'}</p>}
             </div>
           </div>
-
-          <div className="flex items-center gap-1.5 text-blue-600">
-            <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"><Phone size={18} strokeWidth={2.2} /></button>
-            <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"><Video size={18} strokeWidth={2.2} /></button>
-            <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"><Info size={18} strokeWidth={2.2} /></button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowNewChatModal(true)}
+              className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-800 hover:bg-slate-200 transition"
+              title="Start new chat"
+            >
+              <Plus size={18} strokeWidth={2.5} />
+            </button>
           </div>
         </div>
 
-        {/* Messages Feed */}
-        <div className="agape-messenger-thread-messages flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-white">
-          <div className="agape-messenger-date-divider">Live Chat</div>
-          
-          {messages.map((msg, index) => {
-            const isSent = msg.senderId === currentUser.id;
+        {/* Search Bar */}
+        <div className="agape-messenger-search-bar flex items-center bg-slate-100 rounded-full px-4 py-2 mx-4 my-2 shrink-0">
+          <Search size={16} className="text-slate-400 mr-2 flex-shrink-0" />
+          <input
+            type="text"
+            placeholder="Search"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {/* Stories Carousel */}
+        <div className="agape-messenger-stories flex gap-4 overflow-x-auto px-4 py-2 scrollbar-none border-b border-slate-100 bg-white shrink-0">
+          {users.slice(0, 8).map(u => (
+            <div
+              key={u.id}
+              onClick={() => startDirectChat(u)}
+              className="agape-messenger-story flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer"
+            >
+              <div className="agape-messenger-avatar-wrap">
+                <img src={getAvatarUrl(u)} alt={formatDisplayName(u)} className="agape-messenger-avatar w-12 h-12 rounded-full object-cover" />
+                <div className="agape-messenger-status-dot" />
+              </div>
+              <span className="text-[11px] font-semibold text-slate-500 truncate w-14 text-center">{formatDisplayName(u)}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Channels List */}
+        <div className="agape-messenger-list flex-1 overflow-y-auto bg-white">
+          {filteredChannels.map(ch => {
+            const other = getOtherParticipant(ch);
+            if (!other) return null;
             return (
-              <div key={msg.id || index} className={`agape-messenger-bubble-row ${isSent ? 'is-sent' : 'is-received'}`}>
-                {!isSent && (
-                  <img src={getAvatarUrl(otherContact)} alt={otherContact.name} className="agape-messenger-bubble-avatar" />
-                )}
-                <div className={`agape-messenger-bubble-group ${isSent ? 'is-sent' : 'is-received'}`}>
-                  <div className="agape-messenger-bubble">
-                    {msg.text}
+              <div
+                key={ch.id}
+                onClick={() => setActiveChannelId(ch.id)}
+                className={`agape-messenger-row flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition border-b border-slate-50 ${activeChannelId === ch.id ? 'bg-slate-100' : ''}`}
+              >
+                <div className="agape-messenger-avatar-wrap flex-shrink-0">
+                  <img src={getAvatarUrl(other)} alt={formatDisplayName(other)} className="agape-messenger-avatar" />
+                  <div className="agape-messenger-status-dot" />
+                </div>
+
+                <div className="agape-messenger-row-content flex-1 min-w-0">
+                  <div className="agape-messenger-row-header flex justify-between items-baseline mb-0.5 gap-2">
+                    <span className="agape-messenger-row-name text-sm font-bold text-slate-900 truncate">{formatDisplayName(other)}</span>
+                    {unreadByChannel[ch.id] && <span className="agape-unread-badge" aria-label="Unread message">1</span>}
+                  </div>
+                  <div className="agape-messenger-row-snippet text-xs text-slate-500 font-semibold flex items-center justify-between gap-2">
+                    <span className={`truncate ${unreadByChannel[ch.id] ? 'text-slate-900 font-bold' : ''}`}>{ch.lastMessage?.text || 'No messages yet'}</span>
                   </div>
                 </div>
               </div>
             );
           })}
 
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Composer Bar */}
-        <div className="agape-messenger-composer border-t border-slate-100 bg-white px-4 py-3 flex items-center gap-3">
-          <button className="text-blue-600 hover:text-blue-700 transition flex-shrink-0">
-            <Plus size={20} strokeWidth={2.5} />
-          </button>
-          <button className="text-blue-600 hover:text-blue-700 transition flex-shrink-0">
-            <Camera size={20} strokeWidth={2.2} />
-          </button>
-          <button className="text-blue-600 hover:text-blue-700 transition flex-shrink-0">
-            <ImageIcon size={20} strokeWidth={2.2} />
-          </button>
-
-          <div className="agape-messenger-input-wrap flex-1 bg-slate-100 rounded-full px-4 py-2 flex items-center">
-            <input
-              type="text"
-              placeholder="Aa"
-              value={composerText}
-              onChange={e => setComposerText(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSend()}
-            />
-          </div>
-
-          <div className="flex-shrink-0">
-            {composerText.trim() ? (
-              <button
-                onClick={() => handleSend()}
-                className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition active:scale-90"
-              >
-                <Send size={14} strokeWidth={2.5} className="ml-0.5" />
-              </button>
-            ) : (
-              <button
-                onClick={() => handleSend('👍')}
-                className="agape-messenger-like-btn text-blue-600 hover:text-blue-700 transition"
-              >
-                <ThumbsUp size={22} strokeWidth={2.2} />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Chats List Screen (Messenger Home)
-  return (
-    <div className="agape-messenger-wrapper flex flex-col h-full bg-white relative">
-      {/* Header */}
-      <div className="px-4 pt-5 pb-2 flex items-center justify-between bg-white shrink-0">
-        <div className="flex items-center gap-3">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="w-9 h-9 flex items-center justify-center text-slate-600 rounded-full hover:bg-slate-100 transition mr-1"
-            >
-              <ArrowLeft size={18} strokeWidth={2.5} />
-            </button>
+          {filteredChannels.length === 0 && (
+            <div className="flex flex-col items-center justify-center p-12 text-center text-slate-400">
+              <MessageSquare size={36} className="opacity-20 mb-2" />
+              <p className="text-sm font-semibold">No active chats</p>
+              <p className="text-xs mt-1">Tap the "+" button or any active contact to start a conversation.</p>
+            </div>
           )}
-          <h1 className="text-2xl font-black text-slate-900 leading-none tracking-tight">Chats</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowNewChatModal(true)}
-            className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-800 hover:bg-slate-200 transition"
-            title="Start new chat"
-          >
-            <Plus size={18} strokeWidth={2.5} />
-          </button>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="agape-messenger-search-bar flex items-center bg-slate-100 rounded-full px-4 py-2 mx-4 my-2 shrink-0">
-        <Search size={16} className="text-slate-400 mr-2 flex-shrink-0" />
-        <input
-          type="text"
-          placeholder="Search"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
-      </div>
+      {/* Right Column: Chat Thread */}
+      <div className={`agape-messenger-main flex-1 h-full flex flex-col bg-white ${activeChannelId ? 'flex' : 'hidden md:flex'}`}>
+        {activeChannel && otherContact ? (
+          <div className="agape-messenger-thread h-full flex flex-col">
+            {/* Thread Header */}
+            <div className="agape-messenger-thread-header flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-white shrink-0">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setActiveChannelId(null)}
+                  className="w-10 h-10 flex items-center justify-center text-blue-600 rounded-full hover:bg-slate-100 transition md:hidden"
+                  aria-label="Back to chat list"
+                >
+                  <ArrowLeft size={20} strokeWidth={2.5} />
+                </button>
 
-      <div className="agape-messenger-stories flex gap-4 overflow-x-auto px-4 py-2 scrollbar-none border-b border-slate-100 bg-white shrink-0">
-        {users.slice(0, 8).map(u => (
-          <div
-            key={u.id}
-            onClick={() => startDirectChat(u)}
-            className="agape-messenger-story flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer"
-          >
-            <div className="agape-messenger-avatar-wrap">
-              <img src={getAvatarUrl(u)} alt={formatDisplayName(u)} className="agape-messenger-avatar w-12 h-12 rounded-full object-cover" />
-              <div className="agape-messenger-status-dot" />
+                <div className="agape-messenger-avatar-wrap">
+                  <img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="agape-messenger-avatar" />
+                  <div className="agape-messenger-status-dot" />
+                </div>
+
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-slate-900 truncate leading-tight">{formatDisplayName(otherContact)}</h3>
+                  <p className="text-[11px] font-semibold text-slate-500 capitalize">{otherContact.role || 'Driver'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-blue-600">
+                <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"><Phone size={18} strokeWidth={2.2} /></button>
+                <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"><Video size={18} strokeWidth={2.2} /></button>
+                <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"><Info size={18} strokeWidth={2.2} /></button>
+              </div>
             </div>
-            <span className="text-[11px] font-semibold text-slate-500 truncate w-14 text-center">{formatDisplayName(u)}</span>
+
+            {/* Messages Feed */}
+            <div className="agape-messenger-thread-messages flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-white">
+              <div className="agape-messenger-date-divider">Live Chat</div>
+
+              {messages.map((msg, index) => {
+                const isSent = msg.senderId === currentUser.id;
+                return (
+                  <div key={msg.id || index} className={`agape-messenger-bubble-row ${isSent ? 'is-sent' : 'is-received'}`}>
+                    {!isSent && (
+                      <img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="agape-messenger-bubble-avatar" />
+                    )}
+                    <div className={`agape-messenger-bubble-group ${isSent ? 'is-sent' : 'is-received'}`}>
+                      <div className="agape-messenger-bubble">
+                        {msg.text}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Composer Bar */}
+            <div className="agape-messenger-composer border-t border-slate-100 bg-white px-4 py-3 flex items-center gap-3 shrink-0">
+              <button className="text-blue-600 hover:text-blue-700 transition flex-shrink-0">
+                <Plus size={20} strokeWidth={2.5} />
+              </button>
+              <button className="text-blue-600 hover:text-blue-700 transition flex-shrink-0">
+                <Camera size={20} strokeWidth={2.2} />
+              </button>
+              <button className="text-blue-600 hover:text-blue-700 transition flex-shrink-0">
+                <ImageIcon size={20} strokeWidth={2.2} />
+              </button>
+
+              <div className="agape-messenger-input-wrap flex-1 bg-slate-100 rounded-full px-4 py-2 flex items-center">
+                <input
+                  type="text"
+                  placeholder="Aa"
+                  value={composerText}
+                  onChange={e => setComposerText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSend()}
+                />
+              </div>
+
+              <div className="flex-shrink-0">
+                {composerText.trim() ? (
+                  <button
+                    onClick={() => handleSend()}
+                    className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition active:scale-90"
+                  >
+                    <Send size={14} strokeWidth={2.5} className="ml-0.5" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSend('👍')}
+                    className="agape-messenger-like-btn text-blue-600 hover:text-blue-700 transition"
+                  >
+                    <ThumbsUp size={22} strokeWidth={2.2} />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-        ))}
-      </div>
-
-      {/* Channels Feed */}
-      <div className="agape-messenger-list flex-1 overflow-y-auto bg-white">
-        {filteredChannels.map(ch => {
-          const other = getOtherParticipant(ch);
-          if (!other) return null;
-          return (
-            <div
-              key={ch.id}
-              onClick={() => setActiveChannelId(ch.id)}
-              className="agape-messenger-row flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition border-b border-slate-50"
-            >
-              <div className="agape-messenger-avatar-wrap flex-shrink-0">
-                <img src={getAvatarUrl(other)} alt={other.name} className="agape-messenger-avatar" />
-                <div className="agape-messenger-status-dot" />
-              </div>
-
-              <div className="agape-messenger-row-content flex-1 min-w-0">
-                <div className="agape-messenger-row-header flex justify-between items-baseline mb-0.5">
-                  <span className="agape-messenger-row-name text-sm font-bold text-slate-900 truncate">{formatDisplayName(other)}</span>
-                </div>
-                <div className="agape-messenger-row-snippet text-xs text-slate-500 font-semibold flex items-center justify-between gap-2">
-                  <span className="truncate">{ch.lastMessage?.text || 'No messages yet'}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
-        {filteredChannels.length === 0 && (
-          <div className="flex flex-col items-center justify-center p-12 text-center text-slate-400">
-            <MessageSquare size={36} className="opacity-20 mb-2" />
-            <p className="text-sm font-semibold">No active chats</p>
-            <p className="text-xs mt-1">Tap the "+" button or any active contact to start a conversation.</p>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400 bg-slate-50/30">
+            <MessageSquare size={48} className="opacity-20 mb-3 text-blue-600 animate-pulse" />
+            <h3 className="text-base font-bold text-slate-700">Select a Chat</h3>
+            <p className="text-xs text-slate-400 mt-1 max-w-[200px]">Choose a contact from the list or start a new conversation to begin.</p>
           </div>
         )}
       </div>

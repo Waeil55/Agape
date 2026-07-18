@@ -3,6 +3,7 @@ import {
   Map, ChevronLeft, Menu, BarChart2, Zap, Shield, X, MessageCircle
 } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
+import { useChat } from '../hooks/useChat';
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
@@ -41,6 +42,7 @@ const MobileFallback = () => (
 );
 
 const MobileEnterpriseDashboard = (props) => {
+  const { unreadCount } = useChat({ alerts: true });
   const { trips = [], drivers = [], currentUser, role } = props;
   const [currentView, setCurrentView] = useState('map');
   const [subView, setSubView] = useState(null);
@@ -484,6 +486,7 @@ const MobileEnterpriseDashboard = (props) => {
               className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
             >
               <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 1.8 : 1.3} />
+              {unreadCount > 0 && <span className="absolute top-0 right-[22%] min-w-[17px] h-[17px] px-1 rounded-full bg-blue-600 text-white text-[10px] font-black leading-[17px]">{unreadCount > 99 ? '99+' : unreadCount}</span>}
               <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
             </button>
 

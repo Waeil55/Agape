@@ -1,16 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   db, auth, collection, doc, setDoc, addDoc, query, where,
   orderBy, onSnapshot, serverTimestamp, getDoc, updateDoc, writeBatch
 } from '../config/firebase';
+import { playMessageSound } from '../utils/notificationSound';
+import { showLocalNotification } from '../config/notifications';
 
-export const useChat = () => {
+export const useChat = ({ alerts = true } = {}) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [channels, setChannels] = useState([]);
   const [messages, setMessages] = useState([]);
   const [activeChannelId, setActiveChannelId] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const initializedChannelsRef = useRef(false);
+  const notifiedMessageIdsRef = useRef(new Set());
 
   // 1. Subscribe to Current User Profile
   useEffect(() => {
@@ -87,6 +91,25 @@ export const useChat = () => {
         return tB - tA;
       });
       setChannels(list);
+      // Do not alert for the initial snapshot; only messages that arrive afterwards.
+      if (initializedChannelsRef.current && alerts) {
+        list.forEach((channel) => {
+          const lastMessage = channel.lastMessage;
+          const key = `${channel.id}:${lastMessage?.timestamp?.toMillis?.() || ''}:${lastMessage?.text || ''}`;
+          if (lastMessage?.senderId && lastMessage.senderId !== currentUser.id && !notifiedMessageIdsRef.current.has(key)) {
+            notifiedMessageIdsRef.current.add(key);
+            playMessageSound();
+            const sender = lastMessage.senderName || channel.participantDetails?.[lastMessage.senderId]?.name || 'New message';
+            showLocalNotification(sender, lastMessage.text || 'Sent you a message', 'message');
+          }
+        });
+      } else {
+        list.forEach((channel) => {
+          const message = channel.lastMessage;
+          notifiedMessageIdsRef.current.add(`${channel.id}:${message?.timestamp?.toMillis?.() || ''}:${message?.text || ''}`);
+        });
+        initializedChannelsRef.current = true;
+      }
       setLoading(false);
     }, (err) => {
       console.error("Channels list sub error:", err);
@@ -94,7 +117,7 @@ export const useChat = () => {
     });
 
     return () => unsubChannels();
-  }, [currentUser]);
+  }, [currentUser, alerts]);
 
   // 4. Subscribe to Messages in Active Channel
   useEffect(() => {
@@ -116,6 +139,21 @@ export const useChat = () => {
 
     return () => unsubMessages();
   }, [activeChannelId]);
+
+  const markChannelRead = useCallback(async (channelId) => {
+    if (!currentUser || !channelId) return;
+    try {
+      await updateDoc(doc(db, 'chat_channels', channelId), {
+        [`readBy.${currentUser.id}`]: serverTimestamp(),
+      });
+    } catch (err) {
+      console.warn('Unable to mark chat read:', err);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (activeChannelId) markChannelRead(activeChannelId);
+  }, [activeChannelId, messages.length, markChannelRead]);
 
   // 5. Send Message Action
   const sendMessage = useCallback(async (text) => {
@@ -144,6 +182,7 @@ export const useChat = () => {
         timestamp: serverTimestamp()
       },
       updatedAt: serverTimestamp()
+      , [`readBy.${currentUser.id}`]: serverTimestamp()
     });
 
     await batch.commit();
@@ -176,6 +215,7 @@ export const useChat = () => {
             }
           },
           type: 'direct',
+          readBy: { [currentUser.id]: serverTimestamp() },
           lastMessage: {
             text: 'Started a new chat',
             senderId: 'system',
@@ -193,6 +233,15 @@ export const useChat = () => {
     }
   }, [currentUser]);
 
+  const unreadByChannel = useMemo(() => Object.fromEntries(channels.map((channel) => {
+    const message = channel.lastMessage;
+    const lastRead = channel.readBy?.[currentUser?.id];
+    const messageMs = message?.timestamp?.toMillis?.() || 0;
+    const readMs = lastRead?.toMillis?.() || 0;
+    return [channel.id, Boolean(message && message.senderId !== currentUser?.id && messageMs > readMs)];
+  })), [channels, currentUser]);
+  const unreadCount = Object.values(unreadByChannel).filter(Boolean).length;
+
   return {
     currentUser,
     channels,
@@ -202,6 +251,9 @@ export const useChat = () => {
     users,
     loading,
     sendMessage,
-    startDirectChat
+    startDirectChat,
+    markChannelRead,
+    unreadByChannel,
+    unreadCount
   };
 };

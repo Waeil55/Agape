@@ -19,9 +19,9 @@ firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const notificationTitle = payload.notification?.title || 'Agape Care';
+  const notificationTitle = payload.notification?.title || payload.data?.title || 'Agape Care';
   const notificationOptions = {
-    body: payload.notification?.body || '',
+    body: payload.notification?.body || payload.data?.body || '',
     icon: '/agape.png',
     badge: '/agape.png',
     vibrate: [200, 100, 200],

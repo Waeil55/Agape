@@ -12,6 +12,7 @@ import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config
 import { openMapLink } from '../utils/nativeActions';
 import { timeToMinutes, isTripLate, tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
 import { getDriverLiveStatus } from '../constants/statuses';
+import { useChat } from '../hooks/useChat';
 const ArchivesPage = lazy(() => import('./ArchivesPage'));
 const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
 const SettingsPage = lazy(() => import('./SettingsPage'));
@@ -151,6 +152,7 @@ const DesktopEnterpriseDashboard = ({
   onDispatcherStatusUpdate, driverWorkDrivers = [], driverWorkTrips = [], allDrivers = [],
   onUpdateMission, onUpdateDriverTrip, onDriverStatusUpdate, onCompleteTrip, onLogout
 }) => {
+  const { unreadCount } = useChat({ alerts: true });
   const displayLoginId = String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '');
   const VALID_PANELS = ['operations', 'liveMap', 'archives', 'reports', 'admin', 'settings', 'drive', 'routePlanner', 'dispatch', 'chat'];
   const [activePanel, setActivePanel] = useState(() => {
@@ -378,11 +380,11 @@ const DesktopEnterpriseDashboard = ({
       ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
       { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => setActivePanel('reports') },
       { id: 'map', label: 'Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
-      { id: 'chat', label: 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat') },
+      { id: 'chat', label: unreadCount ? `Chat (${unreadCount > 99 ? '99+' : unreadCount})` : 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat'), badge: unreadCount },
       { id: 'settings', label: 'Settings', icon: Settings, active: activePanel === 'settings', action: () => setActivePanel('settings') },
     ];
     return items;
-  }, [activePanel, driverWorkDrivers.length, openOperationsWorkspace, role, setActivePanel, showSequencerModal]);
+  }, [activePanel, driverWorkDrivers.length, openOperationsWorkspace, role, setActivePanel, showSequencerModal, unreadCount]);
 
   const topActionItems = useMemo(() => {
     switch (activePanel) {
@@ -490,6 +492,7 @@ const DesktopEnterpriseDashboard = ({
               >
                 <span className="relative inline-flex">
                   <Icon size={13} />
+                  {item.badge > 0 && <span className="absolute -right-2 -top-2 min-w-[16px] h-[16px] px-1 rounded-full bg-blue-600 text-white text-[9px] font-black leading-[16px] text-center">{item.badge > 99 ? '99+' : item.badge}</span>}
                 </span>
                 <span>{item.label}</span>
               </button>

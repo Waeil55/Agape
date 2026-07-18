@@ -7,6 +7,55 @@ admin.initializeApp();
 
 const TELNYX_API_BASE = "https://api.telnyx.com/v2";
 
+// Deliver Messenger-style push alerts for every newly created team-chat message.
+// Tokens are registered by the web client in users/{uid}.fcmToken.
+exports.notifyChatMessage = functions.firestore
+  .document("chat_channels/{channelId}/messages/{messageId}")
+  .onCreate(async (snapshot, context) => {
+    const message = snapshot.data() || {};
+    const channelSnap = await admin.firestore().doc(`chat_channels/${context.params.channelId}`).get();
+    if (!channelSnap.exists) return null;
+
+    const channel = channelSnap.data() || {};
+    const recipientIds = (channel.participants || []).filter((uid) => uid && uid !== message.senderId);
+    if (!recipientIds.length) return null;
+
+    const recipients = await Promise.all(recipientIds.map((uid) => admin.firestore().doc(`users/${uid}`).get()));
+    const tokens = recipients.map((user) => user.data()?.fcmToken).filter(Boolean);
+    if (!tokens.length) return null;
+
+    const title = message.senderName || "New message";
+    const body = String(message.text || "Sent you a message").slice(0, 180);
+    const response = await admin.messaging().sendEachForMulticast({
+      tokens,
+      data: {
+        type: "message",
+        title,
+        body,
+        channelId: context.params.channelId,
+      },
+      webpush: {
+        headers: { Urgency: "high" },
+        notification: { title, body, icon: "/agape.png", badge: "/agape.png", tag: `chat-${context.params.channelId}`, renotify: true },
+        fcmOptions: { link: `/?chatChannel=${encodeURIComponent(context.params.channelId)}` },
+      },
+    });
+
+    const invalidTokens = [];
+    response.responses.forEach((result, index) => {
+      if (!result.success && ["messaging/registration-token-not-registered", "messaging/invalid-registration-token"].includes(result.error?.code)) {
+        invalidTokens.push(tokens[index]);
+      }
+    });
+    if (invalidTokens.length) {
+      await Promise.all(recipients.map((user) => {
+        if (invalidTokens.includes(user.data()?.fcmToken)) return user.ref.update({ fcmToken: admin.firestore.FieldValue.delete() });
+        return null;
+      }));
+    }
+    return null;
+  });
+
 function normalizePhone(raw) {
   if (!raw) return raw;
   const digits = raw.replace(/\D/g, "");

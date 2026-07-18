@@ -5,6 +5,7 @@ import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
 import { playNotificationSound } from '../utils/notificationSound';
+import { useChat } from '../hooks/useChat';
 const DriverToolsPage = lazy(() => import('./DriverToolsPage'));
 const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
@@ -539,6 +540,7 @@ const applyWorkflowProgress = (trip, progress) => {
 };
 
 const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
+  const { unreadCount } = useChat({ alerts: true });
   const [phoneNumbersFallback, setPhoneNumbersFallback] = useState(null);
 
   useEffect(() => {
@@ -3439,7 +3441,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       { id: 'trips', label: 'Trips', icon: Home },
       { id: 'tools', label: 'Tools', icon: Zap },
 
-      { id: 'chat', label: 'Chat', icon: MessageCircle },
+      { id: 'chat', label: unreadCount ? `Chat (${unreadCount > 99 ? '99+' : unreadCount})` : 'Chat', icon: MessageCircle, badge: unreadCount },
       { id: 'history', label: 'History', icon: Clock },
       { id: 'settings', label: 'Settings', icon: Settings },
     ];
@@ -3452,7 +3454,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       items.splice(1, 0, { id: 'active-trip', label: firstName, sublabel: lastName, icon: Truck });
     }
     return items;
-  }, [activeWorkTripId, activeWorkTrip]);
+  }, [activeWorkTripId, activeWorkTrip, unreadCount]);
 
   const navApp = appSettings.navigationApp || 'google';
 
