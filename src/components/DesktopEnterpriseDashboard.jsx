@@ -21,6 +21,7 @@ const MobileDispatchView = lazy(() => import('./MobileDispatchView'));
 const AdminPage = lazy(() => import('./AdminPage'));
 const DriverPage = lazy(() => import('./DriverPage'));
 const RoutePlannerPage = lazy(() => import('./RoutePlannerPage'));
+const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LiveMapPage = lazy(() => import('./LiveMapPage'));
@@ -151,7 +152,7 @@ const DesktopEnterpriseDashboard = ({
   onUpdateMission, onUpdateDriverTrip, onDriverStatusUpdate, onCompleteTrip, onLogout
 }) => {
   const displayLoginId = String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '');
-  const VALID_PANELS = ['operations', 'liveMap', 'archives', 'reports', 'admin', 'settings', 'drive', 'routePlanner', 'dispatch'];
+  const VALID_PANELS = ['operations', 'liveMap', 'archives', 'reports', 'admin', 'settings', 'drive', 'routePlanner', 'dispatch', 'chat'];
   const [activePanel, setActivePanel] = useState(() => {
     const saved = localStorage.getItem('agape_activePanel');
     return saved && VALID_PANELS.includes(saved) ? saved : 'operations';
@@ -377,6 +378,7 @@ const DesktopEnterpriseDashboard = ({
       ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
       { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => setActivePanel('reports') },
       { id: 'map', label: 'Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
+      { id: 'chat', label: 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat') },
       { id: 'settings', label: 'Settings', icon: Settings, active: activePanel === 'settings', action: () => setActivePanel('settings') },
     ];
     return items;
@@ -1231,6 +1233,11 @@ const DesktopEnterpriseDashboard = ({
           </div>
         </div>
       ) : renderOperationsPage();
+      case 'chat': return (
+        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
+          <ChatPage />
+        </Suspense></ErrorBoundary>
+      );
       default: return renderOperationsPage();
     }
   };
@@ -1247,7 +1254,7 @@ const DesktopEnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${activePanel === 'reports' ? 'flex flex-col' : activePanel === 'admin' || activePanel === 'drive' ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+            <div className={`flex-1 min-h-0 ${['reports', 'admin', 'drive', 'chat'].includes(activePanel) ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap', 'chat'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (

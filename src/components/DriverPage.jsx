@@ -6,6 +6,7 @@ import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/m
 import { showLocalNotification } from '../config/notifications';
 import { playNotificationSound } from '../utils/notificationSound';
 const DriverToolsPage = lazy(() => import('./DriverToolsPage'));
+const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
 const TaskCard = lazy(() => import('./TaskCard'));
@@ -636,8 +637,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [activeNav, setActiveNav] = useState(() => {
     if (defaultTripId) return 'active-trip';
     const savedNav = localStorage.getItem(`agape_drvNav_${userKey}`) || 'trips';
-    return ['trips', 'tools', 'history', 'settings', 'active-trip'].includes(savedNav) ? savedNav : 'trips';
+    return ['trips', 'tools', 'history', 'settings', 'active-trip', 'chat'].includes(savedNav) ? savedNav : 'trips';
   });
+  const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState(() => localStorage.getItem(`agape_drvHistFilter_${userKey}`) || 'all');
   const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
   const [historyDate, setHistoryDate] = useState(() => localCalendarYmd());
@@ -3437,6 +3439,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       { id: 'trips', label: 'Trips', icon: Home },
       { id: 'tools', label: 'Tools', icon: Zap },
 
+      { id: 'chat', label: 'Chat', icon: MessageCircle },
       { id: 'history', label: 'History', icon: Clock },
       { id: 'settings', label: 'Settings', icon: Settings },
     ];
@@ -5912,6 +5915,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         </div>
       )}
 
+      {/* ===== CHAT PAGE ===== */}
+      {activeNav === 'chat' && (
+        <div className="flex-1 overflow-hidden flex flex-col bg-white min-h-0 relative">
+          <ErrorBoundary>
+            <Suspense fallback={<div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
+              <ChatPage onThreadActive={setIsChatThreadOpen} />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+      )}
+
       {/* ===== TIME TRACKING ADMIN ===== */}
       {showTTAdmin && (
         <div className="fixed inset-0 bg-white z-[200] overflow-y-auto">
@@ -6374,7 +6388,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       })()}
 
       {/* ===== BOTTOM NAVIGATION ===== */}
-      {!isEmbedded && (
+      {!isEmbedded && !isChatThreadOpen && (
         <nav className="bottom-nav md:hidden">
           <div className="flex h-full items-center justify-between gap-1 px-3">
               {navItems.map((item) => {

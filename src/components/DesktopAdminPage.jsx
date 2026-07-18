@@ -16,6 +16,7 @@ import DriverPerformanceCard from './DriverPerformanceCard';
 
 import { getDriverLiveStatus } from '../constants/statuses';
 import PayrollReportPage from './PayrollReportPage';
+import { ChatPage } from './chat/ChatPage';
 import {
   AdminShell, AdminCard, AdminButton, AdminBadge,
   AdminAvatar, AdminSearch, AdminEmpty, AdminCardHead,
@@ -957,6 +958,14 @@ const DesktopAdminPage = ({
             policyMode={payrollPolicy}
             onPolicyChange={setPayrollPolicy}
           />
+        </AdminSectionFrame>
+      ) },
+    { id: 'chat', title: 'Chat', icon: MessageCircle, roles: ['admin', 'dispatcher'],
+      content: (
+        <AdminSectionFrame eyebrow="Communication" title="Team Messenger">
+          <div className="h-[650px] border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <ChatPage />
+          </div>
         </AdminSectionFrame>
       ) },
   ];

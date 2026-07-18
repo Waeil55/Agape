@@ -1,6 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense, Component } from 'react';
 import {
-  Map, ChevronLeft, Menu, BarChart2, Zap, Shield, X
+  Map, ChevronLeft, Menu, BarChart2, Zap, Shield, X, MessageCircle
 } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
 
@@ -21,6 +21,7 @@ class ErrorBoundary extends Component {
 const AdminPage = lazy(() => import('./AdminPage'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
 const LiveMapPage = lazy(() => import('./LiveMapPage'));
+const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
 
 const MobileMenuPage = lazy(() => import('./MobileMenuPage'));
 const ArchivesPage = lazy(() => import('./ArchivesPage'));
@@ -43,6 +44,7 @@ const MobileEnterpriseDashboard = (props) => {
   const { trips = [], drivers = [], currentUser, role } = props;
   const [currentView, setCurrentView] = useState('map');
   const [subView, setSubView] = useState(null);
+  const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const [tripDetails, setTripDetails] = useState(null);
   const [tripWorkflowActive, setTripWorkflowActive] = useState(false);
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
@@ -56,7 +58,7 @@ const MobileEnterpriseDashboard = (props) => {
     setSubView(null);
   };
 
-  const VALID_VIEWS = ['map', 'reports', 'tools', 'menu'];
+  const VALID_VIEWS = ['map', 'reports', 'tools', 'menu', 'chat'];
   useEffect(() => {
     if (!VALID_VIEWS.includes(currentView)) setCurrentView('map');
   }, [currentView]);
@@ -345,13 +347,25 @@ const MobileEnterpriseDashboard = (props) => {
       );
     }
 
+    if (currentView === 'chat') {
+      return (
+        <div className="flex-1 overflow-hidden flex flex-col bg-white min-h-0 relative">
+          <ErrorBoundary>
+            <Suspense fallback={<MobileFallback />}>
+              <ChatPage onThreadActive={setIsChatThreadOpen} />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+      );
+    }
+
     return null;
   };
 
   // Show the bottom nav everywhere EXCEPT:
   // 1. When a trip detail overlay is open (full-screen DriverPage)
   // 2. When a chat thread is open inside chat view (thread takes full screen)
-  const showNav = !tripDetails;
+  const showNav = !tripDetails && !isChatThreadOpen;
 
 
 
@@ -462,6 +476,15 @@ const MobileEnterpriseDashboard = (props) => {
             >
               <Map size={24} strokeWidth={currentView === 'map' && !subView ? 1.8 : 1.3} />
               <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Map</span>
+            </button>
+
+            {/* Chat */}
+            <button
+              onClick={() => handleNavClick('chat')}
+              className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
+            >
+              <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 1.8 : 1.3} />
+              <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
             </button>
 
             {/* Reports */}
