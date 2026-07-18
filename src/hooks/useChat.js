@@ -205,8 +205,9 @@ export const useChat = ({ alerts = true } = {}) => {
   }, [activeChannelId, messages.length, markChannelRead]);
 
   // 5. Send Message Action
-  const sendMessage = useCallback(async (text, attachment = null, requestId = null, replyTo = null) => {
-    if (!currentUser || !activeChannelId || (!text.trim() && !attachment)) return;
+  const sendMessage = useCallback(async (text, attachments = [], requestId = null, replyTo = null) => {
+    const normalizedAttachments = Array.isArray(attachments) ? attachments : (attachments ? [attachments] : []);
+    if (!currentUser || !activeChannelId || (!text.trim() && normalizedAttachments.length === 0)) return;
 
     const messagesRef = collection(db, 'chat_channels', activeChannelId, 'messages');
     const channelRef = doc(db, 'chat_channels', activeChannelId);
@@ -221,7 +222,7 @@ export const useChat = ({ alerts = true } = {}) => {
       senderName: currentUser.name || currentUser.username || currentUser.email,
       timestamp: serverTimestamp(),
       clientRequestId: newMsgRef.id,
-      ...(attachment ? { attachment } : {}),
+      ...(normalizedAttachments.length ? { attachments: normalizedAttachments } : {}),
       ...(replyTo ? { replyTo } : {}),
     });
 
@@ -235,7 +236,7 @@ export const useChat = ({ alerts = true } = {}) => {
     const channelUpdate = {
       lastMessage: {
         id: newMsgRef.id,
-        text: text || (attachment?.type?.startsWith('image/') ? 'Sent a photo' : `Sent ${attachment?.name || 'a file'}`),
+        text: text || (normalizedAttachments.length === 1 && normalizedAttachments[0]?.type?.startsWith('image/') ? 'Sent a photo' : `Sent ${normalizedAttachments.length} ${normalizedAttachments.length === 1 ? 'file' : 'files'}`),
         senderId: currentUser.id,
         senderName: currentUser.name || currentUser.username || currentUser.email,
         timestamp: serverTimestamp()
@@ -247,14 +248,16 @@ export const useChat = ({ alerts = true } = {}) => {
     if (channel) {
       batch.update(channelRef, channelUpdate);
     } else if (draftChannel) {
-      const recipientId = draftChannel.participants.find((id) => id !== currentUser.id);
+      const initialUnreadCounts = Object.fromEntries(draftChannel.participants.map(id => [id, id === currentUser.id ? 0 : 1]));
       batch.set(channelRef, {
         participants: draftChannel.participants,
         participantDetails: draftChannel.participantDetails,
-        type: 'direct',
+        type: draftChannel.type || 'direct',
+        ownerId: draftChannel.ownerId || currentUser.id,
+        ...(draftChannel.type === 'group' ? { name: draftChannel.name } : {}),
         createdAt: serverTimestamp(),
         readBy: { [currentUser.id]: serverTimestamp() },
-        unreadCounts: { [currentUser.id]: 0, [recipientId]: 1 },
+        unreadCounts: initialUnreadCounts,
         lastMessage: channelUpdate.lastMessage,
         updatedAt: serverTimestamp(),
       });
@@ -309,6 +312,15 @@ export const useChat = ({ alerts = true } = {}) => {
     });
   }, [activeChannelId, currentUser]);
 
+  const togglePin = useCallback(async (message) => {
+    if (!activeChannelId || !message?.id || !currentUser) return;
+    await updateDoc(doc(db, 'chat_channels', activeChannelId, 'messages', message.id), {
+      pinned: !message.pinned,
+      pinnedBy: !message.pinned ? currentUser.id : null,
+      pinnedAt: !message.pinned ? serverTimestamp() : null,
+    });
+  }, [activeChannelId, currentUser]);
+
   // 6. Start / Retrieve Direct Chat Channel
   const startDirectChat = useCallback((otherUser) => {
     if (!currentUser || !otherUser) return null;
@@ -337,6 +349,7 @@ export const useChat = ({ alerts = true } = {}) => {
             }
           },
           type: 'direct',
+          ownerId: currentUser.id,
           isDraft: true,
         });
       } else {
@@ -351,6 +364,28 @@ export const useChat = ({ alerts = true } = {}) => {
       return null;
     }
   }, [currentUser, channels]);
+
+  const startGroupChat = useCallback((members, name) => {
+    if (!currentUser || !Array.isArray(members) || members.length < 2) return null;
+    const uniqueMembers = members.filter((member, index, list) => member?.id && member.id !== currentUser.id && list.findIndex(item => item.id === member.id) === index).slice(0, 49);
+    if (uniqueMembers.length < 2) return null;
+    const channelId = `group_${crypto.randomUUID()}`;
+    const allMembers = [currentUser, ...uniqueMembers];
+    setDraftChannel({
+      id: channelId,
+      participants: allMembers.map(member => member.id),
+      participantDetails: Object.fromEntries(allMembers.map(member => [member.id, {
+        name: member.name || member.username || member.email || 'Team member',
+        email: member.email || '', role: member.role || 'team member',
+      }])),
+      type: 'group', ownerId: currentUser.id,
+      name: name?.trim() || uniqueMembers.map(member => member.name || member.email).slice(0, 3).join(', '),
+      isDraft: true,
+    });
+    setActiveChannelId(channelId);
+    setMessages([]);
+    return channelId;
+  }, [currentUser]);
 
   const selectChannel = useCallback((channelId) => {
     if (!channelId) setDraftChannel(null);
@@ -403,11 +438,13 @@ export const useChat = ({ alerts = true } = {}) => {
     loading,
     sendMessage,
     startDirectChat,
+    startGroupChat,
     markChannelRead,
     setTyping,
     editMessage,
     deleteMessage,
     toggleReaction,
+    togglePin,
     toggleMute,
     unreadByChannel,
     unreadCount,

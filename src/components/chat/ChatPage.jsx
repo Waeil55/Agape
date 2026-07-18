@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Phone, Info, Search, Plus, Smile, ThumbsUp, Send,
   MessageSquare, Loader2, X, Mail, ShieldCheck, Briefcase, CheckCheck,
-  Paperclip, FileText, Download, Pencil, Trash2, Bell, BellOff, Reply
+  Paperclip, FileText, Download, Pencil, Trash2, Bell, BellOff, Reply, Users, Check, Pin
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import { makeCall } from '../../utils/nativeActions';
@@ -33,12 +33,14 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     loading,
     sendMessage,
     startDirectChat,
+    startGroupChat,
     unreadByChannel,
     unreadCount,
     setTyping,
     editMessage,
     deleteMessage,
     toggleReaction,
+    togglePin,
     contactPresence,
     toggleMute,
     loadOlderMessages,
@@ -59,6 +61,9 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingText, setEditingText] = useState('');
   const [replyTo, setReplyTo] = useState(null);
+  const [newChatMode, setNewChatMode] = useState('direct');
+  const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+  const [groupName, setGroupName] = useState('');
   const [typingClock, setTypingClock] = useState(() => Date.now());
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -138,6 +143,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
 
   const getOtherParticipant = (channel) => {
     if (!channel || !currentUser || !channel.participants) return null;
+    if (channel.type === 'group') return { id: channel.id, name: channel.name || 'Group conversation', role: `${channel.participants.length} members`, isGroup: true };
     const otherId = channel.participants.find(pId => pId !== currentUser.id);
     const directoryUser = users.find(user => user.id === otherId) || {};
     return { ...directoryUser, ...(channel.participantDetails?.[otherId] || {}), id: otherId };
@@ -378,9 +384,9 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                         {msg.deletedAt ? <span className="italic opacity-70">Message removed</span> : editingMessageId === msg.id ? (
                           <div className="flex items-center gap-2"><input autoFocus value={editingText} onChange={event => setEditingText(event.target.value)} className="min-w-0 flex-1 rounded-lg bg-white/90 px-2 py-1 text-slate-900 outline-none" /><button onClick={async () => { await editMessage(msg.id, editingText); setEditingMessageId(null); }} className="text-xs font-black">Save</button></div>
                         ) : <>{msg.text}{msg.editedAt && <span className="ml-1 text-[9px] opacity-60">edited</span>}</>}
-                        {msg.attachment && !msg.deletedAt && (msg.attachment.type?.startsWith('image/') ? <a href={msg.attachment.url} target="_blank" rel="noreferrer"><img src={msg.attachment.url} alt={msg.attachment.name} className="mt-2 max-h-64 rounded-xl object-cover" /></a> : <a href={msg.attachment.url} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-xl bg-white/15 p-2"><FileText size={18} /><span className="truncate text-xs font-bold">{msg.attachment.name}</span><Download size={14} /></a>)}
+                        {(msg.attachments || (msg.attachment ? [msg.attachment] : [])).map((attachment, attachmentIndex) => !msg.deletedAt && (attachment.type?.startsWith('image/') ? <a key={attachment.path || attachmentIndex} href={attachment.url} target="_blank" rel="noreferrer"><img src={attachment.url} alt={attachment.name} className="mt-2 max-h-64 rounded-xl object-cover" /></a> : <a key={attachment.path || attachmentIndex} href={attachment.url} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-xl bg-white/15 p-2"><FileText size={18} /><span className="truncate text-xs font-bold">{attachment.name}</span><Download size={14} /></a>))}
                       </div>
-                      {!msg.deletedAt && <div className={`flex items-center gap-1 ${isSent ? 'justify-end' : 'justify-start'}`}><button onClick={() => setReplyTo(msg)} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Reply to message"><Reply size={11} /></button><button onClick={() => toggleReaction(msg, '👍')} className="rounded-full px-1.5 py-0.5 text-xs hover:bg-slate-200">👍</button>{isSent && <><button onClick={() => { setEditingMessageId(msg.id); setEditingText(msg.text || ''); }} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Edit message"><Pencil size={11} /></button><button onClick={() => deleteMessage(msg.id)} className="p-1 text-slate-400 hover:text-rose-600" aria-label="Delete message"><Trash2 size={11} /></button></>}</div>}
+                      {!msg.deletedAt && <div className={`flex items-center gap-1 ${isSent ? 'justify-end' : 'justify-start'}`}><button onClick={() => setReplyTo(msg)} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Reply to message"><Reply size={11} /></button><button onClick={() => togglePin(msg)} className={`p-1 ${msg.pinned ? 'text-amber-600' : 'text-slate-400 hover:text-amber-600'}`} aria-label={msg.pinned ? 'Unpin message' : 'Pin message'}><Pin size={11} /></button><button onClick={() => toggleReaction(msg, '👍')} className="rounded-full px-1.5 py-0.5 text-xs hover:bg-slate-200">👍</button>{isSent && <><button onClick={() => { setEditingMessageId(msg.id); setEditingText(msg.text || ''); }} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Edit message"><Pencil size={11} /></button><button onClick={() => deleteMessage(msg.id)} className="p-1 text-slate-400 hover:text-rose-600" aria-label="Delete message"><Trash2 size={11} /></button></>}</div>}
                       {msg.reactions && <div className="flex flex-wrap gap-1">{Object.entries(msg.reactions).filter(([, ids]) => ids?.length).map(([emoji, ids]) => <button key={emoji} onClick={() => toggleReaction(msg, emoji)} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] shadow-sm">{emoji} {ids.length}</button>)}</div>}
                       {isLastInGroup && <span className="agape-message-meta">{formatMessageTime(msg.timestamp)}{isSent && <><CheckCheck size={12} />{isMessageSeen(msg, otherReadAt) && <span>Seen</span>}</>}</span>}
                     </div>
@@ -476,13 +482,22 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                 <X size={16} />
               </button>
             </div>
+            <div className="mb-4 grid grid-cols-2 rounded-xl bg-slate-100 p-1">
+              <button onClick={() => { setNewChatMode('direct'); setSelectedMemberIds([]); }} className={`rounded-lg px-3 py-2 text-xs font-bold ${newChatMode === 'direct' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>Direct</button>
+              <button onClick={() => setNewChatMode('group')} className={`rounded-lg px-3 py-2 text-xs font-bold ${newChatMode === 'group' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}><Users size={14} className="mr-1 inline" /> Group</button>
+            </div>
+            {newChatMode === 'group' && <input value={groupName} onChange={event => setGroupName(event.target.value)} maxLength={80} placeholder="Group name" className="mb-3 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-blue-500" />}
             <div className="flex-1 overflow-y-auto space-y-2">
               {filteredContacts.map(u => (
                 <button
                   key={u.id}
                   onClick={() => {
-                    startDirectChat(u);
-                    setShowNewChatModal(false);
+                    if (newChatMode === 'direct') {
+                      startDirectChat(u);
+                      setShowNewChatModal(false);
+                    } else {
+                      setSelectedMemberIds(ids => ids.includes(u.id) ? ids.filter(id => id !== u.id) : [...ids, u.id]);
+                    }
                   }}
                   className="w-full flex items-center gap-3 px-3 py-2 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-2xl text-left transition"
                 >
@@ -491,12 +506,17 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
                     <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">{formatDisplayName(u)}</h4>
                     <p className="text-[10px] text-slate-500 capitalize">{u.role || 'Driver'}</p>
                   </div>
+                  {newChatMode === 'group' && <span className={`flex h-6 w-6 items-center justify-center rounded-full border ${selectedMemberIds.includes(u.id) ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 text-transparent'}`}><Check size={14} /></span>}
                 </button>
               ))}
               {filteredContacts.length === 0 && (
                 <div className="text-center text-slate-400 text-xs py-8">No other users found in the system.</div>
               )}
             </div>
+            {newChatMode === 'group' && <button disabled={selectedMemberIds.length < 2} onClick={() => {
+              startGroupChat(users.filter(user => selectedMemberIds.includes(user.id)), groupName);
+              setSelectedMemberIds([]); setGroupName(''); setShowNewChatModal(false);
+            }} className="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">Create group with {selectedMemberIds.length} members</button>}
           </div>
         </div>
       )}

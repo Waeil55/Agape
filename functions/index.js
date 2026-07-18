@@ -74,12 +74,13 @@ exports.auditChatMessageChanges = functions.firestore
       entityId: context.params.messageId,
       channelId: context.params.channelId,
       actorId: after?.deletedBy || after?.senderId || before?.senderId || "unknown",
-      hasAttachment: Boolean(after?.attachment || before?.attachment),
+      hasAttachment: Boolean(after?.attachment || before?.attachment || after?.attachments?.length || before?.attachments?.length),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    if (after?.deletedAt && !before?.deletedAt && after.attachment?.path) {
-      await admin.storage().bucket().file(after.attachment.path).delete({ ignoreNotFound: true });
+    if (after?.deletedAt && !before?.deletedAt) {
+      const attachments = after.attachments || (after.attachment ? [after.attachment] : []);
+      await Promise.all(attachments.filter(item => item?.path).map(item => admin.storage().bucket().file(item.path).delete({ ignoreNotFound: true })));
     }
     return null;
   });
