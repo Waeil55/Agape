@@ -286,8 +286,7 @@ export async function syncWellTransTrip(page, payload) {
     verifyGrid = page.locator(`${GRID_SELECTOR}:visible:has(.GridCell[title="Signature Captured?"])`).last();
     if (!await verifyGrid.count()) verifyGrid = await openEditItinerary(page);
   } else {
-    await closeEditorWithoutSaving(page);
-    verifyGrid = await openEditItinerary(page);
+    verifyGrid = grid;
   }
 
   // TripSpark can keep the editor open after Apply; verify its refreshed values directly.
