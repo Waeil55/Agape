@@ -40,12 +40,18 @@ async function processJob(job) {
   let browser;
   let page;
   try {
+    const tripSnapshot = await db.doc(`trips/${job.tripId}`).get();
+    if (!tripSnapshot.exists) throw new Error(`Source trip ${job.tripId} no longer exists`);
+    const trip = tripSnapshot.data() || {};
+    const serviceDate = String(job.payload?.serviceDate || trip.dateKey || trip.serviceDate || trip.tripDate || trip.scheduledDate || trip.pickupDate || trip.date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) throw new Error(`Trip ${job.tripId} has no valid service date`);
+    const payload = { ...job.payload, serviceDate };
     const settings = (await db.doc('welltrans_settings/primary').get()).data() || {};
     const portalUrl = assertAllowedPortal(settings.portalUrl || process.env.WELLTRANS_PORTAL_URL);
     ({ browser, page } = await openWellTransBrowser());
     await page.goto(portalUrl, { waitUntil: 'domcontentloaded' });
     await job.ref.update({ stage: 'matching_booking', updatedAt: FieldValue.serverTimestamp() });
-    await syncWellTransTrip(page, job.payload, settings.fieldMapping || {});
+    await syncWellTransTrip(page, payload, settings.fieldMapping || {});
     await job.ref.update({ status: 'completed', stage: 'verified', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '' });
     await db.doc('welltrans_settings/primary').set({ lastSync: FieldValue.serverTimestamp() }, { merge: true });
   } catch (error) {

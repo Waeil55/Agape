@@ -12,6 +12,15 @@ export const DEFAULT_WELLTRANS_FIELD_MAPPING = Object.freeze({
 
 const firstValue = (source, keys) => keys.map((key) => source?.[key]).find((value) => value !== undefined && value !== null && value !== '');
 
+export const normalizeServiceDate = (trip = {}) => {
+  const value = firstValue(trip, ['dateKey', 'serviceDate', 'tripDate', 'scheduledDate', 'pickupDate', 'date']);
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())) return String(value).trim();
+  const date = value?.toDate?.() || new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-CA', { timeZone: 'America/Indiana/Indianapolis' });
+};
+
 export const normalizeBookingId = (trip = {}) => {
   const value = String(firstValue(trip, ['bookingId', 'tripId', 'tripNumber', 'id']) || '').trim();
   return value.replace(/^TRIP-/i, '');
@@ -41,6 +50,7 @@ export const buildWellTransPayload = (trip = {}) => {
   return {
     bookingId,
     tripId: String(trip.id || bookingId),
+    serviceDate: normalizeServiceDate(trip),
     driver: firstValue(trip, ['completedDriverName', 'driverName', 'driver']) || '',
     vehicle: firstValue(trip, ['completedVehicle', 'vehicle', 'vehicleName']) || '',
     pickup: {
@@ -63,9 +73,9 @@ export const validateTripForWellTrans = (trip = {}) => {
   const payload = (() => { try { return buildWellTransPayload(trip); } catch (error) { errors.push(error.message); return null; } })();
   if (!['completed', 'complete'].includes(String(trip.status || '').trim().toLowerCase()) && !trip.completedAt) errors.push('Trip is not completed');
   if (payload && !payload.pickup.arrival) errors.push('Pickup arrival is missing');
+  if (payload && !payload.serviceDate) errors.push('Service date is missing');
   if (payload && !payload.pickup.departure) errors.push('Pickup departure is missing');
   if (payload && !payload.dropoff.arrival) errors.push('Dropoff arrival is missing');
   if (payload && payload.dropoff.mileage === null) errors.push('Mileage or valid odometer readings are missing');
   return { valid: errors.length === 0, errors, payload };
 };
-

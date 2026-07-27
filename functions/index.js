@@ -619,6 +619,15 @@ const wellTransClock = (value) => {
   return date.toLocaleTimeString("en-US", { timeZone: "America/Indiana/Indianapolis", hour12: false, hour: "2-digit", minute: "2-digit" });
 };
 
+const wellTransServiceDate = (trip = {}) => {
+  const value = trip.dateKey || trip.serviceDate || trip.tripDate || trip.scheduledDate || trip.pickupDate || trip.date;
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())) return String(value).trim();
+  const date = value?.toDate?.() || new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Indiana/Indianapolis" }).format(date);
+};
+
 const buildWellTransJobPayload = (trip = {}) => {
   const bookingId = normalizeWellTransBookingId(trip);
   const start = Number(trip.pickupOdometer || trip.startOdometer || trip.startMileage);
@@ -627,7 +636,7 @@ const buildWellTransJobPayload = (trip = {}) => {
   const fallbackMiles = Number(trip.actualDistance ?? trip.distance ?? trip.miles ?? trip.totalMiles);
   const mileage = odometerMiles === null && Number.isFinite(fallbackMiles) && fallbackMiles >= 0 ? fallbackMiles : odometerMiles;
   const payload = {
-    bookingId, tripId: String(trip.id || bookingId),
+    bookingId, tripId: String(trip.id || bookingId), serviceDate: wellTransServiceDate(trip),
     driver: trip.completedDriverName || trip.driverName || trip.driver || "",
     vehicle: trip.completedVehicle || trip.vehicle || trip.vehicleName || "",
     pickup: { arrival: wellTransClock(trip.pickupArrival || trip.arrivalTime || trip.arrivedPickupTime), departure: wellTransClock(trip.pickupDeparture || trip.departedPickupTime || trip.departureTime), mileage: 0, signatureCaptured: false },
@@ -637,6 +646,7 @@ const buildWellTransJobPayload = (trip = {}) => {
   if (!bookingId) errors.push("Trip has no Booking ID");
   if (!["completed", "complete"].includes(String(trip.status || "").toLowerCase()) && !trip.completedAt) errors.push("Trip is not completed");
   if (!payload.pickup.arrival) errors.push("Pickup arrival is missing");
+  if (!payload.serviceDate) errors.push("Service date is missing");
   if (!payload.pickup.departure) errors.push("Pickup departure is missing");
   if (!payload.dropoff.arrival) errors.push("Dropoff arrival is missing");
   if (payload.dropoff.mileage === null) errors.push("Mileage or valid odometer readings are missing");
