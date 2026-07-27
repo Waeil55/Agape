@@ -1,14 +1,16 @@
-import admin from 'firebase-admin';
+import { initializeApp } from 'firebase-admin/app';
+import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import { performManualLogin } from './welltrans.login.js';
 import { openWellTransBrowser } from './welltrans.browser.js';
 import { syncWellTransTrip } from './welltrans.trip.js';
 
-admin.initializeApp();
-const db = admin.firestore();
+initializeApp();
+const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const publishHeartbeat = () => db.doc('welltrans_worker_status/primary').set({
-  workerId, state: 'online', lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+  workerId, state: 'online', lastSeenAt: FieldValue.serverTimestamp(),
   version: '1.0.0',
 }, { merge: true });
 const assertAllowedPortal = value => {
@@ -28,7 +30,7 @@ async function claimNextJob() {
   return db.runTransaction(async transaction => {
     const fresh = await transaction.get(ref);
     if (!fresh.exists || fresh.data().status !== 'pending') return null;
-    transaction.update(ref, { status: 'processing', stage: 'claimed', startedAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp(), leaseExpiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 10 * 60 * 1000), attempt: admin.firestore.FieldValue.increment(1), workerId });
+    transaction.update(ref, { status: 'processing', stage: 'claimed', startedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: Timestamp.fromMillis(Date.now() + 10 * 60 * 1000), attempt: FieldValue.increment(1), workerId });
     return { id: fresh.id, ref, ...fresh.data() };
   });
 }
@@ -41,20 +43,20 @@ async function processJob(job) {
     const portalUrl = assertAllowedPortal(settings.portalUrl || process.env.WELLTRANS_PORTAL_URL);
     ({ browser, page } = await openWellTransBrowser());
     await page.goto(portalUrl, { waitUntil: 'domcontentloaded' });
-    await job.ref.update({ stage: 'matching_booking', updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    await job.ref.update({ stage: 'matching_booking', updatedAt: FieldValue.serverTimestamp() });
     await syncWellTransTrip(page, job.payload, settings.fieldMapping || {});
-    await job.ref.update({ status: 'completed', stage: 'verified', completedAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp(), leaseExpiresAt: admin.firestore.FieldValue.delete(), errorMessage: '' });
-    await db.doc('welltrans_settings/primary').set({ lastSync: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    await job.ref.update({ status: 'completed', stage: 'verified', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '' });
+    await db.doc('welltrans_settings/primary').set({ lastSync: FieldValue.serverTimestamp() }, { merge: true });
   } catch (error) {
     let screenshot = '';
     if (page) {
       const buffer = await page.screenshot({ fullPage: true }).catch(() => null);
       if (buffer) {
         screenshot = `welltrans_sync_screenshots/${job.id}.png`;
-        await admin.storage().bucket().file(screenshot).save(buffer, { contentType: 'image/png', resumable: false, metadata: { cacheControl: 'private, no-store' } });
+        await getStorage().bucket().file(screenshot).save(buffer, { contentType: 'image/png', resumable: false, metadata: { cacheControl: 'private, no-store' } });
       }
     }
-    await job.ref.update({ status: 'failed', stage: 'failed', completedAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp(), leaseExpiresAt: admin.firestore.FieldValue.delete(), errorMessage: String(error?.message || error).slice(0, 2000), screenshot });
+    await job.ref.update({ status: 'failed', stage: 'failed', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: String(error?.message || error).slice(0, 2000), screenshot });
   } finally {
     await browser?.close().catch(() => {});
   }
@@ -62,8 +64,8 @@ async function processJob(job) {
 
 async function main() {
   if (process.argv.includes('--login')) return performManualLogin();
-  const stale = await db.collection('welltrans_sync_logs').where('status', '==', 'processing').where('leaseExpiresAt', '<', admin.firestore.Timestamp.now()).get();
-  await Promise.all(stale.docs.map(item => item.ref.update({ status: 'failed', stage: 'worker_lease_expired', errorMessage: 'Worker stopped before completing this trip. Retry is safe.', completedAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp(), leaseExpiresAt: admin.firestore.FieldValue.delete() })));
+  const stale = await db.collection('welltrans_sync_logs').where('status', '==', 'processing').where('leaseExpiresAt', '<', Timestamp.now()).get();
+  await Promise.all(stale.docs.map(item => item.ref.update({ status: 'failed', stage: 'worker_lease_expired', errorMessage: 'Worker stopped before completing this trip. Retry is safe.', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete() })));
   const once = process.argv.includes('--once');
   await publishHeartbeat();
   do {
