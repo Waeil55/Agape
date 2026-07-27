@@ -117,7 +117,10 @@ function equalCellValue(column, actual, expected) {
     return normalizedTime(actual) === normalizedTime(expected);
   }
   if (column === 'Mileage/Odometer') {
-    return normalizedNumber(actual) === normalizedNumber(expected);
+    const actualNumber = Number(normalizedNumber(actual));
+    const expectedNumber = Number(normalizedNumber(expected));
+    return Number.isFinite(actualNumber) && Number.isFinite(expectedNumber)
+      && Math.abs(actualNumber - expectedNumber) < 0.001;
   }
   return normalized(actual) === normalized(expected);
 }
