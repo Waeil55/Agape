@@ -149,6 +149,12 @@ async function processJob(job, existingSession = null) {
       }
     }
     await job.ref.update({ status: 'failed', stage: 'failed', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: `${String(error?.message || error)}${screenshotError}`.slice(0, 2000), screenshot });
+    // Dismiss only a transient cell/dropdown editor so one failed row cannot
+    // poison the next job. Keep the itinerary itself open and never Apply.
+    if (existingSession && page) {
+      await page.keyboard.press('Escape').catch(() => {});
+      await page.waitForTimeout(100).catch(() => {});
+    }
     return false;
   } finally {
     if (!existingSession) await browser?.close().catch(() => {});

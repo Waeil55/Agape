@@ -147,6 +147,12 @@ async function selectUniqueListOption(page, option, column) {
     await exact.at(-1).click();
     return;
   }
+  // Vehicle identifiers are operational identifiers, not display labels. A
+  // prefix/substring match can select a different vehicle (for example,
+  // "TOYOTA 002" must never select "TOYOTA 0025 3311").
+  if (column === 'Vehicle') {
+    throw new Error(`${column} option "${option}" was not found exactly`);
+  }
   const contained = await visibleMatches(page.getByText(String(option), { exact: false }));
   if (contained.length === 1) {
     await contained[0].click();
@@ -189,7 +195,7 @@ async function setTextCell(page, grid, model, row, column, value, required = fal
       return false;
     }
   }
-  if (column === 'Vehicle') return false;
+  if (column === 'Vehicle' || column === 'Driver') return false;
   throw new Error(`${column} editor did not open for ${row.activity}`);
 }
 
@@ -202,21 +208,15 @@ async function setListCell(page, grid, model, row, column, option) {
   const listbox = page.locator('.EditorWidgets core\\:listbox').last();
   await listbox.locator('.dropdlgbutton').click({ force: true });
   await page.waitForTimeout(250);
-  try {
-    await selectUniqueListOption(page, option, column);
-  } catch (error) {
-    // TripSpark's signature list renders its choices outside the accessible DOM.
-    // "Rider Signature Received" is the confirmed first option. Click its first
-    // rendered row relative to the edited cell, then verify before review.
-    if (column !== 'Signature Captured?') throw error;
-    const box = await cell.boundingBox();
-    if (box) {
-      await page.mouse.click(box.x + Math.min(80, box.width / 2), box.y + box.height + 12);
-    } else {
-      await page.keyboard.press('Home');
-      await page.keyboard.press('Enter');
-    }
+  if (column === 'Signature Captured?') {
+    // The TripSpark dropdown is keyboard-backed even when its choices are
+    // rendered outside the accessible DOM. "Rider Signature Received" is the
+    // first option; Home + Enter commits that exact option deterministically.
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Enter');
     await page.keyboard.press('Tab');
+  } else {
+    await selectUniqueListOption(page, option, column);
   }
   await page.waitForTimeout(250);
   let selected = await cell.evaluate(element =>
@@ -227,13 +227,8 @@ async function setListCell(page, grid, model, row, column, option) {
     await cell.dblclick({ force: true });
     const retryListbox = page.locator('.EditorWidgets core\\:listbox').last();
     await retryListbox.locator('.dropdlgbutton').click({ force: true });
-    const retryBox = await cell.boundingBox();
-    if (retryBox) {
-      await page.mouse.click(retryBox.x + Math.min(80, retryBox.width / 2), retryBox.y + retryBox.height + 12);
-    } else {
-      await page.keyboard.press('Home');
-      await page.keyboard.press('Enter');
-    }
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Enter');
     await page.keyboard.press('Tab');
     await page.waitForTimeout(250);
     selected = await cell.evaluate(element =>
@@ -283,13 +278,13 @@ export async function syncWellTransTrip(page, payload) {
 
   const pickup = pickupRows[0];
   const dropoff = dropoffRows[0];
-  await setTextCell(page, grid, model, pickup, 'Driver', payload.driver);
+  const pickupDriverSet = await setTextCell(page, grid, model, pickup, 'Driver', payload.driver);
   const pickupVehicleSet = await setTextCell(page, grid, model, pickup, 'Vehicle', payload.vehicle);
   await setTextCell(page, grid, model, pickup, 'Arrival Time', payload.pickup.arrival, true);
   await setTextCell(page, grid, model, pickup, 'Departure Time', payload.pickup.departure, true);
   await setTextCell(page, grid, model, pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0, true);
 
-  await setTextCell(page, grid, model, dropoff, 'Driver', payload.driver);
+  const dropoffDriverSet = await setTextCell(page, grid, model, dropoff, 'Driver', payload.driver);
   const dropoffVehicleSet = await setTextCell(page, grid, model, dropoff, 'Vehicle', payload.vehicle);
   await setTextCell(page, grid, model, dropoff, 'Arrival Time', payload.dropoff.arrival, true);
   await setTextCell(page, grid, model, dropoff, 'Departure Time', payload.dropoff.departure);
@@ -299,12 +294,12 @@ export async function syncWellTransTrip(page, payload) {
   }
 
   const expected = [
-    [pickup, 'Driver', payload.driver],
+    ...(pickupDriverSet ? [[pickup, 'Driver', payload.driver]] : []),
     ...(pickupVehicleSet ? [[pickup, 'Vehicle', payload.vehicle]] : []),
     [pickup, 'Arrival Time', payload.pickup.arrival],
     [pickup, 'Departure Time', payload.pickup.departure],
     [pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0],
-    [dropoff, 'Driver', payload.driver],
+    ...(dropoffDriverSet ? [[dropoff, 'Driver', payload.driver]] : []),
     ...(dropoffVehicleSet ? [[dropoff, 'Vehicle', payload.vehicle]] : []),
     [dropoff, 'Arrival Time', payload.dropoff.arrival],
     [dropoff, 'Departure Time', payload.dropoff.departure],
@@ -333,6 +328,8 @@ export async function syncWellTransTrip(page, payload) {
   return {
     selectedDate, stagedForReview: true, verified: true,
     warnings: [
+      ...(!pickupDriverSet ? ['Pickup driver was left unchanged because the WellTrans editor was unavailable.'] : []),
+      ...(!dropoffDriverSet ? ['Dropoff driver was left unchanged because the WellTrans editor was unavailable.'] : []),
       ...(!pickupVehicleSet ? ['Pickup vehicle was left unchanged because no unique WellTrans match was found.'] : []),
       ...(!dropoffVehicleSet ? ['Dropoff vehicle was left unchanged because no unique WellTrans match was found.'] : []),
     ],
