@@ -6,6 +6,9 @@
   "scripts": {
     "install-browser": "playwright install chromium",
     "login": "node src/index.js --login",
+    "inspect": "node src/index.js --inspect",
+    "inspect-editor": "node src/index.js --inspect-editor",
+    "standby": "node src/index.js --standby",
     "start": "node src/index.js",
     "once": "node src/index.js --once",
     "check": "node --check src/index.js"

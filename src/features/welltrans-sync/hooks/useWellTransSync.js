@@ -18,6 +18,7 @@ export const useWellTransSync = (trips = []) => {
   }, [logs]);
   const readyTrips = useMemo(() => completedTrips.filter(trip => validateTripForWellTrans(trip).valid && latestByTrip.get(trip.id)?.status !== 'completed'), [completedTrips, latestByTrip]);
   const heartbeat = worker?.lastSeenAt?.toDate?.() || (worker?.lastSeenAt ? new Date(worker.lastSeenAt) : null);
-  const workerOnline = Boolean(heartbeat && Date.now() - heartbeat.getTime() < 45000);
-  return { settings, logs, worker, workerOnline, loading, completedTrips, readyTrips, latestByTrip };
+  const workerOnline = Boolean(heartbeat && Date.now() - heartbeat.getTime() < 45000 && worker?.state === 'online');
+  const workerStandby = Boolean(heartbeat && Date.now() - heartbeat.getTime() < 45000 && worker?.state === 'standby');
+  return { settings, logs, worker, workerOnline, workerStandby, loading, completedTrips, readyTrips, latestByTrip };
 };
