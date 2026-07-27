@@ -2,7 +2,7 @@ import { collection, db, doc, functions, httpsCallable, onSnapshot, orderBy, que
 import { DEFAULT_WELLTRANS_FIELD_MAPPING } from '../utils/welltransMapping';
 
 export const DEFAULT_SETTINGS = {
-  enabled: false, portalUrl: '', automationMethod: 'playwright', lastSync: null,
+  enabled: false, portalUrl: 'https://tripspark.welltransnemt.com/', automationMethod: 'playwright', lastSync: null,
   fieldMapping: DEFAULT_WELLTRANS_FIELD_MAPPING,
 };
 
@@ -28,4 +28,3 @@ export const explainWellTransFailure = (log) => {
   if (lower.includes('selector') || lower.includes('field')) return `WellTrans did not expose an expected field for trip ${log.bookingId || log.tripId}. Review the captured screenshot and update the selector configuration before retrying.`;
   return `Trip ${log.bookingId || log.tripId} failed during the ${log.stage || 'automation'} stage: ${message} Review the screenshot and retry after correcting the source data or portal configuration.`;
 };
-

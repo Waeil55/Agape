@@ -5,7 +5,7 @@ export const WellTransProvider = Object.freeze({
   displayName: 'WellTrans',
   defaultSettings: {
     enabled: false,
-    portalUrl: '',
+    portalUrl: 'https://tripspark.welltransnemt.com/',
     automationMethod: 'playwright',
     fieldMapping: DEFAULT_WELLTRANS_FIELD_MAPPING,
   },
@@ -20,4 +20,3 @@ export const WellTransProvider = Object.freeze({
 });
 
 export const BROKER_PROVIDERS = Object.freeze({ welltrans: WellTransProvider });
-

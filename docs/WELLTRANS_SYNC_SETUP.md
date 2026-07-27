@@ -4,6 +4,8 @@
 
 Agape’s web application is the control plane. Administrators configure the portal URL, review completed-trip readiness, queue work, monitor status, retry failures, and inspect explanations.
 
+The verified WellTrans provider portal linked by WellTrans is `https://tripspark.welltransnemt.com/`.
+
 `queueWellTransSync` is the trusted server-side boundary. It re-reads trips from Firestore, validates completion and required fields, builds the minimum broker payload, rejects active/completed duplicates, and creates pending records in `welltrans_sync_logs`.
 
 The Playwright worker in `automation/welltrans-worker` is the data plane. It runs on an Agape-controlled Windows workstation or server authorized to access WellTrans. It claims one job transactionally, matches the exact Booking ID, locates one Pickup and one Dropoff activity row, updates fields, verifies success, and records the result. A failed trip does not stop later trips.
