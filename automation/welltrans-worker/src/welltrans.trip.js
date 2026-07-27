@@ -275,17 +275,19 @@ export async function syncWellTransTrip(page, payload) {
       ? [[dropoff, 'Signature Captured?', 'Rider Signature Received']] : []),
   ].filter(([, , value]) => value !== undefined && value !== null && value !== '');
   const changed = expected.some(([row, column, value]) => !equalCellValue(column, row.values?.[column], value));
+  let verifyGrid;
   if (changed) {
     const apply = page.getByRole('button', { name: 'Apply', exact: true }).last();
     await apply.click();
+    await page.waitForTimeout(1000);
+    verifyGrid = page.locator(`${GRID_SELECTOR}:visible:has(.GridCell[title="Signature Captured?"])`).last();
+    if (!await verifyGrid.count()) verifyGrid = await openEditItinerary(page);
   } else {
     await closeEditorWithoutSaving(page);
+    verifyGrid = await openEditItinerary(page);
   }
-  await page.locator(`${GRID_SELECTOR}:visible:has(.GridCell[title="Signature Captured?"])`)
-    .waitFor({ state: 'hidden', timeout: 20000 });
 
-  // Reopen and verify that the exact booking still has one row per activity.
-  const verifyGrid = await openEditItinerary(page);
+  // TripSpark can keep the editor open after Apply; verify its refreshed values directly.
   const verified = await gridModel(verifyGrid, payload.bookingId);
   await closeEditorWithoutSaving(page);
   const verifiedPickup = verified.rows.filter(row => /^pickup$/i.test(row.activity));
