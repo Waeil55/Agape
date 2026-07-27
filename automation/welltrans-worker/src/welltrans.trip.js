@@ -34,8 +34,16 @@ async function waitForAssignedTask(page) {
 async function openEditItinerary(page) {
   const grid = page.locator(`${GRID_SELECTOR}:visible:has(.GridCell[title="Signature Captured?"])`).last();
   for (let attempt = 0; attempt < 3 && !await grid.count(); attempt += 1) {
-    // TripSpark 7.5 exposes the edit command through this calendar-styled control.
-    await page.locator('.ChangeSchedule[title="Select Schedule"]').evaluate(element => element.click());
+    const bulkEdit = page.locator('.BulkEdit[title="Bulk Edit"]:visible').last();
+    if (await bulkEdit.count()) {
+      await bulkEdit.click({ force: true });
+    } else {
+      const schedule = page.locator('.ChangeSchedule[title="Select Schedule"]:visible').last();
+      if (!await schedule.count()) {
+        throw new Error('TripSpark Bulk Edit command is unavailable on the current assigned-task screen');
+      }
+      await schedule.click({ force: true });
+    }
     await grid.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
   }
   if (!await grid.count()) throw new Error('TripSpark Edit Itinerary grid did not open after three attempts');
