@@ -1,7 +1,7 @@
 import { openWellTransBrowser } from './welltrans.browser.js';
 import { saveEncryptedSession } from './cryptoSession.js';
 
-export async function performManualLogin() {
+export async function performManualLogin({ keepOpen = false } = {}) {
   const { browser, context, page } = await openWellTransBrowser({ headed: true, withoutSession: true });
   await page.goto(process.env.WELLTRANS_PORTAL_URL, { waitUntil: 'domcontentloaded' });
   process.stdout.write('Complete WellTrans login, open TRIPS - ASSIGNED so the itinerary grid is visible, then press Enter here.\n');
@@ -26,6 +26,8 @@ export async function performManualLogin() {
     throw new Error('The Trips Assigned task was not detected in any open WellTrans page or frame. Keep the itinerary table visible for two seconds before pressing Enter.');
   }
   await saveEncryptedSession(process.env.WELLTRANS_SESSION_FILE, await context.storageState());
-  await browser.close();
   process.stdout.write('Encrypted WellTrans session saved. No password was stored.\n');
+  if (keepOpen) return { browser, context, page: itineraryPage };
+  await browser.close();
+  return null;
 }

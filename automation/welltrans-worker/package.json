@@ -10,6 +10,8 @@
     "inspect-editor": "node src/index.js --inspect-editor",
     "standby": "node src/index.js --standby",
     "dry-run": "node src/index.js --dry-run",
+    "run-job": "node src/index.js --run-job",
+    "calibrate-job": "node src/index.js --calibrate-job",
     "start": "node src/index.js",
     "once": "node src/index.js --once",
     "check": "node --check src/index.js"

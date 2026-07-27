@@ -4,8 +4,9 @@ import { getStorage } from 'firebase-admin/storage';
 import { performManualLogin } from './welltrans.login.js';
 import { openWellTransBrowser } from './welltrans.browser.js';
 import { syncWellTransTrip, validateWellTransTrip } from './welltrans.trip.js';
+import { validateTripForWellTrans } from '../../../src/features/welltrans-sync/utils/welltransMapping.js';
 
-initializeApp();
+initializeApp({ storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'agape-95c9f.firebasestorage.app' });
 const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
@@ -36,36 +37,71 @@ async function claimNextJob() {
   });
 }
 
-async function processJob(job) {
-  let browser;
-  let page;
+async function claimJobById(logId) {
+  const ref = db.doc(`welltrans_sync_logs/${logId}`);
+  return db.runTransaction(async transaction => {
+    const fresh = await transaction.get(ref);
+    if (!fresh.exists) throw new Error(`WellTrans sync log ${logId} was not found`);
+    if (fresh.data().status !== 'pending') throw new Error(`WellTrans sync log ${logId} is ${fresh.data().status}, not pending`);
+    transaction.update(ref, {
+      status: 'processing', stage: 'claimed', startedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: Timestamp.fromMillis(Date.now() + 10 * 60 * 1000),
+      attempt: FieldValue.increment(1), workerId,
+    });
+    return { id: fresh.id, ref, ...fresh.data() };
+  });
+}
+
+async function processJob(job, existingSession = null) {
+  let browser = existingSession?.browser;
+  let page = existingSession?.page;
   try {
     const tripSnapshot = await db.doc(`trips/${job.tripId}`).get();
     if (!tripSnapshot.exists) throw new Error(`Source trip ${job.tripId} no longer exists`);
     const trip = tripSnapshot.data() || {};
-    const serviceDate = String(job.payload?.serviceDate || trip.dateKey || trip.serviceDate || trip.tripDate || trip.scheduledDate || trip.pickupDate || trip.date || '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) throw new Error(`Trip ${job.tripId} has no valid service date`);
-    const payload = { ...job.payload, serviceDate };
     const settings = (await db.doc('welltrans_settings/primary').get()).data() || {};
+    const driverSnapshot = trip.driverId ? await db.doc(`drivers/${trip.driverId}`).get() : null;
+    const hydratedTrip = {
+      id: tripSnapshot.id,
+      ...trip,
+      completedDriverName: driverSnapshot?.exists ? driverSnapshot.data().name : trip.completedDriverName,
+    };
+    const validation = validateTripForWellTrans(hydratedTrip);
+    if (!validation.valid) throw new Error(`Source trip is not ready: ${validation.errors.join('; ')}`);
+    const payload = {
+      ...validation.payload,
+      driver: settings.driverValueMapping?.[validation.payload.driver] || validation.payload.driver,
+      vehicle: settings.vehicleValueMapping?.[validation.payload.vehicle] || validation.payload.vehicle,
+    };
     const portalUrl = assertAllowedPortal(settings.portalUrl || process.env.WELLTRANS_PORTAL_URL);
-    ({ browser, page } = await openWellTransBrowser());
-    await page.goto(portalUrl, { waitUntil: 'domcontentloaded' });
+    if (!existingSession) {
+      ({ browser, page } = await openWellTransBrowser());
+      await page.goto(portalUrl, { waitUntil: 'domcontentloaded' });
+    } else if (!page.url().startsWith(new URL(portalUrl).origin)) {
+      throw new Error('Calibrated WellTrans page is not on the allowed portal host');
+    }
     await job.ref.update({ stage: 'matching_booking', updatedAt: FieldValue.serverTimestamp() });
     await syncWellTransTrip(page, payload, settings.fieldMapping || {});
     await job.ref.update({ status: 'completed', stage: 'verified', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '' });
     await db.doc('welltrans_settings/primary').set({ lastSync: FieldValue.serverTimestamp() }, { merge: true });
   } catch (error) {
     let screenshot = '';
+    let screenshotError = '';
     if (page) {
       const buffer = await page.screenshot({ fullPage: true }).catch(() => null);
       if (buffer) {
-        screenshot = `welltrans_sync_screenshots/${job.id}.png`;
-        await getStorage().bucket().file(screenshot).save(buffer, { contentType: 'image/png', resumable: false, metadata: { cacheControl: 'private, no-store' } });
+        try {
+          screenshot = `welltrans_sync_screenshots/${job.id}.png`;
+          await getStorage().bucket().file(screenshot).save(buffer, { contentType: 'image/png', resumable: false, metadata: { cacheControl: 'private, no-store' } });
+        } catch (uploadError) {
+          screenshot = '';
+          screenshotError = ` Screenshot capture could not be stored: ${uploadError?.message || uploadError}`;
+        }
       }
     }
-    await job.ref.update({ status: 'failed', stage: 'failed', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: String(error?.message || error).slice(0, 2000), screenshot });
+    await job.ref.update({ status: 'failed', stage: 'failed', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: `${String(error?.message || error)}${screenshotError}`.slice(0, 2000), screenshot });
   } finally {
-    await browser?.close().catch(() => {});
+    if (!existingSession) await browser?.close().catch(() => {});
   }
 }
 
@@ -252,6 +288,27 @@ async function main() {
       console.log(JSON.stringify({ safe: true, bookingId: payload.bookingId, serviceDate, ...result }, null, 2));
     } finally {
       await browser.close();
+    }
+    return;
+  }
+  if (process.argv.includes('--run-job')) {
+    if (process.env.WELLTRANS_ENABLE_WRITES !== 'true') throw new Error('WELLTRANS_ENABLE_WRITES=true is required for --run-job');
+    const logId = process.argv[process.argv.indexOf('--run-job') + 1];
+    if (!logId) throw new Error('Usage: node src/index.js --run-job <welltrans_sync_log_id>');
+    await publishHeartbeat('online');
+    await processJob(await claimJobById(logId));
+    return;
+  }
+  if (process.argv.includes('--calibrate-job')) {
+    if (process.env.WELLTRANS_ENABLE_WRITES !== 'true') throw new Error('WELLTRANS_ENABLE_WRITES=true is required for --calibrate-job');
+    const logId = process.argv[process.argv.indexOf('--calibrate-job') + 1];
+    if (!logId) throw new Error('Usage: node src/index.js --calibrate-job <welltrans_sync_log_id>');
+    const session = await performManualLogin({ keepOpen: true });
+    try {
+      await publishHeartbeat('online');
+      await processJob(await claimJobById(logId), session);
+    } finally {
+      await session.browser.close().catch(() => {});
     }
     return;
   }

@@ -62,13 +62,17 @@ export const buildWellTransPayload = (trip = {}) => {
     pickup: {
       arrival: toClockTime(firstValue(trip, ['pickupArrival', 'arrivalTime', 'arrivedPickupTime'])),
       departure: toClockTime(firstValue(trip, ['pickupDeparture', 'departedPickupTime', 'departureTime'])),
-      mileage: 0,
+      mileage: Number.isFinite(Number(firstValue(trip, ['pickupOdometer', 'startOdometer', 'startMileage'])))
+        ? Number(firstValue(trip, ['pickupOdometer', 'startOdometer', 'startMileage']))
+        : 0,
       signatureCaptured: false,
     },
     dropoff: {
       arrival: toClockTime(firstValue(trip, ['dropoffArrival', 'arrivalDropoffTime', 'completedAt'])),
-      departure: toClockTime(firstValue(trip, ['dropoffDeparture', 'departedDropoffTime', 'completedAt'])),
-      mileage,
+      departure: toClockTime(firstValue(trip, ['dropoffDeparture', 'departedDropoffTime', 'arrivalDropoffTime', 'completedAt'])),
+      mileage: Number.isFinite(Number(firstValue(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'odometer'])))
+        ? Number(firstValue(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'odometer']))
+        : mileage,
       signatureCaptured,
     },
   };

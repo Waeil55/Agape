@@ -639,8 +639,8 @@ const buildWellTransJobPayload = (trip = {}) => {
     bookingId, tripId: String(trip.id || bookingId), serviceDate: wellTransServiceDate(trip),
     driver: trip.completedDriverName || trip.driverName || trip.driver || "",
     vehicle: trip.completedVehicle || trip.vehicle || trip.vehicleName || "",
-    pickup: { arrival: wellTransClock(trip.pickupArrival || trip.arrivalTime || trip.arrivedPickupTime), departure: wellTransClock(trip.pickupDeparture || trip.departedPickupTime || trip.departureTime), mileage: 0, signatureCaptured: false },
-    dropoff: { arrival: wellTransClock(trip.dropoffArrival || trip.arrivalDropoffTime || trip.completedAt), departure: wellTransClock(trip.dropoffDeparture || trip.departedDropoffTime || trip.completedAt), mileage: mileage === null ? null : Number(mileage.toFixed(3)), signatureCaptured: Boolean(trip.signatureCaptured || trip.paperSignatureConfirmed || trip.signatureUrl || trip.signature) },
+    pickup: { arrival: wellTransClock(trip.pickupArrival || trip.arrivalTime || trip.arrivedPickupTime), departure: wellTransClock(trip.pickupDeparture || trip.departedPickupTime || trip.departureTime), mileage: Number.isFinite(start) ? start : 0, signatureCaptured: false },
+    dropoff: { arrival: wellTransClock(trip.dropoffArrival || trip.arrivalDropoffTime || trip.completedAt), departure: wellTransClock(trip.dropoffDeparture || trip.departedDropoffTime || trip.arrivalDropoffTime || trip.completedAt), mileage: Number.isFinite(end) ? end : (mileage === null ? null : Number(mileage.toFixed(3))), signatureCaptured: Boolean(trip.signatureCaptured || trip.paperSignatureConfirmed || trip.signatureUrl || trip.signature) },
   };
   const errors = [];
   if (!bookingId) errors.push("Trip has no Booking ID");

@@ -17,7 +17,7 @@ async function waitForAssignedTask(page) {
 }
 
 async function openEditItinerary(page) {
-  const grid = page.locator(`${GRID_SELECTOR}:has(.GridCell[title="Signature Captured?"])`).last();
+  const grid = page.locator(`${GRID_SELECTOR}:visible:has(.GridCell[title="Signature Captured?"])`).last();
   for (let attempt = 0; attempt < 3 && !await grid.count(); attempt += 1) {
     // TripSpark 7.5 exposes the edit command through this calendar-styled control.
     await page.locator('.ChangeSchedule[title="Select Schedule"]').evaluate(element => element.click());
@@ -34,6 +34,15 @@ async function openEditItinerary(page) {
 }
 
 async function gridModel(grid, bookingId) {
+  await grid.evaluate(element => {
+    for (const scroller of element.querySelectorAll('.GridScroller')) {
+      if (scroller.scrollHeight > scroller.clientHeight) {
+        scroller.scrollTop = 0;
+        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+      }
+    }
+  });
+  await new Promise(resolve => setTimeout(resolve, 150));
   return grid.evaluate((element, booking) => {
     const cells = [...element.querySelectorAll('.GridCell')];
     const header = title => cells.find(cell => cell.style.top === '0px' && cell.title === title);
@@ -41,7 +50,7 @@ async function gridModel(grid, bookingId) {
     const bookingLeft = left('Booking Id');
     const activityLeft = left('Activity');
     const matches = cells.filter(cell =>
-      Number.parseFloat(cell.style.left) === bookingLeft && cell.title === booking);
+      Number.parseFloat(cell.style.left) === bookingLeft && String(cell.title || '').trim() === String(booking).trim());
     return {
       columns: Object.fromEntries([
         'Booking Id', 'Activity', 'Driver', 'Vehicle', 'Arrival Time',
@@ -51,7 +60,7 @@ async function gridModel(grid, bookingId) {
         const top = Number.parseFloat(cell.style.top);
         const activity = cells.find(candidate =>
           Number.parseFloat(candidate.style.left) === activityLeft
-          && Number.parseFloat(candidate.style.top) === top)?.title || '';
+          && Number.parseFloat(candidate.style.top) === top)?.title?.trim() || '';
         return { top, activity };
       }),
     };
@@ -94,7 +103,7 @@ async function closeEditorWithoutSaving(page) {
 
 export async function validateWellTransTrip(page, payload) {
   await waitForAssignedTask(page);
-  const selectedDate = portalDate(await page.locator('.RunName').innerText());
+  const selectedDate = portalDate(await page.locator('.RunName').last().innerText());
   if (selectedDate !== payload.serviceDate) {
     throw new Error(`WellTrans schedule ${selectedDate || 'unknown'} does not match trip service date ${payload.serviceDate}`);
   }
@@ -111,7 +120,7 @@ export async function validateWellTransTrip(page, payload) {
 
 export async function syncWellTransTrip(page, payload) {
   await waitForAssignedTask(page);
-  const selectedDate = portalDate(await page.locator('.RunName').innerText());
+  const selectedDate = portalDate(await page.locator('.RunName').last().innerText());
   if (selectedDate !== payload.serviceDate) {
     throw new Error(`WellTrans schedule ${selectedDate || 'unknown'} does not match trip service date ${payload.serviceDate}`);
   }
