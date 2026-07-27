@@ -1,4 +1,4 @@
-import { collection, db, doc, functions, httpsCallable, onSnapshot, orderBy, query, setDoc } from '../../../config/firebase';
+import { collection, db, doc, functions, httpsCallable, onSnapshot, query, setDoc, where } from '../../../config/firebase';
 import { DEFAULT_WELLTRANS_FIELD_MAPPING } from '../utils/welltransMapping';
 
 export const DEFAULT_SETTINGS = {
@@ -9,8 +9,26 @@ export const DEFAULT_SETTINGS = {
 export const subscribeWellTransSettings = (callback, onError) =>
   onSnapshot(doc(db, 'welltrans_settings', 'primary'), snapshot => callback(snapshot.exists() ? { ...DEFAULT_SETTINGS, ...snapshot.data() } : DEFAULT_SETTINGS), onError);
 
-export const subscribeWellTransLogs = (callback, onError) =>
-  onSnapshot(query(collection(db, 'welltrans_sync_logs'), orderBy('createdAt', 'desc')), snapshot => callback(snapshot.docs.slice(0, 250).map(item => ({ id: item.id, ...item.data() }))), onError);
+const timestampMillis = value => value?.toMillis?.()
+  || value?.toDate?.()?.getTime?.()
+  || (value ? new Date(value).getTime() : 0)
+  || 0;
+
+export const subscribeWellTransLogs = (serviceDate, callback, onError) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(serviceDate || ''))) {
+    callback([]);
+    return () => {};
+  }
+  return onSnapshot(
+    query(collection(db, 'welltrans_sync_logs'), where('serviceDate', '==', serviceDate)),
+    snapshot => callback(snapshot.docs
+      .map(item => ({ id: item.id, ...item.data() }))
+      .sort((left, right) =>
+        timestampMillis(right.updatedAt || right.createdAt) - timestampMillis(left.updatedAt || left.createdAt))
+      .slice(0, 500)),
+    onError,
+  );
+};
 
 export const subscribeWellTransWorker = (callback, onError) =>
   onSnapshot(doc(db, 'welltrans_worker_status', 'primary'), snapshot => callback(snapshot.exists() ? snapshot.data() : null), onError);
@@ -18,11 +36,21 @@ export const subscribeWellTransWorker = (callback, onError) =>
 export const saveWellTransSettings = (settings, actorId) =>
   setDoc(doc(db, 'welltrans_settings', 'primary'), { ...settings, updatedBy: actorId, updatedAt: new Date().toISOString() }, { merge: true });
 
-export const queueWellTransSync = (tripIds, mode = 'selected') =>
-  httpsCallable(functions, 'queueWellTransSync')({ tripIds, mode });
+export const queueWellTransSync = (tripIds, mode, serviceDate) =>
+  httpsCallable(functions, 'queueWellTransSync')({ tripIds, mode, serviceDate });
 
 export const confirmWellTransApplied = logId =>
   httpsCallable(functions, 'confirmWellTransApplied')({ logId });
+
+export const isWellTransFailureRetryable = log => {
+  if (!log || log.status !== 'failed') return false;
+  const message = String(log.errorMessage || '').toLowerCase();
+  return !message.includes('matched 0 pickup')
+    && !message.includes('expected exactly one of each')
+    && !message.includes('does not match trip service date')
+    && !message.includes('source trip is not ready')
+    && !message.includes('source trip') && !message.includes('no longer exists');
+};
 
 export const explainWellTransFailure = (log) => {
   if (!log) return 'Select a failed synchronization to review it.';

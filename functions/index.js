@@ -664,6 +664,10 @@ exports.queueWellTransSync = functions.https.onCall(async (data, context) => {
   const settings = settingsSnap.exists ? settingsSnap.data() : {};
   if (!settings.enabled) throw new functions.https.HttpsError("failed-precondition", "WellTrans automation is disabled.");
   if (!/^https:\/\//i.test(settings.portalUrl || "")) throw new functions.https.HttpsError("failed-precondition", "A secure WellTrans portal URL is required.");
+  const requestedServiceDate = String(data?.serviceDate || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedServiceDate)) {
+    throw new functions.https.HttpsError("invalid-argument", "A valid selected service date is required.");
+  }
   const requestedIds = [...new Set((Array.isArray(data?.tripIds) ? data.tripIds : []).map(String))].slice(0, 500);
   if (!requestedIds.length) throw new functions.https.HttpsError("invalid-argument", "Select at least one trip.");
   let queued = 0;
@@ -678,23 +682,54 @@ exports.queueWellTransSync = functions.https.onCall(async (data, context) => {
       if (driverSnap.exists && driverSnap.data().name) trip.completedDriverName = driverSnap.data().name;
     }
     const { payload, errors } = buildWellTransJobPayload(trip);
+    if (payload.serviceDate !== requestedServiceDate) {
+      errors.push(`Trip belongs to ${payload.serviceDate || "an unknown date"}, not selected date ${requestedServiceDate}`);
+    }
     if (errors.length) { rejected++; rejectionDetails.push({ tripId, bookingId: payload.bookingId, errors }); continue; }
-    const duplicate = await admin.firestore().collection("welltrans_sync_logs")
-      .where("tripId", "==", tripId).where("status", "in", ["pending", "processing", "awaiting_review", "completed"]).limit(1).get();
-    if (!duplicate.empty && data?.mode !== "retry") { rejected++; rejectionDetails.push({ tripId, bookingId: payload.bookingId, errors: ["Already queued or synchronized"] }); continue; }
-    await admin.firestore().collection("welltrans_sync_logs").add({
-      tripId, bookingId: payload.bookingId, serviceDate: payload.serviceDate,
-      status: "pending", stage: "queued",
-      startedAt: null, completedAt: null, errorMessage: "", screenshot: "",
-      syncedBy: context.auth.uid, createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(), attempt: 0,
-      provider: "welltrans", automationMethod: "playwright", payload,
+    const logsQuery = admin.firestore().collection("welltrans_sync_logs").where("tripId", "==", tripId);
+    const newLogRef = admin.firestore().collection("welltrans_sync_logs").doc();
+    const decision = await admin.firestore().runTransaction(async transaction => {
+      const attempts = await transaction.get(logsQuery);
+      const datedAttempts = attempts.docs
+        .map(document => ({ id: document.id, ...document.data() }))
+        .filter(log => String(log.serviceDate || log.payload?.serviceDate || requestedServiceDate).slice(0, 10) === requestedServiceDate)
+        .sort((left, right) => {
+          const leftTime = left.updatedAt?.toMillis?.() || left.createdAt?.toMillis?.() || 0;
+          const rightTime = right.updatedAt?.toMillis?.() || right.createdAt?.toMillis?.() || 0;
+          return rightTime - leftTime;
+        });
+      const latest = datedAttempts[0];
+      if (data?.mode === "retry") {
+        if (!latest || latest.status !== "failed") {
+          return { queued: false, error: latest ? `Latest status is ${latest.status}, not failed` : "No failed attempt exists for the selected date" };
+        }
+        const failure = String(latest.errorMessage || "").toLowerCase();
+        if (failure.includes("expected exactly one of each") || failure.includes("does not match trip service date")) {
+          return { queued: false, error: "Failure requires Booking ID/date correction in WellTrans and is not safe for automatic retry" };
+        }
+      } else if (latest && ["pending", "processing", "awaiting_review", "completed"].includes(latest.status)) {
+        return { queued: false, error: `Already ${latest.status.replace("_", " ")} for the selected date` };
+      }
+      transaction.create(newLogRef, {
+        tripId, bookingId: payload.bookingId, serviceDate: requestedServiceDate,
+        status: "pending", stage: "queued",
+        startedAt: null, completedAt: null, errorMessage: "", screenshot: "",
+        syncedBy: context.auth.uid, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(), attempt: datedAttempts.length,
+        provider: "welltrans", automationMethod: "playwright", payload,
+      });
+      return { queued: true };
     });
-    queued++;
+    if (decision.queued) queued++;
+    else {
+      rejected++;
+      rejectionDetails.push({ tripId, bookingId: payload.bookingId, errors: [decision.error] });
+    }
   }
   await admin.firestore().collection("audit_logs").add({
     action: "welltrans.sync.queued", entityType: "broker_sync", actorId: context.auth.uid,
-    mode: data?.mode || "selected", requested: requestedIds.length, queued, rejected,
+    mode: data?.mode || "selected", serviceDate: requestedServiceDate,
+    requested: requestedIds.length, queued, rejected,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
   return { queued, rejected, rejectionDetails: rejectionDetails.slice(0, 50) };

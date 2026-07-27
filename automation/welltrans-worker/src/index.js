@@ -14,10 +14,11 @@ initializeApp({
 const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
+const workerVersion = '1.1.0';
 const publishHeartbeat = (state = 'online') => db.doc('welltrans_worker_status/primary').set({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
   adapter: 'tripspark-novusmed', lastSeenAt: FieldValue.serverTimestamp(),
-  version: '1.0.0',
+  version: workerVersion,
 }, { merge: true });
 const assertAllowedPortal = value => {
   const url = new URL(value);
@@ -97,6 +98,40 @@ async function publishDateReviewSummary(serviceDate) {
   return summary;
 }
 
+async function migrateLegacyDateJobs(serviceDate) {
+  const snapshot = await db.collection('welltrans_sync_logs')
+    .where('serviceDate', '==', serviceDate).limit(500).get();
+  const latestByTrip = new Map();
+  for (const document of snapshot.docs) {
+    const data = document.data();
+    const updatedAt = data.updatedAt?.toMillis?.() || data.createdAt?.toMillis?.() || 0;
+    const current = latestByTrip.get(data.tripId);
+    if (!current || updatedAt > current.updatedAt) {
+      latestByTrip.set(data.tripId, { ref: document.ref, data, updatedAt });
+    }
+  }
+  const legacy = [...latestByTrip.values()].filter(({ data }) => {
+    if (data.workerVersion) return false;
+    if (data.status === 'awaiting_review') return true;
+    if (data.status !== 'failed') return false;
+    const failure = String(data.errorMessage || '').toLowerCase();
+    return !failure.includes('expected exactly one of each')
+      && !failure.includes('does not match trip service date')
+      && !failure.includes('source trip is not ready');
+  });
+  if (!legacy.length) return 0;
+  const batch = db.batch();
+  for (const { ref } of legacy) {
+    batch.update(ref, {
+      status: 'pending', stage: 'queued_for_worker_upgrade',
+      workerVersionMigration: workerVersion, errorMessage: '',
+      completedAt: null, updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
+  await batch.commit();
+  return legacy.length;
+}
+
 async function processJob(job, existingSession = null) {
   let browser = existingSession?.browser;
   let page = existingSession?.page;
@@ -130,7 +165,7 @@ async function processJob(job, existingSession = null) {
     await job.ref.update({
       status: 'awaiting_review', stage: 'awaiting_manual_apply', stagedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '',
-      warnings: result.warnings || [],
+      warnings: result.warnings || [], workerVersion,
     });
     return true;
   } catch (error) {
@@ -148,7 +183,7 @@ async function processJob(job, existingSession = null) {
         }
       }
     }
-    await job.ref.update({ status: 'failed', stage: 'failed', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: `${String(error?.message || error)}${screenshotError}`.slice(0, 2000), screenshot });
+    await job.ref.update({ status: 'failed', stage: 'failed', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: `${String(error?.message || error)}${screenshotError}`.slice(0, 2000), screenshot, workerVersion });
     // Dismiss only a transient cell/dropdown editor so one failed row cannot
     // poison the next job. Keep the itinerary itself open and never Apply.
     if (existingSession && page) {
@@ -385,6 +420,10 @@ async function main() {
       selectedDate, calibratedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
     process.stdout.write(`Worker calibrated to WellTrans schedule ${selectedDate}. Only this date will be processed.\n`);
+    const migrated = await migrateLegacyDateJobs(selectedDate);
+    if (migrated) {
+      process.stdout.write(`Worker upgrade recovery: ${migrated} legacy trip(s) queued for complete field restaging.\n`);
+    }
     do {
       await publishHeartbeat('calibrated');
       const job = await claimNextJobForDate(selectedDate);
