@@ -20,4 +20,14 @@ describe('WellTrans mapping', () => {
   it('rejects incomplete records before queueing', () => {
     expect(validateTripForWellTrans({ bookingId: '1', status: 'Assigned' }).valid).toBe(false);
   });
+  it('allows the server to resolve an authoritative driver ID', () => {
+    const result = validateTripForWellTrans({
+      bookingId: '107413428', dateKey: '2026-07-25', status: 'Completed',
+      driverId: 'DRV-GGQOR7', driverName: 'Agape Care Medical Transportation Inc.',
+      vehicle: 'prius_350025', arrivalTime: '2026-07-25T10:49:00Z',
+      departedPickupTime: '2026-07-25T10:49:00Z', arrivalDropoffTime: '2026-07-25T11:18:00Z',
+      pickupOdometer: 263206, dropoffOdometer: 263223,
+    });
+    expect(result.valid).toBe(true);
+  });
 });
