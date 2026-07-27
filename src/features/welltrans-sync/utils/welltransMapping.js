@@ -11,6 +11,12 @@ export const DEFAULT_WELLTRANS_FIELD_MAPPING = Object.freeze({
 });
 
 const firstValue = (source, keys) => keys.map((key) => source?.[key]).find((value) => value !== undefined && value !== null && value !== '');
+const isOperationalAssignment = value => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return Boolean(normalized
+    && !normalized.includes('pending assignment')
+    && !normalized.includes('medical transportation inc'));
+};
 
 export const normalizeServiceDate = (trip = {}) => {
   const value = firstValue(trip, ['dateKey', 'serviceDate', 'tripDate', 'scheduledDate', 'pickupDate', 'date']);
@@ -74,6 +80,8 @@ export const validateTripForWellTrans = (trip = {}) => {
   if (!['completed', 'complete'].includes(String(trip.status || '').trim().toLowerCase()) && !trip.completedAt) errors.push('Trip is not completed');
   if (payload && !payload.pickup.arrival) errors.push('Pickup arrival is missing');
   if (payload && !payload.serviceDate) errors.push('Service date is missing');
+  if (payload && !isOperationalAssignment(payload.driver)) errors.push('A valid assigned driver is missing');
+  if (payload && !isOperationalAssignment(payload.vehicle)) errors.push('A valid assigned vehicle is missing');
   if (payload && !payload.pickup.departure) errors.push('Pickup departure is missing');
   if (payload && !payload.dropoff.arrival) errors.push('Dropoff arrival is missing');
   if (payload && payload.dropoff.mileage === null) errors.push('Mileage or valid odometer readings are missing');

@@ -12,7 +12,7 @@ describe('WellTrans mapping', () => {
     expect(normalizeServiceDate({ dateKey: '2026-07-25' })).toBe('2026-07-25');
   });
   it('maps pickup and dropoff activity rows independently', () => {
-    const payload = buildWellTransPayload({ bookingId: '107577968', dateKey: '2026-07-25', arrivalTime: '2026-07-25T10:49:00Z', departedPickupTime: '2026-07-25T10:52:00Z', arrivalDropoffTime: '2026-07-25T11:19:00Z', completedAt: '2026-07-25T11:21:00Z', pickupOdometer: 10, dropoffOdometer: 27, paperSignatureConfirmed: true });
+    const payload = buildWellTransPayload({ bookingId: '107577968', dateKey: '2026-07-25', driverName: 'waeil2', vehicle: 'prius_350025', arrivalTime: '2026-07-25T10:49:00Z', departedPickupTime: '2026-07-25T10:52:00Z', arrivalDropoffTime: '2026-07-25T11:19:00Z', completedAt: '2026-07-25T11:21:00Z', pickupOdometer: 10, dropoffOdometer: 27, paperSignatureConfirmed: true });
     expect(payload.pickup.mileage).toBe(0);
     expect(payload.dropoff.mileage).toBe(17);
     expect(payload.dropoff.signatureCaptured).toBe(true);

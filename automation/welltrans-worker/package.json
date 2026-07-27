@@ -9,6 +9,7 @@
     "inspect": "node src/index.js --inspect",
     "inspect-editor": "node src/index.js --inspect-editor",
     "standby": "node src/index.js --standby",
+    "dry-run": "node src/index.js --dry-run",
     "start": "node src/index.js",
     "once": "node src/index.js --once",
     "check": "node --check src/index.js"

@@ -647,6 +647,12 @@ const buildWellTransJobPayload = (trip = {}) => {
   if (!["completed", "complete"].includes(String(trip.status || "").toLowerCase()) && !trip.completedAt) errors.push("Trip is not completed");
   if (!payload.pickup.arrival) errors.push("Pickup arrival is missing");
   if (!payload.serviceDate) errors.push("Service date is missing");
+  const assignmentValid = (value) => {
+    const normalized = String(value || "").trim().toLowerCase();
+    return normalized && !normalized.includes("pending assignment") && !normalized.includes("medical transportation inc");
+  };
+  if (!assignmentValid(payload.driver)) errors.push("A valid assigned driver is missing");
+  if (!assignmentValid(payload.vehicle)) errors.push("A valid assigned vehicle is missing");
   if (!payload.pickup.departure) errors.push("Pickup departure is missing");
   if (!payload.dropoff.arrival) errors.push("Dropoff arrival is missing");
   if (payload.dropoff.mileage === null) errors.push("Mileage or valid odometer readings are missing");
@@ -668,6 +674,10 @@ exports.queueWellTransSync = functions.https.onCall(async (data, context) => {
     const tripSnap = await admin.firestore().doc(`trips/${tripId}`).get();
     if (!tripSnap.exists) { rejected++; rejectionDetails.push({ tripId, errors: ["Trip not found"] }); continue; }
     const trip = { id: tripSnap.id, ...tripSnap.data() };
+    if (trip.driverId && (!trip.driverName || /medical transportation inc/i.test(trip.driverName))) {
+      const driverSnap = await admin.firestore().doc(`drivers/${trip.driverId}`).get();
+      if (driverSnap.exists && driverSnap.data().name) trip.completedDriverName = driverSnap.data().name;
+    }
     const { payload, errors } = buildWellTransJobPayload(trip);
     if (errors.length) { rejected++; rejectionDetails.push({ tripId, bookingId: payload.bookingId, errors }); continue; }
     const duplicate = await admin.firestore().collection("welltrans_sync_logs")

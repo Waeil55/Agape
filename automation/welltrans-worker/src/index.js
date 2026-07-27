@@ -3,7 +3,7 @@ import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { performManualLogin } from './welltrans.login.js';
 import { openWellTransBrowser } from './welltrans.browser.js';
-import { syncWellTransTrip } from './welltrans.trip.js';
+import { syncWellTransTrip, validateWellTransTrip } from './welltrans.trip.js';
 
 initializeApp();
 const db = getFirestore();
@@ -230,6 +230,30 @@ async function main() {
       await publishHeartbeat('standby');
       await sleep(Number(process.env.WELLTRANS_POLL_MS) || 10000);
     } while (true);
+  }
+  if (process.argv.includes('--dry-run')) {
+    await publishHeartbeat('inspection');
+    const logId = process.argv[process.argv.indexOf('--dry-run') + 1];
+    if (!logId) throw new Error('Usage: node src/index.js --dry-run <welltrans_sync_log_id>');
+    const logSnapshot = await db.doc(`welltrans_sync_logs/${logId}`).get();
+    if (!logSnapshot.exists) throw new Error(`WellTrans sync log ${logId} was not found`);
+    const log = logSnapshot.data();
+    const tripSnapshot = await db.doc(`trips/${log.tripId}`).get();
+    if (!tripSnapshot.exists) throw new Error(`Source trip ${log.tripId} was not found`);
+    const trip = tripSnapshot.data() || {};
+    const serviceDate = String(log.payload?.serviceDate || trip.dateKey || trip.serviceDate || trip.tripDate || trip.scheduledDate || trip.pickupDate || trip.date || '').slice(0, 10);
+    const payload = { ...log.payload, serviceDate };
+    const settings = (await db.doc('welltrans_settings/primary').get()).data() || {};
+    const portalUrl = assertAllowedPortal(settings.portalUrl || process.env.WELLTRANS_PORTAL_URL);
+    const { browser, page } = await openWellTransBrowser();
+    try {
+      await page.goto(portalUrl, { waitUntil: 'domcontentloaded' });
+      const result = await validateWellTransTrip(page, payload);
+      console.log(JSON.stringify({ safe: true, bookingId: payload.bookingId, serviceDate, ...result }, null, 2));
+    } finally {
+      await browser.close();
+    }
+    return;
   }
   if (process.env.WELLTRANS_ENABLE_WRITES !== 'true') {
     await publishHeartbeat('standby');
